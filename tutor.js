@@ -1562,12 +1562,8 @@ let allStudents = [];
 let scheduledStudents = new Set(); // Track students with schedules
 let currentStudentIndex = 0;
 let schedulePopup = null;
-let isSchedulingComplete = false; // NEW: Flag to track if scheduling is done
 
 async function checkAndShowSchedulePopup(tutor) {
-    // Reset completion flag when starting new scheduling session
-    isSchedulingComplete = false;
-    
     try {
         const studentsQuery = query(
             collection(db, "students"), 
@@ -1599,11 +1595,7 @@ async function checkAndShowSchedulePopup(tutor) {
             showBulkSchedulePopup(studentsWithoutSchedule[0], tutor, studentsWithoutSchedule.length);
             return true;
         } else {
-            // Only show the alert once if there are no students to schedule
-            if (!isSchedulingComplete) {
-                isSchedulingComplete = true;
-                showCustomAlert('✅ All students have been scheduled!');
-            }
+            // Modified: Silently return false if all students are scheduled
             return false;
         }
         
@@ -1640,7 +1632,7 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
                                     <label class="form-label">Day of Week</label>
                                     <select class="form-input schedule-day">
                                         ${DAYS_OF_WEEK.map(day => `<option value="${day}">${day}</option>`).join('')}
-                                    </select>
+                                </select>
                                 </div>
                                 <div>
                                     <label class="form-label">Start Time</label>
@@ -1754,13 +1746,9 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
                     showBulkSchedulePopup(studentsWithoutSchedule[currentStudentIndex], tutor, studentsWithoutSchedule.length);
                 }, 500);
             } else {
-                // All students are scheduled - mark as complete
-                isSchedulingComplete = true;
-                if (studentsWithoutSchedule.length > 0) {
-                    setTimeout(() => {
-                        showCustomAlert('🎉 All students have been scheduled!');
-                    }, 500);
-                }
+                setTimeout(() => {
+                    showCustomAlert('🎉 All students have been scheduled!');
+                }, 500);
             }
             
         } catch (error) {
@@ -1782,8 +1770,6 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
                 showBulkSchedulePopup(studentsWithoutSchedule[currentStudentIndex], tutor, studentsWithoutSchedule.length);
             }, 500);
         } else {
-            // No more students to schedule
-            isSchedulingComplete = true;
             showCustomAlert('Skipped all remaining students.');
         }
     });
@@ -6409,6 +6395,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
