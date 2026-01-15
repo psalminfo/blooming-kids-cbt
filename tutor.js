@@ -24,6 +24,7 @@ style.textContent = `
         --radius-sm: 0.375rem;
         --radius: 0.5rem;
         --radius-lg: 0.75rem;
+        --success-color: #10b981;
     }
 
     /* Active Tab Styling */
@@ -413,6 +414,46 @@ style.textContent = `
         background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%) !important;
     }
 
+    /* Inbox Button Styling */
+    .inbox-btn {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important;
+        color: white !important;
+        padding: 0.625rem 1.25rem !important;
+        border-radius: var(--radius) !important;
+        border: none !important;
+        cursor: pointer !important;
+        margin: 0.25rem !important;
+        font-weight: 500 !important;
+        transition: all 0.2s ease !important;
+        box-shadow: var(--shadow) !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+        position: relative;
+    }
+
+    .inbox-btn:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: var(--shadow-lg) !important;
+        background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%) !important;
+    }
+
+    .inbox-badge {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background-color: #ef4444;
+        color: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        font-weight: bold;
+    }
+
     /* Responsive Design */
     @media (max-width: 768px) {
         .hero-section {
@@ -596,7 +637,143 @@ style.textContent = `
         margin-bottom: 1rem;
     }
 
-    /* Messaging Modal Styles */
+    /* Messaging Modal Styles - WhatsApp-like UI */
+    .whatsapp-chat-container {
+        display: flex;
+        flex-direction: column;
+        height: 500px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+
+    .chat-header {
+        background: linear-gradient(135deg, #128c7e 0%, #075e54 100%);
+        color: white;
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .chat-header-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .chat-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        color: #128c7e;
+    }
+
+    .chat-header-text h4 {
+        margin: 0;
+        font-weight: 600;
+    }
+
+    .chat-header-text p {
+        margin: 0;
+        font-size: 0.8rem;
+        opacity: 0.9;
+    }
+
+    .chat-messages {
+        flex: 1;
+        padding: 1rem;
+        overflow-y: auto;
+        background-color: #e5ddd5;
+        background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23a8a8a8' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
+    }
+
+    .message-bubble {
+        max-width: 70%;
+        padding: 0.5rem 0.75rem;
+        border-radius: 1rem;
+        margin-bottom: 0.5rem;
+        position: relative;
+        word-wrap: break-word;
+    }
+
+    .message-bubble.sent {
+        background-color: #dcf8c6;
+        align-self: flex-end;
+        margin-left: auto;
+        border-bottom-right-radius: 0.25rem;
+    }
+
+    .message-bubble.received {
+        background-color: white;
+        align-self: flex-start;
+        margin-right: auto;
+        border-bottom-left-radius: 0.25rem;
+    }
+
+    .message-content {
+        font-size: 0.9rem;
+        line-height: 1.4;
+    }
+
+    .message-time {
+        font-size: 0.7rem;
+        color: #666;
+        text-align: right;
+        margin-top: 0.25rem;
+    }
+
+    .message-sender {
+        font-weight: 600;
+        font-size: 0.8rem;
+        margin-bottom: 0.25rem;
+        color: #333;
+    }
+
+    .chat-input-area {
+        padding: 0.75rem;
+        background-color: white;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .chat-input {
+        flex: 1;
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: 2rem;
+        font-size: 0.9rem;
+    }
+
+    .chat-input:focus {
+        outline: none;
+        border-color: #128c7e;
+    }
+
+    .send-message-btn {
+        background-color: #128c7e;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+
+    .send-message-btn:hover {
+        background-color: #075e54;
+    }
+
     .message-recipient-options {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -636,39 +813,117 @@ style.textContent = `
         gap: 0.5rem;
     }
 
-    /* Message History Styles */
-    .message-history {
-        max-height: 300px;
-        overflow-y: auto;
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius);
-        padding: 1rem;
-        margin-top: 1.5rem;
+    /* Inbox Modal Styles */
+    .inbox-container {
+        display: flex;
+        height: 600px;
     }
 
-    .message-item {
-        padding: 0.75rem;
-        margin-bottom: 0.75rem;
-        border-radius: var(--radius);
-        border-left: 3px solid var(--primary-color);
+    .conversations-sidebar {
+        width: 300px;
+        border-right: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .conversations-header {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        font-weight: 600;
+    }
+
+    .conversations-list {
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    .conversation-item {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+
+    .conversation-item:hover {
         background-color: var(--light-color);
     }
 
-    .message-item.sent {
-        border-left-color: var(--info-color);
-        background-color: #e0f2fe;
+    .conversation-item.active {
+        background-color: var(--primary-light);
+        border-left: 3px solid var(--primary-color);
     }
 
-    .message-item.received {
-        border-left-color: var(--success-color);
-        background-color: #dcfce7;
+    .conversation-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
     }
 
-    .message-meta {
+    .conversation-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: var(--primary-color);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+    }
+
+    .conversation-details {
+        flex: 1;
+    }
+
+    .conversation-title {
+        font-weight: 600;
+        margin: 0;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .conversation-preview {
+        font-size: 0.85rem;
+        color: #666;
+        margin: 0.25rem 0 0 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .conversation-time {
         font-size: 0.75rem;
-        color: var(--dark-color);
-        opacity: 0.7;
-        margin-top: 0.25rem;
+        color: #999;
+    }
+
+    .conversation-unread {
+        background-color: var(--primary-color);
+        color: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+
+    .chat-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* New message indicator */
+    .new-message-indicator {
+        background-color: #ef4444;
+        color: white;
+        border-radius: 50%;
+        width: 8px;
+        height: 8px;
+        display: inline-block;
+        margin-left: 0.5rem;
     }
 `;
 document.head.appendChild(style);
@@ -676,10 +931,8 @@ document.head.appendChild(style);
 // --- Cloudinary Configuration ---
 const CLOUDINARY_CONFIG = {
     cloudName: 'dwjq7j5zp',
-    uploadPreset: 'tutor_homework', // You'll need to create this in Cloudinary
+    uploadPreset: 'tutor_homework',
     apiKey: '963245294794452'
-    // Note: API Secret should NEVER be exposed in frontend code
-    // For production, use signed uploads or backend API
 };
 
 // --- Global state to hold report submission status ---
@@ -865,8 +1118,9 @@ function normalizePhoneNumber(phone) {
     return cleaned;
 }
 
-// --- FIXED: Schedule Management Functions for ALL students ---
+// --- FIXED: Schedule Management Functions - Track scheduled students ---
 let allStudents = [];
+let scheduledStudents = new Set(); // Track students with schedules
 let currentStudentIndex = 0;
 let schedulePopup = null;
 
@@ -879,22 +1133,30 @@ async function checkAndShowSchedulePopup(tutor) {
         const studentsSnapshot = await getDocs(studentsQuery);
         
         allStudents = [];
+        scheduledStudents.clear(); // Reset scheduled students
+        
         studentsSnapshot.forEach(doc => {
             const student = { id: doc.id, ...doc.data() };
-            // Filter out archived students but include ALL students regardless of schedule
+            // Filter out archived students
             if (!['archived', 'graduated', 'transferred'].includes(student.status)) {
                 allStudents.push(student);
+                // Check if student already has a schedule
+                if (student.schedule && student.schedule.length > 0) {
+                    scheduledStudents.add(student.id);
+                }
             }
         });
         
+        // Filter students that don't have schedules yet
+        const studentsWithoutSchedule = allStudents.filter(student => !scheduledStudents.has(student.id));
+        
         currentStudentIndex = 0;
         
-        if (allStudents.length > 0) {
-            showBulkSchedulePopup(allStudents[0], tutor, allStudents.length);
+        if (studentsWithoutSchedule.length > 0) {
+            showBulkSchedulePopup(studentsWithoutSchedule[0], tutor, studentsWithoutSchedule.length);
             return true;
         } else {
-            // FIX: Show a message if no students found
-            showCustomAlert('No students found. Please add students first.');
+            showCustomAlert('✅ All students have been scheduled!');
             return false;
         }
         
@@ -1076,12 +1338,17 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
             
             showCustomAlert('✅ Schedule saved!');
             
+            // Add student to scheduled set
+            scheduledStudents.add(student.id);
             currentStudentIndex++;
             schedulePopup.remove();
             
-            if (currentStudentIndex < allStudents.length) {
+            // Get remaining students without schedule
+            const studentsWithoutSchedule = allStudents.filter(s => !scheduledStudents.has(s.id));
+            
+            if (currentStudentIndex < studentsWithoutSchedule.length) {
                 setTimeout(() => {
-                    showBulkSchedulePopup(allStudents[currentStudentIndex], tutor, allStudents.length);
+                    showBulkSchedulePopup(studentsWithoutSchedule[currentStudentIndex], tutor, studentsWithoutSchedule.length);
                 }, 500);
             } else {
                 setTimeout(() => {
@@ -1096,15 +1363,19 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
     });
     
     document.getElementById('skip-schedule-btn').addEventListener('click', () => {
+        // Skip this student (don't mark as scheduled)
         currentStudentIndex++;
         schedulePopup.remove();
         
-        if (currentStudentIndex < allStudents.length) {
+        // Get remaining students without schedule
+        const studentsWithoutSchedule = allStudents.filter(s => !scheduledStudents.has(s.id));
+        
+        if (currentStudentIndex < studentsWithoutSchedule.length) {
             setTimeout(() => {
-                showBulkSchedulePopup(allStudents[currentStudentIndex], tutor, allStudents.length);
+                showBulkSchedulePopup(studentsWithoutSchedule[currentStudentIndex], tutor, studentsWithoutSchedule.length);
             }, 500);
         } else {
-            showCustomAlert('Skipped all students.');
+            showCustomAlert('Skipped all remaining students.');
         }
     });
 }
@@ -1442,7 +1713,43 @@ async function scheduleEmailReminder(hwData, fileUrl = '') {
     }
 }
 
-// --- NEW: Messaging Feature ---
+// --- ENHANCED: Messaging Feature with Inbox ---
+let unreadMessageCount = 0;
+
+async function updateUnreadMessageCount() {
+    try {
+        const tutorId = window.tutorData?.id;
+        if (!tutorId) return;
+        
+        const messagesQuery = query(
+            collection(db, "tutor_messages"),
+            where("tutorId", "==", tutorId),
+            where("read", "==", false)
+        );
+        
+        const messagesSnapshot = await getDocs(messagesQuery);
+        unreadMessageCount = messagesSnapshot.size;
+        
+        // Update inbox button badge
+        const inboxBtn = document.getElementById('inbox-btn');
+        if (inboxBtn) {
+            const existingBadge = inboxBtn.querySelector('.inbox-badge');
+            if (existingBadge) {
+                existingBadge.remove();
+            }
+            
+            if (unreadMessageCount > 0) {
+                const badge = document.createElement('span');
+                badge.className = 'inbox-badge';
+                badge.textContent = unreadMessageCount > 99 ? '99+' : unreadMessageCount;
+                inboxBtn.appendChild(badge);
+            }
+        }
+    } catch (error) {
+        console.error("Error updating unread message count:", error);
+    }
+}
+
 function showMessagingModal() {
     const modalHTML = `
         <div class="modal-overlay">
@@ -1555,6 +1862,7 @@ function showMessagingModal() {
                 recipients: recipients,
                 isUrgent: isUrgent,
                 status: 'sent',
+                read: false,
                 createdAt: new Date()
             };
             
@@ -1579,6 +1887,376 @@ function showMessagingModal() {
             showCustomAlert('❌ Error sending message. Please try again.');
         }
     });
+}
+
+// --- NEW: Inbox Feature with WhatsApp-like UI ---
+function showInboxModal() {
+    const modalHTML = `
+        <div class="modal-overlay">
+            <div class="modal-content max-w-6xl" style="height: 80vh;">
+                <div class="modal-header">
+                    <h3 class="modal-title">📨 Inbox</h3>
+                    <button id="new-message-btn" class="btn btn-primary btn-sm">💬 New Message</button>
+                </div>
+                <div class="modal-body" style="padding: 0; flex: 1;">
+                    <div class="inbox-container">
+                        <div class="conversations-sidebar">
+                            <div class="conversations-header">
+                                Conversations
+                            </div>
+                            <div class="conversations-list" id="conversations-list">
+                                <div class="text-center p-4">
+                                    <div class="spinner mx-auto mb-2"></div>
+                                    <p class="text-gray-500">Loading conversations...</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chat-main">
+                            <div id="chat-container" class="whatsapp-chat-container">
+                                <div class="chat-header">
+                                    <div class="chat-header-info">
+                                        <div class="chat-avatar">💬</div>
+                                        <div class="chat-header-text">
+                                            <h4>Select a conversation</h4>
+                                            <p>Choose a conversation to start messaging</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chat-messages" id="chat-messages">
+                                    <div class="text-center p-8">
+                                        <div class="text-gray-400 text-4xl mb-3">💭</div>
+                                        <h4 class="font-bold text-gray-600 mb-2">No Conversation Selected</h4>
+                                        <p class="text-gray-500">Select a conversation from the sidebar to view messages</p>
+                                    </div>
+                                </div>
+                                <div class="chat-input-area hidden" id="chat-input-area">
+                                    <input type="text" id="chat-input" class="chat-input" placeholder="Type a message...">
+                                    <button id="send-chat-btn" class="send-message-btn">📤</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const modal = document.createElement('div');
+    modal.innerHTML = modalHTML;
+    document.body.appendChild(modal);
+    
+    // Load conversations
+    loadConversations();
+    
+    document.getElementById('new-message-btn').addEventListener('click', () => {
+        modal.remove();
+        showMessagingModal();
+    });
+    
+    // Close modal when clicking outside
+    modal.addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal-overlay')) {
+            modal.remove();
+        }
+    });
+}
+
+async function loadConversations() {
+    try {
+        const tutorId = window.tutorData?.id;
+        if (!tutorId) return;
+        
+        // Load messages where tutor is recipient
+        const messagesQuery = query(
+            collection(db, "tutor_messages"),
+            where("tutorId", "==", tutorId)
+        );
+        
+        const messagesSnapshot = await getDocs(messagesQuery);
+        const messages = [];
+        const conversations = {};
+        
+        messagesSnapshot.forEach(doc => {
+            const message = { id: doc.id, ...doc.data() };
+            messages.push(message);
+            
+            // Group by sender (management or parent)
+            const senderKey = message.senderType || 'management';
+            if (!conversations[senderKey]) {
+                conversations[senderKey] = {
+                    id: senderKey,
+                    title: senderKey === 'management' ? 'Management Team' : 'Parents',
+                    lastMessage: message,
+                    unread: message.read === false,
+                    messages: [message]
+                };
+            } else {
+                conversations[senderKey].messages.push(message);
+                if (message.createdAt > conversations[senderKey].lastMessage.createdAt) {
+                    conversations[senderKey].lastMessage = message;
+                }
+                if (message.read === false) {
+                    conversations[senderKey].unread = true;
+                }
+            }
+        });
+        
+        renderConversationsList(Object.values(conversations));
+        
+    } catch (error) {
+        console.error("Error loading conversations:", error);
+        document.getElementById('conversations-list').innerHTML = `
+            <div class="text-center p-4">
+                <div class="text-red-400 text-4xl mb-3">⚠️</div>
+                <h4 class="font-bold text-red-600 mb-2">Failed to Load</h4>
+                <p class="text-gray-500">Error loading conversations. Please try again.</p>
+            </div>
+        `;
+    }
+}
+
+function renderConversationsList(conversations) {
+    const container = document.getElementById('conversations-list');
+    
+    if (conversations.length === 0) {
+        container.innerHTML = `
+            <div class="text-center p-8">
+                <div class="text-gray-400 text-4xl mb-3">📭</div>
+                <h4 class="font-bold text-gray-600 mb-2">No Messages</h4>
+                <p class="text-gray-500">You don't have any messages yet.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    
+    conversations.forEach(conv => {
+        const lastMessageTime = conv.lastMessage.createdAt?.toDate 
+            ? conv.lastMessage.createdAt.toDate() 
+            : new Date(conv.lastMessage.createdAt);
+        
+        html += `
+            <div class="conversation-item" data-conversation-id="${conv.id}">
+                <div class="conversation-info">
+                    <div class="conversation-avatar">
+                        ${conv.id === 'management' ? '👔' : '👨‍👩‍👧‍👦'}
+                    </div>
+                    <div class="conversation-details">
+                        <div class="conversation-title">
+                            <span>${conv.title}</span>
+                            <span class="conversation-time">${formatTime(lastMessageTime)}</span>
+                        </div>
+                        <p class="conversation-preview">
+                            ${conv.lastMessage.content.substring(0, 50)}${conv.lastMessage.content.length > 50 ? '...' : ''}
+                            ${conv.unread ? '<span class="new-message-indicator"></span>' : ''}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+    
+    // Add click listeners
+    document.querySelectorAll('.conversation-item').forEach(item => {
+        item.addEventListener('click', async () => {
+            const conversationId = item.getAttribute('data-conversation-id');
+            
+            // Remove active class from all items
+            document.querySelectorAll('.conversation-item').forEach(i => {
+                i.classList.remove('active');
+            });
+            
+            // Add active class to clicked item
+            item.classList.add('active');
+            
+            // Load conversation messages
+            await loadConversationMessages(conversationId);
+        });
+    });
+}
+
+async function loadConversationMessages(conversationId) {
+    try {
+        const tutorId = window.tutorData?.id;
+        if (!tutorId) return;
+        
+        // Load messages for this conversation
+        const messagesQuery = query(
+            collection(db, "tutor_messages"),
+            where("tutorId", "==", tutorId)
+        );
+        
+        const messagesSnapshot = await getDocs(messagesQuery);
+        const messages = [];
+        
+        messagesSnapshot.forEach(doc => {
+            const message = { id: doc.id, ...doc.data() };
+            const senderType = message.senderType || 'management';
+            
+            if (senderType === conversationId) {
+                messages.push(message);
+                
+                // Mark as read
+                if (!message.read) {
+                    updateDoc(doc.ref, { read: true });
+                }
+            }
+        });
+        
+        // Sort messages by date
+        messages.sort((a, b) => {
+            const timeA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+            const timeB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+            return timeA - timeB;
+        });
+        
+        renderChatMessages(messages, conversationId);
+        
+        // Update unread count
+        await updateUnreadMessageCount();
+        
+    } catch (error) {
+        console.error("Error loading conversation messages:", error);
+        document.getElementById('chat-messages').innerHTML = `
+            <div class="text-center p-8">
+                <div class="text-red-400 text-4xl mb-3">⚠️</div>
+                <h4 class="font-bold text-red-600 mb-2">Failed to Load</h4>
+                <p class="text-gray-500">Error loading messages. Please try again.</p>
+            </div>
+        `;
+    }
+}
+
+function renderChatMessages(messages, conversationId) {
+    const chatMessages = document.getElementById('chat-messages');
+    const chatInputArea = document.getElementById('chat-input-area');
+    const chatContainer = document.getElementById('chat-container');
+    const chatHeader = chatContainer.querySelector('.chat-header-info');
+    
+    // Update chat header
+    const title = conversationId === 'management' ? 'Management Team' : 'Parents';
+    chatHeader.innerHTML = `
+        <div class="chat-avatar">${conversationId === 'management' ? '👔' : '👨‍👩‍👧‍👦'}</div>
+        <div class="chat-header-text">
+            <h4>${title}</h4>
+            <p>${messages.length} messages</p>
+        </div>
+    `;
+    
+    // Show chat input
+    chatInputArea.classList.remove('hidden');
+    
+    // Clear existing messages
+    chatMessages.innerHTML = '';
+    
+    if (messages.length === 0) {
+        chatMessages.innerHTML = `
+            <div class="text-center p-8">
+                <div class="text-gray-400 text-4xl mb-3">💭</div>
+                <h4 class="font-bold text-gray-600 mb-2">No Messages Yet</h4>
+                <p class="text-gray-500">Start a conversation by sending a message</p>
+            </div>
+        `;
+    } else {
+        messages.forEach(message => {
+            const messageTime = message.createdAt?.toDate 
+                ? message.createdAt.toDate() 
+                : new Date(message.createdAt);
+            
+            const isSent = message.tutorId === window.tutorData?.id;
+            
+            const messageHTML = `
+                <div class="message-bubble ${isSent ? 'sent' : 'received'}">
+                    ${!isSent ? `<div class="message-sender">${message.senderName || 'Management'}</div>` : ''}
+                    <div class="message-content">${message.content}</div>
+                    <div class="message-time">${formatTime(messageTime)}</div>
+                </div>
+            `;
+            
+            chatMessages.innerHTML += messageHTML;
+        });
+        
+        // Scroll to bottom
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    
+    // Setup send message functionality
+    const sendBtn = document.getElementById('send-chat-btn');
+    const chatInput = document.getElementById('chat-input');
+    
+    // Clear existing event listeners
+    const newSendBtn = sendBtn.cloneNode(true);
+    sendBtn.parentNode.replaceChild(newSendBtn, sendBtn);
+    
+    const newChatInput = chatInput.cloneNode(true);
+    chatInput.parentNode.replaceChild(newChatInput, chatInput);
+    
+    // Add new event listener
+    document.getElementById('send-chat-btn').addEventListener('click', async () => {
+        await sendChatMessage(conversationId);
+    });
+    
+    document.getElementById('chat-input').addEventListener('keypress', async (e) => {
+        if (e.key === 'Enter') {
+            await sendChatMessage(conversationId);
+        }
+    });
+}
+
+async function sendChatMessage(conversationId) {
+    const chatInput = document.getElementById('chat-input');
+    const messageContent = chatInput.value.trim();
+    
+    if (!messageContent) {
+        showCustomAlert('Please enter a message.');
+        return;
+    }
+    
+    try {
+        const messageData = {
+            tutorId: window.tutorData.id,
+            tutorEmail: window.tutorData.email,
+            tutorName: window.tutorData.name,
+            content: messageContent,
+            senderType: conversationId,
+            recipients: [conversationId],
+            status: 'sent',
+            read: true,
+            createdAt: new Date()
+        };
+        
+        const messageRef = doc(collection(db, "tutor_messages"));
+        await setDoc(messageRef, messageData);
+        
+        // Clear input
+        chatInput.value = '';
+        
+        // Reload messages
+        await loadConversationMessages(conversationId);
+        
+    } catch (error) {
+        console.error("Error sending message:", error);
+        showCustomAlert('❌ Error sending message. Please try again.');
+    }
+}
+
+function formatTime(date) {
+    const now = new Date();
+    const diff = now - date;
+    
+    if (diff < 24 * 60 * 60 * 1000) {
+        // Today
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else if (diff < 7 * 24 * 60 * 60 * 1000) {
+        // This week
+        return date.toLocaleDateString([], { weekday: 'short' });
+    } else {
+        // Older
+        return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
 }
 
 // --- NEW: View Schedule Calendar for All Students ---
@@ -1699,7 +2377,7 @@ function renderCalendarView(students) {
                 grade: student.grade,
                 start: slot.start,
                 end: slot.end,
-                time: `${formatTime(slot.start)} - ${formatTime(slot.end)}`,
+                time: `${formatScheduleTime(slot.start)} - ${formatScheduleTime(slot.end)}`,
                 studentId: student.id,
                 isOvernight: slot.isOvernight || false
             });
@@ -1834,7 +2512,7 @@ function showEditScheduleModal(student) {
                                 </div>
                                 <button class="btn btn-danger btn-sm mt-2 remove-schedule-btn hidden">Remove</button>
                             </div>`
-                        }
+                                                  }
                     </div>
                     
                     <button id="add-schedule-entry" class="btn btn-secondary btn-sm mt-2">
@@ -1956,7 +2634,7 @@ function getEarliestClass(scheduleByDay) {
         scheduleByDay[day].forEach(event => {
             if (event.start < earliestTime) {
                 earliestTime = event.start;
-                earliestInfo = `${formatTime(event.start)} (${event.student} - ${day})`;
+                earliestInfo = `${formatScheduleTime(event.start)} (${event.student} - ${day})`;
             }
         });
     });
@@ -1998,7 +2676,7 @@ function printCalendar() {
     `);
 }
 
-function formatTime(timeString) {
+function formatScheduleTime(timeString) {
     const [hour, minute] = timeString.split(':').map(Number);
     
     if (hour === 0 && minute === 0) {
@@ -2285,7 +2963,7 @@ onSnapshot(settingsDocRef, (docSnap) => {
 let studentCache = [];
 
 // ##################################################################
-// # ENHANCED TUTOR DASHBOARD - WITH MESSAGING FEATURE
+// # ENHANCED TUTOR DASHBOARD - WITH MESSAGING & INBOX FEATURES
 // ##################################################################
 function renderTutorDashboard(container, tutor) {
     // Update active tab
@@ -2297,11 +2975,16 @@ function renderTutorDashboard(container, tutor) {
             <p class="hero-subtitle">Manage your students, submit reports, and track progress</p>
         </div>
         
-        <!-- Messaging Button -->
+        <!-- Messaging & Inbox Buttons -->
         <div class="text-center mb-6">
-            <button id="messaging-btn" class="messaging-btn">
-                💬 Send Message
-            </button>
+            <div class="action-buttons justify-center">
+                <button id="messaging-btn" class="messaging-btn">
+                    💬 Send Message
+                </button>
+                <button id="inbox-btn" class="inbox-btn">
+                    📨 Inbox
+                </button>
+            </div>
         </div>
         
         <div class="student-actions-container">
@@ -2391,8 +3074,14 @@ function renderTutorDashboard(container, tutor) {
         </div>
     `;
 
+    // Update unread message count
+    updateUnreadMessageCount();
+    
     // Add messaging button event listener
     document.getElementById('messaging-btn').addEventListener('click', showMessagingModal);
+    
+    // Add inbox button event listener
+    document.getElementById('inbox-btn').addEventListener('click', showInboxModal);
     
     // Load student dropdowns
     loadStudentDropdowns(tutor.email);
