@@ -2417,7 +2417,7 @@ function showHomeworkModal(student) {
             if (hwData.sendReminder && hwData.parentEmail) {
                 
                 // *** YOUR GOOGLE APPS SCRIPT URL ***
-                const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxi3Xk0Y_qF2b08nsnMGyRZ0kNU90VY42Nrmcq1tT-f_UdLcI1W8z1nZ6eaVJ7RJl3PIA/exec"; 
+                const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz9yuiR1egvxRcCLbW1Id-6lxBsYotiID0j_Fpeb9D8RyQGdMPNPPZn8WqOpJ4m_JqJNQ/exec"; 
 
                 // We don't await this because we don't want to freeze the UI while email sends
                 fetch(GOOGLE_SCRIPT_URL, {
@@ -6729,6 +6729,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
