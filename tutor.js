@@ -1894,7 +1894,7 @@ function showDailyTopicModal(student) {
     });
 }
 
-// UPDATED: Logic to fetch and filter only current month's topics
+// UPDATED: Logic to fetch, filter current month, and sort using JS (No 'orderBy' needed)
 async function loadDailyTopicHistory(studentId) {
     const topicHistoryContainer = document.getElementById('topic-history-container');
     const topicHistoryDiv = document.getElementById('topic-history');
@@ -1907,35 +1907,41 @@ async function loadDailyTopicHistory(studentId) {
         const currentMonth = now.getMonth(); // 0 = Jan, 1 = Feb, etc.
         const currentYear = now.getFullYear();
 
-        // Query all topics for this student, ordered by newest first
-        // We filter by month in Javascript to avoid complex Firestore composite indexes
+        // Query all topics for this student (Removed 'orderBy' to prevent crash)
         const topicsQuery = query(
             collection(db, "daily_topics"),
-            where("studentId", "==", studentId),
-            orderBy("createdAt", "desc")
+            where("studentId", "==", studentId)
         );
         
         const querySnapshot = await getDocs(topicsQuery);
-        let historyHTML = '<ul class="space-y-2">';
-        let count = 0;
         
+        // Convert snapshot to array of data objects
+        let topicsData = [];
         querySnapshot.forEach(doc => {
             const data = doc.data();
-            
             // Handle Firestore Timestamp or standard Date string
-            let topicDate;
             if (data.createdAt && typeof data.createdAt.toDate === 'function') {
-                topicDate = data.createdAt.toDate();
+                data.parsedDate = data.createdAt.toDate();
             } else if (data.createdAt) {
-                topicDate = new Date(data.createdAt);
+                data.parsedDate = new Date(data.createdAt);
             } else {
-                return; // Skip if no valid date
+                data.parsedDate = new Date(); // Fallback
             }
+            topicsData.push(data);
+        });
 
+        // SORTING IN JAVASCRIPT: Newest first
+        topicsData.sort((a, b) => b.parsedDate - a.parsedDate);
+
+        let historyHTML = '<ul class="space-y-2">';
+        let count = 0;
+
+        // Render sorted data
+        topicsData.forEach(data => {
             // FILTER: Only show topics if they match CURRENT Month and Year
-            if (topicDate.getMonth() === currentMonth && topicDate.getFullYear() === currentYear) {
+            if (data.parsedDate.getMonth() === currentMonth && data.parsedDate.getFullYear() === currentYear) {
                 count++;
-                const formattedDate = topicDate.toLocaleDateString(undefined, { 
+                const formattedDate = data.parsedDate.toLocaleDateString(undefined, { 
                     month: 'short', 
                     day: 'numeric' 
                 });
@@ -1963,8 +1969,6 @@ async function loadDailyTopicHistory(studentId) {
         }
     } catch (error) {
         console.error("Error loading daily topic history:", error);
-        // If the specific index is missing, the query might fail. 
-        // Fallback: Show a simple error or empty state without crashing
         topicHistoryDiv.innerHTML = '<p class="text-xs text-red-400">Could not load history. (Check console)</p>';
         topicHistoryContainer.classList.remove('hidden');
     }
@@ -6484,6 +6488,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
