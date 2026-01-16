@@ -1789,7 +1789,8 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
 }
 
 /*******************************************************************************
- * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT (With Edit, Delete & Multi-Upload)
+ * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT
+ * (Final Version: Edit, Delete, Multi-Upload, & Live Email Notification)
  ******************************************************************************/
 
 // ==========================================
@@ -1935,12 +1936,11 @@ function enableTopicEdit(topicId) {
 
     inputField.value = textSpan.textContent;
 
-    // Toggle visibility: Hide Text & Edit/Delete Buttons
+    // Toggle visibility
     textSpan.classList.add('hidden');
     editBtn.classList.add('hidden');
     if(deleteBtn) deleteBtn.classList.add('hidden');
     
-    // Show Input & Save/Cancel Buttons
     inputContainer.classList.remove('hidden');
     actionBtns.classList.remove('hidden');
     
@@ -1988,7 +1988,6 @@ async function saveTopicEdit(topicId, studentId) {
 async function deleteTopic(topicId, studentId) {
     try {
         const topicRef = doc(db, "daily_topics", topicId);
-        // Ensure 'deleteDoc' is imported in your main file
         await deleteDoc(topicRef);
         
         await loadDailyTopicHistory(studentId);
@@ -2117,7 +2116,7 @@ async function loadDailyTopicHistory(studentId) {
 
 
 // ==========================================
-// 2. HOMEWORK ASSIGNMENT FUNCTIONS (Updated for Multiple Files)
+// 2. HOMEWORK ASSIGNMENT FUNCTIONS
 // ==========================================
 
 async function uploadToCloudinary(file, studentId) {
@@ -2207,7 +2206,7 @@ function showHomeworkModal(student) {
                                 <input type="checkbox" id="hw-reminder" class="rounded" checked>
                                 <span class="text-sm font-semibold">Send Email Reminder to Parent</span>
                             </label>
-                            <p class="text-xs text-gray-500 mt-1">Parent will receive an email reminder 1 day before due date</p>
+                            <p class="text-xs text-gray-500 mt-1">Parent will receive an email reminder immediately via Google Script.</p>
                         </div>
                         
                         <div id="email-preview" class="email-preview hidden">
@@ -2359,13 +2358,15 @@ function showHomeworkModal(student) {
         
         const dueDate = new Date(hwData.dueDate);
         const today = new Date();
+        // Reset hours to compare dates properly
+        today.setHours(0,0,0,0);
+        const dueDateOnly = new Date(dueDate);
+        dueDateOnly.setHours(0,0,0,0);
+
         const maxDueDate = new Date(today);
         maxDueDate.setDate(maxDueDate.getDate() + 7);
         
-        const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
-
-        if (dueDateOnly < todayDateOnly) {
+        if (dueDateOnly < today) {
             showCustomAlert('Due date cannot be in the past.');
             return;
         }
@@ -2412,14 +2413,38 @@ function showHomeworkModal(student) {
             const hwRef = doc(collection(db, "homework_assignments"));
             await setDoc(hwRef, hwData);
             
-            // 4. Schedule Email
+            // 4. Send Email Notification via Google Apps Script (LIVE TRIGGER)
             if (hwData.sendReminder && hwData.parentEmail) {
-                const firstFileUrl = hwData.attachments.length > 0 ? hwData.attachments[0].url : '';
-                await scheduleEmailReminder(hwData, firstFileUrl);
+                
+                // *** YOUR GOOGLE APPS SCRIPT URL ***
+                const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxi3Xk0Y_qF2b08nsnMGyRZ0kNU90VY42Nrmcq1tT-f_UdLcI1W8z1nZ6eaVJ7RJl3PIA/exec"; 
+
+                // We don't await this because we don't want to freeze the UI while email sends
+                fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', // Important for calling GAS from browser
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        parentEmail: hwData.parentEmail,
+                        studentName: hwData.studentName,
+                        tutorName: hwData.tutorName,
+                        title: hwData.title,
+                        description: hwData.description,
+                        dueDate: hwData.dueDate,
+                        attachments: hwData.attachments // Sends the array of file links
+                    })
+                }).then(() => console.log("Email request sent to GAS"))
+                  .catch(err => console.error("Email failed", err));
+                
+                 // 5. Schedule Internal Reminder (Optional, preserving legacy functionality)
+                 const firstFileUrl = hwData.attachments.length > 0 ? hwData.attachments[0].url : '';
+                 await scheduleEmailReminder(hwData, firstFileUrl);
             }
             
             modal.remove();
-            showCustomAlert(`✅ Homework assigned successfully! ${hwData.attachments.length} file(s) attached.`);
+            showCustomAlert(`✅ Homework assigned & email sent! ${hwData.attachments.length} file(s) attached.`);
             
         } catch (error) {
             console.error("Error assigning homework:", error);
@@ -6704,6 +6729,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
