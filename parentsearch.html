@@ -1,0 +1,1547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Parent Portal Viewer - Blooming Kids House</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/libphonenumber-js@1.10.14/bundle/libphonenumber-js.min.js"></script>
+    <style>
+        .loading-spinner {
+            border: 6px solid #f3f3f3;
+            border-top: 6px solid #10B981;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        .loading-spinner-small {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #10B981;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .admin-badge {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #DC2626;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 10000;
+        }
+        .preserve-whitespace {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .defective-account {
+            border-left: 4px solid #DC2626;
+            background-color: #FEF2F2;
+        }
+        .duplicate-account {
+            border-left: 4px solid #F59E0B;
+            background-color: #FFFBEB;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app">
+        <div class="min-h-screen bg-gray-50 py-8">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <!-- Admin Header -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h1 class="text-3xl font-bold text-gray-900">Admin Parent Portal Viewer</h1>
+                            <p class="text-gray-600 mt-2">View any parent's portal by phone number - LOCAL MODE</p>
+                            <p class="text-sm text-green-600 mt-1">✅ Running locally - No deployment needed</p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">Admin Mode</span>
+                            <button onclick="showAdminTools()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
+                                🛠️ Admin Tools
+                            </button>
+                            <button onclick="showAdminInfo()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                                ℹ️ Admin Info
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search Section -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Parent Phone Number
+                            </label>
+                            <input 
+                                type="text" 
+                                id="adminParentPhone" 
+                                placeholder="Enter parent phone number (e.g., +1234567890, 2348012345678)"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            >
+                            <p class="text-sm text-gray-500 mt-2">
+                                Enter the exact phone number the parent used to sign up
+                            </p>
+                        </div>
+                        <div class="flex items-end space-x-4">
+                            <button 
+                                onclick="loadParentPortal()"
+                                class="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center"
+                                id="searchBtn"
+                            >
+                                <span class="mr-2">🔍</span>
+                                View Parent Portal
+                            </button>
+                            <button 
+                                onclick="testWithSampleData()"
+                                class="bg-yellow-600 text-white px-4 py-3 rounded-lg font-semibold hover:bg-yellow-700 transition-colors"
+                                title="Test with sample phone numbers"
+                            >
+                                🧪 Test
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Search Options -->
+                    <div class="mt-6 border-t pt-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Quick Search Options</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <button onclick="searchRecentParents()" class="bg-blue-100 text-blue-800 px-4 py-3 rounded-lg hover:bg-blue-200 transition-colors flex items-center justify-center">
+                                <span class="mr-2">📋</span> Recent Parents
+                            </button>
+                            <button onclick="searchByStudentName()" class="bg-green-100 text-green-800 px-4 py-3 rounded-lg hover:bg-green-200 transition-colors flex items-center justify-center">
+                                <span class="mr-2">👦</span> By Student Name
+                            </button>
+                            <button onclick="showAllParents()" class="bg-purple-100 text-purple-800 px-4 py-3 rounded-lg hover:bg-purple-200 transition-colors flex items-center justify-center">
+                                <span class="mr-2">👨‍👩‍👧‍👦</span> All Parents
+                            </button>
+                            <button onclick="showDefectiveParents()" class="bg-red-100 text-red-800 px-4 py-3 rounded-lg hover:bg-red-200 transition-colors flex items-center justify-center">
+                                <span class="mr-2">⚠️</span> Defective Accounts
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Connection Status -->
+                <div id="connectionStatus" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-8 hidden">
+                    <div class="flex items-center">
+                        <div class="loading-spinner-small mr-3"></div>
+                        <div>
+                            <h4 class="font-semibold text-yellow-800">Connecting to Database...</h4>
+                            <p class="text-yellow-700 text-sm">Initializing Firebase connection</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Area -->
+                <div id="adminResultsArea" class="hidden">
+                    <!-- Parent portal will be loaded here -->
+                </div>
+
+                <!-- Loading State -->
+                <div id="adminLoader" class="hidden text-center py-12">
+                    <div class="loading-spinner mx-auto" style="width: 60px; height: 60px;"></div>
+                    <p class="text-green-600 font-semibold mt-4 text-lg">Loading parent portal...</p>
+                    <p class="text-gray-500 text-sm mt-2" id="loadingDetails"></p>
+                </div>
+
+                <!-- Error State -->
+                <div id="adminError" class="hidden text-center py-12">
+                    <div class="text-6xl mb-4">❌</div>
+                    <h3 class="text-xl font-bold text-red-700 mb-2" id="adminErrorTitle">Unable to Load Parent Portal</h3>
+                    <p class="text-gray-500 max-w-md mx-auto mb-4" id="adminErrorMessage"></p>
+                    <button onclick="hideError()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                        Try Again
+                    </button>
+                </div>
+
+                <!-- Debug Info (collapsible) -->
+                <div class="bg-gray-100 rounded-lg p-4 mt-8">
+                    <button onclick="toggleDebugInfo()" class="flex items-center text-gray-700 font-semibold">
+                        <span id="debugToggleIcon">▶</span>
+                        <span class="ml-2">Debug Information</span>
+                    </button>
+                    <div id="debugInfo" class="hidden mt-4 text-sm">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <h4 class="font-semibold mb-2">Firebase Status</h4>
+                                <pre id="firebaseStatus" class="bg-white p-2 rounded text-xs overflow-auto max-h-32">Initializing...</pre>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold mb-2">Last Search</h4>
+                                <pre id="lastSearch" class="bg-white p-2 rounded text-xs overflow-auto max-h-32">No searches yet</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Tools Modal -->
+    <div id="adminToolsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">🛠️ Admin Tools</h2>
+            
+            <!-- Broadcast Message Section -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+                <h3 class="text-lg font-semibold text-blue-800 mb-3">📢 Broadcast Message to Parents</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Message Title</label>
+                        <input type="text" id="broadcastTitle" placeholder="Important Announcement" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Message Content</label>
+                        <textarea id="broadcastMessage" rows="4" placeholder="Type your message here..." 
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                    <div class="flex space-x-4">
+                        <button onclick="sendBroadcastMessage()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                            📤 Send to All Parents
+                        </button>
+                        <button onclick="previewBroadcastMessage()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                            👁️ Preview
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Account Management Section -->
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">
+                <h3 class="text-lg font-semibold text-yellow-800 mb-3">👥 Account Management</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button onclick="showDuplicateAccounts()" class="bg-yellow-100 text-yellow-800 px-4 py-3 rounded-lg hover:bg-yellow-200 transition-colors">
+                        🔍 Find Duplicate Accounts
+                    </button>
+                    <button onclick="showDefectiveParents()" class="bg-red-100 text-red-800 px-4 py-3 rounded-lg hover:bg-red-200 transition-colors">
+                        ⚠️ Show Defective Accounts
+                    </button>
+                </div>
+            </div>
+
+            <!-- System Information -->
+            <div class="bg-green-50 border border-green-200 rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-green-800 mb-3">📊 System Information</h3>
+                <div id="systemStats" class="text-sm text-gray-700">
+                    Loading system statistics...
+                </div>
+            </div>
+
+            <div class="flex justify-end mt-6">
+                <button onclick="hideAdminTools()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Info Modal -->
+    <div id="adminInfoModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Admin Parent Viewer Information</h2>
+            <div class="space-y-4">
+                <div class="bg-green-50 p-4 rounded-lg">
+                    <h3 class="font-semibold text-green-800">✅ Local Mode Active</h3>
+                    <p class="text-green-700 text-sm mt-1">This tool runs completely locally - no server deployment needed!</p>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-gray-800">How to Use:</h3>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1">
+                        <li>Enter a parent's phone number in any format</li>
+                        <li>Click "View Parent Portal" to see exactly what they see</li>
+                        <li>Use quick search options to find parents easily</li>
+                        <li>Test with sample data using the 🧪 Test button</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-gray-800">Features:</h3>
+                    <ul class="list-disc list-inside text-gray-600 space-y-1">
+                        <li>View all assessment and monthly reports</li>
+                        <li>See parent account information</li>
+                        <li>Check referral codes and earnings</li>
+                        <li>Real-time database connection</li>
+                        <li>Phone number normalization for all countries</li>
+                        <li><strong>NEW:</strong> Edit phone numbers, delete accounts, send messages</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="flex justify-end mt-6">
+                <button onclick="hideAdminInfo()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Phone Modal -->
+    <div id="editPhoneModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">✏️ Edit Parent Phone Number</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Current Phone</label>
+                    <input type="text" id="currentPhone" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">New Phone Number</label>
+                    <input type="text" id="newPhone" placeholder="Enter new phone number" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div id="phoneValidation" class="text-sm hidden"></div>
+            </div>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button onclick="hideEditPhoneModal()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                    Cancel
+                </button>
+                <button onclick="updateParentPhone()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    Update Phone
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Account Modal -->
+    <div id="deleteAccountModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold text-red-800 mb-4">🗑️ Delete Parent Account</h3>
+            <div class="space-y-4">
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p class="text-red-700 font-semibold">⚠️ Warning: This action cannot be undone!</p>
+                    <p class="text-red-600 text-sm mt-2">This will permanently delete the parent account and all associated data.</p>
+                </div>
+                <div>
+                    <p><strong>Parent:</strong> <span id="deleteParentName"></span></p>
+                    <p><strong>Phone:</strong> <span id="deleteParentPhone"></span></p>
+                    <p><strong>Email:</strong> <span id="deleteParentEmail"></span></p>
+                </div>
+                <div>
+                    <label class="flex items-center">
+                        <input type="checkbox" id="confirmDelete" class="mr-2">
+                        <span class="text-sm text-red-700">I understand this action is permanent</span>
+                    </label>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button onclick="hideDeleteAccountModal()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                    Cancel
+                </button>
+                <button onclick="deleteParentAccount()" id="confirmDeleteBtn" disabled class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors opacity-50">
+                    Delete Account
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Broadcast Preview Modal -->
+    <div id="broadcastPreviewModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
+            <h3 class="text-xl font-bold text-blue-800 mb-4">👁️ Broadcast Message Preview</h3>
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                <h4 class="font-semibold text-yellow-800" id="previewTitle">Message Title</h4>
+                <p class="text-yellow-700 mt-2" id="previewMessage">Message content will appear here...</p>
+            </div>
+            <p class="text-sm text-gray-600">This is how the message will appear to parents when they sign in.</p>
+            <div class="flex justify-end mt-6">
+                <button onclick="hideBroadcastPreview()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                    Close Preview
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
+            authDomain: "bloomingkidsassessment.firebaseapp.com",
+            projectId: "bloomingkidsassessment",
+            storageBucket: "bloomingkidsassessment.appspot.com",
+            messagingSenderId: "238975054977",
+            appId: "1:238975054977:web:87c70b4db044998a204980"
+        };
+
+        // Initialize Firebase
+        let db;
+        let auth;
+        
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            auth = firebase.auth();
+            updateFirebaseStatus('✅ Connected to Firebase');
+            document.getElementById('connectionStatus').classList.add('hidden');
+        } catch (error) {
+            console.error('Firebase initialization error:', error);
+            updateFirebaseStatus('❌ Firebase Error: ' + error.message);
+            showError('Firebase Connection Failed', 'Unable to connect to the database. Please check your internet connection.');
+        }
+
+        // Global variables
+        let currentParentData = null;
+        let currentEditingUserId = null;
+
+        // Utility functions
+        function capitalize(str) {
+            if (!str) return "";
+            return str.replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        function updateFirebaseStatus(message) {
+            const statusElement = document.getElementById('firebaseStatus');
+            if (statusElement) {
+                statusElement.textContent = message + '\n' + new Date().toLocaleTimeString();
+            }
+        }
+
+        function updateLastSearch(phone, result) {
+            const searchElement = document.getElementById('lastSearch');
+            if (searchElement) {
+                searchElement.textContent = `Phone: ${phone}\nResult: ${result}\nTime: ${new Date().toLocaleTimeString()}`;
+            }
+        }
+
+        function showError(title, message) {
+            document.getElementById('adminErrorTitle').textContent = title;
+            document.getElementById('adminErrorMessage').textContent = message;
+            document.getElementById('adminError').classList.remove('hidden');
+            document.getElementById('adminLoader').classList.add('hidden');
+            document.getElementById('adminResultsArea').classList.add('hidden');
+        }
+
+        function hideError() {
+            document.getElementById('adminError').classList.add('hidden');
+        }
+
+        function showAdminTools() {
+            loadSystemStats();
+            document.getElementById('adminToolsModal').classList.remove('hidden');
+        }
+
+        function hideAdminTools() {
+            document.getElementById('adminToolsModal').classList.add('hidden');
+        }
+
+        function showAdminInfo() {
+            document.getElementById('adminInfoModal').classList.remove('hidden');
+        }
+
+        function hideAdminInfo() {
+            document.getElementById('adminInfoModal').classList.add('hidden');
+        }
+
+        function toggleDebugInfo() {
+            const debugInfo = document.getElementById('debugInfo');
+            const toggleIcon = document.getElementById('debugToggleIcon');
+            if (debugInfo.classList.contains('hidden')) {
+                debugInfo.classList.remove('hidden');
+                toggleIcon.textContent = '▼';
+            } else {
+                debugInfo.classList.add('hidden');
+                toggleIcon.textContent = '▶';
+            }
+        }
+
+        // Phone number normalization (same as parent.js)
+        function multiNormalizePhoneNumber(phone) {
+            if (!phone || typeof phone !== 'string') {
+                return [{ normalized: null, country: null, valid: false, error: 'Invalid input' }];
+            }
+
+            console.log("🔧 Starting multi-normalization for:", phone);
+            const normalizationAttempts = [];
+            
+            try {
+                let cleaned = phone.replace(/[^\d+]/g, '');
+                
+                // ATTEMPT 1: Standard normalization
+                let attempt1 = null;
+                try {
+                    const parsed1 = libphonenumber.parsePhoneNumberFromString(cleaned);
+                    if (parsed1 && parsed1.isValid()) {
+                        attempt1 = {
+                            normalized: parsed1.format('E.164'),
+                            country: parsed1.country,
+                            valid: true,
+                            attempt: 'standard'
+                        };
+                        normalizationAttempts.push(attempt1);
+                    }
+                } catch (e) {
+                    console.log("🔧 Attempt 1 failed:", e.message);
+                }
+
+                // ATTEMPT 2: Country code correction
+                let attempt2 = null;
+                try {
+                    // Nigeria patterns
+                    if (cleaned.match(/^(234)?(80|70|81|90|91)/) && !cleaned.startsWith('+')) {
+                        const ngNumber = '+234' + cleaned.replace(/^234/, '');
+                        const parsed2 = libphonenumber.parsePhoneNumberFromString(ngNumber);
+                        if (parsed2 && parsed2.isValid()) {
+                            attempt2 = {
+                                normalized: parsed2.format('E.164'),
+                                country: parsed2.country,
+                                valid: true,
+                                attempt: 'nigeria_correction'
+                            };
+                            normalizationAttempts.push(attempt2);
+                        }
+                    }
+                    
+                    // US/Canada patterns
+                    if (cleaned.match(/^(1)?(469|214|972|713|281|832|210|817)/) && !cleaned.startsWith('+')) {
+                        const usNumber = '+1' + cleaned.replace(/^1/, '');
+                        const parsed2 = libphonenumber.parsePhoneNumberFromString(usNumber);
+                        if (parsed2 && parsed2.isValid()) {
+                            attempt2 = {
+                                normalized: parsed2.format('E.164'),
+                                country: parsed2.country,
+                                valid: true,
+                                attempt: 'us_correction'
+                            };
+                            normalizationAttempts.push(attempt2);
+                        }
+                    }
+                } catch (e) {
+                    console.log("🔧 Attempt 2 failed:", e.message);
+                }
+
+                // ATTEMPT 3: Digits only (fallback)
+                let attempt3 = null;
+                try {
+                    const digitsOnly = cleaned.replace(/\D/g, '');
+                    if (digitsOnly.length >= 8 && digitsOnly.length <= 15) {
+                        attempt3 = {
+                            normalized: digitsOnly,
+                            country: null,
+                            valid: true,
+                            attempt: 'digits_only'
+                        };
+                        normalizationAttempts.push(attempt3);
+                    }
+                } catch (e) {
+                    console.log("🔧 Attempt 3 failed:", e.message);
+                }
+
+                if (normalizationAttempts.length > 0) {
+                    return normalizationAttempts;
+                }
+
+                return [{ 
+                    normalized: null, 
+                    country: null, 
+                    valid: false, 
+                    error: 'No valid normalization found',
+                    attempt: 'failed'
+                }];
+                
+            } catch (error) {
+                console.error("❌ Multi-normalization error:", error);
+                return [{ 
+                    normalized: null, 
+                    country: null, 
+                    valid: false, 
+                    error: error.message,
+                    attempt: 'error'
+                }];
+            }
+        }
+
+        // Multi-layer search function
+        async function performMultiLayerSearch(parentPhone, parentEmail, userId) {
+            console.log("🔍 Starting multi-layer search for:", parentPhone);
+            
+            let assessmentResults = [];
+            let monthlyResults = [];
+            
+            try {
+                const normalizedVersions = multiNormalizePhoneNumber(parentPhone);
+                const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
+                
+                console.log(`🎯 Searching with ${validVersions.length} normalized versions:`, validVersions.map(v => v.normalized));
+
+                // Assessment Reports Search
+                for (const version of validVersions) {
+                    let assessmentSnapshot = await db.collection("student_results")
+                        .where("normalizedParentPhone", "==", version.normalized)
+                        .get();
+                    
+                    if (!assessmentSnapshot.empty) {
+                        assessmentSnapshot.forEach(doc => {
+                            const data = doc.data();
+                            if (!assessmentResults.some(r => r.id === doc.id)) {
+                                assessmentResults.push({ 
+                                    id: doc.id,
+                                    ...data,
+                                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                                    type: 'assessment',
+                                    foundWith: version.normalized
+                                });
+                            }
+                        });
+                        break;
+                    }
+                }
+
+                // Monthly Reports Search
+                for (const version of validVersions) {
+                    let monthlySnapshot = await db.collection("tutor_submissions")
+                        .where("normalizedParentPhone", "==", version.normalized)
+                        .get();
+                    
+                    if (!monthlySnapshot.empty) {
+                        monthlySnapshot.forEach(doc => {
+                            const data = doc.data();
+                            if (!monthlyResults.some(r => r.id === doc.id)) {
+                                monthlyResults.push({ 
+                                    id: doc.id,
+                                    ...data,
+                                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                                    type: 'monthly',
+                                    foundWith: version.normalized
+                                });
+                            }
+                        });
+                        break;
+                    }
+                }
+
+                console.log("🎯 SEARCH SUMMARY - Assessments:", assessmentResults.length, "Monthly:", monthlyResults.length);
+                
+            } catch (error) {
+                console.error("❌ Error during multi-layer search:", error);
+            }
+            
+            return { assessmentResults, monthlyResults };
+        }
+
+        // NEW: Load system statistics
+        async function loadSystemStats() {
+            try {
+                const parentsSnapshot = await db.collection('parent_users').get();
+                const totalParents = parentsSnapshot.size;
+                
+                let defectiveCount = 0;
+                let duplicateCount = 0;
+                let parentsWithNoReports = 0;
+                
+                parentsSnapshot.forEach(doc => {
+                    const parent = doc.data();
+                    // Check for defective accounts (no normalized phone, invalid format, etc.)
+                    if (!parent.normalizedPhone || !parent.phone || parent.phone.length < 8) {
+                        defectiveCount++;
+                    }
+                });
+                
+                // Check for duplicates (same phone number)
+                const phoneMap = new Map();
+                parentsSnapshot.forEach(doc => {
+                    const parent = doc.data();
+                    if (parent.phone) {
+                        if (!phoneMap.has(parent.phone)) {
+                            phoneMap.set(parent.phone, []);
+                        }
+                        phoneMap.get(parent.phone).push(parent);
+                    }
+                });
+                
+                phoneMap.forEach((parents, phone) => {
+                    if (parents.length > 1) {
+                        duplicateCount += parents.length;
+                    }
+                });
+                
+                document.getElementById('systemStats').innerHTML = `
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-white p-3 rounded-lg border">
+                            <div class="text-2xl font-bold text-blue-600">${totalParents}</div>
+                            <div class="text-sm text-gray-600">Total Parents</div>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg border">
+                            <div class="text-2xl font-bold text-red-600">${defectiveCount}</div>
+                            <div class="text-sm text-gray-600">Defective Accounts</div>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg border">
+                            <div class="text-2xl font-bold text-yellow-600">${duplicateCount}</div>
+                            <div class="text-sm text-gray-600">Duplicate Accounts</div>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg border">
+                            <div class="text-2xl font-bold text-green-600">${totalParents - defectiveCount}</div>
+                            <div class="text-sm text-gray-600">Healthy Accounts</div>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('systemStats').innerHTML = `<p class="text-red-600">Error loading statistics: ${error.message}</p>`;
+            }
+        }
+
+        // NEW: Show defective parents
+        async function showDefectiveParents() {
+            try {
+                document.getElementById('loadingDetails').textContent = 'Finding defective accounts...';
+                document.getElementById('adminLoader').classList.remove('hidden');
+                hideAdminTools();
+                
+                const parentsSnapshot = await db.collection('parent_users').get();
+                let defectiveParents = [];
+                
+                parentsSnapshot.forEach(doc => {
+                    const parent = doc.data();
+                    const issues = [];
+                    
+                    if (!parent.normalizedPhone) issues.push('No normalized phone');
+                    if (!parent.phone || parent.phone.length < 8) issues.push('Invalid phone format');
+                    if (!parent.email || !parent.email.includes('@')) issues.push('Invalid email');
+                    if (!parent.parentName || parent.parentName === 'Parent') issues.push('Default parent name');
+                    
+                    if (issues.length > 0) {
+                        defectiveParents.push({
+                            id: doc.id,
+                            ...parent,
+                            issues: issues
+                        });
+                    }
+                });
+                
+                if (defectiveParents.length === 0) {
+                    showError('No Defective Accounts', 'All parent accounts appear to be healthy!');
+                    return;
+                }
+                
+                displayParentList(defectiveParents, 'Defective Accounts', true);
+                
+            } catch (error) {
+                showError('Search Failed', 'Error finding defective accounts: ' + error.message);
+            }
+        }
+
+        // NEW: Show duplicate accounts
+        async function showDuplicateAccounts() {
+            try {
+                document.getElementById('loadingDetails').textContent = 'Finding duplicate accounts...';
+                document.getElementById('adminLoader').classList.remove('hidden');
+                hideAdminTools();
+                
+                const parentsSnapshot = await db.collection('parent_users').get();
+                const phoneMap = new Map();
+                
+                parentsSnapshot.forEach(doc => {
+                    const parent = doc.data();
+                    if (parent.phone) {
+                        if (!phoneMap.has(parent.phone)) {
+                            phoneMap.set(parent.phone, []);
+                        }
+                        phoneMap.get(parent.phone).push({
+                            id: doc.id,
+                            ...parent
+                        });
+                    }
+                });
+                
+                let duplicateParents = [];
+                phoneMap.forEach((parents, phone) => {
+                    if (parents.length > 1) {
+                        duplicateParents = duplicateParents.concat(parents.map(p => ({
+                            ...p,
+                            duplicateCount: parents.length
+                        })));
+                    }
+                });
+                
+                if (duplicateParents.length === 0) {
+                    showError('No Duplicates', 'No duplicate accounts found!');
+                    return;
+                }
+                
+                displayParentList(duplicateParents, 'Duplicate Accounts', true);
+                
+            } catch (error) {
+                showError('Search Failed', 'Error finding duplicate accounts: ' + error.message);
+            }
+        }
+
+        // NEW: Display parent list with action buttons
+        function displayParentList(parents, title, showActions = false) {
+            let optionsHTML = `
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold mb-4">${title} (${parents.length})</h3>
+                    <div class="space-y-3 max-h-96 overflow-y-auto">
+            `;
+            
+            parents.forEach(parent => {
+                const isDefective = parent.issues && parent.issues.length > 0;
+                const isDuplicate = parent.duplicateCount > 1;
+                
+                let badgeHTML = '';
+                if (isDefective) {
+                    badgeHTML = `<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full ml-2">Defective</span>`;
+                }
+                if (isDuplicate) {
+                    badgeHTML += `<span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full ml-2">Duplicate (${parent.duplicateCount})</span>`;
+                }
+                
+                optionsHTML += `
+                    <div class="border rounded-lg p-4 ${isDefective ? 'defective-account' : isDuplicate ? 'duplicate-account' : ''}">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <strong class="text-gray-800">${parent.parentName || 'Unknown Name'}</strong>
+                                ${badgeHTML}
+                                <div class="text-sm text-gray-600 mt-1">
+                                    📞 ${parent.phone}<br>
+                                    📧 ${parent.email}
+                                </div>
+                                ${parent.issues ? `
+                                    <div class="text-xs text-red-600 mt-2">
+                                        <strong>Issues:</strong> ${parent.issues.join(', ')}
+                                    </div>
+                                ` : ''}
+                            </div>
+                            ${showActions ? `
+                                <div class="flex space-x-2 ml-4">
+                                    <button onclick="editParentPhone('${parent.id}', '${parent.phone}')" 
+                                            class="bg-blue-100 text-blue-800 px-3 py-1 rounded text-sm hover:bg-blue-200 transition-colors">
+                                        ✏️ Edit
+                                    </button>
+                                    <button onclick="viewParentPortalById('${parent.id}')" 
+                                            class="bg-green-100 text-green-800 px-3 py-1 rounded text-sm hover:bg-green-200 transition-colors">
+                                        👁️ View
+                                    </button>
+                                    <button onclick="deleteParentAccountPrompt('${parent.id}', '${parent.parentName || 'Unknown'}', '${parent.phone}', '${parent.email}')" 
+                                            class="bg-red-100 text-red-800 px-3 py-1 rounded text-sm hover:bg-red-200 transition-colors">
+                                        🗑️ Delete
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            optionsHTML += '</div></div>';
+            
+            document.getElementById('adminLoader').classList.add('hidden');
+            document.getElementById('adminResultsArea').innerHTML = optionsHTML;
+            document.getElementById('adminResultsArea').classList.remove('hidden');
+        }
+
+        // NEW: Edit parent phone modal
+        function editParentPhone(userId, currentPhone) {
+            currentEditingUserId = userId;
+            document.getElementById('currentPhone').value = currentPhone;
+            document.getElementById('newPhone').value = '';
+            document.getElementById('phoneValidation').classList.add('hidden');
+            document.getElementById('editPhoneModal').classList.remove('hidden');
+        }
+
+        function hideEditPhoneModal() {
+            document.getElementById('editPhoneModal').classList.add('hidden');
+            currentEditingUserId = null;
+        }
+
+        // NEW: Update parent phone
+        async function updateParentPhone() {
+            const newPhone = document.getElementById('newPhone').value.trim();
+            const validationElement = document.getElementById('phoneValidation');
+            
+            if (!newPhone) {
+                validationElement.innerHTML = '<p class="text-red-600">Please enter a phone number</p>';
+                validationElement.classList.remove('hidden');
+                return;
+            }
+            
+            // Validate phone number
+            const normalizedVersions = multiNormalizePhoneNumber(newPhone);
+            const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
+            
+            if (validVersions.length === 0) {
+                validationElement.innerHTML = '<p class="text-red-600">Invalid phone number format</p>';
+                validationElement.classList.remove('hidden');
+                return;
+            }
+            
+            const normalizedPhone = validVersions[0].normalized;
+            
+            try {
+                // Update the parent record
+                await db.collection('parent_users').doc(currentEditingUserId).update({
+                    phone: newPhone,
+                    normalizedPhone: normalizedPhone,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                validationElement.innerHTML = '<p class="text-green-600">✅ Phone number updated successfully!</p>';
+                validationElement.classList.remove('hidden');
+                
+                // Close modal after 2 seconds
+                setTimeout(() => {
+                    hideEditPhoneModal();
+                    showAdminMessage('Phone number updated successfully!', 'success');
+                }, 2000);
+                
+            } catch (error) {
+                validationElement.innerHTML = `<p class="text-red-600">Error updating phone: ${error.message}</p>`;
+                validationElement.classList.remove('hidden');
+            }
+        }
+
+        // NEW: Delete account modal
+        function deleteParentAccountPrompt(userId, parentName, phone, email) {
+            currentEditingUserId = userId;
+            document.getElementById('deleteParentName').textContent = parentName;
+            document.getElementById('deleteParentPhone').textContent = phone;
+            document.getElementById('deleteParentEmail').textContent = email;
+            document.getElementById('confirmDelete').checked = false;
+            document.getElementById('confirmDeleteBtn').disabled = true;
+            document.getElementById('deleteAccountModal').classList.remove('hidden');
+        }
+
+        function hideDeleteAccountModal() {
+            document.getElementById('deleteAccountModal').classList.add('hidden');
+            currentEditingUserId = null;
+        }
+
+        // NEW: Enable delete button when confirmed
+        document.getElementById('confirmDelete').addEventListener('change', function() {
+            document.getElementById('confirmDeleteBtn').disabled = !this.checked;
+            document.getElementById('confirmDeleteBtn').classList.toggle('opacity-50', !this.checked);
+        });
+
+        // NEW: Delete parent account
+        async function deleteParentAccount() {
+            if (!currentEditingUserId) return;
+            
+            try {
+                await db.collection('parent_users').doc(currentEditingUserId).delete();
+                showAdminMessage('Parent account deleted successfully!', 'success');
+                hideDeleteAccountModal();
+                
+                // Refresh the current view if we're viewing a list
+                if (document.getElementById('adminResultsArea').innerHTML.includes('Defective Accounts') || 
+                    document.getElementById('adminResultsArea').innerHTML.includes('Duplicate Accounts')) {
+                    // Re-run the current search
+                    const activeButton = document.querySelector('.bg-red-100, .bg-yellow-100');
+                    if (activeButton) {
+                        if (activeButton.textContent.includes('Defective')) {
+                            showDefectiveParents();
+                        } else if (activeButton.textContent.includes('Duplicate')) {
+                            showDuplicateAccounts();
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                showAdminMessage('Error deleting account: ' + error.message, 'error');
+            }
+        }
+
+        // NEW: View parent portal by ID
+        async function viewParentPortalById(userId) {
+            try {
+                const userDoc = await db.collection('parent_users').doc(userId).get();
+                if (userDoc.exists) {
+                    const parentUser = userDoc.data();
+                    document.getElementById('adminParentPhone').value = parentUser.phone;
+                    loadParentPortal();
+                }
+            } catch (error) {
+                showAdminMessage('Error loading parent: ' + error.message, 'error');
+            }
+        }
+
+        // NEW: Broadcast message functions
+        function previewBroadcastMessage() {
+            const title = document.getElementById('broadcastTitle').value || 'No title';
+            const message = document.getElementById('broadcastMessage').value || 'No message content';
+            
+            document.getElementById('previewTitle').textContent = title;
+            document.getElementById('previewMessage').textContent = message;
+            document.getElementById('broadcastPreviewModal').classList.remove('hidden');
+        }
+
+        function hideBroadcastPreview() {
+            document.getElementById('broadcastPreviewModal').classList.add('hidden');
+        }
+
+        async function sendBroadcastMessage() {
+            const title = document.getElementById('broadcastTitle').value.trim();
+            const message = document.getElementById('broadcastMessage').value.trim();
+            
+            if (!title || !message) {
+                showAdminMessage('Please enter both title and message', 'error');
+                return;
+            }
+            
+            try {
+                const broadcastData = {
+                    title: title,
+                    message: message,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    sentBy: 'Admin',
+                    isActive: true,
+                    viewedBy: [] // Track which parents have seen it
+                };
+                
+                await db.collection('admin_broadcasts').add(broadcastData);
+                
+                showAdminMessage('Broadcast message sent successfully! It will appear when parents sign in.', 'success');
+                document.getElementById('broadcastTitle').value = '';
+                document.getElementById('broadcastMessage').value = '';
+                hideAdminTools();
+                
+            } catch (error) {
+                showAdminMessage('Error sending broadcast: ' + error.message, 'error');
+            }
+        }
+
+        // Main function to load parent portal
+        async function loadParentPortal() {
+            const phoneInput = document.getElementById('adminParentPhone');
+            const phone = phoneInput.value.trim();
+            const searchBtn = document.getElementById('searchBtn');
+            
+            if (!phone) {
+                showError('Input Required', 'Please enter a phone number');
+                return;
+            }
+
+            // Show loading state
+            searchBtn.disabled = true;
+            searchBtn.innerHTML = '<div class="loading-spinner-small mr-2"></div> Searching...';
+            document.getElementById('adminLoader').classList.remove('hidden');
+            document.getElementById('adminError').classList.add('hidden');
+            document.getElementById('adminResultsArea').classList.add('hidden');
+            document.getElementById('loadingDetails').textContent = `Searching for: ${phone}`;
+
+            try {
+                updateLastSearch(phone, 'Searching...');
+                
+                const normalizedVersions = multiNormalizePhoneNumber(phone);
+                const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
+                
+                if (validVersions.length === 0) {
+                    throw new Error('Invalid phone number format. Try formats like: +2348012345678 or 08012345678');
+                }
+
+                let parentUser = null;
+                let parentUserId = null;
+
+                // Search for parent user
+                for (const version of validVersions) {
+                    const userQuery = await db.collection('parent_users')
+                        .where('normalizedPhone', '==', version.normalized)
+                        .limit(1)
+                        .get();
+
+                    if (!userQuery.empty) {
+                        parentUser = userQuery.docs[0].data();
+                        parentUserId = userQuery.docs[0].id;
+                        break;
+                    }
+                }
+
+                // Fallback search
+                if (!parentUser) {
+                    const fallbackQuery = await db.collection('parent_users')
+                        .where('phone', '==', phone)
+                        .limit(1)
+                        .get();
+                        
+                    if (!fallbackQuery.empty) {
+                        parentUser = fallbackQuery.docs[0].data();
+                        parentUserId = fallbackQuery.docs[0].id;
+                    }
+                }
+
+                if (!parentUser) {
+                    throw new Error('No parent account found with this phone number');
+                }
+
+                updateLastSearch(phone, `Found: ${parentUser.parentName || 'Unknown'} (${parentUser.email})`);
+                await loadParentPortalForAdmin(parentUserId, parentUser.normalizedPhone || parentUser.phone, parentUser);
+
+            } catch (error) {
+                console.error('Admin parent portal error:', error);
+                updateLastSearch(phone, `Error: ${error.message}`);
+                showError('Search Failed', error.message);
+            } finally {
+                searchBtn.disabled = false;
+                searchBtn.innerHTML = '<span class="mr-2">🔍</span> View Parent Portal';
+            }
+        }
+
+        // Load parent portal content
+        async function loadParentPortalForAdmin(parentUserId, parentPhone, parentUserData) {
+            const resultsArea = document.getElementById('adminResultsArea');
+            const loadingDetails = document.getElementById('loadingDetails');
+            
+            try {
+                loadingDetails.textContent = `Loading reports for ${parentUserData.parentName || 'Parent'}...`;
+
+                // Create the parent portal interface
+                resultsArea.innerHTML = `
+                    <div class="bg-white rounded-lg shadow-lg">
+                        <!-- Admin Info Header -->
+                        <div class="bg-red-50 border-b border-red-200 p-4">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <h2 class="text-xl font-bold text-red-800">Viewing Portal for: ${parentUserData.parentName || 'Parent'}</h2>
+                                    <p class="text-red-600">Phone: ${parentUserData.phone} | Email: ${parentUserData.email}</p>
+                                    <p class="text-red-600 text-sm">User ID: ${parentUserId}</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-sm text-red-700">Account Created: ${parentUserData.createdAt?.toDate().toLocaleDateString() || 'Unknown'}</p>
+                                    <p class="text-sm text-red-700">Referral Code: ${parentUserData.referralCode || 'None'}</p>
+                                    <div class="flex space-x-2 mt-2">
+                                        <button onclick="editParentPhone('${parentUserId}', '${parentUserData.phone}')" 
+                                                class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors">
+                                            ✏️ Edit Phone
+                                        </button>
+                                        <button onclick="deleteParentAccountPrompt('${parentUserId}', '${parentUserData.parentName || 'Unknown'}', '${parentUserData.phone}', '${parentUserData.email}')" 
+                                                class="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition-colors">
+                                            🗑️ Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Parent Portal Content -->
+                        <div id="adminParentPortalContent" class="p-6">
+                            <div class="text-center py-8">
+                                <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+                                <p class="text-green-600 font-semibold mt-4">Loading parent reports...</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // Load reports
+                const { assessmentResults, monthlyResults } = await performMultiLayerSearch(
+                    parentPhone, 
+                    parentUserData.email, 
+                    parentUserId
+                );
+
+                currentParentData = {
+                    user: parentUserData,
+                    userId: parentUserId,
+                    assessments: assessmentResults,
+                    monthly: monthlyResults
+                };
+
+                // Display reports
+                displayParentReports(assessmentResults, monthlyResults, parentUserData);
+
+                // Hide loader and show results
+                document.getElementById('adminLoader').classList.add('hidden');
+                resultsArea.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Error loading parent portal:', error);
+                resultsArea.innerHTML = `
+                    <div class="bg-white rounded-lg shadow-lg p-8 text-center">
+                        <div class="text-6xl mb-4">❌</div>
+                        <h3 class="text-xl font-bold text-red-700 mb-2">Error Loading Parent Portal</h3>
+                        <p class="text-gray-500">${error.message}</p>
+                    </div>
+                `;
+                document.getElementById('adminLoader').classList.add('hidden');
+                resultsArea.classList.remove('hidden');
+            }
+        }
+
+        // Display parent reports
+        function displayParentReports(assessmentResults, monthlyResults, parentUserData) {
+            const portalContent = document.getElementById('adminParentPortalContent');
+
+            if (assessmentResults.length === 0 && monthlyResults.length === 0) {
+                portalContent.innerHTML = `
+                    <div class="text-center py-16">
+                        <div class="text-6xl mb-6">📊</div>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4">No Reports Found</h2>
+                        <p class="text-gray-600 max-w-2xl mx-auto mb-6">
+                            This parent has no assessment or monthly reports yet.
+                        </p>
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 max-w-2xl mx-auto">
+                            <h3 class="font-semibold text-yellow-800 mb-2">Parent Information:</h3>
+                            <div class="text-left text-yellow-700 space-y-2">
+                                <p><strong>Name:</strong> ${parentUserData.parentName || 'Not set'}</p>
+                                <p><strong>Phone:</strong> ${parentUserData.phone}</p>
+                                <p><strong>Email:</strong> ${parentUserData.email}</p>
+                                <p><strong>Referral Code:</strong> ${parentUserData.referralCode || 'None'}</p>
+                                <p><strong>Account Created:</strong> ${parentUserData.createdAt?.toDate().toLocaleDateString() || 'Unknown'}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            let contentHTML = '';
+            const studentsMap = new Map();
+
+            // Process assessment reports
+            assessmentResults.forEach(result => {
+                const studentName = result.studentName;
+                if (!studentsMap.has(studentName)) {
+                    studentsMap.set(studentName, { assessments: [], monthly: [] });
+                }
+                studentsMap.get(studentName).assessments.push(result);
+            });
+
+            // Process monthly reports
+            monthlyResults.forEach(report => {
+                const studentName = report.studentName;
+                if (!studentsMap.has(studentName)) {
+                    studentsMap.set(studentName, { assessments: [], monthly: [] });
+                }
+                studentsMap.get(studentName).monthly.push(report);
+            });
+
+            // Display reports for each student
+            studentsMap.forEach((reports, studentName) => {
+                const fullName = capitalize(studentName);
+                
+                contentHTML += `
+                    <div class="bg-green-100 border-l-4 border-green-600 p-4 rounded-lg mb-6">
+                        <h2 class="text-xl font-bold text-green-800">${fullName}</h2>
+                        <p class="text-green-600">
+                            ${reports.assessments.length} assessment(s), 
+                            ${reports.monthly.length} monthly report(s)
+                        </p>
+                    </div>
+                `;
+
+                // Display Assessment Reports
+                if (reports.assessments.length > 0) {
+                    const uniqueSessions = new Map();
+                    
+                    reports.assessments.forEach((result) => {
+                        const sessionKey = Math.floor(result.timestamp / 86400);
+                        if (!uniqueSessions.has(sessionKey)) {
+                            uniqueSessions.set(sessionKey, []);
+                        }
+                        uniqueSessions.get(sessionKey).push(result);
+                    });
+
+                    uniqueSessions.forEach((session, sessionKey) => {
+                        const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', {
+                            dateStyle: 'long',
+                            timeStyle: 'short'
+                        });
+
+                        const results = session.map(testResult => {
+                            return {
+                                subject: testResult.subject,
+                                correct: testResult.score !== undefined ? testResult.score : 0,
+                                total: testResult.totalScoreableQuestions !== undefined ? testResult.totalScoreableQuestions : 0,
+                            };
+                        });
+
+                        const tableRows = results.map(res => `
+                            <tr>
+                                <td class="border px-4 py-2 font-semibold">${res.subject.toUpperCase()}</td>
+                                <td class="border px-4 py-2 text-center">${res.correct} / ${res.total}</td>
+                                <td class="border px-4 py-2 text-center">${Math.round((res.correct / res.total) * 100)}%</td>
+                            </tr>
+                        `).join("");
+
+                        contentHTML += `
+                            <div class="border rounded-lg shadow mb-8 p-6 bg-white">
+                                <div class="text-center mb-6 border-b pb-4">
+                                    <h2 class="text-2xl font-bold text-green-800">Assessment Report</h2>
+                                    <p class="text-gray-600">Date: ${formattedDate}</p>
+                                    <p class="text-gray-500 text-sm">Tutor: ${session[0].tutorEmail || 'N/A'}</p>
+                                </div>
+                                <table class="w-full text-sm mb-4 border border-collapse">
+                                    <thead class="bg-gray-100">
+                                        <tr>
+                                            <th class="border px-4 py-2 text-left">Subject</th>
+                                            <th class="border px-4 py-2 text-center">Score</th>
+                                            <th class="border px-4 py-2 text-center">Percentage</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${tableRows}</tbody>
+                                </table>
+                            </div>
+                        `;
+                    });
+                }
+                
+                // Display Monthly Reports
+                if (reports.monthly.length > 0) {
+                    reports.monthly.forEach((monthlyReport, index) => {
+                        const formattedDate = new Date(monthlyReport.timestamp * 1000).toLocaleString('en-US', {
+                            dateStyle: 'long',
+                            timeStyle: 'short'
+                        });
+
+                        contentHTML += `
+                            <div class="border rounded-lg shadow mb-8 p-6 bg-white">
+                                <div class="text-center mb-6 border-b pb-4">
+                                    <h2 class="text-2xl font-bold text-green-800">MONTHLY LEARNING REPORT</h2>
+                                    <p class="text-gray-600">Date: ${formattedDate}</p>
+                                    <p class="text-gray-500 text-sm">Tutor: ${monthlyReport.tutorName || 'N/A'}</p>
+                                </div>
+                                ${monthlyReport.introduction ? `
+                                    <div class="mb-4">
+                                        <h3 class="font-semibold text-green-700 mb-2">INTRODUCTION</h3>
+                                        <p class="text-gray-700 preserve-whitespace">${monthlyReport.introduction}</p>
+                                    </div>
+                                ` : ''}
+                                ${monthlyReport.progress ? `
+                                    <div class="mb-4">
+                                        <h3 class="font-semibold text-green-700 mb-2">PROGRESS & ACHIEVEMENTS</h3>
+                                        <p class="text-gray-700 preserve-whitespace">${monthlyReport.progress}</p>
+                                    </div>
+                                ` : ''}
+                                ${monthlyReport.recommendations ? `
+                                    <div class="mb-4">
+                                        <h3 class="font-semibold text-green-700 mb-2">RECOMMENDATIONS</h3>
+                                        <p class="text-gray-700 preserve-whitespace">${monthlyReport.recommendations}</p>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    });
+                }
+            });
+
+            // Add parent summary
+            contentHTML += `
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mt-8">
+                    <h3 class="text-lg font-semibold text-blue-800 mb-4">Parent Account Summary</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <p><strong>Parent Name:</strong> ${parentUserData.parentName || 'Not set'}</p>
+                            <p><strong>Phone:</strong> ${parentUserData.phone}</p>
+                            <p><strong>Email:</strong> ${parentUserData.email}</p>
+                        </div>
+                        <div>
+                            <p><strong>Referral Code:</strong> ${parentUserData.referralCode || 'None'}</p>
+                            <p><strong>Total Children:</strong> ${studentsMap.size}</p>
+                            <p><strong>Total Reports:</strong> ${assessmentResults.length + monthlyResults.length}</p>
+                            <p><strong>Assessments:</strong> ${assessmentResults.length}</p>
+                            <p><strong>Monthly Reports:</strong> ${monthlyResults.length}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            portalContent.innerHTML = contentHTML;
+        }
+
+        // Quick search functions
+        async function searchRecentParents() {
+            try {
+                document.getElementById('loadingDetails').textContent = 'Loading recent parents...';
+                document.getElementById('adminLoader').classList.remove('hidden');
+                
+                const recentParents = await db.collection('parent_users')
+                    .orderBy('createdAt', 'desc')
+                    .limit(20)
+                    .get();
+
+                if (recentParents.empty) {
+                    showError('No Parents Found', 'No parent accounts found in the system.');
+                    return;
+                }
+
+                let parentsArray = [];
+                recentParents.forEach(doc => {
+                    parentsArray.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+
+                displayParentList(parentsArray, 'Recent Parents', true);
+                
+            } catch (error) {
+                showError('Search Failed', 'Error loading recent parents: ' + error.message);
+            }
+        }
+
+        async function searchByStudentName() {
+            const studentName = prompt('Enter student name to search:');
+            if (!studentName) return;
+
+            try {
+                document.getElementById('loadingDetails').textContent = `Searching for student: ${studentName}`;
+                document.getElementById('adminLoader').classList.remove('hidden');
+
+                // Search in student_results
+                const assessmentSnapshot = await db.collection('student_results')
+                    .where('studentName', '>=', studentName)
+                    .where('studentName', '<=', studentName + '\uf8ff')
+                    .limit(10)
+                    .get();
+
+                let parentsFound = new Map();
+
+                assessmentSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    const parentPhone = data.parentPhone;
+                    if (parentPhone && !parentsFound.has(parentPhone)) {
+                        parentsFound.set(parentPhone, {
+                            phone: parentPhone,
+                            studentName: data.studentName,
+                            type: 'assessment'
+                        });
+                    }
+                });
+
+                // Search in tutor_submissions
+                const monthlySnapshot = await db.collection('tutor_submissions')
+                    .where('studentName', '>=', studentName)
+                    .where('studentName', '<=', studentName + '\uf8ff')
+                    .limit(10)
+                    .get();
+
+                monthlySnapshot.forEach(doc => {
+                    const data = doc.data();
+                    const parentPhone = data.parentPhone;
+                    if (parentPhone && !parentsFound.has(parentPhone)) {
+                        parentsFound.set(parentPhone, {
+                            phone: parentPhone,
+                            studentName: data.studentName,
+                            type: 'monthly'
+                        });
+                    }
+                });
+
+                if (parentsFound.size === 0) {
+                    showError('No Results', `No parents found for student: ${studentName}`);
+                    return;
+                }
+
+                let parentsArray = [];
+                // We need to get full parent data for these phone numbers
+                for (let [phone, info] of parentsFound) {
+                    const parentQuery = await db.collection('parent_users')
+                        .where('phone', '==', phone)
+                        .limit(1)
+                        .get();
+                    
+                    if (!parentQuery.empty) {
+                        parentsArray.push({
+                            id: parentQuery.docs[0].id,
+                            ...parentQuery.docs[0].data(),
+                            studentInfo: info
+                        });
+                    }
+                }
+
+                displayParentList(parentsArray, `Parents for Student: ${studentName}`, true);
+
+            } catch (error) {
+                showError('Search Failed', 'Error searching by student name: ' + error.message);
+            }
+        }
+
+        async function showAllParents() {
+            try {
+                document.getElementById('loadingDetails').textContent = 'Loading all parents...';
+                document.getElementById('adminLoader').classList.remove('hidden');
+
+                const allParents = await db.collection('parent_users')
+                    .orderBy('parentName')
+                    .limit(50)
+                    .get();
+
+                if (allParents.empty) {
+                    showError('No Parents', 'No parent accounts found in the system.');
+                    return;
+                }
+
+                let parentsArray = [];
+                allParents.forEach(doc => {
+                    parentsArray.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+
+                displayParentList(parentsArray, 'All Parents', true);
+
+            } catch (error) {
+                showError('Search Failed', 'Error loading all parents: ' + error.message);
+            }
+        }
+
+        // Test function with sample data
+        function testWithSampleData() {
+            const sampleNumbers = [
+                '+2348012345678',
+                '+2347012345678',
+                '+2348112345678',
+                '+2349012345678'
+            ];
+            
+            const randomNumber = sampleNumbers[Math.floor(Math.random() * sampleNumbers.length)];
+            document.getElementById('adminParentPhone').value = randomNumber;
+            
+            showAdminMessage(`Testing with sample number: ${randomNumber}`, 'info');
+            loadParentPortal();
+        }
+
+        function showAdminMessage(message, type) {
+            // Simple alert for now - you can enhance this with a proper toast notification
+            alert(`Admin: ${message}`);
+        }
+
+        // Add admin badge
+        function addAdminBadge() {
+            const badge = document.createElement('div');
+            badge.className = 'admin-badge';
+            badge.textContent = 'ADMIN VIEW - LOCAL MODE';
+            badge.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                background: #DC2626;
+                color: white;
+                padding: 8px 12px;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: bold;
+                z-index: 10000;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            `;
+            document.body.appendChild(badge);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            addAdminBadge();
+            updateFirebaseStatus('✅ Standalone Admin Viewer Ready');
+            console.log('🚀 Admin Parent Viewer running locally');
+        });
+
+        // Allow Enter key to search
+        document.getElementById('adminParentPhone').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                loadParentPortal();
+            }
+        });
+    </script>
+</body>
+</html>
