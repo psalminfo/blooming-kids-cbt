@@ -1789,7 +1789,7 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
 }
 
 /*******************************************************************************
- * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT
+ * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT (With Edit Functionality)
  ******************************************************************************/
 
 // ==========================================
@@ -1797,7 +1797,6 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
 // ==========================================
 
 function showDailyTopicModal(student) {
-    // We get the current month name for the header
     const date = new Date();
     const monthName = date.toLocaleString('default', { month: 'long' });
 
@@ -1816,7 +1815,7 @@ function showDailyTopicModal(student) {
                             </h5>
                             <span id="topic-count-badge" class="bg-blue-200 text-blue-800 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
                         </div>
-                        <div id="topic-history" class="topic-history text-sm text-gray-700 max-h-40 overflow-y-auto custom-scrollbar">
+                        <div id="topic-history" class="topic-history text-sm text-gray-700 max-h-60 overflow-y-auto custom-scrollbar">
                             <div class="flex justify-center p-2">
                                 <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-700"></div>
                             </div>
@@ -1850,8 +1849,27 @@ function showDailyTopicModal(student) {
     // Load history immediately
     loadDailyTopicHistory(student.id);
     
-    // Focus the textarea
     setTimeout(() => document.getElementById('topic-topics').focus(), 100);
+
+    // Event Delegation for Edit/Save/Cancel buttons in the history list
+    const historyContainer = document.getElementById('topic-history');
+    historyContainer.addEventListener('click', async (e) => {
+        const target = e.target;
+        const btn = target.closest('button');
+        
+        if (!btn) return;
+
+        const action = btn.dataset.action;
+        const topicId = btn.dataset.id;
+
+        if (action === 'edit') {
+            enableTopicEdit(topicId);
+        } else if (action === 'cancel') {
+            cancelTopicEdit(topicId);
+        } else if (action === 'save') {
+            await saveTopicEdit(topicId, student.id);
+        }
+    });
 
     document.getElementById('cancel-topic-btn').addEventListener('click', () => modal.remove());
     
@@ -1875,26 +1893,97 @@ function showDailyTopicModal(student) {
             tutorEmail: window.tutorData.email,
             tutorName: window.tutorData.name,
             topics: content,
-            date: new Date().toISOString().split('T')[0], // YYYY-MM-DD for simple sorting
-            createdAt: new Date() // Full timestamp
+            date: new Date().toISOString().split('T')[0],
+            createdAt: new Date()
         };
         
         try {
             const topicRef = doc(collection(db, "daily_topics"));
             await setDoc(topicRef, topicData);
             
-            modal.remove();
-            showCustomAlert('✅ Topic saved successfully!');
+            // Clear input and reload history instead of closing modal (better UX)
+            topicInput.value = '';
+            await loadDailyTopicHistory(student.id);
+            showCustomAlert('✅ Topic saved!');
+            
+            saveBtn.disabled = false;
+            saveBtn.innerText = originalBtnText;
         } catch (error) {
             console.error("Error saving topic:", error);
-            showCustomAlert('❌ Error saving topic. Please try again.');
+            showCustomAlert('❌ Error saving topic.');
             saveBtn.disabled = false;
             saveBtn.innerText = originalBtnText;
         }
     });
 }
 
-// UPDATED: Logic to fetch, filter current month, and sort using JS (No 'orderBy' needed)
+// ------------------------------------------
+// HELPER FUNCTIONS FOR EDITING
+// ------------------------------------------
+
+function enableTopicEdit(topicId) {
+    const textSpan = document.getElementById(`text-${topicId}`);
+    const inputContainer = document.getElementById(`input-container-${topicId}`);
+    const editBtn = document.getElementById(`btn-edit-${topicId}`);
+    const actionBtns = document.getElementById(`action-btns-${topicId}`);
+    const inputField = document.getElementById(`input-${topicId}`);
+
+    // Populate input with current text
+    inputField.value = textSpan.textContent;
+
+    // Toggle visibility
+    textSpan.classList.add('hidden');
+    editBtn.classList.add('hidden');
+    inputContainer.classList.remove('hidden');
+    actionBtns.classList.remove('hidden');
+    
+    inputField.focus();
+}
+
+function cancelTopicEdit(topicId) {
+    const textSpan = document.getElementById(`text-${topicId}`);
+    const inputContainer = document.getElementById(`input-container-${topicId}`);
+    const editBtn = document.getElementById(`btn-edit-${topicId}`);
+    const actionBtns = document.getElementById(`action-btns-${topicId}`);
+
+    // Toggle visibility back
+    textSpan.classList.remove('hidden');
+    editBtn.classList.remove('hidden');
+    inputContainer.classList.add('hidden');
+    actionBtns.classList.add('hidden');
+}
+
+async function saveTopicEdit(topicId, studentId) {
+    const inputField = document.getElementById(`input-${topicId}`);
+    const newText = inputField.value.trim();
+    
+    if (!newText) {
+        showCustomAlert("Topic cannot be empty.");
+        return;
+    }
+
+    try {
+        const topicRef = doc(db, "daily_topics", topicId);
+        
+        // Note: ensure 'updateDoc' is imported in your main file imports
+        await updateDoc(topicRef, {
+            topics: newText
+        });
+
+        // Reload the list to show changes
+        await loadDailyTopicHistory(studentId);
+        showCustomAlert("✅ Topic updated!");
+
+    } catch (error) {
+        console.error("Error updating topic:", error);
+        showCustomAlert("❌ Failed to update topic.");
+    }
+}
+
+// ------------------------------------------
+// HISTORY LOADER
+// ------------------------------------------
+
 async function loadDailyTopicHistory(studentId) {
     const topicHistoryContainer = document.getElementById('topic-history-container');
     const topicHistoryDiv = document.getElementById('topic-history');
@@ -1904,10 +1993,9 @@ async function loadDailyTopicHistory(studentId) {
     
     try {
         const now = new Date();
-        const currentMonth = now.getMonth(); // 0 = Jan, 1 = Feb, etc.
+        const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
 
-        // Query all topics for this student (Removed 'orderBy' to prevent crash)
         const topicsQuery = query(
             collection(db, "daily_topics"),
             where("studentId", "==", studentId)
@@ -1915,28 +2003,29 @@ async function loadDailyTopicHistory(studentId) {
         
         const querySnapshot = await getDocs(topicsQuery);
         
-        // Convert snapshot to array of data objects
+        // Convert snapshot to array WITH DOC ID
         let topicsData = [];
         querySnapshot.forEach(doc => {
             const data = doc.data();
-            // Handle Firestore Timestamp or standard Date string
+            // Store the Document ID for editing
+            data.id = doc.id; 
+            
             if (data.createdAt && typeof data.createdAt.toDate === 'function') {
                 data.parsedDate = data.createdAt.toDate();
             } else if (data.createdAt) {
                 data.parsedDate = new Date(data.createdAt);
             } else {
-                data.parsedDate = new Date(); // Fallback
+                data.parsedDate = new Date();
             }
             topicsData.push(data);
         });
 
-        // SORTING IN JAVASCRIPT: Newest first
+        // Sort: Newest first
         topicsData.sort((a, b) => b.parsedDate - a.parsedDate);
 
-        let historyHTML = '<ul class="space-y-2">';
+        let historyHTML = '<ul class="space-y-3">';
         let count = 0;
 
-        // Render sorted data
         topicsData.forEach(data => {
             // FILTER: Only show topics if they match CURRENT Month and Year
             if (data.parsedDate.getMonth() === currentMonth && data.parsedDate.getFullYear() === currentYear) {
@@ -1947,9 +2036,39 @@ async function loadDailyTopicHistory(studentId) {
                 });
                 
                 historyHTML += `
-                    <li class="flex items-start border-b border-blue-100 last:border-0 pb-1">
-                        <span class="font-bold text-blue-600 min-w-[60px] text-xs mt-0.5">${formattedDate}:</span>
-                        <span class="text-gray-800 break-words flex-1">${data.topics}</span>
+                    <li class="flex flex-col border-b border-blue-100 last:border-0 pb-2">
+                        <div class="flex items-start justify-between w-full">
+                            <div class="flex items-start flex-1 mr-2">
+                                <span class="font-bold text-blue-600 min-w-[60px] text-xs mt-1">${formattedDate}:</span>
+                                
+                                <span id="text-${data.id}" class="text-gray-800 break-words flex-1 text-sm mt-0.5">${data.topics}</span>
+                                
+                                <div id="input-container-${data.id}" class="hidden flex-1">
+                                    <textarea id="input-${data.id}" class="w-full text-sm p-1 border rounded focus:ring-blue-500 focus:border-blue-500" rows="2"></textarea>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center">
+                                <button id="btn-edit-${data.id}" data-action="edit" data-id="${data.id}" class="text-gray-400 hover:text-blue-600 transition-colors p-1" title="Edit Topic">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                </button>
+                                
+                                <div id="action-btns-${data.id}" class="hidden flex space-x-1">
+                                    <button data-action="save" data-id="${data.id}" class="text-green-600 hover:text-green-800 p-1" title="Save">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
+                                    <button data-action="cancel" data-id="${data.id}" class="text-red-500 hover:text-red-700 p-1" title="Cancel">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </li>
                 `;
             }
@@ -1962,7 +2081,6 @@ async function loadDailyTopicHistory(studentId) {
             countBadge.textContent = count;
             topicHistoryContainer.classList.remove('hidden');
         } else {
-            // If it's a new month (or no data yet), we show this message
             topicHistoryDiv.innerHTML = `<p class="text-gray-500 italic text-center">No topics recorded for ${now.toLocaleString('default', { month: 'long' })} yet.</p>`;
             countBadge.textContent = '0';
             topicHistoryContainer.classList.remove('hidden');
@@ -1971,6 +2089,278 @@ async function loadDailyTopicHistory(studentId) {
         console.error("Error loading daily topic history:", error);
         topicHistoryDiv.innerHTML = '<p class="text-xs text-red-400">Could not load history. (Check console)</p>';
         topicHistoryContainer.classList.remove('hidden');
+    }
+}
+
+
+// ==========================================
+// 2. HOMEWORK ASSIGNMENT FUNCTIONS
+// ==========================================
+
+async function uploadToCloudinary(file, studentId) {
+    return new Promise((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+        formData.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
+        formData.append('folder', 'homework_assignments');
+        formData.append('public_id', `homework_${studentId}_${Date.now()}_${file.name.replace(/\.[^/.]+$/, "")}`);
+        
+        // Create upload URL
+        const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/upload`;
+        
+        fetch(uploadUrl, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.secure_url) {
+                resolve({
+                    url: data.secure_url,
+                    publicId: data.public_id,
+                    format: data.format,
+                    bytes: data.bytes,
+                    createdAt: data.created_at
+                });
+            } else {
+                reject(new Error('Upload failed: ' + (data.error?.message || 'Unknown error')));
+            }
+        })
+        .catch(error => {
+            reject(error);
+        });
+    });
+}
+
+function showHomeworkModal(student) {
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    const maxDate = nextWeek.toISOString().split('T')[0];
+    
+    const modalHTML = `
+        <div class="modal-overlay">
+            <div class="modal-content max-w-2xl">
+                <div class="modal-header">
+                    <h3 class="modal-title">📝 Assign Homework for ${student.studentName}</h3>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Homework Title *</label>
+                        <input type="text" id="hw-title" class="form-input" placeholder="e.g., Math Worksheet #3" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Description *</label>
+                        <textarea id="hw-description" class="form-input form-textarea report-textarea" placeholder="Detailed instructions for the homework..." required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Due Date *</label>
+                        <input type="date" id="hw-due-date" class="form-input" min="${new Date().toISOString().split('T')[0]}" max="${maxDate}" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Upload File (Optional)</label>
+                        <div class="file-upload-container" id="file-upload-container">
+                            <input type="file" id="hw-file" class="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.ppt,.pptx">
+                            <label for="hw-file" class="file-upload-label">
+                                <div class="file-upload-icon">📎</div>
+                                <span class="text-sm font-medium text-primary-color">Click to upload file</span>
+                                <span class="text-xs text-gray-500 block mt-1">PDF, DOC, JPG, PNG, TXT, PPT (Max 10MB)</span>
+                            </label>
+                            <div id="file-preview" class="file-preview hidden">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <div class="file-name" id="file-name"></div>
+                                        <div class="file-size" id="file-size"></div>
+                                    </div>
+                                    <button type="button" id="remove-file-btn" class="btn btn-danger btn-sm">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="email-settings">
+                        <div class="form-group">
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" id="hw-reminder" class="rounded" checked>
+                                <span class="text-sm font-semibold">Send Email Reminder to Parent</span>
+                            </label>
+                            <p class="text-xs text-gray-500 mt-1">Parent will receive an email reminder 1 day before due date</p>
+                        </div>
+                        
+                        <div id="email-preview" class="email-preview hidden">
+                            <div class="email-preview-header">
+                                <strong>Email Preview:</strong>
+                            </div>
+                            <p><strong>Subject:</strong> <span id="email-subject">Homework Reminder for ${student.studentName}</span></p>
+                            <p><strong>To:</strong> ${student.parentEmail || 'Parent email will be used'}</p>
+                            <p><strong>Message:</strong> <span id="email-message">Don't forget! ${student.studentName} has homework due tomorrow. Please check the assignment details.</span></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-hw-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="save-hw-btn" class="btn btn-primary" data-student-id="${student.id}">
+                        Assign Homework
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const modal = document.createElement('div');
+    modal.innerHTML = modalHTML;
+    document.body.appendChild(modal);
+    
+    const fileInput = document.getElementById('hw-file');
+    const filePreview = document.getElementById('file-preview');
+    const fileName = document.getElementById('file-name');
+    const fileSize = document.getElementById('file-size');
+    const removeFileBtn = document.getElementById('remove-file-btn');
+    const emailPreview = document.getElementById('email-preview');
+    const emailSubject = document.getElementById('email-subject');
+    const emailMessage = document.getElementById('email-message');
+    
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            const file = e.target.files[0];
+            if (file.size > 10 * 1024 * 1024) {
+                showCustomAlert('File size must be less than 10MB.');
+                fileInput.value = '';
+                return;
+            }
+            
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            filePreview.classList.remove('hidden');
+            
+            emailMessage.textContent = `Don't forget! ${student.studentName} has homework due tomorrow. A file has been attached to this assignment.`;
+        }
+    });
+    
+    removeFileBtn.addEventListener('click', () => {
+        fileInput.value = '';
+        filePreview.classList.add('hidden');
+        emailMessage.textContent = `Don't forget! ${student.studentName} has homework due tomorrow. Please check the assignment details.`;
+    });
+    
+    const reminderCheckbox = document.getElementById('hw-reminder');
+    reminderCheckbox.addEventListener('change', () => {
+        if (reminderCheckbox.checked) {
+            emailPreview.classList.remove('hidden');
+            const titleInput = document.getElementById('hw-title');
+            titleInput.addEventListener('input', () => {
+                emailSubject.textContent = `Homework Reminder: ${titleInput.value || 'Assignment'} for ${student.studentName}`;
+            });
+        } else {
+            emailPreview.classList.add('hidden');
+        }
+    });
+    
+    document.getElementById('cancel-hw-btn').addEventListener('click', () => modal.remove());
+    document.getElementById('save-hw-btn').addEventListener('click', async () => {
+        const hwData = {
+            studentId: student.id,
+            studentName: student.studentName,
+            parentEmail: student.parentEmail || '',
+            parentPhone: student.parentPhone,
+            tutorEmail: window.tutorData.email,
+            tutorName: window.tutorData.name,
+            title: document.getElementById('hw-title').value.trim(),
+            description: document.getElementById('hw-description').value.trim(),
+            dueDate: document.getElementById('hw-due-date').value,
+            sendReminder: document.getElementById('hw-reminder').checked,
+            assignedDate: new Date(),
+            status: 'assigned',
+            submissions: []
+        };
+        
+        if (!hwData.title || !hwData.description || !hwData.dueDate) {
+            showCustomAlert('Please fill in all required fields (title, description, due date).');
+            return;
+        }
+        
+        const dueDate = new Date(hwData.dueDate);
+        const today = new Date();
+        const maxDueDate = new Date(today);
+        maxDueDate.setDate(maxDueDate.getDate() + 7);
+        
+        const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+
+        if (dueDateOnly < todayDateOnly) {
+            showCustomAlert('Due date cannot be in the past.');
+            return;
+        }
+        
+        if (dueDate > maxDueDate) {
+            showCustomAlert('Due date must be within 7 days from today.');
+            return;
+        }
+        
+        try {
+            let fileData = null;
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                showCustomAlert('📤 Uploading file to Cloudinary...');
+                
+                fileData = await uploadToCloudinary(file, student.id);
+                
+                hwData.fileUrl = fileData.url;
+                hwData.fileName = file.name;
+                hwData.fileSize = file.size;
+                hwData.fileType = file.type;
+                hwData.cloudinaryPublicId = fileData.publicId;
+            }
+            
+            const hwRef = doc(collection(db, "homework_assignments"));
+            await setDoc(hwRef, hwData);
+            
+            if (hwData.sendReminder && hwData.parentEmail) {
+                await scheduleEmailReminder(hwData, fileData?.url);
+            }
+            
+            modal.remove();
+            showCustomAlert('✅ Homework assigned successfully! ' + 
+                (hwData.sendReminder && hwData.parentEmail ? 'Email reminder will be sent 1 day before due date.' : ''));
+            
+        } catch (error) {
+            console.error("Error assigning homework:", error);
+            showCustomAlert('❌ Error assigning homework: ' + error.message);
+        }
+    });
+}
+
+async function scheduleEmailReminder(hwData, fileUrl = '') {
+    try {
+        const dueDate = new Date(hwData.dueDate);
+        const reminderDate = new Date(dueDate);
+        reminderDate.setDate(reminderDate.getDate() - 1);
+        
+        const reminderData = {
+            homeworkId: hwData.id,
+            studentId: hwData.studentId,
+            studentName: hwData.studentName,
+            parentEmail: hwData.parentEmail,
+            tutorEmail: hwData.tutorEmail,
+            tutorName: hwData.tutorName,
+            title: hwData.title,
+            description: hwData.description,
+            dueDate: hwData.dueDate,
+            reminderDate: reminderDate,
+            fileUrl: fileUrl,
+            fileName: hwData.fileName,
+            status: 'scheduled',
+            createdAt: new Date()
+        };
+        
+        const reminderRef = doc(collection(db, "email_reminders"));
+        await setDoc(reminderRef, reminderData);
+        
+        console.log('Email reminder scheduled for:', reminderDate);
+        
+    } catch (error) {
+        console.error("Error scheduling email reminder:", error);
     }
 }
 
@@ -6488,6 +6878,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
