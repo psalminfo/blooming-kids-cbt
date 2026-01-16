@@ -1789,7 +1789,7 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
 }
 
 /*******************************************************************************
- * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT (Fixed: No Duplicates)
+ * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT
  ******************************************************************************/
 
 // ==========================================
@@ -2096,8 +2096,41 @@ async function loadDailyTopicHistory(studentId) {
 // 2. HOMEWORK ASSIGNMENT FUNCTIONS
 // ==========================================
 
-// NOTE: uploadToCloudinary function removed from here because it is already defined 
-// elsewhere in your file. This prevents the "Identifier already declared" error.
+async function uploadToCloudinary(file, studentId) {
+    return new Promise((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+        formData.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
+        formData.append('folder', 'homework_assignments');
+        formData.append('public_id', `homework_${studentId}_${Date.now()}_${file.name.replace(/\.[^/.]+$/, "")}`);
+        
+        // Create upload URL
+        const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/upload`;
+        
+        fetch(uploadUrl, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.secure_url) {
+                resolve({
+                    url: data.secure_url,
+                    publicId: data.public_id,
+                    format: data.format,
+                    bytes: data.bytes,
+                    createdAt: data.created_at
+                });
+            } else {
+                reject(new Error('Upload failed: ' + (data.error?.message || 'Unknown error')));
+            }
+        })
+        .catch(error => {
+            reject(error);
+        });
+    });
+}
 
 function showHomeworkModal(student) {
     const nextWeek = new Date();
@@ -2131,7 +2164,7 @@ function showHomeworkModal(student) {
                             <label for="hw-file" class="file-upload-label">
                                 <div class="file-upload-icon">📎</div>
                                 <span class="text-sm font-medium text-primary-color">Click to upload file</span>
-                                <span class="text-xs text-gray-500 block mt-1">PDF, DOC, JPG, PNG, TXT, PPT (Max 20MB)</span>
+                                <span class="text-xs text-gray-500 block mt-1">PDF, DOC, JPG, PNG, TXT, PPT (Max 10MB)</span>
                             </label>
                             <div id="file-preview" class="file-preview hidden">
                                 <div class="flex items-center justify-between">
@@ -2191,7 +2224,7 @@ function showHomeworkModal(student) {
         if (e.target.files.length > 0) {
             const file = e.target.files[0];
             if (file.size > 10 * 1024 * 1024) {
-                showCustomAlert('File size must be less than 20MB.');
+                showCustomAlert('File size must be less than 10MB.');
                 fileInput.value = '';
                 return;
             }
@@ -2270,7 +2303,6 @@ function showHomeworkModal(student) {
                 const file = fileInput.files[0];
                 showCustomAlert('📤 Uploading file to Cloudinary...');
                 
-                // This will use the GLOBAL uploadToCloudinary function
                 fileData = await uploadToCloudinary(file, student.id);
                 
                 hwData.fileUrl = fileData.url;
@@ -6572,6 +6604,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
