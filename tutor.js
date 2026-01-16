@@ -1789,7 +1789,7 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
 }
 
 /*******************************************************************************
- * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT
+ * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT (With Edit, Delete & Multi-Upload)
  ******************************************************************************/
 
 // ==========================================
@@ -1851,7 +1851,7 @@ function showDailyTopicModal(student) {
     
     setTimeout(() => document.getElementById('topic-topics').focus(), 100);
 
-    // Event Delegation for Edit/Save/Cancel buttons in the history list
+    // Event Delegation for Edit/Delete/Save/Cancel buttons
     const historyContainer = document.getElementById('topic-history');
     historyContainer.addEventListener('click', async (e) => {
         const target = e.target;
@@ -1864,6 +1864,10 @@ function showDailyTopicModal(student) {
 
         if (action === 'edit') {
             enableTopicEdit(topicId);
+        } else if (action === 'delete') {
+            if (confirm('Are you sure you want to delete this topic? This cannot be undone.')) {
+                await deleteTopic(topicId, student.id);
+            }
         } else if (action === 'cancel') {
             cancelTopicEdit(topicId);
         } else if (action === 'save') {
@@ -1901,7 +1905,7 @@ function showDailyTopicModal(student) {
             const topicRef = doc(collection(db, "daily_topics"));
             await setDoc(topicRef, topicData);
             
-            // Clear input and reload history instead of closing modal (better UX)
+            // Clear input and reload history
             topicInput.value = '';
             await loadDailyTopicHistory(student.id);
             showCustomAlert('✅ Topic saved!');
@@ -1918,22 +1922,25 @@ function showDailyTopicModal(student) {
 }
 
 // ------------------------------------------
-// HELPER FUNCTIONS FOR EDITING
+// HELPER FUNCTIONS FOR EDITING & DELETING
 // ------------------------------------------
 
 function enableTopicEdit(topicId) {
     const textSpan = document.getElementById(`text-${topicId}`);
     const inputContainer = document.getElementById(`input-container-${topicId}`);
     const editBtn = document.getElementById(`btn-edit-${topicId}`);
+    const deleteBtn = document.getElementById(`btn-delete-${topicId}`);
     const actionBtns = document.getElementById(`action-btns-${topicId}`);
     const inputField = document.getElementById(`input-${topicId}`);
 
-    // Populate input with current text
     inputField.value = textSpan.textContent;
 
-    // Toggle visibility
+    // Toggle visibility: Hide Text & Edit/Delete Buttons
     textSpan.classList.add('hidden');
     editBtn.classList.add('hidden');
+    if(deleteBtn) deleteBtn.classList.add('hidden');
+    
+    // Show Input & Save/Cancel Buttons
     inputContainer.classList.remove('hidden');
     actionBtns.classList.remove('hidden');
     
@@ -1944,11 +1951,14 @@ function cancelTopicEdit(topicId) {
     const textSpan = document.getElementById(`text-${topicId}`);
     const inputContainer = document.getElementById(`input-container-${topicId}`);
     const editBtn = document.getElementById(`btn-edit-${topicId}`);
+    const deleteBtn = document.getElementById(`btn-delete-${topicId}`);
     const actionBtns = document.getElementById(`action-btns-${topicId}`);
 
     // Toggle visibility back
     textSpan.classList.remove('hidden');
     editBtn.classList.remove('hidden');
+    if(deleteBtn) deleteBtn.classList.remove('hidden');
+    
     inputContainer.classList.add('hidden');
     actionBtns.classList.add('hidden');
 }
@@ -1964,13 +1974,8 @@ async function saveTopicEdit(topicId, studentId) {
 
     try {
         const topicRef = doc(db, "daily_topics", topicId);
-        
-        // Ensure 'updateDoc' is imported in your main file
-        await updateDoc(topicRef, {
-            topics: newText
-        });
+        await updateDoc(topicRef, { topics: newText });
 
-        // Reload the list to show changes
         await loadDailyTopicHistory(studentId);
         showCustomAlert("✅ Topic updated!");
 
@@ -1980,8 +1985,22 @@ async function saveTopicEdit(topicId, studentId) {
     }
 }
 
+async function deleteTopic(topicId, studentId) {
+    try {
+        const topicRef = doc(db, "daily_topics", topicId);
+        // Ensure 'deleteDoc' is imported in your main file
+        await deleteDoc(topicRef);
+        
+        await loadDailyTopicHistory(studentId);
+        showCustomAlert("🗑️ Topic deleted.");
+    } catch (error) {
+        console.error("Error deleting topic:", error);
+        showCustomAlert("❌ Failed to delete topic.");
+    }
+}
+
 // ------------------------------------------
-// HISTORY LOADER
+// HISTORY LOADER (With Filter, Edit & Delete)
 // ------------------------------------------
 
 async function loadDailyTopicHistory(studentId) {
@@ -2003,7 +2022,6 @@ async function loadDailyTopicHistory(studentId) {
         
         const querySnapshot = await getDocs(topicsQuery);
         
-        // Convert snapshot to array WITH DOC ID
         let topicsData = [];
         querySnapshot.forEach(doc => {
             const data = doc.data();
@@ -2047,10 +2065,16 @@ async function loadDailyTopicHistory(studentId) {
                                 </div>
                             </div>
 
-                            <div class="flex items-center">
-                                <button id="btn-edit-${data.id}" data-action="edit" data-id="${data.id}" class="text-gray-400 hover:text-blue-600 transition-colors p-1" title="Edit Topic">
+                            <div class="flex items-center space-x-1">
+                                <button id="btn-edit-${data.id}" data-action="edit" data-id="${data.id}" class="text-gray-400 hover:text-blue-600 transition-colors p-1" title="Edit">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                </button>
+
+                                <button id="btn-delete-${data.id}" data-action="delete" data-id="${data.id}" class="text-gray-400 hover:text-red-600 transition-colors p-1" title="Delete">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
                                 </button>
                                 
@@ -2093,7 +2117,7 @@ async function loadDailyTopicHistory(studentId) {
 
 
 // ==========================================
-// 2. HOMEWORK ASSIGNMENT FUNCTIONS
+// 2. HOMEWORK ASSIGNMENT FUNCTIONS (Updated for Multiple Files)
 // ==========================================
 
 async function uploadToCloudinary(file, studentId) {
@@ -2120,7 +2144,8 @@ async function uploadToCloudinary(file, studentId) {
                     publicId: data.public_id,
                     format: data.format,
                     bytes: data.bytes,
-                    createdAt: data.created_at
+                    createdAt: data.created_at,
+                    fileName: file.name
                 });
             } else {
                 reject(new Error('Upload failed: ' + (data.error?.message || 'Unknown error')));
@@ -2137,6 +2162,9 @@ function showHomeworkModal(student) {
     nextWeek.setDate(nextWeek.getDate() + 7);
     const maxDate = nextWeek.toISOString().split('T')[0];
     
+    // Store selected files in an array
+    let selectedFiles = [];
+
     const modalHTML = `
         <div class="modal-overlay">
             <div class="modal-content max-w-2xl">
@@ -2158,22 +2186,17 @@ function showHomeworkModal(student) {
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label">Upload File (Optional)</label>
+                        <label class="form-label">Upload Files (Max 5)</label>
                         <div class="file-upload-container" id="file-upload-container">
-                            <input type="file" id="hw-file" class="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.ppt,.pptx">
+                            <input type="file" id="hw-file" class="hidden" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.ppt,.pptx">
                             <label for="hw-file" class="file-upload-label">
                                 <div class="file-upload-icon">📎</div>
-                                <span class="text-sm font-medium text-primary-color">Click to upload file</span>
-                                <span class="text-xs text-gray-500 block mt-1">PDF, DOC, JPG, PNG, TXT, PPT (Max 10MB)</span>
+                                <span class="text-sm font-medium text-primary-color">Click to upload files</span>
+                                <span class="text-xs text-gray-500 block mt-1">PDF, DOC, JPG, PNG, TXT, PPT (Max 10MB each)</span>
                             </label>
-                            <div id="file-preview" class="file-preview hidden">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <div class="file-name" id="file-name"></div>
-                                        <div class="file-size" id="file-size"></div>
-                                    </div>
-                                    <button type="button" id="remove-file-btn" class="btn btn-danger btn-sm">Remove</button>
-                                </div>
+                            <div id="file-list-preview" class="file-preview hidden mt-2">
+                                <ul id="file-list-ul" class="text-sm text-gray-700 space-y-2"></ul>
+                                <button type="button" id="remove-all-files-btn" class="btn btn-danger btn-sm mt-2 w-full">Remove All Files</button>
                             </div>
                         </div>
                     </div>
@@ -2212,35 +2235,86 @@ function showHomeworkModal(student) {
     document.body.appendChild(modal);
     
     const fileInput = document.getElementById('hw-file');
-    const filePreview = document.getElementById('file-preview');
-    const fileName = document.getElementById('file-name');
-    const fileSize = document.getElementById('file-size');
-    const removeFileBtn = document.getElementById('remove-file-btn');
+    const fileListPreview = document.getElementById('file-list-preview');
+    const fileListUl = document.getElementById('file-list-ul');
+    const removeAllBtn = document.getElementById('remove-all-files-btn');
     const emailPreview = document.getElementById('email-preview');
     const emailSubject = document.getElementById('email-subject');
     const emailMessage = document.getElementById('email-message');
     
     fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            const file = e.target.files[0];
-            if (file.size > 10 * 1024 * 1024) {
-                showCustomAlert('File size must be less than 10MB.');
-                fileInput.value = '';
-                return;
-            }
-            
-            fileName.textContent = file.name;
-            fileSize.textContent = formatFileSize(file.size);
-            filePreview.classList.remove('hidden');
-            
-            emailMessage.textContent = `Don't forget! ${student.studentName} has homework due tomorrow. A file has been attached to this assignment.`;
+        const files = Array.from(e.target.files);
+        
+        if (files.length === 0) return;
+
+        // Check file limit
+        if (selectedFiles.length + files.length > 5) {
+            showCustomAlert('❌ You can only upload a maximum of 5 files.');
+            fileInput.value = ''; // Reset input to allow re-selection
+            return;
         }
+
+        // Add valid files to the array
+        let invalidFiles = false;
+        files.forEach(file => {
+            if (file.size > 10 * 1024 * 1024) {
+                invalidFiles = true;
+            } else {
+                selectedFiles.push(file);
+            }
+        });
+
+        if (invalidFiles) {
+            showCustomAlert('⚠️ Some files were skipped because they exceed 10MB.');
+        }
+
+        renderFileList();
     });
+
+    function renderFileList() {
+        if (selectedFiles.length === 0) {
+            fileListPreview.classList.add('hidden');
+            emailMessage.textContent = `Don't forget! ${student.studentName} has homework due tomorrow. Please check the assignment details.`;
+            return;
+        }
+
+        fileListPreview.classList.remove('hidden');
+        fileListUl.innerHTML = '';
+        
+        selectedFiles.forEach((file, index) => {
+            const li = document.createElement('li');
+            li.className = 'flex justify-between items-center bg-gray-50 p-2 rounded border';
+            li.innerHTML = `
+                <div class="flex items-center overflow-hidden">
+                    <span class="mr-2 text-lg">📄</span>
+                    <div class="truncate">
+                        <div class="font-medium truncate">${file.name}</div>
+                        <div class="text-xs text-gray-500">${formatFileSize(file.size)}</div>
+                    </div>
+                </div>
+                <button type="button" class="text-red-500 hover:text-red-700 ml-2" data-index="${index}">
+                    ✕
+                </button>
+            `;
+            
+            // Add click listener to the X button inside the list item
+            li.querySelector('button').addEventListener('click', (ev) => {
+                const idx = parseInt(ev.target.closest('button').dataset.index);
+                selectedFiles.splice(idx, 1);
+                renderFileList();
+            });
+
+            fileListUl.appendChild(li);
+        });
+
+        const fileCount = selectedFiles.length;
+        emailMessage.textContent = `Don't forget! ${student.studentName} has homework due tomorrow. ${fileCount} file${fileCount > 1 ? 's have' : ' has'} been attached.`;
+    }
     
-    removeFileBtn.addEventListener('click', () => {
+    removeAllBtn.addEventListener('click', () => {
+        selectedFiles = [];
         fileInput.value = '';
-        filePreview.classList.add('hidden');
-        emailMessage.textContent = `Don't forget! ${student.studentName} has homework due tomorrow. Please check the assignment details.`;
+        renderFileList();
     });
     
     const reminderCheckbox = document.getElementById('hw-reminder');
@@ -2257,7 +2331,10 @@ function showHomeworkModal(student) {
     });
     
     document.getElementById('cancel-hw-btn').addEventListener('click', () => modal.remove());
+    
     document.getElementById('save-hw-btn').addEventListener('click', async () => {
+        const saveBtn = document.getElementById('save-hw-btn');
+        
         const hwData = {
             studentId: student.id,
             studentName: student.studentName,
@@ -2271,7 +2348,8 @@ function showHomeworkModal(student) {
             sendReminder: document.getElementById('hw-reminder').checked,
             assignedDate: new Date(),
             status: 'assigned',
-            submissions: []
+            submissions: [],
+            attachments: [] // New Array to hold multiple files
         };
         
         if (!hwData.title || !hwData.description || !hwData.dueDate) {
@@ -2298,34 +2376,56 @@ function showHomeworkModal(student) {
         }
         
         try {
-            let fileData = null;
-            if (fileInput.files.length > 0) {
-                const file = fileInput.files[0];
-                showCustomAlert('📤 Uploading file to Cloudinary...');
-                
-                fileData = await uploadToCloudinary(file, student.id);
-                
-                hwData.fileUrl = fileData.url;
-                hwData.fileName = file.name;
-                hwData.fileSize = file.size;
-                hwData.fileType = file.type;
-                hwData.cloudinaryPublicId = fileData.publicId;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = `Uploading ${selectedFiles.length} file(s)...`;
+
+            // 1. Upload all files to Cloudinary sequentially
+            if (selectedFiles.length > 0) {
+                for (const file of selectedFiles) {
+                    try {
+                        const fileData = await uploadToCloudinary(file, student.id);
+                        hwData.attachments.push({
+                            url: fileData.url,
+                            name: file.name,
+                            size: file.size,
+                            type: file.type,
+                            publicId: fileData.publicId
+                        });
+                    } catch (uploadError) {
+                        console.error("Failed to upload file:", file.name, uploadError);
+                        showCustomAlert(`❌ Failed to upload ${file.name}. Please try again.`);
+                        saveBtn.disabled = false;
+                        saveBtn.innerHTML = "Assign Homework";
+                        return;
+                    }
+                }
+            }
+
+            // 2. Backward compatibility for older logic (optional, keeps first file as 'main' file)
+            if (hwData.attachments.length > 0) {
+                hwData.fileUrl = hwData.attachments[0].url;
+                hwData.fileName = hwData.attachments[0].name;
+                hwData.fileSize = hwData.attachments[0].size;
             }
             
+            // 3. Save to Firestore
             const hwRef = doc(collection(db, "homework_assignments"));
             await setDoc(hwRef, hwData);
             
+            // 4. Schedule Email
             if (hwData.sendReminder && hwData.parentEmail) {
-                await scheduleEmailReminder(hwData, fileData?.url);
+                const firstFileUrl = hwData.attachments.length > 0 ? hwData.attachments[0].url : '';
+                await scheduleEmailReminder(hwData, firstFileUrl);
             }
             
             modal.remove();
-            showCustomAlert('✅ Homework assigned successfully! ' + 
-                (hwData.sendReminder && hwData.parentEmail ? 'Email reminder will be sent 1 day before due date.' : ''));
+            showCustomAlert(`✅ Homework assigned successfully! ${hwData.attachments.length} file(s) attached.`);
             
         } catch (error) {
             console.error("Error assigning homework:", error);
             showCustomAlert('❌ Error assigning homework: ' + error.message);
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = "Assign Homework";
         }
     });
 }
@@ -6604,6 +6704,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
