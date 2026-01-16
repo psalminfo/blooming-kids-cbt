@@ -1790,7 +1790,7 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
 
 /*******************************************************************************
  * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT
- * (Final Version: Edit, Delete, Multi-Upload, & Live Email Notification)
+ * (Final Version: Edit, Delete, Multi-Upload & Live Email Notification)
  ******************************************************************************/
 
 // ==========================================
@@ -2206,7 +2206,7 @@ function showHomeworkModal(student) {
                                 <input type="checkbox" id="hw-reminder" class="rounded" checked>
                                 <span class="text-sm font-semibold">Send Email Reminder to Parent</span>
                             </label>
-                            <p class="text-xs text-gray-500 mt-1">Parent will receive an email reminder immediately via Google Script.</p>
+                            <p class="text-xs text-gray-500 mt-1">Parent will receive an email reminder immediately.</p>
                         </div>
                         
                         <div id="email-preview" class="email-preview hidden">
@@ -2416,11 +2416,11 @@ function showHomeworkModal(student) {
             // 4. Send Email Notification via Google Apps Script (LIVE TRIGGER)
             if (hwData.sendReminder && hwData.parentEmail) {
                 
-                // *** YOUR GOOGLE APPS SCRIPT URL ***
-                const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz9yuiR1egvxRcCLbW1Id-6lxBsYotiID0j_Fpeb9D8RyQGdMPNPPZn8WqOpJ4m_JqJNQ/exec"; 
+                // 🔴 PASTE YOUR WORKING GOOGLE SCRIPT URL HERE 🔴
+                const HOMEWORK_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz9yuiR1egvxRcCLbW1Id-6lxBsYotiID0j_Fpeb9D8RyQGdMPNPPZn8WqOpJ4m_JqJNQ/exec"; 
 
                 // We don't await this because we don't want to freeze the UI while email sends
-                fetch(GOOGLE_SCRIPT_URL, {
+                fetch(HOMEWORK_SCRIPT_URL, {
                     method: 'POST',
                     mode: 'no-cors', // Important for calling GAS from browser
                     headers: {
@@ -2429,7 +2429,7 @@ function showHomeworkModal(student) {
                     body: JSON.stringify({
                         parentEmail: hwData.parentEmail,
                         studentName: hwData.studentName,
-                        tutorName: hwData.tutorName,
+                        tutorName: window.tutorData.name,
                         title: hwData.title,
                         description: hwData.description,
                         dueDate: hwData.dueDate,
@@ -6729,6 +6729,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
