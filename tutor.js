@@ -1789,7 +1789,7 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
 }
 
 /*******************************************************************************
- * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT (With Edit Functionality)
+ * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT (Fixed: No Duplicates)
  ******************************************************************************/
 
 // ==========================================
@@ -1965,7 +1965,7 @@ async function saveTopicEdit(topicId, studentId) {
     try {
         const topicRef = doc(db, "daily_topics", topicId);
         
-        // Note: ensure 'updateDoc' is imported in your main file imports
+        // Ensure 'updateDoc' is imported in your main file
         await updateDoc(topicRef, {
             topics: newText
         });
@@ -2007,7 +2007,6 @@ async function loadDailyTopicHistory(studentId) {
         let topicsData = [];
         querySnapshot.forEach(doc => {
             const data = doc.data();
-            // Store the Document ID for editing
             data.id = doc.id; 
             
             if (data.createdAt && typeof data.createdAt.toDate === 'function') {
@@ -2097,41 +2096,8 @@ async function loadDailyTopicHistory(studentId) {
 // 2. HOMEWORK ASSIGNMENT FUNCTIONS
 // ==========================================
 
-async function uploadToCloudinary(file, studentId) {
-    return new Promise((resolve, reject) => {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
-        formData.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
-        formData.append('folder', 'homework_assignments');
-        formData.append('public_id', `homework_${studentId}_${Date.now()}_${file.name.replace(/\.[^/.]+$/, "")}`);
-        
-        // Create upload URL
-        const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/upload`;
-        
-        fetch(uploadUrl, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.secure_url) {
-                resolve({
-                    url: data.secure_url,
-                    publicId: data.public_id,
-                    format: data.format,
-                    bytes: data.bytes,
-                    createdAt: data.created_at
-                });
-            } else {
-                reject(new Error('Upload failed: ' + (data.error?.message || 'Unknown error')));
-            }
-        })
-        .catch(error => {
-            reject(error);
-        });
-    });
-}
+// NOTE: uploadToCloudinary function removed from here because it is already defined 
+// elsewhere in your file. This prevents the "Identifier already declared" error.
 
 function showHomeworkModal(student) {
     const nextWeek = new Date();
@@ -2304,279 +2270,7 @@ function showHomeworkModal(student) {
                 const file = fileInput.files[0];
                 showCustomAlert('📤 Uploading file to Cloudinary...');
                 
-                fileData = await uploadToCloudinary(file, student.id);
-                
-                hwData.fileUrl = fileData.url;
-                hwData.fileName = file.name;
-                hwData.fileSize = file.size;
-                hwData.fileType = file.type;
-                hwData.cloudinaryPublicId = fileData.publicId;
-            }
-            
-            const hwRef = doc(collection(db, "homework_assignments"));
-            await setDoc(hwRef, hwData);
-            
-            if (hwData.sendReminder && hwData.parentEmail) {
-                await scheduleEmailReminder(hwData, fileData?.url);
-            }
-            
-            modal.remove();
-            showCustomAlert('✅ Homework assigned successfully! ' + 
-                (hwData.sendReminder && hwData.parentEmail ? 'Email reminder will be sent 1 day before due date.' : ''));
-            
-        } catch (error) {
-            console.error("Error assigning homework:", error);
-            showCustomAlert('❌ Error assigning homework: ' + error.message);
-        }
-    });
-}
-
-async function scheduleEmailReminder(hwData, fileUrl = '') {
-    try {
-        const dueDate = new Date(hwData.dueDate);
-        const reminderDate = new Date(dueDate);
-        reminderDate.setDate(reminderDate.getDate() - 1);
-        
-        const reminderData = {
-            homeworkId: hwData.id,
-            studentId: hwData.studentId,
-            studentName: hwData.studentName,
-            parentEmail: hwData.parentEmail,
-            tutorEmail: hwData.tutorEmail,
-            tutorName: hwData.tutorName,
-            title: hwData.title,
-            description: hwData.description,
-            dueDate: hwData.dueDate,
-            reminderDate: reminderDate,
-            fileUrl: fileUrl,
-            fileName: hwData.fileName,
-            status: 'scheduled',
-            createdAt: new Date()
-        };
-        
-        const reminderRef = doc(collection(db, "email_reminders"));
-        await setDoc(reminderRef, reminderData);
-        
-        console.log('Email reminder scheduled for:', reminderDate);
-        
-    } catch (error) {
-        console.error("Error scheduling email reminder:", error);
-    }
-}
-
-
-// ==========================================
-// 2. HOMEWORK ASSIGNMENT FUNCTIONS
-// ==========================================
-
-async function uploadToCloudinary(file, studentId) {
-    return new Promise((resolve, reject) => {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
-        formData.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
-        formData.append('folder', 'homework_assignments');
-        formData.append('public_id', `homework_${studentId}_${Date.now()}_${file.name.replace(/\.[^/.]+$/, "")}`);
-        
-        // Create upload URL
-        const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/upload`;
-        
-        fetch(uploadUrl, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.secure_url) {
-                resolve({
-                    url: data.secure_url,
-                    publicId: data.public_id,
-                    format: data.format,
-                    bytes: data.bytes,
-                    createdAt: data.created_at
-                });
-            } else {
-                reject(new Error('Upload failed: ' + (data.error?.message || 'Unknown error')));
-            }
-        })
-        .catch(error => {
-            reject(error);
-        });
-    });
-}
-
-function showHomeworkModal(student) {
-    const nextWeek = new Date();
-    nextWeek.setDate(nextWeek.getDate() + 7);
-    const maxDate = nextWeek.toISOString().split('T')[0];
-    
-    const modalHTML = `
-        <div class="modal-overlay">
-            <div class="modal-content max-w-2xl">
-                <div class="modal-header">
-                    <h3 class="modal-title">📝 Assign Homework for ${student.studentName}</h3>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label class="form-label">Homework Title *</label>
-                        <input type="text" id="hw-title" class="form-input" placeholder="e.g., Math Worksheet #3" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Description *</label>
-                        <textarea id="hw-description" class="form-input form-textarea report-textarea" placeholder="Detailed instructions for the homework..." required></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Due Date *</label>
-                        <input type="date" id="hw-due-date" class="form-input" min="${new Date().toISOString().split('T')[0]}" max="${maxDate}" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Upload File (Optional)</label>
-                        <div class="file-upload-container" id="file-upload-container">
-                            <input type="file" id="hw-file" class="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.ppt,.pptx">
-                            <label for="hw-file" class="file-upload-label">
-                                <div class="file-upload-icon">📎</div>
-                                <span class="text-sm font-medium text-primary-color">Click to upload file</span>
-                                <span class="text-xs text-gray-500 block mt-1">PDF, DOC, JPG, PNG, TXT, PPT (Max 10MB)</span>
-                            </label>
-                            <div id="file-preview" class="file-preview hidden">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <div class="file-name" id="file-name"></div>
-                                        <div class="file-size" id="file-size"></div>
-                                    </div>
-                                    <button type="button" id="remove-file-btn" class="btn btn-danger btn-sm">Remove</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="email-settings">
-                        <div class="form-group">
-                            <label class="flex items-center space-x-2">
-                                <input type="checkbox" id="hw-reminder" class="rounded" checked>
-                                <span class="text-sm font-semibold">Send Email Reminder to Parent</span>
-                            </label>
-                            <p class="text-xs text-gray-500 mt-1">Parent will receive an email reminder 1 day before due date</p>
-                        </div>
-                        
-                        <div id="email-preview" class="email-preview hidden">
-                            <div class="email-preview-header">
-                                <strong>Email Preview:</strong>
-                            </div>
-                            <p><strong>Subject:</strong> <span id="email-subject">Homework Reminder for ${student.studentName}</span></p>
-                            <p><strong>To:</strong> ${student.parentEmail || 'Parent email will be used'}</p>
-                            <p><strong>Message:</strong> <span id="email-message">Don't forget! ${student.studentName} has homework due tomorrow. Please check the assignment details.</span></p>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button id="cancel-hw-btn" class="btn btn-secondary">Cancel</button>
-                    <button id="save-hw-btn" class="btn btn-primary" data-student-id="${student.id}">
-                        Assign Homework
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const modal = document.createElement('div');
-    modal.innerHTML = modalHTML;
-    document.body.appendChild(modal);
-    
-    const fileInput = document.getElementById('hw-file');
-    const filePreview = document.getElementById('file-preview');
-    const fileName = document.getElementById('file-name');
-    const fileSize = document.getElementById('file-size');
-    const removeFileBtn = document.getElementById('remove-file-btn');
-    const emailPreview = document.getElementById('email-preview');
-    const emailSubject = document.getElementById('email-subject');
-    const emailMessage = document.getElementById('email-message');
-    
-    fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            const file = e.target.files[0];
-            if (file.size > 10 * 1024 * 1024) {
-                showCustomAlert('File size must be less than 10MB.');
-                fileInput.value = '';
-                return;
-            }
-            
-            fileName.textContent = file.name;
-            fileSize.textContent = formatFileSize(file.size);
-            filePreview.classList.remove('hidden');
-            
-            emailMessage.textContent = `Don't forget! ${student.studentName} has homework due tomorrow. A file has been attached to this assignment.`;
-        }
-    });
-    
-    removeFileBtn.addEventListener('click', () => {
-        fileInput.value = '';
-        filePreview.classList.add('hidden');
-        emailMessage.textContent = `Don't forget! ${student.studentName} has homework due tomorrow. Please check the assignment details.`;
-    });
-    
-    const reminderCheckbox = document.getElementById('hw-reminder');
-    reminderCheckbox.addEventListener('change', () => {
-        if (reminderCheckbox.checked) {
-            emailPreview.classList.remove('hidden');
-            const titleInput = document.getElementById('hw-title');
-            titleInput.addEventListener('input', () => {
-                emailSubject.textContent = `Homework Reminder: ${titleInput.value || 'Assignment'} for ${student.studentName}`;
-            });
-        } else {
-            emailPreview.classList.add('hidden');
-        }
-    });
-    
-    document.getElementById('cancel-hw-btn').addEventListener('click', () => modal.remove());
-    document.getElementById('save-hw-btn').addEventListener('click', async () => {
-        const hwData = {
-            studentId: student.id,
-            studentName: student.studentName,
-            parentEmail: student.parentEmail || '',
-            parentPhone: student.parentPhone,
-            tutorEmail: window.tutorData.email,
-            tutorName: window.tutorData.name,
-            title: document.getElementById('hw-title').value.trim(),
-            description: document.getElementById('hw-description').value.trim(),
-            dueDate: document.getElementById('hw-due-date').value,
-            sendReminder: document.getElementById('hw-reminder').checked,
-            assignedDate: new Date(),
-            status: 'assigned',
-            submissions: []
-        };
-        
-        if (!hwData.title || !hwData.description || !hwData.dueDate) {
-            showCustomAlert('Please fill in all required fields (title, description, due date).');
-            return;
-        }
-        
-        const dueDate = new Date(hwData.dueDate);
-        const today = new Date();
-        const maxDueDate = new Date(today);
-        maxDueDate.setDate(maxDueDate.getDate() + 7);
-        
-        // Normalize time to compare dates correctly
-        const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
-
-        if (dueDateOnly < todayDateOnly) {
-            showCustomAlert('Due date cannot be in the past.');
-            return;
-        }
-        
-        if (dueDate > maxDueDate) {
-            showCustomAlert('Due date must be within 7 days from today.');
-            return;
-        }
-        
-        try {
-            let fileData = null;
-            if (fileInput.files.length > 0) {
-                const file = fileInput.files[0];
-                showCustomAlert('📤 Uploading file to Cloudinary...');
-                
+                // This will use the GLOBAL uploadToCloudinary function
                 fileData = await uploadToCloudinary(file, student.id);
                 
                 hwData.fileUrl = fileData.url;
@@ -6878,6 +6572,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
