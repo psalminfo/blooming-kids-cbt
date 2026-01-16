@@ -2131,7 +2131,7 @@ function showHomeworkModal(student) {
                             <label for="hw-file" class="file-upload-label">
                                 <div class="file-upload-icon">📎</div>
                                 <span class="text-sm font-medium text-primary-color">Click to upload file</span>
-                                <span class="text-xs text-gray-500 block mt-1">PDF, DOC, JPG, PNG, TXT, PPT (Max 10MB)</span>
+                                <span class="text-xs text-gray-500 block mt-1">PDF, DOC, JPG, PNG, TXT, PPT (Max 20MB)</span>
                             </label>
                             <div id="file-preview" class="file-preview hidden">
                                 <div class="flex items-center justify-between">
@@ -2191,7 +2191,7 @@ function showHomeworkModal(student) {
         if (e.target.files.length > 0) {
             const file = e.target.files[0];
             if (file.size > 10 * 1024 * 1024) {
-                showCustomAlert('File size must be less than 10MB.');
+                showCustomAlert('File size must be less than 20MB.');
                 fileInput.value = '';
                 return;
             }
@@ -6572,6 +6572,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
