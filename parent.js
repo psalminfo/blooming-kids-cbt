@@ -812,6 +812,125 @@ async function submitMessage() {
 }
 
 // -------------------------------------------------------------------
+// FEEDBACK SYSTEM (Integrated)
+// -------------------------------------------------------------------
+
+function showFeedbackModal() {
+    populateStudentDropdownForFeedback();
+    const modal = document.getElementById('feedbackModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+    } else {
+        console.error('Feedback modal element not found');
+        showMessage('Feedback form is currently unavailable', 'error');
+    }
+}
+
+function hideFeedbackModal() {
+    const modal = document.getElementById('feedbackModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+    
+    // Reset form fields if they exist
+    const category = document.getElementById('feedbackCategory');
+    const priority = document.getElementById('feedbackPriority');
+    const student = document.getElementById('feedbackStudent');
+    const message = document.getElementById('feedbackMessage');
+    
+    if (category) category.value = 'General';
+    if (priority) priority.value = 'Normal';
+    if (student) student.value = '';
+    if (message) message.value = '';
+}
+
+function populateStudentDropdownForFeedback() {
+    const studentDropdown = document.getElementById('feedbackStudent');
+    if (!studentDropdown) return;
+    
+    studentDropdown.innerHTML = '<option value="">Select student (optional)</option>';
+    
+    // Get student names from the userChildren array
+    if (userChildren.length === 0) {
+        studentDropdown.innerHTML += '<option value="" disabled>No students found</option>';
+        return;
+    }
+
+    userChildren.forEach(studentName => {
+        const option = document.createElement('option');
+        option.value = studentName;
+        option.textContent = capitalize(studentName);
+        studentDropdown.appendChild(option);
+    });
+}
+
+async function submitFeedback() {
+    const category = document.getElementById('feedbackCategory').value;
+    const priority = document.getElementById('feedbackPriority').value;
+    const student = document.getElementById('feedbackStudent').value;
+    const message = document.getElementById('feedbackMessage').value;
+
+    // Validation
+    if (!category || !priority || !message) {
+        showMessage('Please fill in all required fields', 'error');
+        return;
+    }
+
+    if (message.length < 10) {
+        showMessage('Please provide a more detailed message (at least 10 characters)', 'error');
+        return;
+    }
+
+    const submitBtn = document.getElementById('submitFeedbackBtn');
+    submitBtn.disabled = true;
+    document.getElementById('submitFeedbackText').textContent = 'Submitting...';
+    document.getElementById('submitFeedbackSpinner').classList.remove('hidden');
+
+    try {
+        const user = auth.currentUser;
+        if (!user) {
+            throw new Error('Please sign in to submit feedback');
+        }
+
+        // Get user data
+        const userDoc = await db.collection('parent_users').doc(user.uid).get();
+        const userData = userDoc.data();
+
+        // Create feedback document
+        const feedbackData = {
+            parentName: currentUserData?.parentName || userData.parentName || 'Unknown Parent',
+            parentPhone: userData.phone,
+            parentEmail: userData.email,
+            parentUid: user.uid, // Add parent UID for querying responses
+            studentName: student || 'General',
+            category: category,
+            priority: priority,
+            message: message,
+            status: 'New',
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            emailSent: false,
+            responses: [] // Initialize empty responses array
+        };
+
+        // Save to Firestore
+        await db.collection('parent_feedback').add(feedbackData);
+
+        showMessage('Thank you! Your feedback has been submitted successfully. We will respond within 24-48 hours.', 'success');
+        
+        // Close modal and reset form
+        hideFeedbackModal();
+
+    } catch (error) {
+        console.error('Feedback submission error:', error);
+        showMessage('Failed to submit feedback. Please try again.', 'error');
+    } finally {
+        submitBtn.disabled = false;
+        document.getElementById('submitFeedbackText').textContent = 'Submit Feedback';
+        document.getElementById('submitFeedbackSpinner').classList.add('hidden');
+    }
+}
+
+// -------------------------------------------------------------------
 // ACADEMICS TAB FUNCTIONS - FIXED DATE ERROR
 // -------------------------------------------------------------------
 
@@ -2244,11 +2363,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const signUpBtn = document.getElementById("signUpBtn");
     const sendResetBtn = document.getElementById("sendResetBtn");
     const submitMessageBtn = document.getElementById("submitMessageBtn");
+    // New listener for feedback submission
+    const submitFeedbackBtn = document.getElementById("submitFeedbackBtn");
     
     if (signInBtn) signInBtn.addEventListener("click", handleSignIn);
     if (signUpBtn) signUpBtn.addEventListener("click", handleSignUp);
     if (sendResetBtn) sendResetBtn.addEventListener("click", handlePasswordReset);
     if (submitMessageBtn) submitMessageBtn.addEventListener("click", submitMessage);
+    if (submitFeedbackBtn) submitFeedbackBtn.addEventListener("click", submitFeedback);
     
     const signInTab = document.getElementById("signInTab");
     const signUpTab = document.getElementById("signUpTab");
@@ -2270,7 +2392,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // FIXED: Event delegation for dynamically created cancel buttons
+    // FIXED: Event delegation for dynamically created cancel buttons and modals
     document.addEventListener('click', function(event) {
         // Check if cancel message button was clicked
         if (event.target.id === 'cancelMessageBtn' || 
@@ -2284,6 +2406,13 @@ document.addEventListener('DOMContentLoaded', function() {
             event.target.closest('#cancelMessagesModalBtn')) {
             event.preventDefault();
             hideMessagesModal();
+        }
+
+        // Check if cancel feedback modal button was clicked
+        if (event.target.id === 'cancelFeedbackBtn' ||
+            event.target.closest('#cancelFeedbackBtn')) {
+            event.preventDefault();
+            hideFeedbackModal();
         }
     });
 
