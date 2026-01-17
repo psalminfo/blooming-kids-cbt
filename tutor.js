@@ -2395,16 +2395,23 @@ async function scheduleEmailReminder(hwData, fileUrl = '') {
 }
 
 /*******************************************************************************
- * SECTION 9: MESSAGING & INBOX FEATURES (CONFLICT-FREE EDITION)
- * * UPDATES:
- * - Renamed helper functions (msgFormatTime, msgEscapeHtml) to avoid
- * "Identifier already declared" errors with previous code sections.
- * - Renamed state variables to ensure unique scope.
- * - fully compatible with your existing firebase setup.
+ * SECTION 9: MESSAGING & INBOX FEATURES (SELF-HEALING EDITION)
+ * * FIXES:
+ * - Polyfills 'serverTimestamp' if missing.
+ * - Restores 'updateUnreadMessageCount' alias for compatibility.
+ * - Fixes Modal Close Buttons (Z-Index & Event Handling).
  ******************************************************************************/
 
-// --- SECTION STATE MANAGEMENT ---
-// Using specific names to avoid conflicts with other sections of tutor.js
+// --- COMPATIBILITY LAYER (Fixes "serverTimestamp is not defined") ---
+// We check if serverTimestamp exists globally. If not, we use Date.now() or 
+// try to grab it from the Firebase SDK object if available.
+const msgServerTimestamp = () => {
+    if (typeof serverTimestamp === 'function') return serverTimestamp();
+    if (typeof firebase !== 'undefined' && firebase.firestore) return firebase.firestore.FieldValue.serverTimestamp();
+    return new Date(); // Fallback for client-side display immediate
+};
+
+// --- STATE MANAGEMENT ---
 let msgSectionUnreadCount = 0;
 let btnFloatingMsg = null;
 let btnFloatingInbox = null;
@@ -2414,10 +2421,8 @@ let unsubInboxListener = null;
 let unsubChatListener = null;
 let unsubUnreadListener = null;
 
-// --- UNIQUE UTILITY FUNCTIONS ---
-// Renamed to be specific to Messaging to prevent "Already Declared" errors
+// --- UTILITY FUNCTIONS ---
 
-// 1. Sanitize HTML (Security)
 function msgEscapeHtml(text) {
     if (!text) return '';
     return text
@@ -2428,16 +2433,12 @@ function msgEscapeHtml(text) {
         .replace(/'/g, "&#039;");
 }
 
-// 2. Consistent ID Generation
 function msgGenerateConvId(tutorId, parentPhone) {
-    // Sorts IDs so the conversation is the same regardless of who starts it
     return [tutorId, parentPhone].sort().join("_");
 }
 
-// 3. Format Date/Time
 function msgFormatTime(timestamp) {
     if (!timestamp) return '';
-    // Handle Firestore Timestamp vs JS Date
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
@@ -2449,13 +2450,13 @@ function initializeFloatingMessagingButton() {
     const oldBtns = document.querySelectorAll('.floating-messaging-btn, .floating-inbox-btn');
     oldBtns.forEach(btn => btn.remove());
     
-    // 2. Create Messaging Button (New Message)
+    // 2. Create Messaging Button
     btnFloatingMsg = document.createElement('button');
     btnFloatingMsg.className = 'floating-messaging-btn';
     btnFloatingMsg.innerHTML = `<span class="floating-btn-icon">💬</span><span class="floating-btn-text">New</span>`;
     btnFloatingMsg.onclick = showEnhancedMessagingModal;
     
-    // 3. Create Inbox Button (View Messages)
+    // 3. Create Inbox Button
     btnFloatingInbox = document.createElement('button');
     btnFloatingInbox.className = 'floating-inbox-btn';
     btnFloatingInbox.innerHTML = `<span class="floating-btn-icon">📨</span><span class="floating-btn-text">Inbox</span>`;
@@ -2468,25 +2469,23 @@ function initializeFloatingMessagingButton() {
     // 5. Inject CSS
     injectMessagingStyles();
     
-    // 6. Start Background Listeners
-    // We check for window.tutorData in case it hasn't loaded yet
+    // 6. Start Listener (Safe Check)
     if (window.tutorData && window.tutorData.id) {
         initializeUnreadListener();
     } else {
-        // Retry once after a short delay if tutorData is slow to load
         setTimeout(() => {
             if (window.tutorData && window.tutorData.id) initializeUnreadListener();
-        }, 2000);
+        }, 3000);
     }
 }
 
 // --- BACKGROUND LISTENERS ---
 
+// Renamed for internal consistency
 function initializeUnreadListener() {
     const tutorId = window.tutorData.id;
     if (unsubUnreadListener) unsubUnreadListener();
 
-    // Simple Query: No Index Required
     const q = query(
         collection(db, "conversations"),
         where("participants", "array-contains", tutorId)
@@ -2496,7 +2495,6 @@ function initializeUnreadListener() {
         let count = 0;
         snapshot.forEach(doc => {
             const data = doc.data();
-            // Count unread if I am NOT the last sender
             if (data.unreadCount > 0 && data.lastSenderId !== tutorId) {
                 count += data.unreadCount;
             }
@@ -2506,6 +2504,16 @@ function initializeUnreadListener() {
         updateFloatingBadges();
     });
 }
+
+// *** COMPATIBILITY ALIAS ***
+// This fixes: "Uncaught ReferenceError: updateUnreadMessageCount is not defined"
+// Your other code tries to call this function, so we simply point it to our new one.
+window.updateUnreadMessageCount = function() {
+    console.log("Legacy updateUnreadMessageCount called - redirecting to new listener");
+    if (window.tutorData && window.tutorData.id) {
+        initializeUnreadListener();
+    }
+};
 
 function updateFloatingBadges() {
     const updateBadge = (btn) => {
@@ -2524,16 +2532,24 @@ function updateFloatingBadges() {
     updateBadge(btnFloatingInbox);
 }
 
-// --- FEATURE 1: SEND NEW MESSAGE MODAL ---
+// --- FEATURE 1: SEND MESSAGE MODAL ---
 
 function showEnhancedMessagingModal() {
+    // Remove existing if open
+    document.querySelectorAll('.enhanced-messaging-modal').forEach(e => e.remove());
+
     const modal = document.createElement('div');
     modal.className = 'modal-overlay enhanced-messaging-modal';
+    // Added onclick to close when clicking outside content
+    modal.onclick = (e) => {
+        if (e.target === modal) modal.remove();
+    };
+
     modal.innerHTML = `
         <div class="modal-content messaging-modal-content">
             <div class="modal-header">
                 <h3>💬 Send Message</h3>
-                <button class="close-modal-btn">&times;</button>
+                <button type="button" class="close-modal-btn text-2xl font-bold">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="message-type-grid">
@@ -2551,8 +2567,7 @@ function showEnhancedMessagingModal() {
                     </div>
                 </div>
 
-                <div id="recipient-loader" class="recipient-area">
-                    </div>
+                <div id="recipient-loader" class="recipient-area"></div>
 
                 <input type="text" id="msg-subject" class="form-input" placeholder="Subject">
                 <textarea id="msg-content" class="form-input" rows="5" placeholder="Type your message..."></textarea>
@@ -2565,32 +2580,41 @@ function showEnhancedMessagingModal() {
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary close-modal-btn">Cancel</button>
-                <button id="btn-send-initial" class="btn btn-primary">Send Message</button>
+                <button type="button" class="btn btn-secondary close-modal-btn">Cancel</button>
+                <button type="button" id="btn-send-initial" class="btn btn-primary">Send Message</button>
             </div>
         </div>
     `;
 
     document.body.appendChild(modal);
 
-    // Logic for Type Selection
-    const typeOptions = modal.querySelectorAll('.type-option');
-    typeOptions.forEach(opt => {
+    // Initial Load
+    msgLoadRecipients('individual', modal.querySelector('#recipient-loader'));
+
+    // Event Listeners
+    modal.querySelectorAll('.type-option').forEach(opt => {
         opt.onclick = () => {
-            typeOptions.forEach(o => o.classList.remove('selected'));
+            modal.querySelectorAll('.type-option').forEach(o => o.classList.remove('selected'));
             opt.classList.add('selected');
             msgLoadRecipients(opt.dataset.type, modal.querySelector('#recipient-loader'));
         };
     });
 
-    // Load default (Individual)
-    msgLoadRecipients('individual', modal.querySelector('#recipient-loader'));
-
-    // Close Handlers
-    modal.querySelectorAll('.close-modal-btn').forEach(b => b.onclick = () => modal.remove());
+    // Explicit Close Handlers
+    const closeBtns = modal.querySelectorAll('.close-modal-btn');
+    closeBtns.forEach(btn => {
+        btn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            modal.remove();
+        };
+    });
     
-    // Send Handler
-    modal.querySelector('#btn-send-initial').onclick = () => msgProcessSend(modal);
+    const sendBtn = modal.querySelector('#btn-send-initial');
+    sendBtn.onclick = (e) => {
+        e.preventDefault();
+        msgProcessSend(modal);
+    };
 }
 
 async function msgLoadRecipients(type, container) {
@@ -2598,7 +2622,6 @@ async function msgLoadRecipients(type, container) {
     const tutorEmail = window.tutorData?.email;
 
     try {
-        // Fetch students for this tutor
         const q = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
         const snap = await getDocs(q);
         const students = snap.docs.map(d => d.data());
@@ -2643,7 +2666,6 @@ async function msgProcessSend(modal) {
         return;
     }
 
-    // 1. Gather Targets
     let targets = [];
     if (type === 'individual') {
         const sel = modal.querySelector('#sel-recipient');
@@ -2658,7 +2680,7 @@ async function msgProcessSend(modal) {
         const map = new Map();
         snap.forEach(d => {
             const s = d.data();
-            map.set(s.parentPhone, s.parentName); // Deduplicate
+            map.set(s.parentPhone, s.parentName);
         });
         map.forEach((name, phone) => targets.push({ phone, name }));
     }
@@ -2668,14 +2690,15 @@ async function msgProcessSend(modal) {
         return;
     }
 
-    modal.querySelector('#btn-send-initial').innerText = "Sending...";
+    const btn = modal.querySelector('#btn-send-initial');
+    btn.innerText = "Sending...";
+    btn.disabled = true;
     
     try {
-        // 2. Loop and Send
         const promises = targets.map(async (target) => {
             const convId = msgGenerateConvId(tutor.id, target.phone);
-            
-            // Upsert Conversation
+            const timestamp = msgServerTimestamp(); // USE SAFE TIMESTAMP
+
             await setDoc(doc(db, "conversations", convId), {
                 participants: [tutor.id, target.phone],
                 participantDetails: {
@@ -2683,19 +2706,18 @@ async function msgProcessSend(modal) {
                     [target.phone]: { name: target.name, role: 'parent' }
                 },
                 lastMessage: content,
-                lastMessageTimestamp: serverTimestamp(),
+                lastMessageTimestamp: timestamp,
                 lastSenderId: tutor.id,
                 unreadCount: increment(1)
             }, { merge: true });
 
-            // Add Message
             await addDoc(collection(db, "conversations", convId, "messages"), {
                 content: content,
                 subject: subject,
                 senderId: tutor.id,
                 senderName: tutor.name,
                 isUrgent: isUrgent,
-                createdAt: serverTimestamp(),
+                createdAt: timestamp,
                 read: false
             });
         });
@@ -2706,18 +2728,29 @@ async function msgProcessSend(modal) {
         alert("Message Sent!");
     } catch (e) {
         console.error(e);
-        alert("Error sending message.");
-        modal.querySelector('#btn-send-initial').innerText = "Try Again";
+        alert("Error sending message: " + e.message);
+        btn.innerText = "Try Again";
+        btn.disabled = false;
     }
 }
 
-// --- FEATURE 2: INBOX MODAL (CLIENT-SIDE SORTING) ---
+// --- FEATURE 2: INBOX MODAL ---
 
 function showInboxModal() {
+    // Clean up existing
+    document.querySelectorAll('.inbox-modal').forEach(e => e.remove());
+
     const modal = document.createElement('div');
     modal.className = 'modal-overlay inbox-modal';
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            closeInbox(modal);
+        }
+    };
+
     modal.innerHTML = `
         <div class="modal-content inbox-content">
+            <button class="close-modal-absolute">&times;</button>
             <div class="inbox-container">
                 <div class="inbox-list-col">
                     <div class="inbox-header">
@@ -2741,21 +2774,20 @@ function showInboxModal() {
                     </div>
                 </div>
             </div>
-            <button class="close-modal-absolute">&times;</button>
         </div>
     `;
 
     document.body.appendChild(modal);
 
-    // Cleanup Listeners on Close
-    modal.querySelector('.close-modal-absolute').onclick = () => {
-        if (unsubInboxListener) unsubInboxListener();
-        if (unsubChatListener) unsubChatListener();
-        modal.remove();
-    };
+    modal.querySelector('.close-modal-absolute').onclick = () => closeInbox(modal);
 
-    // Initialize Inbox
     msgStartInboxListener(modal);
+}
+
+function closeInbox(modal) {
+    if (unsubInboxListener) unsubInboxListener();
+    if (unsubChatListener) unsubChatListener();
+    modal.remove();
 }
 
 function msgStartInboxListener(modal) {
@@ -2764,7 +2796,6 @@ function msgStartInboxListener(modal) {
     
     if (unsubInboxListener) unsubInboxListener();
 
-    // NO "OrderBy" here. This avoids the Index requirement.
     const q = query(
         collection(db, "conversations"),
         where("participants", "array-contains", tutorId)
@@ -2776,11 +2807,10 @@ function msgStartInboxListener(modal) {
             convs.push({ id: doc.id, ...doc.data() });
         });
 
-        // CLIENT-SIDE SORTING (Solves the "Index" error)
         convs.sort((a, b) => {
-            const timeA = a.lastMessageTimestamp?.toMillis() || 0;
-            const timeB = b.lastMessageTimestamp?.toMillis() || 0;
-            return timeB - timeA; // Newest first
+            const timeA = a.lastMessageTimestamp?.toMillis ? a.lastMessageTimestamp.toMillis() : 0;
+            const timeB = b.lastMessageTimestamp?.toMillis ? b.lastMessageTimestamp.toMillis() : 0;
+            return timeB - timeA; 
         });
 
         msgRenderInboxList(convs, listEl, modal, tutorId);
@@ -2796,7 +2826,6 @@ function msgRenderInboxList(conversations, container, modal, tutorId) {
     }
 
     conversations.forEach(conv => {
-        // Find "The Other Person"
         const otherId = conv.participants.find(p => p !== tutorId);
         const otherName = conv.participantDetails?.[otherId]?.name || "Parent";
         const isUnread = conv.unreadCount > 0 && conv.lastSenderId !== tutorId;
@@ -2823,7 +2852,6 @@ function msgRenderInboxList(conversations, container, modal, tutorId) {
 }
 
 function msgLoadChat(convId, name, modal, tutorId) {
-    // UI Setup
     modal.querySelector('#chat-view-header').classList.remove('hidden');
     modal.querySelector('#chat-inputs').classList.remove('hidden');
     modal.querySelector('#chat-title').innerText = name;
@@ -2831,18 +2859,27 @@ function msgLoadChat(convId, name, modal, tutorId) {
     const msgContainer = modal.querySelector('#chat-messages');
     msgContainer.innerHTML = '<div class="spinner"></div>';
 
-    // 1. Reset Unread
     updateDoc(doc(db, "conversations", convId), { unreadCount: 0 });
 
-    // 2. Listen for Messages
     if (unsubChatListener) unsubChatListener();
 
-    const q = query(collection(db, "conversations", convId, "messages"), orderBy("createdAt", "asc"));
+    // Use simple query without orderBy first to ensure it loads
+    // If you need strict ordering, ensure client-side sort
+    const q = query(collection(db, "conversations", convId, "messages"));
 
     unsubChatListener = onSnapshot(q, (snapshot) => {
+        let msgs = [];
+        snapshot.forEach(doc => msgs.push(doc.data()));
+        
+        // Client side sort (Reliable)
+        msgs.sort((a,b) => {
+            const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+            const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+            return tA - tB;
+        });
+
         msgContainer.innerHTML = '';
-        snapshot.forEach(doc => {
-            const msg = doc.data();
+        msgs.forEach(msg => {
             const isMe = msg.senderId === tutorId;
             const bubble = document.createElement('div');
             bubble.className = `chat-bubble ${isMe ? 'me' : 'them'}`;
@@ -2856,11 +2893,9 @@ function msgLoadChat(convId, name, modal, tutorId) {
         msgContainer.scrollTop = msgContainer.scrollHeight;
     });
 
-    // 3. Send Logic
     const btn = modal.querySelector('#chat-send-btn');
     const input = modal.querySelector('#chat-input-text');
     
-    // Replace button to clear old listeners
     const newBtn = btn.cloneNode(true);
     btn.parentNode.replaceChild(newBtn, btn);
 
@@ -2869,19 +2904,26 @@ function msgLoadChat(convId, name, modal, tutorId) {
         if (!txt) return;
         input.value = '';
 
+        const timestamp = msgServerTimestamp();
+
         await addDoc(collection(db, "conversations", convId, "messages"), {
             content: txt,
             senderId: tutorId,
-            createdAt: serverTimestamp(),
+            createdAt: timestamp,
             read: false
         });
 
         await updateDoc(doc(db, "conversations", convId), {
             lastMessage: txt,
-            lastMessageTimestamp: serverTimestamp(),
+            lastMessageTimestamp: timestamp,
             lastSenderId: tutorId,
             unreadCount: increment(1)
         });
+    };
+    
+    // Enter key support
+    input.onkeypress = (e) => {
+        if (e.key === 'Enter') newBtn.click();
     };
 }
 
@@ -2915,7 +2957,7 @@ function injectMessagingStyles() {
         .modal-content {
             background: white; border-radius: 12px; width: 90%; max-width: 800px;
             max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); position: relative;
         }
         .modal-header {
             padding: 15px; border-bottom: 1px solid #eee; display: flex; 
@@ -2923,6 +2965,13 @@ function injectMessagingStyles() {
         }
         .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
         .modal-footer { padding: 15px; background: #f9fafb; display: flex; justify-content: flex-end; gap: 10px; }
+        
+        .close-modal-absolute { 
+            position: absolute; top: 10px; right: 10px; font-size: 30px; 
+            background: rgba(255,255,255,0.8); border: none; cursor: pointer; color: #333; z-index: 50;
+            width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        }
+        .close-modal-absolute:hover { background: #eee; }
         
         /* --- Inputs --- */
         .form-input { 
@@ -2932,6 +2981,7 @@ function injectMessagingStyles() {
         .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: 500; }
         .btn-primary { background: #4f46e5; color: white; }
         .btn-secondary { background: #e5e7eb; color: #374151; }
+        .btn:disabled { opacity: 0.7; cursor: not-allowed; }
         
         /* --- Messaging Specific --- */
         .message-type-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
@@ -2976,7 +3026,6 @@ function injectMessagingStyles() {
         .chat-inputs input { flex: 1; padding: 10px; border-radius: 20px; border: 1px solid #ddd; outline: none; }
         .chat-inputs button { background: #4f46e5; color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; }
 
-        .close-modal-absolute { position: absolute; top: 10px; right: 10px; font-size: 24px; background: none; border: none; cursor: pointer; color: #666; }
         .hidden { display: none !important; }
         .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #4f46e5; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 10px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -2986,14 +3035,16 @@ function injectMessagingStyles() {
             .inbox-chat-col { display: none; }
             .inbox-container.chat-active .inbox-list-col { display: none; }
             .inbox-container.chat-active .inbox-chat-col { display: flex; width: 100%; }
+            .message-type-grid { grid-template-columns: repeat(2, 1fr); }
         }
     `;
     document.head.appendChild(style);
 }
 
 // --- AUTO-INIT ---
-// Automatically starts when the script loads
 initializeFloatingMessagingButton();
+
+
 /*******************************************************************************
  * SECTION 10: SCHEDULE CALENDAR VIEW
  ******************************************************************************/
@@ -5371,6 +5422,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
