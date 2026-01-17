@@ -2807,6 +2807,7 @@ function showNewReportNotification(type) {
 }
 
 // ============================================================================
+// ============================================================================
 // SECTION 14: YEARLY ARCHIVES REPORTS SYSTEM WITH ACCORDIONS
 // ============================================================================
 
@@ -2820,6 +2821,7 @@ function createYearlyArchiveReportView(reportsByStudent) {
     
     for (const [studentName, reports] of reportsByStudent) {
         const fullName = capitalize(studentName);
+        const studentData = reports.studentData;
         
         // Count reports for this student
         const assessmentCount = Array.from(reports.assessments.values()).flat().length;
@@ -2837,6 +2839,7 @@ function createYearlyArchiveReportView(reportsByStudent) {
                             <h3 class="font-bold text-green-800 text-lg">${fullName}</h3>
                             <p class="text-green-600 text-sm">
                                 ${assessmentCount} Assessment(s), ${monthlyCount} Monthly Report(s) • Total: ${totalCount}
+                                ${studentData?.isPending ? ' • <span class="text-yellow-600">(Pending Registration)</span>' : ''}
                             </p>
                         </div>
                     </div>
@@ -2847,45 +2850,48 @@ function createYearlyArchiveReportView(reportsByStudent) {
                 <div id="student-${studentIndex}-content" class="accordion-content hidden">
         `;
         
-        // Group reports by year
-        const reportsByYear = new Map();
-        
-        // Process assessment reports by year
-        for (const [sessionKey, session] of reports.assessments) {
-            session.forEach(report => {
-                const year = new Date(report.timestamp * 1000).getFullYear();
-                if (!reportsByYear.has(year)) {
-                    reportsByYear.set(year, { assessments: [], monthly: [] });
-                }
-                reportsByYear.get(year).assessments.push({ sessionKey, session });
-            });
-        }
-        
-        // Process monthly reports by year
-        for (const [sessionKey, session] of reports.monthly) {
-            session.forEach(report => {
-                const year = new Date(report.timestamp * 1000).getFullYear();
-                if (!reportsByYear.has(year)) {
-                    reportsByYear.set(year, { assessments: [], monthly: [] });
-                }
-                reportsByYear.get(year).monthly.push({ sessionKey, session });
-            });
-        }
-        
-        // Sort years in descending order
-        const sortedYears = Array.from(reportsByYear.keys()).sort((a, b) => b - a);
-        
-        if (sortedYears.length === 0) {
-            // Empty State: Student appears even with zero reports
+        // If no reports, show empty state
+        if (totalCount === 0) {
             html += `
                 <div class="p-6 bg-gray-50 border border-gray-200 rounded-lg text-center">
                     <div class="text-4xl mb-3">📄</div>
                     <h4 class="text-lg font-semibold text-gray-700 mb-2">No Reports Yet</h4>
                     <p class="text-gray-500">No reports have been generated for ${fullName} yet.</p>
-                    <p class="text-gray-400 text-sm mt-2">This student will appear here once reports are available.</p>
+                    <p class="text-gray-400 text-sm mt-2">Reports will appear here once tutors or assessors submit them.</p>
+                    ${studentData?.isPending ? 
+                        '<p class="text-yellow-600 text-sm mt-2">⚠️ This student is pending registration. Reports will be available after registration is complete.</p>' : 
+                        ''}
                 </div>
             `;
         } else {
+            // Group reports by year
+            const reportsByYear = new Map();
+            
+            // Process assessment reports by year
+            for (const [sessionKey, session] of reports.assessments) {
+                session.forEach(report => {
+                    const year = new Date(report.timestamp * 1000).getFullYear();
+                    if (!reportsByYear.has(year)) {
+                        reportsByYear.set(year, { assessments: [], monthly: [] });
+                    }
+                    reportsByYear.get(year).assessments.push({ sessionKey, session });
+                });
+            }
+            
+            // Process monthly reports by year
+            for (const [sessionKey, session] of reports.monthly) {
+                session.forEach(report => {
+                    const year = new Date(report.timestamp * 1000).getFullYear();
+                    if (!reportsByYear.has(year)) {
+                        reportsByYear.set(year, { assessments: [], monthly: [] });
+                    }
+                    reportsByYear.get(year).monthly.push({ sessionKey, session });
+                });
+            }
+            
+            // Sort years in descending order
+            const sortedYears = Array.from(reportsByYear.keys()).sort((a, b) => b - a);
+            
             // Create year accordions
             let yearIndex = 0;
             for (const year of sortedYears) {
@@ -3196,7 +3202,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                         console.log("Loading reports from cache.");
                         if (reportContent) reportContent.innerHTML = cacheData.html;
                         
-                        // Set welcome message from cache - FIXED VARIABLE NAME
+                        // Set welcome message from cache
                         if (cacheData.userData && cacheData.userData.parentName && welcomeMessage) {
                             welcomeMessage.textContent = `Welcome, ${cacheData.userData.parentName}!`;
                             currentUserData = cacheData.userData;
@@ -3338,12 +3344,59 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         // SETUP REAL-TIME MONITORING
         setupRealTimeMonitoring(parentPhone, userId);
 
-        // Group reports by student name
+        // Group reports by student name - FIXED: Initialize ALL students first
         const reportsByStudent = new Map();
 
-        // Initialize all students in the map (even those without reports)
+        // CRITICAL FIX: Initialize ALL students in the map (even those without reports)
         for (const studentName of userChildren) {
-            reportsByStudent.set(studentName, { assessments: new Map(), monthly: new Map() });
+            reportsByStudent.set(studentName, { 
+                assessments: new Map(), 
+                monthly: new Map(),
+                studentData: allStudentData.find(s => s.name === studentName) // Store student data
+            });
+        }
+
+        // If no reports found at all, still show all students
+        if (assessmentResults.length === 0 && monthlyResults.length === 0) {
+            console.log("⚠️ No reports found for any student, but showing all registered students");
+            
+            // Create empty report view with all students
+            if (reportContent) {
+                const reportsHtml = createYearlyArchiveReportView(reportsByStudent);
+                reportContent.innerHTML = reportsHtml;
+            }
+            
+            // --- CACHE SAVING LOGIC ---
+            try {
+                const dataToCache = {
+                    timestamp: Date.now(),
+                    html: reportContent ? reportContent.innerHTML : '',
+                    userData: currentUserData
+                };
+                localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
+                console.log("Report data cached successfully.");
+            } catch (e) {
+                console.error("Could not write to cache:", e);
+            }
+            // --- END CACHE SAVING ---
+
+            if (authArea && reportArea) {
+                authArea.classList.add("hidden");
+                reportArea.classList.remove("hidden");
+            }
+
+            // Add buttons to welcome section
+            addMessagesButton();
+            addManualRefreshButton();
+            addLogoutButton();
+            
+            // Load initial referral data for the rewards dashboard tab
+            loadReferralRewards(userId);
+            
+            // Load academics data
+            loadAcademicsData();
+
+            return; // Exit early since no reports
         }
 
         // Group assessment reports by student
@@ -3370,6 +3423,14 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             
             if (reportsByStudent.has(studentName)) {
                 reportsByStudent.get(studentName).assessments = sessionGroups;
+            } else {
+                // Student has reports but wasn't in userChildren? Add them
+                console.log(`📝 Adding ${studentName} to reports (found in assessment results)`);
+                reportsByStudent.set(studentName, { 
+                    assessments: sessionGroups, 
+                    monthly: new Map(),
+                    studentData: null
+                });
             }
         }
 
@@ -3397,13 +3458,30 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             
             if (reportsByStudent.has(studentName)) {
                 reportsByStudent.get(studentName).monthly = sessionGroups;
+            } else {
+                // Student has reports but wasn't in userChildren? Add them
+                console.log(`📝 Adding ${studentName} to reports (found in monthly results)`);
+                const existingData = reportsByStudent.get(studentName) || { assessments: new Map() };
+                reportsByStudent.set(studentName, { 
+                    ...existingData,
+                    monthly: sessionGroups,
+                    studentData: existingData.studentData || null
+                });
             }
         }
 
-        // Create yearly archive accordion view
+        // DEBUG: Log which students will be shown
+        console.log("📊 Students to display in reports:");
+        for (const [studentName, data] of reportsByStudent) {
+            const assessmentCount = Array.from(data.assessments.values()).flat().length;
+            const monthlyCount = Array.from(data.monthly.values()).flat().length;
+            console.log(`  👤 ${studentName}: ${assessmentCount} assessments, ${monthlyCount} monthly reports`);
+        }
+
+        // Create yearly archive accordion view - This will show ALL students
         if (reportContent) {
             const reportsHtml = createYearlyArchiveReportView(reportsByStudent);
-            reportContent.innerHTML = reportsHtml; // Direct assignment, not escaped
+            reportContent.innerHTML = reportsHtml;
         }
         
         // --- CACHE SAVING LOGIC ---
