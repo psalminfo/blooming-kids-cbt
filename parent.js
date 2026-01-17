@@ -15,6 +15,7 @@ const db = firebase.firestore();
 const auth = firebase.auth();
 
 // --- SLEEK TRANSITIONS CSS INJECTOR ---
+// This adds the smooth animations for tabs and accordions
 const style = document.createElement('style');
 style.textContent = `
     .fade-in { animation: fadeIn 0.4s ease-in-out; }
@@ -91,6 +92,94 @@ function showMessage(message, type) {
     setTimeout(() => { if (div.parentNode) div.remove(); }, 5000);
 }
 
+function createCountryCodeDropdown() {
+    if(document.getElementById('countryCode')) return;
+    const phoneInput = document.getElementById('signupPhone');
+    if (!phoneInput) return; // Guard clause
+
+    const parent = phoneInput.parentNode;
+    const container = document.createElement('div');
+    container.className = 'flex gap-2';
+    
+    const select = document.createElement('select');
+    select.id = 'countryCode';
+    select.className = 'w-32 px-3 py-3 border border-gray-300 rounded-xl focus:outline-none transition-all duration-200';
+    
+    // FULL LIST RESTORED
+    const countries = [
+        { code: '+1', name: 'USA/Canada (+1)' },
+        { code: '+234', name: 'Nigeria (+234)' },
+        { code: '+44', name: 'UK (+44)' },
+        { code: '+233', name: 'Ghana (+233)' },
+        { code: '+254', name: 'Kenya (+254)' },
+        { code: '+27', name: 'South Africa (+27)' },
+        { code: '+91', name: 'India (+91)' },
+        { code: '+971', name: 'UAE (+971)' },
+        { code: '+966', name: 'Saudi Arabia (+966)' },
+        { code: '+20', name: 'Egypt (+20)' },
+        { code: '+237', name: 'Cameroon (+237)' },
+        { code: '+256', name: 'Uganda (+256)' },
+        { code: '+255', name: 'Tanzania (+255)' },
+        { code: '+250', name: 'Rwanda (+250)' },
+        { code: '+251', name: 'Ethiopia (+251)' },
+        { code: '+41', name: 'Switzerland (+41)' },
+        { code: '+86', name: 'China (+86)' },
+        { code: '+33', name: 'France (+33)' },
+        { code: '+49', name: 'Germany (+49)' },
+        { code: '+61', name: 'Australia (+61)' },
+        { code: '+55', name: 'Brazil (+55)' },
+        { code: '+351', name: 'Portugal (+351)' },
+        { code: '+34', name: 'Spain (+34)' },
+        { code: '+39', name: 'Italy (+39)' },
+        { code: '+31', name: 'Netherlands (+31)' },
+        { code: '+32', name: 'Belgium (+32)' },
+        { code: '+46', name: 'Sweden (+46)' },
+        { code: '+47', name: 'Norway (+47)' },
+        { code: '+45', name: 'Denmark (+45)' },
+        { code: '+358', name: 'Finland (+358)' },
+        { code: '+353', name: 'Ireland (+353)' },
+        { code: '+48', name: 'Poland (+48)' },
+        { code: '+90', name: 'Turkey (+90)' },
+        { code: '+961', name: 'Lebanon (+961)' },
+        { code: '+962', name: 'Jordan (+962)' },
+        { code: '+81', name: 'Japan (+81)' },
+        { code: '+82', name: 'South Korea (+82)' },
+        { code: '+60', name: 'Malaysia (+60)' },
+        { code: '+852', name: 'Hong Kong (+852)' },
+        { code: '+52', name: 'Mexico (+52)' }
+    ];
+
+    countries.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.code; opt.textContent = c.name;
+        select.appendChild(opt);
+    });
+    select.value = '+1';
+    
+    inputPlaceholder = document.getElementById('signupPhone');
+    inputPlaceholder.placeholder = 'Phone (No Country Code)';
+    inputPlaceholder.className = 'flex-1 px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200';
+    
+    container.appendChild(select);
+    container.appendChild(inputPlaceholder);
+    parent.appendChild(container);
+}
+
+function downloadReportPDF(elementId, studentName, type) {
+    const element = document.getElementById(elementId);
+    if (!element) return showMessage('Report content not found', 'error');
+    if (typeof html2pdf === 'undefined') return showMessage('PDF Tool loading... please wait 5s', 'error');
+
+    const opt = { 
+        margin: 0.5, 
+        filename: `${type}_Report_${studentName}_${new Date().toISOString().split('T')[0]}.pdf`, 
+        image: { type: 'jpeg', quality: 0.98 }, 
+        html2canvas: { scale: 2 }, 
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } 
+    };
+    html2pdf().from(element).set(opt).save();
+}
+
 // ===================================================================
 // SECTION 3: STATE & DATA FETCHING
 // ===================================================================
@@ -124,8 +213,62 @@ async function findParentNameAndStudents(parentPhone) {
 }
 
 // ===================================================================
-// SECTION 4: AUTHENTICATION
+// SECTION 4: AUTHENTICATION & REFERRALS
 // ===================================================================
+
+async function generateReferralCode() {
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const prefix = 'BKH';
+    let code; let isUnique = false;
+    while (!isUnique) {
+        let suffix = ''; for (let i = 0; i < 6; i++) suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+        code = prefix + suffix;
+        const snap = await db.collection('parent_users').where('referralCode', '==', code).limit(1).get();
+        if (snap.empty) isUnique = true;
+    }
+    return code;
+}
+
+async function loadReferralRewards(parentUid) {
+    const container = document.getElementById('rewardsContent');
+    container.innerHTML = '<div class="text-center py-8"><div class="loading-spinner"></div><p class="mt-2 text-green-600">Loading rewards...</p></div>';
+
+    try {
+        const userDoc = await db.collection('parent_users').doc(parentUid).get();
+        if (!userDoc.exists) return;
+        const data = userDoc.data();
+        
+        const snap = await db.collection('referral_transactions').where('ownerUid', '==', parentUid).get();
+        const txs = snap.docs.map(d => d.data()).sort((a,b) => (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0));
+        
+        let rows = '';
+        let stats = { pending: 0, paid: 0 };
+        
+        txs.forEach(t => {
+            const status = t.status || 'pending';
+            if(status === 'paid') stats.paid++; else stats.pending++;
+            const color = status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
+            rows += `<tr class="hover:bg-gray-50"><td class="px-4 py-3">${escapeHtml(t.referredStudentName)}</td><td class="px-4 py-3">${formatDateTime(t.timestamp)}</td><td class="px-4 py-3"><span class="px-2 py-1 rounded-full text-xs ${color}">${status}</span></td><td class="px-4 py-3 font-bold">₦${(t.rewardAmount||5000).toLocaleString()}</td></tr>`;
+        });
+
+        if(!rows) rows = '<tr><td colspan="4" class="text-center py-4 text-gray-500">No referrals yet.</td></tr>';
+
+        container.innerHTML = `
+            <div class="fade-in">
+                <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-8 shadow-sm">
+                    <h2 class="text-xl font-bold text-blue-800">Your Code</h2>
+                    <p class="text-2xl font-mono text-blue-600 p-2 bg-white inline-block rounded border border-blue-200 mt-2 select-all">${data.referralCode || 'Generating...'}</p>
+                    <p class="text-sm text-blue-700 mt-2">Earn ₦5,000 per student referred!</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div class="bg-green-100 p-4 rounded-lg border-b-4 border-green-500"><p class="text-sm text-green-700">Total Earnings</p><p class="text-2xl font-bold text-green-900">₦${(data.referralEarnings||0).toLocaleString()}</p></div>
+                    <div class="bg-yellow-100 p-4 rounded-lg border-b-4 border-yellow-500"><p class="text-sm text-yellow-700">Pending</p><p class="text-2xl font-bold text-yellow-900">${stats.pending}</p></div>
+                    <div class="bg-gray-100 p-4 rounded-lg border-b-4 border-gray-500"><p class="text-sm text-gray-700">Paid Out</p><p class="text-2xl font-bold text-gray-900">${stats.paid}</p></div>
+                </div>
+                <div class="bg-white rounded-lg shadow overflow-hidden"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reward</th></tr></thead><tbody class="divide-y divide-gray-200">${rows}</tbody></table></div>
+            </div>`;
+    } catch (e) { console.error(e); }
+}
 
 async function handleAuth(type) {
     const btn = document.getElementById(type === 'signin' ? 'signInBtn' : 'signUpBtn');
@@ -149,8 +292,7 @@ async function handleAuth(type) {
             const { name } = await findParentNameAndStudents(fullPhone.normalized);
             
             // Generate Referral Code
-            const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-            let refCode = 'BKH' + Array(6).fill(0).map(() => chars[Math.floor(Math.random() * chars.length)]).join('');
+            const refCode = await generateReferralCode();
             
             await db.collection('parent_users').doc(cred.user.uid).set({
                 phone: code + phone, normalizedPhone: fullPhone.normalized, email,
@@ -159,7 +301,7 @@ async function handleAuth(type) {
             });
             showMessage("Account created!", "success");
         } else {
-            // Sign In
+            // Sign In & Remember Me
             if (document.getElementById('rememberMe').checked) {
                 localStorage.setItem('savedEmail', email); localStorage.setItem('rememberMe', 'true');
             } else {
@@ -171,6 +313,16 @@ async function handleAuth(type) {
         showMessage(e.message, 'error');
         btn.disabled = false; btn.innerHTML = originalText;
     }
+}
+
+async function handlePasswordReset() {
+    const email = document.getElementById('resetEmail').value.trim();
+    if (!email) return showMessage('Enter email', 'error');
+    try {
+        await auth.sendPasswordResetEmail(email);
+        showMessage('Reset link sent!', 'success');
+        document.getElementById('passwordResetModal').classList.add('hidden');
+    } catch(e) { showMessage(e.message, 'error'); }
 }
 
 function logout() {
@@ -187,7 +339,7 @@ function toggleModal(id, show) {
     const el = document.getElementById(id);
     if(show) { 
         el.classList.remove('hidden'); 
-        el.querySelector('div').classList.add('fade-in'); // Animate inner container
+        el.querySelector('div').classList.add('fade-in'); 
         if(id === 'composeMessageModal') populateStudentDropdown();
     } else { 
         el.classList.add('hidden'); 
@@ -299,8 +451,9 @@ async function loadAcademicsData() {
         if (map.size === 0) { container.innerHTML = '<p class="text-center">No students found.</p>'; return; }
 
         // --- AUTO CLEAR LOGIC (2nd Day Rule) ---
+        // Logic: On 1st/2nd of month, show Last Month + Current Month.
+        // On 3rd onwards, show ONLY Current Month.
         const now = new Date();
-        // If today is 3rd or later, show ONLY current month. If 1st/2nd, show current + previous.
         const cutoffDate = new Date(now.getFullYear(), now.getMonth() - (now.getDate() > 2 ? 0 : 1), 1);
 
         let html = '<div class="space-y-4 fade-in">';
@@ -403,21 +556,6 @@ async function loadAcademicsData() {
 // SECTION 7: REPORTS (YEARLY ARCHIVES & PDF)
 // ===================================================================
 
-function downloadReportPDF(elementId, studentName, type) {
-    const element = document.getElementById(elementId);
-    if (!element) return showMessage('Content not found', 'error');
-    if (typeof html2pdf === 'undefined') return showMessage('PDF Tool loading...', 'error');
-
-    const opt = { 
-        margin: 0.5, 
-        filename: `${type}_Report_${studentName}_${new Date().toISOString().split('T')[0]}.pdf`, 
-        image: { type: 'jpeg', quality: 0.98 }, 
-        html2canvas: { scale: 2 }, 
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } 
-    };
-    html2pdf().from(element).set(opt).save();
-}
-
 async function loadDashboard(phone, uid) {
     document.getElementById('authArea').classList.add('hidden');
     document.getElementById('reportArea').classList.remove('hidden');
@@ -427,9 +565,9 @@ async function loadDashboard(phone, uid) {
     // Parallel Loading
     loadReferralRewards(uid);
     loadAcademicsData();
-    
-    // Monitoring
     setupRealTimeMonitoring(phone, uid);
+    addManualRefreshButton();
+    addMessagesButton();
 
     const [assSnap, monSnap] = await Promise.all([
         db.collection("student_results").where("parentPhone", "==", phone).get(),
@@ -455,7 +593,7 @@ async function loadDashboard(phone, uid) {
     const years = Object.keys(grouped).sort((a,b) => b - a); // Descending Year
 
     if (years.length === 0) {
-        container.innerHTML = '<div class="text-center py-10 text-gray-500">No reports found.</div>';
+        container.innerHTML = '<div class="text-center py-10 text-gray-500">No reports available yet.</div>';
         return;
     }
 
@@ -557,7 +695,6 @@ function setupRealTimeMonitoring(phone, uid) {
 }
 
 function checkForNewMessages() {
-    // Logic handles badge updates in UI
     const badge = document.getElementById('messagesNotificationBadge');
     if(badge) { badge.classList.remove('hidden'); badge.textContent = "New"; }
 }
@@ -582,7 +719,6 @@ function toggleAccordion(id, btn) {
 function switchMainTab(tabId) {
     const tabs = ['report', 'academics', 'rewards'];
     
-    // Smooth transition
     const active = tabs.find(t => !document.getElementById(`${t}ContentArea`).classList.contains('hidden'));
     if(active) document.getElementById(`${active}ContentArea`).classList.add('hidden-tab');
 
@@ -595,18 +731,51 @@ function switchMainTab(tabId) {
 
         const newEl = document.getElementById(`${tabId}ContentArea`);
         newEl.classList.remove('hidden', 'hidden-tab');
-        newEl.classList.add('fade-in'); // Trigger CSS animation
+        newEl.classList.add('fade-in'); 
 
         document.getElementById(`${tabId}Tab`).className = "flex-1 py-4 text-center text-green-600 font-bold border-b-4 border-green-600 transition-colors duration-300 cursor-pointer";
         
         if(tabId === 'academics') {
             document.getElementById('academicsNotificationBadge')?.classList.add('hidden');
-            loadAcademicsData(); // Auto refresh
+            loadAcademicsData(); 
         }
         if(tabId === 'rewards') {
             if(currentUserData) loadReferralRewards(currentUserData.uid);
         }
     }, 50);
+}
+
+function addManualRefreshButton() {
+    const container = document.querySelector('.bg-green-50 .flex.gap-2');
+    if (!container || document.getElementById('manualRefreshBtn')) return;
+    
+    const refreshBtn = document.createElement('button');
+    refreshBtn.id = 'manualRefreshBtn';
+    refreshBtn.onclick = () => loadDashboard(currentUserData.phone, currentUserData.uid);
+    refreshBtn.className = 'bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition shadow-sm flex items-center gap-2';
+    refreshBtn.innerHTML = '🔄 Refresh';
+    container.appendChild(refreshBtn);
+    
+    // Add Logout Button too if missing
+    if(!document.getElementById('logoutBtn')) {
+        const logBtn = document.createElement('button');
+        logBtn.id = 'logoutBtn';
+        logBtn.onclick = logout;
+        logBtn.className = 'bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 transition shadow-sm';
+        logBtn.innerHTML = '🚪 Logout';
+        container.appendChild(logBtn);
+    }
+}
+
+function addMessagesButton() {
+    const container = document.querySelector('.bg-green-50 .flex.gap-2');
+    if (!container || document.getElementById('viewMessagesBtn')) return;
+    const btn = document.createElement('button');
+    btn.id = 'viewMessagesBtn';
+    btn.className = 'bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 relative shadow-sm';
+    btn.innerHTML = '📨 Messages <span id="messagesNotificationBadge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white rounded-full text-xs w-4 h-4 flex items-center justify-center animate-pulse"></span>';
+    btn.onclick = () => { toggleModal('messagesModal', true); loadUnifiedMessages(); };
+    container.insertBefore(btn, container.firstChild);
 }
 
 // ===================================================================
@@ -637,29 +806,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(d.exists) {
                     const data = d.data();
                     loadDashboard(data.normalizedPhone, u.uid);
-                    
-                    // Inject Nav Buttons (Refresh/Messages/Logout)
-                    const navContainer = document.querySelector('.bg-green-50 .flex.gap-2');
-                    if(navContainer) {
-                        navContainer.innerHTML = ''; // Clean slate
-                        
-                        const msgBtn = document.createElement('button');
-                        msgBtn.className = "bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700";
-                        msgBtn.innerHTML = "📨 Messages";
-                        msgBtn.onclick = () => { toggleModal('messagesModal', true); loadUnifiedMessages(); };
-                        
-                        const refBtn = document.createElement('button');
-                        refBtn.className = "bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700";
-                        refBtn.innerHTML = "🔄 Refresh";
-                        refBtn.onclick = () => loadDashboard(data.normalizedPhone, u.uid);
-                        
-                        const logBtn = document.createElement('button');
-                        logBtn.className = "bg-red-600 text-white px-4 py-2 rounded shadow hover:bg-red-700";
-                        logBtn.innerHTML = "🚪 Logout";
-                        logBtn.onclick = logout;
-
-                        navContainer.append(msgBtn, refBtn, logBtn);
-                    }
                 }
             });
         } else {
@@ -676,10 +822,7 @@ document.addEventListener('DOMContentLoaded', () => {
     bind('reportTab', () => switchMainTab('report'));
     bind('academicsTab', () => switchMainTab('academics'));
     bind('rewardsTab', () => switchMainTab('rewards'));
-    bind('sendResetBtn', async () => {
-        const e = document.getElementById('resetEmail').value;
-        if(e) { await auth.sendPasswordResetEmail(e); showMessage('Sent!', 'success'); toggleModal('passwordResetModal', false); }
-    });
+    bind('sendResetBtn', handlePasswordReset);
     bind('composeMessageBtn', () => toggleModal('composeMessageModal', true));
     bind('forgotPasswordBtn', () => toggleModal('passwordResetModal', true));
     bind('cancelResetBtn', () => toggleModal('passwordResetModal', false));
