@@ -1,11 +1,10 @@
 /**
- * BLOOMING KIDS TUTOR PORTAL - GAME WIDGET V3 (LEVEL UP EDITION)
- * --------------------------------------------------------------
- * Updates: 
- * 1. Word Game now has LEVELS (Find the 'Bingo' word to advance).
- * 2. Massive Dictionary added (1000+ common words) to fix spelling rejections.
- * 3. Added 'Shuffle' button for tiles.
- * 4. Persisted Leaderboards & Mobile fixes.
+ * BLOOMING KIDS TUTOR PORTAL - GAME WIDGET V4 (STABLE)
+ * ----------------------------------------------------
+ * Fixes: 
+ * 1. Fixed "Firebase ArrayUnion" crash by using new Date() instead of serverTimestamp.
+ * 2. Scores now save to BOTH Global Leaderboard and Personal History.
+ * 3. Includes Level-Up Word Game & Massive Dictionary.
  */
 
 (function () {
@@ -17,7 +16,7 @@
             accent: 'text-indigo-600',
             overlay: 'bg-gray-900/90'
         },
-        // Expanded Dictionary: Common English words (3-7 letters)
+        // Expanded Dictionary: Common English words
         dictionary: [
             "THE", "AND", "FOR", "ARE", "BUT", "NOT", "YOU", "ALL", "ANY", "CAN", "HAD", "HAS", "HIM", "HIS", "HER", "ITS", "ONE", "TWO", "NEW", "OUR", "OUT", "SEE", "WAY", "WHO", "BOY", "DID", "LET", "PUT", "SAY", "SHE", "TOO", "USE", "DAD", "MOM", "CAT", "DOG", "RUN", "EAT", "BIG", "RED", "YES", "LOW", "KEY", "BED", "WIN", "TOP", "JOY", "SKY", "FOX", "ART", "PEN", "BUS", "CAR", "FUN", "GYM", "JOB", "PIE", "SIT", "TOY", "VAN", "WEB", "ZOO", "GAME", "PLAY", "READ", "BOOK", "KIDS", "CODE", "MATH", "TEST", "EXAM", "PASS", "FAIL", "WORK", "GOOD", "BEST", "LOVE", "HELP", "GROW", "MIND", "WORD", "LIST", "TYPE", "TEXT", "VIEW", "MENU", "USER", "TIME", "DATA", "QUIZ", "SOUL", "LIFE", "BRAIN", "SMART", "THINK", "CLASS", "STUDY", "LEARN", "WRITE", "START", "STOP", "OPEN", "CLOSE", "NEXT", "BACK", "HOME", "SAVE", "FIND", "LOOK", "MAKE", "KNOW", "TAKE", "YEAR", "ROOM", "DOOR", "GIRL", "DONE", "HIGH", "NAME", "NOTE", "IDEA", "HARD", "EASY", "BLUE", "BABY", "BALL", "BIRD", "BOAT", "BODY", "BONE", "CAKE", "CALL", "CARD", "CARE", "CASH", "CITY", "CLUB", "COOK", "COOL", "CORN", "COST", "DATE", "DEAR", "DEEP", "DESK", "DROP", "DUCK", "DUST", "EAST", "EDGE", "FACE", "FACT", "FARM", "FAST", "FEEL", "FILE", "FIRE", "FISH", "FLAG", "FLAT", "FOOD", "FOOT", "FORM", "FREE", "FROG", "FULL", "GIFT", "GIVE", "GLAD", "GOAL", "GOLD", "GONE", "HAIR", "HALF", "HALL", "HAND", "HEAD", "HEAR", "HEAT", "HELD", "HELL", "HILL", "HOLD", "HOLE", "HOPE", "HOUR", "HURT", "IRON", "ITEM", "JOIN", "JUMP", "JUST", "KEEP", "KILL", "KIND", "KING", "KISS", "KNEE", "LADY", "LAKE", "LAND", "LAST", "LATE", "LEAD", "LEFT", "LESS", "LINE", "LION", "LONG", "LOST", "LUCK", "MAIN", "MARK", "MEAL", "MEET", "MILE", "MILK", "MISS", "MOON", "MOVE", "NEAR", "NECK", "NEED", "NEWS", "NICE", "NOSE", "NOTE", "OKAY", "ONCE", "ONLY", "PACK", "PAGE", "PAIN", "PAIR", "PARK", "PART", "PAST", "PATH", "PICK", "PLAN", "POOR", "POST", "PULL", "PUSH", "RACE", "RAIN", "RARE", "REAL", "REST", "RICH", "RIDE", "RING", "RISE", "RISK", "ROAD", "ROCK", "ROLE", "ROOF", "ROOM", "ROOT", "ROPE", "ROSE", "RULE", "SAFE", "SALT", "SAND", "SAVE", "SEAT", "SEED", "SELL", "SEND", "SHIP", "SHOE", "SHOP", "SHOT", "SHOW", "SHUT", "SICK", "SIDE", "SIGN", "SING", "SIZE", "SKIN", "SLOW", "SNOW", "SOFT", "SOIL", "SONG", "SOON", "SORT", "SOUP", "SPOT", "STAR", "STAY", "STEP", "STOP", "SUCH", "SURE", "SWIM", "TAIL", "TALK", "TALL", "TEAM", "TELL", "TENT", "TERM", "THAT", "THEN", "THIS", "TIDE", "TILL", "TIME", "TINY", "TOWN", "TREE", "TRIP", "TURN", "TYPE", "UNIT", "UPON", "VOTE", "WAIT", "WALK", "WALL", "WANT", "WARM", "WASH", "WAVE", "WEAR", "WEEK", "WELL", "WENT", "WERE", "WEST", "WHAT", "WHEN", "WILD", "WILL", "WIND", "WISH", "WITH", "WOOD", "WORK", "YARD", "YEAR", "YOUR", "ZERO", "ZONE",
             "ABOUT", "ABOVE", "ACTOR", "ADMIT", "ADULT", "AFTER", "AGAIN", "AGENT", "AGREE", "AHEAD", "ALARM", "ALBUM", "ALERT", "ALIKE", "ALIVE", "ALLOW", "ALONE", "ALONG", "ALTER", "AMONG", "ANGER", "ANGLE", "ANGRY", "APART", "APPLE", "APPLY", "ARENA", "ARGUE", "ARISE", "ARRAY", "ASIDE", "ASSET", "AUDIO", "AUDIT", "AVOID", "AWARD", "AWARE", "BADLY", "BAKER", "BASES", "BASIC", "BASIS", "BEACH", "BEGAN", "BEGIN", "BEGUN", "BEING", "BELOW", "BENCH", "BILLY", "BIRTH", "BLACK", "BLAME", "BLIND", "BLOCK", "BLOOD", "BOARD", "BOOST", "BOOTH", "BOUND", "BRAIN", "BRAND", "BREAD", "BREAK", "BREED", "BRIEF", "BRING", "BROAD", "BROKE", "BROWN", "BUILD", "BUILT", "BUYER", "CABLE", "CALIF", "CARRY", "CATCH", "CAUSE", "CHAIN", "CHAIR", "CHART", "CHASE", "CHEAP", "CHECK", "CHEST", "CHIEF", "CHILD", "CHINA", "CHOSE", "CIVIL", "CLAIM", "CLASS", "CLEAN", "CLEAR", "CLICK", "CLOCK", "CLOSE", "COACH", "COAST", "COULD", "COUNT", "COURT", "COVER", "CRAFT", "CRASH", "CREAM", "CRIME", "CROSS", "CROWD", "CROWN", "CURVE", "CYCLE", "DAILY", "DANCE", "DATED", "DEALT", "DEATH", "DEBUT", "DELAY", "DEPTH", "DOING", "DOUBT", "DOZEN", "DRAFT", "DRAMA", "DRAWN", "DREAM", "DRESS", "DRILL", "DRINK", "DRIVE", "DROVE", "DYING", "EAGER", "EARLY", "EARTH", "EIGHT", "ELITE", "EMPTY", "ENEMY", "ENJOY", "ENTER", "ENTRY", "EQUAL", "ERROR", "EVENT", "EVERY", "EXACT", "EXIST", "EXTRA", "FAITH", "FALSE", "FAULT", "FIBER", "FIELD", "FIFTH", "FIFTY", "FIGHT", "FINAL", "FIRST", "FIXED", "FLASH", "FLEET", "FLOOR", "FLUID", "FOCUS", "FORCE", "FORTH", "FORTY", "FORUM", "FOUND", "FRAME", "FRANK", "FRAUD", "FRESH", "FRONT", "FRUIT", "FULLY", "FUNNY", "GIANT", "GIVEN", "GLASS", "GLOBE", "GOING", "GRACE", "GRADE", "GRAND", "GRANT", "GRASS", "GREAT", "GREEN", "GROSS", "GROUP", "GROWN", "GUARD", "GUESS", "GUEST", "GUIDE", "HAPPY", "HARRY", "HEART", "HEAVY", "HENCE", "HENRY", "HORSE", "HOTEL", "HOUSE", "HUMAN", "IDEAL", "IMAGE", "INDEX", "INNER", "INPUT", "ISSUE", "JAPAN", "JIMMY", "JOINT", "JONES", "JUDGE", "KNOWN", "LABEL", "LARGE", "LASER", "LATER", "LAUGH", "LAYER", "LEARN", "LEASE", "LEAST", "LEAVE", "LEGAL", "LEVEL", "LEWIS", "LIGHT", "LIMIT", "LINKS", "LIVES", "LOCAL", "LOGIC", "LOOSE", "LOWER", "LUCKY", "LUNCH", "LYING", "MAGIC", "MAJOR", "MAKER", "MARCH", "MARIA", "MATCH", "MAYBE", "MAYOR", "MEANT", "MEDIA", "METAL", "MIGHT", "MINOR", "MINUS", "MIXED", "MODEL", "MONEY", "MONTH", "MORAL", "MOTOR", "MOUNT", "MOUSE", "MOUTH", "MOVIE", "MUSIC", "NEEDS", "NEVER", "NEWLY", "NIGHT", "NOISE", "NORTH", "NOTED", "NOVEL", "NURSE", "OCCUR", "OCEAN", "OFFER", "OFTEN", "ORDER", "OTHER", "OUGHT", "PAINT", "PANEL", "PAPER", "PARTY", "PEACE", "PETER", "PHASE", "PHONE", "PHOTO", "PIECE", "PILOT", "PITCH", "PLACE", "PLAIN", "PLANE", "PLANT", "PLATE", "POINT", "POUND", "POWER", "PRESS", "PRICE", "PRIDE", "PRIME", "PRINT", "PRIOR", "PRIZE", "PROOF", "PROUD", "PROVE", "QUEEN", "QUICK", "QUIET", "QUITE", "RADIO", "RAISE", "RANGE", "RAPID", "RATIO", "REACH", "READY", "REFER", "RIGHT", "RIVAL", "RIVER", "ROBIN", "ROGER", "ROMAN", "ROUGH", "ROUND", "ROUTE", "ROYAL", "RURAL", "SCALE", "SCENE", "SCOPE", "SCORE", "SENSE", "SERVE", "SEVEN", "SHALL", "SHAPE", "SHARE", "SHARP", "SHEET", "SHELF", "SHELL", "SHIFT", "SHIRT", "SHOCK", "SHOOT", "SHORT", "SHOWN", "SIGHT", "SINCE", "SIXTH", "SIXTY", "SIZED", "SKILL", "SLEEP", "SLIDE", "SMALL", "SMART", "SMILE", "SMITH", "SMOKE", "SOLID", "SOLVE", "SORRY", "SOUND", "SOUTH", "SPACE", "SPARE", "SPEAK", "SPEED", "SPEND", "SPENT", "SPLIT", "SPOKE", "SPORT", "STAFF", "STAGE", "STAKE", "STAND", "START", "STATE", "STEAM", "STEEL", "STICK", "STILL", "STOCK", "STONE", "STOOD", "STORE", "STORM", "STORY", "STRIP", "STUCK", "STUDY", "STUFF", "STYLE", "SUGAR", "SUITE", "SUPER", "SWEET", "TABLE", "TAKEN", "TASTE", "TAXES", "TEACH", "TEETH", "TERRY", "TEXAS", "THANK", "THEFT", "THEIR", "THEME", "THERE", "THESE", "THICK", "THING", "THINK", "THIRD", "THOSE", "THREE", "THREW", "THROW", "TIGHT", "TIMES", "TIRED", "TITLE", "TODAY", "TOPIC", "TOTAL", "TOUCH", "TOUGH", "TOWER", "TRACK", "TRADE", "TRAIN", "TREAT", "TREND", "TRIAL", "TRIED", "TRUCK", "TRULY", "TRUST", "TRUTH", "TWICE", "UNDER", "UNDUE", "UNION", "UNITY", "UNTIL", "UPPER", "UPSET", "URBAN", "USAGE", "USUAL", "VALID", "VALUE", "VIDEO", "VIRUS", "VISIT", "VITAL", "VOICE", "WASTE", "WATCH", "WATER", "WHEEL", "WHERE", "WHICH", "WHILE", "WHITE", "WHOLE", "WHOSE", "WOMAN", "WOMEN", "WORLD", "WORRY", "WORSE", "WORST", "WORTH", "WOULD", "WOUND", "WRITE", "WRONG", "WROTE", "YIELD", "YOUNG", "YOUTH",
@@ -120,6 +119,10 @@
 
             <div class="w-full bg-yellow-50 p-4 rounded-lg border border-yellow-200">
                 <h4 class="font-bold text-yellow-800 mb-2 text-sm uppercase tracking-wide">🏆 Global Leaderboard</h4>
+                <div class="flex gap-2 mb-2 text-xs">
+                     <button id="tab-snake" class="flex-1 py-1 rounded bg-yellow-200 font-bold">Snake</button>
+                     <button id="tab-word" class="flex-1 py-1 rounded bg-gray-200">Word Builder</button>
+                </div>
                 <div id="main-leaderboard-list" class="text-sm text-gray-600 space-y-2">
                     <p class="text-center italic text-gray-400">Loading top players...</p>
                 </div>
@@ -129,6 +132,23 @@
         document.getElementById('btn-snake').onclick = initSnakeGame;
         document.getElementById('btn-word').onclick = initWordGame;
         
+        // Tab Logic
+        const tabSnake = document.getElementById('tab-snake');
+        const tabWord = document.getElementById('tab-word');
+        
+        tabSnake.onclick = () => {
+            tabSnake.className = "flex-1 py-1 rounded bg-yellow-200 font-bold";
+            tabWord.className = "flex-1 py-1 rounded bg-gray-200";
+            fetchGlobalLeaderboard('Snake', 'main-leaderboard-list');
+        };
+        
+        tabWord.onclick = () => {
+            tabWord.className = "flex-1 py-1 rounded bg-yellow-200 font-bold";
+            tabSnake.className = "flex-1 py-1 rounded bg-gray-200";
+            fetchGlobalLeaderboard('Word Builder', 'main-leaderboard-list');
+        };
+
+        // Load Snake by default
         fetchGlobalLeaderboard('Snake', 'main-leaderboard-list');
     }
 
@@ -410,31 +430,46 @@
         document.onkeydown = null;
     }
 
-    // --- FIREBASE LOGIC ---
+    // --- FIREBASE LOGIC (UPDATED & FIXED) ---
     async function saveScoreToFirebase(score, gameName) {
         if (typeof db === 'undefined') { console.warn("DB not connected."); return; }
+        
+        // FIXED: Using new Date() instead of serverTimestamp() for arrayUnion compatibility
         const scoreData = {
             userId: state.currentUser.id || 'guest',
             userName: state.currentUser.name || 'Guest Player',
             game: gameName,
             score: score,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            timestamp: new Date() 
         };
+
         try {
+            // 1. Save to global 'leaderboard' collection (For Top 3)
             await db.collection('leaderboard').add(scoreData);
+            
+            // 2. Also update user profile history (For Personal Stats)
             if (state.currentUser.id) {
                 await db.collection('tutors').doc(state.currentUser.id).update({
                     gameHistory: firebase.firestore.FieldValue.arrayUnion(scoreData)
                 });
             }
-        } catch (e) { console.error("Firebase save failed:", e); }
+            console.log("Score saved successfully");
+        } catch (e) { 
+            console.error("Firebase save failed:", e); 
+        }
     }
 
     function fetchGlobalLeaderboard(gameName, elementId) {
         const listEl = document.getElementById(elementId);
         if (!listEl || typeof db === 'undefined') return;
 
-        db.collection('leaderboard').where('game', '==', gameName).orderBy('score', 'desc').limit(3).get()
+        listEl.innerHTML = '<p class="text-center italic text-gray-400">Loading...</p>';
+
+        db.collection('leaderboard')
+            .where('game', '==', gameName)
+            .orderBy('score', 'desc')
+            .limit(3)
+            .get()
             .then((querySnapshot) => {
                 let html = ''; let rank = 1;
                 querySnapshot.forEach((doc) => {
