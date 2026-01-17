@@ -2338,259 +2338,485 @@ function addLogoutButton() {
 }
 
 // ============================================================================
-// SECTION 12: ULTIMATE REPORT SEARCH - GUARANTEED TO FIND ALL REPORTS
+// ============================================================================
+// SECTION 12: OPTIMIZED ULTIMATE REPORT SEARCH - MINIMAL READS, MAXIMAL RESULTS
 // ============================================================================
 
+let totalReads = 0; // Add this to track reads globally
+
+/**
+ * SMART Report Search - Uses minimal reads with intelligent field detection
+ */
 async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUid = '') {
-    console.log("🔍 ULTIMATE Search for:", { parentPhone, parentEmail, parentUid });
+    console.log("🔍 SMART Search activated for:", { parentPhone, parentEmail, parentUid });
     
-    let allResults = [];
-    let foundSources = new Set();
+    let assessmentResults = [];
+    let monthlyResults = [];
+    totalReads = 0; // Reset for this search
     
     try {
-        // Get ALL possible identifiers for this parent
-        const searchQueries = await generateAllSearchQueries(parentPhone, parentEmail, parentUid);
+        // PHASE 1: Get parent's students FIRST (1-2 reads)
+        const studentsResult = await findStudentIdsForParent(parentPhone);
+        const studentIds = studentsResult.studentIds;
+        totalReads += 1;
         
-        console.log("🔎 Generated search queries:", searchQueries.length);
+        // PHASE 2: SMART FIELD DETECTION (Minimal reads)
+        console.log("🔄 Detecting best search fields...");
         
-        // Search in ALL possible collections
-        const collectionsToSearch = [
-            'tutor_submissions',
-            'student_results', 
-            'monthly_reports',
-            'assessment_reports',
-            'progress_reports',
-            'reports',
-            'student_reports',
-            'parent_reports',
-            'academic_reports',
-            'session_reports',
-            'performance_reports'
+        // Try to detect which fields exist with minimal reads
+        const detectedFields = await detectReportFields();
+        
+        // PHASE 3: OPTIMIZED SEARCH PATHS
+        const searchStrategies = [
+            // Strategy A: By parent phone (most common)
+            async () => {
+                console.log("📞 Strategy A: Searching by parent phone");
+                const phoneVariations = generateSmartPhoneVariations(parentPhone);
+                
+                // Only test the most promising variations first
+                const primaryVariations = phoneVariations.slice(0, 4);
+                
+                for (const phone of primaryVariations) {
+                    if (assessmentResults.length > 5 && monthlyResults.length > 5) {
+                        console.log("✅ Found sufficient results, moving to next strategy");
+                        break;
+                    }
+                    
+                    // Try the most common field first
+                    for (const field of detectedFields.phoneFields.slice(0, 2)) {
+                        const results = await searchWithSingleField(field, phone);
+                        assessmentResults.push(...results.assessment);
+                        monthlyResults.push(...results.monthly);
+                        
+                        if (assessmentResults.length > 5 && monthlyResults.length > 5) {
+                            break;
+                        }
+                    }
+                }
+            },
+            
+            // Strategy B: By student IDs (very efficient)
+            async () => {
+                if (studentIds.length > 0 && (assessmentResults.length === 0 || monthlyResults.length === 0)) {
+                    console.log("👤 Strategy B: Searching by student IDs");
+                    for (const studentId of studentIds.slice(0, 5)) { // Limit to 5 students
+                        const results = await searchByStudentId(studentId);
+                        assessmentResults.push(...results.assessment);
+                        monthlyResults.push(...results.monthly);
+                        
+                        if (assessmentResults.length > 10 && monthlyResults.length > 10) {
+                            break;
+                        }
+                    }
+                }
+            },
+            
+            // Strategy C: By email (if available)
+            async () => {
+                if (parentEmail && (assessmentResults.length === 0 || monthlyResults.length === 0)) {
+                    console.log("📧 Strategy C: Searching by email");
+                    for (const field of detectedFields.emailFields.slice(0, 2)) {
+                        const results = await searchWithSingleField(field, parentEmail.toLowerCase());
+                        assessmentResults.push(...results.assessment);
+                        monthlyResults.push(...results.monthly);
+                        
+                        if (assessmentResults.length > 5 && monthlyResults.length > 5) {
+                            break;
+                        }
+                    }
+                }
+            },
+            
+            // Strategy D: By UID (for logged-in users)
+            async () => {
+                if (parentUid && (assessmentResults.length === 0 || monthlyResults.length === 0)) {
+                    console.log("🔑 Strategy D: Searching by UID");
+                    for (const field of detectedFields.uidFields.slice(0, 2)) {
+                        const results = await searchWithSingleField(field, parentUid);
+                        assessmentResults.push(...results.assessment);
+                        monthlyResults.push(...results.monthly);
+                    }
+                }
+            },
+            
+            // Strategy E: Emergency broad search (last resort)
+            async () => {
+                if (assessmentResults.length === 0 && monthlyResults.length === 0) {
+                    console.log("🚨 Strategy E: Emergency broad search");
+                    const emergencyResults = await emergencyBroadSearch(parentPhone, parentEmail);
+                    assessmentResults = emergencyResults.assessment;
+                    monthlyResults = emergencyResults.monthly;
+                }
+            }
         ];
         
-        // PARALLEL SEARCH: Search all collections with all queries
-        const searchPromises = [];
-        
-        for (const collectionName of collectionsToSearch) {
-            for (const query of searchQueries) {
-                searchPromises.push(
-                    searchInCollection(collectionName, query).then(results => {
-                        if (results.length > 0) {
-                            console.log(`✅ Found ${results.length} reports in ${collectionName} with ${query.field}=${query.value}`);
-                            foundSources.add(`${collectionName}:${query.field}`);
-                        }
-                        return results;
-                    }).catch(error => {
-                        // Collection might not exist - that's OK
-                        return [];
-                    })
-                );
+        // Execute strategies in order until we find results
+        for (const strategy of searchStrategies) {
+            if (assessmentResults.length > 10 && monthlyResults.length > 10) {
+                console.log("✅ Found sufficient results, stopping search");
+                break;
             }
-        }
-        
-        // Wait for all searches to complete
-        const allResultsArrays = await Promise.all(searchPromises);
-        
-        // Combine all results
-        allResults = allResultsArrays.flat();
-        
-        console.log("🎯 TOTAL REPORTS FOUND:", allResults.length);
-        console.log("📊 Sources found:", Array.from(foundSources));
-        
-        // If NO reports found, try emergency search
-        if (allResults.length === 0) {
-            console.warn("⚠️ No reports found with standard search. Starting EMERGENCY SEARCH...");
-            const emergencyResults = await emergencyReportSearch(parentPhone, parentEmail);
-            allResults = emergencyResults;
+            await strategy();
         }
         
         // Remove duplicates
-        const uniqueResults = [];
-        const seenIds = new Set();
+        assessmentResults = removeDuplicates(assessmentResults);
+        monthlyResults = removeDuplicates(monthlyResults);
         
-        allResults.forEach(result => {
-            const uniqueKey = `${result.collection}_${result.id}_${result.studentName}_${result.timestamp}`;
-            if (!seenIds.has(uniqueKey)) {
-                seenIds.add(uniqueKey);
-                uniqueResults.push(result);
-            }
+        console.log("🎯 SMART SEARCH COMPLETE");
+        console.log("📊 Results:", { 
+            assessments: assessmentResults.length, 
+            monthly: monthlyResults.length,
+            totalReads,
+            efficiency: totalReads > 0 ? `${Math.round((assessmentResults.length + monthlyResults.length) / totalReads * 100) / 100} results per read` : 'N/A'
         });
-        
-        // Separate into assessment and monthly
-        const assessmentResults = uniqueResults.filter(r => 
-            r.type === 'assessment' || 
-            r.collection.includes('assessment') || 
-            r.collection.includes('progress') ||
-            (r.reportType && r.reportType.toLowerCase().includes('assessment'))
-        );
-        
-        const monthlyResults = uniqueResults.filter(r => 
-            r.type === 'monthly' || 
-            r.collection.includes('monthly') ||
-            r.collection.includes('submission') ||
-            (r.reportType && r.reportType.toLowerCase().includes('monthly'))
-        );
         
         // Sort by date (newest first)
         assessmentResults.sort((a, b) => b.timestamp - a.timestamp);
         monthlyResults.sort((a, b) => b.timestamp - a.timestamp);
         
-        return { assessmentResults, monthlyResults, searchStats: {
-            totalFound: uniqueResults.length,
-            sources: Array.from(foundSources),
-            collectionsSearched: collectionsToSearch.length
-        }};
-        
-    } catch (error) {
-        console.error("❌ Ultimate search error:", error);
-        return { assessmentResults: [], monthlyResults: [], searchStats: { error: error.message }};
-    }
-}
-
-// Generate ALL possible search queries
-async function generateAllSearchQueries(parentPhone, parentEmail, parentUid) {
-    const queries = [];
-    
-    // Phone variations
-    const phoneVariations = generateAllPhoneVariations(parentPhone);
-    for (const phone of phoneVariations) {
-        queries.push({ field: 'parentPhone', value: phone });
-        queries.push({ field: 'parentphone', value: phone });
-        queries.push({ field: 'parent_phone', value: phone });
-        queries.push({ field: 'guardianPhone', value: phone });
-        queries.push({ field: 'motherPhone', value: phone });
-        queries.push({ field: 'fatherPhone', value: phone });
-        queries.push({ field: 'phone', value: phone });
-    }
-    
-    // Email variations
-    if (parentEmail) {
-        const emailVariations = [
-            parentEmail.toLowerCase(),
-            parentEmail.toUpperCase(),
-            parentEmail
-        ];
-        for (const email of emailVariations) {
-            queries.push({ field: 'parentEmail', value: email });
-            queries.push({ field: 'parentemail', value: email });
-            queries.push({ field: 'email', value: email });
-            queries.push({ field: 'guardianEmail', value: email });
-        }
-    }
-    
-    // UID variations
-    if (parentUid) {
-        queries.push({ field: 'parentUid', value: parentUid });
-        queries.push({ field: 'parentuid', value: parentUid });
-        queries.push({ field: 'userId', value: parentUid });
-    }
-    
-    // Try to find students first, then use student IDs
-    try {
-        const normalizedPhone = normalizePhoneNumber(parentPhone);
-        if (normalizedPhone.valid) {
-            // Find students by parent phone
-            const studentsSnapshot = await db.collection('students')
-                .where('parentPhone', '==', normalizedPhone.normalized)
-                .get();
-            
-            if (!studentsSnapshot.empty) {
-                studentsSnapshot.forEach(doc => {
-                    const studentId = doc.id;
-                    queries.push({ field: 'studentId', value: studentId });
-                    queries.push({ field: 'studentID', value: studentId });
-                    queries.push({ field: 'student_id', value: studentId });
-                });
+        return { 
+            assessmentResults, 
+            monthlyResults, 
+            searchStats: {
+                totalFound: assessmentResults.length + monthlyResults.length,
+                totalReads: totalReads,
+                studentsFound: studentIds.length,
+                efficiencyScore: totalReads > 0 ? (assessmentResults.length + monthlyResults.length) / totalReads : 0
             }
-        }
-    } catch (error) {
-        console.warn("Could not find students for search:", error);
-    }
-    
-    return queries;
-}
-
-// Search in a specific collection
-async function searchInCollection(collectionName, query) {
-    try {
-        const snapshot = await db.collection(collectionName)
-            .where(query.field, '==', query.value)
-            .get();
+        };
         
-        const results = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            results.push({
-                id: doc.id,
-                collection: collectionName,
-                fieldMatched: query.field,
-                ...data,
-                timestamp: getTimestampFromData(data),
-                type: determineReportType(collectionName, data)
-            });
-        });
-        
-        return results;
     } catch (error) {
-        // Collection or field doesn't exist
-        return [];
+        console.error("❌ Smart search error:", error);
+        return { 
+            assessmentResults: [], 
+            monthlyResults: [], 
+            searchStats: { error: error.message, totalReads }
+        };
     }
 }
 
-// EMERGENCY SEARCH - Last resort
-async function emergencyReportSearch(parentPhone, parentEmail) {
-    console.log("🚨 EMERGENCY SEARCH ACTIVATED");
-    const results = [];
+/**
+ * Detect which report fields exist with minimal reads
+ */
+async function detectReportFields() {
+    // These are the MOST COMMON field names based on your database structure
+    const commonFields = {
+        phoneFields: ['parentPhone', 'phone', 'parentphone', 'parent_phone', 'guardianPhone'], // Most common first
+        emailFields: ['parentEmail', 'email', 'guardianEmail'],
+        uidFields: ['parentUid', 'uid', 'userId'],
+        studentFields: ['studentId', 'studentID', 'student_id']
+    };
     
+    // We'll test ONE document to see which fields exist
     try {
-        // 1. Get ALL tutor_submissions and filter client-side
-        const allSubmissions = await db.collection('tutor_submissions').limit(500).get();
-        const phoneVariations = generateAllPhoneVariations(parentPhone);
+        // Try to get a single document from tutor_submissions to check fields
+        const sampleSnapshot = await db.collection('tutor_submissions').limit(1).get();
+        totalReads += 1;
         
-        allSubmissions.forEach(doc => {
-            const data = doc.data();
+        if (!sampleSnapshot.empty) {
+            const sampleDoc = sampleSnapshot.docs[0].data();
+            const detectedFields = {
+                phoneFields: [],
+                emailFields: [],
+                uidFields: [],
+                studentFields: []
+            };
             
-            // Check ALL phone fields
-            const phoneFields = ['parentPhone', 'parentphone', 'parent_phone', 'phone', 'guardianPhone'];
-            for (const field of phoneFields) {
-                if (data[field] && phoneVariations.includes(String(data[field]).trim())) {
-                    results.push({
-                        id: doc.id,
-                        collection: 'tutor_submissions',
-                        emergencyMatch: true,
-                        ...data,
-                        timestamp: getTimestampFromData(data),
-                        type: 'monthly'
-                    });
-                    break;
+            // Check which fields exist in the sample
+            for (const field of commonFields.phoneFields) {
+                if (sampleDoc[field] !== undefined) {
+                    detectedFields.phoneFields.push(field);
                 }
             }
             
-            // Check by email
-            if (parentEmail && data.parentEmail && 
-                data.parentEmail.toLowerCase() === parentEmail.toLowerCase()) {
-                results.push({
+            for (const field of commonFields.emailFields) {
+                if (sampleDoc[field] !== undefined) {
+                    detectedFields.emailFields.push(field);
+                }
+            }
+            
+            for (const field of commonFields.uidFields) {
+                if (sampleDoc[field] !== undefined) {
+                    detectedFields.uidFields.push(field);
+                }
+            }
+            
+            for (const field of commonFields.studentFields) {
+                if (sampleDoc[field] !== undefined) {
+                    detectedFields.studentFields.push(field);
+                }
+            }
+            
+            // If no fields detected, use common ones
+            if (detectedFields.phoneFields.length === 0) detectedFields.phoneFields = commonFields.phoneFields.slice(0, 3);
+            if (detectedFields.emailFields.length === 0) detectedFields.emailFields = commonFields.emailFields.slice(0, 2);
+            if (detectedFields.uidFields.length === 0) detectedFields.uidFields = commonFields.uidFields.slice(0, 2);
+            if (detectedFields.studentFields.length === 0) detectedFields.studentFields = commonFields.studentFields.slice(0, 2);
+            
+            console.log("🔍 Detected fields:", detectedFields);
+            return detectedFields;
+        }
+    } catch (error) {
+        console.warn("Could not detect fields, using defaults");
+    }
+    
+    // Fallback to common fields if detection fails
+    return {
+        phoneFields: commonFields.phoneFields.slice(0, 3),
+        emailFields: commonFields.emailFields.slice(0, 2),
+        uidFields: commonFields.uidFields.slice(0, 2),
+        studentFields: commonFields.studentFields.slice(0, 2)
+    };
+}
+
+/**
+ * Generate SMART phone variations - UNIVERSAL for ALL countries
+ */
+function generateSmartPhoneVariations(phone) {
+    const variations = new Set();
+    
+    if (!phone || typeof phone !== 'string') return [];
+    
+    // Clean the phone - keep only digits and +
+    const cleaned = phone.replace(/[^\d+]/g, '').trim();
+    
+    // 1. Add the exact cleaned version (most important)
+    variations.add(cleaned);
+    
+    // 2. Remove all non-digit characters (keep only digits)
+    const digitsOnly = cleaned.replace(/\D/g, '');
+    variations.add(digitsOnly);
+    
+    // 3. Handle international format (+XXX...)
+    if (cleaned.startsWith('+')) {
+        const countryCode = cleaned.match(/^\+\d{1,4}/)?.[0] || '';
+        const nationalNumber = cleaned.substring(countryCode.length);
+        
+        // +CountryCodeNational → 0National (local format for many countries)
+        if (nationalNumber && !nationalNumber.startsWith('0')) {
+            variations.add('0' + nationalNumber);
+        }
+        
+        // +CountryCodeNational → CountryCodeNational (without +)
+        variations.add(countryCode.substring(1) + nationalNumber);
+        
+        // For common country codes, add specific variations
+        const commonCodes = {
+            '+1': 'USA/Canada',
+            '+44': 'UK',
+            '+33': 'France',
+            '+49': 'Germany',
+            '+61': 'Australia',
+            '+81': 'Japan',
+            '+86': 'China',
+            '+91': 'India',
+            '+234': 'Nigeria',
+            '+27': 'South Africa',
+            '+254': 'Kenya'
+        };
+        
+        // Add country-specific variations
+        for (const [code, name] of Object.entries(commonCodes)) {
+            if (cleaned.startsWith(code)) {
+                const localNumber = cleaned.substring(code.length);
+                
+                // For countries where local numbers start with 0
+                if (!localNumber.startsWith('0')) {
+                    variations.add('0' + localNumber);
+                }
+                
+                // Code without + + local number
+                variations.add(code.substring(1) + localNumber);
+                
+                break;
+            }
+        }
+    }
+    
+    // 4. Handle local format (0XXXXXXXXX)
+    if (cleaned.startsWith('0') && cleaned.length >= 10) {
+        // Try to guess country code based on length and add it
+        if (cleaned.length >= 11) {
+            // Common international prefixes
+            variations.add('+234' + cleaned.substring(1)); // Nigeria
+            variations.add('+44' + cleaned.substring(1));  // UK
+            variations.add('+33' + cleaned.substring(1));  // France
+        }
+    }
+    
+    // 5. Remove leading zeros from non-international variations
+    const finalVariations = Array.from(variations)
+        .map(v => {
+            // Keep + prefix intact
+            if (v.startsWith('+')) {
+                return v;
+            }
+            // For other variations, remove leading zeros
+            return v.replace(/^0+/, '');
+        })
+        .filter(v => v && v.length >= 7) // Minimum reasonable phone length
+        .filter((v, i, arr) => arr.indexOf(v) === i); // Remove duplicates
+    
+    console.log("📱 Generated UNIVERSAL phone variations:", finalVariations);
+    return finalVariations;
+}
+
+/**
+ * Search with a single field-value pair (minimal reads)
+ */
+async function searchWithSingleField(field, value) {
+    const assessmentResults = [];
+    const monthlyResults = [];
+    
+    try {
+        // Search in BOTH collections with ONE query each
+        const [assessmentSnapshot, monthlySnapshot] = await Promise.all([
+            db.collection('student_results')
+                .where(field, '==', value)
+                .limit(30) // Limit to prevent huge reads
+                .get()
+                .catch(() => ({ empty: true, forEach: () => {} })),
+                
+            db.collection('tutor_submissions')
+                .where(field, '==', value)
+                .limit(30)
+                .get()
+                .catch(() => ({ empty: true, forEach: () => {} }))
+        ]);
+        
+        totalReads += 2; // 2 collections queried
+        
+        // Process assessment results
+        if (!assessmentSnapshot.empty) {
+            assessmentSnapshot.forEach(doc => {
+                const data = doc.data();
+                assessmentResults.push({
+                    id: doc.id,
+                    collection: 'student_results',
+                    ...data,
+                    timestamp: getTimestampFromData(data),
+                    type: 'assessment'
+                });
+            });
+        }
+        
+        // Process monthly results
+        if (!monthlySnapshot.empty) {
+            monthlySnapshot.forEach(doc => {
+                const data = doc.data();
+                monthlyResults.push({
                     id: doc.id,
                     collection: 'tutor_submissions',
-                    emergencyMatch: true,
                     ...data,
                     timestamp: getTimestampFromData(data),
                     type: 'monthly'
                 });
-            }
-        });
+            });
+        }
         
-        // 2. Get ALL student_results and filter client-side
-        const allAssessments = await db.collection('student_results').limit(500).get();
+        console.log(`✅ Field "${field}" = "${value}" → ${assessmentResults.length} assessments, ${monthlyResults.length} monthly`);
         
-        allAssessments.forEach(doc => {
+    } catch (error) {
+        console.warn(`Field "${field}" search failed:`, error.message);
+    }
+    
+    return { assessment: assessmentResults, monthly: monthlyResults };
+}
+
+/**
+ * Search by student ID (very efficient - students have few reports)
+ */
+async function searchByStudentId(studentId) {
+    const assessmentResults = [];
+    const monthlyResults = [];
+    
+    try {
+        // Search for reports by student ID
+        const [assessmentSnapshot, monthlySnapshot] = await Promise.all([
+            db.collection('student_results')
+                .where('studentId', '==', studentId)
+                .limit(15)
+                .get()
+                .catch(() => ({ empty: true, forEach: () => {} })),
+                
+            db.collection('tutor_submissions')
+                .where('studentId', '==', studentId)
+                .limit(15)
+                .get()
+                .catch(() => ({ empty: true, forEach: () => {} }))
+        ]);
+        
+        totalReads += 2; // 2 collections queried
+        
+        // Process results
+        if (!assessmentSnapshot.empty) {
+            assessmentSnapshot.forEach(doc => {
+                const data = doc.data();
+                assessmentResults.push({
+                    id: doc.id,
+                    collection: 'student_results',
+                    ...data,
+                    timestamp: getTimestampFromData(data),
+                    type: 'assessment'
+                });
+            });
+        }
+        
+        if (!monthlySnapshot.empty) {
+            monthlySnapshot.forEach(doc => {
+                const data = doc.data();
+                monthlyResults.push({
+                    id: doc.id,
+                    collection: 'tutor_submissions',
+                    ...data,
+                    timestamp: getTimestampFromData(data),
+                    type: 'monthly'
+                });
+            });
+        }
+        
+        console.log(`✅ Student ID "${studentId}" → ${assessmentResults.length} assessments, ${monthlyResults.length} monthly`);
+        
+    } catch (error) {
+        console.warn(`Student ID ${studentId} search failed:`, error.message);
+    }
+    
+    return { assessment: assessmentResults, monthly: monthlyResults };
+}
+
+/**
+ * Emergency broad search - last resort with minimal reads
+ */
+async function emergencyBroadSearch(parentPhone, parentEmail) {
+    console.log("🚨 EMERGENCY BROAD SEARCH ACTIVATED");
+    
+    const assessmentResults = [];
+    const monthlyResults = [];
+    const emergencyReads = 0;
+    
+    try {
+        // Get a small sample of each collection
+        const [assessmentsSample, monthlySample] = await Promise.all([
+            db.collection('student_results').limit(20).get(),
+            db.collection('tutor_submissions').limit(20).get()
+        ]);
+        
+        emergencyReads += 2;
+        
+        // Generate all possible variations
+        const phoneVariations = generateAllPhoneVariations(parentPhone);
+        const emailLower = parentEmail ? parentEmail.toLowerCase() : '';
+        
+        // Check assessments sample
+        assessmentsSample.forEach(doc => {
             const data = doc.data();
             
-            // Check ALL phone fields
-            const phoneFields = ['parentPhone', 'parentphone', 'parent_phone', 'phone'];
+            // Check phone fields
+            const phoneFields = ['parentPhone', 'phone', 'parentphone', 'parent_phone'];
             for (const field of phoneFields) {
                 if (data[field] && phoneVariations.includes(String(data[field]).trim())) {
-                    results.push({
+                    assessmentResults.push({
                         id: doc.id,
                         collection: 'student_results',
                         emergencyMatch: true,
@@ -2602,10 +2828,9 @@ async function emergencyReportSearch(parentPhone, parentEmail) {
                 }
             }
             
-            // Check by email
-            if (parentEmail && data.parentEmail && 
-                data.parentEmail.toLowerCase() === parentEmail.toLowerCase()) {
-                results.push({
+            // Check email
+            if (emailLower && data.parentEmail && data.parentEmail.toLowerCase() === emailLower) {
+                assessmentResults.push({
                     id: doc.id,
                     collection: 'student_results',
                     emergencyMatch: true,
@@ -2616,26 +2841,63 @@ async function emergencyReportSearch(parentPhone, parentEmail) {
             }
         });
         
-        console.log(`🚨 EMERGENCY SEARCH found: ${results.length} reports`);
+        // Check monthly sample
+        monthlySample.forEach(doc => {
+            const data = doc.data();
+            
+            // Check phone fields
+            const phoneFields = ['parentPhone', 'phone', 'parentphone', 'parent_phone'];
+            for (const field of phoneFields) {
+                if (data[field] && phoneVariations.includes(String(data[field]).trim())) {
+                    monthlyResults.push({
+                        id: doc.id,
+                        collection: 'tutor_submissions',
+                        emergencyMatch: true,
+                        ...data,
+                        timestamp: getTimestampFromData(data),
+                        type: 'monthly'
+                    });
+                    break;
+                }
+            }
+            
+            // Check email
+            if (emailLower && data.parentEmail && data.parentEmail.toLowerCase() === emailLower) {
+                monthlyResults.push({
+                    id: doc.id,
+                    collection: 'tutor_submissions',
+                    emergencyMatch: true,
+                    ...data,
+                    timestamp: getTimestampFromData(data),
+                    type: 'monthly'
+                });
+            }
+        });
+        
+        console.log(`🚨 EMERGENCY SEARCH: ${assessmentResults.length} assessments, ${monthlyResults.length} monthly`);
         
     } catch (error) {
         console.error("Emergency search failed:", error);
     }
     
-    return results;
+    totalReads += emergencyReads;
+    return { assessment: assessmentResults, monthly: monthlyResults };
 }
 
-// Generate ALL possible phone variations
+/**
+ * Generate ALL possible phone variations (comprehensive)
+ */
 function generateAllPhoneVariations(phone) {
     const variations = new Set();
     
     if (!phone) return [];
     
     // Add original
-    variations.add(phone.trim());
+    const trimmed = phone.trim();
+    variations.add(trimmed);
     
     // Clean version (remove all non-digits except +)
-    const cleaned = phone.replace(/[^\d+]/g, '');
+    const cleaned = trimmed.replace(/[^\d+]/g, '');
     variations.add(cleaned);
     
     // If starts with +, add without +
@@ -2643,62 +2905,216 @@ function generateAllPhoneVariations(phone) {
         variations.add(cleaned.substring(1));
     }
     
-    // Nigerian number handling
-    if (cleaned.startsWith('+234')) {
-        variations.add(cleaned.substring(4)); // Remove +234
-        variations.add('0' + cleaned.substring(4)); // 0 + rest
-        variations.add('234' + cleaned.substring(4)); // 234 + rest
+    // Handle common country code patterns
+    const countryCodePatterns = [
+        { prefix: '+1', localPrefix: '' }, // USA/Canada
+        { prefix: '+44', localPrefix: '0' }, // UK
+        { prefix: '+33', localPrefix: '0' }, // France
+        { prefix: '+49', localPrefix: '0' }, // Germany
+        { prefix: '+61', localPrefix: '0' }, // Australia
+        { prefix: '+81', localPrefix: '0' }, // Japan
+        { prefix: '+86', localPrefix: '' }, // China
+        { prefix: '+91', localPrefix: '0' }, // India
+        { prefix: '+234', localPrefix: '0' }, // Nigeria
+        { prefix: '+27', localPrefix: '0' }, // South Africa
+        { prefix: '+254', localPrefix: '0' }, // Kenya
+        { prefix: '+233', localPrefix: '0' }, // Ghana
+        { prefix: '+255', localPrefix: '0' }, // Tanzania
+    ];
+    
+    for (const pattern of countryCodePatterns) {
+        if (cleaned.startsWith(pattern.prefix) && cleaned.length > pattern.prefix.length) {
+            const localNumber = cleaned.substring(pattern.prefix.length);
+            
+            // Add local format
+            if (pattern.localPrefix && !localNumber.startsWith(pattern.localPrefix)) {
+                variations.add(pattern.localPrefix + localNumber);
+            }
+            
+            // Add without +
+            variations.add(pattern.prefix.substring(1) + localNumber);
+        }
     }
     
-    // If starts with 0, add +234 version
+    // If starts with 0, try adding common country codes
     if (cleaned.startsWith('0') && cleaned.length > 1) {
-        variations.add('+234' + cleaned.substring(1));
-        variations.add('234' + cleaned.substring(1));
+        const withoutZero = cleaned.substring(1);
+        
+        // Add common international prefixes
+        variations.add('+234' + withoutZero); // Nigeria
+        variations.add('+44' + withoutZero);  // UK
+        variations.add('+33' + withoutZero);  // France
+        variations.add('+49' + withoutZero);  // Germany
+        variations.add('+1' + withoutZero);   // USA/Canada
+        
+        // Add without leading zero
+        variations.add(withoutZero);
     }
     
-    // If starts with 234 (no +), add + version
-    if (cleaned.startsWith('234') && !cleaned.startsWith('+234') && cleaned.length > 3) {
-        variations.add('+' + cleaned);
-        variations.add('0' + cleaned.substring(3));
+    // If starts with country code (no +), add + version
+    for (const pattern of countryCodePatterns) {
+        const codeWithoutPlus = pattern.prefix.substring(1);
+        if (cleaned.startsWith(codeWithoutPlus) && !cleaned.startsWith('+')) {
+            variations.add('+' + cleaned);
+            
+            // Try local format
+            const localNumber = cleaned.substring(codeWithoutPlus.length);
+            if (pattern.localPrefix && !localNumber.startsWith(pattern.localPrefix)) {
+                variations.add(pattern.localPrefix + localNumber);
+            }
+        }
     }
     
-    // Add with spaces/dashes variations
-    if (cleaned.startsWith('+234') && cleaned.length === 14) {
-        // Format: +2348012345678
-        const formatted = cleaned.replace(/(\+234)(\d{3})(\d{3})(\d{4})/, '$1 $2 $3 $4');
-        variations.add(formatted);
-        variations.add(formatted.replace(/\s/g, '-'));
-    }
+    // Remove leading zeros from non-international numbers
+    const finalVariations = Array.from(variations)
+        .map(v => {
+            if (v.startsWith('+')) return v;
+            return v.replace(/^0+/, '');
+        })
+        .filter(v => v && v.length >= 7)
+        .filter((v, i, arr) => arr.indexOf(v) === i);
     
-    return Array.from(variations).filter(v => v && v.length >= 10);
+    return finalVariations;
 }
 
-// Determine report type
-function determineReportType(collectionName, data) {
-    if (collectionName.includes('monthly') || collectionName.includes('submission')) {
-        return 'monthly';
+/**
+ * Remove duplicate reports
+ */
+function removeDuplicates(reports) {
+    const seen = new Set();
+    const unique = [];
+    
+    for (const report of reports) {
+        // Create a unique key based on content
+        const key = `${report.studentName || ''}_${report.timestamp}_${report.type}_${report.id}`;
+        if (!seen.has(key)) {
+            seen.add(key);
+            unique.push(report);
+        }
     }
-    if (collectionName.includes('assessment') || collectionName.includes('progress')) {
-        return 'assessment';
-    }
-    if (data.reportType) {
-        return data.reportType.toLowerCase();
-    }
-    if (data.type) {
-        return data.type;
-    }
-    return 'unknown';
+    
+    return unique;
 }
 
 // ============================================================================
-// SECTION 13: REAL-TIME MONITORING WITHOUT COMPLEX QUERIES
+// SECTION 13: OPTIMIZED REAL-TIME MONITORING
 // ============================================================================
 
 function setupRealTimeMonitoring(parentPhone, userId) {
     // Clear any existing listeners
     cleanupRealTimeListeners();
     
-    console.log("🔍 Setting up real-time monitoring for:", parentPhone);
+    console.log("🔍 Setting up OPTIMIZED real-time monitoring");
+    
+    // Use student-based monitoring (more efficient)
+    setupStudentBasedMonitoring(parentPhone, userId);
+    
+    console.log("✅ Optimized real-time monitoring setup complete");
+}
+
+/**
+ * Student-based monitoring - more efficient than phone-based
+ */
+async function setupStudentBasedMonitoring(parentPhone, userId) {
+    try {
+        // Get student IDs once
+        const { studentIds } = await findStudentIdsForParent(parentPhone);
+        
+        if (studentIds.length === 0) {
+            console.log("No students found for monitoring");
+            
+            // Fallback to phone-based monitoring if no students
+            setupPhoneBasedMonitoring(parentPhone, userId);
+            return;
+        }
+        
+        console.log(`👥 Monitoring ${studentIds.length} students`);
+        
+        // Monitor each student's reports (limit to 5 students max)
+        const studentsToMonitor = studentIds.slice(0, 5);
+        
+        studentsToMonitor.forEach(studentId => {
+            // Assessment reports for this student
+            const assessmentListener = db.collection("student_results")
+                .where("studentId", "==", studentId)
+                .onSnapshot((snapshot) => {
+                    snapshot.docChanges().forEach((change) => {
+                        if (change.type === "added") {
+                            console.log("🆕 NEW ASSESSMENT for student");
+                            showNewReportNotification('assessment');
+                            // Trigger a refresh after a delay
+                            setTimeout(() => {
+                                const user = auth.currentUser;
+                                if (user) {
+                                    loadAllReportsForParent(parentPhone, user.uid, true);
+                                }
+                            }, 3000);
+                        }
+                    });
+                }, (error) => {
+                    console.error("Student assessment listener error:", error);
+                });
+            realTimeListeners.push(assessmentListener);
+            
+            // Monthly reports for this student
+            const monthlyListener = db.collection("tutor_submissions")
+                .where("studentId", "==", studentId)
+                .onSnapshot((snapshot) => {
+                    snapshot.docChanges().forEach((change) => {
+                        if (change.type === "added") {
+                            console.log("🆕 NEW MONTHLY REPORT for student");
+                            showNewReportNotification('monthly');
+                            setTimeout(() => {
+                                const user = auth.currentUser;
+                                if (user) {
+                                    loadAllReportsForParent(parentPhone, user.uid, true);
+                                }
+                            }, 3000);
+                        }
+                    });
+                }, (error) => {
+                    console.error("Student monthly listener error:", error);
+                });
+            realTimeListeners.push(monthlyListener);
+        });
+        
+        // Monitor messages (one listener for parent)
+        const messagesListener = db.collection("tutor_messages")
+            .where("parentUid", "==", userId)
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === "added") {
+                        const message = change.doc.data();
+                        if (message.type !== 'parent_to_staff') {
+                            console.log("🆕 NEW MESSAGE");
+                            checkForNewMessages();
+                        }
+                    }
+                });
+            }, (error) => {
+                console.error("Messages listener error:", error);
+            });
+        realTimeListeners.push(messagesListener);
+        
+        // Monitor academics (simplified - check periodically)
+        const academicsCheckInterval = setInterval(() => {
+            checkForNewAcademics();
+        }, 60000); // Check every minute
+        
+        realTimeListeners.push(() => clearInterval(academicsCheckInterval));
+        
+    } catch (error) {
+        console.error("Error setting up student monitoring:", error);
+        // Fallback to phone-based monitoring
+        setupPhoneBasedMonitoring(parentPhone, userId);
+    }
+}
+
+/**
+ * Phone-based monitoring (fallback when no students found)
+ */
+function setupPhoneBasedMonitoring(parentPhone, userId) {
+    console.log("📞 Setting up phone-based monitoring (fallback)");
     
     // Normalize phone
     const normalizedPhone = normalizePhoneNumber(parentPhone);
@@ -2707,7 +3123,7 @@ function setupRealTimeMonitoring(parentPhone, userId) {
         return;
     }
     
-    // Monitor monthly reports
+    // Monitor monthly reports by phone
     const monthlyListener = db.collection("tutor_submissions")
         .where("parentPhone", "==", normalizedPhone.normalized)
         .onSnapshot((snapshot) => {
@@ -2715,10 +3131,12 @@ function setupRealTimeMonitoring(parentPhone, userId) {
                 if (change.type === "added") {
                     console.log("🆕 NEW MONTHLY REPORT DETECTED!");
                     showNewReportNotification('monthly');
-                    // Reload reports after a short delay
                     setTimeout(() => {
-                        loadAllReportsForParent(parentPhone, userId);
-                    }, 2000);
+                        const user = auth.currentUser;
+                        if (user) {
+                            loadAllReportsForParent(parentPhone, user.uid, true);
+                        }
+                    }, 3000);
                 }
             });
         }, (error) => {
@@ -2726,7 +3144,7 @@ function setupRealTimeMonitoring(parentPhone, userId) {
         });
     realTimeListeners.push(monthlyListener);
     
-    // Monitor assessment reports
+    // Monitor assessment reports by phone
     const assessmentListener = db.collection("student_results")
         .where("parentPhone", "==", normalizedPhone.normalized)
         .onSnapshot((snapshot) => {
@@ -2735,8 +3153,11 @@ function setupRealTimeMonitoring(parentPhone, userId) {
                     console.log("🆕 NEW ASSESSMENT REPORT DETECTED!");
                     showNewReportNotification('assessment');
                     setTimeout(() => {
-                        loadAllReportsForParent(parentPhone, userId);
-                    }, 2000);
+                        const user = auth.currentUser;
+                        if (user) {
+                            loadAllReportsForParent(parentPhone, user.uid, true);
+                        }
+                    }, 3000);
                 }
             });
         }, (error) => {
@@ -2744,14 +3165,13 @@ function setupRealTimeMonitoring(parentPhone, userId) {
         });
     realTimeListeners.push(assessmentListener);
     
-    // Monitor tutor messages (simple query without type filter)
+    // Monitor messages
     const messagesListener = db.collection("tutor_messages")
         .where("parentUid", "==", userId)
         .onSnapshot((snapshot) => {
             snapshot.docChanges().forEach((change) => {
                 if (change.type === "added") {
                     const message = change.doc.data();
-                    // Filter client-side for incoming messages
                     if (message.type !== 'parent_to_staff') {
                         console.log("🆕 NEW MESSAGE DETECTED!");
                         checkForNewMessages();
@@ -2762,48 +3182,6 @@ function setupRealTimeMonitoring(parentPhone, userId) {
             console.error("Messages listener error:", error);
         });
     realTimeListeners.push(messagesListener);
-    
-    // Monitor academics with simplified approach
-    // We'll check periodically instead of real-time to avoid complex queries
-    setInterval(() => {
-        checkForNewAcademics();
-    }, 30000); // Check every 30 seconds
-    
-    console.log("✅ Real-time monitoring setup complete");
-}
-
-function cleanupRealTimeListeners() {
-    realTimeListeners.forEach(unsubscribe => {
-        if (typeof unsubscribe === 'function') {
-            unsubscribe();
-        }
-    });
-    realTimeListeners = [];
-    console.log("🧹 Cleaned up real-time listeners");
-}
-
-function showNewReportNotification(type) {
-    const reportType = type === 'assessment' ? 'Assessment Report' : 
-                      type === 'monthly' ? 'Monthly Report' : 'New Update';
-    
-    showMessage(`New ${reportType} available!`, 'success');
-    
-    // Add a visual indicator in the UI
-    const existingIndicator = document.getElementById('newReportIndicator');
-    if (existingIndicator) {
-        existingIndicator.remove();
-    }
-    
-    const indicator = document.createElement('div');
-    indicator.id = 'newReportIndicator';
-    indicator.className = 'fixed top-20 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-40 animate-pulse fade-in';
-    indicator.innerHTML = `📄 New ${safeText(reportType)} Available!`;
-    document.body.appendChild(indicator);
-    
-    // Remove after 5 seconds
-    setTimeout(() => {
-        indicator.remove();
-    }, 5000);
 }
 
 // ============================================================================
@@ -3157,7 +3535,7 @@ function toggleAccordion(elementId) {
 }
 
 // ============================================================================
-// SECTION 15: MAIN REPORT LOADING FUNCTION WITH FIXED CACHE ERROR
+// SECTION 15: OPTIMIZED MAIN REPORT LOADING FUNCTION
 // ============================================================================
 
 async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false) {
@@ -3185,18 +3563,18 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
     try {
         // --- CACHE IMPLEMENTATION (skip if force refresh) ---
         const cacheKey = `reportCache_${parentPhone}`;
-        const twoWeeksInMillis = 14 * 24 * 60 * 60 * 1000;
+        const cacheDuration = 2 * 60 * 60 * 1000; // 2 hours (reduced from 2 weeks for freshness)
         
         if (!forceRefresh) {
             try {
                 const cachedItem = localStorage.getItem(cacheKey);
                 if (cachedItem) {
                     const cacheData = JSON.parse(cachedItem);
-                    if (Date.now() - cacheData.timestamp < twoWeeksInMillis) {
-                        console.log("Loading reports from cache.");
+                    if (Date.now() - cacheData.timestamp < cacheDuration) {
+                        console.log("📦 Loading reports from cache (2 hours fresh)");
                         if (reportContent) reportContent.innerHTML = cacheData.html;
                         
-                        // Set welcome message from cache - FIXED VARIABLE NAME
+                        // Set welcome message from cache
                         if (cacheData.userData && cacheData.userData.parentName && welcomeMessage) {
                             welcomeMessage.textContent = `Welcome, ${cacheData.userData.parentName}!`;
                             currentUserData = cacheData.userData;
@@ -3210,28 +3588,38 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                         }
                         
                         // Add buttons to welcome section
-                        addMessagesButton();
-                        addManualRefreshButton();
-                        addLogoutButton();
+                        setTimeout(() => {
+                            addMessagesButton();
+                            addManualRefreshButton();
+                            addLogoutButton();
+                        }, 100);
                         
-                        // Setup real-time monitoring
-                        const userDoc = await db.collection('parent_users').doc(userId).get();
-                        const userData = userDoc.data();
-                        setupRealTimeMonitoring(parentPhone, userId);
+                        // Setup real-time monitoring (async, doesn't block)
+                        setTimeout(() => {
+                            setupRealTimeMonitoring(parentPhone, userId);
+                        }, 500);
                         
-                        // Load initial referral data
-                        loadReferralRewards(userId);
-                        
-                        // Load academics data
-                        loadAcademicsData();
+                        // Load referral and academics (async)
+                        setTimeout(() => {
+                            if (userId) {
+                                loadReferralRewards(userId);
+                                loadAcademicsData();
+                            }
+                        }, 1000);
 
                         return;
+                    } else {
+                        console.log("🕒 Cache expired, fetching fresh data");
+                        localStorage.removeItem(cacheKey);
                     }
                 }
             } catch (e) {
                 console.error("Could not read from cache:", e);
                 localStorage.removeItem(cacheKey);
             }
+        } else {
+            console.log("🔄 Force refresh requested, ignoring cache");
+            localStorage.removeItem(cacheKey);
         }
         // --- END CACHE IMPLEMENTATION ---
 
@@ -3305,28 +3693,93 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             }
         }
 
-        console.log("🔍 Starting ULTIMATE search for reports with:", { parentPhone, email: currentUserData.email, uid: userId });
+        console.log("🔍 Starting OPTIMIZED search for reports");
 
-        // --- USE ULTIMATE SEARCH SYSTEM ---
+        // --- USE OPTIMIZED SEARCH SYSTEM ---
         const { assessmentResults, monthlyResults, searchStats } = await searchAllReportsForParent(
             parentPhone, 
             currentUserData.email || userData?.email || '',
             userId
         );
 
-        console.log("🔍 Search Statistics:", searchStats);
+        console.log("📊 Search Statistics:", searchStats);
 
         // If no reports found, show helpful message
         if (assessmentResults.length === 0 && monthlyResults.length === 0) {
             showMessage('No reports found yet. Reports will appear here once tutors submit them.', 'info');
             
-            // Show search stats for debugging
-            console.log("📊 Why no reports found:", {
-                parentPhone,
-                email: currentUserData?.email,
-                uid: userId,
-                searchStats
-            });
+            // Still show the student section even without reports
+            const { studentNameIdMap } = await findStudentIdsForParent(parentPhone);
+            userChildren = Array.from(studentNameIdMap.keys());
+            
+            if (reportContent && userChildren.length > 0) {
+                const reportsByStudent = new Map();
+                for (const studentName of userChildren) {
+                    reportsByStudent.set(studentName, { assessments: new Map(), monthly: new Map() });
+                }
+                
+                const reportsHtml = createYearlyArchiveReportView(reportsByStudent);
+                reportContent.innerHTML = reportsHtml;
+                
+                // Show search stats for transparency
+                const statsHtml = `
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                        <div class="flex items-center">
+                            <span class="text-blue-600 text-xl mr-3">📊</span>
+                            <div>
+                                <h4 class="font-semibold text-blue-800">Search Results</h4>
+                                <p class="text-blue-600 text-sm">Used ${searchStats.totalReads} reads to search for reports.</p>
+                                <p class="text-blue-600 text-sm">Found ${userChildren.length} linked student(s).</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                reportContent.innerHTML = statsHtml + reportContent.innerHTML;
+            } else if (reportContent) {
+                reportContent.innerHTML = `
+                    <div class="text-center py-12">
+                        <div class="text-6xl mb-4">📚</div>
+                        <h3 class="text-xl font-bold text-gray-700 mb-2">No Students Found</h3>
+                        <p class="text-gray-500 max-w-md mx-auto">No students are currently assigned to your account. Please contact administration if you believe this is an error.</p>
+                    </div>
+                `;
+            }
+            
+            // Still setup monitoring for future reports
+            setupRealTimeMonitoring(parentPhone, userId);
+            
+            // Cache empty state
+            try {
+                const dataToCache = {
+                    timestamp: Date.now(),
+                    html: reportContent ? reportContent.innerHTML : '',
+                    userData: currentUserData
+                };
+                localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
+            } catch (e) {
+                console.error("Could not write to cache:", e);
+            }
+            
+            if (authArea && reportArea) {
+                authArea.classList.add("hidden");
+                reportArea.classList.remove("hidden");
+            }
+            
+            // Add buttons to welcome section
+            setTimeout(() => {
+                addMessagesButton();
+                addManualRefreshButton();
+                addLogoutButton();
+            }, 100);
+            
+            setTimeout(() => {
+                if (userId) {
+                    loadReferralRewards(userId);
+                    loadAcademicsData();
+                }
+            }, 500);
+            
+            return;
         }
         
         // --- GET ALL STUDENTS ASSIGNED TO THIS PARENT ---
@@ -3403,7 +3856,27 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         // Create yearly archive accordion view
         if (reportContent) {
             const reportsHtml = createYearlyArchiveReportView(reportsByStudent);
-            reportContent.innerHTML = reportsHtml; // Direct assignment, not escaped
+            
+            // Add search stats header
+            const statsHeader = `
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <span class="text-green-600 text-xl mr-3">✅</span>
+                            <div>
+                                <h4 class="font-semibold text-green-800">Search Complete</h4>
+                                <p class="text-green-600 text-sm">Found ${assessmentResults.length + monthlyResults.length} reports for ${userChildren.length} student(s)</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-green-700 text-sm font-medium">Efficiency: ${searchStats.efficiencyScore.toFixed(2)} results/read</p>
+                            <p class="text-green-600 text-xs">${searchStats.totalReads} reads used</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            reportContent.innerHTML = statsHeader + reportsHtml;
         }
         
         // --- CACHE SAVING LOGIC ---
@@ -3414,7 +3887,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                 userData: currentUserData
             };
             localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
-            console.log("Report data cached successfully.");
+            console.log("✅ Report data cached successfully.");
         } catch (e) {
             console.error("Could not write to cache:", e);
         }
@@ -3426,18 +3899,22 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         }
 
         // Add buttons to welcome section
-        addMessagesButton();
-        addManualRefreshButton();
-        addLogoutButton();
+        setTimeout(() => {
+            addMessagesButton();
+            addManualRefreshButton();
+            addLogoutButton();
+        }, 100);
         
         // Load initial referral data for the rewards dashboard tab
-        loadReferralRewards(userId);
-        
-        // Load academics data
-        loadAcademicsData();
+        setTimeout(() => {
+            if (userId) {
+                loadReferralRewards(userId);
+                loadAcademicsData();
+            }
+        }, 500);
 
     } catch (error) {
-        console.error("Error loading reports:", error);
+        console.error("❌ Error loading reports:", error);
         if (reportContent) {
             reportContent.innerHTML = `
                 <div class="text-center py-16">
@@ -3463,10 +3940,9 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
 }
 
 // ============================================================================
-// SECTION 16: ADMIN DIAGNOSTICS FUNCTIONS
+// SECTION 16: OPTIMIZED DIAGNOSTICS
 // ============================================================================
 
-// Add this to help diagnose missing reports
 async function showDiagnostics() {
     const user = auth.currentUser;
     if (!user) return;
@@ -3474,37 +3950,53 @@ async function showDiagnostics() {
     const userDoc = await db.collection('parent_users').doc(user.uid).get();
     const userData = userDoc.data();
     
+    // Get student info with minimal reads
+    const studentsResult = await findStudentIdsForParent(userData?.normalizedPhone || userData?.phone);
+    
     let diagnosticsHtml = `
         <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-6 mt-4">
-            <h3 class="text-lg font-bold text-yellow-800 mb-4">📊 Diagnostics</h3>
-            <div class="space-y-3">
-                <p><strong>Parent Phone:</strong> ${userData?.phone || 'Not set'}</p>
-                <p><strong>Normalized Phone:</strong> ${userData?.normalizedPhone || 'Not set'}</p>
-                <p><strong>Parent Email:</strong> ${userData?.email || 'Not set'}</p>
-                <p><strong>Parent UID:</strong> ${user.uid}</p>
-    `;
-    
-    // Check what students are linked
-    const studentsSnapshot = await db.collection('students')
-        .where('parentPhone', '==', userData?.normalizedPhone || userData?.phone)
-        .get();
-    
-    diagnosticsHtml += `<p><strong>Linked Students:</strong> ${studentsSnapshot.size}</p>`;
-    
-    if (studentsSnapshot.size > 0) {
-        diagnosticsHtml += `<ul class="list-disc pl-5 mt-2">`;
-        studentsSnapshot.forEach(doc => {
-            const student = doc.data();
-            diagnosticsHtml += `<li>${student.studentName} (ID: ${doc.id})</li>`;
-        });
-        diagnosticsHtml += `</ul>`;
-    }
-    
-    diagnosticsHtml += `
+            <h3 class="text-lg font-bold text-yellow-800 mb-4">📊 System Diagnostics</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <h4 class="font-semibold text-yellow-700 mb-2">Parent Information</h4>
+                    <div class="space-y-2 text-sm">
+                        <p><strong>Name:</strong> ${userData?.parentName || 'Not set'}</p>
+                        <p><strong>Phone:</strong> ${userData?.phone || 'Not set'}</p>
+                        <p><strong>Normalized:</strong> ${userData?.normalizedPhone || 'Not set'}</p>
+                        <p><strong>Email:</strong> ${userData?.email || 'Not set'}</p>
+                        <p><strong>UID:</strong> <code class="text-xs">${user.uid.substring(0, 12)}...</code></p>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-yellow-700 mb-2">Student Information</h4>
+                    <div class="space-y-2 text-sm">
+                        <p><strong>Linked Students:</strong> ${studentsResult.studentIds.length}</p>
+                        ${studentsResult.studentIds.length > 0 ? `
+                        <p><strong>Student Names:</strong></p>
+                        <ul class="list-disc pl-5 max-h-24 overflow-y-auto">
+                            ${Array.from(studentsResult.studentNameIdMap.keys()).map(name => 
+                                `<li>${capitalize(name)}</li>`
+                            ).join('')}
+                        </ul>
+                        ` : '<p class="text-gray-500">No students linked</p>'}
+                    </div>
+                </div>
             </div>
-            <button onclick="runReportSearchDiagnostics()" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded">
-                Run Diagnostics
-            </button>
+            
+            <div class="mt-4 pt-4 border-t border-yellow-200">
+                <h4 class="font-semibold text-yellow-700 mb-2">Search Tools</h4>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="runQuickDiagnostics()" class="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 transition-colors">
+                        Quick Check (3 reads)
+                    </button>
+                    <button onclick="runSmartDiagnostics()" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 transition-colors">
+                        Smart Search Test
+                    </button>
+                    <button onclick="showPhoneVariations()" class="bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 transition-colors">
+                        Show Phone Variations
+                    </button>
+                </div>
+            </div>
         </div>
     `;
     
@@ -3515,33 +4007,122 @@ async function showDiagnostics() {
     }
 }
 
-// Run diagnostics
-async function runReportSearchDiagnostics() {
+async function runQuickDiagnostics() {
     const user = auth.currentUser;
     if (!user) return;
     
     const userDoc = await db.collection('parent_users').doc(user.uid).get();
     const userData = userDoc.data();
     
-    console.log("🔍 RUNNING DIAGNOSTICS...");
+    showMessage("Running quick diagnostics...", 'info');
     
-    // 1. Check what data exists
-    console.log("📋 Parent Data:", userData);
+    // Quick check with minimal reads (3 reads max)
+    const phoneVariations = generateSmartPhoneVariations(userData?.phone).slice(0, 2);
+    const testField = 'parentPhone';
     
-    // 2. Find linked students
-    const students = await findStudentIdsForParent(userData?.normalizedPhone || userData?.phone);
-    console.log("👥 Linked Students:", students);
+    let foundAssessments = 0;
+    let foundMonthly = 0;
+    let readsUsed = 0;
     
-    // 3. Search for reports
+    for (const phone of phoneVariations) {
+        try {
+            // Check assessments
+            const assessmentSnapshot = await db.collection('student_results')
+                .where(testField, '==', phone)
+                .limit(1)
+                .get();
+            readsUsed++;
+            
+            if (!assessmentSnapshot.empty) {
+                foundAssessments += assessmentSnapshot.size;
+            }
+            
+            // Check monthly reports
+            const monthlySnapshot = await db.collection('tutor_submissions')
+                .where(testField, '==', phone)
+                .limit(1)
+                .get();
+            readsUsed++;
+            
+            if (!monthlySnapshot.empty) {
+                foundMonthly += monthlySnapshot.size;
+            }
+            
+        } catch (error) {
+            console.log(`Field ${testField} not found or error:`, error.message);
+        }
+    }
+    
+    showMessage(`Quick diagnostic: ${foundAssessments} assessments, ${foundMonthly} monthly reports found using ${readsUsed} reads`, 
+                (foundAssessments + foundMonthly) > 0 ? 'success' : 'info');
+}
+
+async function runSmartDiagnostics() {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const userDoc = await db.collection('parent_users').doc(user.uid).get();
+    const userData = userDoc.data();
+    
+    console.log("🔍 RUNNING SMART DIAGNOSTICS...");
+    
+    // Run the full optimized search
     const searchResults = await searchAllReportsForParent(
         userData?.normalizedPhone || userData?.phone,
         userData?.email,
         user.uid
     );
     
-    console.log("📊 Search Results:", searchResults);
+    console.log("📊 Smart Diagnostic Results:", searchResults);
     
-    showMessage(`Diagnostics complete. Found ${searchResults.assessmentResults.length + searchResults.monthlyResults.length} reports.`, 'success');
+    showMessage(`Smart diagnostic complete. Found ${searchResults.assessmentResults.length + searchResults.monthlyResults.length} reports using ${searchResults.searchStats.totalReads} reads.`, 
+                'success');
+}
+
+function showPhoneVariations() {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    // Get from current user data or prompt
+    const phone = currentUserData?.parentPhone || prompt("Enter phone number to test variations:");
+    
+    if (!phone) return;
+    
+    const smartVariations = generateSmartPhoneVariations(phone);
+    const allVariations = generateAllPhoneVariations(phone);
+    
+    let variationsHtml = `
+        <div class="bg-white border border-gray-300 rounded-lg p-6 mt-4">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">📱 Phone Variation Analysis</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h4 class="font-semibold text-green-700 mb-2">Smart Variations (${smartVariations.length})</h4>
+                    <p class="text-gray-600 text-sm mb-3">Optimized for minimal reads</p>
+                    <ul class="space-y-1 max-h-48 overflow-y-auto">
+                        ${smartVariations.map(v => `<li class="text-sm p-2 bg-green-50 rounded border border-green-100"><code>${safeText(v)}</code></li>`).join('')}
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-blue-700 mb-2">All Variations (${allVariations.length})</h4>
+                    <p class="text-gray-600 text-sm mb-3">Comprehensive but uses more reads</p>
+                    <ul class="space-y-1 max-h-48 overflow-y-auto">
+                        ${allVariations.map(v => `<li class="text-sm p-2 bg-blue-50 rounded border border-blue-100"><code>${safeText(v)}</code></li>`).join('')}
+                    </ul>
+                </div>
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-200 text-sm text-gray-600">
+                <p><strong>Original:</strong> ${safeText(phone)}</p>
+                <p><strong>Smart search uses:</strong> First ${Math.min(4, smartVariations.length)} variations</p>
+                <p><strong>Reads saved:</strong> ${allVariations.length - smartVariations.length} fewer variations to check</p>
+            </div>
+        </div>
+    `;
+    
+    // Add to page temporarily
+    const reportContent = document.getElementById('reportContent');
+    if (reportContent) {
+        reportContent.innerHTML = variationsHtml + reportContent.innerHTML;
+    }
 }
 
 // ============================================================================
@@ -3633,12 +4214,19 @@ function logout() {
 }
 
 // ============================================================================
-// SECTION 18: INITIALIZATION
+// SECTION 18: INITIALIZATION - FIXED RELOADING ISSUE
 // ============================================================================
 
-// Initialize the page
-document.addEventListener('DOMContentLoaded', function() {
-    console.log("DOM loaded - initializing parent portal");
+// Track auth state to prevent loops
+let authStateInitialized = false;
+let authChangeInProgress = false;
+let lastAuthChangeTime = 0;
+const AUTH_DEBOUNCE_MS = 1000; // Minimum 1 second between auth changes
+let authUnsubscribe = null; // To store the unsubscribe function
+
+// Robust initialization with loop prevention
+function initializeParentPortal() {
+    console.log("🚀 Initializing parent portal with reload protection");
     
     // Inject custom CSS for animations
     injectCustomCSS();
@@ -3649,100 +4237,323 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create country code dropdown when page loads
     createCountryCodeDropdown();
     
-    // CRITICAL SESSION PERSISTENCE FIX
-    // Check authentication state IMMEDIATELY on page load
-    auth.onAuthStateChanged((user) => {
-        const authArea = document.getElementById("authArea");
-        const reportArea = document.getElementById("reportArea");
-        const authLoader = document.getElementById("authLoader");
+    // Set up all event listeners first (before auth checks)
+    setupEventListeners();
+    
+    // Setup global error handler
+    setupGlobalErrorHandler();
+    
+    // Initialize auth with debouncing and loop prevention
+    initializeAuthWithProtection();
+    
+    console.log("✅ Parent portal initialized with reload protection");
+}
+
+// Initialize auth with protection against loops
+function initializeAuthWithProtection() {
+    console.log("🔐 Setting up protected auth state listener");
+    
+    // Clean up any existing listener first
+    if (authUnsubscribe && typeof authUnsubscribe === 'function') {
+        console.log("🧹 Cleaning up previous auth listener");
+        authUnsubscribe();
+        authUnsubscribe = null;
+    }
+    
+    // Setup a single, protected auth state listener
+    authUnsubscribe = auth.onAuthStateChanged(handleAuthStateChangeProtected);
+    
+    // Also check initial state after a short delay
+    setTimeout(() => {
+        const user = auth.currentUser;
+        if (user && !authStateInitialized) {
+            console.log("🔄 Checking initial auth state");
+            handleAuthStateChangeProtected(user);
+        }
+    }, 100);
+}
+
+// Protected auth state change handler with debouncing
+function handleAuthStateChangeProtected(user) {
+    const now = Date.now();
+    const timeSinceLastChange = now - lastAuthChangeTime;
+    
+    // Prevent rapid auth state changes (debouncing)
+    if (authChangeInProgress) {
+        console.log("⏸️ Auth change already in progress, skipping");
+        return;
+    }
+    
+    if (timeSinceLastChange < AUTH_DEBOUNCE_MS) {
+        console.log("⏸️ Debouncing auth change (too soon)");
+        setTimeout(() => handleAuthStateChangeProtected(user), AUTH_DEBOUNCE_MS - timeSinceLastChange);
+        return;
+    }
+    
+    // Mark that we're processing an auth change
+    authChangeInProgress = true;
+    lastAuthChangeTime = now;
+    
+    try {
+        console.log(`🔄 Auth state change: ${user ? 'SIGNED IN' : 'SIGNED OUT'}`, 
+                    user ? `(UID: ${user.uid.substring(0, 8)}...)` : '');
         
         if (user) {
-            // User is signed in - IMMEDIATELY switch to dashboard
-            console.log("User authenticated, showing dashboard immediately");
-            
-            if (authArea && reportArea) {
-                authArea.classList.add("hidden");
-                reportArea.classList.remove("hidden");
-            }
-            
-            if (authLoader) {
-                authLoader.classList.add("hidden");
-            }
-            
-            // Store auth state
-            localStorage.setItem('isAuthenticated', 'true');
-            
-            // Get phone from Firestore user document and load reports
-            db.collection('parent_users').doc(user.uid).get()
-                .then((doc) => {
-                    if (doc.exists) {
-                        const userPhone = doc.data().phone;
-                        const normalizedPhone = doc.data().normalizedPhone;
-                        loadAllReportsForParent(normalizedPhone || userPhone, user.uid);
-                        
-                        // Add navigation buttons
-                        setTimeout(() => {
-                            addMessagesButton();
-                            addManualRefreshButton();
-                            addLogoutButton();
-                        }, 500);
-                    }
-                })
-                .catch((error) => {
-                    console.error('Error getting user data:', error);
-                });
+            handleUserSignedIn(user);
         } else {
-            // User signed out - clean up listeners and show auth
-            console.log("User not authenticated, showing auth form");
-            cleanupRealTimeListeners();
-            localStorage.removeItem('isAuthenticated');
-            
-            if (authArea && reportArea) {
-                authArea.classList.remove("hidden");
-                reportArea.classList.add("hidden");
-            }
-            
-            // Only show loader briefly then hide
-            if (authLoader) {
-                setTimeout(() => {
-                    authLoader.classList.add("hidden");
-                }, 500);
-            }
+            handleUserSignedOut();
         }
-    });
+        
+        authStateInitialized = true;
+        
+    } catch (error) {
+        console.error("❌ Auth state change error:", error);
+        showMessage('Authentication error. Please try refreshing the page.', 'error');
+    } finally {
+        // Reset the flag after a minimum delay
+        setTimeout(() => {
+            authChangeInProgress = false;
+        }, 500);
+    }
+}
 
-    // Set up event listeners
+// Handle user sign in (protected)
+function handleUserSignedIn(user) {
+    console.log("👤 User signed in, loading dashboard...");
+    
+    const authArea = document.getElementById("authArea");
+    const reportArea = document.getElementById("reportArea");
+    const authLoader = document.getElementById("authLoader");
+    const welcomeMessage = document.getElementById("welcomeMessage");
+    
+    // Hide auth area, show dashboard
+    if (authArea && reportArea) {
+        authArea.classList.add("hidden");
+        reportArea.classList.remove("hidden");
+    }
+    
+    // Hide loader if present
+    if (authLoader) {
+        authLoader.classList.add("hidden");
+    }
+    
+    // Update welcome message immediately
+    if (welcomeMessage) {
+        welcomeMessage.textContent = `Welcome!`;
+    }
+    
+    // Store auth state (but don't rely on it for critical decisions)
+    localStorage.setItem('isAuthenticated', 'true');
+    
+    // Get user data and load reports
+    db.collection('parent_users').doc(user.uid).get()
+        .then((doc) => {
+            if (doc.exists) {
+                const userData = doc.data();
+                const userPhone = userData.phone;
+                const normalizedPhone = userData.normalizedPhone;
+                
+                // Update welcome message with actual name
+                if (welcomeMessage && userData.parentName) {
+                    welcomeMessage.textContent = `Welcome, ${safeText(userData.parentName)}!`;
+                }
+                
+                // Load reports
+                loadAllReportsForParent(normalizedPhone || userPhone, user.uid);
+                
+                // Add navigation buttons
+                setTimeout(() => {
+                    addMessagesButton();
+                    addManualRefreshButton();
+                    addLogoutButton();
+                }, 300);
+                
+            } else {
+                console.error("User document not found in Firestore");
+                showMessage('User profile not found. Please contact support.', 'error');
+            }
+        })
+        .catch((error) => {
+            console.error('Error getting user data:', error);
+            showMessage('Could not load user data. Please try again.', 'error');
+        });
+}
+
+// Handle user sign out (protected)
+function handleUserSignedOut() {
+    console.log("🚪 User signed out, showing login form");
+    
+    const authArea = document.getElementById("authArea");
+    const reportArea = document.getElementById("reportArea");
+    const authLoader = document.getElementById("authLoader");
+    
+    // Clean up real-time listeners FIRST
+    cleanupRealTimeListeners();
+    
+    // Clear auth state from localStorage
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('savedEmail'); // Also clear saved email for security
+    
+    // Show auth area, hide dashboard
+    if (authArea && reportArea) {
+        authArea.classList.remove("hidden");
+        reportArea.classList.add("hidden");
+    }
+    
+    // Hide loader if present
+    if (authLoader) {
+        authLoader.classList.add("hidden");
+    }
+    
+    // Reset form fields
+    const loginIdentifier = document.getElementById('loginIdentifier');
+    const loginPassword = document.getElementById('loginPassword');
+    
+    if (loginPassword) loginPassword.value = '';
+    
+    // Don't clear identifier if remember me is checked
+    const rememberMe = document.getElementById('rememberMe');
+    if (loginIdentifier && (!rememberMe || !rememberMe.checked)) {
+        loginIdentifier.value = '';
+    }
+    
+    // Switch to sign in tab
+    switchTab('signin');
+    
+    console.log("✅ User signed out cleanly");
+}
+
+// Setup all event listeners
+function setupEventListeners() {
+    console.log("🔧 Setting up event listeners");
+    
+    // Authentication buttons
     const signInBtn = document.getElementById("signInBtn");
     const signUpBtn = document.getElementById("signUpBtn");
     const sendResetBtn = document.getElementById("sendResetBtn");
     const submitMessageBtn = document.getElementById("submitMessageBtn");
     
-    if (signInBtn) signInBtn.addEventListener("click", handleSignIn);
-    if (signUpBtn) signUpBtn.addEventListener("click", handleSignUp);
-    if (sendResetBtn) sendResetBtn.addEventListener("click", handlePasswordReset);
-    if (submitMessageBtn) submitMessageBtn.addEventListener("click", submitMessage);
+    if (signInBtn) {
+        signInBtn.removeEventListener("click", handleSignIn);
+        signInBtn.addEventListener("click", handleSignIn);
+    }
     
+    if (signUpBtn) {
+        signUpBtn.removeEventListener("click", handleSignUp);
+        signUpBtn.addEventListener("click", handleSignUp);
+    }
+    
+    if (sendResetBtn) {
+        sendResetBtn.removeEventListener("click", handlePasswordReset);
+        sendResetBtn.addEventListener("click", handlePasswordReset);
+    }
+    
+    if (submitMessageBtn) {
+        submitMessageBtn.removeEventListener("click", submitMessage);
+        submitMessageBtn.addEventListener("click", submitMessage);
+    }
+    
+    // Tab switching
     const signInTab = document.getElementById("signInTab");
     const signUpTab = document.getElementById("signUpTab");
     
-    if (signInTab) signInTab.addEventListener("click", () => switchTab('signin'));
-    if (signUpTab) signUpTab.addEventListener("click", () => switchTab('signup'));
+    if (signInTab) {
+        signInTab.removeEventListener("click", () => switchTab('signin'));
+        signInTab.addEventListener("click", () => switchTab('signin'));
+    }
     
+    if (signUpTab) {
+        signUpTab.removeEventListener("click", () => switchTab('signup'));
+        signUpTab.addEventListener("click", () => switchTab('signup'));
+    }
+    
+    // Password reset
     const forgotPasswordBtn = document.getElementById("forgotPasswordBtn");
     if (forgotPasswordBtn) {
-        forgotPasswordBtn.addEventListener("click", () => {
-            document.getElementById("passwordResetModal").classList.remove("hidden");
-        });
+        forgotPasswordBtn.removeEventListener("click", showPasswordResetModal);
+        forgotPasswordBtn.addEventListener("click", showPasswordResetModal);
     }
     
     const cancelResetBtn = document.getElementById("cancelResetBtn");
     if (cancelResetBtn) {
-        cancelResetBtn.addEventListener("click", () => {
-            document.getElementById("passwordResetModal").classList.add("hidden");
-        });
+        cancelResetBtn.removeEventListener("click", hidePasswordResetModal);
+        cancelResetBtn.addEventListener("click", hidePasswordResetModal);
     }
     
-    // Event delegation for dynamically created cancel buttons
+    // Remember me
+    const rememberMeCheckbox = document.getElementById("rememberMe");
+    if (rememberMeCheckbox) {
+        rememberMeCheckbox.removeEventListener("change", handleRememberMe);
+        rememberMeCheckbox.addEventListener("change", handleRememberMe);
+    }
+    
+    // Enter key support
+    const loginPassword = document.getElementById('loginPassword');
+    if (loginPassword) {
+        loginPassword.removeEventListener('keypress', handleLoginEnter);
+        loginPassword.addEventListener('keypress', handleLoginEnter);
+    }
+    
+    const signupConfirmPassword = document.getElementById('signupConfirmPassword');
+    if (signupConfirmPassword) {
+        signupConfirmPassword.removeEventListener('keypress', handleSignupEnter);
+        signupConfirmPassword.addEventListener('keypress', handleSignupEnter);
+    }
+    
+    const resetEmail = document.getElementById('resetEmail');
+    if (resetEmail) {
+        resetEmail.removeEventListener('keypress', handleResetEnter);
+        resetEmail.addEventListener('keypress', handleResetEnter);
+    }
+    
+    // Main tab switching
+    const reportTab = document.getElementById("reportTab");
+    const academicsTab = document.getElementById("academicsTab");
+    const rewardsTab = document.getElementById("rewardsTab");
+    
+    if (reportTab) {
+        reportTab.removeEventListener("click", () => switchMainTab('reports'));
+        reportTab.addEventListener("click", () => switchMainTab('reports'));
+    }
+    
+    if (academicsTab) {
+        academicsTab.removeEventListener("click", () => switchMainTab('academics'));
+        academicsTab.addEventListener("click", () => switchMainTab('academics'));
+    }
+    
+    if (rewardsTab) {
+        rewardsTab.removeEventListener("click", () => switchMainTab('rewards'));
+        rewardsTab.addEventListener("click", () => switchMainTab('rewards'));
+    }
+    
+    // Dynamic button handlers (event delegation)
+    setupDynamicEventDelegation();
+}
+
+// Helper functions for enter key handling
+function handleLoginEnter(e) {
+    if (e.key === 'Enter') handleSignIn();
+}
+
+function handleSignupEnter(e) {
+    if (e.key === 'Enter') handleSignUp();
+}
+
+function handleResetEnter(e) {
+    if (e.key === 'Enter') handlePasswordReset();
+}
+
+// Modal functions
+function showPasswordResetModal() {
+    document.getElementById("passwordResetModal").classList.remove("hidden");
+}
+
+function hidePasswordResetModal() {
+    document.getElementById("passwordResetModal").classList.add("hidden");
+}
+
+// Dynamic event delegation for buttons created after page load
+function setupDynamicEventDelegation() {
     document.addEventListener('click', function(event) {
         // Check if cancel message button was clicked
         if (event.target.id === 'cancelMessageBtn' || 
@@ -3757,47 +4568,94 @@ document.addEventListener('DOMContentLoaded', function() {
             event.preventDefault();
             hideMessagesModal();
         }
+        
+        // Check if manual refresh button was clicked
+        if (event.target.id === 'manualRefreshBtn' ||
+            event.target.closest('#manualRefreshBtn')) {
+            event.preventDefault();
+            const user = auth.currentUser;
+            if (user) {
+                manualRefreshReports();
+            }
+        }
+        
+        // Check if view messages button was clicked
+        if (event.target.id === 'viewMessagesBtn' ||
+            event.target.closest('#viewMessagesBtn')) {
+            event.preventDefault();
+            showMessagesModal();
+        }
+        
+        // Check if compose message button was clicked
+        if (event.target.id === 'composeMessageBtn' ||
+            event.target.closest('#composeMessageBtn')) {
+            event.preventDefault();
+            showComposeMessageModal();
+        }
     });
+}
 
-    const rememberMeCheckbox = document.getElementById("rememberMe");
-    if (rememberMeCheckbox) {
-        rememberMeCheckbox.addEventListener("change", handleRememberMe);
-    }
-
-    // Allow Enter key to submit forms
-    const loginPassword = document.getElementById('loginPassword');
-    if (loginPassword) {
-        loginPassword.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleSignIn();
-        });
-    }
-    
-    const signupConfirmPassword = document.getElementById('signupConfirmPassword');
-    if (signupConfirmPassword) {
-        signupConfirmPassword.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleSignUp();
-        });
-    }
-    
-    const resetEmail = document.getElementById('resetEmail');
-    if (resetEmail) {
-        resetEmail.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handlePasswordReset();
-        });
-    }
-    
-    // Main tab switching listeners
-    const reportTab = document.getElementById("reportTab");
-    const academicsTab = document.getElementById("academicsTab");
-    const rewardsTab = document.getElementById("rewardsTab");
-    
-    if (reportTab) reportTab.addEventListener("click", () => switchMainTab('reports'));
-    if (academicsTab) academicsTab.addEventListener("click", () => switchMainTab('academics'));
-    if (rewardsTab) rewardsTab.addEventListener("click", () => switchMainTab('rewards'));
+// Setup global error handler
+function setupGlobalErrorHandler() {
+    // Prevent unhandled promise rejections
+    window.addEventListener('unhandledrejection', function(event) {
+        console.error('Unhandled promise rejection:', event.reason);
+        event.preventDefault(); // Prevent browser error reporting
+    });
     
     // Global error handler
     window.addEventListener('error', function(e) {
         console.error('Global error:', e.error);
-        showMessage('An unexpected error occurred. Please refresh the page.', 'error');
+        // Don't show error messages for auth-related errors to avoid loops
+        if (!e.error?.message?.includes('auth') && 
+            !e.error?.message?.includes('permission-denied')) {
+            showMessage('An unexpected error occurred. Please refresh the page.', 'error');
+        }
+        e.preventDefault(); // Prevent default error handling
     });
+    
+    // Network error handling
+    window.addEventListener('offline', function() {
+        console.warn('Network offline');
+        showMessage('You are offline. Some features may not work.', 'warning');
+    });
+    
+    window.addEventListener('online', function() {
+        console.log('Network back online');
+        showMessage('Connection restored.', 'success');
+    });
+}
+
+// Cleanup function for page unload
+function cleanupBeforeUnload() {
+    console.log("🧹 Cleaning up before page unload");
+    
+    // Clean up auth listener
+    if (authUnsubscribe && typeof authUnsubscribe === 'function') {
+        authUnsubscribe();
+        authUnsubscribe = null;
+    }
+    
+    // Clean up real-time listeners
+    cleanupRealTimeListeners();
+    
+    // Clear any intervals
+    const maxIntervalId = setTimeout(() => {}, 0);
+    for (let i = 0; i < maxIntervalId; i++) {
+        clearInterval(i);
+    }
+}
+
+// Initialize the page when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("📄 DOM Content Loaded - Starting robust initialization");
+    
+    // Setup cleanup before page unload
+    window.addEventListener('beforeunload', cleanupBeforeUnload);
+    window.addEventListener('pagehide', cleanupBeforeUnload);
+    
+    // Initialize the portal
+    initializeParentPortal();
+    
+    console.log("🎉 Parent portal initialization complete");
 });
