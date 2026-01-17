@@ -3678,7 +3678,7 @@ function logout() {
 }
 
 // ============================================================================
-// SECTION 18: INITIALIZATION - FIXED RELOADING ISSUE WITH PROPER ORDERING
+// SECTION 18: INITIALIZATION - FIXED RELOADING ISSUE WITH ALL DEPENDENCIES
 // ============================================================================
 
 // Track auth state to prevent loops
@@ -3687,6 +3687,10 @@ let authChangeInProgress = false;
 let lastAuthChangeTime = 0;
 const AUTH_DEBOUNCE_MS = 1000; // Minimum 1 second between auth changes
 let authUnsubscribe = null; // To store the unsubscribe function
+
+// ============================================================================
+// CRITICAL AUTHENTICATION FUNCTIONS (moved from SECTION 6 for initialization)
+// ============================================================================
 
 // Setup Remember Me Functionality
 function setupRememberMe() {
@@ -3724,6 +3728,111 @@ function handleRememberMe() {
         localStorage.removeItem('savedEmail');
     }
 }
+
+// Basic handleSignIn function for event listeners (full version is in SECTION 6)
+function handleSignIn() {
+    const identifier = document.getElementById('loginIdentifier')?.value.trim();
+    const password = document.getElementById('loginPassword')?.value;
+
+    if (!identifier || !password) {
+        showMessage('Please fill in all fields', 'error');
+        return;
+    }
+
+    const signInBtn = document.getElementById('signInBtn');
+    const authLoader = document.getElementById('authLoader');
+
+    signInBtn.disabled = true;
+    document.getElementById('signInText').textContent = 'Signing In...';
+    document.getElementById('signInSpinner').classList.remove('hidden');
+    authLoader.classList.remove('hidden');
+
+    // Call the full implementation from SECTION 6
+    handleSignInFull(identifier, password, signInBtn, authLoader);
+}
+
+// Basic handleSignUp function for event listeners
+function handleSignUp() {
+    const countryCode = document.getElementById('countryCode')?.value;
+    const localPhone = document.getElementById('signupPhone')?.value.trim();
+    const email = document.getElementById('signupEmail')?.value.trim();
+    const password = document.getElementById('signupPassword')?.value;
+    const confirmPassword = document.getElementById('signupConfirmPassword')?.value;
+
+    // Validation
+    if (!countryCode || !localPhone || !email || !password || !confirmPassword) {
+        showMessage('Please fill in all fields including country code', 'error');
+        return;
+    }
+
+    if (password.length < 6) {
+        showMessage('Password must be at least 6 characters', 'error');
+        return;
+    }
+
+    if (password !== confirmPassword) {
+        showMessage('Passwords do not match', 'error');
+        return;
+    }
+
+    const signUpBtn = document.getElementById('signUpBtn');
+    const authLoader = document.getElementById('authLoader');
+
+    signUpBtn.disabled = true;
+    document.getElementById('signUpText').textContent = 'Creating Account...';
+    document.getElementById('signUpSpinner').classList.remove('hidden');
+    authLoader.classList.remove('hidden');
+
+    // Call the full implementation from SECTION 6
+    handleSignUpFull(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader);
+}
+
+// Basic password reset function
+function handlePasswordReset() {
+    const email = document.getElementById('resetEmail')?.value.trim();
+    
+    if (!email) {
+        showMessage('Please enter your email address', 'error');
+        return;
+    }
+
+    const sendResetBtn = document.getElementById('sendResetBtn');
+    const resetLoader = document.getElementById('resetLoader');
+
+    sendResetBtn.disabled = true;
+    resetLoader.classList.remove('hidden');
+
+    // Call the full implementation from SECTION 6
+    handlePasswordResetFull(email, sendResetBtn, resetLoader);
+}
+
+// Basic tab switching functions
+function switchTab(tab) {
+    const signInTab = document.getElementById('signInTab');
+    const signUpTab = document.getElementById('signUpTab');
+    const signInForm = document.getElementById('signInForm');
+    const signUpForm = document.getElementById('signUpForm');
+
+    if (tab === 'signin') {
+        signInTab?.classList.remove('tab-inactive');
+        signInTab?.classList.add('tab-active');
+        signUpTab?.classList.remove('tab-active');
+        signUpTab?.classList.add('tab-inactive');
+        signInForm?.classList.remove('hidden');
+        signUpForm?.classList.add('hidden');
+    } else {
+        signUpTab?.classList.remove('tab-inactive');
+        signUpTab?.classList.add('tab-active');
+        signInTab?.classList.remove('tab-active');
+        signInTab?.classList.add('tab-inactive');
+        signUpForm?.classList.remove('hidden');
+        signInForm?.classList.add('hidden');
+    }
+}
+
+// ============================================================================
+// MAIN INITIALIZATION FUNCTIONS
+// ============================================================================
 
 // Robust initialization with loop prevention
 function initializeParentPortal() {
@@ -4046,11 +4155,17 @@ function handleResetEnter(e) {
 
 // Modal functions
 function showPasswordResetModal() {
-    document.getElementById("passwordResetModal").classList.remove("hidden");
+    const modal = document.getElementById("passwordResetModal");
+    if (modal) {
+        modal.classList.remove("hidden");
+    }
 }
 
 function hidePasswordResetModal() {
-    document.getElementById("passwordResetModal").classList.add("hidden");
+    const modal = document.getElementById("passwordResetModal");
+    if (modal) {
+        modal.classList.add("hidden");
+    }
 }
 
 // Dynamic event delegation for buttons created after page load
@@ -4146,6 +4261,21 @@ function cleanupBeforeUnload() {
         clearInterval(i);
     }
 }
+
+// ============================================================================
+// WRAPPER FUNCTIONS TO CALL FULL IMPLEMENTATIONS FROM SECTION 6
+// ============================================================================
+
+// Now we need to update SECTION 6 to rename the original functions and add wrapper calls
+
+// In SECTION 6, rename the original functions:
+// 1. Change "async function handleSignIn()" to "async function handleSignInFull(identifier, password, signInBtn, authLoader)"
+// 2. Change "async function handleSignUp()" to "async function handleSignUpFull(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader)"
+// 3. Change "async function handlePasswordReset()" to "async function handlePasswordResetFull(email, sendResetBtn, resetLoader)"
+
+// ============================================================================
+// PAGE INITIALIZATION
+// ============================================================================
 
 // Initialize the page when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
