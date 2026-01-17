@@ -472,31 +472,28 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 
-    <script>
-        // ------------------------------------------------------------------
-        // ⚠️ CRITICAL STEP: PASTE YOUR CONFIG FROM TUTOR.JS HERE ⚠️
-        // The game needs to see the database BEFORE the rest of the app loads.
-        // Copy the "const firebaseConfig = { ... }" part from tutor.js
-        // and replace the placeholder below.
-        // ------------------------------------------------------------------
-        
-        const firebaseConfig = {
-            apiKey: "PASTE_YOUR_API_KEY_HERE",
-            authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
-            projectId: "PASTE_YOUR_PROJECT_ID",
-            storageBucket: "PASTE_YOUR_PROJECT.appspot.com",
-            messagingSenderId: "PASTE_YOUR_SENDER_ID",
-            appId: "PASTE_YOUR_APP_ID"
-        };
+    <script src="firebaseConfig.js"></script>
 
-        // Initialize Firebase Globally for Games.js
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
+    <script>
+        // Initialize Firebase using the config from the file above
+        try {
+            if (typeof firebaseConfig === 'undefined') {
+                console.error("❌ Error: firebaseConfig variable not found. Check if firebaseConfig.js is loaded correctly.");
+                alert("System Error: Could not load database configuration.");
+            } else {
+                // Initialize only if not already initialized
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(firebaseConfig);
+                }
+                
+                // Expose DB to Window so games.js can see it
+                window.db = firebase.firestore();
+                window.auth = firebase.auth();
+                console.log("✅ Database Connected via External Config");
+            }
+        } catch (error) {
+            console.error("Firebase Init Error:", error);
         }
-        
-        // This line fixes the "Offline" error in the Game Widget
-        window.db = firebase.firestore();
-        window.auth = firebase.auth();
     </script>
     
     <script src="games.js"></script>
