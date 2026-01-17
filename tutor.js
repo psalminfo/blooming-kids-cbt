@@ -2395,28 +2395,30 @@ async function scheduleEmailReminder(hwData, fileUrl = '') {
 }
 
 /*******************************************************************************
- * SECTION 9: MESSAGING & INBOX FEATURES (ZERO-SETUP EDITION)
- * * COMPATIBILITY NOTE:
- * This section assumes the following Firebase functions are available globally 
- * or imported in your main file:
- * db, collection, addDoc, setDoc, doc, query, where, onSnapshot, 
- * serverTimestamp, updateDoc, increment, getDocs
+ * SECTION 9: MESSAGING & INBOX FEATURES (CONFLICT-FREE EDITION)
+ * * UPDATES:
+ * - Renamed helper functions (msgFormatTime, msgEscapeHtml) to avoid
+ * "Identifier already declared" errors with previous code sections.
+ * - Renamed state variables to ensure unique scope.
+ * - fully compatible with your existing firebase setup.
  ******************************************************************************/
 
-// --- GLOBAL STATE ---
-let unreadMessageCount = 0;
-let messagingFloatingBtn = null;
-let inboxFloatingBtn = null;
+// --- SECTION STATE MANAGEMENT ---
+// Using specific names to avoid conflicts with other sections of tutor.js
+let msgSectionUnreadCount = 0;
+let btnFloatingMsg = null;
+let btnFloatingInbox = null;
 
 // --- LISTENERS (Memory Management) ---
-let unsubscribeInbox = null;
-let unsubscribeChat = null;
-let unsubscribeUnreadCount = null;
+let unsubInboxListener = null;
+let unsubChatListener = null;
+let unsubUnreadListener = null;
 
-// --- UTILITY FUNCTIONS ---
+// --- UNIQUE UTILITY FUNCTIONS ---
+// Renamed to be specific to Messaging to prevent "Already Declared" errors
 
 // 1. Sanitize HTML (Security)
-function escapeHtml(text) {
+function msgEscapeHtml(text) {
     if (!text) return '';
     return text
         .replace(/&/g, "&amp;")
@@ -2426,14 +2428,14 @@ function escapeHtml(text) {
         .replace(/'/g, "&#039;");
 }
 
-// 2. Consistent ID Generation (TutorID_ParentPhone)
-function getConversationId(tutorId, parentPhone) {
+// 2. Consistent ID Generation
+function msgGenerateConvId(tutorId, parentPhone) {
     // Sorts IDs so the conversation is the same regardless of who starts it
     return [tutorId, parentPhone].sort().join("_");
 }
 
 // 3. Format Date/Time
-function formatTime(timestamp) {
+function msgFormatTime(timestamp) {
     if (!timestamp) return '';
     // Handle Firestore Timestamp vs JS Date
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -2448,27 +2450,33 @@ function initializeFloatingMessagingButton() {
     oldBtns.forEach(btn => btn.remove());
     
     // 2. Create Messaging Button (New Message)
-    messagingFloatingBtn = document.createElement('button');
-    messagingFloatingBtn.className = 'floating-messaging-btn';
-    messagingFloatingBtn.innerHTML = `<span class="floating-btn-icon">💬</span><span class="floating-btn-text">New</span>`;
-    messagingFloatingBtn.onclick = showEnhancedMessagingModal;
+    btnFloatingMsg = document.createElement('button');
+    btnFloatingMsg.className = 'floating-messaging-btn';
+    btnFloatingMsg.innerHTML = `<span class="floating-btn-icon">💬</span><span class="floating-btn-text">New</span>`;
+    btnFloatingMsg.onclick = showEnhancedMessagingModal;
     
     // 3. Create Inbox Button (View Messages)
-    inboxFloatingBtn = document.createElement('button');
-    inboxFloatingBtn.className = 'floating-inbox-btn';
-    inboxFloatingBtn.innerHTML = `<span class="floating-btn-icon">📨</span><span class="floating-btn-text">Inbox</span>`;
-    inboxFloatingBtn.onclick = showInboxModal;
+    btnFloatingInbox = document.createElement('button');
+    btnFloatingInbox.className = 'floating-inbox-btn';
+    btnFloatingInbox.innerHTML = `<span class="floating-btn-icon">📨</span><span class="floating-btn-text">Inbox</span>`;
+    btnFloatingInbox.onclick = showInboxModal;
     
     // 4. Mount to DOM
-    document.body.appendChild(messagingFloatingBtn);
-    document.body.appendChild(inboxFloatingBtn);
+    document.body.appendChild(btnFloatingMsg);
+    document.body.appendChild(btnFloatingInbox);
     
     // 5. Inject CSS
     injectMessagingStyles();
     
     // 6. Start Background Listeners
+    // We check for window.tutorData in case it hasn't loaded yet
     if (window.tutorData && window.tutorData.id) {
         initializeUnreadListener();
+    } else {
+        // Retry once after a short delay if tutorData is slow to load
+        setTimeout(() => {
+            if (window.tutorData && window.tutorData.id) initializeUnreadListener();
+        }, 2000);
     }
 }
 
@@ -2476,7 +2484,7 @@ function initializeFloatingMessagingButton() {
 
 function initializeUnreadListener() {
     const tutorId = window.tutorData.id;
-    if (unsubscribeUnreadCount) unsubscribeUnreadCount();
+    if (unsubUnreadListener) unsubUnreadListener();
 
     // Simple Query: No Index Required
     const q = query(
@@ -2484,7 +2492,7 @@ function initializeUnreadListener() {
         where("participants", "array-contains", tutorId)
     );
 
-    unsubscribeUnreadCount = onSnapshot(q, (snapshot) => {
+    unsubUnreadListener = onSnapshot(q, (snapshot) => {
         let count = 0;
         snapshot.forEach(doc => {
             const data = doc.data();
@@ -2494,7 +2502,7 @@ function initializeUnreadListener() {
             }
         });
         
-        unreadMessageCount = count;
+        msgSectionUnreadCount = count;
         updateFloatingBadges();
     });
 }
@@ -2505,15 +2513,15 @@ function updateFloatingBadges() {
         const existing = btn.querySelector('.unread-badge');
         if (existing) existing.remove();
 
-        if (unreadMessageCount > 0) {
+        if (msgSectionUnreadCount > 0) {
             const badge = document.createElement('span');
             badge.className = 'unread-badge';
-            badge.textContent = unreadMessageCount > 99 ? '99+' : unreadMessageCount;
+            badge.textContent = msgSectionUnreadCount > 99 ? '99+' : msgSectionUnreadCount;
             btn.appendChild(badge);
         }
     };
-    updateBadge(messagingFloatingBtn);
-    updateBadge(inboxFloatingBtn);
+    updateBadge(btnFloatingMsg);
+    updateBadge(btnFloatingInbox);
 }
 
 // --- FEATURE 1: SEND NEW MESSAGE MODAL ---
@@ -2571,21 +2579,21 @@ function showEnhancedMessagingModal() {
         opt.onclick = () => {
             typeOptions.forEach(o => o.classList.remove('selected'));
             opt.classList.add('selected');
-            loadRecipients(opt.dataset.type, modal.querySelector('#recipient-loader'));
+            msgLoadRecipients(opt.dataset.type, modal.querySelector('#recipient-loader'));
         };
     });
 
     // Load default (Individual)
-    loadRecipients('individual', modal.querySelector('#recipient-loader'));
+    msgLoadRecipients('individual', modal.querySelector('#recipient-loader'));
 
     // Close Handlers
     modal.querySelectorAll('.close-modal-btn').forEach(b => b.onclick = () => modal.remove());
     
     // Send Handler
-    modal.querySelector('#btn-send-initial').onclick = () => processSendMessage(modal);
+    modal.querySelector('#btn-send-initial').onclick = () => msgProcessSend(modal);
 }
 
-async function loadRecipients(type, container) {
+async function msgLoadRecipients(type, container) {
     container.innerHTML = '<div class="spinner"></div>';
     const tutorEmail = window.tutorData?.email;
 
@@ -2623,7 +2631,7 @@ async function loadRecipients(type, container) {
     }
 }
 
-async function processSendMessage(modal) {
+async function msgProcessSend(modal) {
     const type = modal.querySelector('.type-option.selected').dataset.type;
     const subject = modal.querySelector('#msg-subject').value;
     const content = modal.querySelector('#msg-content').value;
@@ -2645,7 +2653,6 @@ async function processSendMessage(modal) {
             targets.push({ phone: c.value, name: c.dataset.name });
         });
     } else if (type === 'all') {
-        // Re-fetch strictly for sending to ensure freshness
         const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
         const snap = await getDocs(q);
         const map = new Map();
@@ -2666,7 +2673,7 @@ async function processSendMessage(modal) {
     try {
         // 2. Loop and Send
         const promises = targets.map(async (target) => {
-            const convId = getConversationId(tutor.id, target.phone);
+            const convId = msgGenerateConvId(tutor.id, target.phone);
             
             // Upsert Conversation
             await setDoc(doc(db, "conversations", convId), {
@@ -2742,20 +2749,20 @@ function showInboxModal() {
 
     // Cleanup Listeners on Close
     modal.querySelector('.close-modal-absolute').onclick = () => {
-        if (unsubscribeInbox) unsubscribeInbox();
-        if (unsubscribeChat) unsubscribeChat();
+        if (unsubInboxListener) unsubInboxListener();
+        if (unsubChatListener) unsubChatListener();
         modal.remove();
     };
 
     // Initialize Inbox
-    startInboxListener(modal);
+    msgStartInboxListener(modal);
 }
 
-function startInboxListener(modal) {
+function msgStartInboxListener(modal) {
     const tutorId = window.tutorData.id;
     const listEl = modal.querySelector('#inbox-list');
     
-    if (unsubscribeInbox) unsubscribeInbox();
+    if (unsubInboxListener) unsubInboxListener();
 
     // NO "OrderBy" here. This avoids the Index requirement.
     const q = query(
@@ -2763,7 +2770,7 @@ function startInboxListener(modal) {
         where("participants", "array-contains", tutorId)
     );
 
-    unsubscribeInbox = onSnapshot(q, (snapshot) => {
+    unsubInboxListener = onSnapshot(q, (snapshot) => {
         const convs = [];
         snapshot.forEach(doc => {
             convs.push({ id: doc.id, ...doc.data() });
@@ -2776,11 +2783,11 @@ function startInboxListener(modal) {
             return timeB - timeA; // Newest first
         });
 
-        renderInboxList(convs, listEl, modal, tutorId);
+        msgRenderInboxList(convs, listEl, modal, tutorId);
     });
 }
 
-function renderInboxList(conversations, container, modal, tutorId) {
+function msgRenderInboxList(conversations, container, modal, tutorId) {
     container.innerHTML = '';
     
     if (conversations.length === 0) {
@@ -2799,23 +2806,23 @@ function renderInboxList(conversations, container, modal, tutorId) {
         el.innerHTML = `
             <div class="avatar">${otherName.charAt(0)}</div>
             <div class="info">
-                <div class="name">${escapeHtml(otherName)}</div>
+                <div class="name">${msgEscapeHtml(otherName)}</div>
                 <div class="preview">
-                    ${conv.lastSenderId === tutorId ? 'You: ' : ''}${escapeHtml(conv.lastMessage || '')}
+                    ${conv.lastSenderId === tutorId ? 'You: ' : ''}${msgEscapeHtml(conv.lastMessage || '')}
                 </div>
             </div>
             <div class="meta">
-                <div class="time">${formatTime(conv.lastMessageTimestamp)}</div>
+                <div class="time">${msgFormatTime(conv.lastMessageTimestamp)}</div>
                 ${isUnread ? `<div class="badge">${conv.unreadCount}</div>` : ''}
             </div>
         `;
         
-        el.onclick = () => loadChat(conv.id, otherName, modal, tutorId);
+        el.onclick = () => msgLoadChat(conv.id, otherName, modal, tutorId);
         container.appendChild(el);
     });
 }
 
-function loadChat(convId, name, modal, tutorId) {
+function msgLoadChat(convId, name, modal, tutorId) {
     // UI Setup
     modal.querySelector('#chat-view-header').classList.remove('hidden');
     modal.querySelector('#chat-inputs').classList.remove('hidden');
@@ -2828,13 +2835,11 @@ function loadChat(convId, name, modal, tutorId) {
     updateDoc(doc(db, "conversations", convId), { unreadCount: 0 });
 
     // 2. Listen for Messages
-    if (unsubscribeChat) unsubscribeChat();
+    if (unsubChatListener) unsubChatListener();
 
-    // Messages are usually small enough that ordering works fine without complex indexes on subcollections
-    // If this fails, remove orderBy and sort in client like we did for inbox
     const q = query(collection(db, "conversations", convId, "messages"), orderBy("createdAt", "asc"));
 
-    unsubscribeChat = onSnapshot(q, (snapshot) => {
+    unsubChatListener = onSnapshot(q, (snapshot) => {
         msgContainer.innerHTML = '';
         snapshot.forEach(doc => {
             const msg = doc.data();
@@ -2842,9 +2847,9 @@ function loadChat(convId, name, modal, tutorId) {
             const bubble = document.createElement('div');
             bubble.className = `chat-bubble ${isMe ? 'me' : 'them'}`;
             bubble.innerHTML = `
-                ${msg.subject ? `<strong>${escapeHtml(msg.subject)}</strong><br>` : ''}
-                ${escapeHtml(msg.content)}
-                <div class="timestamp">${formatTime(msg.createdAt)}</div>
+                ${msg.subject ? `<strong>${msgEscapeHtml(msg.subject)}</strong><br>` : ''}
+                ${msgEscapeHtml(msg.content)}
+                <div class="timestamp">${msgFormatTime(msg.createdAt)}</div>
             `;
             msgContainer.appendChild(bubble);
         });
@@ -2989,7 +2994,6 @@ function injectMessagingStyles() {
 // --- AUTO-INIT ---
 // Automatically starts when the script loads
 initializeFloatingMessagingButton();
-
 /*******************************************************************************
  * SECTION 10: SCHEDULE CALENDAR VIEW
  ******************************************************************************/
@@ -5064,6 +5068,154 @@ function renderAutoStudentsList(students) {
 }
 
 /*******************************************************************************
+ * SECTION 13A: GAMIFICATION & PERFORMANCE ENGINE
+ ******************************************************************************/
+
+// --- CONFIGURATION ---
+const GAMIFICATION_CONFIG = {
+    confettiDuration: 3000, // 3 seconds
+    celebrationFrequency: 'weekly', // 'daily', 'weekly', 'always'
+    gradingCriteria: [
+        { id: 'attendance', label: 'Punctuality', max: 20 },
+        { id: 'student_feedback', label: 'Student Rating', max: 30 },
+        { id: 'admin_review', label: 'Admin Assessment', max: 50 }
+    ]
+};
+
+// --- STATE MANAGEMENT ---
+let currentTutorScore = 0;
+let isTutorOfTheMonth = false;
+
+/**
+ * Initializes the gamification dashboard widget.
+ * Call this function when the dashboard loads.
+ */
+async function initGamification(tutorId) {
+    try {
+        // 1. Get Current Tutor's Score
+        const tutorRef = doc(db, "tutors", tutorId);
+        // We use onSnapshot for REAL-TIME updates. 
+        // If Admin updates score, Tutor sees it instantly.
+        onSnapshot(tutorRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                currentTutorScore = data.performanceScore || 0;
+                updateScoreDisplay(currentTutorScore, data.scoreBreakdown);
+            }
+        });
+
+        // 2. Check "Tutor of the Month" Status
+        checkWinnerStatus(tutorId);
+
+    } catch (error) {
+        console.error("Gamification Error:", error);
+    }
+}
+
+/**
+ * Checks if the current user is the winner and handles the celebration logic.
+ */
+async function checkWinnerStatus(tutorId) {
+    try {
+        // We assume a central document 'gamification/current_cycle' holds the winner info
+        const cycleRef = doc(db, "gamification", "current_cycle");
+        const cycleSnap = await getDoc(cycleRef);
+
+        if (cycleSnap.exists()) {
+            const data = cycleSnap.data();
+            // Data structure: { winnerId: "xyz", month: "October", year: 2023 }
+            
+            if (data.winnerId === tutorId) {
+                isTutorOfTheMonth = true;
+                renderWinnerBadge(data.month);
+                
+                // Logic: Blow confetti if it's the start of the month OR weekly reminder
+                // For now, we blow it on every login if they are the winner (High Dopamine)
+                triggerConfetti(); 
+                showCustomAlert(`🏆 You are the ${data.month} Tutor of the Month!`);
+            }
+        }
+    } catch (error) {
+        console.error("Winner Check Error:", error);
+    }
+}
+
+// --- UI RENDERING FUNCTIONS ---
+
+function updateScoreDisplay(totalScore, breakdown = {}) {
+    // Locate the dashboard widget (Create this div in your HTML)
+    const scoreWidget = document.getElementById('performance-widget');
+    if (!scoreWidget) return;
+
+    // Calculate color based on score
+    let scoreColor = 'text-red-500';
+    if (totalScore > 50) scoreColor = 'text-yellow-500';
+    if (totalScore > 80) scoreColor = 'text-green-500';
+
+    scoreWidget.innerHTML = `
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
+            ${isTutorOfTheMonth ? '<div class="absolute top-0 right-0 bg-yellow-400 text-xs font-bold px-2 py-1 rounded-bl-lg">👑 REIGNING CHAMPION</div>' : ''}
+            
+            <h3 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Performance Score</h3>
+            
+            <div class="flex items-end gap-2 mb-3">
+                <span class="text-4xl font-black ${scoreColor}">${totalScore}</span>
+                <span class="text-gray-400 text-sm mb-1">/ 100 pts</span>
+            </div>
+            
+            <div class="space-y-2">
+                <div class="w-full bg-gray-100 rounded-full h-2">
+                    <div class="bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full transition-all duration-1000" style="width: ${totalScore}%"></div>
+                </div>
+                <p class="text-xs text-gray-400 text-right">Updated by Management</p>
+            </div>
+        </div>
+    `;
+}
+
+function renderWinnerBadge(month) {
+    // Inject a badge into the profile header or sidebar
+    const header = document.querySelector('.header-profile-section'); // Adjust selector to match your HTML
+    if (header) {
+        const badge = document.createElement('div');
+        badge.className = 'winner-badge animate-pulse bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 rounded-full border border-yellow-300 ml-2 flex items-center gap-1';
+        badge.innerHTML = `<span>🏆</span> ${month} Top Tutor`;
+        header.appendChild(badge);
+    }
+}
+
+// --- VISUAL FX (Confetti Engine) ---
+// No external library needed - Raw Canvas implementation for speed
+function triggerConfetti() {
+    const duration = 3000;
+    const end = Date.now() + duration;
+
+    // Simple confetti shim
+    (function frame() {
+        // Launch confetti from left and right edges
+        confetti({
+            particleCount: 2,
+            angle: 60,
+            spread: 55,
+            origin: { x: 0 }
+        });
+        confetti({
+            particleCount: 2,
+            angle: 120,
+            spread: 55,
+            origin: { x: 1 }
+        });
+
+        if (Date.now() < end) {
+            requestAnimationFrame(frame);
+        }
+    }());
+}
+
+// NOTE: You will need to include the lightweight canvas-confetti script in your HTML head for the FX to work:
+// <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+/*******************************************************************************
  * SECTION 14: ADMIN SETTINGS LISTENER
  ******************************************************************************/
 
@@ -5219,6 +5371,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
