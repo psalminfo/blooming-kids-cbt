@@ -1,10 +1,10 @@
 /**
- * BLOOMING KIDS TUTOR PORTAL - GAME WIDGET V4 (STABLE)
- * ----------------------------------------------------
+ * BLOOMING KIDS TUTOR PORTAL - GAME WIDGET V5 (AUTH SYNC FIX)
+ * -----------------------------------------------------------
  * Fixes: 
- * 1. Fixed "Firebase ArrayUnion" crash by using new Date() instead of serverTimestamp.
- * 2. Scores now save to BOTH Global Leaderboard and Personal History.
- * 3. Includes Level-Up Word Game & Massive Dictionary.
+ * 1. Fixed "Guest" issue by adding an Auth Listener.
+ * (Now waits for Firebase to confirm login before setting name).
+ * 2. Scores now correctly save under the specific Tutor's Name.
  */
 
 (function () {
@@ -45,14 +45,6 @@
 
     // --- INITIALIZATION ---
     function initWidget() {
-        if (typeof firebase !== 'undefined' && firebase.auth()) {
-            const u = firebase.auth().currentUser;
-            if (u) {
-                state.currentUser.id = u.uid;
-                state.currentUser.name = u.displayName || u.email.split('@')[0] || "Tutor";
-            }
-        }
-
         const floater = document.createElement('button');
         floater.id = 'bk-game-floater';
         floater.className = `fixed bottom-6 left-6 z-50 p-4 rounded-full shadow-2xl transition-transform transform hover:scale-110 cursor-pointer ${CONFIG.colors.primary} text-white border-4 border-white`;
@@ -83,8 +75,25 @@
             </div>
         `;
         document.body.appendChild(modal);
-
         document.getElementById('bk-close-btn').onclick = closeModal;
+
+        // --- AUTH SYNC (The Fix for "Guest" Issue) ---
+        if (typeof firebase !== 'undefined' && firebase.auth()) {
+            // Listen for the moment Firebase confirms login
+            firebase.auth().onAuthStateChanged((user) => {
+                if (user) {
+                    state.currentUser.id = user.uid;
+                    state.currentUser.name = user.displayName || user.email.split('@')[0] || "Tutor";
+                    console.log("Game Widget: User identified as " + state.currentUser.name);
+                    
+                    // If menu is open, update the name immediately
+                    const nameDisplay = document.querySelector('#bk-game-container h2');
+                    if(nameDisplay && nameDisplay.innerText.includes('Welcome')) {
+                        nameDisplay.innerText = `Welcome, ${state.currentUser.name}!`;
+                    }
+                }
+            });
+        }
     }
 
     // --- NAVIGATION ---
@@ -430,11 +439,11 @@
         document.onkeydown = null;
     }
 
-    // --- FIREBASE LOGIC (UPDATED & FIXED) ---
+    // --- FIREBASE LOGIC (FIXED) ---
     async function saveScoreToFirebase(score, gameName) {
         if (typeof db === 'undefined') { console.warn("DB not connected."); return; }
         
-        // FIXED: Using new Date() instead of serverTimestamp() for arrayUnion compatibility
+        // Use new Date() for compatibility
         const scoreData = {
             userId: state.currentUser.id || 'guest',
             userName: state.currentUser.name || 'Guest Player',
