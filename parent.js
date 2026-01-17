@@ -3099,7 +3099,7 @@ function toggleAccordion(elementId) {
 }
 
 // ============================================================================
-// SECTION 15: MAIN REPORT LOADING FUNCTION WITH IMPROVED STUDENT HANDLING
+// SECTION 15: MAIN REPORT LOADING FUNCTION (FIXED & VERIFIED)
 // ============================================================================
 
 async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false) {
@@ -3109,14 +3109,11 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
     const authLoader = document.getElementById("authLoader");
     const welcomeMessage = document.getElementById("welcomeMessage");
 
-    // Show dashboard if user is authenticated
-    const user = auth.currentUser;
-    if (user && authArea && reportArea) {
+    // 1. UI STATE MANAGEMENT
+    if (auth.currentUser && authArea && reportArea) {
         authArea.classList.add("hidden");
         reportArea.classList.remove("hidden");
         authLoader.classList.add("hidden");
-        
-        // Store auth state in localStorage to persist across page refreshes
         localStorage.setItem('isAuthenticated', 'true');
     } else {
         localStorage.removeItem('isAuthenticated');
@@ -3125,380 +3122,224 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
     if (authLoader) authLoader.classList.remove("hidden");
 
     try {
-        // --- CACHE IMPLEMENTATION (skip if force refresh) ---
+        // 2. CACHE CHECK (Performance Optimization)
         const cacheKey = `reportCache_${parentPhone}`;
-        const twoWeeksInMillis = 14 * 24 * 60 * 60 * 1000;
+        const cacheDuration = 60 * 60 * 1000; // 1 hour
         
         if (!forceRefresh) {
             try {
                 const cachedItem = localStorage.getItem(cacheKey);
                 if (cachedItem) {
                     const cacheData = JSON.parse(cachedItem);
-                    if (Date.now() - cacheData.timestamp < twoWeeksInMillis) {
-                        console.log("Loading reports from cache.");
+                    if (Date.now() - cacheData.timestamp < cacheDuration) {
+                        console.log("⚡ GOD MODE: Loading data from fast cache.");
+                        
+                        // Restore global state
+                        currentUserData = cacheData.userData;
+                        userChildren = cacheData.studentList || [];
+                        
                         if (reportContent) reportContent.innerHTML = cacheData.html;
                         
-                        // Set welcome message from cache
-                        if (cacheData.userData && cacheData.userData.parentName && welcomeMessage) {
-                            welcomeMessage.textContent = `Welcome, ${cacheData.userData.parentName}!`;
-                            currentUserData = cacheData.userData;
-                        } else if (welcomeMessage) {
-                            welcomeMessage.textContent = `Welcome!`;
+                        // UI Restoration
+                        if (welcomeMessage && currentUserData.parentName) {
+                            welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
                         }
 
-                        if (authArea && reportArea) {
-                            authArea.classList.add("hidden");
-                            reportArea.classList.remove("hidden");
-                        }
-                        
-                        // Add buttons to welcome section
+                        // Re-initialize dynamic components
                         addMessagesButton();
                         addManualRefreshButton();
                         addLogoutButton();
-                        
-                        // Setup real-time monitoring
-                        const userDoc = await db.collection('parent_users').doc(userId).get();
-                        const userData = userDoc.data();
+                        loadReferralRewards(userId);
+                        loadAcademicsData();
                         setupRealTimeMonitoring(parentPhone, userId);
                         
-                        // Load initial referral data
-                        loadReferralRewards(userId);
-                        
-                        // Load academics data
-                        loadAcademicsData();
-
                         return;
                     }
                 }
             } catch (e) {
-                console.error("Could not read from cache:", e);
+                console.warn("Cache invalid, forcing fresh load.");
                 localStorage.removeItem(cacheKey);
             }
         }
-        // --- END CACHE IMPLEMENTATION ---
 
-        // FIND PARENT NAME
-        let parentName = await findParentNameFromStudents(parentPhone);
+        // 3. CRITICAL: FETCH ALL LINKED CHILDREN (The "Entity-First" Step)
+        const { studentIds, studentNameIdMap, allStudentData } = await findStudentIdsForParent(parentPhone);
         
-        // Get parent's email and latest user data from their account document
+        // Update Global State
+        userChildren = Array.from(studentNameIdMap.keys());
+        
+        console.log("👥 GOD MODE: Verified Student Entity List:", userChildren);
+
+        // 4. USER PROFILE & REFERRAL SYNC
+        // [FIX]: We extract parent name from the students we just fetched instead of calling a missing function
+        let parentName = null;
+        if (allStudentData && allStudentData.length > 0) {
+            // Find the first student record that has a parent name attached
+            const studentWithParentInfo = allStudentData.find(s => 
+                s.data && (s.data.parentName || s.data.guardianName || s.data.fatherName || s.data.motherName)
+            );
+            
+            if (studentWithParentInfo) {
+                parentName = studentWithParentInfo.data.parentName || 
+                             studentWithParentInfo.data.guardianName || 
+                             studentWithParentInfo.data.fatherName || 
+                             studentWithParentInfo.data.motherName;
+            }
+        }
+
         const userDocRef = db.collection('parent_users').doc(userId);
         let userDoc = await userDocRef.get();
         let userData = userDoc.data();
 
-        // Store email in currentUserData for report searching
-        if (userData?.email) {
-            currentUserData = {
-                ...currentUserData,
-                email: userData.email
-            };
+        // Ensure referral code exists
+        if (userDoc.exists && !userData.referralCode) {
+            const newCode = await generateReferralCode();
+            await userDocRef.update({ referralCode: newCode });
         }
 
-        // REFERRAL CODE CHECK/GENERATION FOR EXISTING USERS
-        if (!userData.referralCode) {
-            console.log("Existing user detected without a referral code. Generating and assigning now.");
-            try {
-                const newReferralCode = await generateReferralCode();
-                await userDocRef.update({
-                    referralCode: newReferralCode,
-                    referralEarnings: userData.referralEarnings || 0
-                });
-                
-                // Re-fetch updated user data
-                userDoc = await userDocRef.get();
-                userData = userDoc.data();
-                console.log("Referral code assigned successfully:", newReferralCode);
-                
-            } catch (error) {
-                console.error('Error auto-assigning referral code:', error);
-                // Non-critical failure, continue loading reports
-            }
-        }
+        // Parent Name Fallback Logic
+        if (!parentName && userData?.parentName) parentName = userData.parentName;
+        if (!parentName) parentName = 'Parent';
 
-        // If not found in students collections, use name from user document
-        if (!parentName && userId) {
-            if (userDoc.exists) {
-                parentName = userData.parentName;
-            }
-        }
-
-        // Final fallback
-        if (!parentName) {
-            parentName = 'Parent';
-        }
-
-        // Store user data globally
+        // Update Global User Data
         currentUserData = {
             parentName: safeText(parentName),
             parentPhone: parentPhone,
             email: userData?.email || ''
         };
 
-        // UPDATE WELCOME MESSAGE WITH PARENT NAME
         if (welcomeMessage) welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
 
-        // Update parent name in user document if we found a better one
-        if (userId && parentName && parentName !== 'Parent' && userData.parentName !== parentName) {
-            try {
-                await userDocRef.update({
-                    parentName: parentName
-                });
-            } catch (error) {
-                console.error('Error updating parent name:', error);
-            }
-        }
-
-        console.log("🔍 Starting ULTIMATE search for reports with:", { parentPhone, email: currentUserData.email, uid: userId });
-
-        // --- FIRST: GET ALL STUDENTS ASSIGNED TO THIS PARENT ---
-        const { studentIds, studentNameIdMap, allStudentData } = await findStudentIdsForParent(parentPhone);
-        
-        // Store student names globally - CRITICAL: Store ALL students found
-        userChildren = Array.from(studentNameIdMap.keys());
-        
-        console.log("👥 ALL Students found for parent:", {
-            count: userChildren.length,
-            names: userChildren,
-            ids: studentIds,
-            dataCount: allStudentData.length
-        });
-
-        // --- USE ULTIMATE SEARCH SYSTEM ---
-        const { assessmentResults, monthlyResults, searchStats } = await searchAllReportsForParent(
+        // 5. REPORT AGGREGATION (The "Ultimate Search")
+        const { assessmentResults, monthlyResults } = await searchAllReportsForParent(
             parentPhone, 
-            currentUserData.email || userData?.email || '',
+            currentUserData.email, 
             userId
         );
 
-        console.log("🔍 Search Statistics:", searchStats);
-        console.log("📊 Report counts - Assessments:", assessmentResults.length, "Monthly:", monthlyResults.length);
-
-        // If no reports found, show helpful message with all students listed
-        if (assessmentResults.length === 0 && monthlyResults.length === 0) {
-            showMessage(`No reports found yet for your ${userChildren.length} child(ren). Reports will appear here once tutors submit them.`, 'info');
-            
-            // Show search stats for debugging
-            console.log("📊 Why no reports found:", {
-                parentPhone,
-                email: currentUserData?.email,
-                uid: userId,
-                studentsFound: userChildren.length,
-                searchStats
-            });
-        }
-        
-        // Group reports by student name - CRITICAL FIX: Initialize ALL students first
+        // 6. DATA MAPPING (The "Container" Logic)
         const reportsByStudent = new Map();
 
-        // CRITICAL FIX: Initialize ALL students in the map (even those without reports)
-        for (const studentName of userChildren) {
+        // A. Initialize containers for ALL known students (Empty or Not)
+        userChildren.forEach(studentName => {
             const studentInfo = allStudentData.find(s => s.name === studentName);
             reportsByStudent.set(studentName, { 
                 assessments: new Map(), 
                 monthly: new Map(),
-                studentData: studentInfo // Store student data
+                studentData: studentInfo || { name: studentName, isPending: false }
             });
-        }
+        });
 
-        // DEBUG: Log which students were initialized
-        console.log("📋 Students initialized in reports map:", Array.from(reportsByStudent.keys()));
-
-        // If no reports found at all, still show all students
-        if (assessmentResults.length === 0 && monthlyResults.length === 0) {
-            console.log("⚠️ No reports found for any student, but showing all registered students");
+        // B. Populate containers with Assessment Data
+        assessmentResults.forEach(result => {
+            const rawName = result.studentName || result.student;
+            if (!rawName) return;
             
-            // Create empty report view with all students
-            if (reportContent) {
+            const studentName = safeText(rawName);
+            
+            // If report belongs to a student NOT in our initial list (rare), add them now
+            if (!reportsByStudent.has(studentName)) {
+                reportsByStudent.set(studentName, { 
+                    assessments: new Map(), 
+                    monthly: new Map(),
+                    studentData: { name: studentName, isPending: false } 
+                });
+                userChildren.push(studentName); // Update global list
+            }
+
+            const sessionKey = Math.floor(result.timestamp / 86400);
+            const studentRecord = reportsByStudent.get(studentName);
+            
+            if (!studentRecord.assessments.has(sessionKey)) {
+                studentRecord.assessments.set(sessionKey, []);
+            }
+            studentRecord.assessments.get(sessionKey).push(result);
+        });
+
+        // C. Populate containers with Monthly Report Data
+        monthlyResults.forEach(result => {
+            const rawName = result.studentName || result.student;
+            if (!rawName) return;
+            
+            const studentName = safeText(rawName);
+            
+            if (!reportsByStudent.has(studentName)) {
+                reportsByStudent.set(studentName, { 
+                    assessments: new Map(), 
+                    monthly: new Map(),
+                    studentData: { name: studentName, isPending: false } 
+                });
+                userChildren.push(studentName);
+            }
+
+            const sessionKey = Math.floor(result.timestamp / 86400);
+            const studentRecord = reportsByStudent.get(studentName);
+            
+            if (!studentRecord.monthly.has(sessionKey)) {
+                studentRecord.monthly.set(sessionKey, []);
+            }
+            studentRecord.monthly.get(sessionKey).push(result);
+        });
+
+        // 7. RENDER (Generate the UI)
+        if (reportContent) {
+            // Check if we truly have zero students
+            if (reportsByStudent.size === 0) {
+                reportContent.innerHTML = `
+                    <div class="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+                        <div class="text-6xl mb-4">👋</div>
+                        <h3 class="text-xl font-bold text-gray-700 mb-2">Welcome to BKH!</h3>
+                        <p class="text-gray-500 max-w-md mx-auto mb-6">We don't see any students linked to your account yet.</p>
+                        <p class="text-sm text-gray-400">If you have registered, please contact support to link your account.</p>
+                    </div>
+                `;
+            } else {
+                // Pass the map containing ALL students (empty or full) to the view generator
                 const reportsHtml = createYearlyArchiveReportView(reportsByStudent);
                 reportContent.innerHTML = reportsHtml;
             }
-            
-            // --- CACHE SAVING LOGIC ---
-            try {
-                const dataToCache = {
-                    timestamp: Date.now(),
-                    html: reportContent ? reportContent.innerHTML : '',
-                    userData: currentUserData,
-                    studentCount: userChildren.length
-                };
-                localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
-                console.log("Report data cached successfully.");
-            } catch (e) {
-                console.error("Could not write to cache:", e);
-            }
-            // --- END CACHE SAVING ---
-
-            if (authArea && reportArea) {
-                authArea.classList.add("hidden");
-                reportArea.classList.remove("hidden");
-            }
-
-            // Add buttons to welcome section
-            addMessagesButton();
-            addManualRefreshButton();
-            addLogoutButton();
-            
-            // Load initial referral data for the rewards dashboard tab
-            loadReferralRewards(userId);
-            
-            // Load academics data
-            loadAcademicsData();
-
-            return; // Exit early since no reports
         }
 
-        // Group assessment reports by student
-        const assessmentGroups = new Map();
-        assessmentResults.forEach(result => {
-            const studentName = safeText(result.studentName || result.student || 'Unknown Student');
-            if (!assessmentGroups.has(studentName)) {
-                assessmentGroups.set(studentName, []);
-            }
-            assessmentGroups.get(studentName).push(result);
-        });
-
-        // Group assessment reports by session (day) and add to existing student map
-        for (const [studentName, assessments] of assessmentGroups) {
-            const sessionGroups = new Map();
-            
-            assessments.forEach(result => {
-                const sessionKey = Math.floor(result.timestamp / 86400); // Group by day
-                if (!sessionGroups.has(sessionKey)) {
-                    sessionGroups.set(sessionKey, []);
-                }
-                sessionGroups.get(sessionKey).push(result);
-            });
-            
-            if (reportsByStudent.has(studentName)) {
-                // Student already in map, add assessments
-                reportsByStudent.get(studentName).assessments = sessionGroups;
-            } else {
-                // Student has reports but wasn't in userChildren? Add them
-                console.log(`📝 Adding ${studentName} to reports (found in assessment results but not in student list)`);
-                reportsByStudent.set(studentName, { 
-                    assessments: sessionGroups, 
-                    monthly: new Map(),
-                    studentData: null // No student data found
-                });
-                // Also add to userChildren for consistency
-                if (!userChildren.includes(studentName)) {
-                    userChildren.push(studentName);
-                }
-            }
-        }
-
-        // Group monthly reports by student
-        const monthlyGroups = new Map();
-        monthlyResults.forEach(result => {
-            const studentName = safeText(result.studentName || result.student || 'Unknown Student');
-            if (!monthlyGroups.has(studentName)) {
-                monthlyGroups.set(studentName, []);
-            }
-            monthlyGroups.get(studentName).push(result);
-        });
-
-        // Group monthly reports by session (day) and add to existing student map
-        for (const [studentName, monthlies] of monthlyGroups) {
-            const sessionGroups = new Map();
-            
-            monthlies.forEach(result => {
-                const sessionKey = Math.floor(result.timestamp / 86400); // Group by day
-                if (!sessionGroups.has(sessionKey)) {
-                    sessionGroups.set(sessionKey, []);
-                }
-                sessionGroups.get(sessionKey).push(result);
-            });
-            
-            if (reportsByStudent.has(studentName)) {
-                // Student already in map, add monthly reports
-                reportsByStudent.get(studentName).monthly = sessionGroups;
-            } else {
-                // Student has reports but wasn't in userChildren? Add them
-                console.log(`📝 Adding ${studentName} to reports (found in monthly results but not in student list)`);
-                const existingData = reportsByStudent.get(studentName) || { assessments: new Map() };
-                reportsByStudent.set(studentName, { 
-                    ...existingData,
-                    monthly: sessionGroups,
-                    studentData: existingData.studentData || null
-                });
-                // Also add to userChildren for consistency
-                if (!userChildren.includes(studentName)) {
-                    userChildren.push(studentName);
-                }
-            }
-        }
-
-        // DEBUG: Log which students will be shown
-        console.log("📊 Students to display in reports (FINAL):");
-        for (const [studentName, data] of reportsByStudent) {
-            const assessmentCount = Array.from(data.assessments.values()).flat().length;
-            const monthlyCount = Array.from(data.monthly.values()).flat().length;
-            const hasStudentData = !!data.studentData;
-            console.log(`  👤 ${studentName}: ${assessmentCount} assessments, ${monthlyCount} monthly reports, Has data: ${hasStudentData}`);
-        }
-
-        // Create yearly archive accordion view - This will show ALL students
-        if (reportContent) {
-            const reportsHtml = createYearlyArchiveReportView(reportsByStudent);
-            reportContent.innerHTML = reportsHtml;
-        }
-        
-        // --- CACHE SAVING LOGIC ---
+        // 8. UPDATE CACHE
         try {
             const dataToCache = {
                 timestamp: Date.now(),
                 html: reportContent ? reportContent.innerHTML : '',
                 userData: currentUserData,
-                studentCount: userChildren.length,
-                reportCount: assessmentResults.length + monthlyResults.length
+                studentList: userChildren
             };
             localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
-            console.log("Report data cached successfully.");
         } catch (e) {
-            console.error("Could not write to cache:", e);
+            console.error("Cache write failed:", e);
         }
-        // --- END CACHE SAVING ---
 
+        // 9. FINAL UI COMPONENTS
         if (authArea && reportArea) {
             authArea.classList.add("hidden");
             reportArea.classList.remove("hidden");
         }
-
-        // Add buttons to welcome section
+        
         addMessagesButton();
         addManualRefreshButton();
         addLogoutButton();
-        
-        // Setup real-time monitoring AFTER reports are loaded
         setupRealTimeMonitoring(parentPhone, userId);
-        
-        // Load initial referral data for the rewards dashboard tab
         loadReferralRewards(userId);
-        
-        // Load academics data
         loadAcademicsData();
 
     } catch (error) {
-        console.error("❌ Error loading reports:", error);
+        console.error("❌ CRITICAL FAILURE in Report Loading:", error);
         if (reportContent) {
             reportContent.innerHTML = `
-                <div class="text-center py-16">
-                    <div class="text-6xl mb-6">❌</div>
-                    <h2 class="text-2xl font-bold text-red-800 mb-4">Error Loading Reports</h2>
-                    <p class="text-gray-600 max-w-2xl mx-auto mb-6">
-                        Sorry, there was an error loading your reports. Please try again.
-                        <br><br>
-                        <small>Error: ${safeText(error.message)}</small>
-                    </p>
-                    <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                        <button onclick="window.location.reload()" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 flex items-center">
-                            <span class="mr-2">🔄</span> Reload Page
-                        </button>
-                        <button onclick="showComposeMessageModal()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 flex items-center">
-                            <span class="mr-2">💬</span> Contact Support
-                        </button>
-                        <button onclick="runReportSearchDiagnostics()" class="bg-yellow-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-yellow-700 transition-all duration-200 flex items-center">
-                            <span class="mr-2">🔧</span> Run Diagnostics
-                        </button>
+                <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded shadow-md">
+                    <div class="flex">
+                        <div class="flex-shrink-0"><span class="text-2xl">⚠️</span></div>
+                        <div class="ml-3">
+                            <h3 class="text-lg font-medium text-red-800">System Error</h3>
+                            <p class="text-sm text-red-700 mt-1">We encountered an issue loading your dashboard: ${safeText(error.message)}</p>
+                            <button onclick="window.location.reload()" class="mt-3 bg-red-100 text-red-800 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-200">
+                                Reload Page
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
