@@ -667,6 +667,149 @@ async function findStudentIdsForParent(parentPhone) {
 }
 
 // ============================================================================
+// SECTION 6: AUTHENTICATION & USER MANAGEMENT (CORE IMPLEMENTATION)
+// ============================================================================
+
+/**
+ * FULL SIGN IN LOGIC
+ * Handles the actual Firebase authentication and UI updates.
+ * Called by the wrapper in Section 18.
+ */
+async function handleSignInFull(identifier, password, signInBtn, authLoader) {
+    try {
+        // 1. Attempt Sign In
+        // We assume identifier is email, but if you use phone-as-email, logic can be added here
+        await auth.signInWithEmailAndPassword(identifier, password);
+        
+        // 2. Success is handled by the onAuthStateChanged listener in Section 18
+        // We just log here for debugging
+        console.log("✅ Sign in successful for:", identifier);
+
+    } catch (error) {
+        console.error("Sign In Error:", error);
+        
+        // 3. Handle Errors
+        let errorMessage = "Failed to sign in. Please check your credentials.";
+        
+        if (error.code === 'auth/user-not-found') {
+            errorMessage = "No account found with this email.";
+        } else if (error.code === 'auth/wrong-password') {
+            errorMessage = "Incorrect password.";
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = "Invalid email address format.";
+        } else if (error.code === 'auth/too-many-requests') {
+            errorMessage = "Too many failed attempts. Please try again later.";
+        }
+        
+        showMessage(errorMessage, 'error');
+        
+        // 4. Reset UI
+        if (signInBtn) signInBtn.disabled = false;
+        
+        const signInText = document.getElementById('signInText');
+        const signInSpinner = document.getElementById('signInSpinner');
+        
+        if (signInText) signInText.textContent = 'Sign In';
+        if (signInSpinner) signInSpinner.classList.add('hidden');
+        if (authLoader) authLoader.classList.add('hidden');
+    }
+}
+
+/**
+ * FULL SIGN UP LOGIC
+ * Handles creating the user, normalizing phone, and saving to Firestore.
+ */
+async function handleSignUpFull(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader) {
+    try {
+        // 1. Normalize Phone Number
+        // Combine country code and local phone first
+        let fullPhoneInput = localPhone;
+        if (!localPhone.startsWith('+')) {
+            fullPhoneInput = countryCode + localPhone;
+        }
+        
+        const normalizedResult = normalizePhoneNumber(fullPhoneInput);
+        
+        if (!normalizedResult.valid) {
+            throw new Error(`Invalid phone number: ${normalizedResult.error}`);
+        }
+        
+        const finalPhone = normalizedResult.normalized;
+        console.log("📱 Processing signup with normalized phone:", finalPhone);
+
+        // 2. Create Authentication User
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+
+        // 3. Generate Referral Code
+        const referralCode = await generateReferralCode();
+
+        // 4. Save User Data to Firestore
+        // We use the normalized phone here to ensure matching works later
+        await db.collection('parent_users').doc(user.uid).set({
+            email: email,
+            phone: finalPhone, // Normalized +CountryCode format
+            normalizedPhone: finalPhone, // Explicit field for searching
+            parentName: 'Parent', // Default name
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            referralCode: referralCode,
+            referralEarnings: 0,
+            uid: user.uid
+        });
+
+        console.log("✅ Account created and profile saved for:", user.uid);
+        showMessage('Account created successfully!', 'success');
+        
+        // Success is further handled by onAuthStateChanged listener
+
+    } catch (error) {
+        console.error("Sign Up Error:", error);
+        
+        let errorMessage = "Failed to create account.";
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = "This email is already registered. Please sign in instead.";
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = "Password should be at least 6 characters.";
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+
+        showMessage(errorMessage, 'error');
+
+        // Reset UI
+        if (signUpBtn) signUpBtn.disabled = false;
+        
+        const signUpText = document.getElementById('signUpText');
+        const signUpSpinner = document.getElementById('signUpSpinner');
+        
+        if (signUpText) signUpText.textContent = 'Create Account';
+        if (signUpSpinner) signUpSpinner.classList.add('hidden');
+        if (authLoader) authLoader.classList.add('hidden');
+    }
+}
+
+/**
+ * FULL PASSWORD RESET LOGIC
+ */
+async function handlePasswordResetFull(email, sendResetBtn, resetLoader) {
+    try {
+        await auth.sendPasswordResetEmail(email);
+        showMessage('Password reset link sent to your email!', 'success');
+        hidePasswordResetModal();
+    } catch (error) {
+        console.error("Reset Error:", error);
+        let errorMessage = "Failed to send reset email.";
+        if (error.code === 'auth/user-not-found') {
+            errorMessage = "No account found with this email address.";
+        }
+        showMessage(errorMessage, 'error');
+    } finally {
+        if (sendResetBtn) sendResetBtn.disabled = false;
+        if (resetLoader) resetLoader.classList.add('hidden');
+    }
+}
+
+// ============================================================================
 // SECTION 7: ENHANCED MESSAGING SYSTEM
 // ============================================================================
 
