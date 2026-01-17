@@ -1647,6 +1647,44 @@ function addLogoutButton() {
 // SECTION 12: ULTIMATE REPORT SEARCH - GUARANTEED TO FIND ALL REPORTS
 // ============================================================================
 
+// NEW FUNCTION: Generate all possible phone formats for searching
+function generateAllPhoneFormatsForSearch(phone) {
+    const formats = new Set();
+    
+    if (!phone) return Array.from(formats);
+    
+    // Get the normalized version first
+    const normalized = normalizePhoneNumber(phone);
+    if (normalized.valid) {
+        formats.add(normalized.normalized);
+    }
+    
+    // Add the original
+    formats.add(phone);
+    
+    // Add common formatted versions
+    const digitsOnly = phone.replace(/\D/g, '');
+    
+    if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
+        // US/Canada format: +1 (XXX) XXX-XXXX
+        const formatted1 = `+1 (${digitsOnly.substring(1, 4)}) ${digitsOnly.substring(4, 7)}-${digitsOnly.substring(7)}`;
+        formats.add(formatted1);
+        
+        // Another common format: +1-XXX-XXX-XXXX
+        const formatted2 = `+1-${digitsOnly.substring(1, 4)}-${digitsOnly.substring(4, 7)}-${digitsOnly.substring(7)}`;
+        formats.add(formatted2);
+    }
+    
+    // Also add with spaces: +1 XXX XXX XXXX
+    if (digitsOnly.length >= 10) {
+        const withSpaces = `+${digitsOnly.substring(0, 1)} ${digitsOnly.substring(1, 4)} ${digitsOnly.substring(4, 7)} ${digitsOnly.substring(7)}`;
+        formats.add(withSpaces);
+    }
+    
+    return Array.from(formats);
+}
+
+
 async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUid = '') {
     console.log("🔍 ULTIMATE Search for:", { parentPhone, parentEmail, parentUid });
     
@@ -1918,18 +1956,24 @@ for (const phone of allPhoneVersions) {
     queries.push({ field: 'normalizedParentPhone', value: phone });
 }
     
-    for (const phone of phoneVariations) {
-        queries.push({ field: 'parentPhone', value: phone });
-        queries.push({ field: 'parentphone', value: phone });
-        queries.push({ field: 'parent_phone', value: phone });
-        queries.push({ field: 'guardianPhone', value: phone });
-        queries.push({ field: 'motherPhone', value: phone });
-        queries.push({ field: 'fatherPhone', value: phone });
-        queries.push({ field: 'phone', value: phone });
-        queries.push({ field: 'parent_contact', value: phone });
-        queries.push({ field: 'contact_number', value: phone });
-        queries.push({ field: 'contactPhone', value: phone });
-    }
+    // Phone variations - USING ENHANCED FUNCTION
+const phoneVariations = generateAllPhoneVariations(parentPhone);
+console.log(`📱 Generated ${phoneVariations.length} phone variations for search`);
+
+for (const phone of phoneVariations) {
+    queries.push({ field: 'parentPhone', value: phone });
+    queries.push({ field: 'parentphone', value: phone });
+    queries.push({ field: 'parent_phone', value: phone });
+    queries.push({ field: 'guardianPhone', value: phone });
+    queries.push({ field: 'motherPhone', value: phone });
+    queries.push({ field: 'fatherPhone', value: phone });
+    queries.push({ field: 'phone', value: phone });
+    queries.push({ field: 'parent_contact', value: phone });
+    queries.push({ field: 'contact_number', value: phone });
+    queries.push({ field: 'contactPhone', value: phone });
+    // ADD THIS CRITICAL FIELD FOR REPORT SEARCHING:
+    queries.push({ field: 'normalizedParentPhone', value: phone });
+}
         // ENHANCED FUNCTION: Search for reports with ALL possible phone formats
 function generateAllPhoneFormatsForSearch(phone) {
     const formats = new Set();
