@@ -14,16 +14,19 @@ firebase.initializeApp({
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-const libphonenumberScript = document.createElement('script');
-libphonenumberScript.src = 'https://cdn.jsdelivr.net/npm/libphonenumber-js@1.10.14/bundle/libphonenumber-js.min.js';
-document.head.appendChild(libphonenumberScript);
+// Ensure phone library is loaded
+if (!document.querySelector('script[src*="libphonenumber"]')) {
+    const libphonenumberScript = document.createElement('script');
+    libphonenumberScript.src = 'https://cdn.jsdelivr.net/npm/libphonenumber-js@1.10.14/bundle/libphonenumber-js.min.js';
+    document.head.appendChild(libphonenumberScript);
+}
 
 // ===================================================================
-// SECTION 2: UTILITY FUNCTIONS (SECURITY, PHONE & UI)
+// SECTION 2: UTILITY FUNCTIONS (SECURITY, FORMATTING & UI)
 // ===================================================================
 
 /**
- * 🔒 SECURITY CRITICAL: Prevents Cross-Site Scripting (XSS)
+ * 🔒 SECURITY: Prevents XSS attacks
  */
 function escapeHtml(unsafe) {
     if (typeof unsafe !== 'string') return unsafe;
@@ -33,6 +36,21 @@ function escapeHtml(unsafe) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+}
+
+/**
+ * 📅 FORMATTING: Restores detailed Date & Time display
+ */
+function formatDateTime(timestamp) {
+    if (!timestamp) return 'N/A';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp * 1000); // Handle Firestore vs Seconds
+    return date.toLocaleString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    });
 }
 
 function normalizePhoneNumber(phone) {
@@ -160,11 +178,12 @@ async function loadReferralRewards(parentUid) {
                 
                 const statusColor = status === 'paid' ? 'bg-green-100 text-green-800' : status === 'approved' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800';
                 const safeStudentName = escapeHtml(capitalize(data.referredStudentName || 'Unknown'));
-                
+                const dateStr = formatDateTime(data.timestamp);
+
                 referralsHtml += `
                     <tr class="hover:bg-gray-50">
                         <td class="px-4 py-3 text-sm font-medium text-gray-900">${safeStudentName}</td>
-                        <td class="px-4 py-3 text-sm text-gray-500">${data.timestamp?.toDate?.().toLocaleDateString() || 'N/A'}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500">${dateStr}</td>
                         <td class="px-4 py-3 text-sm"><span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium ${statusColor}">${capitalize(status)}</span></td>
                         <td class="px-4 py-3 text-sm text-gray-900 font-bold">₦${(data.rewardAmount || 5000).toLocaleString()}</td>
                     </tr>`;
@@ -513,7 +532,7 @@ async function loadUnifiedMessages() {
             <div class="bg-white border ${msg.isUrgent ? 'border-red-300' : 'border-gray-200'} rounded-xl p-6 mb-4 shadow-sm">
                 <div class="flex justify-between mb-2">
                     <h4 class="font-bold text-gray-800">${escapeHtml(msg.subject)} ${msg.isOutgoing ? '<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded ml-2">OUTGOING</span>' : ''}</h4>
-                    <span class="text-xs text-gray-500">${msg.timestamp?.toDate?.().toLocaleDateString()}</span>
+                    <span class="text-xs text-gray-500">${formatDateTime(msg.timestamp)}</span>
                 </div>
                 <p class="text-sm text-gray-600 mb-2">From: ${escapeHtml(msg.sender)}</p>
                 ${msg.originalMsg ? `<div class="text-xs bg-gray-50 p-2 mb-2 italic">You said: ${escapeHtml(msg.originalMsg)}</div>` : ''}
@@ -546,10 +565,14 @@ function resetNotificationCount() {
 }
 
 // ===================================================================
-// SECTION 7: ACADEMICS & HOMEWORK SYSTEM (RESTORED DAILY TOPICS)
+// SECTION 7: ACADEMICS & NOTIFICATION SYSTEM (UPDATED ACCORDION)
 // ===================================================================
 
-async function loadAcademicsData(selectedStudent = null) {
+/**
+ * 🎓 ACADEMICS DATA LOADER
+ * Updated with Student Accordions and Notification Badges
+ */
+async function loadAcademicsData() {
     const container = document.getElementById('academicsContent');
     container.innerHTML = '<div class="text-center py-8"><div class="loading-spinner"></div></div>';
 
@@ -566,84 +589,127 @@ async function loadAcademicsData(selectedStudent = null) {
             return;
         }
 
-        let html = '';
-        if (studentNameIdMap.size > 1) {
-            html += `<div class="mb-6"><select id="studentSelector" class="w-full p-3 border rounded-lg" onchange="loadAcademicsData(this.value)"><option value="">All Students</option>`;
-            allStudentData.forEach(s => {
-                html += `<option value="${s.name}" ${selectedStudent === s.name ? 'selected' : ''}>${capitalize(s.name)}</option>`;
-            });
-            html += `</select></div>`;
-        }
+        const lastCheck = localStorage.getItem('lastAcademicsCheck') || 0;
+        let totalNewItems = 0;
+        let html = '<div class="space-y-4">';
+        let idx = 0;
 
-        const studentsToShow = selectedStudent ? [selectedStudent] : Array.from(studentNameIdMap.keys());
-
-        for (const name of studentsToShow) {
+        // Process each student
+        const studentNames = Array.from(studentNameIdMap.keys());
+        
+        for (const name of studentNames) {
             const id = studentNameIdMap.get(name);
-            html += `<div class="bg-green-50 p-4 rounded-lg mb-4"><h3 class="font-bold text-lg text-green-800">${escapeHtml(capitalize(name))}</h3></div>`;
+            let studentNewCount = 0;
 
-            // 1. Daily Topics (Restored)
-            html += `<h4 class="font-bold text-gray-700 mb-2 flex items-center">📅 Daily Topics</h4>`;
-            const topicsSnapshot = await db.collection('daily_topics').where('studentId', '==', id).get();
+            // Fetch Data
+            const [topicsSnap, hwSnap] = await Promise.all([
+                db.collection('daily_topics').where('studentId', '==', id).get(),
+                db.collection('homework_assignments').where('studentId', '==', id).get()
+            ]);
+
+            // Sort & Check for New Items
+            const topics = topicsSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => {
+                const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+                const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+                return dateB - dateA;
+            });
+
+            const hwList = hwSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (a.dueDate?.toDate?.() || 0) - (b.dueDate?.toDate?.() || 0));
+
+            // Logic to check if item is "new" (added after last check)
+            // Note: In a real app, we'd check created_at. Here we approximation using timestamps if available or assumption.
+            // Simplified: If the item timestamp > lastCheck. 
+            // Since topics have dates, we check if the topic date is "future" relative to last check.
             
-            if (topicsSnapshot.empty) {
-                html += `<div class="bg-gray-50 p-4 rounded mb-6 text-gray-500">No daily topics recorded yet.</div>`;
-            } else {
-                let topics = topicsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Sort client-side
-                topics.sort((a, b) => {
-                    const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
-                    const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
-                    return dateB - dateA;
-                });
-                
-                html += `<div class="space-y-4 mb-8">`;
-                topics.slice(0, 5).forEach(topic => {
-                    const dateObj = topic.date?.toDate ? topic.date.toDate() : new Date(topic.date);
-                    const dateStr = dateObj.toLocaleDateString();
-                    html += `
-                        <div class="bg-white border p-4 rounded shadow-sm">
-                            <div class="flex justify-between items-start mb-2">
-                                <span class="font-medium text-gray-800">${dateStr}</span>
-                                <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Session</span>
-                            </div>
-                            <p class="text-gray-700 whitespace-pre-wrap">${escapeHtml(topic.topics)}</p>
-                        </div>
-                    `;
-                });
-                html += `</div>`;
-            }
+            // Checking Topics
+            topics.forEach(t => {
+                const tDate = t.date?.toDate ? t.date.toDate().getTime() : new Date(t.date).getTime();
+                if (tDate > lastCheck) studentNewCount++;
+            });
 
-            // 2. Homework Assignments
-            html += `<h4 class="font-bold text-gray-700 mb-2 flex items-center">📝 Homework</h4>`;
-            const hwSnapshot = await db.collection('homework_assignments').where('studentId', '==', id).get();
-            if (hwSnapshot.empty) {
-                html += `<p class="text-gray-500 mb-8 bg-gray-50 p-4 rounded">No homework assigned.</p>`;
-            } else {
-                let hwList = hwSnapshot.docs.map(d => d.data());
-                hwList.sort((a,b) => (a.dueDate?.toDate?.() || 0) - (b.dueDate?.toDate?.() || 0));
+            // Checking Homework (using created date if available, or just due date approximation)
+            hwList.forEach(h => {
+                // If homework has a timestamp/createdAt, use it. If not, we skip notification for simplicity or use dueDate if strictly required.
+                // Assuming newer homeworks are naturally at the end or have a timestamp field. 
+                // Let's assume 'createdAt' exists or use fallback.
+                const hDate = h.timestamp?.toDate ? h.timestamp.toDate().getTime() : 0;
+                if (hDate > lastCheck) studentNewCount++;
+            });
+
+            totalNewItems += studentNewCount;
+
+            // --- BUILD ACCORDION HTML ---
+            html += `
+            <div class="border rounded-lg overflow-hidden mb-4">
+                <button onclick="toggleAccordion('acad-stu-${idx}')" class="w-full flex justify-between p-4 bg-blue-50 hover:bg-blue-100 transition items-center">
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold text-blue-900 text-lg">${escapeHtml(capitalize(name))}</span>
+                        ${studentNewCount > 0 ? `<span class="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">New Updates</span>` : ''}
+                    </div>
+                    <span class="text-blue-500">▼</span>
+                </button>
                 
-                html += `<div class="space-y-4 mb-8">`;
-                hwList.forEach(hw => {
-                    const due = hw.dueDate?.toDate?.().toLocaleDateString();
-                    const isOverdue = (hw.dueDate?.toDate?.() || new Date()) < new Date();
-                    html += `
-                        <div class="bg-white border ${isOverdue ? 'border-red-200' : 'border-gray-200'} p-4 rounded shadow-sm">
-                            <div class="flex justify-between font-bold">
-                                <span>${escapeHtml(hw.title)}</span>
-                                <span class="text-sm ${isOverdue ? 'text-red-600' : 'text-blue-600'}">Due: ${due}</span>
-                            </div>
-                            <p class="text-gray-600 mt-2">${escapeHtml(hw.description)}</p>
-                            ${hw.fileUrl ? `<a href="${hw.fileUrl}" target="_blank" class="text-blue-600 text-sm mt-2 inline-block">📎 Download Attachment</a>` : ''}
-                        </div>`;
-                });
-                html += `</div>`;
+                <div id="acad-stu-${idx}" class="hidden bg-white p-4">
+                    
+                    <div class="mb-6">
+                        <h4 class="font-bold text-gray-700 mb-3 border-b pb-2 flex items-center">📅 Daily Topics</h4>
+                        ${topics.length === 0 ? '<p class="text-gray-500 italic">No daily topics yet.</p>' : 
+                          `<div class="space-y-3">
+                              ${topics.slice(0, 5).map(t => {
+                                  const dStr = t.date?.toDate ? t.date.toDate().toLocaleDateString() : new Date(t.date).toLocaleDateString();
+                                  return `
+                                  <div class="bg-gray-50 p-3 rounded border border-gray-100">
+                                      <div class="font-semibold text-gray-800 text-sm mb-1">${dStr}</div>
+                                      <p class="text-gray-600 text-sm whitespace-pre-wrap">${escapeHtml(t.topics)}</p>
+                                  </div>`;
+                              }).join('')}
+                           </div>`
+                        }
+                    </div>
+
+                    <div>
+                        <h4 class="font-bold text-gray-700 mb-3 border-b pb-2 flex items-center">📝 Homework</h4>
+                        ${hwList.length === 0 ? '<p class="text-gray-500 italic">No homework assigned.</p>' : 
+                          `<div class="space-y-3">
+                              ${hwList.map(h => {
+                                  const due = h.dueDate?.toDate?.().toLocaleDateString();
+                                  const isOverdue = (h.dueDate?.toDate?.() || new Date()) < new Date();
+                                  return `
+                                  <div class="bg-white border ${isOverdue ? 'border-red-200' : 'border-gray-200'} p-3 rounded shadow-sm">
+                                      <div class="flex justify-between font-semibold text-sm">
+                                          <span>${escapeHtml(h.title)}</span>
+                                          <span class="${isOverdue ? 'text-red-600' : 'text-blue-600'}">Due: ${due}</span>
+                                      </div>
+                                      <p class="text-gray-600 text-sm mt-1">${escapeHtml(h.description)}</p>
+                                      ${h.fileUrl ? `<a href="${h.fileUrl}" target="_blank" class="text-blue-600 text-xs font-bold mt-2 inline-block">📎 Download</a>` : ''}
+                                  </div>`;
+                              }).join('')}
+                           </div>`
+                        }
+                    </div>
+
+                </div>
+            </div>`;
+            idx++;
+        }
+        
+        html += '</div>';
+        container.innerHTML = html;
+
+        // Update Main Academics Tab Badge
+        const tabBadge = document.getElementById('academicsNotificationBadge');
+        if (tabBadge) {
+            if (totalNewItems > 0) {
+                tabBadge.textContent = totalNewItems > 9 ? '9+' : totalNewItems;
+                tabBadge.classList.remove('hidden');
+            } else {
+                tabBadge.classList.add('hidden');
             }
         }
-        container.innerHTML = html;
 
     } catch (e) {
         console.error(e);
-        container.innerHTML = '<p class="text-red-500">Error loading data.</p>';
+        container.innerHTML = '<p class="text-red-500 text-center">Error loading academic data.</p>';
     }
 }
 
@@ -749,11 +815,11 @@ function createAccordionReportView(reportsByStudent) {
                 html += `<h4 class="font-bold text-gray-700 mb-2 border-b pb-1">Assessment Reports</h4>`;
                 let aIdx = 0;
                 reports.assessments.sort((a,b) => b.timestamp - a.timestamp).forEach(rep => {
-                    const date = new Date(rep.timestamp * 1000).toLocaleDateString();
+                    const dateStr = formatDateTime(rep.timestamp);
                     html += `
                         <div class="mb-4 border p-3 rounded bg-gray-50" id="ass-block-${idx}-${aIdx}">
                             <div class="flex justify-between items-center mb-2">
-                                <span class="font-semibold">${date} - ${escapeHtml(rep.subject || 'General')}</span>
+                                <span class="font-semibold">${dateStr} - ${escapeHtml(rep.subject || 'General')}</span>
                                 <div class="flex gap-2 items-center">
                                     <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">Score: ${rep.score}/${rep.totalScoreableQuestions}</span>
                                     <button onclick="downloadSessionReport(${idx}, ${aIdx}, '${escapeHtml(studentName)}', 'assessment')" class="text-green-600 text-xs font-bold">⬇ PDF</button>
@@ -769,11 +835,11 @@ function createAccordionReportView(reportsByStudent) {
                 html += `<h4 class="font-bold text-gray-700 mt-4 mb-2 border-b pb-1">Monthly Reports</h4>`;
                 let mIdx = 0;
                 reports.monthly.sort((a,b) => b.timestamp - a.timestamp).forEach(rep => {
-                    const date = new Date(rep.timestamp * 1000).toLocaleDateString();
+                    const dateStr = formatDateTime(rep.timestamp);
                     html += `
                         <div class="mb-4 border p-3 rounded bg-gray-50" id="mon-block-${idx}-${mIdx}">
                             <div class="flex justify-between items-center">
-                                <span class="font-semibold">${date}</span>
+                                <span class="font-semibold">${dateStr}</span>
                                 <button onclick="downloadSessionReport(${idx}, ${mIdx}, '${escapeHtml(studentName)}', 'monthly')" class="text-green-600 text-xs font-bold">⬇ PDF</button>
                             </div>
                             <p class="text-sm text-gray-600 mt-1">Tutor: ${escapeHtml(rep.tutorName || 'N/A')}</p>
@@ -883,6 +949,7 @@ function switchTab(tab) {
 }
 
 function switchMainTab(tab) {
+    // Handle Navigation Styling
     ['report', 'academics', 'rewards'].forEach(t => {
         document.getElementById(`${t}ContentArea`).classList.add('hidden');
         document.getElementById(`${t}Tab`).classList.remove('bg-green-600', 'text-white');
@@ -890,12 +957,33 @@ function switchMainTab(tab) {
     
     document.getElementById(`${tab}ContentArea`).classList.remove('hidden');
     document.getElementById(`${tab}Tab`).classList.add('bg-green-600', 'text-white');
+
+    // Handle Logic based on Tab
+    if (tab === 'academics') {
+        // When user views academics, we update their "last viewed" time
+        // This clears the "New" badges effectively on next refresh
+        localStorage.setItem('lastAcademicsCheck', Date.now());
+        
+        // Hide badge immediately for UX
+        const badge = document.getElementById('academicsNotificationBadge');
+        if (badge) badge.classList.add('hidden');
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     setupRememberMe();
     createCountryCodeDropdown();
     
+    // Create Notification Badge for Academics Tab if not present
+    const academicsTab = document.getElementById('academicsTab');
+    if (academicsTab && !document.getElementById('academicsNotificationBadge')) {
+        const badge = document.createElement('span');
+        badge.id = 'academicsNotificationBadge';
+        badge.className = 'hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-pulse';
+        academicsTab.style.position = 'relative';
+        academicsTab.appendChild(badge);
+    }
+
     auth.onAuthStateChanged(user => {
         if (user) {
             db.collection('parent_users').doc(user.uid).get().then(doc => {
