@@ -1170,7 +1170,7 @@ function getPreviousMonthYear() {
 }
 
 /**
- * Formats date with detailed format
+ * Formats date with detailed format including time
  * @param {Date|FirebaseTimestamp} date 
  * @returns {string} Formatted date
  */
@@ -1232,6 +1232,31 @@ function getYearMonthFromDate(date) {
     };
 }
 
+/**
+ * Gets timestamp in milliseconds from various date formats
+ * @param {any} dateInput 
+ * @returns {number} Timestamp in milliseconds
+ */
+function getTimestamp(dateInput) {
+    if (!dateInput) return 0;
+    
+    if (dateInput?.toDate) {
+        return dateInput.toDate().getTime();
+    } else if (dateInput instanceof Date) {
+        return dateInput.getTime();
+    } else if (typeof dateInput === 'string') {
+        return new Date(dateInput).getTime();
+    } else if (typeof dateInput === 'number') {
+        // Handle seconds timestamp
+        if (dateInput < 10000000000) {
+            return dateInput * 1000; // Convert seconds to milliseconds
+        }
+        return dateInput; // Assume milliseconds
+    }
+    
+    return 0;
+}
+
 async function loadAcademicsData(selectedStudent = null) {
     const academicsContent = document.getElementById('academicsContent');
     if (!academicsContent) return;
@@ -1286,8 +1311,8 @@ async function loadAcademicsData(selectedStudent = null) {
             Array.from(studentNameIdMap.keys()).forEach(studentName => {
                 const isSelected = selectedStudent === studentName ? 'selected' : '';
                 const studentStatus = allStudentData.find(s => s.name === studentName)?.isPending ? ' (Pending Registration)' : '';
-                const studentNotifications = academicsNotifications.get(studentName) || { dailyTopics: 0, homework: 0 };
-                const studentUnread = studentNotifications.dailyTopics + studentNotifications.homework;
+                const studentNotifications = academicsNotifications.get(studentName) || { sessionTopics: 0, homework: 0 };
+                const studentUnread = studentNotifications.sessionTopics + studentNotifications.homework;
                 const badge = studentUnread > 0 ? `<span class="ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-1 notification-pulse">${studentUnread}</span>` : '';
                 
                 academicsHtml += `<option value="${safeText(studentName)}" ${isSelected}>${capitalize(studentName)}${safeText(studentStatus)} ${badge}</option>`;
@@ -1307,8 +1332,8 @@ async function loadAcademicsData(selectedStudent = null) {
             if (!studentId) continue;
 
             // Get notification counts for this student
-            const studentNotifications = academicsNotifications.get(studentName) || { dailyTopics: 0, homework: 0 };
-            const studentUnread = studentNotifications.dailyTopics + studentNotifications.homework;
+            const studentNotifications = academicsNotifications.get(studentName) || { sessionTopics: 0, homework: 0 };
+            const studentUnread = studentNotifications.sessionTopics + studentNotifications.homework;
             totalUnreadCount += studentUnread;
             
             const notificationBadge = studentUnread > 0 ? 
@@ -1355,59 +1380,68 @@ async function loadAcademicsData(selectedStudent = null) {
             const currentMonth = getCurrentMonthYear();
             const previousMonth = getPreviousMonthYear();
 
-            // Daily Topics Section with Nested Accordion
+            // Session Topics Section with Nested Accordion (was Daily Topics)
             academicsHtml += `
                 <div class="mb-8 fade-in">
-                    <button onclick="toggleAcademicsAccordion('daily-topics-${safeText(studentName)}')" 
+                    <button onclick="toggleAcademicsAccordion('session-topics-${safeText(studentName)}')" 
                             class="accordion-header w-full flex justify-between items-center p-4 bg-blue-100 border border-blue-300 rounded-lg hover:bg-blue-200 transition-all duration-200 mb-4">
                         <div class="flex items-center">
-                            <span class="text-xl mr-3">📅</span>
+                            <span class="text-xl mr-3">📝</span>
                             <div class="text-left">
-                                <h3 class="font-bold text-blue-800 text-lg">Daily Topics</h3>
-                                <p class="text-blue-600 text-sm">What your child learned each session</p>
+                                <h3 class="font-bold text-blue-800 text-lg">Session Topics</h3>
+                                <p class="text-blue-600 text-sm">What your child learned in each session</p>
                             </div>
                         </div>
                         <div class="flex items-center">
-                            ${studentNotifications.dailyTopics > 0 ? `<span class="mr-3 bg-red-500 text-white text-xs rounded-full px-2 py-1">${studentNotifications.dailyTopics} new</span>` : ''}
-                            <span id="daily-topics-${safeText(studentName)}-arrow" class="accordion-arrow text-blue-600 text-xl">▼</span>
+                            ${studentNotifications.sessionTopics > 0 ? `<span class="mr-3 bg-red-500 text-white text-xs rounded-full px-2 py-1">${studentNotifications.sessionTopics} new</span>` : ''}
+                            <span id="session-topics-${safeText(studentName)}-arrow" class="accordion-arrow text-blue-600 text-xl">▼</span>
                         </div>
                     </button>
-                    <div id="daily-topics-${safeText(studentName)}-content" class="accordion-content hidden">
+                    <div id="session-topics-${safeText(studentName)}-content" class="accordion-content hidden">
             `;
 
             try {
-                // SIMPLIFIED QUERY: Get all topics and filter client-side
-                const dailyTopicsSnapshot = await db.collection('daily_topics')
+                // Get all session topics from daily_topics collection
+                const sessionTopicsSnapshot = await db.collection('daily_topics')
                     .where('studentId', '==', studentId)
                     .get();
 
-                if (dailyTopicsSnapshot.empty) {
+                if (sessionTopicsSnapshot.empty) {
                     academicsHtml += `
                         <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                            <p class="text-gray-500">No daily topics recorded yet. Check back after your child's first session!</p>
+                            <p class="text-gray-500">No session topics recorded yet. Check back after your child's sessions!</p>
                         </div>
                     `;
                 } else {
-                    const topics = dailyTopicsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    const topics = [];
                     
-                    // Sort manually by date descending (most recent first)
+                    // Process each document
+                    sessionTopicsSnapshot.forEach(doc => {
+                        const topicData = doc.data();
+                        topics.push({ 
+                            id: doc.id, 
+                            ...topicData,
+                            // Ensure we have a proper timestamp
+                            timestamp: getTimestamp(topicData.date || topicData.createdAt || topicData.timestamp)
+                        });
+                    });
+                    
+                    // Sort manually by date ASCENDING (earliest first) for better readability
                     topics.sort((a, b) => {
-                        const aDate = a.date?.toDate?.() || new Date(0);
-                        const bDate = b.date?.toDate?.() || new Date(0);
-                        return bDate - aDate;
+                        return a.timestamp - b.timestamp;
                     });
                     
                     // Filter topics based on month display logic - CLIENT SIDE
                     const filteredTopics = topics.filter(topic => {
-                        const topicDate = topic.date?.toDate?.() || new Date(0);
+                        const topicDate = new Date(topic.timestamp);
                         const { year, month } = getYearMonthFromDate(topicDate);
                         
-                        if (monthLogic.showCurrentMonth && 
-                            year === currentMonth.year && 
-                            month === currentMonth.month) {
+                        // Always show topics from current month
+                        if (year === currentMonth.year && month === currentMonth.month) {
                             return true;
                         }
                         
+                        // Show previous month only if allowed by 2nd Day Rule
                         if (monthLogic.showPreviousMonth && 
                             year === previousMonth.year && 
                             month === previousMonth.month) {
@@ -1420,14 +1454,14 @@ async function loadAcademicsData(selectedStudent = null) {
                     if (filteredTopics.length === 0) {
                         academicsHtml += `
                             <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                                <p class="text-gray-500">No daily topics for the selected time period.</p>
+                                <p class="text-gray-500">No session topics for the selected time period.</p>
                             </div>
                         `;
                     } else {
                         // Group by month
                         const topicsByMonth = {};
                         filteredTopics.forEach(topic => {
-                            const topicDate = topic.date?.toDate?.() || new Date(0);
+                            const topicDate = new Date(topic.timestamp);
                             const { year, month } = getYearMonthFromDate(topicDate);
                             const monthKey = `${year}-${month}`;
                             
@@ -1439,32 +1473,47 @@ async function loadAcademicsData(selectedStudent = null) {
                         
                         // Display topics grouped by month
                         for (const [monthKey, monthTopics] of Object.entries(topicsByMonth)) {
-                            const [year, month] = monthKey.split('-');
+                            const [year, month] = monthKey.split('-').map(num => parseInt(num));
                             const monthNames = [
                                 'January', 'February', 'March', 'April', 'May', 'June',
                                 'July', 'August', 'September', 'October', 'November', 'December'
                             ];
-                            const monthName = monthNames[parseInt(month)];
+                            const monthName = monthNames[month];
                             
                             academicsHtml += `
-                                <div class="mb-4">
-                                    <h4 class="font-semibold text-gray-700 mb-3 p-2 bg-gray-100 rounded">${monthName} ${year}</h4>
+                                <div class="mb-6">
+                                    <h4 class="font-semibold text-gray-700 mb-4 p-3 bg-gray-100 rounded-lg">${monthName} ${year}</h4>
                                     <div class="space-y-4">
                             `;
                             
                             monthTopics.forEach(topicData => {
-                                const formattedDate = formatDetailedDate(topicData.date);
-                                const safeTopics = safeText(topicData.topics || 'No topics recorded for this session.');
+                                const formattedDate = formatDetailedDate(new Date(topicData.timestamp));
+                                const safeTopics = safeText(topicData.topics || topicData.sessionTopics || 'No topics recorded for this session.');
+                                const tutorName = safeText(topicData.tutorName || topicData.updatedBy || 'Tutor');
                                 
                                 academicsHtml += `
                                     <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                                        <div class="flex justify-between items-start mb-2">
-                                            <span class="font-medium text-gray-800">${safeText(formattedDate)}</span>
-                                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">Daily Session</span>
+                                        <div class="flex justify-between items-start mb-3">
+                                            <div>
+                                                <span class="font-medium text-gray-800 text-sm">${safeText(formattedDate)}</span>
+                                                <div class="mt-1 flex items-center">
+                                                    <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full mr-2">Session</span>
+                                                    <span class="text-xs text-gray-600">By: ${tutorName}</span>
+                                                </div>
+                                            </div>
+                                            ${topicData.updatedAt ? 
+                                                `<span class="text-xs text-gray-500">Updated: ${formatDetailedDate(topicData.updatedAt)}</span>` : 
+                                                ''}
                                         </div>
-                                        <div class="text-gray-700">
+                                        <div class="text-gray-700 bg-gray-50 p-3 rounded-md">
                                             <p class="whitespace-pre-wrap">${safeTopics}</p>
                                         </div>
+                                        ${topicData.notes ? `
+                                        <div class="mt-3 text-sm">
+                                            <span class="font-medium text-gray-700">Additional Notes:</span>
+                                            <p class="text-gray-600 mt-1 bg-yellow-50 p-2 rounded">${safeText(topicData.notes)}</p>
+                                        </div>
+                                        ` : ''}
                                     </div>
                                 `;
                             });
@@ -1477,10 +1526,10 @@ async function loadAcademicsData(selectedStudent = null) {
                     }
                 }
             } catch (error) {
-                console.error('Error loading daily topics:', error);
+                console.error('Error loading session topics:', error);
                 academicsHtml += `
                     <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                        <p class="text-yellow-700">Unable to load daily topics at this time.</p>
+                        <p class="text-yellow-700">Unable to load session topics at this time. Please try again later.</p>
                     </div>
                 `;
             }
@@ -1496,7 +1545,7 @@ async function loadAcademicsData(selectedStudent = null) {
                     <button onclick="toggleAcademicsAccordion('homework-${safeText(studentName)}')" 
                             class="accordion-header w-full flex justify-between items-center p-4 bg-purple-100 border border-purple-300 rounded-lg hover:bg-purple-200 transition-all duration-200 mb-4">
                         <div class="flex items-center">
-                            <span class="text-xl mr-3">📝</span>
+                            <span class="text-xl mr-3">📚</span>
                             <div class="text-left">
                                 <h3 class="font-bold text-purple-800 text-lg">Homework Assignments</h3>
                                 <p class="text-purple-600 text-sm">Assignments and due dates</p>
@@ -1511,7 +1560,7 @@ async function loadAcademicsData(selectedStudent = null) {
             `;
 
             try {
-                // SIMPLIFIED QUERY: Get all homework and filter client-side
+                // Get all homework from homework_assignments collection
                 const homeworkSnapshot = await db.collection('homework_assignments')
                     .where('studentId', '==', studentId)
                     .get();
@@ -1523,35 +1572,52 @@ async function loadAcademicsData(selectedStudent = null) {
                         </div>
                     `;
                 } else {
-                    const homeworkList = homeworkSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    const now = new Date();
+                    const homeworkList = [];
                     
-                    // Sort manually by due date
+                    // Process each document
+                    homeworkSnapshot.forEach(doc => {
+                        const homework = doc.data();
+                        homeworkList.push({ 
+                            id: doc.id, 
+                            ...homework,
+                            // Ensure we have proper timestamps
+                            assignedTimestamp: getTimestamp(homework.assignedDate || homework.createdAt || homework.timestamp),
+                            dueTimestamp: getTimestamp(homework.dueDate)
+                        });
+                    });
+                    
+                    const now = new Date().getTime();
+                    
+                    // Sort manually by due date ASCENDING (earliest due date first)
                     homeworkList.sort((a, b) => {
-                        const aDate = a.dueDate?.toDate?.() || new Date(0);
-                        const bDate = b.dueDate?.toDate?.() || new Date(0);
-                        return aDate - bDate;
+                        return a.dueTimestamp - b.dueTimestamp;
                     });
                     
                     // Filter homework based on month display logic - CLIENT SIDE
                     const filteredHomework = homeworkList.filter(homework => {
-                        const dueDate = homework.dueDate?.toDate?.() || new Date(0);
+                        const dueDate = new Date(homework.dueTimestamp);
                         const { year, month } = getYearMonthFromDate(dueDate);
                         
-                        if (monthLogic.showCurrentMonth && 
-                            year === currentMonth.year && 
-                            month === currentMonth.month) {
+                        // Always show current month homework
+                        if (year === currentMonth.year && month === currentMonth.month) {
                             return true;
                         }
                         
+                        // Show previous month homework if allowed by 2nd Day Rule
                         if (monthLogic.showPreviousMonth && 
                             year === previousMonth.year && 
                             month === previousMonth.month) {
                             return true;
                         }
                         
-                        // Also show overdue assignments from previous months
-                        if (dueDate < now) {
+                        // Always show overdue assignments regardless of month
+                        if (homework.dueTimestamp < now) {
+                            return true;
+                        }
+                        
+                        // Show upcoming assignments (next month)
+                        const nextMonth = new Date(currentMonth.year, currentMonth.month + 1, 1);
+                        if (dueDate <= nextMonth) {
                             return true;
                         }
                         
@@ -1568,7 +1634,7 @@ async function loadAcademicsData(selectedStudent = null) {
                         // Group by month
                         const homeworkByMonth = {};
                         filteredHomework.forEach(homework => {
-                            const dueDate = homework.dueDate?.toDate?.() || new Date(0);
+                            const dueDate = new Date(homework.dueTimestamp);
                             const { year, month } = getYearMonthFromDate(dueDate);
                             const monthKey = `${year}-${month}`;
                             
@@ -1578,47 +1644,98 @@ async function loadAcademicsData(selectedStudent = null) {
                             homeworkByMonth[monthKey].push(homework);
                         });
                         
+                        // Sort months in chronological order
+                        const sortedMonthKeys = Object.keys(homeworkByMonth).sort((a, b) => {
+                            const [aYear, aMonth] = a.split('-').map(Number);
+                            const [bYear, bMonth] = b.split('-').map(Number);
+                            return aYear - bYear || aMonth - bMonth;
+                        });
+                        
                         // Display homework grouped by month
-                        for (const [monthKey, monthHomework] of Object.entries(homeworkByMonth)) {
-                            const [year, month] = monthKey.split('-');
+                        for (const monthKey of sortedMonthKeys) {
+                            const [year, month] = monthKey.split('-').map(num => parseInt(num));
                             const monthNames = [
                                 'January', 'February', 'March', 'April', 'May', 'June',
                                 'July', 'August', 'September', 'October', 'November', 'December'
                             ];
-                            const monthName = monthNames[parseInt(month)];
+                            const monthName = monthNames[month];
+                            const monthHomework = homeworkByMonth[monthKey];
                             
                             academicsHtml += `
-                                <div class="mb-4">
-                                    <h4 class="font-semibold text-gray-700 mb-3 p-2 bg-gray-100 rounded">${monthName} ${year}</h4>
+                                <div class="mb-6">
+                                    <h4 class="font-semibold text-gray-700 mb-4 p-3 bg-gray-100 rounded-lg">${monthName} ${year}</h4>
                                     <div class="space-y-4">
                             `;
                             
                             monthHomework.forEach(homework => {
-                                const dueDate = homework.dueDate;
+                                const dueDate = new Date(homework.dueTimestamp);
+                                const assignedDate = new Date(homework.assignedTimestamp);
                                 const formattedDueDate = formatDetailedDate(dueDate);
-                                const isOverdue = dueDate?.toDate?.() < now;
-                                const statusColor = isOverdue ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800';
-                                const statusText = isOverdue ? 'Overdue' : 'Pending';
-                                const safeTitle = safeText(homework.title || 'Untitled Assignment');
-                                const safeDescription = safeText(homework.description || 'No description provided.');
+                                const formattedAssignedDate = formatDetailedDate(assignedDate);
+                                const isOverdue = homework.dueTimestamp < now;
+                                const isSubmitted = homework.status === 'submitted' || homework.status === 'completed';
+                                const statusColor = isOverdue ? 'bg-red-100 text-red-800' : 
+                                                  isSubmitted ? 'bg-green-100 text-green-800' : 
+                                                  'bg-blue-100 text-blue-800';
+                                const statusText = isOverdue ? 'Overdue' : 
+                                                 isSubmitted ? 'Submitted' : 
+                                                 'Pending';
+                                const safeTitle = safeText(homework.title || homework.subject || 'Untitled Assignment');
+                                const safeDescription = safeText(homework.description || homework.instructions || 'No description provided.');
+                                const tutorName = safeText(homework.tutorName || homework.assignedBy || 'Tutor');
                                 
                                 academicsHtml += `
                                     <div class="bg-white border ${isOverdue ? 'border-red-200' : 'border-gray-200'} rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                                        <div class="flex justify-between items-start mb-2">
-                                            <span class="font-medium text-gray-800">${safeTitle}</span>
-                                            <span class="text-xs ${statusColor} px-2 py-1 rounded-full">${statusText}</span>
+                                        <div class="flex justify-between items-start mb-3">
+                                            <div>
+                                                <h5 class="font-medium text-gray-800 text-lg">${safeTitle}</h5>
+                                                <div class="mt-1 flex flex-wrap items-center gap-2">
+                                                    <span class="text-xs ${statusColor} px-2 py-1 rounded-full">${statusText}</span>
+                                                    <span class="text-xs text-gray-600">Assigned by: ${tutorName}</span>
+                                                    ${homework.subject ? `<span class="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded-full">${safeText(homework.subject)}</span>` : ''}
+                                                </div>
+                                            </div>
+                                            <div class="text-right">
+                                                <span class="text-sm font-medium text-gray-700">Due: ${safeText(formattedDueDate)}</span>
+                                                <div class="text-xs text-gray-500 mt-1">Assigned: ${safeText(formattedAssignedDate)}</div>
+                                            </div>
                                         </div>
-                                        <div class="text-gray-700 mb-3">
-                                            <p class="whitespace-pre-wrap">${safeDescription}</p>
+                                        
+                                        <div class="text-gray-700 mb-4">
+                                            <p class="whitespace-pre-wrap bg-gray-50 p-3 rounded-md">${safeDescription}</p>
                                         </div>
-                                        <div class="flex justify-between items-center">
-                                            <span class="text-sm text-gray-500">Due: ${safeText(formattedDueDate)}</span>
-                                            ${homework.fileUrl ? `
-                                                <a href="${safeText(homework.fileUrl)}" target="_blank" class="text-green-600 hover:text-green-800 font-medium flex items-center">
-                                                    <span class="mr-1">📎</span> Download Attachment
-                                                </a>
+                                        
+                                        <div class="flex justify-between items-center pt-3 border-t border-gray-100">
+                                            <div class="flex items-center space-x-3">
+                                                ${homework.fileUrl ? `
+                                                    <a href="${safeText(homework.fileUrl)}" target="_blank" class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm">
+                                                        <span class="mr-1">📎</span> Download Attachment
+                                                    </a>
+                                                ` : ''}
+                                                
+                                                ${homework.submissionUrl ? `
+                                                    <a href="${safeText(homework.submissionUrl)}" target="_blank" class="text-blue-600 hover:text-blue-800 font-medium flex items-center text-sm">
+                                                        <span class="mr-1">📤</span> View Submission
+                                                    </a>
+                                                ` : ''}
+                                            </div>
+                                            
+                                            ${homework.grade ? `
+                                                <div class="text-sm">
+                                                    <span class="font-medium text-gray-700">Grade:</span>
+                                                    <span class="ml-1 font-bold ${homework.grade >= 70 ? 'text-green-600' : homework.grade >= 50 ? 'text-yellow-600' : 'text-red-600'}">
+                                                        ${homework.grade}%
+                                                    </span>
+                                                </div>
                                             ` : ''}
                                         </div>
+                                        
+                                        ${homework.feedback ? `
+                                        <div class="mt-4 pt-3 border-t border-gray-100">
+                                            <span class="font-medium text-gray-700 text-sm">Tutor Feedback:</span>
+                                            <p class="text-gray-600 text-sm mt-1 bg-blue-50 p-2 rounded">${safeText(homework.feedback)}</p>
+                                        </div>
+                                        ` : ''}
                                     </div>
                                 `;
                             });
@@ -1634,7 +1751,7 @@ async function loadAcademicsData(selectedStudent = null) {
                 console.error('Error loading homework:', error);
                 academicsHtml += `
                     <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                        <p class="text-yellow-700">Unable to load homework assignments at this time.</p>
+                        <p class="text-yellow-700">Unable to load homework assignments at this time. Please try again later.</p>
                     </div>
                 `;
             }
@@ -1648,7 +1765,7 @@ async function loadAcademicsData(selectedStudent = null) {
         // Update academics content
         academicsContent.innerHTML = academicsHtml;
         
-        // Update academics tab badge
+        // Update academics tab badge with proper styling
         updateAcademicsTabBadge(totalUnreadCount);
 
     } catch (error) {
@@ -1697,8 +1814,11 @@ function updateAcademicsTabBadge(count) {
     // Add new badge if there are unread items
     if (count > 0) {
         const badge = document.createElement('span');
-        badge.className = 'academics-badge absolute -top-2 -right-2 bg-red-500 text-white rounded-full text-xs w-6 h-6 flex items-center justify-center font-bold animate-pulse';
+        badge.className = 'academics-badge absolute -top-1 -right-1 bg-red-500 text-white rounded-full text-xs min-w-5 h-5 flex items-center justify-center font-bold animate-pulse px-1';
         badge.textContent = count > 9 ? '9+' : count;
+        badge.style.lineHeight = '1rem';
+        badge.style.fontSize = '0.7rem';
+        badge.style.padding = '0 4px';
         academicsTab.style.position = 'relative';
         academicsTab.appendChild(badge);
     }
@@ -1706,6 +1826,80 @@ function updateAcademicsTabBadge(count) {
 
 function onStudentSelected(studentName) {
     loadAcademicsData(studentName || null);
+}
+
+// Update the checkForNewAcademics function to match
+async function checkForNewAcademics() {
+    try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        // Get user data to find phone
+        const userDoc = await db.collection('parent_users').doc(user.uid).get();
+        const userData = userDoc.data();
+        const parentPhone = userData.normalizedPhone || userData.phone;
+
+        // Find student IDs for this parent
+        const { studentNameIdMap } = await findStudentIdsForParent(parentPhone);
+        
+        // Reset notifications
+        academicsNotifications.clear();
+        let totalUnread = 0;
+
+        // Check for new session topics and homework for each student
+        for (const [studentName, studentId] of studentNameIdMap) {
+            let studentUnread = { sessionTopics: 0, homework: 0 };
+            
+            try {
+                // Get session topics from last 7 days
+                const oneWeekAgo = new Date();
+                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                
+                const sessionTopicsSnapshot = await db.collection('daily_topics')
+                    .where('studentId', '==', studentId)
+                    .get();
+                
+                // Filter client-side for recent topics (last 7 days)
+                sessionTopicsSnapshot.forEach(doc => {
+                    const topic = doc.data();
+                    const topicDate = topic.date?.toDate?.() || topic.createdAt?.toDate?.() || new Date(0);
+                    if (topicDate >= oneWeekAgo) {
+                        studentUnread.sessionTopics++;
+                    }
+                });
+                
+                // Get homework from last 7 days
+                const homeworkSnapshot = await db.collection('homework_assignments')
+                    .where('studentId', '==', studentId)
+                    .get();
+                
+                // Filter client-side for recent homework (last 7 days)
+                homeworkSnapshot.forEach(doc => {
+                    const homework = doc.data();
+                    const assignedDate = homework.assignedDate?.toDate?.() || homework.createdAt?.toDate?.() || new Date(0);
+                    if (assignedDate >= oneWeekAgo) {
+                        studentUnread.homework++;
+                    }
+                });
+                
+            } catch (error) {
+                console.error(`Error checking academics for ${studentName}:`, error);
+                // Continue with other students
+            }
+            
+            // Store student notifications
+            academicsNotifications.set(studentName, studentUnread);
+            
+            // Add to total
+            totalUnread += studentUnread.sessionTopics + studentUnread.homework;
+        }
+        
+        // Update academics tab badge
+        updateAcademicsTabBadge(totalUnread);
+
+    } catch (error) {
+        console.error('Error checking for new academics:', error);
+    }
 }
 
 // ============================================================================
