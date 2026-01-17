@@ -2131,7 +2131,7 @@ function addManualRefreshButton() {
     
     const refreshBtn = document.createElement('button');
     refreshBtn.id = 'manualRefreshBtn';
-    refreshBtn.onclick = manualRefreshReports;
+    refreshBtn.onclick = manualRefreshReportsV2;
     refreshBtn.className = 'bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 btn-glow flex items-center justify-center';
     refreshBtn.innerHTML = '<span class="mr-2">🔄</span> Check for New Reports';
     
@@ -4265,14 +4265,540 @@ function cleanupBeforeUnload() {
 
 // Initialize the page when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("📄 DOM Content Loaded - Starting robust initialization");
+    console.log("📄 DOM Content Loaded - Starting V2 initialization");
     
-    // Setup cleanup before page unload
-    window.addEventListener('beforeunload', cleanupBeforeUnload);
-    window.addEventListener('pagehide', cleanupBeforeUnload);
+    // Initialize the NEW portal (no reload edition)
+    initializeParentPortalV2();  // ✅ NEW
     
-    // Initialize the portal
-    initializeParentPortal();
-    
-    console.log("🎉 Parent portal initialization complete");
+    console.log("🎉 Parent Portal V2 initialized");
 });
+
+// ============================================================================
+// SECTION 19: UNIFIED AUTH & DATA MANAGER - FIXES RELOADING & MISSING CHILDREN
+// ============================================================================
+// INSERT THIS SECTION AFTER SECTION 18 (before the DOMContentLoaded event)
+
+/**
+ * CRITICAL FIX: This section solves two major issues:
+ * 1. Page reloading loop after sign-in
+ * 2. Parents not seeing all their children/reports
+ * 
+ * How it works:
+ * - Single source of truth for auth state
+ * - Comprehensive phone matching across ALL variations
+ * - Prevents duplicate auth listeners
+ * - Batches all data loading to prevent cascading reloads
+ */
+
+// ============================================================================
+// 1. UNIFIED AUTH STATE MANAGER (Prevents Reloading)
+// ============================================================================
+
+class UnifiedAuthManager {
+    constructor() {
+        this.currentUser = null;
+        this.authListener = null;
+        this.isInitialized = false;
+        this.isProcessing = false;
+        this.lastProcessTime = 0;
+        this.DEBOUNCE_MS = 2000; // 2 second minimum between auth changes
+    }
+
+    /**
+     * Initialize auth listener - CALL ONLY ONCE
+     */
+    initialize() {
+        if (this.isInitialized) {
+            console.warn("⚠️ Auth manager already initialized, skipping");
+            return;
+        }
+
+        console.log("🔐 Initializing Unified Auth Manager");
+
+        // Remove any existing listeners first
+        this.cleanup();
+
+        // Set up single auth listener
+        this.authListener = auth.onAuthStateChanged(
+            (user) => this.handleAuthChange(user),
+            (error) => this.handleAuthError(error)
+        );
+
+        this.isInitialized = true;
+        console.log("✅ Auth manager initialized");
+    }
+
+    /**
+     * Handle auth state changes with debouncing
+     */
+    async handleAuthChange(user) {
+        const now = Date.now();
+        const timeSinceLastProcess = now - this.lastProcessTime;
+
+        // Prevent rapid successive calls
+        if (this.isProcessing) {
+            console.log("⏸️ Auth change already processing, ignoring");
+            return;
+        }
+
+        // Debounce to prevent loops
+        if (timeSinceLastProcess < this.DEBOUNCE_MS) {
+            console.log(`⏸️ Debouncing auth change (${timeSinceLastProcess}ms since last)`);
+            return;
+        }
+
+        this.isProcessing = true;
+        this.lastProcessTime = now;
+
+        try {
+            if (user && user.uid) {
+                console.log(`👤 User authenticated: ${user.uid.substring(0, 8)}...`);
+                await this.loadUserDashboard(user);
+            } else {
+                console.log("🚪 User signed out");
+                this.showAuthScreen();
+            }
+        } catch (error) {
+            console.error("❌ Auth change error:", error);
+            showMessage("Authentication error. Please refresh.", "error");
+        } finally {
+            // Reset processing flag after delay
+            setTimeout(() => {
+                this.isProcessing = false;
+            }, 1000);
+        }
+    }
+
+    /**
+     * Handle auth errors
+     */
+    handleAuthError(error) {
+        console.error("❌ Auth listener error:", error);
+        showMessage("Authentication error occurred", "error");
+    }
+
+    /**
+     * Load user dashboard - SINGLE ENTRY POINT
+     */
+    async loadUserDashboard(user) {
+        console.log("📊 Loading dashboard for user");
+
+        const authArea = document.getElementById("authArea");
+        const reportArea = document.getElementById("reportArea");
+        const authLoader = document.getElementById("authLoader");
+
+        // Show loading state
+        if (authLoader) authLoader.classList.remove("hidden");
+
+        try {
+            // 1. Get user data from Firestore
+            const userDoc = await db.collection('parent_users').doc(user.uid).get();
+            
+            if (!userDoc.exists) {
+                throw new Error("User profile not found");
+            }
+
+            const userData = userDoc.data();
+            this.currentUser = {
+                uid: user.uid,
+                email: userData.email,
+                phone: userData.phone,
+                normalizedPhone: userData.normalizedPhone || userData.phone,
+                parentName: userData.parentName || 'Parent',
+                referralCode: userData.referralCode
+            };
+
+            console.log("👤 User data loaded:", this.currentUser.parentName);
+
+            // 2. Update UI immediately (prevent feeling of lag)
+            this.showDashboardUI();
+
+            // 3. Load all data in parallel (faster)
+            await Promise.all([
+                this.loadAllChildrenAndReports(),
+                this.loadReferralsData(),
+                this.loadAcademicsData(),
+                this.setupRealtimeMonitoring()
+            ]);
+
+            // 4. Setup UI components
+            this.setupUIComponents();
+
+            console.log("✅ Dashboard fully loaded");
+
+        } catch (error) {
+            console.error("❌ Dashboard load error:", error);
+            showMessage(error.message || "Failed to load dashboard", "error");
+            this.showAuthScreen();
+        } finally {
+            if (authLoader) authLoader.classList.add("hidden");
+        }
+    }
+
+    /**
+     * Show dashboard UI
+     */
+    showDashboardUI() {
+        const authArea = document.getElementById("authArea");
+        const reportArea = document.getElementById("reportArea");
+        const welcomeMessage = document.getElementById("welcomeMessage");
+
+        if (authArea) authArea.classList.add("hidden");
+        if (reportArea) reportArea.classList.remove("hidden");
+        
+        if (welcomeMessage && this.currentUser) {
+            welcomeMessage.textContent = `Welcome, ${this.currentUser.parentName}!`;
+        }
+
+        localStorage.setItem('isAuthenticated', 'true');
+    }
+
+    /**
+     * Show auth screen
+     */
+    showAuthScreen() {
+        const authArea = document.getElementById("authArea");
+        const reportArea = document.getElementById("reportArea");
+
+        if (authArea) authArea.classList.remove("hidden");
+        if (reportArea) reportArea.classList.add("hidden");
+
+        localStorage.removeItem('isAuthenticated');
+        cleanupRealTimeListeners();
+    }
+
+    /**
+     * Load all children and reports - COMPREHENSIVE SEARCH
+     */
+    async loadAllChildrenAndReports() {
+        console.log("🔍 Searching for all children and reports");
+
+        try {
+            // Use the comprehensive search
+            const childrenData = await comprehensiveFindChildren(this.currentUser.normalizedPhone);
+            
+            // Store globally
+            userChildren = childrenData.studentNames;
+            studentIdMap = childrenData.studentNameIdMap;
+
+            console.log(`✅ Found ${userChildren.length} children:`, userChildren);
+
+            // Load reports for all children
+            await loadAllReportsForParent(
+                this.currentUser.normalizedPhone,
+                this.currentUser.uid,
+                false // Don't force refresh
+            );
+
+        } catch (error) {
+            console.error("❌ Error loading children/reports:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * Load referrals data
+     */
+    async loadReferralsData() {
+        try {
+            await loadReferralRewards(this.currentUser.uid);
+        } catch (error) {
+            console.error("⚠️ Error loading referrals:", error);
+            // Non-critical, don't throw
+        }
+    }
+
+    /**
+     * Load academics data
+     */
+    async loadAcademicsData() {
+        try {
+            await loadAcademicsData();
+        } catch (error) {
+            console.error("⚠️ Error loading academics:", error);
+            // Non-critical, don't throw
+        }
+    }
+
+    /**
+     * Setup realtime monitoring
+     */
+    async setupRealtimeMonitoring() {
+        try {
+            setupRealTimeMonitoring(this.currentUser.normalizedPhone, this.currentUser.uid);
+        } catch (error) {
+            console.error("⚠️ Error setting up monitoring:", error);
+            // Non-critical, don't throw
+        }
+    }
+
+    /**
+     * Setup UI components
+     */
+    setupUIComponents() {
+        addMessagesButton();
+        addManualRefreshButton();
+        addLogoutButton();
+    }
+
+    /**
+     * Cleanup auth listener
+     */
+    cleanup() {
+        if (this.authListener && typeof this.authListener === 'function') {
+            console.log("🧹 Cleaning up auth listener");
+            this.authListener();
+            this.authListener = null;
+        }
+        this.isInitialized = false;
+    }
+
+    /**
+     * Force reload dashboard
+     */
+    async reloadDashboard() {
+        if (!this.currentUser) {
+            console.warn("⚠️ No user to reload dashboard for");
+            return;
+        }
+
+        console.log("🔄 Force reloading dashboard");
+        await this.loadAllChildrenAndReports();
+    }
+}
+
+// Create singleton instance
+const authManager = new UnifiedAuthManager();
+
+// ============================================================================
+// 2. COMPREHENSIVE CHILDREN FINDER (Finds ALL Children)
+// ============================================================================
+
+/**
+ * Comprehensive search for all children linked to a parent
+ * This searches EVERY possible phone variation across multiple collections
+ */
+async function comprehensiveFindChildren(parentPhone) {
+    console.log("🔍 COMPREHENSIVE SEARCH for children with phone:", parentPhone);
+
+    const allChildren = new Map(); // studentId -> studentData
+    const studentNameIdMap = new Map(); // studentName -> studentId
+
+    try {
+        // 1. Generate ALL phone variations
+        const phoneVariations = generateAllPhoneVariations(parentPhone);
+        console.log(`📱 Generated ${phoneVariations.length} phone variations`);
+
+        // 2. Search in students collection
+        console.log("📚 Searching students collection...");
+        for (const phoneVar of phoneVariations) {
+            try {
+                const snapshot = await db.collection('students')
+                    .where('parentPhone', '==', phoneVar)
+                    .get();
+
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const studentId = doc.id;
+                    const studentName = safeText(data.studentName || data.name || 'Unknown');
+
+                    if (studentName !== 'Unknown' && !allChildren.has(studentId)) {
+                        allChildren.set(studentId, {
+                            id: studentId,
+                            name: studentName,
+                            data: data,
+                            isPending: false,
+                            collection: 'students'
+                        });
+                        
+                        // Handle duplicate names
+                        if (studentNameIdMap.has(studentName)) {
+                            const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
+                            studentNameIdMap.set(uniqueName, studentId);
+                        } else {
+                            studentNameIdMap.set(studentName, studentId);
+                        }
+
+                        console.log(`✅ Found student: ${studentName} (${studentId.substring(0, 8)}...)`);
+                    }
+                });
+            } catch (error) {
+                console.warn(`⚠️ Error searching students with ${phoneVar}:`, error.message);
+            }
+        }
+
+        // 3. Search in pending_students collection
+        console.log("📚 Searching pending_students collection...");
+        for (const phoneVar of phoneVariations) {
+            try {
+                const snapshot = await db.collection('pending_students')
+                    .where('parentPhone', '==', phoneVar)
+                    .get();
+
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const studentId = doc.id;
+                    const studentName = safeText(data.studentName || data.name || 'Unknown');
+
+                    if (studentName !== 'Unknown' && !allChildren.has(studentId)) {
+                        allChildren.set(studentId, {
+                            id: studentId,
+                            name: studentName,
+                            data: data,
+                            isPending: true,
+                            collection: 'pending_students'
+                        });
+                        
+                        // Handle duplicate names
+                        if (studentNameIdMap.has(studentName)) {
+                            const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
+                            studentNameIdMap.set(uniqueName, studentId);
+                        } else {
+                            studentNameIdMap.set(studentName, studentId);
+                        }
+
+                        console.log(`✅ Found pending student: ${studentName} (${studentId.substring(0, 8)}...)`);
+                    }
+                });
+            } catch (error) {
+                console.warn(`⚠️ Error searching pending_students with ${phoneVar}:`, error.message);
+            }
+        }
+
+        // 4. Emergency backup search - check by email if available
+        // (This catches edge cases where phone might be wrong but email is right)
+        const userDoc = await db.collection('parent_users')
+            .where('normalizedPhone', '==', parentPhone)
+            .limit(1)
+            .get();
+
+        if (!userDoc.empty) {
+            const userData = userDoc.docs[0].data();
+            if (userData.email) {
+                console.log("📧 Backup search by email:", userData.email);
+                
+                try {
+                    const emailSnapshot = await db.collection('students')
+                        .where('parentEmail', '==', userData.email)
+                        .get();
+
+                    emailSnapshot.forEach(doc => {
+                        const data = doc.data();
+                        const studentId = doc.id;
+                        const studentName = safeText(data.studentName || data.name || 'Unknown');
+
+                        if (studentName !== 'Unknown' && !allChildren.has(studentId)) {
+                            allChildren.set(studentId, {
+                                id: studentId,
+                                name: studentName,
+                                data: data,
+                                isPending: false,
+                                collection: 'students'
+                            });
+                            
+                            if (!studentNameIdMap.has(studentName)) {
+                                studentNameIdMap.set(studentName, studentId);
+                            }
+
+                            console.log(`✅ Found student by email: ${studentName}`);
+                        }
+                    });
+                } catch (error) {
+                    console.warn("⚠️ Email backup search failed:", error.message);
+                }
+            }
+        }
+
+        // 5. Return results
+        const studentNames = Array.from(studentNameIdMap.keys());
+        const studentIds = Array.from(allChildren.keys());
+        const allStudentData = Array.from(allChildren.values());
+
+        console.log(`📊 FINAL RESULTS: Found ${studentNames.length} children total`);
+        console.log("👥 Children:", studentNames);
+
+        return {
+            studentIds,
+            studentNameIdMap,
+            allStudentData,
+            studentNames
+        };
+
+    } catch (error) {
+        console.error("❌ Comprehensive search error:", error);
+        return {
+            studentIds: [],
+            studentNameIdMap: new Map(),
+            allStudentData: [],
+            studentNames: []
+        };
+    }
+}
+
+// ============================================================================
+// 3. REPLACE OLD INITIALIZATION
+// ============================================================================
+
+/**
+ * NEW initialization function - replaces initializeParentPortal()
+ */
+function initializeParentPortalV2() {
+    console.log("🚀 Initializing Parent Portal V2 (No Reload Edition)");
+
+    // 1. Setup UI first
+    setupRememberMe();
+    injectCustomCSS();
+    createCountryCodeDropdown();
+    setupEventListeners();
+    setupGlobalErrorHandler();
+
+    // 2. Initialize auth manager (SINGLE SOURCE OF TRUTH)
+    authManager.initialize();
+
+    // 3. Setup cleanup
+    window.addEventListener('beforeunload', () => {
+        authManager.cleanup();
+        cleanupRealTimeListeners();
+    });
+
+    console.log("✅ Parent Portal V2 initialized");
+}
+
+// ============================================================================
+// 4. HELPER: Manual Dashboard Refresh
+// ============================================================================
+
+/**
+ * Manual refresh function that uses the auth manager
+ */
+async function manualRefreshReportsV2() {
+    const refreshBtn = document.getElementById('manualRefreshBtn');
+    if (!refreshBtn) return;
+
+    const originalText = refreshBtn.innerHTML;
+    refreshBtn.innerHTML = '<div class="loading-spinner-small mr-2"></div> Refreshing...';
+    refreshBtn.disabled = true;
+
+    try {
+        await authManager.reloadDashboard();
+        await checkForNewAcademics();
+        showMessage('Dashboard refreshed!', 'success');
+    } catch (error) {
+        console.error('Refresh error:', error);
+        showMessage('Refresh failed. Please try again.', 'error');
+    } finally {
+        refreshBtn.innerHTML = originalText;
+        refreshBtn.disabled = false;
+    }
+}
+
+// ============================================================================
+// 5. EXPORTS & GLOBAL REFERENCES
+// ============================================================================
+
+// Make auth manager globally accessible for debugging
+window.authManager = authManager;
+window.comprehensiveFindChildren = comprehensiveFindChildren;
+window.manualRefreshReportsV2 = manualRefreshReportsV2;
+
+console.log("✅ Section 19: Unified Auth & Data Manager loaded");
