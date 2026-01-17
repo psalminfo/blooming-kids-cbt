@@ -2,7 +2,6 @@
 // SECTION 1: APP CONFIGURATION & DEPENDENCIES
 // ===================================================================
 
-// Firebase config for the 'bloomingkidsassessment' project
 firebase.initializeApp({
     apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
     authDomain: "bloomingkidsassessment.firebaseapp.com",
@@ -15,18 +14,16 @@ firebase.initializeApp({
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// Load libphonenumber-js for phone number validation
 const libphonenumberScript = document.createElement('script');
 libphonenumberScript.src = 'https://cdn.jsdelivr.net/npm/libphonenumber-js@1.10.14/bundle/libphonenumber-js.min.js';
 document.head.appendChild(libphonenumberScript);
 
 // ===================================================================
-// SECTION 2: UTILITY FUNCTIONS (SECURITY & FORMATTING)
+// SECTION 2: UTILITY FUNCTIONS (SECURITY, PHONE & UI)
 // ===================================================================
 
 /**
  * 🔒 SECURITY CRITICAL: Prevents Cross-Site Scripting (XSS)
- * Converts dangerous characters into safe HTML entities.
  */
 function escapeHtml(unsafe) {
     if (typeof unsafe !== 'string') return unsafe;
@@ -38,10 +35,39 @@ function escapeHtml(unsafe) {
         .replace(/'/g, "&#039;");
 }
 
+function normalizePhoneNumber(phone) {
+    if (!phone || typeof phone !== 'string') return { normalized: null, valid: false, error: 'Invalid input' };
+    try {
+        let cleaned = phone.replace(/[^\d+]/g, '').replace(/^0+/, '');
+        if (!cleaned.startsWith('+')) cleaned = '+1' + cleaned;
+        return { normalized: cleaned, valid: true, error: null };
+    } catch (error) {
+        return { normalized: null, valid: false, error: error.message };
+    }
+}
+
+function capitalize(str) {
+    if (!str) return "";
+    return str.replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function showMessage(message, type) {
+    const existingMessage = document.querySelector('.message-toast');
+    if (existingMessage) existingMessage.remove();
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message-toast fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm ${
+        type === 'error' ? 'bg-red-500 text-white' : 
+        type === 'success' ? 'bg-green-500 text-white' : 
+        'bg-blue-500 text-white'
+    }`;
+    messageDiv.textContent = `BKH says: ${message}`;
+    document.body.appendChild(messageDiv);
+    setTimeout(() => { if (messageDiv.parentNode) messageDiv.remove(); }, 5000);
+}
+
 function createCountryCodeDropdown() {
     const phoneInputContainer = document.getElementById('signupPhone').parentNode;
-    
-    // Check if already created to avoid duplicates
     if(document.getElementById('countryCode')) return;
 
     const container = document.createElement('div');
@@ -75,39 +101,6 @@ function createCountryCodeDropdown() {
     container.appendChild(countryCodeSelect);
     container.appendChild(phoneInput);
     phoneInputContainer.appendChild(container);
-}
-
-function normalizePhoneNumber(phone) {
-    if (!phone || typeof phone !== 'string') return { normalized: null, valid: false, error: 'Invalid input' };
-    try {
-        let cleaned = phone.replace(/[^\d+]/g, '').replace(/^0+/, '');
-        if (!cleaned.startsWith('+')) cleaned = '+1' + cleaned;
-        return { normalized: cleaned, valid: true, error: null };
-    } catch (error) {
-        return { normalized: null, valid: false, error: error.message };
-    }
-}
-
-function capitalize(str) {
-    if (!str) return "";
-    return str.replace(/\b\w/g, l => l.toUpperCase());
-}
-
-function showMessage(message, type) {
-    const existingMessage = document.querySelector('.message-toast');
-    if (existingMessage) existingMessage.remove();
-
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message-toast fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm ${
-        type === 'error' ? 'bg-red-500 text-white' : 
-        type === 'success' ? 'bg-green-500 text-white' : 
-        'bg-blue-500 text-white'
-    }`;
-    messageDiv.textContent = `BKH says: ${message}`; // Text content is safe by default
-    document.body.appendChild(messageDiv);
-    setTimeout(() => {
-        if (messageDiv.parentNode) messageDiv.remove();
-    }, 5000);
 }
 
 // ===================================================================
@@ -157,7 +150,6 @@ async function loadReferralRewards(parentUid) {
             referralsHtml = `<tr><td colspan="4" class="text-center py-4 text-gray-500">No one has used your referral code yet.</td></tr>`;
         } else {
             const transactions = transactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            // Client-side Sort
             transactions.sort((a, b) => (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0));
             
             transactions.forEach(data => {
@@ -255,6 +247,27 @@ async function findStudentIdsForParent(parentPhone) {
 // SECTION 5: AUTHENTICATION HANDLERS
 // ===================================================================
 
+function setupRememberMe() {
+    const rememberMe = localStorage.getItem('rememberMe');
+    const savedEmail = localStorage.getItem('savedEmail');
+    if (rememberMe === 'true' && savedEmail) {
+        document.getElementById('loginIdentifier').value = savedEmail;
+        document.getElementById('rememberMe').checked = true;
+    }
+}
+
+function handleRememberMe() {
+    const rememberMe = document.getElementById('rememberMe').checked;
+    const identifier = document.getElementById('loginIdentifier').value.trim();
+    if (rememberMe && identifier) {
+        localStorage.setItem('rememberMe', 'true');
+        localStorage.setItem('savedEmail', identifier);
+    } else {
+        localStorage.removeItem('rememberMe');
+        localStorage.removeItem('savedEmail');
+    }
+}
+
 async function handleSignUp() {
     const countryCode = document.getElementById('countryCode').value;
     const localPhone = document.getElementById('signupPhone').value.trim();
@@ -262,22 +275,12 @@ async function handleSignUp() {
     const password = document.getElementById('signupPassword').value;
     const confirmPassword = document.getElementById('signupConfirmPassword').value;
 
-    if (!countryCode || !localPhone || !email || !password) {
-        showMessage('Please fill in all fields', 'error');
-        return;
-    }
-    if (password !== confirmPassword) {
-        showMessage('Passwords do not match', 'error');
-        return;
-    }
+    if (!countryCode || !localPhone || !email || !password) return showMessage('Please fill in all fields', 'error');
+    if (password !== confirmPassword) return showMessage('Passwords do not match', 'error');
 
     const fullPhoneNumber = countryCode + localPhone.replace(/\D/g, '');
     const normalized = normalizePhoneNumber(fullPhoneNumber);
-    
-    if (!normalized.valid) {
-        showMessage('Invalid phone number format', 'error');
-        return;
-    }
+    if (!normalized.valid) return showMessage('Invalid phone number format', 'error');
 
     document.getElementById('signUpBtn').disabled = true;
     document.getElementById('authLoader').classList.remove('hidden');
@@ -312,10 +315,7 @@ async function handleSignIn() {
     const identifier = document.getElementById('loginIdentifier').value.trim();
     const password = document.getElementById('loginPassword').value;
 
-    if (!identifier || !password) {
-        showMessage('Please fill in all fields', 'error');
-        return;
-    }
+    if (!identifier || !password) return showMessage('Please fill in all fields', 'error');
 
     document.getElementById('signInBtn').disabled = true;
     document.getElementById('authLoader').classList.remove('hidden');
@@ -330,14 +330,10 @@ async function handleSignIn() {
             const doc = await db.collection('parent_users').doc(userId).get();
             if (doc.exists) normalizedPhone = doc.data().normalizedPhone;
         } else {
-            // Simplified for email login only based on typical Firebase patterns
             throw new Error("Please login with Email.");
         }
 
-        if (document.getElementById('rememberMe').checked) {
-            localStorage.setItem('rememberMe', 'true');
-            localStorage.setItem('savedEmail', identifier);
-        }
+        handleRememberMe();
 
         if (normalizedPhone) {
             await loadAllReportsForParent(normalizedPhone, userId);
@@ -350,6 +346,27 @@ async function handleSignIn() {
     } finally {
         document.getElementById('signInBtn').disabled = false;
         document.getElementById('authLoader').classList.add('hidden');
+    }
+}
+
+async function handlePasswordReset() {
+    const email = document.getElementById('resetEmail').value.trim();
+    if (!email) return showMessage('Please enter your email address', 'error');
+
+    const sendResetBtn = document.getElementById('sendResetBtn');
+    const resetLoader = document.getElementById('resetLoader');
+    sendResetBtn.disabled = true;
+    resetLoader.classList.remove('hidden');
+
+    try {
+        await auth.sendPasswordResetEmail(email);
+        showMessage('Password reset link sent to your email.', 'success');
+        document.getElementById('passwordResetModal').classList.add('hidden');
+    } catch (error) {
+        showMessage(error.message || 'Failed to send reset email.', 'error');
+    } finally {
+        sendResetBtn.disabled = false;
+        resetLoader.classList.add('hidden');
     }
 }
 
@@ -386,10 +403,7 @@ async function submitMessage() {
     const content = document.getElementById('messageContent').value.trim();
     const isUrgent = document.getElementById('messageUrgent').checked;
 
-    if (!subject || !content) {
-        showMessage('Please fill in subject and content', 'error');
-        return;
-    }
+    if (!subject || !content) return showMessage('Please fill in subject and content', 'error');
 
     const btn = document.getElementById('submitMessageBtn');
     btn.disabled = true;
@@ -402,7 +416,6 @@ async function submitMessage() {
 
         let recipientsList = recipient === 'tutor' ? ['tutors'] : recipient === 'management' ? ['management'] : ['tutors', 'management'];
 
-        // Save to 'tutor_messages'
         await db.collection('tutor_messages').add({
             parentName: userData.parentName || 'Parent',
             parentPhone: userData.phone,
@@ -485,7 +498,6 @@ async function loadUnifiedMessages() {
             }
         });
 
-        // Client-side Sort
         allItems.sort((a, b) => {
             const tA = a.timestamp?.toDate?.() || new Date(0);
             const tB = b.timestamp?.toDate?.() || new Date(0);
@@ -497,7 +509,6 @@ async function loadUnifiedMessages() {
             return;
         }
 
-        // Render with XSS Protection (escapeHtml)
         container.innerHTML = allItems.map(msg => `
             <div class="bg-white border ${msg.isUrgent ? 'border-red-300' : 'border-gray-200'} rounded-xl p-6 mb-4 shadow-sm">
                 <div class="flex justify-between mb-2">
@@ -511,7 +522,6 @@ async function loadUnifiedMessages() {
         `).join('');
 
     } catch (error) {
-        console.error("Msg Load Error:", error);
         container.innerHTML = '<p class="text-red-500 text-center">Error loading messages.</p>';
     }
 }
@@ -522,13 +532,9 @@ async function checkForNewMessages() {
         if (!user) return;
         const msgs = await db.collection('tutor_messages').where('parentUid', '==', user.uid).get();
         const count = msgs.size; 
-        
         if (count > unreadMessagesCount) {
              const badge = document.getElementById('messagesNotificationBadge');
-             if(badge) {
-                 badge.textContent = 'New';
-                 badge.classList.remove('hidden');
-             }
+             if(badge) { badge.textContent = 'New'; badge.classList.remove('hidden'); }
         }
         unreadMessagesCount = count;
     } catch (e) { console.log("Bg check failed"); }
@@ -540,7 +546,7 @@ function resetNotificationCount() {
 }
 
 // ===================================================================
-// SECTION 7: ACADEMICS & HOMEWORK SYSTEM
+// SECTION 7: ACADEMICS & HOMEWORK SYSTEM (RESTORED DAILY TOPICS)
 // ===================================================================
 
 async function loadAcademicsData(selectedStudent = null) {
@@ -575,9 +581,43 @@ async function loadAcademicsData(selectedStudent = null) {
             const id = studentNameIdMap.get(name);
             html += `<div class="bg-green-50 p-4 rounded-lg mb-4"><h3 class="font-bold text-lg text-green-800">${escapeHtml(capitalize(name))}</h3></div>`;
 
+            // 1. Daily Topics (Restored)
+            html += `<h4 class="font-bold text-gray-700 mb-2 flex items-center">📅 Daily Topics</h4>`;
+            const topicsSnapshot = await db.collection('daily_topics').where('studentId', '==', id).get();
+            
+            if (topicsSnapshot.empty) {
+                html += `<div class="bg-gray-50 p-4 rounded mb-6 text-gray-500">No daily topics recorded yet.</div>`;
+            } else {
+                let topics = topicsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Sort client-side
+                topics.sort((a, b) => {
+                    const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+                    const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+                    return dateB - dateA;
+                });
+                
+                html += `<div class="space-y-4 mb-8">`;
+                topics.slice(0, 5).forEach(topic => {
+                    const dateObj = topic.date?.toDate ? topic.date.toDate() : new Date(topic.date);
+                    const dateStr = dateObj.toLocaleDateString();
+                    html += `
+                        <div class="bg-white border p-4 rounded shadow-sm">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="font-medium text-gray-800">${dateStr}</span>
+                                <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Session</span>
+                            </div>
+                            <p class="text-gray-700 whitespace-pre-wrap">${escapeHtml(topic.topics)}</p>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            }
+
+            // 2. Homework Assignments
+            html += `<h4 class="font-bold text-gray-700 mb-2 flex items-center">📝 Homework</h4>`;
             const hwSnapshot = await db.collection('homework_assignments').where('studentId', '==', id).get();
             if (hwSnapshot.empty) {
-                html += `<p class="text-gray-500 mb-8">No homework assigned.</p>`;
+                html += `<p class="text-gray-500 mb-8 bg-gray-50 p-4 rounded">No homework assigned.</p>`;
             } else {
                 let hwList = hwSnapshot.docs.map(d => d.data());
                 hwList.sort((a,b) => (a.dueDate?.toDate?.() || 0) - (b.dueDate?.toDate?.() || 0));
@@ -585,11 +625,15 @@ async function loadAcademicsData(selectedStudent = null) {
                 html += `<div class="space-y-4 mb-8">`;
                 hwList.forEach(hw => {
                     const due = hw.dueDate?.toDate?.().toLocaleDateString();
+                    const isOverdue = (hw.dueDate?.toDate?.() || new Date()) < new Date();
                     html += `
-                        <div class="bg-white border p-4 rounded shadow-sm">
-                            <div class="flex justify-between font-bold"><span>${escapeHtml(hw.title)}</span><span class="text-sm text-red-600">Due: ${due}</span></div>
-                            <p class="text-gray-600">${escapeHtml(hw.description)}</p>
-                            ${hw.fileUrl ? `<a href="${hw.fileUrl}" target="_blank" class="text-blue-600 text-sm">Download Attachment</a>` : ''}
+                        <div class="bg-white border ${isOverdue ? 'border-red-200' : 'border-gray-200'} p-4 rounded shadow-sm">
+                            <div class="flex justify-between font-bold">
+                                <span>${escapeHtml(hw.title)}</span>
+                                <span class="text-sm ${isOverdue ? 'text-red-600' : 'text-blue-600'}">Due: ${due}</span>
+                            </div>
+                            <p class="text-gray-600 mt-2">${escapeHtml(hw.description)}</p>
+                            ${hw.fileUrl ? `<a href="${hw.fileUrl}" target="_blank" class="text-blue-600 text-sm mt-2 inline-block">📎 Download Attachment</a>` : ''}
                         </div>`;
                 });
                 html += `</div>`;
@@ -637,12 +681,37 @@ function setupRealTimeMonitoring(parentPhone, userId) {
     }));
 }
 
+async function manualRefreshReports() {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const refreshBtn = document.getElementById('manualRefreshBtn');
+    if (!refreshBtn) return;
+    
+    const originalText = refreshBtn.innerHTML;
+    refreshBtn.innerHTML = '<div class="loading-spinner-small mr-2"></div> Checking...';
+    refreshBtn.disabled = true;
+    
+    try {
+        const userDoc = await db.collection('parent_users').doc(user.uid).get();
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            await loadAllReportsForParent(userData.normalizedPhone, user.uid);
+            showMessage('Reports refreshed successfully!', 'success');
+        }
+    } catch (error) {
+        console.error('Manual refresh error:', error);
+    } finally {
+        refreshBtn.innerHTML = originalText;
+        refreshBtn.disabled = false;
+    }
+}
+
 // ===================================================================
 // SECTION 9: CORE REPORT RENDERING (ACCORDION SYSTEM)
 // ===================================================================
 
 function downloadSessionReport(studentIndex, sessionIndex, studentName, type) {
-    // Note: requires html2pdf library to be loaded in the main HTML
     const element = document.getElementById(`${type === 'assessment' ? 'ass' : 'mon'}-block-${studentIndex}-${sessionIndex}`);
     if (!element) return showMessage('Report element not found', 'error');
     
@@ -753,6 +822,7 @@ async function loadAllReportsForParent(parentPhone, userId) {
     loadAcademicsData();
     setupRealTimeMonitoring(parentPhone, userId);
     addMessagesButton();
+    addManualRefreshButton();
 }
 
 // ===================================================================
@@ -778,6 +848,19 @@ function addMessagesButton() {
     container.insertBefore(btn, container.lastElementChild);
     
     checkForNewMessages();
+}
+
+function addManualRefreshButton() {
+    const container = document.querySelector('.bg-green-50 .flex.gap-2');
+    if (!container || document.getElementById('manualRefreshBtn')) return;
+    
+    const refreshBtn = document.createElement('button');
+    refreshBtn.id = 'manualRefreshBtn';
+    refreshBtn.onclick = manualRefreshReports;
+    refreshBtn.className = 'bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200';
+    refreshBtn.innerHTML = '🔄 Refresh';
+    
+    container.insertBefore(refreshBtn, container.lastElementChild);
 }
 
 function logout() {
@@ -810,6 +893,7 @@ function switchMainTab(tab) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    setupRememberMe();
     createCountryCodeDropdown();
     
     auth.onAuthStateChanged(user => {
@@ -822,12 +906,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('signInBtn')?.addEventListener('click', handleSignIn);
     document.getElementById('signUpBtn')?.addEventListener('click', handleSignUp);
+    document.getElementById('sendResetBtn')?.addEventListener('click', handlePasswordReset);
     document.getElementById('submitMessageBtn')?.addEventListener('click', submitMessage);
     document.getElementById('reportTab')?.addEventListener('click', () => switchMainTab('report'));
     document.getElementById('academicsTab')?.addEventListener('click', () => switchMainTab('academics'));
     document.getElementById('rewardsTab')?.addEventListener('click', () => switchMainTab('rewards'));
     document.getElementById('signInTab')?.addEventListener('click', () => switchTab('signin'));
     document.getElementById('signUpTab')?.addEventListener('click', () => switchTab('signup'));
+    
+    const forgotBtn = document.getElementById('forgotPasswordBtn');
+    if(forgotBtn) forgotBtn.addEventListener('click', () => document.getElementById("passwordResetModal").classList.remove("hidden"));
+    
+    const cancelResetBtn = document.getElementById('cancelResetBtn');
+    if(cancelResetBtn) cancelResetBtn.addEventListener('click', () => document.getElementById("passwordResetModal").classList.add("hidden"));
+
+    document.getElementById('rememberMe')?.addEventListener('change', handleRememberMe);
     
     window.onclick = (e) => {
         if (e.target.classList.contains('fixed')) { 
