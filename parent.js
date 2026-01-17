@@ -1897,9 +1897,26 @@ function findStudentForReport(report) {
 async function generateAllSearchQueries(parentPhone, parentEmail, parentUid) {
     const queries = [];
     
-    // Phone variations - USING ENHANCED FUNCTION
-    const phoneVariations = generateAllPhoneVariations(parentPhone);
-    console.log(`📱 Generated ${phoneVariations.length} phone variations for search`);
+    // Phone variations - USING ENHANCED FUNCTION WITH FORMATS
+const phoneVariations = generateAllPhoneVariations(parentPhone);
+const phoneFormats = generateAllPhoneFormatsForSearch(parentPhone);
+const allPhoneVersions = [...new Set([...phoneVariations, ...phoneFormats])];
+console.log(`📱 Generated ${allPhoneVersions.length} phone versions for search (${phoneVariations.length} variations + ${phoneFormats.length} formats)`);
+
+for (const phone of allPhoneVersions) {
+    queries.push({ field: 'parentPhone', value: phone });
+    queries.push({ field: 'parentphone', value: phone });
+    queries.push({ field: 'parent_phone', value: phone });
+    queries.push({ field: 'guardianPhone', value: phone });
+    queries.push({ field: 'motherPhone', value: phone });
+    queries.push({ field: 'fatherPhone', value: phone });
+    queries.push({ field: 'phone', value: phone });
+    queries.push({ field: 'parent_contact', value: phone });
+    queries.push({ field: 'contact_number', value: phone });
+    queries.push({ field: 'contactPhone', value: phone });
+    // ADD THIS CRITICAL FIELD:
+    queries.push({ field: 'normalizedParentPhone', value: phone });
+}
     
     for (const phone of phoneVariations) {
         queries.push({ field: 'parentPhone', value: phone });
@@ -1913,6 +1930,42 @@ async function generateAllSearchQueries(parentPhone, parentEmail, parentUid) {
         queries.push({ field: 'contact_number', value: phone });
         queries.push({ field: 'contactPhone', value: phone });
     }
+        // ENHANCED FUNCTION: Search for reports with ALL possible phone formats
+function generateAllPhoneFormatsForSearch(phone) {
+    const formats = new Set();
+    
+    if (!phone) return Array.from(formats);
+    
+    // Get the normalized version first
+    const normalized = normalizePhoneNumber(phone);
+    if (normalized.valid) {
+        formats.add(normalized.normalized);
+    }
+    
+    // Add the original
+    formats.add(phone);
+    
+    // Add common formatted versions
+    const digitsOnly = phone.replace(/\D/g, '');
+    
+    if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
+        // US/Canada format: +1 (XXX) XXX-XXXX
+        const formatted1 = `+1 (${digitsOnly.substring(1, 4)}) ${digitsOnly.substring(4, 7)}-${digitsOnly.substring(7)}`;
+        formats.add(formatted1);
+        
+        // Another common format: +1-XXX-XXX-XXXX
+        const formatted2 = `+1-${digitsOnly.substring(1, 4)}-${digitsOnly.substring(4, 7)}-${digitsOnly.substring(7)}`;
+        formats.add(formatted2);
+    }
+    
+    // Also add with spaces: +1 XXX XXX XXXX
+    if (digitsOnly.length >= 10) {
+        const withSpaces = `+${digitsOnly.substring(0, 1)} ${digitsOnly.substring(1, 4)} ${digitsOnly.substring(4, 7)} ${digitsOnly.substring(7)}`;
+        formats.add(withSpaces);
+    }
+    
+    return Array.from(formats);
+}
     
     // Email variations
     if (parentEmail) {
@@ -2034,7 +2087,7 @@ async function emergencyReportSearch(parentPhone, parentEmail) {
             let matched = false;
             
             // Check ALL phone fields with ALL variations
-            const phoneFields = ['parentPhone', 'parentphone', 'parent_phone', 'phone', 'guardianPhone', 'contact_number'];
+            const phoneFields = ['parentPhone', 'parentphone', 'parent_phone', 'phone', 'guardianPhone', 'contact_number, 'normalizedParentPhone'];
             for (const field of phoneFields) {
                 if (data[field]) {
                     const fieldValue = String(data[field]).trim();
