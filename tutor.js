@@ -2395,2016 +2395,600 @@ async function scheduleEmailReminder(hwData, fileUrl = '') {
 }
 
 /*******************************************************************************
- * SECTION 9: MESSAGING & INBOX FEATURES (ENHANCED)
+ * SECTION 9: MESSAGING & INBOX FEATURES (ZERO-SETUP EDITION)
+ * * COMPATIBILITY NOTE:
+ * This section assumes the following Firebase functions are available globally 
+ * or imported in your main file:
+ * db, collection, addDoc, setDoc, doc, query, where, onSnapshot, 
+ * serverTimestamp, updateDoc, increment, getDocs
  ******************************************************************************/
 
-// Messaging Feature with Floating Button & Enhanced UI
+// --- GLOBAL STATE ---
 let unreadMessageCount = 0;
 let messagingFloatingBtn = null;
 let inboxFloatingBtn = null;
 
-// Initialize floating messaging and inbox buttons
+// --- LISTENERS (Memory Management) ---
+let unsubscribeInbox = null;
+let unsubscribeChat = null;
+let unsubscribeUnreadCount = null;
+
+// --- UTILITY FUNCTIONS ---
+
+// 1. Sanitize HTML (Security)
+function escapeHtml(text) {
+    if (!text) return '';
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+// 2. Consistent ID Generation (TutorID_ParentPhone)
+function getConversationId(tutorId, parentPhone) {
+    // Sorts IDs so the conversation is the same regardless of who starts it
+    return [tutorId, parentPhone].sort().join("_");
+}
+
+// 3. Format Date/Time
+function formatTime(timestamp) {
+    if (!timestamp) return '';
+    // Handle Firestore Timestamp vs JS Date
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+// --- INITIALIZATION ---
+
 function initializeFloatingMessagingButton() {
-    // Remove existing buttons if they exist
-    const existingBtns = document.querySelectorAll('.floating-messaging-btn, .floating-inbox-btn');
-    existingBtns.forEach(btn => btn.remove());
+    // 1. Clean up old buttons
+    const oldBtns = document.querySelectorAll('.floating-messaging-btn, .floating-inbox-btn');
+    oldBtns.forEach(btn => btn.remove());
     
-    // Create messaging floating button
+    // 2. Create Messaging Button (New Message)
     messagingFloatingBtn = document.createElement('button');
     messagingFloatingBtn.className = 'floating-messaging-btn';
-    messagingFloatingBtn.innerHTML = `
-        <span class="floating-btn-icon">💬</span>
-        <span class="floating-btn-text">New Message</span>
-    `;
-    messagingFloatingBtn.title = "Send New Message";
-    document.body.appendChild(messagingFloatingBtn);
+    messagingFloatingBtn.innerHTML = `<span class="floating-btn-icon">💬</span><span class="floating-btn-text">New</span>`;
+    messagingFloatingBtn.onclick = showEnhancedMessagingModal;
     
-    // Create inbox floating button
+    // 3. Create Inbox Button (View Messages)
     inboxFloatingBtn = document.createElement('button');
     inboxFloatingBtn.className = 'floating-inbox-btn';
-    inboxFloatingBtn.innerHTML = `
-        <span class="floating-btn-icon">📨</span>
-        <span class="floating-btn-text">Inbox</span>
-    `;
-    inboxFloatingBtn.title = "View Inbox";
+    inboxFloatingBtn.innerHTML = `<span class="floating-btn-icon">📨</span><span class="floating-btn-text">Inbox</span>`;
+    inboxFloatingBtn.onclick = showInboxModal;
+    
+    // 4. Mount to DOM
+    document.body.appendChild(messagingFloatingBtn);
     document.body.appendChild(inboxFloatingBtn);
     
-    // Add click handlers
-    messagingFloatingBtn.addEventListener('click', showEnhancedMessagingModal);
-    inboxFloatingBtn.addEventListener('click', showInboxModal);
+    // 5. Inject CSS
+    injectMessagingStyles();
     
-    // Add CSS for floating buttons
-    if (!document.querySelector('#floating-btn-styles')) {
-        const floatingBtnStyles = document.createElement('style');
-        floatingBtnStyles.id = 'floating-btn-styles';
-        floatingBtnStyles.textContent = `
-            /* Messaging Button */
-            .floating-messaging-btn {
-                position: fixed;
-                bottom: 30px;
-                right: 30px;
-                background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-                color: white;
-                border: none;
-                border-radius: 50px;
-                padding: 16px 24px;
-                font-size: 16px;
-                font-weight: 600;
-                box-shadow: 0 8px 25px rgba(139, 92, 246, 0.3);
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                transition: all 0.3s ease;
-                z-index: 1000;
-                animation: floatAnimation 3s ease-in-out infinite;
-            }
-            
-            /* Inbox Button */
-            .floating-inbox-btn {
-                position: fixed;
-                bottom: 30px;
-                right: 170px;
-                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                color: white;
-                border: none;
-                border-radius: 50px;
-                padding: 16px 24px;
-                font-size: 16px;
-                font-weight: 600;
-                box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                transition: all 0.3s ease;
-                z-index: 1000;
-                animation: floatAnimation 3s ease-in-out infinite;
-            }
-            
-            .floating-messaging-btn:hover, .floating-inbox-btn:hover {
-                transform: translateY(-5px);
-                box-shadow: 0 15px 30px rgba(139, 92, 246, 0.4);
-            }
-            
-            .floating-messaging-btn:hover {
-                background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
-                box-shadow: 0 15px 30px rgba(139, 92, 246, 0.4);
-            }
-            
-            .floating-inbox-btn:hover {
-                background: linear-gradient(135deg, #059669 0%, #047857 100%);
-                box-shadow: 0 15px 30px rgba(16, 185, 129, 0.4);
-            }
-            
-            .floating-messaging-btn:active, .floating-inbox-btn:active {
-                transform: translateY(-2px);
-            }
-            
-            .floating-btn-icon {
-                font-size: 20px;
-            }
-            
-            .floating-btn-text {
-                display: inline-block;
-            }
-            
-            @keyframes floatAnimation {
-                0%, 100% {
-                    transform: translateY(0);
-                }
-                50% {
-                    transform: translateY(-10px);
-                }
-            }
-            
-            /* Badge styles for both buttons */
-            .unread-badge {
-                position: absolute;
-                top: -5px;
-                right: -5px;
-                background-color: #ef4444;
-                color: white;
-                border-radius: 50%;
-                width: 22px;
-                height: 22px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 0.7rem;
-                font-weight: bold;
-                border: 2px solid white;
-                animation: pulse 2s infinite;
-            }
-            
-            @keyframes pulse {
-                0% {
-                    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-                }
-                70% {
-                    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
-                }
-                100% {
-                    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-                }
-            }
-            
-            /* Responsive design */
-            @media (max-width: 768px) {
-                .floating-messaging-btn, .floating-inbox-btn {
-                    bottom: 20px;
-                    padding: 14px 20px;
-                    font-size: 14px;
-                }
-                
-                .floating-messaging-btn {
-                    right: 20px;
-                }
-                
-                .floating-inbox-btn {
-                    right: 130px;
-                }
-                
-                .floating-btn-text {
-                    display: none;
-                }
-            }
-            
-            @media (max-width: 480px) {
-                .floating-inbox-btn {
-                    right: 110px;
-                }
-            }
-        `;
-        document.head.appendChild(floatingBtnStyles);
+    // 6. Start Background Listeners
+    if (window.tutorData && window.tutorData.id) {
+        initializeUnreadListener();
     }
 }
 
-// Update unread message count - SIMPLIFIED VERSION WITHOUT COMPLEX QUERIES
-async function updateUnreadMessageCount() {
-    try {
-        const tutorId = window.tutorData?.id;
-        if (!tutorId) return;
-        
-        // SIMPLE QUERY - Only check tutorId to avoid index requirements
-        const messagesQuery = query(
-            collection(db, "tutor_messages"),
-            where("tutorId", "==", tutorId)
-        );
-        
-        const messagesSnapshot = await getDocs(messagesQuery);
-        
-        // Count unread messages manually in JavaScript
-        unreadMessageCount = 0;
-        messagesSnapshot.forEach(doc => {
-            const message = doc.data();
-            if (message.read === false && message.senderType !== 'tutor') {
-                unreadMessageCount++;
+// --- BACKGROUND LISTENERS ---
+
+function initializeUnreadListener() {
+    const tutorId = window.tutorData.id;
+    if (unsubscribeUnreadCount) unsubscribeUnreadCount();
+
+    // Simple Query: No Index Required
+    const q = query(
+        collection(db, "conversations"),
+        where("participants", "array-contains", tutorId)
+    );
+
+    unsubscribeUnreadCount = onSnapshot(q, (snapshot) => {
+        let count = 0;
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            // Count unread if I am NOT the last sender
+            if (data.unreadCount > 0 && data.lastSenderId !== tutorId) {
+                count += data.unreadCount;
             }
         });
         
-        // Update badges on both buttons
-        const updateButtonBadge = (button) => {
-            if (!button) return;
-            
-            const existingBadge = button.querySelector('.unread-badge');
-            if (existingBadge) {
-                existingBadge.remove();
-            }
-            
-            if (unreadMessageCount > 0) {
-                const badge = document.createElement('span');
-                badge.className = 'unread-badge';
-                badge.textContent = unreadMessageCount > 99 ? '99+' : unreadMessageCount;
-                button.appendChild(badge);
-            }
-        };
-        
-        updateButtonBadge(messagingFloatingBtn);
-        updateButtonBadge(inboxFloatingBtn);
-        
-    } catch (error) {
-        console.error("Error updating unread message count:", error);
-        // Don't show error to user for unread count updates
-    }
+        unreadMessageCount = count;
+        updateFloatingBadges();
+    });
 }
 
-// Enhanced Messaging Modal with Beautiful UI
+function updateFloatingBadges() {
+    const updateBadge = (btn) => {
+        if (!btn) return;
+        const existing = btn.querySelector('.unread-badge');
+        if (existing) existing.remove();
+
+        if (unreadMessageCount > 0) {
+            const badge = document.createElement('span');
+            badge.className = 'unread-badge';
+            badge.textContent = unreadMessageCount > 99 ? '99+' : unreadMessageCount;
+            btn.appendChild(badge);
+        }
+    };
+    updateBadge(messagingFloatingBtn);
+    updateBadge(inboxFloatingBtn);
+}
+
+// --- FEATURE 1: SEND NEW MESSAGE MODAL ---
+
 function showEnhancedMessagingModal() {
-    const modalHTML = `
-        <div class="modal-overlay enhanced-messaging-modal">
-            <div class="modal-content max-w-4xl messaging-modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title flex items-center gap-3">
-                        <span class="text-2xl">💬</span>
-                        <span>Send Message</span>
-                    </h3>
-                    <button class="close-modal-btn text-gray-400 hover:text-gray-600 text-xl">
-                        &times;
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <!-- Message Type Selection -->
-                    <div class="message-type-selection mb-6">
-                        <h4 class="font-semibold text-gray-700 mb-3">Select Message Type</h4>
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-                            <div class="message-type-option" data-type="individual">
-                                <div class="type-icon">👤</div>
-                                <div class="type-title">Individual</div>
-                                <div class="type-desc">Message to one parent</div>
-                            </div>
-                            <div class="message-type-option" data-type="group">
-                                <div class="type-icon">👨‍👩‍👧‍👦</div>
-                                <div class="type-title">Group</div>
-                                <div class="type-desc">Selected parents</div>
-                            </div>
-                            <div class="message-type-option" data-type="management">
-                                <div class="type-icon">📋</div>
-                                <div class="type-title">Management</div>
-                                <div class="type-desc">Admin team</div>
-                            </div>
-                            <div class="message-type-option" data-type="all">
-                                <div class="type-icon">📢</div>
-                                <div class="type-title">All Parents</div>
-                                <div class="type-desc">Bulk message</div>
-                            </div>
-                        </div>
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay enhanced-messaging-modal';
+    modal.innerHTML = `
+        <div class="modal-content messaging-modal-content">
+            <div class="modal-header">
+                <h3>💬 Send Message</h3>
+                <button class="close-modal-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="message-type-grid">
+                    <div class="type-option selected" data-type="individual">
+                        <div class="icon">👤</div><div>Individual</div>
                     </div>
-                    
-                    <!-- Recipient Selection (Dynamic based on type) -->
-                    <div class="recipient-section mb-6 hidden">
-                        <h4 class="font-semibold text-gray-700 mb-3">Select Recipients</h4>
-                        <div id="individual-recipient-container" class="hidden">
-                            <select id="individual-parent-select" class="form-input">
-                                <option value="">Select a parent...</option>
-                            </select>
-                            <div id="student-selection-container" class="mt-3 hidden">
-                                <label class="form-label">Related Student (Optional)</label>
-                                <select id="student-select" class="form-input">
-                                    <option value="">Select a student...</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div id="group-recipient-container" class="hidden">
-                            <div class="students-list-container max-h-60 overflow-y-auto border rounded-lg p-3 bg-gray-50">
-                                <div class="text-center py-4">
-                                    <div class="spinner mx-auto mb-2"></div>
-                                    <p class="text-gray-500">Loading students...</p>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="type-option" data-type="group">
+                        <div class="icon">👨‍👩‍👧‍👦</div><div>Group</div>
                     </div>
-                    
-                    <!-- Message Details -->
-                    <div class="message-details-section">
-                        <div class="form-group">
-                            <label class="form-label">Subject</label>
-                            <input type="text" id="message-subject" class="form-input" placeholder="Enter message subject" required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Message</label>
-                            <div class="message-editor-container">
-                                <textarea id="message-content" class="form-input form-textarea message-editor" rows="6" placeholder="Type your message here..." required></textarea>
-                                <div class="editor-tools mt-2 flex gap-2">
-                                    <button type="button" class="editor-tool-btn" data-tool="bold" title="Bold">B</button>
-                                    <button type="button" class="editor-tool-btn" data-tool="italic" title="Italic">I</button>
-                                    <button type="button" class="editor-tool-btn" data-tool="underline" title="Underline">U</button>
-                                    <button type="button" class="editor-tool-btn" data-tool="list" title="Bullet List">•</button>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Message Category -->
-                        <div class="form-group">
-                            <label class="form-label">Category (Optional)</label>
-                            <select id="message-category" class="form-input">
-                                <option value="">Select category...</option>
-                                <option value="homework">Homework</option>
-                                <option value="progress">Progress Report</option>
-                                <option value="schedule">Schedule Change</option>
-                                <option value="payment">Payment</option>
-                                <option value="general">General Inquiry</option>
-                                <option value="urgent">Urgent</option>
-                            </select>
-                        </div>
-                        
-                        <!-- File Attachment -->
-                        <div class="form-group">
-                            <label class="form-label">Attachments (Optional)</label>
-                            <div class="file-upload-container" id="message-file-upload">
-                                <input type="file" id="message-attachment" class="hidden" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt">
-                                <label for="message-attachment" class="file-upload-label">
-                                    <div class="file-upload-icon">📎</div>
-                                    <div>
-                                        <span class="text-sm font-medium text-primary-color">Click to add attachments</span>
-                                        <span class="text-xs text-gray-500 block mt-1">PDF, DOC, JPG, PNG, TXT (Max 5MB each)</span>
-                                    </div>
-                                </label>
-                                <div id="attachment-preview" class="attachment-preview hidden"></div>
-                            </div>
-                        </div>
-                        
-                        <!-- Urgent Toggle -->
-                        <div class="form-group">
-                            <label class="flex items-center space-x-3 cursor-pointer">
-                                <div class="relative">
-                                    <input type="checkbox" id="urgent-message" class="sr-only">
-                                    <div class="toggle-bg bg-gray-200 border-2 border-gray-200 h-6 w-11 rounded-full"></div>
-                                    <div class="toggle-dot absolute left-1 top-1 bg-white h-4 w-4 rounded-full transition"></div>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-semibold text-gray-700">Mark as Urgent</span>
-                                    <p class="text-xs text-gray-500">Urgent messages will be highlighted and prioritized</p>
-                                </div>
-                            </label>
-                        </div>
-                        
-                        <!-- Preview Button -->
-                        <div class="flex justify-end mb-4">
-                            <button type="button" id="preview-message-btn" class="btn btn-secondary">
-                                👁️ Preview Message
-                            </button>
-                        </div>
+                    <div class="type-option" data-type="management">
+                        <div class="icon">🏢</div><div>Admin</div>
+                    </div>
+                    <div class="type-option" data-type="all">
+                        <div class="icon">📢</div><div>All Parents</div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button id="cancel-message-btn" class="btn btn-secondary">Cancel</button>
-                    <button id="send-message-btn" class="btn btn-primary">
-                        <span class="send-icon">📤</span>
-                        Send Message
-                    </button>
+
+                <div id="recipient-loader" class="recipient-area">
+                    </div>
+
+                <input type="text" id="msg-subject" class="form-input" placeholder="Subject">
+                <textarea id="msg-content" class="form-input" rows="5" placeholder="Type your message..."></textarea>
+                
+                <div class="flex-row-spaced mt-2">
+                     <label class="urgent-toggle">
+                        <input type="checkbox" id="msg-urgent">
+                        <span class="text-red-500 font-bold">Mark as Urgent</span>
+                     </label>
                 </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary close-modal-btn">Cancel</button>
+                <button id="btn-send-initial" class="btn btn-primary">Send Message</button>
             </div>
         </div>
     `;
-    
-    const modal = document.createElement('div');
-    modal.innerHTML = modalHTML;
+
     document.body.appendChild(modal);
-    
-    // Add enhanced messaging modal styles
-    addEnhancedMessagingStyles();
-    
-    // Initialize message type selection
-    initializeMessageTypeSelection();
-    
-    // Load recipients data
-    loadRecipientsData();
-    
-    // Setup event listeners
-    setupMessagingModalEvents(modal);
-    
-    // Close modal handlers
-    modal.querySelector('.close-modal-btn').addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', (e) => {
-        if (e.target.classList.contains('modal-overlay')) {
-            modal.remove();
-        }
+
+    // Logic for Type Selection
+    const typeOptions = modal.querySelectorAll('.type-option');
+    typeOptions.forEach(opt => {
+        opt.onclick = () => {
+            typeOptions.forEach(o => o.classList.remove('selected'));
+            opt.classList.add('selected');
+            loadRecipients(opt.dataset.type, modal.querySelector('#recipient-loader'));
+        };
     });
+
+    // Load default (Individual)
+    loadRecipients('individual', modal.querySelector('#recipient-loader'));
+
+    // Close Handlers
+    modal.querySelectorAll('.close-modal-btn').forEach(b => b.onclick = () => modal.remove());
+    
+    // Send Handler
+    modal.querySelector('#btn-send-initial').onclick = () => processSendMessage(modal);
 }
 
-// Add enhanced messaging styles
-function addEnhancedMessagingStyles() {
-    if (document.querySelector('#enhanced-messaging-styles')) return;
-    
-    const styles = document.createElement('style');
-    styles.id = 'enhanced-messaging-styles';
-    styles.textContent = `
-        /* Enhanced Messaging Modal Styles */
-        .messaging-modal-content {
-            max-height: 85vh;
-            overflow-y: auto;
-        }
-        
-        .message-type-selection {
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            border-radius: 12px;
-            padding: 1.5rem;
-        }
-        
-        .message-type-option {
-            background: white;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 1rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .message-type-option:hover {
-            transform: translateY(-2px);
-            border-color: #8b5cf6;
-            box-shadow: 0 5px 15px rgba(139, 92, 246, 0.1);
-        }
-        
-        .message-type-option.selected {
-            border-color: #8b5cf6;
-            background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
-            box-shadow: 0 5px 15px rgba(139, 92, 246, 0.15);
-        }
-        
-        .type-icon {
-            font-size: 2rem;
-            margin-bottom: 0.5rem;
-        }
-        
-        .type-title {
-            font-weight: 600;
-            color: #1e293b;
-        }
-        
-        .type-desc {
-            font-size: 0.8rem;
-            color: #64748b;
-        }
-        
-        /* Editor Tools */
-        .editor-tools {
-            display: flex;
-            gap: 0.5rem;
-        }
-        
-        .editor-tool-btn {
-            background: #f1f5f9;
-            border: 1px solid #cbd5e1;
-            border-radius: 4px;
-            padding: 0.25rem 0.75rem;
-            font-size: 0.875rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        
-        .editor-tool-btn:hover {
-            background: #e2e8f0;
-            border-color: #94a3b8;
-        }
-        
-        .editor-tool-btn.active {
-            background: #8b5cf6;
-            color: white;
-            border-color: #8b5cf6;
-        }
-        
-        /* Attachment Preview */
-        .attachment-preview {
-            margin-top: 1rem;
-            padding: 1rem;
-            background: #f8fafc;
-            border-radius: 8px;
-            border: 1px dashed #cbd5e1;
-        }
-        
-        .attachment-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.5rem;
-            background: white;
-            border-radius: 6px;
-            margin-bottom: 0.5rem;
-            border: 1px solid #e2e8f0;
-        }
-        
-        .attachment-info {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-        
-        .attachment-icon {
-            font-size: 1.5rem;
-            color: #8b5cf6;
-        }
-        
-        .attachment-name {
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: #1e293b;
-        }
-        
-        .attachment-size {
-            font-size: 0.75rem;
-            color: #64748b;
-        }
-        
-        /* Toggle Switch */
-        .toggle-bg {
-            transition: background 0.2s ease;
-        }
-        
-        input:checked + .toggle-bg {
-            background: #10b981;
-            border-color: #10b981;
-        }
-        
-        input:checked + .toggle-bg + .toggle-dot {
-            transform: translateX(100%);
-            background: white;
-        }
-        
-        /* Student Selection Items */
-        .student-select-item {
-            display: flex;
-            align-items: center;
-            padding: 0.75rem;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            margin-bottom: 0.5rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        
-        .student-select-item:hover {
-            background: #f8fafc;
-            border-color: #cbd5e1;
-        }
-        
-        .student-select-item.selected {
-            background: #f0f9ff;
-            border-color: #0ea5e9;
-        }
-        
-        .student-select-item input[type="checkbox"] {
-            margin-right: 0.75rem;
-        }
-        
-        .student-info {
-            flex: 1;
-        }
-        
-        .student-name {
-            font-weight: 500;
-            color: #1e293b;
-        }
-        
-        .student-details {
-            font-size: 0.75rem;
-            color: #64748b;
-            margin-top: 0.25rem;
-        }
-        
-        /* Send Button Icon */
-        .send-icon {
-            animation: sendPulse 2s infinite;
-        }
-        
-        @keyframes sendPulse {
-            0%, 100% {
-                transform: scale(1);
-            }
-            50% {
-                transform: scale(1.1);
-            }
-        }
-    `;
-    document.head.appendChild(styles);
-}
+async function loadRecipients(type, container) {
+    container.innerHTML = '<div class="spinner"></div>';
+    const tutorEmail = window.tutorData?.email;
 
-// Initialize message type selection
-function initializeMessageTypeSelection() {
-    const messageTypeOptions = document.querySelectorAll('.message-type-option');
-    
-    messageTypeOptions.forEach(option => {
-        option.addEventListener('click', () => {
-            // Remove selected class from all options
-            messageTypeOptions.forEach(opt => opt.classList.remove('selected'));
-            
-            // Add selected class to clicked option
-            option.classList.add('selected');
-            
-            // Show/hide recipient sections based on type
-            const messageType = option.getAttribute('data-type');
-            showRecipientSection(messageType);
-        });
-    });
-    
-    // Select "Individual" by default
-    document.querySelector('.message-type-option[data-type="individual"]')?.classList.add('selected');
-    showRecipientSection('individual');
-}
-
-// Show appropriate recipient section based on message type
-function showRecipientSection(messageType) {
-    // Hide all recipient containers
-    const recipientContainers = [
-        'individual-recipient-container',
-        'group-recipient-container'
-    ];
-    
-    recipientContainers.forEach(containerId => {
-        const container = document.getElementById(containerId);
-        if (container) container.classList.add('hidden');
-    });
-    
-    // Show recipient section
-    const recipientSection = document.querySelector('.recipient-section');
-    if (recipientSection) recipientSection.classList.remove('hidden');
-    
-    // Show specific container based on type
-    switch(messageType) {
-        case 'individual':
-            document.getElementById('individual-recipient-container')?.classList.remove('hidden');
-            break;
-        case 'group':
-            document.getElementById('group-recipient-container')?.classList.remove('hidden');
-            loadStudentsForGroupSelection();
-            break;
-        case 'management':
-        case 'all':
-            // No recipient selection needed for these types
-            recipientSection.classList.add('hidden');
-            break;
-    }
-}
-
-// Load recipients data
-async function loadRecipientsData() {
     try {
-        const tutorEmail = window.tutorData?.email;
-        if (!tutorEmail) return;
-        
-        // Query students assigned to this tutor
-        const studentsQuery = query(
-            collection(db, "students"),
-            where("tutorEmail", "==", tutorEmail)
-        );
-        
-        const studentsSnapshot = await getDocs(studentsQuery);
-        const students = [];
-        
-        studentsSnapshot.forEach(doc => {
-            const student = { id: doc.id, ...doc.data() };
-            if (!['archived', 'graduated', 'transferred'].includes(student.status)) {
-                students.push(student);
-            }
-        });
-        
-        populateRecipientDropdowns(students);
-        
-    } catch (error) {
-        console.error("Error loading recipients data:", error);
-    }
-}
+        // Fetch students for this tutor
+        const q = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
+        const snap = await getDocs(q);
+        const students = snap.docs.map(d => d.data());
 
-// Populate recipient dropdowns with student data
-function populateRecipientDropdowns(students) {
-    const parentSelect = document.getElementById('individual-parent-select');
-    const studentSelect = document.getElementById('student-select');
-    
-    if (parentSelect) {
-        // Clear existing options except first one
-        while (parentSelect.options.length > 1) {
-            parentSelect.remove(1);
-        }
-        
-        // Add parent options
-        students.forEach(student => {
-            const option = document.createElement('option');
-            option.value = student.parentPhone || student.id;
-            option.textContent = `${student.parentName} (${student.studentName})`;
-            option.setAttribute('data-student-id', student.id);
-            parentSelect.appendChild(option);
-        });
-        
-        // Add event listener to show student selection when parent is selected
-        parentSelect.addEventListener('change', (e) => {
-            const studentSelectionContainer = document.getElementById('student-selection-container');
-            if (e.target.value) {
-                studentSelectionContainer?.classList.remove('hidden');
-                
-                // Populate student select
-                if (studentSelect) {
-                    while (studentSelect.options.length > 1) {
-                        studentSelect.remove(1);
-                    }
-                    
-                    const selectedStudentId = e.target.options[e.target.selectedIndex].getAttribute('data-student-id');
-                    const student = students.find(s => s.id === selectedStudentId);
-                    
-                    if (student) {
-                        const studentOption = document.createElement('option');
-                        studentOption.value = student.id;
-                        studentOption.textContent = `${student.studentName} (${student.grade})`;
-                        studentSelect.appendChild(studentOption);
-                    }
-                }
-            } else {
-                studentSelectionContainer?.classList.add('hidden');
-            }
-        });
-    }
-}
-
-// Load students for group selection
-async function loadStudentsForGroupSelection() {
-    const container = document.querySelector('.students-list-container');
-    if (!container) return;
-    
-    try {
-        const tutorEmail = window.tutorData?.email;
-        if (!tutorEmail) return;
-        
-        const studentsQuery = query(
-            collection(db, "students"),
-            where("tutorEmail", "==", tutorEmail)
-        );
-        
-        const studentsSnapshot = await getDocs(studentsQuery);
-        let html = '';
-        
-        studentsSnapshot.forEach(doc => {
-            const student = doc.data();
-            if (!['archived', 'graduated', 'transferred'].includes(student.status)) {
-                html += `
-                    <div class="student-select-item">
-                        <input type="checkbox" id="student-${doc.id}" value="${student.parentPhone || doc.id}" 
-                               data-student-id="${doc.id}" data-student-name="${student.studentName}">
-                        <div class="student-info">
-                            <div class="student-name">${student.parentName}</div>
-                            <div class="student-details">
-                                Student: ${student.studentName} • Grade: ${student.grade}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-        });
-        
-        container.innerHTML = html || '<p class="text-gray-500 text-center py-4">No students found</p>';
-        
-    } catch (error) {
-        console.error("Error loading students for group selection:", error);
-        container.innerHTML = '<p class="text-red-500 text-center py-4">Error loading students</p>';
-    }
-}
-
-// Setup messaging modal event listeners
-function setupMessagingModalEvents(modal) {
-    // Editor tools
-    const editorTools = modal.querySelectorAll('.editor-tool-btn');
-    editorTools.forEach(tool => {
-        tool.addEventListener('click', (e) => {
-            e.preventDefault();
-            const toolType = tool.getAttribute('data-tool');
-            applyTextFormatting(toolType);
-            tool.classList.toggle('active');
-        });
-    });
-    
-    // File attachment
-    const fileInput = modal.querySelector('#message-attachment');
-    const attachmentPreview = modal.querySelector('#attachment-preview');
-    
-    if (fileInput) {
-        fileInput.addEventListener('change', (e) => {
-            handleFileAttachments(e.target.files, attachmentPreview);
-        });
-    }
-    
-    // Preview message
-    const previewBtn = modal.querySelector('#preview-message-btn');
-    if (previewBtn) {
-        previewBtn.addEventListener('click', previewMessage);
-    }
-    
-    // Send message
-    const sendBtn = modal.querySelector('#send-message-btn');
-    if (sendBtn) {
-        sendBtn.addEventListener('click', () => sendEnhancedMessage(modal));
-    }
-    
-    // Cancel button
-    const cancelBtn = modal.querySelector('#cancel-message-btn');
-    if (cancelBtn) {
-        cancelBtn.addEventListener('click', () => modal.remove());
-    }
-}
-
-// Apply text formatting in message editor
-function applyTextFormatting(toolType) {
-    const textarea = document.getElementById('message-content');
-    if (!textarea) return;
-    
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = textarea.value.substring(start, end);
-    let formattedText = '';
-    
-    switch(toolType) {
-        case 'bold':
-            formattedText = `**${selectedText}**`;
-            break;
-        case 'italic':
-            formattedText = `*${selectedText}*`;
-            break;
-        case 'underline':
-            formattedText = `__${selectedText}__`;
-            break;
-        case 'list':
-            formattedText = `• ${selectedText}`;
-            break;
-    }
-    
-    if (formattedText) {
-        textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
-        textarea.focus();
-        textarea.setSelectionRange(start + formattedText.length, start + formattedText.length);
-    }
-}
-
-// Handle file attachments
-function handleFileAttachments(files, previewContainer) {
-    if (!files.length) return;
-    
-    let html = '';
-    for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (file.size > 5 * 1024 * 1024) { // 5MB limit
-            showCustomAlert(`File "${file.name}" exceeds 5MB limit`);
-            continue;
-        }
-        
-        html += `
-            <div class="attachment-item" data-index="${i}">
-                <div class="attachment-info">
-                    <div class="attachment-icon">📎</div>
-                    <div>
-                        <div class="attachment-name">${file.name}</div>
-                        <div class="attachment-size">${formatFileSize(file.size)}</div>
-                    </div>
+        if (type === 'individual') {
+            container.innerHTML = `
+                <select id="sel-recipient" class="form-input">
+                    <option value="">Select Parent...</option>
+                    ${students.map(s => `<option value="${s.parentPhone}" data-name="${s.parentName}">${s.parentName} (${s.studentName})</option>`).join('')}
+                </select>
+            `;
+        } else if (type === 'group') {
+            container.innerHTML = `
+                <div class="checklist-box">
+                    ${students.map(s => `
+                        <label class="checklist-item">
+                            <input type="checkbox" class="chk-recipient" value="${s.parentPhone}" data-name="${s.parentName}">
+                            <span>${s.parentName} <small>(${s.studentName})</small></span>
+                        </label>
+                    `).join('')}
                 </div>
-                <button type="button" class="btn btn-danger btn-sm remove-attachment-btn" data-index="${i}">
-                    Remove
-                </button>
-            </div>
-        `;
-    }
-    
-    previewContainer.innerHTML = html;
-    previewContainer.classList.remove('hidden');
-    
-    // Add remove button event listeners
-    previewContainer.querySelectorAll('.remove-attachment-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const index = btn.getAttribute('data-index');
-            removeAttachment(index);
-        });
-    });
-}
-
-// Remove attachment
-function removeAttachment(index) {
-    const fileInput = document.getElementById('message-attachment');
-    const dt = new DataTransfer();
-    const files = Array.from(fileInput.files);
-    
-    files.forEach((file, i) => {
-        if (i != index) {
-            dt.items.add(file);
+            `;
+        } else if (type === 'all') {
+            container.innerHTML = `<div class="info-box">Sending to all ${students.length} parents.</div>`;
+        } else {
+            container.innerHTML = `<div class="info-box">Sending to Management/Admin.</div>`;
         }
-    });
-    
-    fileInput.files = dt.files;
-    handleFileAttachments(fileInput.files, document.getElementById('attachment-preview'));
+    } catch (e) {
+        container.innerHTML = `<div class="error-box">Error loading students: ${e.message}</div>`;
+    }
 }
 
-// Preview message
-function previewMessage() {
-    const subject = document.getElementById('message-subject').value;
-    const content = document.getElementById('message-content').value;
-    const category = document.getElementById('message-category').value;
-    const isUrgent = document.getElementById('urgent-message').checked;
-    
+async function processSendMessage(modal) {
+    const type = modal.querySelector('.type-option.selected').dataset.type;
+    const subject = modal.querySelector('#msg-subject').value;
+    const content = modal.querySelector('#msg-content').value;
+    const isUrgent = modal.querySelector('#msg-urgent').checked;
+    const tutor = window.tutorData;
+
     if (!subject || !content) {
-        showCustomAlert('Please enter subject and message content');
+        alert("Please fill in subject and content.");
         return;
     }
-    
-    const previewHTML = `
-        <div class="modal-overlay">
-            <div class="modal-content max-w-2xl">
-                <div class="modal-header">
-                    <h3 class="modal-title">👁️ Message Preview</h3>
-                </div>
-                <div class="modal-body">
-                    <div class="bg-gray-50 p-4 rounded-lg mb-4">
-                        <div class="flex justify-between items-center mb-2">
-                            <h4 class="font-bold text-lg">${subject}</h4>
-                            ${isUrgent ? '<span class="badge badge-danger">URGENT</span>' : ''}
-                        </div>
-                        ${category ? `<p class="text-sm text-gray-600">Category: ${category}</p>` : ''}
-                    </div>
-                    
-                    <div class="message-preview-content bg-white p-4 rounded border">
-                        ${content.replace(/\n/g, '<br>')}
-                    </div>
-                    
-                    <div class="mt-4 text-sm text-gray-500">
-                        <p>Recipients will be shown after sending.</p>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button id="close-preview-btn" class="btn btn-secondary">Close Preview</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const previewModal = document.createElement('div');
-    previewModal.innerHTML = previewHTML;
-    document.body.appendChild(previewModal);
-    
-    previewModal.querySelector('#close-preview-btn').addEventListener('click', () => {
-        previewModal.remove();
-    });
-    
-    previewModal.addEventListener('click', (e) => {
-        if (e.target.classList.contains('modal-overlay')) {
-            previewModal.remove();
-        }
-    });
-}
 
-// Send enhanced message
-async function sendEnhancedMessage(modal) {
+    // 1. Gather Targets
+    let targets = [];
+    if (type === 'individual') {
+        const sel = modal.querySelector('#sel-recipient');
+        if (sel.value) targets.push({ phone: sel.value, name: sel.options[sel.selectedIndex].dataset.name });
+    } else if (type === 'group') {
+        modal.querySelectorAll('.chk-recipient:checked').forEach(c => {
+            targets.push({ phone: c.value, name: c.dataset.name });
+        });
+    } else if (type === 'all') {
+        // Re-fetch strictly for sending to ensure freshness
+        const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+        const snap = await getDocs(q);
+        const map = new Map();
+        snap.forEach(d => {
+            const s = d.data();
+            map.set(s.parentPhone, s.parentName); // Deduplicate
+        });
+        map.forEach((name, phone) => targets.push({ phone, name }));
+    }
+
+    if (targets.length === 0 && type !== 'management') {
+        alert("No recipients selected.");
+        return;
+    }
+
+    modal.querySelector('#btn-send-initial').innerText = "Sending...";
+    
     try {
-        const tutor = window.tutorData;
-        if (!tutor) {
-            showCustomAlert('Tutor information not found');
-            return;
-        }
-        
-        // Get message type
-        const selectedType = document.querySelector('.message-type-option.selected');
-        if (!selectedType) {
-            showCustomAlert('Please select a message type');
-            return;
-        }
-        const messageType = selectedType.getAttribute('data-type');
-        
-        // Get recipients based on message type
-        let recipients = [];
-        let recipientDetails = [];
-        
-        switch(messageType) {
-            case 'individual':
-                const parentSelect = document.getElementById('individual-parent-select');
-                const parentPhone = parentSelect?.value;
-                const studentId = document.getElementById('student-select')?.value;
-                
-                if (!parentPhone) {
-                    showCustomAlert('Please select a parent');
-                    return;
-                }
-                
-                recipients = [parentPhone];
-                recipientDetails = [{
-                    parentPhone: parentPhone,
-                    studentId: studentId || '',
-                    studentName: studentId ? document.getElementById('student-select')?.options[document.getElementById('student-select').selectedIndex]?.textContent : ''
-                }];
-                break;
-                
-            case 'group':
-                const selectedCheckboxes = document.querySelectorAll('.student-select-item input[type="checkbox"]:checked');
-                if (selectedCheckboxes.length === 0) {
-                    showCustomAlert('Please select at least one parent');
-                    return;
-                }
-                
-                selectedCheckboxes.forEach(checkbox => {
-                    recipients.push(checkbox.value);
-                    recipientDetails.push({
-                        parentPhone: checkbox.value,
-                        studentId: checkbox.getAttribute('data-student-id'),
-                        studentName: checkbox.getAttribute('data-student-name')
-                    });
-                });
-                break;
-                
-            case 'management':
-                recipients = ['management'];
-                recipientDetails = [{ recipientType: 'management' }];
-                break;
-                
-            case 'all':
-                // Get all parents from students
-                const allStudentsQuery = query(
-                    collection(db, "students"),
-                    where("tutorEmail", "==", tutor.email)
-                );
-                const allStudentsSnapshot = await getDocs(allStudentsQuery);
-                
-                allStudentsSnapshot.forEach(doc => {
-                    const student = doc.data();
-                    if (student.parentPhone && !['archived', 'graduated', 'transferred'].includes(student.status)) {
-                        recipients.push(student.parentPhone);
-                        recipientDetails.push({
-                            parentPhone: student.parentPhone,
-                            studentId: doc.id,
-                            studentName: student.studentName
-                        });
-                    }
-                });
-                
-                if (recipients.length === 0) {
-                    showCustomAlert('No parents found to send message to');
-                    return;
-                }
-                break;
-        }
-        
-        // Get message data
-        const subject = document.getElementById('message-subject').value.trim();
-        const content = document.getElementById('message-content').value.trim();
-        const category = document.getElementById('message-category').value;
-        const isUrgent = document.getElementById('urgent-message').checked;
-        
-        if (!subject || !content) {
-            showCustomAlert('Please enter both subject and message content');
-            return;
-        }
-        
-        // Get attachments
-        const fileInput = document.getElementById('message-attachment');
-        const attachments = [];
-        
-        if (fileInput.files.length > 0) {
-            for (let i = 0; i < fileInput.files.length; i++) {
-                const file = fileInput.files[i];
-                attachments.push({
-                    name: file.name,
-                    size: file.size,
-                    type: file.type
-                });
-            }
-        }
-        
-        // Create message data
-        const messageData = {
-            tutorId: tutor.id,
-            tutorEmail: tutor.email,
-            tutorName: tutor.name,
-            subject: subject,
-            content: content,
-            messageType: messageType,
-            recipients: recipients,
-            recipientDetails: recipientDetails,
-            category: category || null,
-            isUrgent: isUrgent,
-            attachments: attachments.length > 0 ? attachments : null,
-            status: 'sent',
-            read: false,
-            createdAt: new Date(),
-            conversationId: `${tutor.id}_${Date.now()}`,
-            senderType: 'tutor',
-            senderName: tutor.name
-        };
-        
-        // Save message to Firestore
-        const messageRef = doc(collection(db, "tutor_messages"));
-        await setDoc(messageRef, messageData);
-        
-        // Show success message
-        let successMessage = '✅ Message sent successfully!';
-        if (messageType === 'all') {
-            successMessage = `✅ Message sent to all ${recipients.length} parents!`;
-        } else if (messageType === 'group') {
-            successMessage = `✅ Message sent to ${recipients.length} selected parent(s)!`;
-        }
+        // 2. Loop and Send
+        const promises = targets.map(async (target) => {
+            const convId = getConversationId(tutor.id, target.phone);
+            
+            // Upsert Conversation
+            await setDoc(doc(db, "conversations", convId), {
+                participants: [tutor.id, target.phone],
+                participantDetails: {
+                    [tutor.id]: { name: tutor.name, role: 'tutor' },
+                    [target.phone]: { name: target.name, role: 'parent' }
+                },
+                lastMessage: content,
+                lastMessageTimestamp: serverTimestamp(),
+                lastSenderId: tutor.id,
+                unreadCount: increment(1)
+            }, { merge: true });
+
+            // Add Message
+            await addDoc(collection(db, "conversations", convId, "messages"), {
+                content: content,
+                subject: subject,
+                senderId: tutor.id,
+                senderName: tutor.name,
+                isUrgent: isUrgent,
+                createdAt: serverTimestamp(),
+                read: false
+            });
+        });
+
+        await Promise.all(promises);
         
         modal.remove();
-        showCustomAlert(successMessage);
-        
-        // Update unread count
-        await updateUnreadMessageCount();
-        
-    } catch (error) {
-        console.error("Error sending message:", error);
-        showCustomAlert('❌ Error sending message. Please try again.');
+        alert("Message Sent!");
+    } catch (e) {
+        console.error(e);
+        alert("Error sending message.");
+        modal.querySelector('#btn-send-initial').innerText = "Try Again";
     }
 }
 
-// Enhanced Inbox Feature with WhatsApp-like UI
+// --- FEATURE 2: INBOX MODAL (CLIENT-SIDE SORTING) ---
+
 function showInboxModal() {
-    const modalHTML = `
-        <div class="modal-overlay">
-            <div class="modal-content max-w-6xl" style="height: 85vh;">
-                <div class="modal-header">
-                    <h3 class="modal-title flex items-center gap-2">
-                        <span class="text-2xl">📨</span>
-                        <span>My Inbox</span>
-                        ${unreadMessageCount > 0 ? `<span class="badge badge-danger ml-2">${unreadMessageCount} unread</span>` : ''}
-                    </h3>
-                    <div class="flex gap-2">
-                        <button id="refresh-inbox-btn" class="btn btn-secondary btn-sm" title="Refresh Inbox">
-                            🔄 Refresh
-                        </button>
-                        <button id="new-message-btn" class="btn btn-primary btn-sm">
-                            💬 New Message
-                        </button>
-                        <button class="close-modal-btn text-gray-400 hover:text-gray-600 text-xl">
-                            &times;
-                        </button>
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay inbox-modal';
+    modal.innerHTML = `
+        <div class="modal-content inbox-content">
+            <div class="inbox-container">
+                <div class="inbox-list-col">
+                    <div class="inbox-header">
+                        <h4>Inbox</h4>
+                        <button id="refresh-inbox" class="btn-icon">🔄</button>
+                    </div>
+                    <div id="inbox-list" class="inbox-list">
+                        <div class="spinner"></div>
                     </div>
                 </div>
-                <div class="modal-body" style="padding: 0; flex: 1;">
-                    <div class="inbox-container">
-                        <div class="conversations-sidebar">
-                            <div class="conversations-header">
-                                <div class="flex justify-between items-center mb-2">
-                                    <h4 class="font-semibold">Conversations</h4>
-                                    <span class="text-xs text-gray-500" id="conversation-count"></span>
-                                </div>
-                                <div class="search-conversations mb-3">
-                                    <input type="text" id="search-conversations" 
-                                           class="form-input form-input-sm" 
-                                           placeholder="Search conversations...">
-                                </div>
-                            </div>
-                            <div class="conversations-list" id="conversations-list">
-                                <div class="text-center p-4">
-                                    <div class="spinner mx-auto mb-2"></div>
-                                    <p class="text-gray-500">Loading conversations...</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="chat-main">
-                            <div id="chat-container" class="whatsapp-chat-container">
-                                <div class="chat-header">
-                                    <div class="chat-header-info">
-                                        <div class="chat-avatar">💬</div>
-                                        <div class="chat-header-text">
-                                            <h4>Select a conversation</h4>
-                                            <p>Choose a conversation to view messages</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="chat-messages" id="chat-messages">
-                                    <div class="text-center p-8">
-                                        <div class="text-gray-400 text-4xl mb-3">💭</div>
-                                        <h4 class="font-bold text-gray-600 mb-2">No Conversation Selected</h4>
-                                        <p class="text-gray-500">Select a conversation from the sidebar to view messages</p>
-                                    </div>
-                                </div>
-                                <div class="chat-input-area hidden" id="chat-input-area">
-                                    <div class="flex gap-2">
-                                        <input type="text" id="chat-input" class="chat-input flex-1" 
-                                               placeholder="Type a message... (Press Enter to send)">
-                                        <button id="send-chat-btn" class="send-message-btn">
-                                            <span class="text-xl">📤</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                <div class="inbox-chat-col">
+                    <div id="chat-view-header" class="chat-header hidden">
+                        <div class="chat-title" id="chat-title">Select a chat</div>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <p class="text-sm text-gray-500">
-                        💡 <strong>Tip:</strong> You can reply directly to individual and group conversations.
-                    </p>
+                    <div id="chat-messages" class="chat-messages">
+                        <div class="empty-state">Select a conversation</div>
+                    </div>
+                    <div id="chat-inputs" class="chat-inputs hidden">
+                        <input type="text" id="chat-input-text" placeholder="Type a message...">
+                        <button id="chat-send-btn">➤</button>
+                    </div>
                 </div>
             </div>
+            <button class="close-modal-absolute">&times;</button>
         </div>
     `;
-    
-    const modal = document.createElement('div');
-    modal.innerHTML = modalHTML;
+
     document.body.appendChild(modal);
-    
-    // Add inbox-specific styles
-    addInboxStyles();
-    
-    // Load conversations
-    loadEnhancedConversations();
-    
-    // Event listeners for inbox buttons
-    document.getElementById('refresh-inbox-btn').addEventListener('click', () => {
-        loadEnhancedConversations();
-    });
-    
-    document.getElementById('new-message-btn').addEventListener('click', () => {
+
+    // Cleanup Listeners on Close
+    modal.querySelector('.close-modal-absolute').onclick = () => {
+        if (unsubscribeInbox) unsubscribeInbox();
+        if (unsubscribeChat) unsubscribeChat();
         modal.remove();
-        showEnhancedMessagingModal();
-    });
+    };
+
+    // Initialize Inbox
+    startInboxListener(modal);
+}
+
+function startInboxListener(modal) {
+    const tutorId = window.tutorData.id;
+    const listEl = modal.querySelector('#inbox-list');
     
-    // Search conversations
-    const searchInput = document.getElementById('search-conversations');
-    searchInput.addEventListener('input', debounce((e) => {
-        filterConversations(e.target.value);
-    }, 300));
-    
-    // Close modal when clicking outside or on close button
-    modal.querySelector('.close-modal-btn').addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', (e) => {
-        if (e.target.classList.contains('modal-overlay')) {
-            modal.remove();
-        }
+    if (unsubscribeInbox) unsubscribeInbox();
+
+    // NO "OrderBy" here. This avoids the Index requirement.
+    const q = query(
+        collection(db, "conversations"),
+        where("participants", "array-contains", tutorId)
+    );
+
+    unsubscribeInbox = onSnapshot(q, (snapshot) => {
+        const convs = [];
+        snapshot.forEach(doc => {
+            convs.push({ id: doc.id, ...doc.data() });
+        });
+
+        // CLIENT-SIDE SORTING (Solves the "Index" error)
+        convs.sort((a, b) => {
+            const timeA = a.lastMessageTimestamp?.toMillis() || 0;
+            const timeB = b.lastMessageTimestamp?.toMillis() || 0;
+            return timeB - timeA; // Newest first
+        });
+
+        renderInboxList(convs, listEl, modal, tutorId);
     });
 }
 
-// Add inbox-specific styles
-function addInboxStyles() {
-    if (document.querySelector('#inbox-styles')) return;
+function renderInboxList(conversations, container, modal, tutorId) {
+    container.innerHTML = '';
     
-    const styles = document.createElement('style');
-    styles.id = 'inbox-styles';
-    styles.textContent = `
-        /* Inbox Container */
-        .inbox-container {
-            display: flex;
-            height: 100%;
-            border-radius: 8px;
-            overflow: hidden;
-            border: 1px solid #e2e8f0;
-        }
+    if (conversations.length === 0) {
+        container.innerHTML = '<div class="p-4 text-gray-500 text-center">No messages found.</div>';
+        return;
+    }
+
+    conversations.forEach(conv => {
+        // Find "The Other Person"
+        const otherId = conv.participants.find(p => p !== tutorId);
+        const otherName = conv.participantDetails?.[otherId]?.name || "Parent";
+        const isUnread = conv.unreadCount > 0 && conv.lastSenderId !== tutorId;
+
+        const el = document.createElement('div');
+        el.className = `inbox-item ${isUnread ? 'unread' : ''}`;
+        el.innerHTML = `
+            <div class="avatar">${otherName.charAt(0)}</div>
+            <div class="info">
+                <div class="name">${escapeHtml(otherName)}</div>
+                <div class="preview">
+                    ${conv.lastSenderId === tutorId ? 'You: ' : ''}${escapeHtml(conv.lastMessage || '')}
+                </div>
+            </div>
+            <div class="meta">
+                <div class="time">${formatTime(conv.lastMessageTimestamp)}</div>
+                ${isUnread ? `<div class="badge">${conv.unreadCount}</div>` : ''}
+            </div>
+        `;
         
-        /* Conversations Sidebar */
-        .conversations-sidebar {
-            width: 320px;
-            background: #f8fafc;
-            border-right: 1px solid #e2e8f0;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        
-        .conversations-header {
-            padding: 1rem;
-            background: #fff;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        
-        .conversations-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 0.5rem;
-        }
-        
-        /* Conversation Items */
-        .conversation-item {
-            padding: 0.75rem;
-            border-radius: 8px;
-            margin-bottom: 0.5rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            background: white;
-            border: 1px solid #e2e8f0;
-        }
-        
-        .conversation-item:hover {
-            background: #f0f9ff;
-            border-color: #0ea5e9;
-            transform: translateY(-1px);
-        }
-        
-        .conversation-item.active {
-            background: #f0f9ff;
-            border-color: #0ea5e9;
-            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.15);
-        }
-        
-        .conversation-item.unread {
-            background: #fef3c7;
-            border-color: #f59e0b;
-        }
-        
-        .conversation-info {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-        
-        .conversation-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.25rem;
-        }
-        
-        .conversation-details {
-            flex: 1;
-            min-width: 0;
-        }
-        
-        .conversation-title {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.25rem;
-        }
-        
-        .conversation-title span:first-child {
-            font-weight: 600;
-            color: #1e293b;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        
-        .conversation-time {
-            font-size: 0.75rem;
-            color: #64748b;
-            white-space: nowrap;
-        }
-        
-        .conversation-preview {
-            font-size: 0.875rem;
-            color: #64748b;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .new-message-indicator {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #ef4444;
-            display: inline-block;
-            margin-left: 0.5rem;
-            animation: pulse 2s infinite;
-        }
-        
-        /* Chat Main Area */
-        .chat-main {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: #f0f2f5;
-        }
-        
-        .whatsapp-chat-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .chat-header {
-            background: #f0f2f5;
-            padding: 1rem;
-            border-bottom: 1px solid #e2e8f0;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        
-        .chat-header-info {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-        
-        .chat-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.25rem;
-        }
-        
-        .chat-header-text h4 {
-            font-weight: 600;
-            color: #1e293b;
-            margin: 0;
-        }
-        
-        .chat-header-text p {
-            font-size: 0.875rem;
-            color: #64748b;
-            margin: 0;
-        }
-        
-        /* Chat Messages Area */
-        .chat-messages {
-            flex: 1;
-            padding: 1rem;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-        
-        /* Message Bubbles */
-        .message-bubble {
-            max-width: 70%;
-            padding: 0.75rem 1rem;
-            border-radius: 18px;
-            position: relative;
-            word-wrap: break-word;
-        }
-        
-        .message-bubble.sent {
-            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-            color: white;
-            align-self: flex-end;
-            border-bottom-right-radius: 4px;
-        }
-        
-        .message-bubble.received {
-            background: white;
-            color: #1e293b;
-            align-self: flex-start;
-            border-bottom-left-radius: 4px;
-            border: 1px solid #e2e8f0;
-        }
-        
-        .message-sender {
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #8b5cf6;
-            margin-bottom: 0.25rem;
-        }
-        
-        .message-subject {
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #64748b;
-            margin-bottom: 0.25rem;
-        }
-        
-        .message-content {
-            font-size: 0.9375rem;
-            line-height: 1.4;
-        }
-        
-        .message-meta {
-            font-size: 0.75rem;
-            opacity: 0.8;
-        }
-        
-        .urgent-badge {
-            font-size: 0.7rem !important;
-            font-weight: bold !important;
-            margin-top: 0.25rem;
-        }
-        
-        /* Chat Input Area */
-        .chat-input-area {
-            padding: 1rem;
-            background: #f0f2f5;
-            border-top: 1px solid #e2e8f0;
-        }
-        
-        .chat-input {
-            padding: 0.75rem 1rem;
-            border-radius: 24px;
-            border: 1px solid #cbd5e1;
-            background: white;
-            font-size: 0.9375rem;
-            transition: all 0.2s ease;
-        }
-        
-        .chat-input:focus {
-            outline: none;
-            border-color: #8b5cf6;
-            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
-        }
-        
-        .send-message-btn {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-            color: white;
-            border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        
-        .send-message-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
-        }
-        
-        /* Loading States */
-        .spinner {
-            width: 24px;
-            height: 24px;
-            border: 3px solid #e2e8f0;
-            border-top-color: #8b5cf6;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-        
-        /* Responsive Design */
-        @media (max-width: 1024px) {
-            .conversations-sidebar {
-                width: 280px;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .inbox-container {
-                flex-direction: column;
-            }
-            
-            .conversations-sidebar {
-                width: 100%;
-                height: 200px;
-                border-right: none;
-                border-bottom: 1px solid #e2e8f0;
-            }
-            
-            .chat-main {
-                height: calc(100% - 200px);
-            }
-        }
-    `;
-    document.head.appendChild(styles);
+        el.onclick = () => loadChat(conv.id, otherName, modal, tutorId);
+        container.appendChild(el);
+    });
 }
 
-// Debounce utility function
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
+function loadChat(convId, name, modal, tutorId) {
+    // UI Setup
+    modal.querySelector('#chat-view-header').classList.remove('hidden');
+    modal.querySelector('#chat-inputs').classList.remove('hidden');
+    modal.querySelector('#chat-title').innerText = name;
+    
+    const msgContainer = modal.querySelector('#chat-messages');
+    msgContainer.innerHTML = '<div class="spinner"></div>';
+
+    // 1. Reset Unread
+    updateDoc(doc(db, "conversations", convId), { unreadCount: 0 });
+
+    // 2. Listen for Messages
+    if (unsubscribeChat) unsubscribeChat();
+
+    // Messages are usually small enough that ordering works fine without complex indexes on subcollections
+    // If this fails, remove orderBy and sort in client like we did for inbox
+    const q = query(collection(db, "conversations", convId, "messages"), orderBy("createdAt", "asc"));
+
+    unsubscribeChat = onSnapshot(q, (snapshot) => {
+        msgContainer.innerHTML = '';
+        snapshot.forEach(doc => {
+            const msg = doc.data();
+            const isMe = msg.senderId === tutorId;
+            const bubble = document.createElement('div');
+            bubble.className = `chat-bubble ${isMe ? 'me' : 'them'}`;
+            bubble.innerHTML = `
+                ${msg.subject ? `<strong>${escapeHtml(msg.subject)}</strong><br>` : ''}
+                ${escapeHtml(msg.content)}
+                <div class="timestamp">${formatTime(msg.createdAt)}</div>
+            `;
+            msgContainer.appendChild(bubble);
+        });
+        msgContainer.scrollTop = msgContainer.scrollHeight;
+    });
+
+    // 3. Send Logic
+    const btn = modal.querySelector('#chat-send-btn');
+    const input = modal.querySelector('#chat-input-text');
+    
+    // Replace button to clear old listeners
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+
+    newBtn.onclick = async () => {
+        const txt = input.value.trim();
+        if (!txt) return;
+        input.value = '';
+
+        await addDoc(collection(db, "conversations", convId, "messages"), {
+            content: txt,
+            senderId: tutorId,
+            createdAt: serverTimestamp(),
+            read: false
+        });
+
+        await updateDoc(doc(db, "conversations", convId), {
+            lastMessage: txt,
+            lastMessageTimestamp: serverTimestamp(),
+            lastSenderId: tutorId,
+            unreadCount: increment(1)
+        });
     };
 }
 
-// Filter conversations based on search
-function filterConversations(searchTerm) {
-    const conversationItems = document.querySelectorAll('.conversation-item');
-    const term = searchTerm.toLowerCase().trim();
-    
-    if (!term) {
-        conversationItems.forEach(item => {
-            item.style.display = 'block';
-        });
-        document.getElementById('conversation-count').textContent = 
-            `${conversationItems.length} conversations`;
-        return;
-    }
-    
-    let visibleCount = 0;
-    conversationItems.forEach(item => {
-        const title = item.querySelector('.conversation-title span:first-child').textContent.toLowerCase();
-        const preview = item.querySelector('.conversation-preview').textContent.toLowerCase();
-        
-        if (title.includes(term) || preview.includes(term)) {
-            item.style.display = 'block';
-            visibleCount++;
-        } else {
-            item.style.display = 'none';
+// --- CSS STYLES ---
+
+function injectMessagingStyles() {
+    if (document.getElementById('msg-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'msg-styles';
+    style.textContent = `
+        /* --- Floating Buttons --- */
+        .floating-messaging-btn, .floating-inbox-btn {
+            position: fixed; bottom: 20px; right: 20px;
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white; border: none; border-radius: 50px;
+            padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 9999; font-weight: bold;
         }
-    });
-    
-    document.getElementById('conversation-count').textContent = 
-        `${visibleCount} of ${conversationItems.length} conversations`;
-}
-
-// Load enhanced conversations - SIMPLIFIED VERSION
-async function loadEnhancedConversations() {
-    try {
-        const tutorId = window.tutorData?.id;
-        if (!tutorId) return;
-        
-        // SIMPLE QUERY - Only check tutorId to avoid index requirements
-        const messagesQuery = query(
-            collection(db, "tutor_messages"),
-            where("tutorId", "==", tutorId)
-        );
-        
-        const messagesSnapshot = await getDocs(messagesQuery);
-        const messages = [];
-        const conversations = {};
-        
-        messagesSnapshot.docs.forEach(doc => {
-            const message = { id: doc.id, ...doc.data() };
-            messages.push(message);
-            
-            // Group by conversation ID or recipient - FIXED NULL CHECK
-            const conversationKey = message.conversationId || 
-                                  (message.recipients && message.recipients[0]) || 
-                                  'general';
-            
-            if (!conversations[conversationKey]) {
-                conversations[conversationKey] = {
-                    id: conversationKey,
-                    title: getConversationTitle(message),
-                    lastMessage: message,
-                    unread: message.read === false && message.senderType !== 'tutor',
-                    messages: [message],
-                    recipients: message.recipients || [],
-                    recipientDetails: message.recipientDetails || []
-                };
-            } else {
-                conversations[conversationKey].messages.push(message);
-                if (message.createdAt > conversations[conversationKey].lastMessage.createdAt) {
-                    conversations[conversationKey].lastMessage = message;
-                }
-                if (message.read === false && message.senderType !== 'tutor') {
-                    conversations[conversationKey].unread = true;
-                }
-            }
-        });
-
-        renderEnhancedConversationsList(Object.values(conversations));
-        
-    } catch (error) {
-        console.error("Error loading conversations:", error);
-        document.getElementById('conversations-list').innerHTML = `
-            <div class="text-center p-4">
-                <div class="text-red-400 text-4xl mb-3">⚠️</div>
-                <h4 class="font-bold text-red-600 mb-2">Failed to Load</h4>
-                <p class="text-gray-500">Error loading conversations. Please try again.</p>
-            </div>
-        `;
-    }
-}
-
-// Get conversation title based on message data - FIXED NULL CHECK
-function getConversationTitle(message) {
-    if (!message) return 'Conversation';
-    
-    if (message.messageType === 'management') {
-        return 'Management';
-    } else if (message.messageType === 'all') {
-        return 'All Parents';
-    } else if (message.recipientDetails && message.recipientDetails.length > 0) {
-        if (message.recipientDetails.length === 1) {
-            const detail = message.recipientDetails[0];
-            return detail.studentName ? 
-                `${detail.studentName}'s Parent` : 
-                'Parent';
-        } else {
-            return `${message.recipientDetails.length} Parents`;
+        .floating-inbox-btn { right: 140px; background: linear-gradient(135deg, #10b981, #059669); }
+        .unread-badge {
+            background: red; color: white; border-radius: 50%; width: 20px; height: 20px;
+            font-size: 10px; display: flex; align-items: center; justify-content: center;
+            position: absolute; top: -5px; right: -5px; border: 2px solid white;
         }
-    }
-    return 'Conversation';
-}
 
-// Render enhanced conversations list - FIXED NULL CHECK
-function renderEnhancedConversationsList(conversations) {
-    const container = document.getElementById('conversations-list');
-    
-    if (!conversations || conversations.length === 0) {
-        container.innerHTML = `
-            <div class="text-center p-8">
-                <div class="text-gray-400 text-4xl mb-3">📭</div>
-                <h4 class="font-bold text-gray-600 mb-2">No Messages</h4>
-                <p class="text-gray-500">You don't have any messages yet.</p>
-            </div>
-        `;
-        return;
-    }
-    
-    let html = '';
-    
-    conversations.sort((a, b) => {
-        if (!a.lastMessage || !b.lastMessage) return 0;
-        const timeA = a.lastMessage.createdAt?.toDate ? a.lastMessage.createdAt.toDate() : new Date(a.lastMessage.createdAt);
-        const timeB = b.lastMessage.createdAt?.toDate ? b.lastMessage.createdAt.toDate() : new Date(b.lastMessage.createdAt);
-        return timeB - timeA; // Most recent first
-    });
-    
-    conversations.forEach(conv => {
-        if (!conv || !conv.lastMessage) return;
+        /* --- Modals --- */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5); 
+            display: flex; justify-content: center; align-items: center; z-index: 10000;
+        }
+        .modal-content {
+            background: white; border-radius: 12px; width: 90%; max-width: 800px;
+            max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .modal-header {
+            padding: 15px; border-bottom: 1px solid #eee; display: flex; 
+            justify-content: space-between; align-items: center; background: #f9fafb;
+        }
+        .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+        .modal-footer { padding: 15px; background: #f9fafb; display: flex; justify-content: flex-end; gap: 10px; }
+        
+        /* --- Inputs --- */
+        .form-input { 
+            width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; 
+            margin-bottom: 10px; font-size: 14px;
+        }
+        .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: 500; }
+        .btn-primary { background: #4f46e5; color: white; }
+        .btn-secondary { background: #e5e7eb; color: #374151; }
+        
+        /* --- Messaging Specific --- */
+        .message-type-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+        .type-option { 
+            border: 2px solid #eee; border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; 
+            transition: 0.2s;
+        }
+        .type-option:hover, .type-option.selected { border-color: #4f46e5; background: #eef2ff; }
+        .type-option .icon { font-size: 24px; margin-bottom: 5px; }
+        
+        /* --- Inbox Specific --- */
+        .inbox-container { display: flex; height: 600px; max-height: 80vh; }
+        .inbox-list-col { width: 35%; border-right: 1px solid #eee; display: flex; flex-direction: column; }
+        .inbox-chat-col { width: 65%; display: flex; flex-direction: column; background: #f3f4f6; }
+        
+        .inbox-list { overflow-y: auto; flex: 1; }
+        .inbox-item { 
+            padding: 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer; display: flex; gap: 10px; 
+            align-items: center; transition: 0.2s;
+        }
+        .inbox-item:hover { background: #f9fafb; }
+        .inbox-item.unread { background: #eff6ff; }
+        .inbox-item .avatar { 
+            width: 40px; height: 40px; background: #ddd; border-radius: 50%; 
+            display: flex; align-items: center; justify-content: center; font-weight: bold; color: white;
+            background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+        }
+        .inbox-item .info { flex: 1; overflow: hidden; }
+        .inbox-item .name { font-weight: 600; font-size: 14px; }
+        .inbox-item .preview { font-size: 12px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .inbox-item .meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+        .inbox-item .time { font-size: 10px; color: #9ca3af; }
+        .inbox-item .badge { background: #ef4444; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; }
 
-        const lastMessageTime = conv.lastMessage.createdAt?.toDate 
-            ? conv.lastMessage.createdAt.toDate() 
-            : new Date(conv.lastMessage.createdAt);
+        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .chat-bubble { max-width: 70%; padding: 10px 15px; border-radius: 12px; font-size: 14px; line-height: 1.4; position: relative; }
+        .chat-bubble.me { align-self: flex-end; background: #4f46e5; color: white; border-bottom-right-radius: 2px; }
+        .chat-bubble.them { align-self: flex-start; background: white; border: 1px solid #e5e7eb; border-bottom-left-radius: 2px; }
+        .chat-bubble .timestamp { font-size: 9px; opacity: 0.7; text-align: right; margin-top: 4px; }
         
-        // SAFE ACCESS TO MESSAGE CONTENT
-        const messageContent = conv.lastMessage.content || '';
-        const messageSubject = conv.lastMessage.subject || '';
-        const previewText = messageSubject || messageContent.substring(0, 50);
-        const showEllipsis = messageContent.length > 50;
-        
-        html += `
-            <div class="conversation-item ${conv.unread ? 'unread' : ''}" data-conversation-id="${conv.id}">
-                <div class="conversation-info">
-                    <div class="conversation-avatar" style="background: ${conv.lastMessage.messageType === 'management' ? '#10b981' : conv.lastMessage.messageType === 'all' ? '#f59e0b' : '#8b5cf6'};">
-                        ${conv.lastMessage.messageType === 'management' ? '💼' : 
-                          conv.lastMessage.messageType === 'all' ? '📢' : '👨‍👩‍👧‍👦'}
-                    </div>
-                    <div class="conversation-details">
-                        <div class="conversation-title">
-                            <span>${conv.title || 'Conversation'}</span>
-                            <span class="conversation-time">${formatTime(lastMessageTime)}</span>
-                        </div>
-                        <p class="conversation-preview">
-                            ${conv.lastMessage.senderType === 'tutor' ? 'You: ' : ''}
-                            ${previewText}${showEllipsis ? '...' : ''}
-                            ${conv.unread ? '<span class="new-message-indicator"></span>' : ''}
-                        </p>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    
-    container.innerHTML = html;
-    
-    // Update conversation count
-    document.getElementById('conversation-count').textContent = `${conversations.length} conversations`;
-    
-    // Add click listeners
-    document.querySelectorAll('.conversation-item').forEach(item => {
-        item.addEventListener('click', async () => {
-            const conversationId = item.getAttribute('data-conversation-id');
-            
-            // Remove active class from all items
-            document.querySelectorAll('.conversation-item').forEach(i => {
-                i.classList.remove('active');
-            });
-            
-            // Add active class to clicked item
-            item.classList.add('active');
-            
-            // Load conversation messages
-            await loadEnhancedConversationMessages(conversationId);
-        });
-    });
-}
+        .chat-inputs { padding: 15px; background: white; border-top: 1px solid #eee; display: flex; gap: 10px; }
+        .chat-inputs input { flex: 1; padding: 10px; border-radius: 20px; border: 1px solid #ddd; outline: none; }
+        .chat-inputs button { background: #4f46e5; color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; }
 
-// Load enhanced conversation messages
-async function loadEnhancedConversationMessages(conversationId) {
-    try {
-        const tutorId = window.tutorData?.id;
-        if (!tutorId) return;
+        .close-modal-absolute { position: absolute; top: 10px; right: 10px; font-size: 24px; background: none; border: none; cursor: pointer; color: #666; }
+        .hidden { display: none !important; }
+        .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #4f46e5; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 10px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        // SIMPLE QUERY - Only check tutorId
-        const messagesQuery = query(
-            collection(db, "tutor_messages"),
-            where("tutorId", "==", tutorId)
-        );
-        
-        const messagesSnapshot = await getDocs(messagesQuery);
-        const messages = [];
-        
-        messagesSnapshot.forEach(doc => {
-            const message = { id: doc.id, ...doc.data(), createdAt: doc.data().createdAt.toDate() }; // Convert Timestamp to Date
-            const msgConversationId = message.conversationId || 
-                                    (message.recipients && message.recipients[0]) || 
-                                    'general';
-            
-            if (msgConversationId === conversationId) {
-                messages.push(message);
-                
-                // Mark as read if not already read and not sent by tutor
-                if (!message.read && message.senderType !== 'tutor') {
-                    updateDoc(doc.ref, { read: true });
-                }
-            }
-        });
-        
-        // Sort messages by date
-        messages.sort((a, b) => a.createdAt - b.createdAt);
-        
-        renderEnhancedChatMessages(messages, conversationId);
-        
-        // Update unread count
-        await updateUnreadMessageCount();
-        
-    } catch (error) {
-        console.error("Error loading conversation messages:", error);
-        document.getElementById('chat-messages').innerHTML = `
-            <div class="text-center p-8">
-                <div class="text-red-400 text-4xl mb-3">⚠️</div>
-                <h4 class="font-bold text-red-600 mb-2">Failed to Load</h4>
-                <p class="text-gray-500">Error loading messages. Please try again.</p>
-            </div>
-        `;
-    }
-}
-
-// Render enhanced chat messages - FIXED NULL CHECK
-function renderEnhancedChatMessages(messages, conversationId) {
-    const chatMessages = document.getElementById('chat-messages');
-    const chatInputArea = document.getElementById('chat-input-area');
-    const chatContainer = document.getElementById('chat-container');
-    const chatHeader = chatContainer.querySelector('.chat-header-info');
-    
-    if (!messages || messages.length === 0) {
-        chatMessages.innerHTML = `
-            <div class="text-center p-8">
-                <div class="text-gray-400 text-4xl mb-3">💭</div>
-                <h4 class="font-bold text-gray-600 mb-2">No Messages Yet</h4>
-                <p class="text-gray-500">Start a conversation by sending a message</p>
-            </div>
-        `;
-        return;
-    }
-    
-    // Get conversation info
-    const firstMessage = messages[0];
-    const title = getConversationTitle(firstMessage);
-    
-    // Update chat header
-    chatHeader.innerHTML = `
-        <div class="chat-avatar" style="background: ${firstMessage.messageType === 'management' ? '#10b981' : firstMessage.messageType === 'all' ? '#f59e0b' : '#8b5cf6'};">
-            ${firstMessage.messageType === 'management' ? '💼' : firstMessage.messageType === 'all' ? '📢' : '👨‍👩‍👧‍👦'}
-        </div>
-        <div class="chat-header-text">
-            <h4>${title}</h4>
-            <p>${messages.length} messages</p>
-        </div>
+        @media(max-width: 640px) {
+            .inbox-list-col { width: 100%; }
+            .inbox-chat-col { display: none; }
+            .inbox-container.chat-active .inbox-list-col { display: none; }
+            .inbox-container.chat-active .inbox-chat-col { display: flex; width: 100%; }
+        }
     `;
-    
-    // Show chat input (only for individual conversations)
-    if (firstMessage.messageType === 'individual' || firstMessage.messageType === 'group') {
-        chatInputArea.classList.remove('hidden');
-    } else {
-        chatInputArea.classList.add('hidden');
-    }
-    
-    // Clear existing messages
-    chatMessages.innerHTML = '';
-    
-    messages.forEach(message => {
-        const messageTime = message.createdAt;
-        
-        const isSent = message.senderType === 'tutor';
-        const senderName = isSent ? 'You' : (message.senderName || 'Management');
-        
-        // Check if message has attachments
-        const hasAttachments = message.attachments && message.attachments.length > 0;
-        
-        // SAFE CONTENT ACCESS
-        const messageContent = message.content || '';
-        
-        const messageHTML = `
-            <div class="message-bubble ${isSent ? 'sent' : 'received'}">
-                ${!isSent ? `<div class="message-sender">${senderName}</div>` : ''}
-                ${message.subject && !isSent ? `<div class="message-subject">${message.subject}</div>` : ''}
-                <div class="message-content">${messageContent}</div>
-                
-                ${hasAttachments ? `
-                    <div class="message-attachments mt-2">
-                        ${message.attachments.map(attachment => `
-                            <div class="attachment-item inline-flex items-center gap-1 bg-gray-100 px-2 py-1 rounded text-xs">
-                                <span>📎</span>
-                                <span>${attachment.name || 'Attachment'}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
-                
-                ${message.isUrgent ? `<div class="urgent-badge inline-block bg-red-100 text-red-800 text-xs px-2 py-1 rounded ml-2">URGENT</div>` : ''}
-                
-                <div class="message-meta flex justify-between items-center mt-1">
-                    <div class="message-time">${formatTime(messageTime)}</div>
-                    ${isSent ? '<div class="message-status text-xs text-gray-500">✓ Sent</div>' : ''}
-                </div>
-            </div>
-        `;
-        
-        chatMessages.innerHTML += messageHTML;
-    });
-    
-    // Scroll to bottom
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-    
-    // Setup send message functionality for individual/group conversations
-    if (firstMessage.messageType === 'individual' || firstMessage.messageType === 'group') {
-        const sendBtn = document.getElementById('send-chat-btn');
-        const chatInput = document.getElementById('chat-input');
-        
-        // Clear existing event listeners
-        const newSendBtn = sendBtn.cloneNode(true);
-        sendBtn.parentNode.replaceChild(newSendBtn, sendBtn);
-        
-        const newChatInput = chatInput.cloneNode(true);
-        chatInput.parentNode.replaceChild(newChatInput, chatInput);
-        
-        // Add new event listener
-        document.getElementById('send-chat-btn').addEventListener('click', async () => {
-            await sendReplyMessage(firstMessage);
-        });
-        
-        document.getElementById('chat-input').addEventListener('keypress', async (e) => {
-            if (e.key === 'Enter') {
-                await sendReplyMessage(firstMessage);
-            }
-        });
-    }
+    document.head.appendChild(style);
 }
 
-// Send reply message
-async function sendReplyMessage(originalConversation) {
-    const chatInput = document.getElementById('chat-input');
-    const messageContent = chatInput.value.trim();
-    
-    if (!messageContent) {
-        showCustomAlert('Please enter a message.');
-        return;
-    }
-    
-    try {
-        const tutor = window.tutorData;
-        
-        // Create reply message data
-        const messageData = {
-            tutorId: tutor.id,
-            tutorEmail: tutor.email,
-            tutorName: tutor.name,
-            subject: `Re: ${originalConversation.subject || 'Message'}`,
-            content: messageContent,
-            messageType: originalConversation.messageType || 'individual',
-            recipients: originalConversation.recipients || [],
-            recipientDetails: originalConversation.recipientDetails || [],
-            category: originalConversation.category,
-            isUrgent: false,
-            status: 'sent',
-            read: true,
-            createdAt: new Date(),
-            conversationId: originalConversation.id || 
-                          `${originalConversation.recipients && originalConversation.recipients[0]}_${Date.now()}`,
-            senderType: 'tutor',
-            senderName: tutor.name
-        };
-        
-        // Save message to Firestore
-        const messageRef = doc(collection(db, "tutor_messages"));
-        await setDoc(messageRef, messageData);
-        
-        // Clear input
-        chatInput.value = '';
-        
-        // Reload messages
-        await loadEnhancedConversationMessages(messageData.conversationId);
-        
-    } catch (error) {
-        console.error("Error sending reply message:", error);
-        showCustomAlert('❌ Error sending message. Please try again.');
-    }
-}
+// --- AUTO-INIT ---
+// Automatically starts when the script loads
+initializeFloatingMessagingButton();
 
 /*******************************************************************************
  * SECTION 10: SCHEDULE CALENDAR VIEW
@@ -6635,5 +5219,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
