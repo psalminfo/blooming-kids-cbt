@@ -524,143 +524,198 @@ async function loadReferralRewards(parentUid) {
 // Find student IDs for a parent's phone number - ENHANCED TO FIND ALL CHILDREN
 async function findStudentIdsForParent(parentPhone) {
     try {
-        console.log("🔍 Finding ALL student IDs for parent phone:", parentPhone);
+        console.log("🔍 [FIND STUDENTS] Starting search for parent phone:", parentPhone);
         
         // Normalize the phone number
         const normalizedPhone = normalizePhoneNumber(parentPhone);
         if (!normalizedPhone.valid) {
-            console.log("Invalid phone number format");
+            console.log("❌ Invalid phone number format");
             return { studentIds: [], studentNameIdMap: new Map(), allStudentData: [] };
+        }
+
+        console.log("📱 Normalized phone:", normalizedPhone.normalized);
+        
+        // Generate ALL possible phone variations for thorough search
+        const phoneVariations = generateAllPhoneVariations(parentPhone);
+        console.log(`📱 Generated ${phoneVariations.length} phone variations`);
+        
+        // For debugging: Log first 5 variations
+        if (phoneVariations.length > 0) {
+            console.log("📱 Sample variations:", phoneVariations.slice(0, 5));
         }
 
         let studentIds = [];
         let studentNameIdMap = new Map();
         let allStudentData = [];
+        let foundStudents = new Set(); // Track by ID to avoid duplicates
         
-        // DEBUG: Log what we're searching for
-        console.log("🔍 Searching for normalized phone:", normalizedPhone.normalized);
-        
-        // GENERATE ALL PHONE VARIATIONS for thorough search
-        const phoneVariations = generateAllPhoneVariations(parentPhone);
-        console.log("📱 Phone variations to search:", phoneVariations);
-        
-        // Search in students collection - check ALL variations
-        const studentsPromises = phoneVariations.map(phone => 
-            db.collection("students")
-                .where("parentPhone", "==", phone)
-                .get()
-                .catch(error => {
-                    console.warn(`Error searching students with phone ${phone}:`, error);
-                    return { empty: true, forEach: () => {} };
-                })
-        );
-        
-        // Search in pending_students collection - check ALL variations
-        const pendingStudentsPromises = phoneVariations.map(phone =>
-            db.collection("pending_students")
-                .where("parentPhone", "==", phone)
-                .get()
-                .catch(error => {
-                    console.warn(`Error searching pending_students with phone ${phone}:`, error);
-                    return { empty: true, forEach: () => {} };
-                })
-        );
-        
-        // Wait for all searches to complete
-        const allStudentsSnapshots = await Promise.all(studentsPromises);
-        const allPendingSnapshots = await Promise.all(pendingStudentsPromises);
-        
-        // Process students collection results
-        allStudentsSnapshots.forEach(snapshot => {
-            if (snapshot.empty) return;
-            
-            snapshot.forEach(doc => {
-                const studentData = doc.data();
-                const studentId = doc.id;
-                const studentName = safeText(studentData.studentName || studentData.name || 'Unknown');
+        // SEARCH STRATEGY 1: Search in students collection with ALL variations
+        console.log("🔍 Searching in 'students' collection...");
+        for (const phone of phoneVariations) {
+            try {
+                const studentsSnapshot = await db.collection("students")
+                    .where("parentPhone", "==", phone)
+                    .get();
                 
-                if (studentId && studentName && studentName !== 'Unknown') {
-                    // Check if we already have this student (by ID or name)
-                    const existingById = allStudentData.find(s => s.id === studentId);
-                    const existingByName = allStudentData.find(s => s.name === studentName);
+                if (!studentsSnapshot.empty) {
+                    console.log(`✅ Found ${studentsSnapshot.size} students with phone: ${phone}`);
                     
-                    if (!existingById && !existingByName) {
-                        studentIds.push(studentId);
-                        studentNameIdMap.set(studentName, studentId);
-                        allStudentData.push({ 
-                            id: studentId, 
-                            name: studentName, 
-                            data: studentData,
-                            isPending: false 
-                        });
-                        console.log(`✅ Found student: ${studentName} (ID: ${studentId})`);
-                    } else if (existingByName && existingByName.id !== studentId) {
-                        // Same name, different ID - add with suffix
-                        const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
-                        studentIds.push(studentId);
-                        studentNameIdMap.set(uniqueName, studentId);
-                        allStudentData.push({ 
-                            id: studentId, 
-                            name: uniqueName, 
-                            data: studentData,
-                            isPending: false 
-                        });
-                        console.log(`✅ Found duplicate name student: ${uniqueName} (ID: ${studentId})`);
-                    }
+                    studentsSnapshot.forEach(doc => {
+                        const studentData = doc.data();
+                        const studentId = doc.id;
+                        const studentName = safeText(studentData.studentName || studentData.name || studentData.fullName || 'Unknown Student');
+                        
+                        // Skip if already processed
+                        if (foundStudents.has(studentId)) {
+                            console.log(`⏭️ Skipping duplicate student ID: ${studentId}`);
+                            return;
+                        }
+                        
+                        if (studentId && studentName && studentName !== 'Unknown Student') {
+                            foundStudents.add(studentId);
+                            studentIds.push(studentId);
+                            
+                            // Handle duplicate names by adding parent info
+                            let displayName = studentName;
+                            if (studentNameIdMap.has(studentName)) {
+                                const parentInfo = studentData.parentName ? ` (${safeText(studentData.parentName)}'s child)` : '';
+                                displayName = `${studentName}${parentInfo}`;
+                            }
+                            
+                            studentNameIdMap.set(displayName, studentId);
+                            allStudentData.push({ 
+                                id: studentId, 
+                                name: displayName,
+                                originalName: studentName,
+                                data: studentData,
+                                isPending: false,
+                                collection: 'students',
+                                matchedPhone: phone
+                            });
+                            
+                            console.log(`✅ Added student: ${displayName} (ID: ${studentId}) from phone: ${phone}`);
+                        }
+                    });
                 }
-            });
-        });
+            } catch (error) {
+                console.warn(`⚠️ Error searching students with phone ${phone}:`, error.message);
+            }
+        }
         
-        // Process pending_students collection results
-        allPendingSnapshots.forEach(snapshot => {
-            if (snapshot.empty) return;
-            
-            snapshot.forEach(doc => {
-                const studentData = doc.data();
-                const studentId = doc.id;
-                const studentName = safeText(studentData.studentName || studentData.name || 'Unknown');
+        // SEARCH STRATEGY 2: Search in pending_students collection with ALL variations
+        console.log("🔍 Searching in 'pending_students' collection...");
+        for (const phone of phoneVariations) {
+            try {
+                const pendingSnapshot = await db.collection("pending_students")
+                    .where("parentPhone", "==", phone)
+                    .get();
                 
-                if (studentId && studentName && studentName !== 'Unknown') {
-                    // Check if we already have this student (by ID or name)
-                    const existingById = allStudentData.find(s => s.id === studentId);
-                    const existingByName = allStudentData.find(s => s.name === studentName);
+                if (!pendingSnapshot.empty) {
+                    console.log(`✅ Found ${pendingSnapshot.size} pending students with phone: ${phone}`);
                     
-                    if (!existingById && !existingByName) {
-                        studentIds.push(studentId);
-                        studentNameIdMap.set(studentName, studentId);
-                        allStudentData.push({ 
-                            id: studentId, 
-                            name: studentName, 
-                            data: studentData, 
-                            isPending: true 
-                        });
-                        console.log(`✅ Found pending student: ${studentName} (ID: ${studentId})`);
-                    } else if (existingByName && existingByName.id !== studentId) {
-                        // Same name, different ID - add with suffix
-                        const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
-                        studentIds.push(studentId);
-                        studentNameIdMap.set(uniqueName, studentId);
-                        allStudentData.push({ 
-                            id: studentId, 
-                            name: uniqueName, 
-                            data: studentData,
-                            isPending: true 
-                        });
-                        console.log(`✅ Found duplicate name pending student: ${uniqueName} (ID: ${studentId})`);
-                    }
+                    pendingSnapshot.forEach(doc => {
+                        const studentData = doc.data();
+                        const studentId = doc.id;
+                        const studentName = safeText(studentData.studentName || studentData.name || studentData.fullName || 'Unknown Student');
+                        
+                        // Skip if already processed (might be in both collections)
+                        if (foundStudents.has(studentId)) {
+                            console.log(`⏭️ Skipping duplicate pending student ID: ${studentId}`);
+                            return;
+                        }
+                        
+                        if (studentId && studentName && studentName !== 'Unknown Student') {
+                            foundStudents.add(studentId);
+                            studentIds.push(studentId);
+                            
+                            // Handle duplicate names
+                            let displayName = studentName;
+                            if (studentNameIdMap.has(studentName)) {
+                                const parentInfo = studentData.parentName ? ` (${safeText(studentData.parentName)}'s child)` : '';
+                                displayName = `${studentName}${parentInfo}`;
+                            }
+                            
+                            studentNameIdMap.set(displayName, studentId);
+                            allStudentData.push({ 
+                                id: studentId, 
+                                name: displayName,
+                                originalName: studentName,
+                                data: studentData, 
+                                isPending: true,
+                                collection: 'pending_students',
+                                matchedPhone: phone
+                            });
+                            
+                            console.log(`✅ Added pending student: ${displayName} (ID: ${studentId}) from phone: ${phone}`);
+                        }
+                    });
                 }
-            });
-        });
+            } catch (error) {
+                console.warn(`⚠️ Error searching pending_students with phone ${phone}:`, error.message);
+            }
+        }
+        
+        // SEARCH STRATEGY 3: Search by parent name/email (fallback)
+        if (studentIds.length === 0 && currentUserData?.parentName) {
+            console.log("🔍 Trying fallback search by parent name...");
+            try {
+                // Search by parent name in students collection
+                const nameSnapshot = await db.collection("students")
+                    .where("parentName", "==", currentUserData.parentName)
+                    .get();
+                
+                if (!nameSnapshot.empty) {
+                    console.log(`✅ Found ${nameSnapshot.size} students by parent name: ${currentUserData.parentName}`);
+                    
+                    nameSnapshot.forEach(doc => {
+                        const studentData = doc.data();
+                        const studentId = doc.id;
+                        const studentName = safeText(studentData.studentName || studentData.name || 'Unknown Student');
+                        
+                        if (!foundStudents.has(studentId)) {
+                            foundStudents.add(studentId);
+                            studentIds.push(studentId);
+                            studentNameIdMap.set(studentName, studentId);
+                            allStudentData.push({ 
+                                id: studentId, 
+                                name: studentName,
+                                originalName: studentName,
+                                data: studentData,
+                                isPending: false,
+                                collection: 'students',
+                                matchedBy: 'parentName'
+                            });
+                            
+                            console.log(`✅ Added student by parent name: ${studentName} (ID: ${studentId})`);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.warn("⚠️ Error searching by parent name:", error.message);
+            }
+        }
         
         // Store the mapping globally
         studentIdMap = studentNameIdMap;
         
-        console.log("📊 TOTAL student IDs found:", studentIds.length);
-        console.log("👥 Student names found:", Array.from(studentNameIdMap.keys()));
+        console.log("📊 [FIND STUDENTS] FINAL RESULTS:");
+        console.log(`   Total student IDs found: ${studentIds.length}`);
+        console.log(`   Total student names found: ${studentNameIdMap.size}`);
+        console.log(`   All student data entries: ${allStudentData.length}`);
+        
+        // Log all found students for debugging
+        if (studentNameIdMap.size > 0) {
+            console.log("👥 Found students:");
+            Array.from(studentNameIdMap.entries()).forEach(([name, id]) => {
+                const studentInfo = allStudentData.find(s => s.name === name);
+                console.log(`   - ${name} (ID: ${id}, Pending: ${studentInfo?.isPending || false}, Collection: ${studentInfo?.collection})`);
+            });
+        }
         
         return { studentIds, studentNameIdMap, allStudentData };
     } catch (error) {
-        console.error("❌ Error finding student IDs:", error);
+        console.error("❌ [FIND STUDENTS] Critical error:", error);
+        console.error("❌ Error stack:", error.stack);
         return { studentIds: [], studentNameIdMap: new Map(), allStudentData: [] };
     }
 }
@@ -2751,10 +2806,32 @@ function showNewReportNotification(type) {
  * Student Name → Year → Report Type (Assessments/Monthly)
  */
 function createYearlyArchiveReportView(reportsByStudent) {
+    console.log("📄 Creating yearly archive view for", reportsByStudent.size, "students");
+    
     let html = '';
     let studentIndex = 0;
     
-    for (const [studentName, reports] of reportsByStudent) {
+    // Check if we have any students
+    if (reportsByStudent.size === 0) {
+        return `
+            <div class="text-center py-12">
+                <div class="text-6xl mb-4">👨‍👩‍👧‍👦</div>
+                <h3 class="text-xl font-bold text-gray-700 mb-2">No Students Found</h3>
+                <p class="text-gray-500 max-w-md mx-auto">No students are currently assigned to your account. Please contact administration if you believe this is an error.</p>
+                <button onclick="runReportSearchDiagnostics()" class="mt-4 bg-yellow-600 text-white px-6 py-3 rounded-lg hover:bg-yellow-700 transition-all duration-200">
+                    Run Diagnostics
+                </button>
+            </div>
+        `;
+    }
+    
+    // Sort students alphabetically for better organization
+    const sortedStudents = Array.from(reportsByStudent.entries())
+        .sort(([nameA], [nameB]) => nameA.localeCompare(nameB));
+    
+    console.log(`📄 Processing ${sortedStudents.length} students for display`);
+    
+    for (const [studentName, reports] of sortedStudents) {
         const fullName = capitalize(studentName);
         const studentData = reports.studentData;
         
@@ -2762,33 +2839,76 @@ function createYearlyArchiveReportView(reportsByStudent) {
         const assessmentCount = Array.from(reports.assessments.values()).flat().length;
         const monthlyCount = Array.from(reports.monthly.values()).flat().length;
         const totalCount = assessmentCount + monthlyCount;
+        const hasReports = totalCount > 0;
+        
+        console.log(`📄 Student ${studentIndex + 1}: ${fullName} - ${assessmentCount} assessments, ${monthlyCount} monthly reports`);
         
         // Create student accordion header
         html += `
-            <div class="accordion-item mb-4 fade-in">
+            <div class="accordion-item mb-4 fade-in" id="student-accordion-${studentIndex}">
                 <button onclick="toggleAccordion('student-${studentIndex}')" 
-                        class="accordion-header w-full flex justify-between items-center p-4 bg-gradient-to-r from-green-100 to-green-50 border border-green-300 rounded-lg hover:bg-green-200 transition-all duration-200 hover:shadow-md">
+                        class="accordion-header w-full flex justify-between items-center p-4 ${hasReports ? 'bg-gradient-to-r from-green-100 to-green-50 border border-green-300' : 'bg-gradient-to-r from-gray-100 to-gray-50 border border-gray-300'} rounded-lg hover:shadow-md transition-all duration-200">
                     <div class="flex items-center">
-                        <span class="text-2xl mr-3">👤</span>
+                        <span class="text-2xl mr-3">${hasReports ? '👤' : '👤'}</span>
                         <div class="text-left">
-                            <h3 class="font-bold text-green-800 text-lg">${fullName}</h3>
-                            <p class="text-green-600 text-sm">
-                                ${assessmentCount} Assessment(s), ${monthlyCount} Monthly Report(s) • Total: ${totalCount}
+                            <h3 class="font-bold ${hasReports ? 'text-green-800' : 'text-gray-700'} text-lg">${fullName}</h3>
+                            <p class="${hasReports ? 'text-green-600' : 'text-gray-500'} text-sm">
+                                ${hasReports ? 
+                                    `${assessmentCount} Assessment(s), ${monthlyCount} Monthly Report(s) • Total: ${totalCount}` : 
+                                    'No reports yet'}
                                 ${studentData?.isPending ? ' • <span class="text-yellow-600">(Pending Registration)</span>' : ''}
+                                ${studentData?.collection ? ` • <span class="text-blue-600 text-xs">${studentData.collection}</span>` : ''}
                             </p>
                         </div>
                     </div>
                     <div class="flex items-center">
-                        <span id="student-${studentIndex}-arrow" class="accordion-arrow text-green-600 text-xl">▼</span>
+                        ${!hasReports ? `<span class="text-xs text-gray-500 mr-3">No reports</span>` : ''}
+                        <span id="student-${studentIndex}-arrow" class="accordion-arrow ${hasReports ? 'text-green-600' : 'text-gray-500'} text-xl">▼</span>
                     </div>
                 </button>
                 <div id="student-${studentIndex}-content" class="accordion-content hidden">
         `;
         
+        // Student info section (always show)
+        html += `
+            <div class="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 class="font-semibold text-blue-800 mb-3 flex items-center">
+                    <span class="mr-2">📋</span> Student Information
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p class="text-blue-600">Status</p>
+                        <p class="font-medium">${studentData?.isPending ? 'Pending Registration' : 'Active'}</p>
+                    </div>
+                    <div>
+                        <p class="text-blue-600">Collection</p>
+                        <p class="font-medium">${safeText(studentData?.collection || 'Not specified')}</p>
+                    </div>
+                    ${studentData?.data?.tutorName ? `
+                    <div>
+                        <p class="text-blue-600">Assigned Tutor</p>
+                        <p class="font-medium">${safeText(studentData.data.tutorName)}</p>
+                    </div>
+                    ` : ''}
+                    ${studentData?.data?.gradeLevel ? `
+                    <div>
+                        <p class="text-blue-600">Grade Level</p>
+                        <p class="font-medium">${safeText(studentData.data.gradeLevel)}</p>
+                    </div>
+                    ` : ''}
+                </div>
+                ${studentData?.matchedPhone ? `
+                <div class="mt-3 text-xs text-gray-500">
+                    Matched by phone: ${safeText(studentData.matchedPhone)}
+                </div>
+                ` : ''}
+            </div>
+        `;
+        
         // If no reports, show empty state
-        if (totalCount === 0) {
+        if (!hasReports) {
             html += `
-                <div class="p-6 bg-gray-50 border border-gray-200 rounded-lg text-center">
+                <div class="p-6 bg-gray-50 border border-gray-200 rounded-lg text-center mb-4">
                     <div class="text-4xl mb-3">📄</div>
                     <h4 class="text-lg font-semibold text-gray-700 mb-2">No Reports Yet</h4>
                     <p class="text-gray-500">No reports have been generated for ${fullName} yet.</p>
@@ -2826,6 +2946,8 @@ function createYearlyArchiveReportView(reportsByStudent) {
             
             // Sort years in descending order
             const sortedYears = Array.from(reportsByYear.keys()).sort((a, b) => b - a);
+            
+            console.log(`📅 ${fullName} has reports in ${sortedYears.length} year(s):`, sortedYears);
             
             // Create year accordions
             let yearIndex = 0;
@@ -2879,7 +3001,7 @@ function createYearlyArchiveReportView(reportsByStudent) {
                         });
                     });
                     
-                    // Sort months in descending order
+                    // Sort months in descending order (newest first)
                     const sortedMonths = Array.from(assessmentsByMonth.keys()).sort((a, b) => b - a);
                     
                     sortedMonths.forEach(month => {
@@ -2925,7 +3047,7 @@ function createYearlyArchiveReportView(reportsByStudent) {
                         });
                     });
                     
-                    // Sort months in descending order
+                    // Sort months in descending order (newest first)
                     const sortedMonths = Array.from(monthlyByMonth.keys()).sort((a, b) => b - a);
                     
                     sortedMonths.forEach(month => {
@@ -2961,140 +3083,36 @@ function createYearlyArchiveReportView(reportsByStudent) {
         studentIndex++;
     }
     
-    return html;
-}
-
-function createAssessmentReportHTML(session, studentIndex, sessionId, fullName) {
-    const firstReport = session[0];
-    const formattedDate = formatDetailedDate(new Date(firstReport.timestamp * 1000), true);
+    // Add a summary at the top
+    const totalStudents = sortedStudents.length;
+    const studentsWithReports = sortedStudents.filter(([_, reports]) => {
+        const assessmentCount = Array.from(reports.assessments.values()).flat().length;
+        const monthlyCount = Array.from(reports.monthly.values()).flat().length;
+        return (assessmentCount + monthlyCount) > 0;
+    }).length;
     
-    const results = session.map(testResult => {
-        const topics = [...new Set(testResult.answers?.map(a => safeText(a.topic)).filter(t => t))] || [];
-        return {
-            subject: safeText(testResult.subject),
-            correct: testResult.score !== undefined ? testResult.score : 0,
-            total: testResult.totalScoreableQuestions !== undefined ? testResult.totalScoreableQuestions : 0,
-            topics: topics,
-        };
-    });
-    
-    const tableRows = results.map(res => `
-        <tr>
-            <td class="border px-3 py-2">${res.subject.toUpperCase()}</td>
-            <td class="border px-3 py-2 text-center">${res.correct} / ${res.total}</td>
-            <td class="border px-3 py-2 text-sm">${res.topics.join(', ')}</td>
-        </tr>
-    `).join("");
-    
-    return `
-        <div class="border rounded-lg shadow mb-4 p-4 bg-white hover:shadow-md transition-shadow duration-200" id="assessment-block-${studentIndex}-${sessionId}">
-            <div class="flex justify-between items-center mb-3 border-b pb-2">
-                <h5 class="font-medium text-gray-800">Assessment - ${safeText(formattedDate)}</h5>
-                <button onclick="downloadSessionReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}', 'assessment')" 
-                        class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm bg-green-50 px-3 py-1 rounded-lg hover:bg-green-100 transition-all duration-200">
-                    <span class="mr-1">📥</span> Download PDF
-                </button>
+    const summaryHtml = `
+        <div class="bg-gradient-to-r from-blue-100 to-blue-50 border-l-4 border-blue-600 p-6 rounded-lg mb-8 shadow-md slide-down">
+            <h2 class="text-2xl font-bold text-blue-800 mb-3">📊 Progress Reports Summary</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div class="bg-white p-4 rounded-lg border border-blue-200">
+                    <p class="text-sm font-medium text-blue-700">Total Children</p>
+                    <p class="text-3xl font-extrabold text-blue-900 mt-1">${totalStudents}</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg border border-green-200">
+                    <p class="text-sm font-medium text-green-700">Children with Reports</p>
+                    <p class="text-3xl font-extrabold text-green-900 mt-1">${studentsWithReports}</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg border border-gray-200">
+                    <p class="text-sm font-medium text-gray-700">Children without Reports</p>
+                    <p class="text-3xl font-extrabold text-gray-900 mt-1">${totalStudents - studentsWithReports}</p>
+                </div>
             </div>
-            
-            <table class="w-full text-sm mb-3 border border-collapse">
-                <thead class="bg-gray-100">
-                    <tr>
-                        <th class="border px-3 py-2 text-left">Subject</th>
-                        <th class="border px-3 py-2 text-center">Score</th>
-                        <th class="border px-3 py-2 text-left">Topics</th>
-                    </tr>
-                </thead>
-                <tbody>${tableRows}</tbody>
-            </table>
+            <p class="text-blue-700">Click on each child's name below to expand and view their progress reports.</p>
         </div>
     `;
-}
-
-function createMonthlyReportHTML(session, studentIndex, sessionId, fullName) {
-    const firstReport = session[0];
-    const formattedDate = formatDetailedDate(new Date(firstReport.timestamp * 1000), true);
-    const safeTopics = safeText(firstReport.topics ? firstReport.topics.substring(0, 150) + (firstReport.topics.length > 150 ? '...' : '') : 'N/A');
     
-    return `
-        <div class="border rounded-lg shadow mb-4 p-4 bg-white hover:shadow-md transition-shadow duration-200" id="monthly-block-${studentIndex}-${sessionId}">
-            <div class="flex justify-between items-center mb-3 border-b pb-2">
-                <h5 class="font-medium text-gray-800">Monthly Report - ${safeText(formattedDate)}</h5>
-                <button onclick="downloadMonthlyReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}')" 
-                        class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm bg-green-50 px-3 py-1 rounded-lg hover:bg-green-100 transition-all duration-200">
-                    <span class="mr-1">📥</span> Download PDF
-                </button>
-            </div>
-            
-            <div class="text-sm text-gray-700 space-y-2">
-                <p><strong class="text-gray-800">Tutor:</strong> ${safeText(firstReport.tutorName || 'N/A')}</p>
-                <p><strong class="text-gray-800">Month:</strong> ${safeText(formattedDate.split(' ')[0])} ${new Date(firstReport.timestamp * 1000).getFullYear()}</p>
-                <div>
-                    <strong class="text-gray-800">Topics Covered:</strong>
-                    <p class="mt-1 bg-gray-50 p-3 rounded border">${safeTopics}</p>
-                </div>
-                ${firstReport.studentProgress ? `
-                <div>
-                    <strong class="text-gray-800">Progress Notes:</strong>
-                    <p class="mt-1 bg-blue-50 p-3 rounded border">${safeText(firstReport.studentProgress)}</p>
-                </div>
-                ` : ''}
-            </div>
-        </div>
-    `;
-}
-
-function downloadSessionReport(studentIndex, sessionId, studentName, type) {
-    const element = document.getElementById(`${type}-block-${studentIndex}-${sessionId}`);
-    if (!element) {
-        showMessage('Report element not found for download', 'error');
-        return;
-    }
-    const safeStudentName = studentName.replace(/[^a-zA-Z0-9]/g, '_');
-    const fileName = `${type === 'assessment' ? 'Assessment' : 'Monthly'}_Report_${safeStudentName}_${Date.now()}.pdf`;
-    
-    const opt = {
-        margin: 0.5,
-        filename: fileName,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-            scale: 2, 
-            useCORS: true,
-            backgroundColor: '#ffffff'
-        },
-        jsPDF: { 
-            unit: 'in', 
-            format: 'letter', 
-            orientation: 'portrait' 
-        }
-    };
-    
-    // Show loading message
-    showMessage('Generating PDF download...', 'success');
-    
-    html2pdf().from(element).set(opt).save();
-}
-
-function downloadMonthlyReport(studentIndex, sessionId, studentName) {
-    downloadSessionReport(studentIndex, sessionId, studentName, 'monthly');
-}
-
-// FIXED: Accordion toggle function
-function toggleAccordion(elementId) {
-    const content = document.getElementById(`${elementId}-content`);
-    const arrow = document.getElementById(`${elementId}-arrow`);
-    
-    if (!content || !arrow) {
-        console.error(`Could not find accordion elements for ${elementId}`);
-        return;
-    }
-    
-    if (content.classList.contains('hidden')) {
-        content.classList.remove('hidden');
-        arrow.textContent = '▲';
-    } else {
-        content.classList.add('hidden');
-        arrow.textContent = '▼';
-    }
+    return summaryHtml + html;
 }
 
 // ============================================================================
@@ -3102,6 +3120,8 @@ function toggleAccordion(elementId) {
 // ============================================================================
 
 async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false) {
+    console.log("🚀 [LOAD REPORTS] Starting with parentPhone:", parentPhone, "userId:", userId);
+    
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
     const authArea = document.getElementById("authArea");
@@ -3125,7 +3145,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
 
     try {
         // --- CACHE IMPLEMENTATION (skip if force refresh) ---
-        const cacheKey = `reportCache_${parentPhone}`;
+        const cacheKey = `reportCache_${parentPhone}_${userId}`;
         const twoWeeksInMillis = 14 * 24 * 60 * 60 * 1000;
         
         if (!forceRefresh) {
@@ -3134,7 +3154,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                 if (cachedItem) {
                     const cacheData = JSON.parse(cachedItem);
                     if (Date.now() - cacheData.timestamp < twoWeeksInMillis) {
-                        console.log("Loading reports from cache.");
+                        console.log("📦 Loading reports from cache.");
                         if (reportContent) reportContent.innerHTML = cacheData.html;
                         
                         // Set welcome message from cache
@@ -3167,10 +3187,12 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                         loadAcademicsData();
 
                         return;
+                    } else {
+                        console.log("🗑️ Cache expired, refreshing...");
                     }
                 }
             } catch (e) {
-                console.error("Could not read from cache:", e);
+                console.error("❌ Could not read from cache:", e);
                 localStorage.removeItem(cacheKey);
             }
         }
@@ -3246,64 +3268,69 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             }
         }
 
-        console.log("🔍 Starting ULTIMATE search for reports with:", { parentPhone, email: currentUserData.email, uid: userId });
+        console.log("🔍 [LOAD REPORTS] Starting ULTIMATE search for reports with:", { 
+            parentPhone, 
+            email: currentUserData.email, 
+            uid: userId,
+            parentName: currentUserData.parentName
+        });
 
-        // --- FIRST: GET ALL STUDENTS ASSIGNED TO THIS PARENT ---
+        // --- FIRST: GET ALL STUDENTS ASSIGNED TO THIS PARENT (CRITICAL STEP) ---
+        console.log("👥 [LOAD REPORTS] Step 1: Finding ALL students for parent...");
         const { studentIds, studentNameIdMap, allStudentData } = await findStudentIdsForParent(parentPhone);
         
         // Store student names globally - CRITICAL: Store ALL students found
         userChildren = Array.from(studentNameIdMap.keys());
         
-        console.log("👥 ALL Students found for parent:", {
-            count: userChildren.length,
-            names: userChildren,
-            ids: studentIds,
-            dataCount: allStudentData.length
-        });
+        console.log("👥 [LOAD REPORTS] Step 1 COMPLETE - Students found:");
+        console.log(`   Count: ${userChildren.length}`);
+        console.log(`   Names: ${JSON.stringify(userChildren)}`);
+        console.log(`   IDs: ${JSON.stringify(studentIds)}`);
+        console.log(`   Data entries: ${allStudentData.length}`);
 
         // --- USE ULTIMATE SEARCH SYSTEM ---
+        console.log("🔍 [LOAD REPORTS] Step 2: Searching for reports...");
         const { assessmentResults, monthlyResults, searchStats } = await searchAllReportsForParent(
             parentPhone, 
             currentUserData.email || userData?.email || '',
             userId
         );
 
-        console.log("🔍 Search Statistics:", searchStats);
-        console.log("📊 Report counts - Assessments:", assessmentResults.length, "Monthly:", monthlyResults.length);
+        console.log("📊 [LOAD REPORTS] Search Statistics:", searchStats);
+        console.log("📊 [LOAD REPORTS] Report counts - Assessments:", assessmentResults.length, "Monthly:", monthlyResults.length);
 
-        // If no reports found, show helpful message with all students listed
-        if (assessmentResults.length === 0 && monthlyResults.length === 0) {
-            showMessage(`No reports found yet for your ${userChildren.length} child(ren). Reports will appear here once tutors submit them.`, 'info');
-            
-            // Show search stats for debugging
-            console.log("📊 Why no reports found:", {
-                parentPhone,
-                email: currentUserData?.email,
-                uid: userId,
-                studentsFound: userChildren.length,
-                searchStats
-            });
-        }
+        // --- GROUP REPORTS BY STUDENT ---
+        console.log("📊 [LOAD REPORTS] Step 3: Grouping reports by student...");
         
-        // Group reports by student name - CRITICAL FIX: Initialize ALL students first
+        // Initialize reportsByStudent map with ALL students (even those without reports)
         const reportsByStudent = new Map();
-
-        // CRITICAL FIX: Initialize ALL students in the map (even those without reports)
+        
+        // CRITICAL FIX: Initialize ALL students in the map FIRST
+        console.log("📋 Initializing ALL students in reports map:");
         for (const studentName of userChildren) {
             const studentInfo = allStudentData.find(s => s.name === studentName);
             reportsByStudent.set(studentName, { 
                 assessments: new Map(), 
                 monthly: new Map(),
-                studentData: studentInfo // Store student data
+                studentData: studentInfo, // Store student data
+                hasReports: false // Track if we find any reports for this student
             });
+            console.log(`   - ${studentName} (Pending: ${studentInfo?.isPending || false}, Collection: ${studentInfo?.collection || 'unknown'})`);
         }
 
-        // DEBUG: Log which students were initialized
-        console.log("📋 Students initialized in reports map:", Array.from(reportsByStudent.keys()));
+        // DEBUG: Check what students we initialized
+        console.log(`📋 Total students initialized: ${reportsByStudent.size}`);
 
-        // If no reports found at all, still show all students
+        // If no reports found at all, show all students with empty state
         if (assessmentResults.length === 0 && monthlyResults.length === 0) {
-            console.log("⚠️ No reports found for any student, but showing all registered students");
+            console.log("⚠️ [LOAD REPORTS] No reports found for any student, showing all registered students");
+            
+            // Show message to user
+            if (userChildren.length > 0) {
+                showMessage(`Found ${userChildren.length} child(ren) but no reports yet. Reports will appear here once tutors submit them.`, 'info');
+            } else {
+                showMessage('No students found for your account. Please contact administration.', 'warning');
+            }
             
             // Create empty report view with all students
             if (reportContent) {
@@ -3317,12 +3344,13 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                     timestamp: Date.now(),
                     html: reportContent ? reportContent.innerHTML : '',
                     userData: currentUserData,
-                    studentCount: userChildren.length
+                    studentCount: userChildren.length,
+                    reportCount: 0
                 };
                 localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
-                console.log("Report data cached successfully.");
+                console.log("✅ Report data cached successfully.");
             } catch (e) {
-                console.error("Could not write to cache:", e);
+                console.error("❌ Could not write to cache:", e);
             }
             // --- END CACHE SAVING ---
 
@@ -3345,17 +3373,18 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             return; // Exit early since no reports
         }
 
-        // Group assessment reports by student
+        // Process assessment reports
+        console.log("📊 Processing assessment reports...");
         const assessmentGroups = new Map();
         assessmentResults.forEach(result => {
-            const studentName = safeText(result.studentName || result.student || 'Unknown Student');
+            const studentName = safeText(result.studentName || result.student || result.studentName || 'Unknown Student');
             if (!assessmentGroups.has(studentName)) {
                 assessmentGroups.set(studentName, []);
             }
             assessmentGroups.get(studentName).push(result);
         });
 
-        // Group assessment reports by session (day) and add to existing student map
+        // Add assessment reports to student map
         for (const [studentName, assessments] of assessmentGroups) {
             const sessionGroups = new Map();
             
@@ -3370,32 +3399,37 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             if (reportsByStudent.has(studentName)) {
                 // Student already in map, add assessments
                 reportsByStudent.get(studentName).assessments = sessionGroups;
+                reportsByStudent.get(studentName).hasReports = true;
+                console.log(`✅ Added ${assessments.length} assessment(s) to existing student: ${studentName}`);
             } else {
                 // Student has reports but wasn't in userChildren? Add them
                 console.log(`📝 Adding ${studentName} to reports (found in assessment results but not in student list)`);
                 reportsByStudent.set(studentName, { 
                     assessments: sessionGroups, 
                     monthly: new Map(),
-                    studentData: null // No student data found
+                    studentData: null,
+                    hasReports: true
                 });
                 // Also add to userChildren for consistency
                 if (!userChildren.includes(studentName)) {
                     userChildren.push(studentName);
+                    console.log(`➕ Added ${studentName} to userChildren list`);
                 }
             }
         }
 
-        // Group monthly reports by student
+        // Process monthly reports
+        console.log("📊 Processing monthly reports...");
         const monthlyGroups = new Map();
         monthlyResults.forEach(result => {
-            const studentName = safeText(result.studentName || result.student || 'Unknown Student');
+            const studentName = safeText(result.studentName || result.student || result.studentName || 'Unknown Student');
             if (!monthlyGroups.has(studentName)) {
                 monthlyGroups.set(studentName, []);
             }
             monthlyGroups.get(studentName).push(result);
         });
 
-        // Group monthly reports by session (day) and add to existing student map
+        // Add monthly reports to student map
         for (const [studentName, monthlies] of monthlyGroups) {
             const sessionGroups = new Map();
             
@@ -3410,6 +3444,8 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             if (reportsByStudent.has(studentName)) {
                 // Student already in map, add monthly reports
                 reportsByStudent.get(studentName).monthly = sessionGroups;
+                reportsByStudent.get(studentName).hasReports = true;
+                console.log(`✅ Added ${monthlies.length} monthly report(s) to existing student: ${studentName}`);
             } else {
                 // Student has reports but wasn't in userChildren? Add them
                 console.log(`📝 Adding ${studentName} to reports (found in monthly results but not in student list)`);
@@ -3417,28 +3453,47 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                 reportsByStudent.set(studentName, { 
                     ...existingData,
                     monthly: sessionGroups,
-                    studentData: existingData.studentData || null
+                    studentData: existingData.studentData || null,
+                    hasReports: true
                 });
                 // Also add to userChildren for consistency
                 if (!userChildren.includes(studentName)) {
                     userChildren.push(studentName);
+                    console.log(`➕ Added ${studentName} to userChildren list`);
                 }
             }
         }
 
         // DEBUG: Log which students will be shown
-        console.log("📊 Students to display in reports (FINAL):");
+        console.log("📊 [LOAD REPORTS] Step 4: Final student display list:");
+        let totalStudentsWithReports = 0;
+        let totalStudentsWithoutReports = 0;
+        
         for (const [studentName, data] of reportsByStudent) {
             const assessmentCount = Array.from(data.assessments.values()).flat().length;
             const monthlyCount = Array.from(data.monthly.values()).flat().length;
             const hasStudentData = !!data.studentData;
-            console.log(`  👤 ${studentName}: ${assessmentCount} assessments, ${monthlyCount} monthly reports, Has data: ${hasStudentData}`);
+            const hasReports = data.hasReports || (assessmentCount > 0 || monthlyCount > 0);
+            
+            if (hasReports) {
+                totalStudentsWithReports++;
+                console.log(`   ✅ ${studentName}: ${assessmentCount} assessments, ${monthlyCount} monthly reports, Has data: ${hasStudentData}`);
+            } else {
+                totalStudentsWithoutReports++;
+                console.log(`   ⏭️ ${studentName}: No reports yet (will still be displayed)`);
+            }
         }
+        
+        console.log(`📊 Total students with reports: ${totalStudentsWithReports}`);
+        console.log(`📊 Total students without reports: ${totalStudentsWithoutReports}`);
+        console.log(`📊 Grand total students to display: ${reportsByStudent.size}`);
 
         // Create yearly archive accordion view - This will show ALL students
         if (reportContent) {
+            console.log("📄 [LOAD REPORTS] Step 5: Creating HTML view...");
             const reportsHtml = createYearlyArchiveReportView(reportsByStudent);
             reportContent.innerHTML = reportsHtml;
+            console.log("✅ HTML view created successfully");
         }
         
         // --- CACHE SAVING LOGIC ---
@@ -3448,12 +3503,14 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                 html: reportContent ? reportContent.innerHTML : '',
                 userData: currentUserData,
                 studentCount: userChildren.length,
-                reportCount: assessmentResults.length + monthlyResults.length
+                reportCount: assessmentResults.length + monthlyResults.length,
+                studentsWithReports: totalStudentsWithReports,
+                studentsWithoutReports: totalStudentsWithoutReports
             };
             localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
-            console.log("Report data cached successfully.");
+            console.log("✅ Report data cached successfully.");
         } catch (e) {
-            console.error("Could not write to cache:", e);
+            console.error("❌ Could not write to cache:", e);
         }
         // --- END CACHE SAVING ---
 
@@ -3477,7 +3534,9 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         loadAcademicsData();
 
     } catch (error) {
-        console.error("❌ Error loading reports:", error);
+        console.error("❌ [LOAD REPORTS] Critical error loading reports:", error);
+        console.error("❌ Error stack:", error.stack);
+        
         if (reportContent) {
             reportContent.innerHTML = `
                 <div class="text-center py-16">
@@ -3486,8 +3545,17 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                     <p class="text-gray-600 max-w-2xl mx-auto mb-6">
                         Sorry, there was an error loading your reports. Please try again.
                         <br><br>
-                        <small>Error: ${safeText(error.message)}</small>
+                        <small class="text-red-500">Error: ${safeText(error.message)}</small>
                     </p>
+                    <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-6 mb-6 max-w-2xl mx-auto text-left">
+                        <h3 class="font-bold text-yellow-800 mb-3">Debug Information:</h3>
+                        <p class="text-sm text-yellow-700">
+                            Parent Phone: ${safeText(parentPhone)}<br>
+                            User ID: ${safeText(userId)}<br>
+                            Found Students: ${userChildren.length}<br>
+                            Error: ${safeText(error.message)}
+                        </p>
+                    </div>
                     <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
                         <button onclick="window.location.reload()" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 flex items-center">
                             <span class="mr-2">🔄</span> Reload Page
@@ -3504,6 +3572,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         }
     } finally {
         if (authLoader) authLoader.classList.add("hidden");
+        console.log("🏁 [LOAD REPORTS] Process completed");
     }
 }
 
