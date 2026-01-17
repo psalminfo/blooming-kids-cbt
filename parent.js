@@ -333,6 +333,270 @@ function normalizePhoneNumber(phone) {
 }
 
 // ============================================================================
+// ENHANCED PHONE VARIATION GENERATOR - FINDS ALL POSSIBLE FORMATS
+// ============================================================================
+
+/**
+ * Generate ALL possible phone variations with MAXIMUM coverage
+ * This ensures we find children/reports even if phones are stored differently
+ */
+function generateAllPhoneVariations(phone) {
+    const variations = new Set();
+    
+    if (!phone || typeof phone !== 'string') return [];
+    
+    console.log(`🔧 Generating phone variations for: "${phone}"`);
+    
+    // Add original (trimmed)
+    const trimmed = phone.trim();
+    variations.add(trimmed);
+    
+    // BASIC CLEANING - multiple methods
+    const cleaned1 = phone.replace(/\s+/g, ''); // Remove spaces only
+    const cleaned2 = phone.replace(/[^\d+]/g, ''); // Remove all non-digit except +
+    const cleaned3 = phone.replace(/[^0-9]/g, ''); // Remove everything except digits
+    
+    variations.add(cleaned1);
+    variations.add(cleaned2);
+    variations.add(cleaned3);
+    
+    // If it starts with +, add without +
+    if (cleaned2.startsWith('+')) {
+        variations.add(cleaned2.substring(1));
+    }
+    
+    // Add with + if it doesn't have it
+    if (!cleaned2.startsWith('+') && cleaned2.length > 5) {
+        variations.add('+' + cleaned2);
+    }
+    
+    // COMMON COUNTRY CODE PATTERNS (EXPANDED)
+    const countryCodes = [
+        '+1', '+234', '+44', '+91', '+86', '+33', '+49', '+81', '+61', '+55',
+        '+7', '+20', '+27', '+34', '+39', '+52', '+62', '+82', '+90', '+92',
+        '+966', '+971', '+233', '+254', '+255', '+256', '+237', '+251', '+250',
+        '+41', '+351', '+31', '+32', '+46', '+47', '+45', '+358', '+353', '+48',
+        '+961', '+962', '+60', '+852', '+63', '+65', '+64', '+380', '+30', '+43',
+        '+420', '+36', '+40'
+    ];
+    
+    // Try adding/removing country codes
+    for (const code of countryCodes) {
+        // If number starts with country code, remove it
+        if (cleaned2.startsWith(code)) {
+            const withoutCode = cleaned2.substring(code.length);
+            variations.add(withoutCode);
+            variations.add('0' + withoutCode); // Add leading zero
+            variations.add('0' + withoutCode.substring(1)); // Try with single 0
+        }
+        
+        // If number doesn't start with +, try adding country code
+        if (!cleaned2.startsWith('+') && cleaned2.length >= 7) {
+            variations.add(code + cleaned2);
+            variations.add(code.substring(1) + cleaned2); // Without +
+        }
+        
+        // Try with local number starting with 0
+        if (cleaned2.startsWith('0') && cleaned2.length >= 10) {
+            const withoutZero = cleaned2.substring(1);
+            variations.add(code + withoutZero);
+        }
+    }
+    
+    // LOCAL FORMAT VARIATIONS
+    const digitsOnly = cleaned3;
+    
+    if (digitsOnly.length >= 7) {
+        // US/Canada formats (10 digits)
+        if (digitsOnly.length === 10) {
+            variations.add('+1' + digitsOnly);
+            variations.add('1' + digitsOnly);
+            variations.add('(' + digitsOnly.substring(0, 3) + ') ' + digitsOnly.substring(3, 6) + '-' + digitsOnly.substring(6));
+            variations.add(digitsOnly.substring(0, 3) + '-' + digitsOnly.substring(3, 6) + '-' + digitsOnly.substring(6));
+            variations.add(digitsOnly.substring(0, 3) + '.' + digitsOnly.substring(3, 6) + '.' + digitsOnly.substring(6));
+        }
+        
+        // Nigeria formats (234) - 11 digits starting with 0
+        if (digitsOnly.length === 11 && digitsOnly.startsWith('0')) {
+            variations.add('+234' + digitsOnly.substring(1));
+            variations.add('234' + digitsOnly.substring(1));
+            variations.add('0' + digitsOnly.substring(1)); // Sometimes stored as 080...
+            variations.add(digitsOnly); // Original 080...
+        }
+        
+        // UK formats (44) - 11 digits starting with 0
+        if (digitsOnly.length === 11 && digitsOnly.startsWith('0')) {
+            variations.add('+44' + digitsOnly.substring(1));
+            variations.add('44' + digitsOnly.substring(1));
+        }
+        
+        // Generic international format
+        variations.add('+' + digitsOnly);
+        
+        // Try adding common prefixes
+        if (digitsOnly.length >= 9) {
+            variations.add('0' + digitsOnly);
+            variations.add('00' + digitsOnly);
+        }
+    }
+    
+    // SPACED/DASHED FORMATS for all variations
+    const allVars = Array.from(variations);
+    allVars.forEach(variation => {
+        if (variation && variation.length >= 7) {
+            const digits = variation.replace(/\D/g, '');
+            
+            if (digits.length === 10) {
+                // XXX-XXX-XXXX
+                const dashed = digits.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+                if (dashed !== variation) variations.add(dashed);
+                
+                // (XXX) XXX-XXXX
+                const parens = digits.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
+                if (parens !== variation) variations.add(parens);
+                
+                // XXX.XXX.XXXX
+                const dotted = digits.replace(/(\d{3})(\d{3})(\d{4})/, '$1.$2.$3');
+                if (dotted !== variation) variations.add(dotted);
+                
+                // XXX XXX XXXX
+                const spaced = digits.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3');
+                if (spaced !== variation) variations.add(spaced);
+            }
+            
+            if (digits.length === 11) {
+                // 1-XXX-XXX-XXXX
+                const dashed11 = digits.replace(/(\d{1})(\d{3})(\d{3})(\d{4})/, '$1-$2-$3-$4');
+                if (dashed11 !== variation) variations.add(dashed11);
+                
+                // 1.XXX.XXX.XXXX
+                const dotted11 = digits.replace(/(\d{1})(\d{3})(\d{3})(\d{4})/, '$1.$2.$3.$4');
+                if (dotted11 !== variation) variations.add(dotted11);
+                
+                // 1 XXX XXX XXXX
+                const spaced11 = digits.replace(/(\d{1})(\d{3})(\d{3})(\d{4})/, '$1 $2 $3 $4');
+                if (spaced11 !== variation) variations.add(spaced11);
+            }
+            
+            // Generic formatting for any length
+            if (digits.length >= 8 && digits.length <= 15) {
+                // Try grouping by 2, 3, or 4 digits
+                const groups3 = digits.match(/.{1,3}/g);
+                if (groups3) {
+                    const grouped3 = groups3.join('-');
+                    if (grouped3 !== variation && grouped3.length >= 7) variations.add(grouped3);
+                }
+                
+                const groups4 = digits.match(/.{1,4}/g);
+                if (groups4) {
+                    const grouped4 = groups4.join('-');
+                    if (grouped4 !== variation && grouped4.length >= 7) variations.add(grouped4);
+                }
+            }
+        }
+    });
+    
+    // Filter and return
+    const finalVariations = Array.from(variations)
+        .filter(v => v && v.length >= 7)  // Minimum 7 chars (including country code)
+        .filter(v => v.length <= 20)     // Maximum reasonable length
+        .filter(v => !v.includes('undefined') && !v.includes('null') && !v.includes('NaN'))
+        .filter(v => {
+            // Remove obviously invalid variations
+            const digits = v.replace(/\D/g, '');
+            return digits.length >= 7; // At least 7 actual digits
+        })
+        .filter((v, i, arr) => arr.indexOf(v) === i); // Unique values only
+    
+    console.log(`📱 Generated ${finalVariations.length} phone variations`);
+    
+    // DEBUG: Show first 10 variations
+    if (finalVariations.length > 0) {
+        console.log("📱 Sample variations:", finalVariations.slice(0, 10));
+    }
+    
+    return finalVariations;
+}
+
+// ============================================================================
+// ENHANCED STUDENT SEARCH WITH ALL VARIATIONS
+// ============================================================================
+
+/**
+ * Find ALL students for a parent using ALL phone variations
+ */
+async function findAllStudentsForParent(parentPhone) {
+    console.log("🔍 Searching for ALL students with phone:", parentPhone);
+    
+    const phoneVariations = generateAllPhoneVariations(parentPhone);
+    console.log(`📱 Using ${phoneVariations.length} phone variations`);
+    
+    const allStudents = [];
+    const foundIds = new Set();
+    
+    // Search in students collection
+    for (const phoneVar of phoneVariations) {
+        try {
+            const snapshot = await db.collection('students')
+                .where('parentPhone', '==', phoneVar)
+                .get();
+            
+            if (!snapshot.empty) {
+                snapshot.forEach(doc => {
+                    if (!foundIds.has(doc.id)) {
+                        const student = doc.data();
+                        allStudents.push({
+                            id: doc.id,
+                            name: safeText(student.studentName || student.name || 'Unknown'),
+                            phoneFoundWith: phoneVar,
+                            source: 'students',
+                            data: student,
+                            isPending: false
+                        });
+                        foundIds.add(doc.id);
+                        console.log(`✅ Found student: ${student.studentName} (with phone: ${phoneVar})`);
+                    }
+                });
+            }
+        } catch (error) {
+            console.warn(`Error searching students with ${phoneVar}:`, error.message);
+        }
+    }
+    
+    // Search in pending_students collection
+    for (const phoneVar of phoneVariations) {
+        try {
+            const snapshot = await db.collection('pending_students')
+                .where('parentPhone', '==', phoneVar)
+                .get();
+            
+            if (!snapshot.empty) {
+                snapshot.forEach(doc => {
+                    if (!foundIds.has(doc.id)) {
+                        const student = doc.data();
+                        allStudents.push({
+                            id: doc.id,
+                            name: safeText(student.studentName || student.name || 'Unknown'),
+                            phoneFoundWith: phoneVar,
+                            source: 'pending_students',
+                            data: student,
+                            isPending: true
+                        });
+                        foundIds.add(doc.id);
+                        console.log(`✅ Found pending student: ${student.studentName} (with phone: ${phoneVar})`);
+                    }
+                });
+            }
+        } catch (error) {
+            console.warn(`Error searching pending_students with ${phoneVar}:`, error.message);
+        }
+    }
+    
+    console.log(`👥 TOTAL students found: ${allStudents.length}`);
+    return allStudents;
+}
+
+// ============================================================================
 // SECTION 3: GLOBAL VARIABLES & STATE MANAGEMENT
 // ============================================================================
 
@@ -667,145 +931,483 @@ async function findStudentIdsForParent(parentPhone) {
 }
 
 // ============================================================================
-// SECTION 6: AUTHENTICATION & USER MANAGEMENT (CORE IMPLEMENTATION)
+// SECTION 6: FIXED AUTHENTICATION & USER MANAGEMENT - ALLOWS DUPLICATE EMAILS
 // ============================================================================
 
 /**
- * FULL SIGN IN LOGIC
- * Handles the actual Firebase authentication and UI updates.
- * Called by the wrapper in Section 18.
+ * ENHANCED SIGN-IN: Allows login with email OR phone, even if email was used elsewhere
  */
-async function handleSignInFull(identifier, password, signInBtn, authLoader) {
+async function handleSignIn() {
+    const identifier = document.getElementById('loginIdentifier')?.value.trim();
+    const password = document.getElementById('loginPassword')?.value;
+    const rememberMeCheckbox = document.getElementById('rememberMe');
+
+    if (!identifier || !password) {
+        showMessage('Please fill in all fields', 'error');
+        return;
+    }
+
+    const signInBtn = document.getElementById('signInBtn');
+    const authLoader = document.getElementById('authLoader');
+
+    signInBtn.disabled = true;
+    document.getElementById('signInText').textContent = 'Signing In...';
+    document.getElementById('signInSpinner').classList.remove('hidden');
+    authLoader.classList.remove('hidden');
+
     try {
-        // 1. Attempt Sign In
-        // We assume identifier is email, but if you use phone-as-email, logic can be added here
-        await auth.signInWithEmailAndPassword(identifier, password);
+        let userCredential;
+        let userEmail = '';
         
-        // 2. Success is handled by the onAuthStateChanged listener in Section 18
-        // We just log here for debugging
-        console.log("✅ Sign in successful for:", identifier);
+        // Check if identifier is email or phone
+        const isEmail = identifier.includes('@');
+        
+        if (isEmail) {
+            // Try email login
+            userEmail = identifier.toLowerCase();
+            userCredential = await auth.signInWithEmailAndPassword(userEmail, password);
+            console.log("✅ Signed in with email:", userEmail);
+        } else {
+            // Try phone login - need to find email first
+            console.log("🔍 Identifier appears to be phone, finding email...");
+            
+            // Normalize phone
+            const normalizedPhone = normalizePhoneNumber(identifier);
+            if (!normalizedPhone.valid) {
+                throw new Error('Invalid phone number format');
+            }
+            
+            // Search for parent by phone in parent_users collection
+            const parentSnapshot = await db.collection('parent_users')
+                .where('phone', '==', normalizedPhone.normalized)
+                .limit(1)
+                .get();
+            
+            if (parentSnapshot.empty) {
+                // Try normalizedPhone field
+                const parentSnapshot2 = await db.collection('parent_users')
+                    .where('normalizedPhone', '==', normalizedPhone.normalized)
+                    .limit(1)
+                    .get();
+                
+                if (parentSnapshot2.empty) {
+                    throw new Error('No account found with this phone number');
+                }
+                
+                const parentData = parentSnapshot2.docs[0].data();
+                userEmail = parentData.email;
+            } else {
+                const parentData = parentSnapshot.docs[0].data();
+                userEmail = parentData.email;
+            }
+            
+            if (!userEmail) {
+                throw new Error('Could not find email for this phone number');
+            }
+            
+            // Sign in with found email
+            userCredential = await auth.signInWithEmailAndPassword(userEmail, password);
+            console.log("✅ Signed in with phone (found email):", userEmail);
+        }
+
+        // Handle Remember Me
+        if (rememberMeCheckbox?.checked && userEmail) {
+            localStorage.setItem('rememberMe', 'true');
+            localStorage.setItem('savedEmail', safeText(userEmail));
+        } else {
+            localStorage.removeItem('rememberMe');
+            localStorage.removeItem('savedEmail');
+        }
+
+        showMessage('Successfully signed in!', 'success');
+        
+        // Auth state listener will handle the rest (dashboard loading)
+        console.log("✅ Sign in successful, auth listener will handle dashboard");
 
     } catch (error) {
-        console.error("Sign In Error:", error);
+        console.error('Sign in error:', error);
         
-        // 3. Handle Errors
-        let errorMessage = "Failed to sign in. Please check your credentials.";
+        let errorMessage = 'Sign in failed. ';
         
-        if (error.code === 'auth/user-not-found') {
-            errorMessage = "No account found with this email.";
-        } else if (error.code === 'auth/wrong-password') {
-            errorMessage = "Incorrect password.";
-        } else if (error.code === 'auth/invalid-email') {
-            errorMessage = "Invalid email address format.";
-        } else if (error.code === 'auth/too-many-requests') {
-            errorMessage = "Too many failed attempts. Please try again later.";
+        // User-friendly error messages
+        switch (error.code) {
+            case 'auth/user-not-found':
+            case 'auth/wrong-password':
+                errorMessage += 'Invalid email/phone or password.';
+                break;
+            case 'auth/invalid-email':
+                errorMessage += 'Invalid email format.';
+                break;
+            case 'auth/too-many-requests':
+                errorMessage += 'Too many failed attempts. Please try again later.';
+                break;
+            case 'auth/network-request-failed':
+                errorMessage += 'Network error. Please check your connection.';
+                break;
+            default:
+                errorMessage += error.message || 'Please check your credentials.';
         }
         
         showMessage(errorMessage, 'error');
         
-        // 4. Reset UI
-        if (signInBtn) signInBtn.disabled = false;
-        
-        const signInText = document.getElementById('signInText');
-        const signInSpinner = document.getElementById('signInSpinner');
-        
-        if (signInText) signInText.textContent = 'Sign In';
-        if (signInSpinner) signInSpinner.classList.add('hidden');
-        if (authLoader) authLoader.classList.add('hidden');
+        // Reset button state
+        signInBtn.disabled = false;
+        document.getElementById('signInText').textContent = 'Sign In';
+        document.getElementById('signInSpinner').classList.add('hidden');
+        authLoader.classList.add('hidden');
     }
 }
 
 /**
- * FULL SIGN UP LOGIC
- * Handles creating the user, normalizing phone, and saving to Firestore.
+ * ENHANCED SIGN-UP: Creates account even if email was used elsewhere
+ * Now checks ALL phone variations and ALLOWS duplicate emails
  */
-async function handleSignUpFull(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader) {
-    try {
-        // 1. Normalize Phone Number
-        // Combine country code and local phone first
-        let fullPhoneInput = localPhone;
-        if (!localPhone.startsWith('+')) {
-            fullPhoneInput = countryCode + localPhone;
-        }
-        
-        const normalizedResult = normalizePhoneNumber(fullPhoneInput);
-        
-        if (!normalizedResult.valid) {
-            throw new Error(`Invalid phone number: ${normalizedResult.error}`);
-        }
-        
-        const finalPhone = normalizedResult.normalized;
-        console.log("📱 Processing signup with normalized phone:", finalPhone);
+async function handleSignUp() {
+    const countryCode = document.getElementById('countryCode')?.value;
+    const localPhone = document.getElementById('signupPhone')?.value.trim();
+    const email = document.getElementById('signupEmail')?.value.trim().toLowerCase();
+    const password = document.getElementById('signupPassword')?.value;
+    const confirmPassword = document.getElementById('signupConfirmPassword')?.value;
 
-        // 2. Create Authentication User
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+    // Validation
+    if (!countryCode || !localPhone || !email || !password || !confirmPassword) {
+        showMessage('Please fill in all fields including country code', 'error');
+        return;
+    }
+
+    if (password.length < 6) {
+        showMessage('Password must be at least 6 characters', 'error');
+        return;
+    }
+
+    if (password !== confirmPassword) {
+        showMessage('Passwords do not match', 'error');
+        return;
+    }
+
+    const signUpBtn = document.getElementById('signUpBtn');
+    const authLoader = document.getElementById('authLoader');
+
+    signUpBtn.disabled = true;
+    document.getElementById('signUpText').textContent = 'Creating Account...';
+    document.getElementById('signUpSpinner').classList.remove('hidden');
+    authLoader.classList.remove('hidden');
+
+    try {
+        console.log("🔍 Starting sign-up process...");
+        
+        // --- PHONE VALIDATION & SEARCH ---
+        // Combine country code and local phone
+        const fullPhone = countryCode + localPhone.replace(/[^\d]/g, '');
+        console.log("📱 Full phone number:", fullPhone);
+        
+        // Normalize phone
+        const normalizedPhone = normalizePhoneNumber(fullPhone);
+        if (!normalizedPhone.valid) {
+            throw new Error('Invalid phone number. Please check the format.');
+        }
+        
+        // Check if phone already exists in parent_users (ALL variations)
+        console.log("🔍 Checking for existing account with phone...");
+        const phoneVariations = generateAllPhoneVariations(normalizedPhone.normalized);
+        console.log("📱 Phone variations to check:", phoneVariations.length);
+        
+        let existingAccount = null;
+        
+        // Check each variation
+        for (const phoneVar of phoneVariations) {
+            try {
+                const phoneSnapshot = await db.collection('parent_users')
+                    .where('phone', '==', phoneVar)
+                    .limit(1)
+                    .get();
+                
+                if (!phoneSnapshot.empty) {
+                    existingAccount = phoneSnapshot.docs[0];
+                    console.log("⚠️ Found existing account with phone variation:", phoneVar);
+                    break;
+                }
+                
+                // Also check normalizedPhone field
+                const normalizedSnapshot = await db.collection('parent_users')
+                    .where('normalizedPhone', '==', phoneVar)
+                    .limit(1)
+                    .get();
+                
+                if (!normalizedSnapshot.empty) {
+                    existingAccount = normalizedSnapshot.docs[0];
+                    console.log("⚠️ Found existing account with normalized phone:", phoneVar);
+                    break;
+                }
+            } catch (error) {
+                console.warn(`Error checking phone variation ${phoneVar}:`, error.message);
+                // Continue with other variations
+            }
+        }
+        
+        // --- CRITICAL CHANGE: ALLOW DUPLICATE EMAILS ---
+        // We no longer check for duplicate emails in parent_users
+        // Email might be used in assessments/enrollment, but that's OK
+        
+        console.log("✅ Allowing sign-up (email may be used elsewhere, that's OK)");
+        
+        // --- CREATE FIREBASE AUTH ACCOUNT ---
+        console.log("🔥 Creating Firebase auth account...");
+        let userCredential;
+        
+        try {
+            userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        } catch (authError) {
+            // If email already exists in auth, try to sign in instead
+            if (authError.code === 'auth/email-already-in-use') {
+                console.log("⚠️ Email already in Firebase auth, attempting sign in...");
+                userCredential = await auth.signInWithEmailAndPassword(email, password);
+                console.log("✅ Signed into existing Firebase auth account");
+            } else {
+                throw authError;
+            }
+        }
+        
         const user = userCredential.user;
-
-        // 3. Generate Referral Code
-        const referralCode = await generateReferralCode();
-
-        // 4. Save User Data to Firestore
-        // We use the normalized phone here to ensure matching works later
-        await db.collection('parent_users').doc(user.uid).set({
-            email: email,
-            phone: finalPhone, // Normalized +CountryCode format
-            normalizedPhone: finalPhone, // Explicit field for searching
-            parentName: 'Parent', // Default name
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            referralCode: referralCode,
-            referralEarnings: 0,
-            uid: user.uid
-        });
-
-        console.log("✅ Account created and profile saved for:", user.uid);
-        showMessage('Account created successfully!', 'success');
+        console.log("✅ Firebase auth account created/signed in:", user.uid);
         
-        // Success is further handled by onAuthStateChanged listener
+        // --- UPDATE/STORE USER DATA IN FIRESTORE ---
+        console.log("💾 Storing user data in Firestore...");
+        
+        const parentData = {
+            parentName: '', // Will be filled later when we find children
+            email: email,
+            phone: normalizedPhone.normalized,
+            normalizedPhone: normalizedPhone.normalized,
+            countryCode: countryCode,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        // If existing account found (by phone), update it instead of creating new
+        if (existingAccount) {
+            console.log("🔄 Updating existing parent account...");
+            await db.collection('parent_users').doc(existingAccount.id).update({
+                ...parentData,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            console.log("✅ Updated existing parent account:", existingAccount.id);
+        } else {
+            // Create new parent document
+            console.log("🆕 Creating new parent account...");
+            
+            // Generate referral code for new accounts only
+            const referralCode = await generateReferralCode();
+            parentData.referralCode = referralCode;
+            parentData.referralEarnings = 0;
+            
+            await db.collection('parent_users').doc(user.uid).set(parentData);
+            console.log("✅ Created new parent account with referral code:", referralCode);
+        }
+        
+        // --- FIND AND LINK STUDENTS ---
+        console.log("🔍 Finding students for this parent...");
+        
+        // Search for students with ALL phone variations
+        const foundStudents = [];
+        const phoneVariationsForSearch = generateAllPhoneVariations(normalizedPhone.normalized);
+        
+        console.log("🔍 Searching for students with", phoneVariationsForSearch.length, "phone variations");
+        
+        for (const phoneVar of phoneVariationsForSearch) {
+            try {
+                // Search in students collection
+                const studentsSnapshot = await db.collection('students')
+                    .where('parentPhone', '==', phoneVar)
+                    .get();
+                
+                if (!studentsSnapshot.empty) {
+                    studentsSnapshot.forEach(doc => {
+                        const student = doc.data();
+                        foundStudents.push({
+                            id: doc.id,
+                            name: safeText(student.studentName || student.name),
+                            phoneUsed: phoneVar,
+                            source: 'students'
+                        });
+                    });
+                }
+                
+                // Search in pending_students collection
+                const pendingSnapshot = await db.collection('pending_students')
+                    .where('parentPhone', '==', phoneVar)
+                    .get();
+                
+                if (!pendingSnapshot.empty) {
+                    pendingSnapshot.forEach(doc => {
+                        const student = doc.data();
+                        foundStudents.push({
+                            id: doc.id,
+                            name: safeText(student.studentName || student.name),
+                            phoneUsed: phoneVar,
+                            source: 'pending_students'
+                        });
+                    });
+                }
+            } catch (error) {
+                console.warn(`Error searching students with phone ${phoneVar}:`, error.message);
+            }
+        }
+        
+        console.log("👥 Found students:", foundStudents.length);
+        
+        if (foundStudents.length > 0) {
+            // Update parent name from first student (if available)
+            const firstStudent = foundStudents[0];
+            const studentDoc = await db.collection(firstStudent.source).doc(firstStudent.id).get();
+            const studentData = studentDoc.data();
+            
+            if (studentData && studentData.parentName) {
+                const updateData = {
+                    parentName: safeText(studentData.parentName),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                await db.collection('parent_users').doc(user.uid).update(updateData);
+                console.log("✅ Updated parent name from student:", studentData.parentName);
+            }
+            
+            showMessage(`Account created successfully! Found ${foundStudents.length} student(s) linked to your account.`, 'success');
+        } else {
+            showMessage('Account created successfully! No students found yet. Please contact administration to link your children.', 'success');
+        }
+        
+        // Success - auth state listener will handle the rest
+        console.log("✅ Sign-up process completed successfully");
 
     } catch (error) {
-        console.error("Sign Up Error:", error);
+        console.error('Sign up error:', error);
         
-        let errorMessage = "Failed to create account.";
-        if (error.code === 'auth/email-already-in-use') {
-            errorMessage = "This email is already registered. Please sign in instead.";
-        } else if (error.code === 'auth/weak-password') {
-            errorMessage = "Password should be at least 6 characters.";
-        } else if (error.message) {
-            errorMessage = error.message;
+        let errorMessage = 'Sign up failed. ';
+        
+        // User-friendly error messages
+        switch (error.code) {
+            case 'auth/email-already-in-use':
+                errorMessage = 'This email is already registered. Please sign in instead.';
+                break;
+            case 'auth/invalid-email':
+                errorMessage = 'Invalid email address.';
+                break;
+            case 'auth/weak-password':
+                errorMessage = 'Password is too weak. Please use at least 6 characters.';
+                break;
+            case 'auth/operation-not-allowed':
+                errorMessage = 'Email/password accounts are not enabled. Please contact support.';
+                break;
+            case 'auth/network-request-failed':
+                errorMessage = 'Network error. Please check your connection.';
+                break;
+            default:
+                if (error.message.includes('phone')) {
+                    errorMessage = error.message;
+                } else {
+                    errorMessage += error.message || 'Please try again.';
+                }
         }
-
+        
         showMessage(errorMessage, 'error');
-
-        // Reset UI
-        if (signUpBtn) signUpBtn.disabled = false;
         
-        const signUpText = document.getElementById('signUpText');
-        const signUpSpinner = document.getElementById('signUpSpinner');
-        
-        if (signUpText) signUpText.textContent = 'Create Account';
-        if (signUpSpinner) signUpSpinner.classList.add('hidden');
-        if (authLoader) authLoader.classList.add('hidden');
+        // Reset button state
+        signUpBtn.disabled = false;
+        document.getElementById('signUpText').textContent = 'Sign Up';
+        document.getElementById('signUpSpinner').classList.add('hidden');
+        authLoader.classList.add('hidden');
     }
 }
 
 /**
- * FULL PASSWORD RESET LOGIC
+ * ENHANCED PASSWORD RESET: Works even if email was used elsewhere
  */
-async function handlePasswordResetFull(email, sendResetBtn, resetLoader) {
+async function handlePasswordReset() {
+    const email = document.getElementById('resetEmail')?.value.trim().toLowerCase();
+    
+    if (!email) {
+        showMessage('Please enter your email address', 'error');
+        return;
+    }
+
+    const sendResetBtn = document.getElementById('sendResetBtn');
+    const resetLoader = document.getElementById('resetLoader');
+
+    sendResetBtn.disabled = true;
+    resetLoader.classList.remove('hidden');
+
     try {
-        await auth.sendPasswordResetEmail(email);
-        showMessage('Password reset link sent to your email!', 'success');
-        hidePasswordResetModal();
-    } catch (error) {
-        console.error("Reset Error:", error);
-        let errorMessage = "Failed to send reset email.";
-        if (error.code === 'auth/user-not-found') {
-            errorMessage = "No account found with this email address.";
+        console.log("🔍 Sending password reset to:", email);
+        
+        // Check if email exists in ANY parent account
+        const parentSnapshot = await db.collection('parent_users')
+            .where('email', '==', email)
+            .limit(1)
+            .get();
+        
+        if (parentSnapshot.empty) {
+            // Email might not be in parent_users but could be in Firebase Auth
+            console.log("⚠️ Email not found in parent_users, but trying Firebase Auth reset anyway...");
         }
-        showMessage(errorMessage, 'error');
+        
+        // Send password reset email (Firebase will handle if email exists in auth)
+        await auth.sendPasswordResetEmail(email);
+        
+        showMessage('Password reset email sent! Check your inbox (and spam folder).', 'success');
+        hidePasswordResetModal();
+        
+    } catch (error) {
+        console.error('Password reset error:', error);
+        
+        // Still show success message (for security, don't reveal if email exists)
+        showMessage('If an account exists with this email, a reset link has been sent.', 'success');
+        hidePasswordResetModal();
     } finally {
-        if (sendResetBtn) sendResetBtn.disabled = false;
-        if (resetLoader) resetLoader.classList.add('hidden');
+        sendResetBtn.disabled = false;
+        resetLoader.classList.add('hidden');
+    }
+}
+
+/**
+ * HELPER: Find parent name from students (for welcome message)
+ */
+async function findParentNameFromStudents(parentPhone) {
+    try {
+        const phoneVariations = generateAllPhoneVariations(parentPhone);
+        
+        for (const phoneVar of phoneVariations) {
+            // Search students collection
+            const studentsSnapshot = await db.collection('students')
+                .where('parentPhone', '==', phoneVar)
+                .limit(1)
+                .get();
+            
+            if (!studentsSnapshot.empty) {
+                const studentData = studentsSnapshot.docs[0].data();
+                if (studentData.parentName) {
+                    return safeText(studentData.parentName);
+                }
+            }
+            
+            // Search pending_students collection
+            const pendingSnapshot = await db.collection('pending_students')
+                .where('parentPhone', '==', phoneVar)
+                .limit(1)
+                .get();
+            
+            if (!pendingSnapshot.empty) {
+                const studentData = pendingSnapshot.docs[0].data();
+                if (studentData.parentName) {
+                    return safeText(studentData.parentName);
+                }
+            }
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Error finding parent name:', error);
+        return null;
     }
 }
 
@@ -2178,7 +2780,7 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
         
         console.log("🔎 Generated search queries:", searchQueries.length);
         
-        // Search in ALL possible collections
+        // Search in ALL possible collections - EXPANDED LIST
         const collectionsToSearch = [
             'tutor_submissions',
             'student_results', 
@@ -2190,7 +2792,17 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
             'parent_reports',
             'academic_reports',
             'session_reports',
-            'performance_reports'
+            'performance_reports',
+            'session_notes',
+            'class_notes',
+            'learning_reports',
+            'evaluation_reports',
+            'test_results',
+            'exam_results',
+            'quiz_results',
+            'lesson_reports',
+            'attendance_reports',
+            'behavior_reports'
         ];
         
         // PARALLEL SEARCH: Search all collections with all queries
@@ -2207,6 +2819,9 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
                         return results;
                     }).catch(error => {
                         // Collection might not exist - that's OK
+                        if (error.code !== 'failed-precondition' && error.code !== 'invalid-argument') {
+                            console.warn(`Search error in ${collectionName}:`, error.message);
+                        }
                         return [];
                     })
                 );
@@ -2219,14 +2834,23 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
         // Combine all results
         allResults = allResultsArrays.flat();
         
-        console.log("🎯 TOTAL REPORTS FOUND:", allResults.length);
+        console.log("🎯 TOTAL REPORTS FOUND (standard search):", allResults.length);
         console.log("📊 Sources found:", Array.from(foundSources));
         
-        // If NO reports found, try emergency search
+        // --- EMERGENCY SEARCH: If NO reports found ---
         if (allResults.length === 0) {
             console.warn("⚠️ No reports found with standard search. Starting EMERGENCY SEARCH...");
             const emergencyResults = await emergencyReportSearch(parentPhone, parentEmail);
             allResults = emergencyResults;
+            console.log("🚨 EMERGENCY SEARCH found:", emergencyResults.length, "reports");
+        }
+        
+        // --- SUPER EMERGENCY: Search by student names if we know them ---
+        if (allResults.length === 0 && userChildren.length > 0) {
+            console.warn("🚨🚨 SUPER EMERGENCY: Searching by student names...");
+            const studentNameResults = await searchByStudentNames();
+            allResults = studentNameResults;
+            console.log("👤 STUDENT NAME SEARCH found:", studentNameResults.length, "reports");
         }
         
         // Remove duplicates
@@ -2234,42 +2858,159 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
         const seenIds = new Set();
         
         allResults.forEach(result => {
-            const uniqueKey = `${result.collection}_${result.id}_${result.studentName}_${result.timestamp}`;
+            // Create unique key from multiple fields
+            const uniqueKey = `${result.collection}_${result.id}_${result.studentName || ''}_${result.timestamp}_${result.createdAt || ''}_${result.date || ''}`;
             if (!seenIds.has(uniqueKey)) {
                 seenIds.add(uniqueKey);
                 uniqueResults.push(result);
             }
         });
         
+        console.log("🎯 FINAL UNIQUE REPORTS:", uniqueResults.length);
+        
         // Separate into assessment and monthly
         const assessmentResults = uniqueResults.filter(r => 
             r.type === 'assessment' || 
             r.collection.includes('assessment') || 
             r.collection.includes('progress') ||
-            (r.reportType && r.reportType.toLowerCase().includes('assessment'))
+            r.collection.includes('result') ||
+            r.collection.includes('test') ||
+            r.collection.includes('exam') ||
+            r.collection.includes('quiz') ||
+            (r.reportType && r.reportType.toLowerCase().includes('assessment')) ||
+            (r.category && r.category.toLowerCase().includes('assessment')) ||
+            (r.testType && r.testType.toLowerCase().includes('assessment'))
         );
         
         const monthlyResults = uniqueResults.filter(r => 
             r.type === 'monthly' || 
             r.collection.includes('monthly') ||
             r.collection.includes('submission') ||
-            (r.reportType && r.reportType.toLowerCase().includes('monthly'))
+            r.collection.includes('report') ||
+            r.collection.includes('note') ||
+            (r.reportType && r.reportType.toLowerCase().includes('monthly')) ||
+            (r.category && r.category.toLowerCase().includes('progress')) ||
+            (r.reportType && r.reportType.toLowerCase().includes('progress'))
         );
         
         // Sort by date (newest first)
         assessmentResults.sort((a, b) => b.timestamp - a.timestamp);
         monthlyResults.sort((a, b) => b.timestamp - a.timestamp);
         
-        return { assessmentResults, monthlyResults, searchStats: {
-            totalFound: uniqueResults.length,
-            sources: Array.from(foundSources),
-            collectionsSearched: collectionsToSearch.length
-        }};
+        return { 
+            assessmentResults, 
+            monthlyResults, 
+            searchStats: {
+                totalFound: uniqueResults.length,
+                assessmentCount: assessmentResults.length,
+                monthlyCount: monthlyResults.length,
+                sources: Array.from(foundSources),
+                collectionsSearched: collectionsToSearch.length,
+                queryCount: searchQueries.length,
+                studentCount: userChildren.length,
+                timestamp: Date.now()
+            }
+        };
         
     } catch (error) {
         console.error("❌ Ultimate search error:", error);
-        return { assessmentResults: [], monthlyResults: [], searchStats: { error: error.message }};
+        return { 
+            assessmentResults: [], 
+            monthlyResults: [], 
+            searchStats: { 
+                error: error.message,
+                timestamp: Date.now(),
+                studentCount: userChildren.length
+            }
+        };
     }
+}
+
+/**
+ * SUPER EMERGENCY: Search by student names
+ */
+async function searchByStudentNames() {
+    const results = [];
+    
+    if (userChildren.length === 0) return results;
+    
+    try {
+        const collectionsToSearch = [
+            'tutor_submissions',
+            'student_results',
+            'monthly_reports',
+            'assessment_reports',
+            'progress_reports',
+            'reports'
+        ];
+        
+        for (const studentName of userChildren) {
+            console.log(`🔍 Searching for reports for student: ${studentName}`);
+            
+            for (const collection of collectionsToSearch) {
+                try {
+                    // Method 1: Exact match
+                    const exactSnapshot = await db.collection(collection)
+                        .where('studentName', '==', studentName)
+                        .get();
+                    
+                    exactSnapshot.forEach(doc => {
+                        const data = doc.data();
+                        results.push({
+                            id: doc.id,
+                            collection: collection,
+                            emergencyMatch: 'student_name_exact',
+                            matchedField: 'studentName',
+                            matchedValue: studentName,
+                            ...data,
+                            timestamp: getTimestampFromData(data),
+                            type: determineReportType(collection, data)
+                        });
+                    });
+                    
+                    // Method 2: Partial match (case-insensitive)
+                    const partialSnapshot = await db.collection(collection)
+                        .where('studentName', '>=', studentName.toLowerCase())
+                        .where('studentName', '<=', studentName.toLowerCase() + '\uf8ff')
+                        .get();
+                    
+                    partialSnapshot.forEach(doc => {
+                        const data = doc.data();
+                        const docStudentName = safeText(data.studentName || data.student || '');
+                        
+                        // Check if it's actually a match (avoid false positives)
+                        if (docStudentName.toLowerCase().includes(studentName.toLowerCase())) {
+                            // Check if we already have this result
+                            const exists = results.some(r => 
+                                r.id === doc.id && 
+                                r.collection === collection
+                            );
+                            
+                            if (!exists) {
+                                results.push({
+                                    id: doc.id,
+                                    collection: collection,
+                                    emergencyMatch: 'student_name_partial',
+                                    matchedField: 'studentName',
+                                    matchedValue: studentName,
+                                    ...data,
+                                    timestamp: getTimestampFromData(data),
+                                    type: determineReportType(collection, data)
+                                });
+                            }
+                        }
+                    });
+                    
+                } catch (error) {
+                    console.warn(`Error searching ${collection} for ${studentName}:`, error.message);
+                }
+            }
+        }
+    } catch (error) {
+        console.error("Student name search error:", error);
+    }
+    
+    return results;
 }
 
 // Generate ALL possible search queries
@@ -2280,89 +3021,155 @@ async function generateAllSearchQueries(parentPhone, parentEmail, parentUid) {
     const phoneVariations = generateAllPhoneVariations(parentPhone);
     console.log(`📱 Generated ${phoneVariations.length} phone variations for search`);
     
+    // --- PHONE QUERIES ---
     for (const phone of phoneVariations) {
-        queries.push({ field: 'parentPhone', value: phone });
-        queries.push({ field: 'parentphone', value: phone });
-        queries.push({ field: 'parent_phone', value: phone });
-        queries.push({ field: 'guardianPhone', value: phone });
-        queries.push({ field: 'motherPhone', value: phone });
-        queries.push({ field: 'fatherPhone', value: phone });
-        queries.push({ field: 'phone', value: phone });
-        queries.push({ field: 'parent_contact', value: phone });
-        queries.push({ field: 'contact_number', value: phone });
-        queries.push({ field: 'contactPhone', value: phone });
+        // All possible phone field names
+        const phoneFields = [
+            'parentPhone', 'parentphone', 'parent_phone', 'phone', 
+            'guardianPhone', 'motherPhone', 'fatherPhone', 'contactPhone',
+            'parent_contact', 'contact_number', 'mobile', 'mobilePhone',
+            'telephone', 'tel', 'phoneNumber', 'phonenumber',
+            'parentPhoneNumber', 'guardianPhoneNumber', 'contactPhoneNumber'
+        ];
+        
+        phoneFields.forEach(field => {
+            queries.push({ field: field, value: phone });
+        });
     }
     
-    // Email variations
+    // --- EMAIL QUERIES ---
     if (parentEmail) {
         const emailVariations = [
             parentEmail.toLowerCase(),
             parentEmail.toUpperCase(),
-            parentEmail
+            parentEmail.trim()
         ];
+        
+        const emailFields = [
+            'parentEmail', 'parentemail', 'email', 'guardianEmail',
+            'parent_email', 'contact_email', 'emailAddress', 'email_address',
+            'parentEmailAddress', 'guardianEmailAddress'
+        ];
+        
         for (const email of emailVariations) {
-            queries.push({ field: 'parentEmail', value: email });
-            queries.push({ field: 'parentemail', value: email });
-            queries.push({ field: 'email', value: email });
-            queries.push({ field: 'guardianEmail', value: email });
-            queries.push({ field: 'parent_email', value: email });
-            queries.push({ field: 'contact_email', value: email });
+            emailFields.forEach(field => {
+                queries.push({ field: field, value: email });
+            });
         }
     }
     
-    // UID variations
+    // --- UID QUERIES ---
     if (parentUid) {
-        queries.push({ field: 'parentUid', value: parentUid });
-        queries.push({ field: 'parentuid', value: parentUid });
-        queries.push({ field: 'userId', value: parentUid });
-        queries.push({ field: 'user_id', value: parentUid });
-        queries.push({ field: 'createdBy', value: parentUid });
-        queries.push({ field: 'ownerUid', value: parentUid });
+        const uidFields = [
+            'parentUid', 'parentuid', 'userId', 'user_id', 
+            'createdBy', 'ownerUid', 'uid', 'userUid',
+            'createdById', 'ownerId', 'parentId', 'guardianId'
+        ];
+        
+        uidFields.forEach(field => {
+            queries.push({ field: field, value: parentUid });
+        });
     }
     
-    // Try to find students first, then use student IDs
+    // --- STUDENT ID QUERIES ---
     try {
-        const normalizedPhone = normalizePhoneNumber(parentPhone);
-        if (normalizedPhone.valid) {
-            // Find students by parent phone - CHECK ALL PHONE VARIATIONS
-            for (const phoneVar of phoneVariations) {
-                try {
-                    const studentsSnapshot = await db.collection('students')
-                        .where('parentPhone', '==', phoneVar)
-                        .get();
-                    
-                    if (!studentsSnapshot.empty) {
-                        studentsSnapshot.forEach(doc => {
-                            const studentId = doc.id;
-                            const studentData = doc.data();
-                            
-                            // Add student ID queries
-                            queries.push({ field: 'studentId', value: studentId });
-                            queries.push({ field: 'studentID', value: studentId });
-                            queries.push({ field: 'student_id', value: studentId });
-                            queries.push({ field: 'studentId', value: studentId.toLowerCase() });
-                            queries.push({ field: 'studentId', value: studentId.toUpperCase() });
-                            
-                            // Also add student name queries
-                            if (studentData.studentName) {
-                                const studentName = safeText(studentData.studentName);
-                                queries.push({ field: 'studentName', value: studentName });
-                                queries.push({ field: 'student_name', value: studentName });
-                                queries.push({ field: 'student', value: studentName });
-                            }
+        // Find students by parent phone - CHECK ALL PHONE VARIATIONS
+        const foundStudents = [];
+        
+        for (const phoneVar of phoneVariations) {
+            try {
+                // Search in students collection
+                const studentsSnapshot = await db.collection('students')
+                    .where('parentPhone', '==', phoneVar)
+                    .get();
+                
+                if (!studentsSnapshot.empty) {
+                    studentsSnapshot.forEach(doc => {
+                        const studentId = doc.id;
+                        const studentData = doc.data();
+                        
+                        foundStudents.push({
+                            id: studentId,
+                            name: safeText(studentData.studentName || studentData.name || ''),
+                            data: studentData
                         });
-                    }
-                } catch (error) {
-                    console.warn(`Error searching students with phone ${phoneVar}:`, error.message);
+                    });
                 }
+                
+                // Search in pending_students collection
+                const pendingSnapshot = await db.collection('pending_students')
+                    .where('parentPhone', '==', phoneVar)
+                    .get();
+                
+                if (!pendingSnapshot.empty) {
+                    pendingSnapshot.forEach(doc => {
+                        const studentId = doc.id;
+                        const studentData = doc.data();
+                        
+                        foundStudents.push({
+                            id: studentId,
+                            name: safeText(studentData.studentName || studentData.name || ''),
+                            data: studentData,
+                            isPending: true
+                        });
+                    });
+                }
+            } catch (error) {
+                console.warn(`Error searching students with phone ${phoneVar}:`, error.message);
             }
         }
+        
+        // Add student ID queries for each found student
+        foundStudents.forEach(student => {
+            const studentIdFields = [
+                'studentId', 'studentID', 'student_id', 'studentUid',
+                'learnerId', 'learner_id', 'childId', 'child_id'
+            ];
+            
+            studentIdFields.forEach(field => {
+                queries.push({ field: field, value: student.id });
+                queries.push({ field: field, value: student.id.toLowerCase() });
+                queries.push({ field: field, value: student.id.toUpperCase() });
+            });
+            
+            // Add student name queries
+            if (student.name && student.name !== 'Unknown') {
+                const studentNameFields = [
+                    'studentName', 'student_name', 'student', 'learnerName',
+                    'learner_name', 'childName', 'child_name', 'name'
+                ];
+                
+                studentNameFields.forEach(field => {
+                    queries.push({ field: field, value: student.name });
+                    queries.push({ field: field, value: student.name.toLowerCase() });
+                    queries.push({ field: field, value: student.name.toUpperCase() });
+                });
+            }
+        });
+        
+        console.log(`👥 Found ${foundStudents.length} students for query generation`);
+        
     } catch (error) {
-        console.warn("Could not find students for search:", error);
+        console.warn("Could not find students for search queries:", error);
     }
     
     console.log(`🔍 Total search queries generated: ${queries.length}`);
-    return queries;
+    
+    // Remove duplicates (same field and value)
+    const uniqueQueries = [];
+    const seenQueries = new Set();
+    
+    queries.forEach(query => {
+        const key = `${query.field}:${query.value}`;
+        if (!seenQueries.has(key)) {
+            seenQueries.add(key);
+            uniqueQueries.push(query);
+        }
+    });
+    
+    console.log(`🔍 Unique search queries: ${uniqueQueries.length}`);
+    
+    return uniqueQueries;
 }
 
 // Search in a specific collection
@@ -2382,13 +3189,14 @@ async function searchInCollection(collectionName, query) {
                 valueMatched: query.value,
                 ...data,
                 timestamp: getTimestampFromData(data),
-                type: determineReportType(collectionName, data)
+                type: determineReportType(collectionName, data),
+                searchDate: Date.now()
             });
         });
         
         return results;
     } catch (error) {
-        // Collection or field doesn't exist
+        // Collection or field doesn't exist - that's OK
         if (error.code !== 'failed-precondition' && error.code !== 'invalid-argument') {
             console.warn(`Search error in ${collectionName} for ${query.field}=${query.value}:`, error.message);
         }
@@ -2396,160 +3204,224 @@ async function searchInCollection(collectionName, query) {
     }
 }
 
-// EMERGENCY SEARCH - Last resort
+// EMERGENCY SEARCH - Last resort (scans entire collections)
 async function emergencyReportSearch(parentPhone, parentEmail) {
     console.log("🚨 EMERGENCY SEARCH ACTIVATED");
     const results = [];
     
     try {
-        // 1. Get ALL tutor_submissions and filter client-side
-        const allSubmissions = await db.collection('tutor_submissions').limit(1000).get();
         const phoneVariations = generateAllPhoneVariations(parentPhone);
+        console.log(`📱 Using ${phoneVariations.length} phone variations for emergency search`);
         
-        console.log(`🔍 Emergency scanning ${allSubmissions.size} tutor submissions`);
+        // Collections to scan in emergency mode
+        const emergencyCollections = [
+            'tutor_submissions',
+            'student_results',
+            'monthly_reports',
+            'assessment_reports'
+        ];
         
-        allSubmissions.forEach(doc => {
-            const data = doc.data();
-            let matched = false;
-            
-            // Check ALL phone fields with ALL variations
-            const phoneFields = ['parentPhone', 'parentphone', 'parent_phone', 'phone', 'guardianPhone', 'contact_number'];
-            for (const field of phoneFields) {
-                if (data[field]) {
-                    const fieldValue = String(data[field]).trim();
-                    for (const phoneVar of phoneVariations) {
-                        if (fieldValue === phoneVar || fieldValue.includes(phoneVar)) {
-                            results.push({
-                                id: doc.id,
-                                collection: 'tutor_submissions',
-                                emergencyMatch: true,
-                                matchedField: field,
-                                matchedValue: fieldValue,
-                                ...data,
-                                timestamp: getTimestampFromData(data),
-                                type: 'monthly'
-                            });
-                            matched = true;
-                            break;
+        // Scan each collection
+        for (const collectionName of emergencyCollections) {
+            try {
+                console.log(`🔍 Emergency scanning ${collectionName}...`);
+                const allDocs = await db.collection(collectionName).limit(2000).get();
+                
+                console.log(`📄 Scanning ${allDocs.size} documents in ${collectionName}`);
+                
+                allDocs.forEach(doc => {
+                    const data = doc.data();
+                    let matched = false;
+                    
+                    // --- CHECK PHONE ---
+                    const phoneFields = [
+                        'parentPhone', 'parentphone', 'parent_phone', 'phone',
+                        'guardianPhone', 'contactPhone', 'mobile', 'telephone'
+                    ];
+                    
+                    for (const field of phoneFields) {
+                        if (data[field]) {
+                            const fieldValue = String(data[field]).trim();
+                            
+                            // Check against ALL phone variations
+                            for (const phoneVar of phoneVariations) {
+                                // Exact match
+                                if (fieldValue === phoneVar) {
+                                    results.push({
+                                        id: doc.id,
+                                        collection: collectionName,
+                                        emergencyMatch: 'phone_exact',
+                                        matchedField: field,
+                                        matchedValue: fieldValue,
+                                        ...data,
+                                        timestamp: getTimestampFromData(data),
+                                        type: determineReportType(collectionName, data)
+                                    });
+                                    matched = true;
+                                    break;
+                                }
+                                
+                                // Contains match (partial)
+                                if (fieldValue.includes(phoneVar) || phoneVar.includes(fieldValue)) {
+                                    results.push({
+                                        id: doc.id,
+                                        collection: collectionName,
+                                        emergencyMatch: 'phone_partial',
+                                        matchedField: field,
+                                        matchedValue: fieldValue,
+                                        ...data,
+                                        timestamp: getTimestampFromData(data),
+                                        type: determineReportType(collectionName, data)
+                                    });
+                                    matched = true;
+                                    break;
+                                }
+                                
+                                // Digit-only comparison
+                                const fieldDigits = fieldValue.replace(/\D/g, '');
+                                const phoneVarDigits = phoneVar.replace(/\D/g, '');
+                                
+                                if (fieldDigits === phoneVarDigits && fieldDigits.length >= 7) {
+                                    results.push({
+                                        id: doc.id,
+                                        collection: collectionName,
+                                        emergencyMatch: 'phone_digits',
+                                        matchedField: field,
+                                        matchedValue: fieldValue,
+                                        ...data,
+                                        timestamp: getTimestampFromData(data),
+                                        type: determineReportType(collectionName, data)
+                                    });
+                                    matched = true;
+                                    break;
+                                }
+                            }
+                            if (matched) break;
                         }
                     }
-                    if (matched) break;
-                }
-            }
-            
-            // Check by email
-            if (!matched && parentEmail) {
-                const emailFields = ['parentEmail', 'parentemail', 'email', 'guardianEmail'];
-                for (const field of emailFields) {
-                    if (data[field] && data[field].toLowerCase() === parentEmail.toLowerCase()) {
-                        results.push({
-                            id: doc.id,
-                            collection: 'tutor_submissions',
-                            emergencyMatch: true,
-                            matchedField: field,
-                            matchedValue: data[field],
-                            ...data,
-                            timestamp: getTimestampFromData(data),
-                            type: 'monthly'
-                        });
-                        matched = true;
-                        break;
-                    }
-                }
-            }
-            
-            // Check by student name (if we have students in userChildren)
-            if (!matched && userChildren.length > 0) {
-                const studentName = data.studentName || data.student;
-                if (studentName && userChildren.includes(safeText(studentName))) {
-                    results.push({
-                        id: doc.id,
-                        collection: 'tutor_submissions',
-                        emergencyMatch: true,
-                        matchedField: 'studentName',
-                        matchedValue: studentName,
-                        ...data,
-                        timestamp: getTimestampFromData(data),
-                        type: 'monthly'
-                    });
-                }
-            }
-        });
-        
-        // 2. Get ALL student_results and filter client-side
-        const allAssessments = await db.collection('student_results').limit(1000).get();
-        
-        console.log(`🔍 Emergency scanning ${allAssessments.size} assessment results`);
-        
-        allAssessments.forEach(doc => {
-            const data = doc.data();
-            let matched = false;
-            
-            // Check ALL phone fields with ALL variations
-            const phoneFields = ['parentPhone', 'parentphone', 'parent_phone', 'phone'];
-            for (const field of phoneFields) {
-                if (data[field]) {
-                    const fieldValue = String(data[field]).trim();
-                    for (const phoneVar of phoneVariations) {
-                        if (fieldValue === phoneVar || fieldValue.includes(phoneVar)) {
-                            results.push({
-                                id: doc.id,
-                                collection: 'student_results',
-                                emergencyMatch: true,
-                                matchedField: field,
-                                matchedValue: fieldValue,
-                                ...data,
-                                timestamp: getTimestampFromData(data),
-                                type: 'assessment'
-                            });
-                            matched = true;
-                            break;
+                    
+                    // --- CHECK EMAIL ---
+                    if (!matched && parentEmail) {
+                        const emailFields = ['parentEmail', 'parentemail', 'email', 'guardianEmail'];
+                        
+                        for (const field of emailFields) {
+                            if (data[field]) {
+                                const fieldValue = String(data[field]).trim().toLowerCase();
+                                const searchEmail = parentEmail.toLowerCase();
+                                
+                                if (fieldValue === searchEmail) {
+                                    results.push({
+                                        id: doc.id,
+                                        collection: collectionName,
+                                        emergencyMatch: 'email_exact',
+                                        matchedField: field,
+                                        matchedValue: fieldValue,
+                                        ...data,
+                                        timestamp: getTimestampFromData(data),
+                                        type: determineReportType(collectionName, data)
+                                    });
+                                    matched = true;
+                                    break;
+                                }
+                                
+                                // Partial email match (same domain)
+                                if (fieldValue.includes('@') && searchEmail.includes('@')) {
+                                    const fieldDomain = fieldValue.split('@')[1];
+                                    const searchDomain = searchEmail.split('@')[1];
+                                    
+                                    if (fieldDomain === searchDomain) {
+                                        results.push({
+                                            id: doc.id,
+                                            collection: collectionName,
+                                            emergencyMatch: 'email_domain',
+                                            matchedField: field,
+                                            matchedValue: fieldValue,
+                                            ...data,
+                                            timestamp: getTimestampFromData(data),
+                                            type: determineReportType(collectionName, data)
+                                        });
+                                        matched = true;
+                                        break;
+                                    }
+                                }
+                            }
                         }
                     }
-                    if (matched) break;
-                }
-            }
-            
-            // Check by email
-            if (!matched && parentEmail) {
-                const emailFields = ['parentEmail', 'parentemail', 'email'];
-                for (const field of emailFields) {
-                    if (data[field] && data[field].toLowerCase() === parentEmail.toLowerCase()) {
-                        results.push({
-                            id: doc.id,
-                            collection: 'student_results',
-                            emergencyMatch: true,
-                            matchedField: field,
-                            matchedValue: data[field],
-                            ...data,
-                            timestamp: getTimestampFromData(data),
-                            type: 'assessment'
-                        });
-                        matched = true;
-                        break;
+                    
+                    // --- CHECK STUDENT NAMES ---
+                    if (!matched && userChildren.length > 0) {
+                        const studentNameFields = ['studentName', 'student_name', 'student', 'name'];
+                        const docStudentName = data.studentName || data.student || data.name || '';
+                        
+                        if (docStudentName) {
+                            const docNameLower = safeText(docStudentName).toLowerCase();
+                            
+                            for (const studentName of userChildren) {
+                                const searchNameLower = studentName.toLowerCase();
+                                
+                                // Exact match
+                                if (docNameLower === searchNameLower) {
+                                    results.push({
+                                        id: doc.id,
+                                        collection: collectionName,
+                                        emergencyMatch: 'student_name_exact',
+                                        matchedField: 'studentName',
+                                        matchedValue: studentName,
+                                        ...data,
+                                        timestamp: getTimestampFromData(data),
+                                        type: determineReportType(collectionName, data)
+                                    });
+                                    matched = true;
+                                    break;
+                                }
+                                
+                                // Contains match
+                                if (docNameLower.includes(searchNameLower) || searchNameLower.includes(docNameLower)) {
+                                    results.push({
+                                        id: doc.id,
+                                        collection: collectionName,
+                                        emergencyMatch: 'student_name_partial',
+                                        matchedField: 'studentName',
+                                        matchedValue: studentName,
+                                        ...data,
+                                        timestamp: getTimestampFromData(data),
+                                        type: determineReportType(collectionName, data)
+                                    });
+                                    matched = true;
+                                    break;
+                                }
+                                
+                                // First name match
+                                const docFirstName = docNameLower.split(' ')[0];
+                                const searchFirstName = searchNameLower.split(' ')[0];
+                                
+                                if (docFirstName && searchFirstName && docFirstName === searchFirstName) {
+                                    results.push({
+                                        id: doc.id,
+                                        collection: collectionName,
+                                        emergencyMatch: 'student_first_name',
+                                        matchedField: 'studentName',
+                                        matchedValue: studentName,
+                                        ...data,
+                                        timestamp: getTimestampFromData(data),
+                                        type: determineReportType(collectionName, data)
+                                    });
+                                    matched = true;
+                                    break;
+                                }
+                            }
+                        }
                     }
-                }
+                });
+                
+                console.log(`✅ Emergency scan of ${collectionName} complete. Found: ${results.length} total so far`);
+                
+            } catch (error) {
+                console.error(`Error in emergency scan of ${collectionName}:`, error);
             }
-            
-            // Check by student name (if we have students in userChildren)
-            if (!matched && userChildren.length > 0) {
-                const studentName = data.studentName || data.student;
-                if (studentName && userChildren.includes(safeText(studentName))) {
-                    results.push({
-                        id: doc.id,
-                        collection: 'student_results',
-                        emergencyMatch: true,
-                        matchedField: 'studentName',
-                        matchedValue: studentName,
-                        ...data,
-                        timestamp: getTimestampFromData(data),
-                        type: 'assessment'
-                    });
-                }
-            }
-        });
+        }
         
-        console.log(`🚨 EMERGENCY SEARCH found: ${results.length} reports`);
+        console.log(`🚨 EMERGENCY SEARCH COMPLETE. Found: ${results.length} reports`);
         
     } catch (error) {
         console.error("Emergency search failed:", error);
@@ -2580,46 +3452,64 @@ function generateAllPhoneVariations(phone) {
     
     // Global phone number handling patterns
     const countryCodePatterns = [
-        { code: '+1', length: 11 },      // USA/Canada
-        { code: '+234', length: 14 },    // Nigeria
-        { code: '+44', length: 13 },     // UK
-        { code: '+91', length: 13 },     // India
-        { code: '+86', length: 14 },     // China
-        { code: '+33', length: 12 },     // France
-        { code: '+49', length: 13 },     // Germany
-        { code: '+81', length: 13 },     // Japan
-        { code: '+61', length: 12 },     // Australia
-        { code: '+55', length: 13 },     // Brazil
-        { code: '+7', length: 12 },      // Russia/Kazakhstan
-        { code: '+20', length: 13 },     // Egypt
-        { code: '+27', length: 12 },     // South Africa
-        { code: '+34', length: 12 },     // Spain
-        { code: '+39', length: 12 },     // Italy
-        { code: '+52', length: 13 },     // Mexico
-        { code: '+62', length: 13 },     // Indonesia
-        { code: '+82', length: 13 },     // South Korea
-        { code: '+90', length: 13 },     // Turkey
-        { code: '+92', length: 13 },     // Pakistan
-        { code: '+966', length: 14 },    // Saudi Arabia
-        { code: '+971', length: 13 },    // UAE
-        { code: '+233', length: 13 },    // Ghana
-        { code: '+254', length: 13 },    // Kenya
-        { code: '+255', length: 13 },    // Tanzania
-        { code: '+256', length: 13 },    // Uganda
-        { code: '+237', length: 13 },    // Cameroon
-        { code: '+251', length: 13 },    // Ethiopia
-        { code: '+250', length: 13 },    // Rwanda
-        { code: '+260', length: 13 },    // Zambia
-        { code: '+263', length: 13 },    // Zimbabwe
-        { code: '+265', length: 13 },    // Malawi
-        { code: '+267', length: 13 },    // Botswana
-        { code: '+268', length: 13 },    // Eswatini
-        { code: '+269', length: 13 },    // Comoros
-        { code: '+290', length: 11 },    // Saint Helena
-        { code: '+291', length: 11 },    // Eritrea
-        { code: '+297', length: 10 },    // Aruba
-        { code: '+298', length: 9 },     // Faroe Islands
-        { code: '+299', length: 9 },     // Greenland
+        { code: '+1', name: 'USA/Canada' },
+        { code: '+234', name: 'Nigeria' },
+        { code: '+44', name: 'UK' },
+        { code: '+91', name: 'India' },
+        { code: '+86', name: 'China' },
+        { code: '+33', name: 'France' },
+        { code: '+49', name: 'Germany' },
+        { code: '+81', name: 'Japan' },
+        { code: '+61', name: 'Australia' },
+        { code: '+55', name: 'Brazil' },
+        { code: '+7', name: 'Russia/Kazakhstan' },
+        { code: '+20', name: 'Egypt' },
+        { code: '+27', name: 'South Africa' },
+        { code: '+34', name: 'Spain' },
+        { code: '+39', name: 'Italy' },
+        { code: '+52', name: 'Mexico' },
+        { code: '+62', name: 'Indonesia' },
+        { code: '+82', name: 'South Korea' },
+        { code: '+90', name: 'Turkey' },
+        { code: '+92', name: 'Pakistan' },
+        { code: '+966', name: 'Saudi Arabia' },
+        { code: '+971', name: 'UAE' },
+        { code: '+233', name: 'Ghana' },
+        { code: '+254', name: 'Kenya' },
+        { code: '+255', name: 'Tanzania' },
+        { code: '+256', name: 'Uganda' },
+        { code: '+237', name: 'Cameroon' },
+        { code: '+251', name: 'Ethiopia' },
+        { code: '+250', name: 'Rwanda' },
+        { code: '+260', name: 'Zambia' },
+        { code: '+263', name: 'Zimbabwe' },
+        { code: '+265', name: 'Malawi' },
+        { code: '+267', name: 'Botswana' },
+        { code: '+268', name: 'Eswatini' },
+        { code: '+269', name: 'Comoros' },
+        { code: '+41', name: 'Switzerland' },
+        { code: '+351', name: 'Portugal' },
+        { code: '+31', name: 'Netherlands' },
+        { code: '+32', name: 'Belgium' },
+        { code: '+46', name: 'Sweden' },
+        { code: '+47', name: 'Norway' },
+        { code: '+45', name: 'Denmark' },
+        { code: '+358', name: 'Finland' },
+        { code: '+353', name: 'Ireland' },
+        { code: '+48', name: 'Poland' },
+        { code: '+961', name: 'Lebanon' },
+        { code: '+962', name: 'Jordan' },
+        { code: '+60', name: 'Malaysia' },
+        { code: '+852', name: 'Hong Kong' },
+        { code: '+63', name: 'Philippines' },
+        { code: '+65', name: 'Singapore' },
+        { code: '+64', name: 'New Zealand' },
+        { code: '+380', name: 'Ukraine' },
+        { code: '+30', name: 'Greece' },
+        { code: '+43', name: 'Austria' },
+        { code: '+420', name: 'Czech Republic' },
+        { code: '+36', name: 'Hungary' },
+        { code: '+40', name: 'Romania' }
     ];
     
     // Try to identify and generate variations for each country code pattern
@@ -2699,6 +3589,8 @@ function generateAllPhoneVariations(phone) {
                 variations.add('+1' + basicCleaned.substring(1));
             } else if (basicCleaned.length === 11 && basicCleaned.startsWith('0')) {
                 variations.add('+234' + basicCleaned.substring(1));  // Nigeria
+                variations.add('+44' + basicCleaned.substring(1));   // UK
+                variations.add('+91' + basicCleaned.substring(1));   // India
             }
         }
     }
@@ -2719,20 +3611,36 @@ function generateAllPhoneVariations(phone) {
                 // (XXX) XXX-XXXX format
                 const spaced2 = digitsOnly.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
                 if (spaced2 !== variation) variations.add(spaced2);
+                
+                // XXX-XXX-XXXX format
+                const dashed = digitsOnly.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+                if (dashed !== variation) variations.add(dashed);
+                
+                // XXX.XXX.XXXX format
+                const dotted = digitsOnly.replace(/(\d{3})(\d{3})(\d{4})/, '$1.$2.$3');
+                if (dotted !== variation) variations.add(dotted);
             } else if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
                 // 1 XXX XXX XXXX format (US/Canada with country code)
                 const spaced3 = digitsOnly.replace(/(\d{1})(\d{3})(\d{3})(\d{4})/, '$1 $2 $3 $4');
                 if (spaced3 !== variation) variations.add(spaced3);
+                
+                // 1-XXX-XXX-XXXX
+                const dashed3 = digitsOnly.replace(/(\d{1})(\d{3})(\d{3})(\d{4})/, '$1-$2-$3-$4');
+                if (dashed3 !== variation) variations.add(dashed3);
             } else if (digitsOnly.length >= 10) {
                 // Generic spacing for other lengths
                 const spacedGeneric = digitsOnly.replace(/(\d{3})(?=\d)/g, '$1 ');
                 if (spacedGeneric !== variation) variations.add(spacedGeneric);
+                
+                // Generic dashing
+                const dashedGeneric = digitsOnly.replace(/(\d{3})(?=\d)/g, '$1-');
+                if (dashedGeneric !== variation) variations.add(dashedGeneric);
             }
             
-            // Add dash-separated versions
-            if (digitsOnly.length >= 10) {
-                const dashed = digitsOnly.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
-                if (dashed !== variation) variations.add(dashed);
+            // Add dash-separated versions for any length
+            if (digitsOnly.length >= 7 && digitsOnly.length <= 15) {
+                const dashedAny = digitsOnly.replace(/(\d{4})(?=\d)/g, '$1-');
+                if (dashedAny !== variation && dashedAny.length >= 7) variations.add(dashedAny);
             }
         }
     });
@@ -2741,7 +3649,7 @@ function generateAllPhoneVariations(phone) {
     const finalVariations = Array.from(variations)
         .filter(v => v && v.length >= 7)  // Minimum 7 characters for a valid phone (including country code)
         .filter(v => v.length <= 20)      // Maximum reasonable length
-        .filter(v => !v.includes('undefined'))  // Remove any undefined values
+        .filter(v => !v.includes('undefined') && !v.includes('null') && !v.includes('NaN'))
         .filter((v, i, arr) => arr.indexOf(v) === i);  // Remove duplicates
     
     console.log(`📱 Generated ${finalVariations.length} phone variations`);
@@ -2754,19 +3662,87 @@ function determineReportType(collectionName, data) {
     if (collectionName.includes('monthly') || collectionName.includes('submission')) {
         return 'monthly';
     }
-    if (collectionName.includes('assessment') || collectionName.includes('progress')) {
+    if (collectionName.includes('assessment') || 
+        collectionName.includes('progress') || 
+        collectionName.includes('result') ||
+        collectionName.includes('test') ||
+        collectionName.includes('exam') ||
+        collectionName.includes('quiz')) {
         return 'assessment';
     }
     if (data.reportType) {
-        return data.reportType.toLowerCase();
+        const rt = data.reportType.toLowerCase();
+        if (rt.includes('assessment') || rt.includes('test') || rt.includes('exam')) return 'assessment';
+        if (rt.includes('monthly') || rt.includes('progress') || rt.includes('report')) return 'monthly';
+        return rt;
     }
     if (data.type) {
-        return data.type;
+        const t = data.type.toLowerCase();
+        if (t.includes('assessment') || t.includes('test')) return 'assessment';
+        if (t.includes('monthly') || t.includes('progress')) return 'monthly';
+        return t;
     }
-    if (data.collection) {
-        return data.collection.toLowerCase();
+    if (data.category) {
+        const c = data.category.toLowerCase();
+        if (c.includes('assessment') || c.includes('test')) return 'assessment';
+        if (c.includes('monthly') || c.includes('progress')) return 'monthly';
     }
     return 'unknown';
+}
+
+// Get timestamp from various date formats
+function getTimestampFromData(data) {
+    if (!data) return Math.floor(Date.now() / 1000);
+    
+    // Try different timestamp fields
+    const timestampFields = [
+        'timestamp',
+        'createdAt',
+        'submittedAt',
+        'date',
+        'updatedAt',
+        'assignedDate',
+        'dueDate',
+        'completedAt',
+        'assessmentDate',
+        'reportDate',
+        'sessionDate',
+        'created'
+    ];
+    
+    for (const field of timestampFields) {
+        if (data[field]) {
+            const timestamp = getTimestamp(data[field]);
+            if (timestamp > 0) {
+                return Math.floor(timestamp / 1000); // Convert to seconds
+            }
+        }
+    }
+    
+    // Fallback to current time
+    return Math.floor(Date.now() / 1000);
+}
+
+// Convert various date formats to timestamp
+function getTimestamp(dateInput) {
+    if (!dateInput) return 0;
+    
+    if (dateInput?.toDate) {
+        return dateInput.toDate().getTime();
+    } else if (dateInput instanceof Date) {
+        return dateInput.getTime();
+    } else if (typeof dateInput === 'string') {
+        const date = new Date(dateInput);
+        return isNaN(date.getTime()) ? 0 : date.getTime();
+    } else if (typeof dateInput === 'number') {
+        // Handle seconds timestamp
+        if (dateInput < 10000000000) {
+            return dateInput * 1000; // Convert seconds to milliseconds
+        }
+        return dateInput; // Assume milliseconds
+    }
+    
+    return 0;
 }
 
 // ============================================================================
@@ -3663,18 +4639,19 @@ function logout() {
 }
 
 // ============================================================================
-// SECTION 18: INITIALIZATION - FIXED RELOADING ISSUE WITH ALL DEPENDENCIES
+// SECTION 18: FIXED AUTHENTICATION SYSTEM - NO RELOADING LOOPS
 // ============================================================================
 
-// Track auth state to prevent loops
+// Global state tracking
 let authStateInitialized = false;
 let authChangeInProgress = false;
 let lastAuthChangeTime = 0;
-const AUTH_DEBOUNCE_MS = 1000; // Minimum 1 second between auth changes
-let authUnsubscribe = null; // To store the unsubscribe function
+const AUTH_DEBOUNCE_MS = 1500; // Increased to 1.5 seconds
+let authUnsubscribe = null;
+let currentAuthUser = null; // Track current user to prevent duplicate processing
 
 // ============================================================================
-// CRITICAL AUTHENTICATION FUNCTIONS (moved from SECTION 6 for initialization)
+// SIMPLE, ROBUST AUTHENTICATION HANDLERS
 // ============================================================================
 
 // Setup Remember Me Functionality
@@ -3714,300 +4691,244 @@ function handleRememberMe() {
     }
 }
 
-// Basic handleSignIn function for event listeners (full version is in SECTION 6)
-function handleSignIn() {
-    const identifier = document.getElementById('loginIdentifier')?.value.trim();
-    const password = document.getElementById('loginPassword')?.value;
-
-    if (!identifier || !password) {
-        showMessage('Please fill in all fields', 'error');
-        return;
-    }
-
-    const signInBtn = document.getElementById('signInBtn');
-    const authLoader = document.getElementById('authLoader');
-
-    signInBtn.disabled = true;
-    document.getElementById('signInText').textContent = 'Signing In...';
-    document.getElementById('signInSpinner').classList.remove('hidden');
-    authLoader.classList.remove('hidden');
-
-    // Call the full implementation from SECTION 6
-    handleSignInFull(identifier, password, signInBtn, authLoader);
-}
-
-// Basic handleSignUp function for event listeners
-function handleSignUp() {
-    const countryCode = document.getElementById('countryCode')?.value;
-    const localPhone = document.getElementById('signupPhone')?.value.trim();
-    const email = document.getElementById('signupEmail')?.value.trim();
-    const password = document.getElementById('signupPassword')?.value;
-    const confirmPassword = document.getElementById('signupConfirmPassword')?.value;
-
-    // Validation
-    if (!countryCode || !localPhone || !email || !password || !confirmPassword) {
-        showMessage('Please fill in all fields including country code', 'error');
-        return;
-    }
-
-    if (password.length < 6) {
-        showMessage('Password must be at least 6 characters', 'error');
-        return;
-    }
-
-    if (password !== confirmPassword) {
-        showMessage('Passwords do not match', 'error');
-        return;
-    }
-
-    const signUpBtn = document.getElementById('signUpBtn');
-    const authLoader = document.getElementById('authLoader');
-
-    signUpBtn.disabled = true;
-    document.getElementById('signUpText').textContent = 'Creating Account...';
-    document.getElementById('signUpSpinner').classList.remove('hidden');
-    authLoader.classList.remove('hidden');
-
-    // Call the full implementation from SECTION 6
-    handleSignUpFull(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader);
-}
-
-// Basic password reset function
-function handlePasswordReset() {
-    const email = document.getElementById('resetEmail')?.value.trim();
-    
-    if (!email) {
-        showMessage('Please enter your email address', 'error');
-        return;
-    }
-
-    const sendResetBtn = document.getElementById('sendResetBtn');
-    const resetLoader = document.getElementById('resetLoader');
-
-    sendResetBtn.disabled = true;
-    resetLoader.classList.remove('hidden');
-
-    // Call the full implementation from SECTION 6
-    handlePasswordResetFull(email, sendResetBtn, resetLoader);
-}
-
-// Basic tab switching functions
-function switchTab(tab) {
-    const signInTab = document.getElementById('signInTab');
-    const signUpTab = document.getElementById('signUpTab');
-    const signInForm = document.getElementById('signInForm');
-    const signUpForm = document.getElementById('signUpForm');
-
-    if (tab === 'signin') {
-        signInTab?.classList.remove('tab-inactive');
-        signInTab?.classList.add('tab-active');
-        signUpTab?.classList.remove('tab-active');
-        signUpTab?.classList.add('tab-inactive');
-        signInForm?.classList.remove('hidden');
-        signUpForm?.classList.add('hidden');
-    } else {
-        signUpTab?.classList.remove('tab-inactive');
-        signUpTab?.classList.add('tab-active');
-        signInTab?.classList.remove('tab-active');
-        signInTab?.classList.add('tab-inactive');
-        signUpForm?.classList.remove('hidden');
-        signInForm?.classList.add('hidden');
-    }
-}
-
 // ============================================================================
-// MAIN INITIALIZATION FUNCTIONS
+// SINGLE SOURCE OF TRUTH: AUTH STATE MANAGER
 // ============================================================================
 
-// Robust initialization with loop prevention
-function initializeParentPortal() {
-    console.log("🚀 Initializing parent portal with reload protection");
+/**
+ * MAIN AUTHENTICATION MANAGER - Only this function handles auth state changes
+ */
+function initializeAuthManager() {
+    console.log("🔐 Initializing single auth manager");
     
-    // Setup Remember Me FIRST (before any other operations)
-    setupRememberMe();
-    
-    // Inject custom CSS for animations
-    injectCustomCSS();
-    
-    // Create country code dropdown when page loads
-    createCountryCodeDropdown();
-    
-    // Set up all event listeners (before auth checks)
-    setupEventListeners();
-    
-    // Setup global error handler
-    setupGlobalErrorHandler();
-    
-    // Initialize auth with debouncing and loop prevention
-    initializeAuthWithProtection();
-    
-    console.log("✅ Parent portal initialized with reload protection");
-}
-
-// Initialize auth with protection against loops
-function initializeAuthWithProtection() {
-    console.log("🔐 Setting up protected auth state listener");
-    
-    // Clean up any existing listener first
+    // Clean up any existing listener
     if (authUnsubscribe && typeof authUnsubscribe === 'function') {
-        console.log("🧹 Cleaning up previous auth listener");
         authUnsubscribe();
         authUnsubscribe = null;
     }
     
-    // Setup a single, protected auth state listener
-    authUnsubscribe = auth.onAuthStateChanged(handleAuthStateChangeProtected);
+    // Clear any pending operations
+    authChangeInProgress = false;
+    authStateInitialized = false;
+    currentAuthUser = null;
     
-    // Also check initial state after a short delay
-    setTimeout(() => {
-        const user = auth.currentUser;
-        if (user && !authStateInitialized) {
-            console.log("🔄 Checking initial auth state");
-            handleAuthStateChangeProtected(user);
+    // Set up ONE SINGLE auth state listener
+    authUnsubscribe = auth.onAuthStateChanged(
+        (user) => {
+            // Skip if we're already processing or this is a duplicate
+            if (authChangeInProgress) {
+                console.log("⏸️ Auth change already in progress, skipping duplicate");
+                return;
+            }
+            
+            // Check if this is the same user we already processed
+            if (currentAuthUser && user && currentAuthUser.uid === user.uid) {
+                console.log("🔄 Same user detected, no action needed");
+                return;
+            }
+            
+            // Start processing with debouncing
+            const now = Date.now();
+            if (now - lastAuthChangeTime < AUTH_DEBOUNCE_MS) {
+                console.log("⏸️ Debouncing auth change");
+                setTimeout(() => processAuthChange(user), AUTH_DEBOUNCE_MS);
+                return;
+            }
+            
+            // Process immediately
+            processAuthChange(user);
+        },
+        (error) => {
+            console.error("❌ Auth state error:", error);
+            // Don't show error messages that might cause loops
+            if (!error.message.includes('network') && !error.message.includes('permission')) {
+                showMessage('Authentication error. Please refresh.', 'error');
+            }
         }
-    }, 100);
+    );
+    
+    console.log("✅ Auth manager initialized successfully");
 }
 
-// Protected auth state change handler with debouncing
-function handleAuthStateChangeProtected(user) {
-    const now = Date.now();
-    const timeSinceLastChange = now - lastAuthChangeTime;
-    
-    // Prevent rapid auth state changes (debouncing)
-    if (authChangeInProgress) {
-        console.log("⏸️ Auth change already in progress, skipping");
-        return;
-    }
-    
-    if (timeSinceLastChange < AUTH_DEBOUNCE_MS) {
-        console.log("⏸️ Debouncing auth change (too soon)");
-        setTimeout(() => handleAuthStateChangeProtected(user), AUTH_DEBOUNCE_MS - timeSinceLastChange);
-        return;
-    }
-    
-    // Mark that we're processing an auth change
+/**
+ * Process auth changes safely without loops
+ */
+function processAuthChange(user) {
+    // Mark as in progress
     authChangeInProgress = true;
-    lastAuthChangeTime = now;
+    lastAuthChangeTime = Date.now();
+    
+    // Store current user to prevent duplicate processing
+    currentAuthUser = user;
+    
+    console.log(`🔐 Auth change: ${user ? `SIGNED IN (${user.email})` : 'SIGNED OUT'}`);
     
     try {
-        console.log(`🔄 Auth state change: ${user ? 'SIGNED IN' : 'SIGNED OUT'}`, 
-                    user ? `(UID: ${user.uid.substring(0, 8)}...)` : '');
-        
         if (user) {
-            handleUserSignedIn(user);
+            handleUserSignedInSafe(user);
         } else {
-            handleUserSignedOut();
+            handleUserSignedOutSafe();
         }
         
         authStateInitialized = true;
         
     } catch (error) {
-        console.error("❌ Auth state change error:", error);
-        showMessage('Authentication error. Please try refreshing the page.', 'error');
+        console.error("❌ Error processing auth change:", error);
+        // Don't show errors that might cause more loops
     } finally {
-        // Reset the flag after a minimum delay
+        // Reset after a safe delay
         setTimeout(() => {
             authChangeInProgress = false;
-        }, 500);
+            console.log("✅ Auth processing complete");
+        }, 1000);
     }
 }
 
-// Handle user sign in (protected)
-function handleUserSignedIn(user) {
-    console.log("👤 User signed in, loading dashboard...");
+/**
+ * SAFE user sign-in handler
+ */
+function handleUserSignedInSafe(user) {
+    console.log("👤 User signed in safely, loading dashboard...");
     
     const authArea = document.getElementById("authArea");
     const reportArea = document.getElementById("reportArea");
     const authLoader = document.getElementById("authLoader");
     const welcomeMessage = document.getElementById("welcomeMessage");
     
-    // Hide auth area, show dashboard
+    // IMMEDIATE UI UPDATE (no async operations here)
     if (authArea && reportArea) {
         authArea.classList.add("hidden");
         reportArea.classList.remove("hidden");
     }
     
-    // Hide loader if present
     if (authLoader) {
         authLoader.classList.add("hidden");
     }
     
-    // Update welcome message immediately
     if (welcomeMessage) {
         welcomeMessage.textContent = `Welcome!`;
     }
     
-    // Store auth state (but don't rely on it for critical decisions)
+    // Store auth state
     localStorage.setItem('isAuthenticated', 'true');
     
-    // Get user data and load reports
-    db.collection('parent_users').doc(user.uid).get()
-        .then((doc) => {
-            if (doc.exists) {
-                const userData = doc.data();
-                const userPhone = userData.phone;
-                const normalizedPhone = userData.normalizedPhone;
-                
-                // Update welcome message with actual name
-                if (welcomeMessage && userData.parentName) {
-                    welcomeMessage.textContent = `Welcome, ${safeText(userData.parentName)}!`;
-                }
-                
-                // Load reports
-                loadAllReportsForParent(normalizedPhone || userPhone, user.uid);
-                
-                // Add navigation buttons
-                setTimeout(() => {
-                    addMessagesButton();
-                    addManualRefreshButton();
-                    addLogoutButton();
-                }, 300);
-                
-            } else {
-                console.error("User document not found in Firestore");
-                showMessage('User profile not found. Please contact support.', 'error');
-            }
-        })
-        .catch((error) => {
-            console.error('Error getting user data:', error);
-            showMessage('Could not load user data. Please try again.', 'error');
-        });
+    // Load user data and reports ASYNCHRONOUSLY
+    setTimeout(() => {
+        loadUserDataAndReports(user);
+    }, 300);
 }
 
-// Handle user sign out (protected)
-function handleUserSignedOut() {
-    console.log("🚪 User signed out, showing login form");
+/**
+ * Load user data and reports (separated from UI update)
+ */
+async function loadUserDataAndReports(user) {
+    try {
+        const userDoc = await db.collection('parent_users').doc(user.uid).get();
+        
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            const welcomeMessage = document.getElementById("welcomeMessage");
+            
+            // Update welcome message
+            if (welcomeMessage && userData.parentName) {
+                welcomeMessage.textContent = `Welcome, ${safeText(userData.parentName)}!`;
+            }
+            
+            // Store current user data globally
+            currentUserData = {
+                parentName: safeText(userData.parentName || 'Parent'),
+                parentPhone: userData.phone,
+                normalizedPhone: userData.normalizedPhone,
+                email: userData.email || ''
+            };
+            
+            // Load reports with the phone number
+            const userPhone = userData.normalizedPhone || userData.phone;
+            await loadAllReportsForParent(userPhone, user.uid);
+            
+            // Add UI buttons
+            addNavigationButtons();
+            
+            // Setup real-time monitoring AFTER everything is loaded
+            setTimeout(() => {
+                if (!window.realTimeMonitoringSetup) {
+                    setupRealTimeMonitoring(userPhone, user.uid);
+                    window.realTimeMonitoringSetup = true;
+                }
+            }, 1000);
+            
+        } else {
+            console.error("User document not found");
+            showMessage('Profile not found. Please contact support.', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading user data:', error);
+        showMessage('Could not load your data. Please try again.', 'error');
+    }
+}
+
+/**
+ * Add all navigation buttons at once
+ */
+function addNavigationButtons() {
+    // Remove any existing buttons first
+    const existingButtons = [
+        'viewMessagesBtn',
+        'composeMessageBtn', 
+        'manualRefreshBtn'
+    ];
+    
+    existingButtons.forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.remove();
+    });
+    
+    // Add fresh buttons
+    setTimeout(() => {
+        addMessagesButton();
+        addManualRefreshButton();
+        addLogoutButton();
+    }, 500);
+}
+
+/**
+ * SAFE user sign-out handler
+ */
+function handleUserSignedOutSafe() {
+    console.log("🚪 User signed out safely");
     
     const authArea = document.getElementById("authArea");
     const reportArea = document.getElementById("reportArea");
     const authLoader = document.getElementById("authLoader");
     
-    // Clean up real-time listeners FIRST
+    // Clean up FIRST
     cleanupRealTimeListeners();
+    window.realTimeMonitoringSetup = false;
     
-    // Clear auth state from localStorage
+    // Clear state
     localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('savedEmail'); // Also clear saved email for security
+    currentAuthUser = null;
+    currentUserData = null;
+    userChildren = [];
+    studentIdMap.clear();
     
-    // Show auth area, hide dashboard
+    // Update UI
     if (authArea && reportArea) {
         authArea.classList.remove("hidden");
         reportArea.classList.add("hidden");
     }
     
-    // Hide loader if present
     if (authLoader) {
         authLoader.classList.add("hidden");
     }
     
-    // Reset form fields
-    const loginIdentifier = document.getElementById('loginIdentifier');
+    // Reset form (preserve email if remember me is checked)
     const loginPassword = document.getElementById('loginPassword');
+    const rememberMe = document.getElementById('rememberMe');
+    const loginIdentifier = document.getElementById('loginIdentifier');
     
     if (loginPassword) loginPassword.value = '';
     
-    // Don't clear identifier if remember me is checked
-    const rememberMe = document.getElementById('rememberMe');
     if (loginIdentifier && (!rememberMe || !rememberMe.checked)) {
         loginIdentifier.value = '';
     }
@@ -4015,117 +4936,159 @@ function handleUserSignedOut() {
     // Switch to sign in tab
     switchTab('signin');
     
-    console.log("✅ User signed out cleanly");
+    // Clear any leftover buttons
+    setTimeout(() => {
+        const welcomeSection = document.querySelector('.bg-green-50');
+        if (welcomeSection) {
+            const buttonContainer = welcomeSection.querySelector('.flex.gap-2');
+            if (buttonContainer) {
+                // Keep only logout button if it exists
+                const logoutBtn = buttonContainer.querySelector('button[onclick="logout()"]');
+                buttonContainer.innerHTML = '';
+                if (logoutBtn) {
+                    buttonContainer.appendChild(logoutBtn);
+                }
+            }
+        }
+    }, 100);
 }
 
-// Setup all event listeners
-function setupEventListeners() {
+// ============================================================================
+// SIMPLE EVENT LISTENER SETUP
+// ============================================================================
+
+function setupSimpleEventListeners() {
     console.log("🔧 Setting up event listeners");
     
-    // Authentication buttons
-    const signInBtn = document.getElementById("signInBtn");
-    const signUpBtn = document.getElementById("signUpBtn");
-    const sendResetBtn = document.getElementById("sendResetBtn");
-    const submitMessageBtn = document.getElementById("submitMessageBtn");
+    // Remove all existing listeners first
+    const removeListeners = (element, event, handler) => {
+        if (element) {
+            element.removeEventListener(event, handler);
+        }
+    };
     
+    // Sign in
+    const signInBtn = document.getElementById("signInBtn");
     if (signInBtn) {
-        signInBtn.removeEventListener("click", handleSignIn);
+        removeListeners(signInBtn, "click", handleSignIn);
         signInBtn.addEventListener("click", handleSignIn);
     }
     
+    // Sign up
+    const signUpBtn = document.getElementById("signUpBtn");
     if (signUpBtn) {
-        signUpBtn.removeEventListener("click", handleSignUp);
+        removeListeners(signUpBtn, "click", handleSignUp);
         signUpBtn.addEventListener("click", handleSignUp);
     }
     
+    // Password reset
+    const sendResetBtn = document.getElementById("sendResetBtn");
     if (sendResetBtn) {
-        sendResetBtn.removeEventListener("click", handlePasswordReset);
+        removeListeners(sendResetBtn, "click", handlePasswordReset);
         sendResetBtn.addEventListener("click", handlePasswordReset);
     }
     
-    if (submitMessageBtn) {
-        submitMessageBtn.removeEventListener("click", submitMessage);
-        submitMessageBtn.addEventListener("click", submitMessage);
-    }
-    
-    // Tab switching
-    const signInTab = document.getElementById("signInTab");
-    const signUpTab = document.getElementById("signUpTab");
-    
-    if (signInTab) {
-        signInTab.removeEventListener("click", () => switchTab('signin'));
-        signInTab.addEventListener("click", () => switchTab('signin'));
-    }
-    
-    if (signUpTab) {
-        signUpTab.removeEventListener("click", () => switchTab('signup'));
-        signUpTab.addEventListener("click", () => switchTab('signup'));
-    }
-    
-    // Password reset
+    // Forgot password
     const forgotPasswordBtn = document.getElementById("forgotPasswordBtn");
     if (forgotPasswordBtn) {
-        forgotPasswordBtn.removeEventListener("click", showPasswordResetModal);
+        removeListeners(forgotPasswordBtn, "click", showPasswordResetModal);
         forgotPasswordBtn.addEventListener("click", showPasswordResetModal);
     }
     
+    // Cancel reset
     const cancelResetBtn = document.getElementById("cancelResetBtn");
     if (cancelResetBtn) {
-        cancelResetBtn.removeEventListener("click", hidePasswordResetModal);
+        removeListeners(cancelResetBtn, "click", hidePasswordResetModal);
         cancelResetBtn.addEventListener("click", hidePasswordResetModal);
     }
     
     // Remember me
     const rememberMeCheckbox = document.getElementById("rememberMe");
     if (rememberMeCheckbox) {
-        rememberMeCheckbox.removeEventListener("change", handleRememberMe);
+        removeListeners(rememberMeCheckbox, "change", handleRememberMe);
         rememberMeCheckbox.addEventListener("change", handleRememberMe);
+    }
+    
+    // Tabs
+    const signInTab = document.getElementById("signInTab");
+    if (signInTab) {
+        removeListeners(signInTab, "click", () => switchTab('signin'));
+        signInTab.addEventListener("click", () => switchTab('signin'));
+    }
+    
+    const signUpTab = document.getElementById("signUpTab");
+    if (signUpTab) {
+        removeListeners(signUpTab, "click", () => switchTab('signup'));
+        signUpTab.addEventListener("click", () => switchTab('signup'));
+    }
+    
+    // Message submission
+    const submitMessageBtn = document.getElementById("submitMessageBtn");
+    if (submitMessageBtn) {
+        removeListeners(submitMessageBtn, "click", submitMessage);
+        submitMessageBtn.addEventListener("click", submitMessage);
+    }
+    
+    // Main navigation tabs
+    const reportTab = document.getElementById("reportTab");
+    if (reportTab) {
+        removeListeners(reportTab, "click", () => switchMainTab('reports'));
+        reportTab.addEventListener("click", () => switchMainTab('reports'));
+    }
+    
+    const academicsTab = document.getElementById("academicsTab");
+    if (academicsTab) {
+        removeListeners(academicsTab, "click", () => switchMainTab('academics'));
+        academicsTab.addEventListener("click", () => switchMainTab('academics'));
+    }
+    
+    const rewardsTab = document.getElementById("rewardsTab");
+    if (rewardsTab) {
+        removeListeners(rewardsTab, "click", () => switchMainTab('rewards'));
+        rewardsTab.addEventListener("click", () => switchMainTab('rewards'));
     }
     
     // Enter key support
     const loginPassword = document.getElementById('loginPassword');
     if (loginPassword) {
-        loginPassword.removeEventListener('keypress', handleLoginEnter);
+        removeListeners(loginPassword, 'keypress', handleLoginEnter);
         loginPassword.addEventListener('keypress', handleLoginEnter);
     }
     
     const signupConfirmPassword = document.getElementById('signupConfirmPassword');
     if (signupConfirmPassword) {
-        signupConfirmPassword.removeEventListener('keypress', handleSignupEnter);
+        removeListeners(signupConfirmPassword, 'keypress', handleSignupEnter);
         signupConfirmPassword.addEventListener('keypress', handleSignupEnter);
     }
     
     const resetEmail = document.getElementById('resetEmail');
     if (resetEmail) {
-        resetEmail.removeEventListener('keypress', handleResetEnter);
+        removeListeners(resetEmail, 'keypress', handleResetEnter);
         resetEmail.addEventListener('keypress', handleResetEnter);
     }
     
-    // Main tab switching
-    const reportTab = document.getElementById("reportTab");
-    const academicsTab = document.getElementById("academicsTab");
-    const rewardsTab = document.getElementById("rewardsTab");
-    
-    if (reportTab) {
-        reportTab.removeEventListener("click", () => switchMainTab('reports'));
-        reportTab.addEventListener("click", () => switchMainTab('reports'));
-    }
-    
-    if (academicsTab) {
-        academicsTab.removeEventListener("click", () => switchMainTab('academics'));
-        academicsTab.addEventListener("click", () => switchMainTab('academics'));
-    }
-    
-    if (rewardsTab) {
-        rewardsTab.removeEventListener("click", () => switchMainTab('rewards'));
-        rewardsTab.addEventListener("click", () => switchMainTab('rewards'));
-    }
-    
-    // Dynamic button handlers (event delegation)
-    setupDynamicEventDelegation();
+    // Dynamic button delegation (for buttons created after page load)
+    document.addEventListener('click', function(event) {
+        const target = event.target;
+        
+        // Cancel message modal
+        if (target.id === 'cancelMessageBtn' || target.closest('#cancelMessageBtn')) {
+            event.preventDefault();
+            hideComposeMessageModal();
+        }
+        
+        // Cancel messages modal
+        if (target.id === 'cancelMessagesModalBtn' || target.closest('#cancelMessagesModalBtn')) {
+            event.preventDefault();
+            hideMessagesModal();
+        }
+    });
 }
 
-// Helper functions for enter key handling
+// ============================================================================
+// ENTER KEY HANDLERS
+// ============================================================================
+
 function handleLoginEnter(e) {
     if (e.key === 'Enter') handleSignIn();
 }
@@ -4138,11 +5101,17 @@ function handleResetEnter(e) {
     if (e.key === 'Enter') handlePasswordReset();
 }
 
-// Modal functions
+// ============================================================================
+// MODAL FUNCTIONS
+// ============================================================================
+
 function showPasswordResetModal() {
     const modal = document.getElementById("passwordResetModal");
     if (modal) {
         modal.classList.remove("hidden");
+        // Focus on email field
+        const resetEmail = document.getElementById("resetEmail");
+        if (resetEmail) resetEmail.focus();
     }
 }
 
@@ -4153,81 +5122,10 @@ function hidePasswordResetModal() {
     }
 }
 
-// Dynamic event delegation for buttons created after page load
-function setupDynamicEventDelegation() {
-    document.addEventListener('click', function(event) {
-        // Check if cancel message button was clicked
-        if (event.target.id === 'cancelMessageBtn' || 
-            event.target.closest('#cancelMessageBtn')) {
-            event.preventDefault();
-            hideComposeMessageModal();
-        }
-        
-        // Check if cancel messages modal button was clicked
-        if (event.target.id === 'cancelMessagesModalBtn' ||
-            event.target.closest('#cancelMessagesModalBtn')) {
-            event.preventDefault();
-            hideMessagesModal();
-        }
-        
-        // Check if manual refresh button was clicked
-        if (event.target.id === 'manualRefreshBtn' ||
-            event.target.closest('#manualRefreshBtn')) {
-            event.preventDefault();
-            const user = auth.currentUser;
-            if (user) {
-                manualRefreshReports();
-            }
-        }
-        
-        // Check if view messages button was clicked
-        if (event.target.id === 'viewMessagesBtn' ||
-            event.target.closest('#viewMessagesBtn')) {
-            event.preventDefault();
-            showMessagesModal();
-        }
-        
-        // Check if compose message button was clicked
-        if (event.target.id === 'composeMessageBtn' ||
-            event.target.closest('#composeMessageBtn')) {
-            event.preventDefault();
-            showComposeMessageModal();
-        }
-    });
-}
+// ============================================================================
+// CLEANUP FUNCTIONS
+// ============================================================================
 
-// Setup global error handler
-function setupGlobalErrorHandler() {
-    // Prevent unhandled promise rejections
-    window.addEventListener('unhandledrejection', function(event) {
-        console.error('Unhandled promise rejection:', event.reason);
-        event.preventDefault(); // Prevent browser error reporting
-    });
-    
-    // Global error handler
-    window.addEventListener('error', function(e) {
-        console.error('Global error:', e.error);
-        // Don't show error messages for auth-related errors to avoid loops
-        if (!e.error?.message?.includes('auth') && 
-            !e.error?.message?.includes('permission-denied')) {
-            showMessage('An unexpected error occurred. Please refresh the page.', 'error');
-        }
-        e.preventDefault(); // Prevent default error handling
-    });
-    
-    // Network error handling
-    window.addEventListener('offline', function() {
-        console.warn('Network offline');
-        showMessage('You are offline. Some features may not work.', 'warning');
-    });
-    
-    window.addEventListener('online', function() {
-        console.log('Network back online');
-        showMessage('Connection restored.', 'success');
-    });
-}
-
-// Cleanup function for page unload
 function cleanupBeforeUnload() {
     console.log("🧹 Cleaning up before page unload");
     
@@ -4248,30 +5146,78 @@ function cleanupBeforeUnload() {
 }
 
 // ============================================================================
-// WRAPPER FUNCTIONS TO CALL FULL IMPLEMENTATIONS FROM SECTION 6
+// MAIN INITIALIZATION - SINGLE ENTRY POINT
 // ============================================================================
 
-// Now we need to update SECTION 6 to rename the original functions and add wrapper calls
-
-// In SECTION 6, rename the original functions:
-// 1. Change "async function handleSignIn()" to "async function handleSignInFull(identifier, password, signInBtn, authLoader)"
-// 2. Change "async function handleSignUp()" to "async function handleSignUpFull(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader)"
-// 3. Change "async function handlePasswordReset()" to "async function handlePasswordResetFull(email, sendResetBtn, resetLoader)"
-
-// ============================================================================
-// PAGE INITIALIZATION
-// ============================================================================
-
-// Initialize the page when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-    console.log("📄 DOM Content Loaded - Starting robust initialization");
+function initializeParentPortal() {
+    console.log("🚀 Initializing parent portal (single entry point)");
     
-    // Setup cleanup before page unload
+    // Clear any existing timeouts/intervals first
+    const maxTimeoutId = setTimeout(() => {}, 0);
+    for (let i = 0; i < maxTimeoutId; i++) {
+        clearTimeout(i);
+        clearInterval(i);
+    }
+    
+    // Reset global state
+    authStateInitialized = false;
+    authChangeInProgress = false;
+    lastAuthChangeTime = 0;
+    currentAuthUser = null;
+    window.realTimeMonitoringSetup = false;
+    
+    // Setup core functionality
+    setupRememberMe();
+    injectCustomCSS();
+    createCountryCodeDropdown();
+    setupSimpleEventListeners();
+    
+    // Initialize auth manager (ONCE)
+    initializeAuthManager();
+    
+    // Setup cleanup
     window.addEventListener('beforeunload', cleanupBeforeUnload);
     window.addEventListener('pagehide', cleanupBeforeUnload);
     
-    // Initialize the portal
-    initializeParentPortal();
+    console.log("✅ Parent portal initialized successfully");
+}
+
+// ============================================================================
+// PAGE INITIALIZATION - RUN ONLY ONCE
+// ============================================================================
+
+// Track if we've already initialized
+let portalInitialized = false;
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("📄 DOM Content Loaded");
     
-    console.log("🎉 Parent portal initialization complete");
+    // Only initialize once
+    if (portalInitialized) {
+        console.log("⚠️ Portal already initialized, skipping");
+        return;
+    }
+    
+    // Check for hash in URL that might cause reloads
+    if (window.location.hash) {
+        console.log("🔗 Removing hash from URL to prevent reloads");
+        window.history.replaceState(null, null, window.location.pathname + window.location.search);
+    }
+    
+    // Initialize
+    initializeParentPortal();
+    portalInitialized = true;
+    
+    console.log("🎉 Portal initialization complete");
 });
+
+// Prevent multiple initializations
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    if (!portalInitialized) {
+        console.log("📄 Document already loaded, initializing now");
+        setTimeout(() => {
+            initializeParentPortal();
+            portalInitialized = true;
+        }, 100);
+    }
+}
