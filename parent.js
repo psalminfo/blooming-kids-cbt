@@ -3678,7 +3678,7 @@ function logout() {
 }
 
 // ============================================================================
-// SECTION 18: INITIALIZATION - FIXED RELOADING ISSUE
+// SECTION 18: INITIALIZATION - FIXED RELOADING ISSUE WITH PROPER ORDERING
 // ============================================================================
 
 // Track auth state to prevent loops
@@ -3688,20 +3688,57 @@ let lastAuthChangeTime = 0;
 const AUTH_DEBOUNCE_MS = 1000; // Minimum 1 second between auth changes
 let authUnsubscribe = null; // To store the unsubscribe function
 
+// Setup Remember Me Functionality
+function setupRememberMe() {
+    const rememberMe = localStorage.getItem('rememberMe');
+    const savedEmail = localStorage.getItem('savedEmail');
+    
+    if (rememberMe === 'true' && savedEmail) {
+        const loginIdentifier = document.getElementById('loginIdentifier');
+        const rememberMeCheckbox = document.getElementById('rememberMe');
+        
+        if (loginIdentifier) {
+            loginIdentifier.value = safeText(savedEmail);
+        }
+        if (rememberMeCheckbox) {
+            rememberMeCheckbox.checked = true;
+        }
+    }
+}
+
+// Handle Remember Me checkbox change
+function handleRememberMe() {
+    const rememberMeCheckbox = document.getElementById('rememberMe');
+    const identifier = document.getElementById('loginIdentifier');
+    
+    if (!rememberMeCheckbox || !identifier) return;
+    
+    const rememberMe = rememberMeCheckbox.checked;
+    const email = identifier.value.trim();
+    
+    if (rememberMe && email) {
+        localStorage.setItem('rememberMe', 'true');
+        localStorage.setItem('savedEmail', safeText(email));
+    } else {
+        localStorage.removeItem('rememberMe');
+        localStorage.removeItem('savedEmail');
+    }
+}
+
 // Robust initialization with loop prevention
 function initializeParentPortal() {
     console.log("🚀 Initializing parent portal with reload protection");
     
+    // Setup Remember Me FIRST (before any other operations)
+    setupRememberMe();
+    
     // Inject custom CSS for animations
     injectCustomCSS();
-    
-    // Setup Remember Me
-    setupRememberMe();
     
     // Create country code dropdown when page loads
     createCountryCodeDropdown();
     
-    // Set up all event listeners first (before auth checks)
+    // Set up all event listeners (before auth checks)
     setupEventListeners();
     
     // Setup global error handler
