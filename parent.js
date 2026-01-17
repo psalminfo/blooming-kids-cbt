@@ -1,5 +1,3 @@
-
-
 // Firebase config for the 'bloomingkidsassessment' project
 firebase.initializeApp({
     apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
@@ -186,7 +184,7 @@ function createCountryCodeDropdown() {
     countryCodeSelect.className = 'w-32 px-3 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200';
     countryCodeSelect.required = true;
     
-    // FULL COUNTRY CODES LIST (40+ countries) - MAINTAINED GLOBAL
+    // FULL COUNTRY CODES LIST (50+ countries) - MAINTAINED GLOBAL
     const countries = [
         { code: '+1', name: 'USA/Canada (+1)' },
         { code: '+234', name: 'Nigeria (+234)' },
@@ -340,6 +338,7 @@ function normalizePhoneNumber(phone) {
 let currentUserData = null;
 let userChildren = [];
 let studentIdMap = new Map();
+let allStudentData = [];
 let unreadMessagesCount = 0;
 let unreadAcademicsCount = 0;
 let realTimeListeners = [];
@@ -523,150 +522,6 @@ async function loadReferralRewards(parentUid) {
     }
 }
 
-// Find student IDs for a parent's phone number - ENHANCED TO FIND ALL CHILDREN
-async function findStudentIdsForParent(parentPhone) {
-    try {
-        console.log("🔍 Finding ALL student IDs for parent phone:", parentPhone);
-        
-        // Normalize the phone number
-        const normalizedPhone = normalizePhoneNumber(parentPhone);
-        if (!normalizedPhone.valid) {
-            console.log("Invalid phone number format");
-            return { studentIds: [], studentNameIdMap: new Map(), allStudentData: [] };
-        }
-
-        let studentIds = [];
-        let studentNameIdMap = new Map();
-        let allStudentData = [];
-        
-        // DEBUG: Log what we're searching for
-        console.log("🔍 Searching for normalized phone:", normalizedPhone.normalized);
-        
-        // GENERATE ALL PHONE VARIATIONS for thorough search
-        const phoneVariations = generateAllPhoneVariations(parentPhone);
-        console.log("📱 Phone variations to search:", phoneVariations);
-        
-        // Search in students collection - check ALL variations
-        const studentsPromises = phoneVariations.map(phone => 
-            db.collection("students")
-                .where("parentPhone", "==", phone)
-                .get()
-                .catch(error => {
-                    console.warn(`Error searching students with phone ${phone}:`, error);
-                    return { empty: true, forEach: () => {} };
-                })
-        );
-        
-        // Search in pending_students collection - check ALL variations
-        const pendingStudentsPromises = phoneVariations.map(phone =>
-            db.collection("pending_students")
-                .where("parentPhone", "==", phone)
-                .get()
-                .catch(error => {
-                    console.warn(`Error searching pending_students with phone ${phone}:`, error);
-                    return { empty: true, forEach: () => {} };
-                })
-        );
-        
-        // Wait for all searches to complete
-        const allStudentsSnapshots = await Promise.all(studentsPromises);
-        const allPendingSnapshots = await Promise.all(pendingStudentsPromises);
-        
-        // Process students collection results
-        allStudentsSnapshots.forEach(snapshot => {
-            if (snapshot.empty) return;
-            
-            snapshot.forEach(doc => {
-                const studentData = doc.data();
-                const studentId = doc.id;
-                const studentName = safeText(studentData.studentName || studentData.name || 'Unknown');
-                
-                if (studentId && studentName && studentName !== 'Unknown') {
-                    // Check if we already have this student (by ID or name)
-                    const existingById = allStudentData.find(s => s.id === studentId);
-                    const existingByName = allStudentData.find(s => s.name === studentName);
-                    
-                    if (!existingById && !existingByName) {
-                        studentIds.push(studentId);
-                        studentNameIdMap.set(studentName, studentId);
-                        allStudentData.push({ 
-                            id: studentId, 
-                            name: studentName, 
-                            data: studentData,
-                            isPending: false 
-                        });
-                        console.log(`✅ Found student: ${studentName} (ID: ${studentId})`);
-                    } else if (existingByName && existingByName.id !== studentId) {
-                        // Same name, different ID - add with suffix
-                        const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
-                        studentIds.push(studentId);
-                        studentNameIdMap.set(uniqueName, studentId);
-                        allStudentData.push({ 
-                            id: studentId, 
-                            name: uniqueName, 
-                            data: studentData,
-                            isPending: false 
-                        });
-                        console.log(`✅ Found duplicate name student: ${uniqueName} (ID: ${studentId})`);
-                    }
-                }
-            });
-        });
-        
-        // Process pending_students collection results
-        allPendingSnapshots.forEach(snapshot => {
-            if (snapshot.empty) return;
-            
-            snapshot.forEach(doc => {
-                const studentData = doc.data();
-                const studentId = doc.id;
-                const studentName = safeText(studentData.studentName || studentData.name || 'Unknown');
-                
-                if (studentId && studentName && studentName !== 'Unknown') {
-                    // Check if we already have this student (by ID or name)
-                    const existingById = allStudentData.find(s => s.id === studentId);
-                    const existingByName = allStudentData.find(s => s.name === studentName);
-                    
-                    if (!existingById && !existingByName) {
-                        studentIds.push(studentId);
-                        studentNameIdMap.set(studentName, studentId);
-                        allStudentData.push({ 
-                            id: studentId, 
-                            name: studentName, 
-                            data: studentData, 
-                            isPending: true 
-                        });
-                        console.log(`✅ Found pending student: ${studentName} (ID: ${studentId})`);
-                    } else if (existingByName && existingByName.id !== studentId) {
-                        // Same name, different ID - add with suffix
-                        const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
-                        studentIds.push(studentId);
-                        studentNameIdMap.set(uniqueName, studentId);
-                        allStudentData.push({ 
-                            id: studentId, 
-                            name: uniqueName, 
-                            data: studentData,
-                            isPending: true 
-                        });
-                        console.log(`✅ Found duplicate name pending student: ${uniqueName} (ID: ${studentId})`);
-                    }
-                }
-            });
-        });
-        
-        // Store the mapping globally
-        studentIdMap = studentNameIdMap;
-        
-        console.log("📊 TOTAL student IDs found:", studentIds.length);
-        console.log("👥 Student names found:", Array.from(studentNameIdMap.keys()));
-        
-        return { studentIds, studentNameIdMap, allStudentData };
-    } catch (error) {
-        console.error("❌ Error finding student IDs:", error);
-        return { studentIds: [], studentNameIdMap: new Map(), allStudentData: [] };
-    }
-}
-
 // ============================================================================
 // SECTION 6: AUTHENTICATION & USER MANAGEMENT (CORE IMPLEMENTATION)
 // ============================================================================
@@ -674,17 +529,14 @@ async function findStudentIdsForParent(parentPhone) {
 /**
  * FULL SIGN IN LOGIC
  * Handles the actual Firebase authentication and UI updates.
- * Called by the wrapper in Section 18.
  */
 async function handleSignInFull(identifier, password, signInBtn, authLoader) {
     try {
         // 1. Attempt Sign In
-        // We assume identifier is email, but if you use phone-as-email, logic can be added here
         await auth.signInWithEmailAndPassword(identifier, password);
         
-        // 2. Success is handled by the onAuthStateChanged listener in Section 18
-        // We just log here for debugging
         console.log("✅ Sign in successful for:", identifier);
+        // Success is handled by the UnifiedAuthManager
 
     } catch (error) {
         console.error("Sign In Error:", error);
@@ -723,7 +575,6 @@ async function handleSignInFull(identifier, password, signInBtn, authLoader) {
 async function handleSignUpFull(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader) {
     try {
         // 1. Normalize Phone Number
-        // Combine country code and local phone first
         let fullPhoneInput = localPhone;
         if (!localPhone.startsWith('+')) {
             fullPhoneInput = countryCode + localPhone;
@@ -746,7 +597,6 @@ async function handleSignUpFull(countryCode, localPhone, email, password, confir
         const referralCode = await generateReferralCode();
 
         // 4. Save User Data to Firestore
-        // We use the normalized phone here to ensure matching works later
         await db.collection('parent_users').doc(user.uid).set({
             email: email,
             phone: finalPhone, // Normalized +CountryCode format
@@ -761,7 +611,7 @@ async function handleSignUpFull(countryCode, localPhone, email, password, confir
         console.log("✅ Account created and profile saved for:", user.uid);
         showMessage('Account created successfully!', 'success');
         
-        // Success is further handled by onAuthStateChanged listener
+        // Success is handled by UnifiedAuthManager
 
     } catch (error) {
         console.error("Sign Up Error:", error);
@@ -811,126 +661,10 @@ async function handlePasswordResetFull(email, sendResetBtn, resetLoader) {
 }
 
 // ============================================================================
-// SECTION 7: ENHANCED MESSAGING SYSTEM
+// SECTION 7: MESSAGING - DISABLED (REMOVED FOR NOW)
 // ============================================================================
 
-function showComposeMessageModal() {
-    populateStudentDropdownForMessages();
-    document.getElementById('composeMessageModal').classList.remove('hidden');
-}
-
-function hideComposeMessageModal() {
-    document.getElementById('composeMessageModal').classList.add('hidden');
-    // Reset form
-    document.getElementById('messageRecipient').value = 'tutor';
-    document.getElementById('messageSubject').value = '';
-    document.getElementById('messageStudent').value = '';
-    document.getElementById('messageContent').value = '';
-    document.getElementById('messageUrgent').checked = false;
-}
-
-function populateStudentDropdownForMessages() {
-    const studentDropdown = document.getElementById('messageStudent');
-    if (!studentDropdown) return;
-    
-    studentDropdown.innerHTML = '<option value="">Select student (optional)</option>';
-    
-    // Get student names from the userChildren array
-    if (userChildren.length === 0) {
-        studentDropdown.innerHTML += '<option value="" disabled>No students found</option>';
-        return;
-    }
-
-    userChildren.forEach(studentName => {
-        const option = document.createElement('option');
-        option.value = safeText(studentName);
-        option.textContent = capitalize(studentName);
-        studentDropdown.appendChild(option);
-    });
-}
-
-async function submitMessage() {
-    const recipient = document.getElementById('messageRecipient')?.value;
-    const subject = document.getElementById('messageSubject')?.value.trim();
-    const student = document.getElementById('messageStudent')?.value;
-    const content = document.getElementById('messageContent')?.value.trim();
-    const isUrgent = document.getElementById('messageUrgent')?.checked;
-
-    // Validation
-    if (!recipient || !subject || !content) {
-        showMessage('Please fill in all required fields', 'error');
-        return;
-    }
-
-    if (content.length < 10) {
-        showMessage('Please provide a more detailed message (at least 10 characters)', 'error');
-        return;
-    }
-
-    const submitBtn = document.getElementById('submitMessageBtn');
-    submitBtn.disabled = true;
-    document.getElementById('submitMessageText').textContent = 'Sending...';
-    document.getElementById('submitMessageSpinner').classList.remove('hidden');
-
-    try {
-        const user = auth.currentUser;
-        if (!user) {
-            throw new Error('Please sign in to send messages');
-        }
-
-        // Get user data
-        const userDoc = await db.collection('parent_users').doc(user.uid).get();
-        const userData = userDoc.data();
-
-        // Determine recipients based on selection
-        let recipients = [];
-        if (recipient === 'tutor') {
-            recipients = ['tutors'];
-        } else if (recipient === 'management') {
-            recipients = ['management'];
-        } else if (recipient === 'both') {
-            recipients = ['tutors', 'management'];
-        }
-
-        // Sanitize all inputs
-        const sanitizedStudent = student ? safeText(student) : 'General';
-        const sanitizedSubject = safeText(subject);
-        const sanitizedContent = safeText(content);
-
-        // Create message document in tutor_messages collection
-        const messageData = {
-            parentName: currentUserData?.parentName || safeText(userData.parentName) || 'Unknown Parent',
-            parentPhone: userData.phone,
-            parentEmail: userData.email,
-            parentUid: user.uid,
-            studentName: sanitizedStudent,
-            recipients: recipients,
-            subject: sanitizedSubject,
-            content: sanitizedContent,
-            isUrgent: isUrgent,
-            status: 'sent',
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            type: 'parent_to_staff',
-            readBy: []
-        };
-
-        // Save to Firestore
-        await db.collection('tutor_messages').add(messageData);
-
-        showMessage('Message sent successfully! Our team will respond within 24-48 hours.', 'success');
-        
-        // Close modal and reset form
-        hideComposeMessageModal();
-
-    } catch (error) {
-        console.error('Message submission error:', error);
-        showMessage('Failed to send message. Please try again.', 'error');
-    } finally {
-        submitBtn.disabled = false;
-        document.getElementById('submitMessageText').textContent = 'Send Message';
-        document.getElementById('submitMessageSpinner').classList.add('hidden');
-    }
-}
+// All messaging functions removed as requested
 
 // ============================================================================
 // SECTION 8: PROACTIVE ACADEMICS TAB WITHOUT COMPLEX QUERIES
@@ -1143,6 +877,9 @@ function getTimestampFromData(data) {
     return Math.floor(Date.now() / 1000);
 }
 
+/**
+ * Loads academic data for ALL children (including those with no data)
+ */
 async function loadAcademicsData(selectedStudent = null) {
     const academicsContent = document.getElementById('academicsContent');
     if (!academicsContent) return;
@@ -1155,15 +892,19 @@ async function loadAcademicsData(selectedStudent = null) {
             throw new Error('Please sign in to view academic data');
         }
 
-        // Get user data to find phone
+        // Use comprehensive find children to get ALL children
         const userDoc = await db.collection('parent_users').doc(user.uid).get();
         const userData = userDoc.data();
         const parentPhone = userData.normalizedPhone || userData.phone;
 
-        // Find student IDs for this parent - INCLUDES ALL STUDENTS
-        const { studentIds, studentNameIdMap, allStudentData } = await findStudentIdsForParent(parentPhone);
+        const childrenResult = await comprehensiveFindChildren(parentPhone);
         
-        if (studentIds.length === 0) {
+        // Update global variables
+        userChildren = childrenResult.studentNames;
+        studentIdMap = childrenResult.studentNameIdMap;
+        allStudentData = childrenResult.allStudentData;
+
+        if (userChildren.length === 0) {
             academicsContent.innerHTML = `
                 <div class="text-center py-12">
                     <div class="text-6xl mb-4">📚</div>
@@ -1174,19 +915,19 @@ async function loadAcademicsData(selectedStudent = null) {
             return;
         }
 
-        // Determine which student to show
+        // Determine which student to show - ALL children visible always
         let studentsToShow = [];
-        if (selectedStudent && studentNameIdMap.has(selectedStudent)) {
+        if (selectedStudent && studentIdMap.has(selectedStudent)) {
             studentsToShow = [selectedStudent];
         } else {
-            studentsToShow = Array.from(studentNameIdMap.keys());
+            // Show ALL children
+            studentsToShow = userChildren;
         }
 
         let academicsHtml = '';
-        let totalUnreadCount = 0;
 
         // Create student selector if multiple students
-        if (studentNameIdMap.size > 1) {
+        if (studentIdMap.size > 1) {
             academicsHtml += `
                 <div class="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm slide-down">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Select Student:</label>
@@ -1194,14 +935,12 @@ async function loadAcademicsData(selectedStudent = null) {
                         <option value="">All Students</option>
             `;
             
-            Array.from(studentNameIdMap.keys()).forEach(studentName => {
+            userChildren.forEach(studentName => {
+                const studentInfo = allStudentData.find(s => s.name === studentName);
                 const isSelected = selectedStudent === studentName ? 'selected' : '';
-                const studentStatus = allStudentData.find(s => s.name === studentName)?.isPending ? ' (Pending Registration)' : '';
-                const studentNotifications = academicsNotifications.get(studentName) || { sessionTopics: 0, homework: 0 };
-                const studentUnread = studentNotifications.sessionTopics + studentNotifications.homework;
-                const badge = studentUnread > 0 ? `<span class="ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-1 notification-pulse">${studentUnread}</span>` : '';
+                const studentStatus = studentInfo?.isPending ? ' (Pending Registration)' : '';
                 
-                academicsHtml += `<option value="${safeText(studentName)}" ${isSelected}>${capitalize(studentName)}${safeText(studentStatus)} ${badge}</option>`;
+                academicsHtml += `<option value="${safeText(studentName)}" ${isSelected}>${capitalize(studentName)}${safeText(studentStatus)}</option>`;
             });
             
             academicsHtml += `
@@ -1210,36 +949,25 @@ async function loadAcademicsData(selectedStudent = null) {
             `;
         }
 
-        // Load data for each student
+        // Load data for each student (ALL children, even with no data)
         for (const studentName of studentsToShow) {
-            const studentId = studentNameIdMap.get(studentName);
-            const studentData = allStudentData.find(s => s.name === studentName);
+            const studentId = studentIdMap.get(studentName);
+            const studentInfo = allStudentData.find(s => s.name === studentName);
             
-            if (!studentId) continue;
-
-            // Get notification counts for this student
-            const studentNotifications = academicsNotifications.get(studentName) || { sessionTopics: 0, homework: 0 };
-            const studentUnread = studentNotifications.sessionTopics + studentNotifications.homework;
-            totalUnreadCount += studentUnread;
-            
-            const notificationBadge = studentUnread > 0 ? 
-                `<span class="ml-3 bg-red-500 text-white text-xs font-bold rounded-full px-3 py-1 animate-pulse">${studentUnread} NEW</span>` : '';
-
             const studentHeader = `
                 <div class="bg-gradient-to-r from-green-100 to-green-50 border-l-4 border-green-600 p-4 rounded-lg mb-6 slide-down" id="academics-student-${safeText(studentName)}">
                     <div class="flex justify-between items-center">
                         <div>
-                            <h2 class="text-xl font-bold text-green-800">${capitalize(studentName)}${studentData?.isPending ? ' <span class="text-yellow-600 text-sm">(Pending Registration)</span>' : ''}</h2>
+                            <h2 class="text-xl font-bold text-green-800">${capitalize(studentName)}${studentInfo?.isPending ? ' <span class="text-yellow-600 text-sm">(Pending Registration)</span>' : ''}</h2>
                             <p class="text-green-600">Academic progress and assignments</p>
                         </div>
-                        ${notificationBadge}
                     </div>
                 </div>
             `;
 
             academicsHtml += studentHeader;
 
-            // Student Information Section
+            // Student Information Section (always shown)
             academicsHtml += `
                 <div class="mb-8 fade-in">
                     <div class="flex items-center mb-4">
@@ -1250,23 +978,18 @@ async function loadAcademicsData(selectedStudent = null) {
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <p class="text-sm text-gray-500">Status</p>
-                                <p class="font-medium">${studentData?.isPending ? 'Pending Registration' : 'Active'}</p>
+                                <p class="font-medium">${studentInfo?.isPending ? 'Pending Registration' : 'Active'}</p>
                             </div>
                             <div>
                                 <p class="text-sm text-gray-500">Assigned Tutor</p>
-                                <p class="font-medium">${safeText(studentData?.data?.tutorName || 'Not yet assigned')}</p>
+                                <p class="font-medium">${safeText(studentInfo?.data?.tutorName || 'Not yet assigned')}</p>
                             </div>
                         </div>
                     </div>
                 </div>
             `;
 
-            // Get month display logic based on 2nd Day Rule
-            const monthLogic = getMonthDisplayLogic();
-            const currentMonth = getCurrentMonthYear();
-            const previousMonth = getPreviousMonthYear();
-
-            // Session Topics Section with Nested Accordion (was Daily Topics)
+            // Session Topics Section
             academicsHtml += `
                 <div class="mb-8 fade-in">
                     <button onclick="toggleAcademicsAccordion('session-topics-${safeText(studentName)}')" 
@@ -1279,7 +1002,6 @@ async function loadAcademicsData(selectedStudent = null) {
                             </div>
                         </div>
                         <div class="flex items-center">
-                            ${studentNotifications.sessionTopics > 0 ? `<span class="mr-3 bg-red-500 text-white text-xs rounded-full px-2 py-1">${studentNotifications.sessionTopics} new</span>` : ''}
                             <span id="session-topics-${safeText(studentName)}-arrow" class="accordion-arrow text-blue-600 text-xl">▼</span>
                         </div>
                     </button>
@@ -1287,129 +1009,138 @@ async function loadAcademicsData(selectedStudent = null) {
             `;
 
             try {
-                // Get all session topics from daily_topics collection
-                const sessionTopicsSnapshot = await db.collection('daily_topics')
-                    .where('studentId', '==', studentId)
-                    .get();
+                if (studentId) {
+                    // Get all session topics from daily_topics collection
+                    const sessionTopicsSnapshot = await db.collection('daily_topics')
+                        .where('studentId', '==', studentId)
+                        .get();
 
-                if (sessionTopicsSnapshot.empty) {
-                    academicsHtml += `
-                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                            <p class="text-gray-500">No session topics recorded yet. Check back after your child's sessions!</p>
-                        </div>
-                    `;
-                } else {
-                    const topics = [];
-                    
-                    // Process each document
-                    sessionTopicsSnapshot.forEach(doc => {
-                        const topicData = doc.data();
-                        topics.push({ 
-                            id: doc.id, 
-                            ...topicData,
-                            // Ensure we have a proper timestamp
-                            timestamp: getTimestamp(topicData.date || topicData.createdAt || topicData.timestamp)
-                        });
-                    });
-                    
-                    // Sort manually by date ASCENDING (earliest first) for better readability
-                    topics.sort((a, b) => {
-                        return a.timestamp - b.timestamp;
-                    });
-                    
-                    // Filter topics based on month display logic - CLIENT SIDE
-                    const filteredTopics = topics.filter(topic => {
-                        const topicDate = new Date(topic.timestamp);
-                        const { year, month } = getYearMonthFromDate(topicDate);
-                        
-                        // Always show topics from current month
-                        if (year === currentMonth.year && month === currentMonth.month) {
-                            return true;
-                        }
-                        
-                        // Show previous month only if allowed by 2nd Day Rule
-                        if (monthLogic.showPreviousMonth && 
-                            year === previousMonth.year && 
-                            month === previousMonth.month) {
-                            return true;
-                        }
-                        
-                        return false;
-                    });
-                    
-                    if (filteredTopics.length === 0) {
+                    if (sessionTopicsSnapshot.empty) {
                         academicsHtml += `
                             <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                                <p class="text-gray-500">No session topics for the selected time period.</p>
+                                <p class="text-gray-500">No session topics recorded yet. Check back after your child's sessions!</p>
                             </div>
                         `;
                     } else {
-                        // Group by month
-                        const topicsByMonth = {};
-                        filteredTopics.forEach(topic => {
-                            const topicDate = new Date(topic.timestamp);
-                            const { year, month } = getYearMonthFromDate(topicDate);
-                            const monthKey = `${year}-${month}`;
-                            
-                            if (!topicsByMonth[monthKey]) {
-                                topicsByMonth[monthKey] = [];
-                            }
-                            topicsByMonth[monthKey].push(topic);
+                        const topics = [];
+                        
+                        // Process each document
+                        sessionTopicsSnapshot.forEach(doc => {
+                            const topicData = doc.data();
+                            topics.push({ 
+                                id: doc.id, 
+                                ...topicData,
+                                timestamp: getTimestamp(topicData.date || topicData.createdAt || topicData.timestamp)
+                            });
                         });
                         
-                        // Display topics grouped by month
-                        for (const [monthKey, monthTopics] of Object.entries(topicsByMonth)) {
-                            const [year, month] = monthKey.split('-').map(num => parseInt(num));
-                            const monthNames = [
-                                'January', 'February', 'March', 'April', 'May', 'June',
-                                'July', 'August', 'September', 'October', 'November', 'December'
-                            ];
-                            const monthName = monthNames[month];
+                        // Sort manually by date ASCENDING
+                        topics.sort((a, b) => a.timestamp - b.timestamp);
+                        
+                        // Filter topics based on month display logic
+                        const monthLogic = getMonthDisplayLogic();
+                        const currentMonth = getCurrentMonthYear();
+                        const previousMonth = getPreviousMonthYear();
+                        
+                        const filteredTopics = topics.filter(topic => {
+                            const topicDate = new Date(topic.timestamp);
+                            const { year, month } = getYearMonthFromDate(topicDate);
                             
+                            // Always show topics from current month
+                            if (year === currentMonth.year && month === currentMonth.month) {
+                                return true;
+                            }
+                            
+                            // Show previous month only if allowed by 2nd Day Rule
+                            if (monthLogic.showPreviousMonth && 
+                                year === previousMonth.year && 
+                                month === previousMonth.month) {
+                                return true;
+                            }
+                            
+                            return false;
+                        });
+                        
+                        if (filteredTopics.length === 0) {
                             academicsHtml += `
-                                <div class="mb-6">
-                                    <h4 class="font-semibold text-gray-700 mb-4 p-3 bg-gray-100 rounded-lg">${monthName} ${year}</h4>
-                                    <div class="space-y-4">
-                            `;
-                            
-                            monthTopics.forEach(topicData => {
-                                const formattedDate = formatDetailedDate(new Date(topicData.timestamp), true);
-                                const safeTopics = safeText(topicData.topics || topicData.sessionTopics || 'No topics recorded for this session.');
-                                const tutorName = safeText(topicData.tutorName || topicData.updatedBy || 'Tutor');
-                                
-                                academicsHtml += `
-                                    <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                                        <div class="flex justify-between items-start mb-3">
-                                            <div>
-                                                <span class="font-medium text-gray-800 text-sm">${safeText(formattedDate)}</span>
-                                                <div class="mt-1 flex items-center">
-                                                    <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full mr-2">Session</span>
-                                                    <span class="text-xs text-gray-600">By: ${tutorName}</span>
-                                                </div>
-                                            </div>
-                                            ${topicData.updatedAt ? 
-                                                `<span class="text-xs text-gray-500">Updated: ${formatDetailedDate(topicData.updatedAt, true)}</span>` : 
-                                                ''}
-                                        </div>
-                                        <div class="text-gray-700 bg-gray-50 p-3 rounded-md">
-                                            <p class="whitespace-pre-wrap">${safeTopics}</p>
-                                        </div>
-                                        ${topicData.notes ? `
-                                        <div class="mt-3 text-sm">
-                                            <span class="font-medium text-gray-700">Additional Notes:</span>
-                                            <p class="text-gray-600 mt-1 bg-yellow-50 p-2 rounded">${safeText(topicData.notes)}</p>
-                                        </div>
-                                        ` : ''}
-                                    </div>
-                                `;
-                            });
-                            
-                            academicsHtml += `
-                                    </div>
+                                <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                                    <p class="text-gray-500">No session topics for the selected time period.</p>
                                 </div>
                             `;
+                        } else {
+                            // Group by month
+                            const topicsByMonth = {};
+                            filteredTopics.forEach(topic => {
+                                const topicDate = new Date(topic.timestamp);
+                                const { year, month } = getYearMonthFromDate(topicDate);
+                                const monthKey = `${year}-${month}`;
+                                
+                                if (!topicsByMonth[monthKey]) {
+                                    topicsByMonth[monthKey] = [];
+                                }
+                                topicsByMonth[monthKey].push(topic);
+                            });
+                            
+                            // Display topics grouped by month
+                            for (const [monthKey, monthTopics] of Object.entries(topicsByMonth)) {
+                                const [year, month] = monthKey.split('-').map(num => parseInt(num));
+                                const monthNames = [
+                                    'January', 'February', 'March', 'April', 'May', 'June',
+                                    'July', 'August', 'September', 'October', 'November', 'December'
+                                ];
+                                const monthName = monthNames[month];
+                                
+                                academicsHtml += `
+                                    <div class="mb-6">
+                                        <h4 class="font-semibold text-gray-700 mb-4 p-3 bg-gray-100 rounded-lg">${monthName} ${year}</h4>
+                                        <div class="space-y-4">
+                                `;
+                                
+                                monthTopics.forEach(topicData => {
+                                    const formattedDate = formatDetailedDate(new Date(topicData.timestamp), true);
+                                    const safeTopics = safeText(topicData.topics || topicData.sessionTopics || 'No topics recorded for this session.');
+                                    const tutorName = safeText(topicData.tutorName || topicData.updatedBy || 'Tutor');
+                                    
+                                    academicsHtml += `
+                                        <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+                                            <div class="flex justify-between items-start mb-3">
+                                                <div>
+                                                    <span class="font-medium text-gray-800 text-sm">${safeText(formattedDate)}</span>
+                                                    <div class="mt-1 flex items-center">
+                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full mr-2">Session</span>
+                                                        <span class="text-xs text-gray-600">By: ${tutorName}</span>
+                                                    </div>
+                                                </div>
+                                                ${topicData.updatedAt ? 
+                                                    `<span class="text-xs text-gray-500">Updated: ${formatDetailedDate(topicData.updatedAt, true)}</span>` : 
+                                                    ''}
+                                            </div>
+                                            <div class="text-gray-700 bg-gray-50 p-3 rounded-md">
+                                                <p class="whitespace-pre-wrap">${safeTopics}</p>
+                                            </div>
+                                            ${topicData.notes ? `
+                                            <div class="mt-3 text-sm">
+                                                <span class="font-medium text-gray-700">Additional Notes:</span>
+                                                <p class="text-gray-600 mt-1 bg-yellow-50 p-2 rounded">${safeText(topicData.notes)}</p>
+                                            </div>
+                                            ` : ''}
+                                        </div>
+                                    `;
+                                });
+                                
+                                academicsHtml += `
+                                        </div>
+                                    </div>
+                                `;
+                            }
                         }
                     }
+                } else {
+                    academicsHtml += `
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                            <p class="text-gray-500">Student ID not found. Session topics cannot be loaded.</p>
+                        </div>
+                    `;
                 }
             } catch (error) {
                 console.error('Error loading session topics:', error);
@@ -1425,7 +1156,7 @@ async function loadAcademicsData(selectedStudent = null) {
                 </div>
             `;
 
-            // Homework Assignments Section with Nested Accordion
+            // Homework Assignments Section
             academicsHtml += `
                 <div class="mb-8 fade-in">
                     <button onclick="toggleAcademicsAccordion('homework-${safeText(studentName)}')" 
@@ -1437,201 +1168,207 @@ async function loadAcademicsData(selectedStudent = null) {
                                 <p class="text-purple-600 text-sm">Assignments and due dates</p>
                             </div>
                         </div>
-                        <div class="flex items-center">
-                            ${studentNotifications.homework > 0 ? `<span class="mr-3 bg-red-500 text-white text-xs rounded-full px-2 py-1">${studentNotifications.homework} new</span>` : ''}
-                            <span id="homework-${safeText(studentName)}-arrow" class="accordion-arrow text-purple-600 text-xl">▼</span>
-                        </div>
+                        <span id="homework-${safeText(studentName)}-arrow" class="accordion-arrow text-purple-600 text-xl">▼</span>
                     </button>
                     <div id="homework-${safeText(studentName)}-content" class="accordion-content hidden">
             `;
 
             try {
-                // Get all homework from homework_assignments collection
-                const homeworkSnapshot = await db.collection('homework_assignments')
-                    .where('studentId', '==', studentId)
-                    .get();
+                if (studentId) {
+                    // Get all homework from homework_assignments collection
+                    const homeworkSnapshot = await db.collection('homework_assignments')
+                        .where('studentId', '==', studentId)
+                        .get();
 
-                if (homeworkSnapshot.empty) {
-                    academicsHtml += `
-                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                            <p class="text-gray-500">No homework assignments yet.</p>
-                        </div>
-                    `;
-                } else {
-                    const homeworkList = [];
-                    
-                    // Process each document
-                    homeworkSnapshot.forEach(doc => {
-                        const homework = doc.data();
-                        homeworkList.push({ 
-                            id: doc.id, 
-                            ...homework,
-                            // Ensure we have proper timestamps
-                            assignedTimestamp: getTimestamp(homework.assignedDate || homework.createdAt || homework.timestamp),
-                            dueTimestamp: getTimestamp(homework.dueDate)
-                        });
-                    });
-                    
-                    const now = new Date().getTime();
-                    
-                    // Sort manually by due date ASCENDING (earliest due date first)
-                    homeworkList.sort((a, b) => {
-                        return a.dueTimestamp - b.dueTimestamp;
-                    });
-                    
-                    // Filter homework based on month display logic - CLIENT SIDE
-                    const filteredHomework = homeworkList.filter(homework => {
-                        const dueDate = new Date(homework.dueTimestamp);
-                        const { year, month } = getYearMonthFromDate(dueDate);
-                        
-                        // Always show current month homework
-                        if (year === currentMonth.year && month === currentMonth.month) {
-                            return true;
-                        }
-                        
-                        // Show previous month homework if allowed by 2nd Day Rule
-                        if (monthLogic.showPreviousMonth && 
-                            year === previousMonth.year && 
-                            month === previousMonth.month) {
-                            return true;
-                        }
-                        
-                        // Always show overdue assignments regardless of month
-                        if (homework.dueTimestamp < now) {
-                            return true;
-                        }
-                        
-                        // Show upcoming assignments (next month)
-                        const nextMonth = new Date(currentMonth.year, currentMonth.month + 1, 1);
-                        if (dueDate <= nextMonth) {
-                            return true;
-                        }
-                        
-                        return false;
-                    });
-                    
-                    if (filteredHomework.length === 0) {
+                    if (homeworkSnapshot.empty) {
                         academicsHtml += `
                             <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                                <p class="text-gray-500">No homework for the selected time period.</p>
+                                <p class="text-gray-500">No homework assignments yet.</p>
                             </div>
                         `;
                     } else {
-                        // Group by month
-                        const homeworkByMonth = {};
-                        filteredHomework.forEach(homework => {
+                        const homeworkList = [];
+                        
+                        // Process each document
+                        homeworkSnapshot.forEach(doc => {
+                            const homework = doc.data();
+                            homeworkList.push({ 
+                                id: doc.id, 
+                                ...homework,
+                                assignedTimestamp: getTimestamp(homework.assignedDate || homework.createdAt || homework.timestamp),
+                                dueTimestamp: getTimestamp(homework.dueDate)
+                            });
+                        });
+                        
+                        const now = new Date().getTime();
+                        
+                        // Sort manually by due date ASCENDING
+                        homeworkList.sort((a, b) => a.dueTimestamp - b.dueTimestamp);
+                        
+                        // Filter homework based on month display logic
+                        const monthLogic = getMonthDisplayLogic();
+                        const currentMonth = getCurrentMonthYear();
+                        const previousMonth = getPreviousMonthYear();
+                        
+                        const filteredHomework = homeworkList.filter(homework => {
                             const dueDate = new Date(homework.dueTimestamp);
                             const { year, month } = getYearMonthFromDate(dueDate);
-                            const monthKey = `${year}-${month}`;
                             
-                            if (!homeworkByMonth[monthKey]) {
-                                homeworkByMonth[monthKey] = [];
+                            // Always show current month homework
+                            if (year === currentMonth.year && month === currentMonth.month) {
+                                return true;
                             }
-                            homeworkByMonth[monthKey].push(homework);
-                        });
-                        
-                        // Sort months in chronological order
-                        const sortedMonthKeys = Object.keys(homeworkByMonth).sort((a, b) => {
-                            const [aYear, aMonth] = a.split('-').map(Number);
-                            const [bYear, bMonth] = b.split('-').map(Number);
-                            return aYear - bYear || aMonth - bMonth;
-                        });
-                        
-                        // Display homework grouped by month
-                        for (const monthKey of sortedMonthKeys) {
-                            const [year, month] = monthKey.split('-').map(num => parseInt(num));
-                            const monthNames = [
-                                'January', 'February', 'March', 'April', 'May', 'June',
-                                'July', 'August', 'September', 'October', 'November', 'December'
-                            ];
-                            const monthName = monthNames[month];
-                            const monthHomework = homeworkByMonth[monthKey];
                             
+                            // Show previous month homework if allowed by 2nd Day Rule
+                            if (monthLogic.showPreviousMonth && 
+                                year === previousMonth.year && 
+                                month === previousMonth.month) {
+                                return true;
+                            }
+                            
+                            // Always show overdue assignments regardless of month
+                            if (homework.dueTimestamp < now) {
+                                return true;
+                            }
+                            
+                            // Show upcoming assignments (next month)
+                            const nextMonth = new Date(currentMonth.year, currentMonth.month + 1, 1);
+                            if (dueDate <= nextMonth) {
+                                return true;
+                            }
+                            
+                            return false;
+                        });
+                        
+                        if (filteredHomework.length === 0) {
                             academicsHtml += `
-                                <div class="mb-6">
-                                    <h4 class="font-semibold text-gray-700 mb-4 p-3 bg-gray-100 rounded-lg">${monthName} ${year}</h4>
-                                    <div class="space-y-4">
+                                <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                                    <p class="text-gray-500">No homework for the selected time period.</p>
+                                </div>
                             `;
-                            
-                            monthHomework.forEach(homework => {
+                        } else {
+                            // Group by month
+                            const homeworkByMonth = {};
+                            filteredHomework.forEach(homework => {
                                 const dueDate = new Date(homework.dueTimestamp);
-                                const assignedDate = new Date(homework.assignedTimestamp);
-                                const formattedDueDate = formatDetailedDate(dueDate, true);
-                                const formattedAssignedDate = formatDetailedDate(assignedDate, true);
-                                const isOverdue = homework.dueTimestamp < now;
-                                const isSubmitted = homework.status === 'submitted' || homework.status === 'completed';
-                                const statusColor = isOverdue ? 'bg-red-100 text-red-800' : 
-                                                  isSubmitted ? 'bg-green-100 text-green-800' : 
-                                                  'bg-blue-100 text-blue-800';
-                                const statusText = isOverdue ? 'Overdue' : 
-                                                 isSubmitted ? 'Submitted' : 
-                                                 'Pending';
-                                const safeTitle = safeText(homework.title || homework.subject || 'Untitled Assignment');
-                                const safeDescription = safeText(homework.description || homework.instructions || 'No description provided.');
-                                const tutorName = safeText(homework.tutorName || homework.assignedBy || 'Tutor');
+                                const { year, month } = getYearMonthFromDate(dueDate);
+                                const monthKey = `${year}-${month}`;
+                                
+                                if (!homeworkByMonth[monthKey]) {
+                                    homeworkByMonth[monthKey] = [];
+                                }
+                                homeworkByMonth[monthKey].push(homework);
+                            });
+                            
+                            // Sort months in chronological order
+                            const sortedMonthKeys = Object.keys(homeworkByMonth).sort((a, b) => {
+                                const [aYear, aMonth] = a.split('-').map(Number);
+                                const [bYear, bMonth] = b.split('-').map(Number);
+                                return aYear - bYear || aMonth - bMonth;
+                            });
+                            
+                            // Display homework grouped by month
+                            for (const monthKey of sortedMonthKeys) {
+                                const [year, month] = monthKey.split('-').map(num => parseInt(num));
+                                const monthNames = [
+                                    'January', 'February', 'March', 'April', 'May', 'June',
+                                    'July', 'August', 'September', 'October', 'November', 'December'
+                                ];
+                                const monthName = monthNames[month];
+                                const monthHomework = homeworkByMonth[monthKey];
                                 
                                 academicsHtml += `
-                                    <div class="bg-white border ${isOverdue ? 'border-red-200' : 'border-gray-200'} rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                                        <div class="flex justify-between items-start mb-3">
-                                            <div>
-                                                <h5 class="font-medium text-gray-800 text-lg">${safeTitle}</h5>
-                                                <div class="mt-1 flex flex-wrap items-center gap-2">
-                                                    <span class="text-xs ${statusColor} px-2 py-1 rounded-full">${statusText}</span>
-                                                    <span class="text-xs text-gray-600">Assigned by: ${tutorName}</span>
-                                                    ${homework.subject ? `<span class="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded-full">${safeText(homework.subject)}</span>` : ''}
+                                    <div class="mb-6">
+                                        <h4 class="font-semibold text-gray-700 mb-4 p-3 bg-gray-100 rounded-lg">${monthName} ${year}</h4>
+                                        <div class="space-y-4">
+                                `;
+                                
+                                monthHomework.forEach(homework => {
+                                    const dueDate = new Date(homework.dueTimestamp);
+                                    const assignedDate = new Date(homework.assignedTimestamp);
+                                    const formattedDueDate = formatDetailedDate(dueDate, true);
+                                    const formattedAssignedDate = formatDetailedDate(assignedDate, true);
+                                    const isOverdue = homework.dueTimestamp < now;
+                                    const isSubmitted = homework.status === 'submitted' || homework.status === 'completed';
+                                    const statusColor = isOverdue ? 'bg-red-100 text-red-800' : 
+                                                      isSubmitted ? 'bg-green-100 text-green-800' : 
+                                                      'bg-blue-100 text-blue-800';
+                                    const statusText = isOverdue ? 'Overdue' : 
+                                                     isSubmitted ? 'Submitted' : 
+                                                     'Pending';
+                                    const safeTitle = safeText(homework.title || homework.subject || 'Untitled Assignment');
+                                    const safeDescription = safeText(homework.description || homework.instructions || 'No description provided.');
+                                    const tutorName = safeText(homework.tutorName || homework.assignedBy || 'Tutor');
+                                    
+                                    academicsHtml += `
+                                        <div class="bg-white border ${isOverdue ? 'border-red-200' : 'border-gray-200'} rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+                                            <div class="flex justify-between items-start mb-3">
+                                                <div>
+                                                    <h5 class="font-medium text-gray-800 text-lg">${safeTitle}</h5>
+                                                    <div class="mt-1 flex flex-wrap items-center gap-2">
+                                                        <span class="text-xs ${statusColor} px-2 py-1 rounded-full">${statusText}</span>
+                                                        <span class="text-xs text-gray-600">Assigned by: ${tutorName}</span>
+                                                        ${homework.subject ? `<span class="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded-full">${safeText(homework.subject)}</span>` : ''}
+                                                    </div>
+                                                </div>
+                                                <div class="text-right">
+                                                    <span class="text-sm font-medium text-gray-700">Due: ${safeText(formattedDueDate)}</span>
+                                                    <div class="text-xs text-gray-500 mt-1">Assigned: ${safeText(formattedAssignedDate)}</div>
                                                 </div>
                                             </div>
-                                            <div class="text-right">
-                                                <span class="text-sm font-medium text-gray-700">Due: ${safeText(formattedDueDate)}</span>
-                                                <div class="text-xs text-gray-500 mt-1">Assigned: ${safeText(formattedAssignedDate)}</div>
+                                            
+                                            <div class="text-gray-700 mb-4">
+                                                <p class="whitespace-pre-wrap bg-gray-50 p-3 rounded-md">${safeDescription}</p>
                                             </div>
-                                        </div>
-                                        
-                                        <div class="text-gray-700 mb-4">
-                                            <p class="whitespace-pre-wrap bg-gray-50 p-3 rounded-md">${safeDescription}</p>
-                                        </div>
-                                        
-                                        <div class="flex justify-between items-center pt-3 border-t border-gray-100">
-                                            <div class="flex items-center space-x-3">
-                                                ${homework.fileUrl ? `
-                                                    <a href="${safeText(homework.fileUrl)}" target="_blank" class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm">
-                                                        <span class="mr-1">📎</span> Download Attachment
-                                                    </a>
-                                                ` : ''}
+                                            
+                                            <div class="flex justify-between items-center pt-3 border-t border-gray-100">
+                                                <div class="flex items-center space-x-3">
+                                                    ${homework.fileUrl ? `
+                                                        <a href="${safeText(homework.fileUrl)}" target="_blank" class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm">
+                                                            <span class="mr-1">📎</span> Download Attachment
+                                                        </a>
+                                                    ` : ''}
+                                                    
+                                                    ${homework.submissionUrl ? `
+                                                        <a href="${safeText(homework.submissionUrl)}" target="_blank" class="text-blue-600 hover:text-blue-800 font-medium flex items-center text-sm">
+                                                            <span class="mr-1">📤</span> View Submission
+                                                        </a>
+                                                    ` : ''}
+                                                </div>
                                                 
-                                                ${homework.submissionUrl ? `
-                                                    <a href="${safeText(homework.submissionUrl)}" target="_blank" class="text-blue-600 hover:text-blue-800 font-medium flex items-center text-sm">
-                                                        <span class="mr-1">📤</span> View Submission
-                                                    </a>
+                                                ${homework.grade ? `
+                                                    <div class="text-sm">
+                                                        <span class="font-medium text-gray-700">Grade:</span>
+                                                        <span class="ml-1 font-bold ${homework.grade >= 70 ? 'text-green-600' : homework.grade >= 50 ? 'text-yellow-600' : 'text-red-600'}">
+                                                            ${homework.grade}%
+                                                        </span>
+                                                    </div>
                                                 ` : ''}
                                             </div>
                                             
-                                            ${homework.grade ? `
-                                                <div class="text-sm">
-                                                    <span class="font-medium text-gray-700">Grade:</span>
-                                                    <span class="ml-1 font-bold ${homework.grade >= 70 ? 'text-green-600' : homework.grade >= 50 ? 'text-yellow-600' : 'text-red-600'}">
-                                                        ${homework.grade}%
-                                                    </span>
-                                                </div>
+                                            ${homework.feedback ? `
+                                            <div class="mt-4 pt-3 border-t border-gray-100">
+                                                <span class="font-medium text-gray-700 text-sm">Tutor Feedback:</span>
+                                                <p class="text-gray-600 text-sm mt-1 bg-blue-50 p-2 rounded">${safeText(homework.feedback)}</p>
+                                            </div>
                                             ` : ''}
                                         </div>
-                                        
-                                        ${homework.feedback ? `
-                                        <div class="mt-4 pt-3 border-t border-gray-100">
-                                            <span class="font-medium text-gray-700 text-sm">Tutor Feedback:</span>
-                                            <p class="text-gray-600 text-sm mt-1 bg-blue-50 p-2 rounded">${safeText(homework.feedback)}</p>
+                                    `;
+                                });
+                                
+                                academicsHtml += `
                                         </div>
-                                        ` : ''}
                                     </div>
                                 `;
-                            });
-                            
-                            academicsHtml += `
-                                    </div>
-                                </div>
-                            `;
+                            }
                         }
                     }
+                } else {
+                    academicsHtml += `
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                            <p class="text-gray-500">Student ID not found. Homework cannot be loaded.</p>
+                        </div>
+                    `;
                 }
             } catch (error) {
                 console.error('Error loading homework:', error);
@@ -1650,9 +1387,6 @@ async function loadAcademicsData(selectedStudent = null) {
 
         // Update academics content
         academicsContent.innerHTML = academicsHtml;
-        
-        // Update academics tab badge with proper styling
-        updateAcademicsTabBadge(totalUnreadCount);
 
     } catch (error) {
         console.error('Error loading academics data:', error);
@@ -1725,8 +1459,9 @@ async function checkForNewAcademics() {
         const userData = userDoc.data();
         const parentPhone = userData.normalizedPhone || userData.phone;
 
-        // Find student IDs for this parent
-        const { studentNameIdMap } = await findStudentIdsForParent(parentPhone);
+        // Use comprehensive find children
+        const childrenResult = await comprehensiveFindChildren(parentPhone);
+        const studentNameIdMap = childrenResult.studentNameIdMap;
         
         // Reset notifications
         academicsNotifications.clear();
@@ -1789,298 +1524,38 @@ async function checkForNewAcademics() {
 }
 
 // ============================================================================
-// SECTION 9: UNIFIED MESSAGING INBOX
+// SECTION 9: MESSAGING - DISABLED (REMOVED FOR NOW)
 // ============================================================================
 
-function showMessagesModal() {
-    document.getElementById('messagesModal').classList.remove('hidden');
-    loadUnifiedMessages();
-    // Reset notification count when user views messages
-    resetNotificationCount();
-}
-
-function hideMessagesModal() {
-    document.getElementById('messagesModal').classList.add('hidden');
-}
-
-async function loadUnifiedMessages() {
-    const messagesContent = document.getElementById('messagesContent');
-    if (!messagesContent) return;
-    
-    messagesContent.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading messages...</p></div>';
-
-    try {
-        const user = auth.currentUser;
-        if (!user) {
-            throw new Error('Please sign in to view messages');
-        }
-
-        // Get user data
-        const userDoc = await db.collection('parent_users').doc(user.uid).get();
-        const userData = userDoc.data();
-
-        // SIMPLIFIED QUERY: Get all messages and filter client-side
-        const tutorMessagesSnapshot = await db.collection('tutor_messages')
-            .where('parentUid', '==', user.uid)
-            .get();
-
-        // SIMPLIFIED QUERY: Get all feedback and filter client-side
-        const feedbackSnapshot = await db.collection('parent_feedback')
-            .where('parentUid', '==', user.uid)
-            .get();
-
-        const allMessages = [];
-
-        // Process tutor messages
-        tutorMessagesSnapshot.forEach(doc => {
-            const message = doc.data();
-            allMessages.push({
-                id: doc.id,
-                type: 'tutor_message',
-                sender: safeText(message.parentName || 'Tutor/Admin'),
-                senderRole: message.type === 'parent_to_staff' ? 'You' : 'Staff',
-                subject: safeText(message.subject),
-                content: message.type === 'parent_to_staff' ? `You wrote: ${safeText(message.content)}` : safeText(message.content),
-                studentName: safeText(message.studentName),
-                isUrgent: message.isUrgent || false,
-                timestamp: message.timestamp,
-                status: message.status || 'sent',
-                isOutgoing: message.type === 'parent_to_staff'
-            });
-        });
-
-        // Process feedback responses - filter client-side for responses
-        feedbackSnapshot.forEach(doc => {
-            const feedback = doc.data();
-            if (feedback.responses && Array.isArray(feedback.responses) && feedback.responses.length > 0) {
-                feedback.responses.forEach((response, index) => {
-                    allMessages.push({
-                        id: `${doc.id}_response_${index}`,
-                        type: 'feedback_response',
-                        sender: safeText(response.responderName || 'Admin'),
-                        senderRole: 'Admin',
-                        subject: `Re: ${safeText(feedback.category)} - ${safeText(feedback.studentName)}`,
-                        content: safeText(response.responseText),
-                        studentName: safeText(feedback.studentName),
-                        isUrgent: feedback.priority === 'Urgent' || feedback.priority === 'High',
-                        timestamp: response.responseDate || feedback.timestamp,
-                        originalMessage: safeText(feedback.message)
-                    });
-                });
-            }
-        });
-
-        // Sort all messages by timestamp (newest first) - client-side sorting
-        allMessages.sort((a, b) => {
-            const aDate = a.timestamp?.toDate?.() || new Date(0);
-            const bDate = b.timestamp?.toDate?.() || new Date(0);
-            return bDate - aDate;
-        });
-
-        if (allMessages.length === 0) {
-            messagesContent.innerHTML = `
-                <div class="text-center py-12">
-                    <div class="text-6xl mb-4">📭</div>
-                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Messages Yet</h3>
-                    <p class="text-gray-500 max-w-md mx-auto">You haven't received any messages from our staff yet. Send a message using the "Compose" button!</p>
-                    <button onclick="showComposeMessageModal()" class="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-all duration-200">
-                        Compose Message
-                    </button>
-                </div>
-            `;
-            return;
-        }
-
-        messagesContent.innerHTML = '';
-
-        allMessages.forEach((message) => {
-            const messageDate = message.timestamp?.toDate?.() || new Date();
-            const formattedDate = formatDetailedDate(messageDate, true);
-
-            const urgentBadge = message.isUrgent ? 
-                '<span class="inline-block ml-2 px-2 py-1 text-xs font-bold bg-red-100 text-red-800 rounded-full animate-pulse">URGENT</span>' : '';
-
-            const outgoingIndicator = message.isOutgoing ? 
-                '<span class="inline-block ml-2 px-2 py-1 text-xs font-bold bg-blue-100 text-blue-800 rounded-full">OUTGOING</span>' : '';
-
-            const studentInfo = message.studentName && message.studentName !== 'General' ? 
-                `<span class="text-sm text-gray-600">Regarding: ${message.studentName}</span>` : '';
-
-            const messageTypeIcon = message.type === 'tutor_message' ? '📨' : '💬';
-
-            const messageElement = document.createElement('div');
-            messageElement.className = `bg-white border ${message.isUrgent ? 'border-red-300' : 'border-gray-200'} rounded-xl p-6 mb-4 hover:shadow-md transition-shadow duration-200 fade-in`;
-            messageElement.innerHTML = `
-                <div class="flex justify-between items-start mb-4">
-                    <div>
-                        <div class="flex items-center">
-                            <span class="text-xl mr-2">${messageTypeIcon}</span>
-                            <h4 class="font-bold text-gray-800 text-lg">${message.subject}</h4>
-                            ${urgentBadge}
-                            ${outgoingIndicator}
-                        </div>
-                        <div class="flex items-center mt-1">
-                            <span class="text-sm text-gray-700">
-                                From: <span class="font-semibold">${message.sender}</span> (${message.senderRole})
-                            </span>
-                            ${studentInfo ? `<span class="mx-2">•</span>${studentInfo}` : ''}
-                        </div>
-                    </div>
-                    <span class="text-sm text-gray-500">${safeText(formattedDate)}</span>
-                </div>
-                
-                ${message.originalMessage ? `
-                <div class="mb-4">
-                    <p class="text-gray-600 text-sm mb-1">Your original message:</p>
-                    <p class="text-gray-700 bg-gray-50 p-4 rounded-lg border text-sm">${message.originalMessage}</p>
-                </div>
-                ` : ''}
-                
-                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <p class="text-gray-700 leading-relaxed">${message.content}</p>
-                </div>
-            `;
-
-            messagesContent.appendChild(messageElement);
-        });
-
-    } catch (error) {
-        console.error('Error loading messages:', error);
-        messagesContent.innerHTML = `
-            <div class="text-center py-8">
-                <div class="text-4xl mb-4">❌</div>
-                <h3 class="text-xl font-bold text-red-700 mb-2">Error Loading Messages</h3>
-                <p class="text-gray-500">Unable to load messages at this time. Please try again later.</p>
-                <button onclick="loadUnifiedMessages()" class="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-                    Try Again
-                </button>
-            </div>
-        `;
-    }
-}
+// All messaging functions removed as requested
 
 // ============================================================================
 // SECTION 10: NOTIFICATION SYSTEM WITHOUT COMPLEX QUERIES
 // ============================================================================
 
 async function checkForNewMessages() {
-    try {
-        const user = auth.currentUser;
-        if (!user) return;
-
-        let totalUnread = 0;
-        
-        // SIMPLIFIED QUERY: Get all messages and filter client-side
-        const tutorMessagesSnapshot = await db.collection('tutor_messages')
-            .where('parentUid', '==', user.uid)
-            .get();
-        
-        // Filter client-side for incoming messages only
-        tutorMessagesSnapshot.forEach(doc => {
-            const message = doc.data();
-            if (message.type !== 'parent_to_staff') {
-                totalUnread++;
-            }
-        });
-        
-        // Check feedback responses
-        const feedbackSnapshot = await db.collection('parent_feedback')
-            .where('parentUid', '==', user.uid)
-            .get();
-
-        feedbackSnapshot.forEach(doc => {
-            const feedback = doc.data();
-            if (feedback.responses && Array.isArray(feedback.responses) && feedback.responses.length > 0) {
-                totalUnread += feedback.responses.length;
-            }
-        });
-
-        // Update notification badge
-        updateNotificationBadge(totalUnread > 0 ? totalUnread : 0);
-        
-        // Store for later use
-        unreadMessagesCount = totalUnread;
-
-    } catch (error) {
-        console.error('Error checking for new messages:', error);
-        // Silently fail - don't show error to user for background check
-    }
+    // Function kept but not used since messaging is disabled
+    return;
 }
 
 function updateNotificationBadge(count) {
-    let badge = document.getElementById('messagesNotificationBadge');
-    const viewMessagesBtn = document.getElementById('viewMessagesBtn');
-    
-    if (!viewMessagesBtn) return;
-    
-    if (!badge) {
-        badge = document.createElement('span');
-        badge.id = 'messagesNotificationBadge';
-        badge.className = 'absolute -top-2 -right-2 bg-red-500 text-white rounded-full text-xs w-6 h-6 flex items-center justify-center font-bold animate-pulse';
-        viewMessagesBtn.style.position = 'relative';
-        viewMessagesBtn.appendChild(badge);
-    }
-    
-    if (count > 0) {
-        badge.textContent = count > 9 ? '9+' : count;
-        badge.classList.remove('hidden');
-    } else {
-        badge.classList.add('hidden');
-    }
+    // Function kept but not used since messaging is disabled
+    return;
 }
 
 function resetNotificationCount() {
-    updateNotificationBadge(0);
-    unreadMessagesCount = 0;
+    // Function kept but not used since messaging is disabled
+    return;
 }
 
 // ============================================================================
 // SECTION 11: NAVIGATION BUTTONS & DYNAMIC UI
 // ============================================================================
 
-// Add Messages button to the welcome section with notification badge
-function addMessagesButton() {
-    const welcomeSection = document.querySelector('.bg-green-50');
-    if (!welcomeSection) return;
-    
-    const buttonContainer = welcomeSection.querySelector('.flex.gap-2');
-    if (!buttonContainer) return;
-    
-    // Check if button already exists
-    if (document.getElementById('viewMessagesBtn')) return;
-    
-    const viewMessagesBtn = document.createElement('button');
-    viewMessagesBtn.id = 'viewMessagesBtn';
-    viewMessagesBtn.onclick = showMessagesModal;
-    viewMessagesBtn.className = 'bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 btn-glow flex items-center justify-center relative';
-    viewMessagesBtn.innerHTML = '<span class="mr-2">📨</span> Messages';
-    
-    // Insert before the logout button
-    const logoutBtn = buttonContainer.querySelector('button[onclick="logout()"]');
-    if (logoutBtn) {
-        buttonContainer.insertBefore(viewMessagesBtn, logoutBtn);
-    } else {
-        buttonContainer.appendChild(viewMessagesBtn);
-    }
-    
-    // Add Compose button
-    const composeBtn = document.createElement('button');
-    composeBtn.id = 'composeMessageBtn';
-    composeBtn.onclick = showComposeMessageModal;
-    composeBtn.className = 'bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 btn-glow flex items-center justify-center';
-    composeBtn.innerHTML = '<span class="mr-2">✏️</span> Compose';
-    
-    buttonContainer.insertBefore(composeBtn, viewMessagesBtn);
-    
-    // Check for messages to show notification
-    setTimeout(() => {
-        checkForNewMessages();
-        checkForNewAcademics();
-    }, 1000);
-}
+// Add Messages button removed as requested
 
 // MANUAL REFRESH FUNCTION
-async function manualRefreshReports() {
+async function manualRefreshReportsV2() {
     const user = auth.currentUser;
     if (!user) return;
     
@@ -2100,8 +1575,13 @@ async function manualRefreshReports() {
             const userData = userDoc.data();
             const userPhone = userData.normalizedPhone || userData.phone;
             
-            // Force reload reports
-            await loadAllReportsForParent(userPhone, user.uid, true);
+            // Force reload reports using auth manager
+            if (window.authManager && typeof window.authManager.reloadDashboard === 'function') {
+                await window.authManager.reloadDashboard();
+            } else {
+                // Fallback to old method
+                await loadAllReportsForParent(userPhone, user.uid, true);
+            }
             
             // Also check for new academics
             await checkForNewAcademics();
@@ -2565,8 +2045,6 @@ function generateAllPhoneVariations(phone) {
     
     if (!phone || typeof phone !== 'string') return [];
     
-    console.log(`🔧 Generating phone variations for: "${phone}"`);
-    
     // Add original
     variations.add(phone.trim());
     
@@ -2581,46 +2059,41 @@ function generateAllPhoneVariations(phone) {
     
     // Global phone number handling patterns
     const countryCodePatterns = [
-        { code: '+1', length: 11 },      // USA/Canada
-        { code: '+234', length: 14 },    // Nigeria
-        { code: '+44', length: 13 },     // UK
-        { code: '+91', length: 13 },     // India
-        { code: '+86', length: 14 },     // China
-        { code: '+33', length: 12 },     // France
-        { code: '+49', length: 13 },     // Germany
-        { code: '+81', length: 13 },     // Japan
-        { code: '+61', length: 12 },     // Australia
-        { code: '+55', length: 13 },     // Brazil
-        { code: '+7', length: 12 },      // Russia/Kazakhstan
-        { code: '+20', length: 13 },     // Egypt
-        { code: '+27', length: 12 },     // South Africa
-        { code: '+34', length: 12 },     // Spain
-        { code: '+39', length: 12 },     // Italy
-        { code: '+52', length: 13 },     // Mexico
-        { code: '+62', length: 13 },     // Indonesia
-        { code: '+82', length: 13 },     // South Korea
-        { code: '+90', length: 13 },     // Turkey
-        { code: '+92', length: 13 },     // Pakistan
-        { code: '+966', length: 14 },    // Saudi Arabia
-        { code: '+971', length: 13 },    // UAE
-        { code: '+233', length: 13 },    // Ghana
-        { code: '+254', length: 13 },    // Kenya
-        { code: '+255', length: 13 },    // Tanzania
-        { code: '+256', length: 13 },    // Uganda
-        { code: '+237', length: 13 },    // Cameroon
-        { code: '+251', length: 13 },    // Ethiopia
-        { code: '+250', length: 13 },    // Rwanda
-        { code: '+260', length: 13 },    // Zambia
-        { code: '+263', length: 13 },    // Zimbabwe
-        { code: '+265', length: 13 },    // Malawi
-        { code: '+267', length: 13 },    // Botswana
-        { code: '+268', length: 13 },    // Eswatini
-        { code: '+269', length: 13 },    // Comoros
-        { code: '+290', length: 11 },    // Saint Helena
-        { code: '+291', length: 11 },    // Eritrea
-        { code: '+297', length: 10 },    // Aruba
-        { code: '+298', length: 9 },     // Faroe Islands
-        { code: '+299', length: 9 },     // Greenland
+        { code: '+1', length: 11 },
+        { code: '+234', length: 14 },
+        { code: '+44', length: 13 },
+        { code: '+91', length: 13 },
+        { code: '+86', length: 14 },
+        { code: '+33', length: 12 },
+        { code: '+49', length: 13 },
+        { code: '+81', length: 13 },
+        { code: '+61', length: 12 },
+        { code: '+55', length: 13 },
+        { code: '+7', length: 12 },
+        { code: '+20', length: 13 },
+        { code: '+27', length: 12 },
+        { code: '+34', length: 12 },
+        { code: '+39', length: 12 },
+        { code: '+52', length: 13 },
+        { code: '+62', length: 13 },
+        { code: '+82', length: 13 },
+        { code: '+90', length: 13 },
+        { code: '+92', length: 13 },
+        { code: '+966', length: 14 },
+        { code: '+971', length: 13 },
+        { code: '+233', length: 13 },
+        { code: '+254', length: 13 },
+        { code: '+255', length: 13 },
+        { code: '+256', length: 13 },
+        { code: '+237', length: 13 },
+        { code: '+251', length: 13 },
+        { code: '+250', length: 13 },
+        { code: '+260', length: 13 },
+        { code: '+263', length: 13 },
+        { code: '+265', length: 13 },
+        { code: '+267', length: 13 },
+        { code: '+268', length: 13 },
+        { code: '+269', length: 13 }
     ];
     
     // Try to identify and generate variations for each country code pattern
@@ -2667,7 +2140,7 @@ function generateAllPhoneVariations(phone) {
         
         // Try adding common country codes from our list
         for (const pattern of countryCodePatterns) {
-            if (pattern.code !== '+1' || localNumber.length === 10) { // Special handling for US/Canada
+            if (pattern.code !== '+1' || localNumber.length === 10) {
                 variations.add(pattern.code + localNumber);
                 variations.add(pattern.code.substring(1) + localNumber);
             }
@@ -2694,12 +2167,12 @@ function generateAllPhoneVariations(phone) {
             
             // Special handling for common patterns
             if (basicCleaned.length === 10) {
-                variations.add('+1' + basicCleaned);  // USA/Canada
+                variations.add('+1' + basicCleaned);
             } else if (basicCleaned.length === 11 && basicCleaned.startsWith('1')) {
-                variations.add('+' + basicCleaned);   // USA/Canada with 1
+                variations.add('+' + basicCleaned);
                 variations.add('+1' + basicCleaned.substring(1));
             } else if (basicCleaned.length === 11 && basicCleaned.startsWith('0')) {
-                variations.add('+234' + basicCleaned.substring(1));  // Nigeria
+                variations.add('+234' + basicCleaned.substring(1));
             }
         }
     }
@@ -2740,12 +2213,10 @@ function generateAllPhoneVariations(phone) {
     
     // Filter out invalid variations and return
     const finalVariations = Array.from(variations)
-        .filter(v => v && v.length >= 7)  // Minimum 7 characters for a valid phone (including country code)
-        .filter(v => v.length <= 20)      // Maximum reasonable length
-        .filter(v => !v.includes('undefined'))  // Remove any undefined values
-        .filter((v, i, arr) => arr.indexOf(v) === i);  // Remove duplicates
-    
-    console.log(`📱 Generated ${finalVariations.length} phone variations`);
+        .filter(v => v && v.length >= 7)
+        .filter(v => v.length <= 20)
+        .filter(v => !v.includes('undefined'))
+        .filter((v, i, arr) => arr.indexOf(v) === i);
     
     return finalVariations;
 }
@@ -2778,12 +2249,9 @@ function setupRealTimeMonitoring(parentPhone, userId) {
     // Clear any existing listeners
     cleanupRealTimeListeners();
     
-    console.log("🔍 Setting up real-time monitoring for:", parentPhone);
-    
     // Normalize phone
     const normalizedPhone = normalizePhoneNumber(parentPhone);
     if (!normalizedPhone.valid) {
-        console.log("Invalid phone number for monitoring");
         return;
     }
     
@@ -2795,10 +2263,6 @@ function setupRealTimeMonitoring(parentPhone, userId) {
                 if (change.type === "added") {
                     console.log("🆕 NEW MONTHLY REPORT DETECTED!");
                     showNewReportNotification('monthly');
-                    // Reload reports after a short delay
-                    setTimeout(() => {
-                        loadAllReportsForParent(parentPhone, userId);
-                    }, 2000);
                 }
             });
         }, (error) => {
@@ -2814,9 +2278,6 @@ function setupRealTimeMonitoring(parentPhone, userId) {
                 if (change.type === "added") {
                     console.log("🆕 NEW ASSESSMENT REPORT DETECTED!");
                     showNewReportNotification('assessment');
-                    setTimeout(() => {
-                        loadAllReportsForParent(parentPhone, userId);
-                    }, 2000);
                 }
             });
         }, (error) => {
@@ -2824,32 +2285,10 @@ function setupRealTimeMonitoring(parentPhone, userId) {
         });
     realTimeListeners.push(assessmentListener);
     
-    // Monitor tutor messages (simple query without type filter)
-    const messagesListener = db.collection("tutor_messages")
-        .where("parentUid", "==", userId)
-        .onSnapshot((snapshot) => {
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === "added") {
-                    const message = change.doc.data();
-                    // Filter client-side for incoming messages
-                    if (message.type !== 'parent_to_staff') {
-                        console.log("🆕 NEW MESSAGE DETECTED!");
-                        checkForNewMessages();
-                    }
-                }
-            });
-        }, (error) => {
-            console.error("Messages listener error:", error);
-        });
-    realTimeListeners.push(messagesListener);
-    
-    // Monitor academics with simplified approach
-    // We'll check periodically instead of real-time to avoid complex queries
+    // Monitor academics periodically
     setInterval(() => {
         checkForNewAcademics();
-    }, 30000); // Check every 30 seconds
-    
-    console.log("✅ Real-time monitoring setup complete");
+    }, 30000);
 }
 
 function cleanupRealTimeListeners() {
@@ -2859,7 +2298,6 @@ function cleanupRealTimeListeners() {
         }
     });
     realTimeListeners = [];
-    console.log("🧹 Cleaned up real-time listeners");
 }
 
 function showNewReportNotification(type) {
@@ -2887,7 +2325,6 @@ function showNewReportNotification(type) {
 }
 
 // ============================================================================
-// ============================================================================
 // SECTION 14: YEARLY ARCHIVES REPORTS SYSTEM WITH ACCORDIONS
 // ============================================================================
 
@@ -2908,7 +2345,7 @@ function createYearlyArchiveReportView(reportsByStudent) {
         const monthlyCount = Array.from(reports.monthly.values()).flat().length;
         const totalCount = assessmentCount + monthlyCount;
         
-        // Create student accordion header
+        // Create student accordion header (ALWAYS SHOW, EVEN WITH ZERO REPORTS)
         html += `
             <div class="accordion-item mb-4 fade-in">
                 <button onclick="toggleAccordion('student-${studentIndex}')" 
@@ -2930,7 +2367,7 @@ function createYearlyArchiveReportView(reportsByStudent) {
                 <div id="student-${studentIndex}-content" class="accordion-content hidden">
         `;
         
-        // If no reports, show empty state
+        // If no reports, show empty state (BUT STILL SHOW THE STUDENT)
         if (totalCount === 0) {
             html += `
                 <div class="p-6 bg-gray-50 border border-gray-200 rounded-lg text-center">
@@ -3012,10 +2449,6 @@ function createYearlyArchiveReportView(reportsByStudent) {
                         session.forEach(report => {
                             const date = new Date(report.timestamp * 1000);
                             const month = date.getMonth();
-                            const monthNames = [
-                                'January', 'February', 'March', 'April', 'May', 'June',
-                                'July', 'August', 'September', 'October', 'November', 'December'
-                            ];
                             
                             if (!assessmentsByMonth.has(month)) {
                                 assessmentsByMonth.set(month, []);
@@ -3058,10 +2491,6 @@ function createYearlyArchiveReportView(reportsByStudent) {
                         session.forEach(report => {
                             const date = new Date(report.timestamp * 1000);
                             const month = date.getMonth();
-                            const monthNames = [
-                                'January', 'February', 'March', 'April', 'May', 'June',
-                                'July', 'August', 'September', 'October', 'November', 'December'
-                            ];
                             
                             if (!monthlyByMonth.has(month)) {
                                 monthlyByMonth.set(month, []);
@@ -3213,7 +2642,6 @@ function downloadSessionReport(studentIndex, sessionId, studentName, type) {
         }
     };
     
-    // Show loading message
     showMessage('Generating PDF download...', 'success');
     
     html2pdf().from(element).set(opt).save();
@@ -3266,9 +2694,9 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
     if (authLoader) authLoader.classList.remove("hidden");
 
     try {
-        // 2. CACHE CHECK (Performance Optimization)
+        // 2. CACHE CHECK (Short-lived: 5 minutes)
         const cacheKey = `reportCache_${parentPhone}`;
-        const cacheDuration = 60 * 60 * 1000; // 1 hour
+        const cacheDuration = 5 * 60 * 1000; // 5 minutes
         
         if (!forceRefresh) {
             try {
@@ -3276,7 +2704,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                 if (cachedItem) {
                     const cacheData = JSON.parse(cachedItem);
                     if (Date.now() - cacheData.timestamp < cacheDuration) {
-                        console.log("⚡ GOD MODE: Loading data from fast cache.");
                         
                         // Restore global state
                         currentUserData = cacheData.userData;
@@ -3290,7 +2717,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                         }
 
                         // Re-initialize dynamic components
-                        addMessagesButton();
                         addManualRefreshButton();
                         addLogoutButton();
                         loadReferralRewards(userId);
@@ -3301,21 +2727,21 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                     }
                 }
             } catch (e) {
-                console.warn("Cache invalid, forcing fresh load.");
                 localStorage.removeItem(cacheKey);
             }
         }
 
-        // 3. CRITICAL: FETCH ALL LINKED CHILDREN (The "Entity-First" Step)
-        const { studentIds, studentNameIdMap, allStudentData } = await findStudentIdsForParent(parentPhone);
+        // 3. CRITICAL: FIND ALL CHILDREN USING COMPREHENSIVE SEARCH
+        const childrenResult = await comprehensiveFindChildren(parentPhone);
         
         // Update Global State
-        userChildren = Array.from(studentNameIdMap.keys());
-        
-        console.log("👥 GOD MODE: Verified Student Entity List:", userChildren);
+        userChildren = childrenResult.studentNames;
+        studentIdMap = childrenResult.studentNameIdMap;
+        allStudentData = childrenResult.allStudentData;
+
+        console.log("👥 Found children:", userChildren);
 
         // 4. USER PROFILE & REFERRAL SYNC
-        // [FIX]: We extract parent name from the students we just fetched instead of calling a missing function
         let parentName = null;
         if (allStudentData && allStudentData.length > 0) {
             // Find the first student record that has a parent name attached
@@ -3354,14 +2780,14 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
 
         if (welcomeMessage) welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
 
-        // 5. REPORT AGGREGATION (The "Ultimate Search")
+        // 5. REPORT AGGREGATION
         const { assessmentResults, monthlyResults } = await searchAllReportsForParent(
             parentPhone, 
             currentUserData.email, 
             userId
         );
 
-        // 6. DATA MAPPING (The "Container" Logic)
+        // 6. DATA MAPPING
         const reportsByStudent = new Map();
 
         // A. Initialize containers for ALL known students (Empty or Not)
@@ -3388,7 +2814,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                     monthly: new Map(),
                     studentData: { name: studentName, isPending: false } 
                 });
-                userChildren.push(studentName); // Update global list
+                userChildren.push(studentName);
             }
 
             const sessionKey = Math.floor(result.timestamp / 86400);
@@ -3427,24 +2853,12 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
 
         // 7. RENDER (Generate the UI)
         if (reportContent) {
-            // Check if we truly have zero students
-            if (reportsByStudent.size === 0) {
-                reportContent.innerHTML = `
-                    <div class="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
-                        <div class="text-6xl mb-4">👋</div>
-                        <h3 class="text-xl font-bold text-gray-700 mb-2">Welcome to BKH!</h3>
-                        <p class="text-gray-500 max-w-md mx-auto mb-6">We don't see any students linked to your account yet.</p>
-                        <p class="text-sm text-gray-400">If you have registered, please contact support to link your account.</p>
-                    </div>
-                `;
-            } else {
-                // Pass the map containing ALL students (empty or full) to the view generator
-                const reportsHtml = createYearlyArchiveReportView(reportsByStudent);
-                reportContent.innerHTML = reportsHtml;
-            }
+            // ALWAYS show students, even if zero reports
+            const reportsHtml = createYearlyArchiveReportView(reportsByStudent);
+            reportContent.innerHTML = reportsHtml;
         }
 
-        // 8. UPDATE CACHE
+        // 8. UPDATE CACHE (Short-lived)
         try {
             const dataToCache = {
                 timestamp: Date.now(),
@@ -3463,7 +2877,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             reportArea.classList.remove("hidden");
         }
         
-        addMessagesButton();
         addManualRefreshButton();
         addLogoutButton();
         setupRealTimeMonitoring(parentPhone, userId);
@@ -3516,17 +2929,14 @@ async function showDiagnostics() {
     `;
     
     // Check what students are linked
-    const studentsSnapshot = await db.collection('students')
-        .where('parentPhone', '==', userData?.normalizedPhone || userData?.phone)
-        .get();
+    const childrenResult = await comprehensiveFindChildren(userData?.normalizedPhone || userData?.phone);
     
-    diagnosticsHtml += `<p><strong>Linked Students:</strong> ${studentsSnapshot.size}</p>`;
+    diagnosticsHtml += `<p><strong>Linked Students:</strong> ${childrenResult.studentNames.length}</p>`;
     
-    if (studentsSnapshot.size > 0) {
+    if (childrenResult.studentNames.length > 0) {
         diagnosticsHtml += `<ul class="list-disc pl-5 mt-2">`;
-        studentsSnapshot.forEach(doc => {
-            const student = doc.data();
-            diagnosticsHtml += `<li>${student.studentName} (ID: ${doc.id})</li>`;
+        childrenResult.studentNames.forEach(studentName => {
+            diagnosticsHtml += `<li>${studentName}</li>`;
         });
         diagnosticsHtml += `</ul>`;
     }
@@ -3554,14 +2964,12 @@ async function runReportSearchDiagnostics() {
     const userDoc = await db.collection('parent_users').doc(user.uid).get();
     const userData = userDoc.data();
     
-    console.log("🔍 RUNNING DIAGNOSTICS...");
-    
     // 1. Check what data exists
     console.log("📋 Parent Data:", userData);
     
     // 2. Find linked students
-    const students = await findStudentIdsForParent(userData?.normalizedPhone || userData?.phone);
-    console.log("👥 Linked Students:", students);
+    const children = await comprehensiveFindChildren(userData?.normalizedPhone || userData?.phone);
+    console.log("👥 Linked Students:", children);
     
     // 3. Search for reports
     const searchResults = await searchAllReportsForParent(
@@ -3578,29 +2986,6 @@ async function runReportSearchDiagnostics() {
 // ============================================================================
 // SECTION 17: TAB MANAGEMENT & NAVIGATION
 // ============================================================================
-
-function switchTab(tab) {
-    const signInTab = document.getElementById('signInTab');
-    const signUpTab = document.getElementById('signUpTab');
-    const signInForm = document.getElementById('signInForm');
-    const signUpForm = document.getElementById('signUpForm');
-
-    if (tab === 'signin') {
-        signInTab?.classList.remove('tab-inactive');
-        signInTab?.classList.add('tab-active');
-        signUpTab?.classList.remove('tab-active');
-        signUpTab?.classList.add('tab-inactive');
-        signInForm?.classList.remove('hidden');
-        signUpForm?.classList.add('hidden');
-    } else {
-        signUpTab?.classList.remove('tab-inactive');
-        signUpTab?.classList.add('tab-active');
-        signInTab?.classList.remove('tab-active');
-        signInTab?.classList.add('tab-inactive');
-        signUpForm?.classList.remove('hidden');
-        signInForm?.classList.add('hidden');
-    }
-}
 
 function switchMainTab(tab) {
     const reportTab = document.getElementById('reportTab');
@@ -3664,634 +3049,7 @@ function logout() {
 }
 
 // ============================================================================
-// SECTION 18: INITIALIZATION - FIXED RELOADING ISSUE WITH ALL DEPENDENCIES
-// ============================================================================
-
-// Track auth state to prevent loops
-let authStateInitialized = false;
-let authChangeInProgress = false;
-let lastAuthChangeTime = 0;
-const AUTH_DEBOUNCE_MS = 1000; // Minimum 1 second between auth changes
-let authUnsubscribe = null; // To store the unsubscribe function
-
-// ============================================================================
-// CRITICAL AUTHENTICATION FUNCTIONS (moved from SECTION 6 for initialization)
-// ============================================================================
-
-// Setup Remember Me Functionality
-function setupRememberMe() {
-    const rememberMe = localStorage.getItem('rememberMe');
-    const savedEmail = localStorage.getItem('savedEmail');
-    
-    if (rememberMe === 'true' && savedEmail) {
-        const loginIdentifier = document.getElementById('loginIdentifier');
-        const rememberMeCheckbox = document.getElementById('rememberMe');
-        
-        if (loginIdentifier) {
-            loginIdentifier.value = safeText(savedEmail);
-        }
-        if (rememberMeCheckbox) {
-            rememberMeCheckbox.checked = true;
-        }
-    }
-}
-
-// Handle Remember Me checkbox change
-function handleRememberMe() {
-    const rememberMeCheckbox = document.getElementById('rememberMe');
-    const identifier = document.getElementById('loginIdentifier');
-    
-    if (!rememberMeCheckbox || !identifier) return;
-    
-    const rememberMe = rememberMeCheckbox.checked;
-    const email = identifier.value.trim();
-    
-    if (rememberMe && email) {
-        localStorage.setItem('rememberMe', 'true');
-        localStorage.setItem('savedEmail', safeText(email));
-    } else {
-        localStorage.removeItem('rememberMe');
-        localStorage.removeItem('savedEmail');
-    }
-}
-
-// Basic handleSignIn function for event listeners (full version is in SECTION 6)
-function handleSignIn() {
-    const identifier = document.getElementById('loginIdentifier')?.value.trim();
-    const password = document.getElementById('loginPassword')?.value;
-
-    if (!identifier || !password) {
-        showMessage('Please fill in all fields', 'error');
-        return;
-    }
-
-    const signInBtn = document.getElementById('signInBtn');
-    const authLoader = document.getElementById('authLoader');
-
-    signInBtn.disabled = true;
-    document.getElementById('signInText').textContent = 'Signing In...';
-    document.getElementById('signInSpinner').classList.remove('hidden');
-    authLoader.classList.remove('hidden');
-
-    // Call the full implementation from SECTION 6
-    handleSignInFull(identifier, password, signInBtn, authLoader);
-}
-
-// Basic handleSignUp function for event listeners
-function handleSignUp() {
-    const countryCode = document.getElementById('countryCode')?.value;
-    const localPhone = document.getElementById('signupPhone')?.value.trim();
-    const email = document.getElementById('signupEmail')?.value.trim();
-    const password = document.getElementById('signupPassword')?.value;
-    const confirmPassword = document.getElementById('signupConfirmPassword')?.value;
-
-    // Validation
-    if (!countryCode || !localPhone || !email || !password || !confirmPassword) {
-        showMessage('Please fill in all fields including country code', 'error');
-        return;
-    }
-
-    if (password.length < 6) {
-        showMessage('Password must be at least 6 characters', 'error');
-        return;
-    }
-
-    if (password !== confirmPassword) {
-        showMessage('Passwords do not match', 'error');
-        return;
-    }
-
-    const signUpBtn = document.getElementById('signUpBtn');
-    const authLoader = document.getElementById('authLoader');
-
-    signUpBtn.disabled = true;
-    document.getElementById('signUpText').textContent = 'Creating Account...';
-    document.getElementById('signUpSpinner').classList.remove('hidden');
-    authLoader.classList.remove('hidden');
-
-    // Call the full implementation from SECTION 6
-    handleSignUpFull(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader);
-}
-
-// Basic password reset function
-function handlePasswordReset() {
-    const email = document.getElementById('resetEmail')?.value.trim();
-    
-    if (!email) {
-        showMessage('Please enter your email address', 'error');
-        return;
-    }
-
-    const sendResetBtn = document.getElementById('sendResetBtn');
-    const resetLoader = document.getElementById('resetLoader');
-
-    sendResetBtn.disabled = true;
-    resetLoader.classList.remove('hidden');
-
-    // Call the full implementation from SECTION 6
-    handlePasswordResetFull(email, sendResetBtn, resetLoader);
-}
-
-// Basic tab switching functions
-function switchTab(tab) {
-    const signInTab = document.getElementById('signInTab');
-    const signUpTab = document.getElementById('signUpTab');
-    const signInForm = document.getElementById('signInForm');
-    const signUpForm = document.getElementById('signUpForm');
-
-    if (tab === 'signin') {
-        signInTab?.classList.remove('tab-inactive');
-        signInTab?.classList.add('tab-active');
-        signUpTab?.classList.remove('tab-active');
-        signUpTab?.classList.add('tab-inactive');
-        signInForm?.classList.remove('hidden');
-        signUpForm?.classList.add('hidden');
-    } else {
-        signUpTab?.classList.remove('tab-inactive');
-        signUpTab?.classList.add('tab-active');
-        signInTab?.classList.remove('tab-active');
-        signInTab?.classList.add('tab-inactive');
-        signUpForm?.classList.remove('hidden');
-        signInForm?.classList.add('hidden');
-    }
-}
-
-// ============================================================================
-// MAIN INITIALIZATION FUNCTIONS
-// ============================================================================
-
-// Robust initialization with loop prevention
-function initializeParentPortal() {
-    console.log("🚀 Initializing parent portal with reload protection");
-    
-    // Setup Remember Me FIRST (before any other operations)
-    setupRememberMe();
-    
-    // Inject custom CSS for animations
-    injectCustomCSS();
-    
-    // Create country code dropdown when page loads
-    createCountryCodeDropdown();
-    
-    // Set up all event listeners (before auth checks)
-    setupEventListeners();
-    
-    // Setup global error handler
-    setupGlobalErrorHandler();
-    
-    // Initialize auth with debouncing and loop prevention
-    initializeAuthWithProtection();
-    
-    console.log("✅ Parent portal initialized with reload protection");
-}
-
-// Initialize auth with protection against loops
-function initializeAuthWithProtection() {
-    console.log("🔐 Setting up protected auth state listener");
-    
-    // Clean up any existing listener first
-    if (authUnsubscribe && typeof authUnsubscribe === 'function') {
-        console.log("🧹 Cleaning up previous auth listener");
-        authUnsubscribe();
-        authUnsubscribe = null;
-    }
-    
-    // Setup a single, protected auth state listener
-    authUnsubscribe = auth.onAuthStateChanged(handleAuthStateChangeProtected);
-    
-    // Also check initial state after a short delay
-    setTimeout(() => {
-        const user = auth.currentUser;
-        if (user && !authStateInitialized) {
-            console.log("🔄 Checking initial auth state");
-            handleAuthStateChangeProtected(user);
-        }
-    }, 100);
-}
-
-// Protected auth state change handler with debouncing
-function handleAuthStateChangeProtected(user) {
-    const now = Date.now();
-    const timeSinceLastChange = now - lastAuthChangeTime;
-    
-    // Prevent rapid auth state changes (debouncing)
-    if (authChangeInProgress) {
-        console.log("⏸️ Auth change already in progress, skipping");
-        return;
-    }
-    
-    if (timeSinceLastChange < AUTH_DEBOUNCE_MS) {
-        console.log("⏸️ Debouncing auth change (too soon)");
-        setTimeout(() => handleAuthStateChangeProtected(user), AUTH_DEBOUNCE_MS - timeSinceLastChange);
-        return;
-    }
-    
-    // Mark that we're processing an auth change
-    authChangeInProgress = true;
-    lastAuthChangeTime = now;
-    
-    try {
-        console.log(`🔄 Auth state change: ${user ? 'SIGNED IN' : 'SIGNED OUT'}`, 
-                    user ? `(UID: ${user.uid.substring(0, 8)}...)` : '');
-        
-        if (user) {
-            handleUserSignedIn(user);
-        } else {
-            handleUserSignedOut();
-        }
-        
-        authStateInitialized = true;
-        
-    } catch (error) {
-        console.error("❌ Auth state change error:", error);
-        showMessage('Authentication error. Please try refreshing the page.', 'error');
-    } finally {
-        // Reset the flag after a minimum delay
-        setTimeout(() => {
-            authChangeInProgress = false;
-        }, 500);
-    }
-}
-
-// Handle user sign in (protected)
-function handleUserSignedIn(user) {
-    console.log("👤 User signed in, loading dashboard...");
-    
-    const authArea = document.getElementById("authArea");
-    const reportArea = document.getElementById("reportArea");
-    const authLoader = document.getElementById("authLoader");
-    const welcomeMessage = document.getElementById("welcomeMessage");
-    
-    // Hide auth area, show dashboard
-    if (authArea && reportArea) {
-        authArea.classList.add("hidden");
-        reportArea.classList.remove("hidden");
-    }
-    
-    // Hide loader if present
-    if (authLoader) {
-        authLoader.classList.add("hidden");
-    }
-    
-    // Update welcome message immediately
-    if (welcomeMessage) {
-        welcomeMessage.textContent = `Welcome!`;
-    }
-    
-    // Store auth state (but don't rely on it for critical decisions)
-    localStorage.setItem('isAuthenticated', 'true');
-    
-    // Get user data and load reports
-    db.collection('parent_users').doc(user.uid).get()
-        .then((doc) => {
-            if (doc.exists) {
-                const userData = doc.data();
-                const userPhone = userData.phone;
-                const normalizedPhone = userData.normalizedPhone;
-                
-                // Update welcome message with actual name
-                if (welcomeMessage && userData.parentName) {
-                    welcomeMessage.textContent = `Welcome, ${safeText(userData.parentName)}!`;
-                }
-                
-                // Load reports
-                loadAllReportsForParent(normalizedPhone || userPhone, user.uid);
-                
-                // Add navigation buttons
-                setTimeout(() => {
-                    addMessagesButton();
-                    addManualRefreshButton();
-                    addLogoutButton();
-                }, 300);
-                
-            } else {
-                console.error("User document not found in Firestore");
-                showMessage('User profile not found. Please contact support.', 'error');
-            }
-        })
-        .catch((error) => {
-            console.error('Error getting user data:', error);
-            showMessage('Could not load user data. Please try again.', 'error');
-        });
-}
-
-// Handle user sign out (protected)
-function handleUserSignedOut() {
-    console.log("🚪 User signed out, showing login form");
-    
-    const authArea = document.getElementById("authArea");
-    const reportArea = document.getElementById("reportArea");
-    const authLoader = document.getElementById("authLoader");
-    
-    // Clean up real-time listeners FIRST
-    cleanupRealTimeListeners();
-    
-    // Clear auth state from localStorage
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('savedEmail'); // Also clear saved email for security
-    
-    // Show auth area, hide dashboard
-    if (authArea && reportArea) {
-        authArea.classList.remove("hidden");
-        reportArea.classList.add("hidden");
-    }
-    
-    // Hide loader if present
-    if (authLoader) {
-        authLoader.classList.add("hidden");
-    }
-    
-    // Reset form fields
-    const loginIdentifier = document.getElementById('loginIdentifier');
-    const loginPassword = document.getElementById('loginPassword');
-    
-    if (loginPassword) loginPassword.value = '';
-    
-    // Don't clear identifier if remember me is checked
-    const rememberMe = document.getElementById('rememberMe');
-    if (loginIdentifier && (!rememberMe || !rememberMe.checked)) {
-        loginIdentifier.value = '';
-    }
-    
-    // Switch to sign in tab
-    switchTab('signin');
-    
-    console.log("✅ User signed out cleanly");
-}
-
-// Setup all event listeners
-function setupEventListeners() {
-    console.log("🔧 Setting up event listeners");
-    
-    // Authentication buttons
-    const signInBtn = document.getElementById("signInBtn");
-    const signUpBtn = document.getElementById("signUpBtn");
-    const sendResetBtn = document.getElementById("sendResetBtn");
-    const submitMessageBtn = document.getElementById("submitMessageBtn");
-    
-    if (signInBtn) {
-        signInBtn.removeEventListener("click", handleSignIn);
-        signInBtn.addEventListener("click", handleSignIn);
-    }
-    
-    if (signUpBtn) {
-        signUpBtn.removeEventListener("click", handleSignUp);
-        signUpBtn.addEventListener("click", handleSignUp);
-    }
-    
-    if (sendResetBtn) {
-        sendResetBtn.removeEventListener("click", handlePasswordReset);
-        sendResetBtn.addEventListener("click", handlePasswordReset);
-    }
-    
-    if (submitMessageBtn) {
-        submitMessageBtn.removeEventListener("click", submitMessage);
-        submitMessageBtn.addEventListener("click", submitMessage);
-    }
-    
-    // Tab switching
-    const signInTab = document.getElementById("signInTab");
-    const signUpTab = document.getElementById("signUpTab");
-    
-    if (signInTab) {
-        signInTab.removeEventListener("click", () => switchTab('signin'));
-        signInTab.addEventListener("click", () => switchTab('signin'));
-    }
-    
-    if (signUpTab) {
-        signUpTab.removeEventListener("click", () => switchTab('signup'));
-        signUpTab.addEventListener("click", () => switchTab('signup'));
-    }
-    
-    // Password reset
-    const forgotPasswordBtn = document.getElementById("forgotPasswordBtn");
-    if (forgotPasswordBtn) {
-        forgotPasswordBtn.removeEventListener("click", showPasswordResetModal);
-        forgotPasswordBtn.addEventListener("click", showPasswordResetModal);
-    }
-    
-    const cancelResetBtn = document.getElementById("cancelResetBtn");
-    if (cancelResetBtn) {
-        cancelResetBtn.removeEventListener("click", hidePasswordResetModal);
-        cancelResetBtn.addEventListener("click", hidePasswordResetModal);
-    }
-    
-    // Remember me
-    const rememberMeCheckbox = document.getElementById("rememberMe");
-    if (rememberMeCheckbox) {
-        rememberMeCheckbox.removeEventListener("change", handleRememberMe);
-        rememberMeCheckbox.addEventListener("change", handleRememberMe);
-    }
-    
-    // Enter key support
-    const loginPassword = document.getElementById('loginPassword');
-    if (loginPassword) {
-        loginPassword.removeEventListener('keypress', handleLoginEnter);
-        loginPassword.addEventListener('keypress', handleLoginEnter);
-    }
-    
-    const signupConfirmPassword = document.getElementById('signupConfirmPassword');
-    if (signupConfirmPassword) {
-        signupConfirmPassword.removeEventListener('keypress', handleSignupEnter);
-        signupConfirmPassword.addEventListener('keypress', handleSignupEnter);
-    }
-    
-    const resetEmail = document.getElementById('resetEmail');
-    if (resetEmail) {
-        resetEmail.removeEventListener('keypress', handleResetEnter);
-        resetEmail.addEventListener('keypress', handleResetEnter);
-    }
-    
-    // Main tab switching
-    const reportTab = document.getElementById("reportTab");
-    const academicsTab = document.getElementById("academicsTab");
-    const rewardsTab = document.getElementById("rewardsTab");
-    
-    if (reportTab) {
-        reportTab.removeEventListener("click", () => switchMainTab('reports'));
-        reportTab.addEventListener("click", () => switchMainTab('reports'));
-    }
-    
-    if (academicsTab) {
-        academicsTab.removeEventListener("click", () => switchMainTab('academics'));
-        academicsTab.addEventListener("click", () => switchMainTab('academics'));
-    }
-    
-    if (rewardsTab) {
-        rewardsTab.removeEventListener("click", () => switchMainTab('rewards'));
-        rewardsTab.addEventListener("click", () => switchMainTab('rewards'));
-    }
-    
-    // Dynamic button handlers (event delegation)
-    setupDynamicEventDelegation();
-}
-
-// Helper functions for enter key handling
-function handleLoginEnter(e) {
-    if (e.key === 'Enter') handleSignIn();
-}
-
-function handleSignupEnter(e) {
-    if (e.key === 'Enter') handleSignUp();
-}
-
-function handleResetEnter(e) {
-    if (e.key === 'Enter') handlePasswordReset();
-}
-
-// Modal functions
-function showPasswordResetModal() {
-    const modal = document.getElementById("passwordResetModal");
-    if (modal) {
-        modal.classList.remove("hidden");
-    }
-}
-
-function hidePasswordResetModal() {
-    const modal = document.getElementById("passwordResetModal");
-    if (modal) {
-        modal.classList.add("hidden");
-    }
-}
-
-// Dynamic event delegation for buttons created after page load
-function setupDynamicEventDelegation() {
-    document.addEventListener('click', function(event) {
-        // Check if cancel message button was clicked
-        if (event.target.id === 'cancelMessageBtn' || 
-            event.target.closest('#cancelMessageBtn')) {
-            event.preventDefault();
-            hideComposeMessageModal();
-        }
-        
-        // Check if cancel messages modal button was clicked
-        if (event.target.id === 'cancelMessagesModalBtn' ||
-            event.target.closest('#cancelMessagesModalBtn')) {
-            event.preventDefault();
-            hideMessagesModal();
-        }
-        
-        // Check if manual refresh button was clicked
-        if (event.target.id === 'manualRefreshBtn' ||
-            event.target.closest('#manualRefreshBtn')) {
-            event.preventDefault();
-            const user = auth.currentUser;
-            if (user) {
-                manualRefreshReports();
-            }
-        }
-        
-        // Check if view messages button was clicked
-        if (event.target.id === 'viewMessagesBtn' ||
-            event.target.closest('#viewMessagesBtn')) {
-            event.preventDefault();
-            showMessagesModal();
-        }
-        
-        // Check if compose message button was clicked
-        if (event.target.id === 'composeMessageBtn' ||
-            event.target.closest('#composeMessageBtn')) {
-            event.preventDefault();
-            showComposeMessageModal();
-        }
-    });
-}
-
-// Setup global error handler
-function setupGlobalErrorHandler() {
-    // Prevent unhandled promise rejections
-    window.addEventListener('unhandledrejection', function(event) {
-        console.error('Unhandled promise rejection:', event.reason);
-        event.preventDefault(); // Prevent browser error reporting
-    });
-    
-    // Global error handler
-    window.addEventListener('error', function(e) {
-        console.error('Global error:', e.error);
-        // Don't show error messages for auth-related errors to avoid loops
-        if (!e.error?.message?.includes('auth') && 
-            !e.error?.message?.includes('permission-denied')) {
-            showMessage('An unexpected error occurred. Please refresh the page.', 'error');
-        }
-        e.preventDefault(); // Prevent default error handling
-    });
-    
-    // Network error handling
-    window.addEventListener('offline', function() {
-        console.warn('Network offline');
-        showMessage('You are offline. Some features may not work.', 'warning');
-    });
-    
-    window.addEventListener('online', function() {
-        console.log('Network back online');
-        showMessage('Connection restored.', 'success');
-    });
-}
-
-// Cleanup function for page unload
-function cleanupBeforeUnload() {
-    console.log("🧹 Cleaning up before page unload");
-    
-    // Clean up auth listener
-    if (authUnsubscribe && typeof authUnsubscribe === 'function') {
-        authUnsubscribe();
-        authUnsubscribe = null;
-    }
-    
-    // Clean up real-time listeners
-    cleanupRealTimeListeners();
-    
-    // Clear any intervals
-    const maxIntervalId = setTimeout(() => {}, 0);
-    for (let i = 0; i < maxIntervalId; i++) {
-        clearInterval(i);
-    }
-}
-
-// ============================================================================
-// WRAPPER FUNCTIONS TO CALL FULL IMPLEMENTATIONS FROM SECTION 6
-// ============================================================================
-
-// Now we need to update SECTION 6 to rename the original functions and add wrapper calls
-
-// In SECTION 6, rename the original functions:
-// 1. Change "async function handleSignIn()" to "async function handleSignInFull(identifier, password, signInBtn, authLoader)"
-// 2. Change "async function handleSignUp()" to "async function handleSignUpFull(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader)"
-// 3. Change "async function handlePasswordReset()" to "async function handlePasswordResetFull(email, sendResetBtn, resetLoader)"
-
-// ============================================================================
-// PAGE INITIALIZATION
-// ============================================================================
-
-// Initialize the page when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-    console.log("📄 DOM Content Loaded - Starting V2 initialization");
-    
-    // Initialize the NEW portal (no reload edition)
-    initializeParentPortalV2();  // ✅ NEW
-    
-    console.log("🎉 Parent Portal V2 initialized");
-});
-
-// ============================================================================
-// SECTION 19: UNIFIED AUTH & DATA MANAGER - FIXES RELOADING & MISSING CHILDREN
-// ============================================================================
-// INSERT THIS SECTION AFTER SECTION 18 (before the DOMContentLoaded event)
-
-/**
- * CRITICAL FIX: This section solves two major issues:
- * 1. Page reloading loop after sign-in
- * 2. Parents not seeing all their children/reports
- * 
- * How it works:
- * - Single source of truth for auth state
- * - Comprehensive phone matching across ALL variations
- * - Prevents duplicate auth listeners
- * - Batches all data loading to prevent cascading reloads
- */
-
-// ============================================================================
-// 1. UNIFIED AUTH STATE MANAGER (Prevents Reloading)
+// SECTION 18: UNIFIED AUTH & DATA MANAGER - FIXES RELOADING & MISSING CHILDREN
 // ============================================================================
 
 class UnifiedAuthManager {
@@ -4309,7 +3067,6 @@ class UnifiedAuthManager {
      */
     initialize() {
         if (this.isInitialized) {
-            console.warn("⚠️ Auth manager already initialized, skipping");
             return;
         }
 
@@ -4480,6 +3237,7 @@ class UnifiedAuthManager {
             // Store globally
             userChildren = childrenData.studentNames;
             studentIdMap = childrenData.studentNameIdMap;
+            allStudentData = childrenData.allStudentData;
 
             console.log(`✅ Found ${userChildren.length} children:`, userChildren);
 
@@ -4536,7 +3294,6 @@ class UnifiedAuthManager {
      * Setup UI components
      */
     setupUIComponents() {
-        addMessagesButton();
         addManualRefreshButton();
         addLogoutButton();
     }
@@ -4546,7 +3303,6 @@ class UnifiedAuthManager {
      */
     cleanup() {
         if (this.authListener && typeof this.authListener === 'function') {
-            console.log("🧹 Cleaning up auth listener");
             this.authListener();
             this.authListener = null;
         }
@@ -4587,10 +3343,8 @@ async function comprehensiveFindChildren(parentPhone) {
     try {
         // 1. Generate ALL phone variations
         const phoneVariations = generateAllPhoneVariations(parentPhone);
-        console.log(`📱 Generated ${phoneVariations.length} phone variations`);
 
         // 2. Search in students collection
-        console.log("📚 Searching students collection...");
         for (const phoneVar of phoneVariations) {
             try {
                 const snapshot = await db.collection('students')
@@ -4618,17 +3372,14 @@ async function comprehensiveFindChildren(parentPhone) {
                         } else {
                             studentNameIdMap.set(studentName, studentId);
                         }
-
-                        console.log(`✅ Found student: ${studentName} (${studentId.substring(0, 8)}...)`);
                     }
                 });
             } catch (error) {
-                console.warn(`⚠️ Error searching students with ${phoneVar}:`, error.message);
+                // Silently continue
             }
         }
 
         // 3. Search in pending_students collection
-        console.log("📚 Searching pending_students collection...");
         for (const phoneVar of phoneVariations) {
             try {
                 const snapshot = await db.collection('pending_students')
@@ -4656,17 +3407,14 @@ async function comprehensiveFindChildren(parentPhone) {
                         } else {
                             studentNameIdMap.set(studentName, studentId);
                         }
-
-                        console.log(`✅ Found pending student: ${studentName} (${studentId.substring(0, 8)}...)`);
                     }
                 });
             } catch (error) {
-                console.warn(`⚠️ Error searching pending_students with ${phoneVar}:`, error.message);
+                // Silently continue
             }
         }
 
         // 4. Emergency backup search - check by email if available
-        // (This catches edge cases where phone might be wrong but email is right)
         const userDoc = await db.collection('parent_users')
             .where('normalizedPhone', '==', parentPhone)
             .limit(1)
@@ -4675,8 +3423,6 @@ async function comprehensiveFindChildren(parentPhone) {
         if (!userDoc.empty) {
             const userData = userDoc.docs[0].data();
             if (userData.email) {
-                console.log("📧 Backup search by email:", userData.email);
-                
                 try {
                     const emailSnapshot = await db.collection('students')
                         .where('parentEmail', '==', userData.email)
@@ -4699,12 +3445,10 @@ async function comprehensiveFindChildren(parentPhone) {
                             if (!studentNameIdMap.has(studentName)) {
                                 studentNameIdMap.set(studentName, studentId);
                             }
-
-                            console.log(`✅ Found student by email: ${studentName}`);
                         }
                     });
                 } catch (error) {
-                    console.warn("⚠️ Email backup search failed:", error.message);
+                    // Silently continue
                 }
             }
         }
@@ -4713,9 +3457,6 @@ async function comprehensiveFindChildren(parentPhone) {
         const studentNames = Array.from(studentNameIdMap.keys());
         const studentIds = Array.from(allChildren.keys());
         const allStudentData = Array.from(allChildren.values());
-
-        console.log(`📊 FINAL RESULTS: Found ${studentNames.length} children total`);
-        console.log("👥 Children:", studentNames);
 
         return {
             studentIds,
@@ -4736,11 +3477,11 @@ async function comprehensiveFindChildren(parentPhone) {
 }
 
 // ============================================================================
-// 3. REPLACE OLD INITIALIZATION
+// 3. NEW INITIALIZATION FUNCTION
 // ============================================================================
 
 /**
- * NEW initialization function - replaces initializeParentPortal()
+ * NEW initialization function
  */
 function initializeParentPortalV2() {
     console.log("🚀 Initializing Parent Portal V2 (No Reload Edition)");
@@ -4765,40 +3506,311 @@ function initializeParentPortalV2() {
 }
 
 // ============================================================================
-// 4. HELPER: Manual Dashboard Refresh
+// HELPER FUNCTIONS
 // ============================================================================
 
-/**
- * Manual refresh function that uses the auth manager
- */
-async function manualRefreshReportsV2() {
-    const refreshBtn = document.getElementById('manualRefreshBtn');
-    if (!refreshBtn) return;
-
-    const originalText = refreshBtn.innerHTML;
-    refreshBtn.innerHTML = '<div class="loading-spinner-small mr-2"></div> Refreshing...';
-    refreshBtn.disabled = true;
-
-    try {
-        await authManager.reloadDashboard();
-        await checkForNewAcademics();
-        showMessage('Dashboard refreshed!', 'success');
-    } catch (error) {
-        console.error('Refresh error:', error);
-        showMessage('Refresh failed. Please try again.', 'error');
-    } finally {
-        refreshBtn.innerHTML = originalText;
-        refreshBtn.disabled = false;
+// Setup Remember Me Functionality
+function setupRememberMe() {
+    const rememberMe = localStorage.getItem('rememberMe');
+    const savedEmail = localStorage.getItem('savedEmail');
+    
+    if (rememberMe === 'true' && savedEmail) {
+        const loginIdentifier = document.getElementById('loginIdentifier');
+        const rememberMeCheckbox = document.getElementById('rememberMe');
+        
+        if (loginIdentifier) {
+            loginIdentifier.value = safeText(savedEmail);
+        }
+        if (rememberMeCheckbox) {
+            rememberMeCheckbox.checked = true;
+        }
     }
 }
 
+// Handle Remember Me checkbox change
+function handleRememberMe() {
+    const rememberMeCheckbox = document.getElementById('rememberMe');
+    const identifier = document.getElementById('loginIdentifier');
+    
+    if (!rememberMeCheckbox || !identifier) return;
+    
+    const rememberMe = rememberMeCheckbox.checked;
+    const email = identifier.value.trim();
+    
+    if (rememberMe && email) {
+        localStorage.setItem('rememberMe', 'true');
+        localStorage.setItem('savedEmail', safeText(email));
+    } else {
+        localStorage.removeItem('rememberMe');
+        localStorage.removeItem('savedEmail');
+    }
+}
+
+// Basic handleSignIn function for event listeners
+function handleSignIn() {
+    const identifier = document.getElementById('loginIdentifier')?.value.trim();
+    const password = document.getElementById('loginPassword')?.value;
+
+    if (!identifier || !password) {
+        showMessage('Please fill in all fields', 'error');
+        return;
+    }
+
+    const signInBtn = document.getElementById('signInBtn');
+    const authLoader = document.getElementById('authLoader');
+
+    signInBtn.disabled = true;
+    document.getElementById('signInText').textContent = 'Signing In...';
+    document.getElementById('signInSpinner').classList.remove('hidden');
+    authLoader.classList.remove('hidden');
+
+    handleSignInFull(identifier, password, signInBtn, authLoader);
+}
+
+// Basic handleSignUp function for event listeners
+function handleSignUp() {
+    const countryCode = document.getElementById('countryCode')?.value;
+    const localPhone = document.getElementById('signupPhone')?.value.trim();
+    const email = document.getElementById('signupEmail')?.value.trim();
+    const password = document.getElementById('signupPassword')?.value;
+    const confirmPassword = document.getElementById('signupConfirmPassword')?.value;
+
+    // Validation
+    if (!countryCode || !localPhone || !email || !password || !confirmPassword) {
+        showMessage('Please fill in all fields including country code', 'error');
+        return;
+    }
+
+    if (password.length < 6) {
+        showMessage('Password must be at least 6 characters', 'error');
+        return;
+    }
+
+    if (password !== confirmPassword) {
+        showMessage('Passwords do not match', 'error');
+        return;
+    }
+
+    const signUpBtn = document.getElementById('signUpBtn');
+    const authLoader = document.getElementById('authLoader');
+
+    signUpBtn.disabled = true;
+    document.getElementById('signUpText').textContent = 'Creating Account...';
+    document.getElementById('signUpSpinner').classList.remove('hidden');
+    authLoader.classList.remove('hidden');
+
+    handleSignUpFull(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader);
+}
+
+// Basic password reset function
+function handlePasswordReset() {
+    const email = document.getElementById('resetEmail')?.value.trim();
+    
+    if (!email) {
+        showMessage('Please enter your email address', 'error');
+        return;
+    }
+
+    const sendResetBtn = document.getElementById('sendResetBtn');
+    const resetLoader = document.getElementById('resetLoader');
+
+    sendResetBtn.disabled = true;
+    resetLoader.classList.remove('hidden');
+
+    handlePasswordResetFull(email, sendResetBtn, resetLoader);
+}
+
+// Basic tab switching functions
+function switchTab(tab) {
+    const signInTab = document.getElementById('signInTab');
+    const signUpTab = document.getElementById('signUpTab');
+    const signInForm = document.getElementById('signInForm');
+    const signUpForm = document.getElementById('signUpForm');
+
+    if (tab === 'signin') {
+        signInTab?.classList.remove('tab-inactive');
+        signInTab?.classList.add('tab-active');
+        signUpTab?.classList.remove('tab-active');
+        signUpTab?.classList.add('tab-inactive');
+        signInForm?.classList.remove('hidden');
+        signUpForm?.classList.add('hidden');
+    } else {
+        signUpTab?.classList.remove('tab-inactive');
+        signUpTab?.classList.add('tab-active');
+        signInTab?.classList.remove('tab-active');
+        signInTab?.classList.add('tab-inactive');
+        signUpForm?.classList.remove('hidden');
+        signInForm?.classList.add('hidden');
+    }
+}
+
+// Setup all event listeners
+function setupEventListeners() {
+    // Authentication buttons
+    const signInBtn = document.getElementById("signInBtn");
+    const signUpBtn = document.getElementById("signUpBtn");
+    const sendResetBtn = document.getElementById("sendResetBtn");
+    
+    if (signInBtn) {
+        signInBtn.removeEventListener("click", handleSignIn);
+        signInBtn.addEventListener("click", handleSignIn);
+    }
+    
+    if (signUpBtn) {
+        signUpBtn.removeEventListener("click", handleSignUp);
+        signUpBtn.addEventListener("click", handleSignUp);
+    }
+    
+    if (sendResetBtn) {
+        sendResetBtn.removeEventListener("click", handlePasswordReset);
+        sendResetBtn.addEventListener("click", handlePasswordReset);
+    }
+    
+    // Tab switching
+    const signInTab = document.getElementById("signInTab");
+    const signUpTab = document.getElementById("signUpTab");
+    
+    if (signInTab) {
+        signInTab.removeEventListener("click", () => switchTab('signin'));
+        signInTab.addEventListener("click", () => switchTab('signin'));
+    }
+    
+    if (signUpTab) {
+        signUpTab.removeEventListener("click", () => switchTab('signup'));
+        signUpTab.addEventListener("click", () => switchTab('signup'));
+    }
+    
+    // Password reset
+    const forgotPasswordBtn = document.getElementById("forgotPasswordBtn");
+    if (forgotPasswordBtn) {
+        forgotPasswordBtn.removeEventListener("click", showPasswordResetModal);
+        forgotPasswordBtn.addEventListener("click", showPasswordResetModal);
+    }
+    
+    const cancelResetBtn = document.getElementById("cancelResetBtn");
+    if (cancelResetBtn) {
+        cancelResetBtn.removeEventListener("click", hidePasswordResetModal);
+        cancelResetBtn.addEventListener("click", hidePasswordResetModal);
+    }
+    
+    // Remember me
+    const rememberMeCheckbox = document.getElementById("rememberMe");
+    if (rememberMeCheckbox) {
+        rememberMeCheckbox.removeEventListener("change", handleRememberMe);
+        rememberMeCheckbox.addEventListener("change", handleRememberMe);
+    }
+    
+    // Enter key support
+    const loginPassword = document.getElementById('loginPassword');
+    if (loginPassword) {
+        loginPassword.removeEventListener('keypress', handleLoginEnter);
+        loginPassword.addEventListener('keypress', handleLoginEnter);
+    }
+    
+    const signupConfirmPassword = document.getElementById('signupConfirmPassword');
+    if (signupConfirmPassword) {
+        signupConfirmPassword.removeEventListener('keypress', handleSignupEnter);
+        signupConfirmPassword.addEventListener('keypress', handleSignupEnter);
+    }
+    
+    const resetEmail = document.getElementById('resetEmail');
+    if (resetEmail) {
+        resetEmail.removeEventListener('keypress', handleResetEnter);
+        resetEmail.addEventListener('keypress', handleResetEnter);
+    }
+    
+    // Main tab switching
+    const reportTab = document.getElementById("reportTab");
+    const academicsTab = document.getElementById("academicsTab");
+    const rewardsTab = document.getElementById("rewardsTab");
+    
+    if (reportTab) {
+        reportTab.removeEventListener("click", () => switchMainTab('reports'));
+        reportTab.addEventListener("click", () => switchMainTab('reports'));
+    }
+    
+    if (academicsTab) {
+        academicsTab.removeEventListener("click", () => switchMainTab('academics'));
+        academicsTab.addEventListener("click", () => switchMainTab('academics'));
+    }
+    
+    if (rewardsTab) {
+        rewardsTab.removeEventListener("click", () => switchMainTab('rewards'));
+        rewardsTab.addEventListener("click", () => switchMainTab('rewards'));
+    }
+}
+
+// Helper functions for enter key handling
+function handleLoginEnter(e) {
+    if (e.key === 'Enter') handleSignIn();
+}
+
+function handleSignupEnter(e) {
+    if (e.key === 'Enter') handleSignUp();
+}
+
+function handleResetEnter(e) {
+    if (e.key === 'Enter') handlePasswordReset();
+}
+
+// Modal functions
+function showPasswordResetModal() {
+    const modal = document.getElementById("passwordResetModal");
+    if (modal) {
+        modal.classList.remove("hidden");
+    }
+}
+
+function hidePasswordResetModal() {
+    const modal = document.getElementById("passwordResetModal");
+    if (modal) {
+        modal.classList.add("hidden");
+    }
+}
+
+// Setup global error handler
+function setupGlobalErrorHandler() {
+    // Prevent unhandled promise rejections
+    window.addEventListener('unhandledrejection', function(event) {
+        console.error('Unhandled promise rejection:', event.reason);
+        event.preventDefault();
+    });
+    
+    // Global error handler
+    window.addEventListener('error', function(e) {
+        console.error('Global error:', e.error);
+        if (!e.error?.message?.includes('auth') && 
+            !e.error?.message?.includes('permission-denied')) {
+            showMessage('An unexpected error occurred. Please refresh the page.', 'error');
+        }
+        e.preventDefault();
+    });
+    
+    // Network error handling
+    window.addEventListener('offline', function() {
+        showMessage('You are offline. Some features may not work.', 'warning');
+    });
+    
+    window.addEventListener('online', function() {
+        showMessage('Connection restored.', 'success');
+    });
+}
+
 // ============================================================================
-// 5. EXPORTS & GLOBAL REFERENCES
+// PAGE INITIALIZATION
 // ============================================================================
+
+// Initialize the page when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("📄 DOM Content Loaded - Starting V2 initialization");
+    
+    // Initialize the NEW portal
+    initializeParentPortalV2();
+    
+    console.log("🎉 Parent Portal V2 initialized");
+});
 
 // Make auth manager globally accessible for debugging
 window.authManager = authManager;
 window.comprehensiveFindChildren = comprehensiveFindChildren;
 window.manualRefreshReportsV2 = manualRefreshReportsV2;
-
-console.log("✅ Section 19: Unified Auth & Data Manager loaded");
