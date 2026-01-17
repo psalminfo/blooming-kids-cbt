@@ -3633,12 +3633,19 @@ function logout() {
 }
 
 // ============================================================================
-// SECTION 18: INITIALIZATION
+// SECTION 18: INITIALIZATION - FIXED RELOADING ISSUE
 // ============================================================================
 
-// Initialize the page
-document.addEventListener('DOMContentLoaded', function() {
-    console.log("DOM loaded - initializing parent portal");
+// Track auth state to prevent loops
+let authStateInitialized = false;
+let authChangeInProgress = false;
+let lastAuthChangeTime = 0;
+const AUTH_DEBOUNCE_MS = 1000; // Minimum 1 second between auth changes
+let authUnsubscribe = null; // To store the unsubscribe function
+
+// Robust initialization with loop prevention
+function initializeParentPortal() {
+    console.log("🚀 Initializing parent portal with reload protection");
     
     // Inject custom CSS for animations
     injectCustomCSS();
@@ -3649,100 +3656,323 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create country code dropdown when page loads
     createCountryCodeDropdown();
     
-    // CRITICAL SESSION PERSISTENCE FIX
-    // Check authentication state IMMEDIATELY on page load
-    auth.onAuthStateChanged((user) => {
-        const authArea = document.getElementById("authArea");
-        const reportArea = document.getElementById("reportArea");
-        const authLoader = document.getElementById("authLoader");
+    // Set up all event listeners first (before auth checks)
+    setupEventListeners();
+    
+    // Setup global error handler
+    setupGlobalErrorHandler();
+    
+    // Initialize auth with debouncing and loop prevention
+    initializeAuthWithProtection();
+    
+    console.log("✅ Parent portal initialized with reload protection");
+}
+
+// Initialize auth with protection against loops
+function initializeAuthWithProtection() {
+    console.log("🔐 Setting up protected auth state listener");
+    
+    // Clean up any existing listener first
+    if (authUnsubscribe && typeof authUnsubscribe === 'function') {
+        console.log("🧹 Cleaning up previous auth listener");
+        authUnsubscribe();
+        authUnsubscribe = null;
+    }
+    
+    // Setup a single, protected auth state listener
+    authUnsubscribe = auth.onAuthStateChanged(handleAuthStateChangeProtected);
+    
+    // Also check initial state after a short delay
+    setTimeout(() => {
+        const user = auth.currentUser;
+        if (user && !authStateInitialized) {
+            console.log("🔄 Checking initial auth state");
+            handleAuthStateChangeProtected(user);
+        }
+    }, 100);
+}
+
+// Protected auth state change handler with debouncing
+function handleAuthStateChangeProtected(user) {
+    const now = Date.now();
+    const timeSinceLastChange = now - lastAuthChangeTime;
+    
+    // Prevent rapid auth state changes (debouncing)
+    if (authChangeInProgress) {
+        console.log("⏸️ Auth change already in progress, skipping");
+        return;
+    }
+    
+    if (timeSinceLastChange < AUTH_DEBOUNCE_MS) {
+        console.log("⏸️ Debouncing auth change (too soon)");
+        setTimeout(() => handleAuthStateChangeProtected(user), AUTH_DEBOUNCE_MS - timeSinceLastChange);
+        return;
+    }
+    
+    // Mark that we're processing an auth change
+    authChangeInProgress = true;
+    lastAuthChangeTime = now;
+    
+    try {
+        console.log(`🔄 Auth state change: ${user ? 'SIGNED IN' : 'SIGNED OUT'}`, 
+                    user ? `(UID: ${user.uid.substring(0, 8)}...)` : '');
         
         if (user) {
-            // User is signed in - IMMEDIATELY switch to dashboard
-            console.log("User authenticated, showing dashboard immediately");
-            
-            if (authArea && reportArea) {
-                authArea.classList.add("hidden");
-                reportArea.classList.remove("hidden");
-            }
-            
-            if (authLoader) {
-                authLoader.classList.add("hidden");
-            }
-            
-            // Store auth state
-            localStorage.setItem('isAuthenticated', 'true');
-            
-            // Get phone from Firestore user document and load reports
-            db.collection('parent_users').doc(user.uid).get()
-                .then((doc) => {
-                    if (doc.exists) {
-                        const userPhone = doc.data().phone;
-                        const normalizedPhone = doc.data().normalizedPhone;
-                        loadAllReportsForParent(normalizedPhone || userPhone, user.uid);
-                        
-                        // Add navigation buttons
-                        setTimeout(() => {
-                            addMessagesButton();
-                            addManualRefreshButton();
-                            addLogoutButton();
-                        }, 500);
-                    }
-                })
-                .catch((error) => {
-                    console.error('Error getting user data:', error);
-                });
+            handleUserSignedIn(user);
         } else {
-            // User signed out - clean up listeners and show auth
-            console.log("User not authenticated, showing auth form");
-            cleanupRealTimeListeners();
-            localStorage.removeItem('isAuthenticated');
-            
-            if (authArea && reportArea) {
-                authArea.classList.remove("hidden");
-                reportArea.classList.add("hidden");
-            }
-            
-            // Only show loader briefly then hide
-            if (authLoader) {
-                setTimeout(() => {
-                    authLoader.classList.add("hidden");
-                }, 500);
-            }
+            handleUserSignedOut();
         }
-    });
+        
+        authStateInitialized = true;
+        
+    } catch (error) {
+        console.error("❌ Auth state change error:", error);
+        showMessage('Authentication error. Please try refreshing the page.', 'error');
+    } finally {
+        // Reset the flag after a minimum delay
+        setTimeout(() => {
+            authChangeInProgress = false;
+        }, 500);
+    }
+}
 
-    // Set up event listeners
+// Handle user sign in (protected)
+function handleUserSignedIn(user) {
+    console.log("👤 User signed in, loading dashboard...");
+    
+    const authArea = document.getElementById("authArea");
+    const reportArea = document.getElementById("reportArea");
+    const authLoader = document.getElementById("authLoader");
+    const welcomeMessage = document.getElementById("welcomeMessage");
+    
+    // Hide auth area, show dashboard
+    if (authArea && reportArea) {
+        authArea.classList.add("hidden");
+        reportArea.classList.remove("hidden");
+    }
+    
+    // Hide loader if present
+    if (authLoader) {
+        authLoader.classList.add("hidden");
+    }
+    
+    // Update welcome message immediately
+    if (welcomeMessage) {
+        welcomeMessage.textContent = `Welcome!`;
+    }
+    
+    // Store auth state (but don't rely on it for critical decisions)
+    localStorage.setItem('isAuthenticated', 'true');
+    
+    // Get user data and load reports
+    db.collection('parent_users').doc(user.uid).get()
+        .then((doc) => {
+            if (doc.exists) {
+                const userData = doc.data();
+                const userPhone = userData.phone;
+                const normalizedPhone = userData.normalizedPhone;
+                
+                // Update welcome message with actual name
+                if (welcomeMessage && userData.parentName) {
+                    welcomeMessage.textContent = `Welcome, ${safeText(userData.parentName)}!`;
+                }
+                
+                // Load reports
+                loadAllReportsForParent(normalizedPhone || userPhone, user.uid);
+                
+                // Add navigation buttons
+                setTimeout(() => {
+                    addMessagesButton();
+                    addManualRefreshButton();
+                    addLogoutButton();
+                }, 300);
+                
+            } else {
+                console.error("User document not found in Firestore");
+                showMessage('User profile not found. Please contact support.', 'error');
+            }
+        })
+        .catch((error) => {
+            console.error('Error getting user data:', error);
+            showMessage('Could not load user data. Please try again.', 'error');
+        });
+}
+
+// Handle user sign out (protected)
+function handleUserSignedOut() {
+    console.log("🚪 User signed out, showing login form");
+    
+    const authArea = document.getElementById("authArea");
+    const reportArea = document.getElementById("reportArea");
+    const authLoader = document.getElementById("authLoader");
+    
+    // Clean up real-time listeners FIRST
+    cleanupRealTimeListeners();
+    
+    // Clear auth state from localStorage
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('savedEmail'); // Also clear saved email for security
+    
+    // Show auth area, hide dashboard
+    if (authArea && reportArea) {
+        authArea.classList.remove("hidden");
+        reportArea.classList.add("hidden");
+    }
+    
+    // Hide loader if present
+    if (authLoader) {
+        authLoader.classList.add("hidden");
+    }
+    
+    // Reset form fields
+    const loginIdentifier = document.getElementById('loginIdentifier');
+    const loginPassword = document.getElementById('loginPassword');
+    
+    if (loginPassword) loginPassword.value = '';
+    
+    // Don't clear identifier if remember me is checked
+    const rememberMe = document.getElementById('rememberMe');
+    if (loginIdentifier && (!rememberMe || !rememberMe.checked)) {
+        loginIdentifier.value = '';
+    }
+    
+    // Switch to sign in tab
+    switchTab('signin');
+    
+    console.log("✅ User signed out cleanly");
+}
+
+// Setup all event listeners
+function setupEventListeners() {
+    console.log("🔧 Setting up event listeners");
+    
+    // Authentication buttons
     const signInBtn = document.getElementById("signInBtn");
     const signUpBtn = document.getElementById("signUpBtn");
     const sendResetBtn = document.getElementById("sendResetBtn");
     const submitMessageBtn = document.getElementById("submitMessageBtn");
     
-    if (signInBtn) signInBtn.addEventListener("click", handleSignIn);
-    if (signUpBtn) signUpBtn.addEventListener("click", handleSignUp);
-    if (sendResetBtn) sendResetBtn.addEventListener("click", handlePasswordReset);
-    if (submitMessageBtn) submitMessageBtn.addEventListener("click", submitMessage);
+    if (signInBtn) {
+        signInBtn.removeEventListener("click", handleSignIn);
+        signInBtn.addEventListener("click", handleSignIn);
+    }
     
+    if (signUpBtn) {
+        signUpBtn.removeEventListener("click", handleSignUp);
+        signUpBtn.addEventListener("click", handleSignUp);
+    }
+    
+    if (sendResetBtn) {
+        sendResetBtn.removeEventListener("click", handlePasswordReset);
+        sendResetBtn.addEventListener("click", handlePasswordReset);
+    }
+    
+    if (submitMessageBtn) {
+        submitMessageBtn.removeEventListener("click", submitMessage);
+        submitMessageBtn.addEventListener("click", submitMessage);
+    }
+    
+    // Tab switching
     const signInTab = document.getElementById("signInTab");
     const signUpTab = document.getElementById("signUpTab");
     
-    if (signInTab) signInTab.addEventListener("click", () => switchTab('signin'));
-    if (signUpTab) signUpTab.addEventListener("click", () => switchTab('signup'));
+    if (signInTab) {
+        signInTab.removeEventListener("click", () => switchTab('signin'));
+        signInTab.addEventListener("click", () => switchTab('signin'));
+    }
     
+    if (signUpTab) {
+        signUpTab.removeEventListener("click", () => switchTab('signup'));
+        signUpTab.addEventListener("click", () => switchTab('signup'));
+    }
+    
+    // Password reset
     const forgotPasswordBtn = document.getElementById("forgotPasswordBtn");
     if (forgotPasswordBtn) {
-        forgotPasswordBtn.addEventListener("click", () => {
-            document.getElementById("passwordResetModal").classList.remove("hidden");
-        });
+        forgotPasswordBtn.removeEventListener("click", showPasswordResetModal);
+        forgotPasswordBtn.addEventListener("click", showPasswordResetModal);
     }
     
     const cancelResetBtn = document.getElementById("cancelResetBtn");
     if (cancelResetBtn) {
-        cancelResetBtn.addEventListener("click", () => {
-            document.getElementById("passwordResetModal").classList.add("hidden");
-        });
+        cancelResetBtn.removeEventListener("click", hidePasswordResetModal);
+        cancelResetBtn.addEventListener("click", hidePasswordResetModal);
     }
     
-    // Event delegation for dynamically created cancel buttons
+    // Remember me
+    const rememberMeCheckbox = document.getElementById("rememberMe");
+    if (rememberMeCheckbox) {
+        rememberMeCheckbox.removeEventListener("change", handleRememberMe);
+        rememberMeCheckbox.addEventListener("change", handleRememberMe);
+    }
+    
+    // Enter key support
+    const loginPassword = document.getElementById('loginPassword');
+    if (loginPassword) {
+        loginPassword.removeEventListener('keypress', handleLoginEnter);
+        loginPassword.addEventListener('keypress', handleLoginEnter);
+    }
+    
+    const signupConfirmPassword = document.getElementById('signupConfirmPassword');
+    if (signupConfirmPassword) {
+        signupConfirmPassword.removeEventListener('keypress', handleSignupEnter);
+        signupConfirmPassword.addEventListener('keypress', handleSignupEnter);
+    }
+    
+    const resetEmail = document.getElementById('resetEmail');
+    if (resetEmail) {
+        resetEmail.removeEventListener('keypress', handleResetEnter);
+        resetEmail.addEventListener('keypress', handleResetEnter);
+    }
+    
+    // Main tab switching
+    const reportTab = document.getElementById("reportTab");
+    const academicsTab = document.getElementById("academicsTab");
+    const rewardsTab = document.getElementById("rewardsTab");
+    
+    if (reportTab) {
+        reportTab.removeEventListener("click", () => switchMainTab('reports'));
+        reportTab.addEventListener("click", () => switchMainTab('reports'));
+    }
+    
+    if (academicsTab) {
+        academicsTab.removeEventListener("click", () => switchMainTab('academics'));
+        academicsTab.addEventListener("click", () => switchMainTab('academics'));
+    }
+    
+    if (rewardsTab) {
+        rewardsTab.removeEventListener("click", () => switchMainTab('rewards'));
+        rewardsTab.addEventListener("click", () => switchMainTab('rewards'));
+    }
+    
+    // Dynamic button handlers (event delegation)
+    setupDynamicEventDelegation();
+}
+
+// Helper functions for enter key handling
+function handleLoginEnter(e) {
+    if (e.key === 'Enter') handleSignIn();
+}
+
+function handleSignupEnter(e) {
+    if (e.key === 'Enter') handleSignUp();
+}
+
+function handleResetEnter(e) {
+    if (e.key === 'Enter') handlePasswordReset();
+}
+
+// Modal functions
+function showPasswordResetModal() {
+    document.getElementById("passwordResetModal").classList.remove("hidden");
+}
+
+function hidePasswordResetModal() {
+    document.getElementById("passwordResetModal").classList.add("hidden");
+}
+
+// Dynamic event delegation for buttons created after page load
+function setupDynamicEventDelegation() {
     document.addEventListener('click', function(event) {
         // Check if cancel message button was clicked
         if (event.target.id === 'cancelMessageBtn' || 
@@ -3757,47 +3987,94 @@ document.addEventListener('DOMContentLoaded', function() {
             event.preventDefault();
             hideMessagesModal();
         }
+        
+        // Check if manual refresh button was clicked
+        if (event.target.id === 'manualRefreshBtn' ||
+            event.target.closest('#manualRefreshBtn')) {
+            event.preventDefault();
+            const user = auth.currentUser;
+            if (user) {
+                manualRefreshReports();
+            }
+        }
+        
+        // Check if view messages button was clicked
+        if (event.target.id === 'viewMessagesBtn' ||
+            event.target.closest('#viewMessagesBtn')) {
+            event.preventDefault();
+            showMessagesModal();
+        }
+        
+        // Check if compose message button was clicked
+        if (event.target.id === 'composeMessageBtn' ||
+            event.target.closest('#composeMessageBtn')) {
+            event.preventDefault();
+            showComposeMessageModal();
+        }
     });
+}
 
-    const rememberMeCheckbox = document.getElementById("rememberMe");
-    if (rememberMeCheckbox) {
-        rememberMeCheckbox.addEventListener("change", handleRememberMe);
-    }
-
-    // Allow Enter key to submit forms
-    const loginPassword = document.getElementById('loginPassword');
-    if (loginPassword) {
-        loginPassword.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleSignIn();
-        });
-    }
-    
-    const signupConfirmPassword = document.getElementById('signupConfirmPassword');
-    if (signupConfirmPassword) {
-        signupConfirmPassword.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleSignUp();
-        });
-    }
-    
-    const resetEmail = document.getElementById('resetEmail');
-    if (resetEmail) {
-        resetEmail.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handlePasswordReset();
-        });
-    }
-    
-    // Main tab switching listeners
-    const reportTab = document.getElementById("reportTab");
-    const academicsTab = document.getElementById("academicsTab");
-    const rewardsTab = document.getElementById("rewardsTab");
-    
-    if (reportTab) reportTab.addEventListener("click", () => switchMainTab('reports'));
-    if (academicsTab) academicsTab.addEventListener("click", () => switchMainTab('academics'));
-    if (rewardsTab) rewardsTab.addEventListener("click", () => switchMainTab('rewards'));
+// Setup global error handler
+function setupGlobalErrorHandler() {
+    // Prevent unhandled promise rejections
+    window.addEventListener('unhandledrejection', function(event) {
+        console.error('Unhandled promise rejection:', event.reason);
+        event.preventDefault(); // Prevent browser error reporting
+    });
     
     // Global error handler
     window.addEventListener('error', function(e) {
         console.error('Global error:', e.error);
-        showMessage('An unexpected error occurred. Please refresh the page.', 'error');
+        // Don't show error messages for auth-related errors to avoid loops
+        if (!e.error?.message?.includes('auth') && 
+            !e.error?.message?.includes('permission-denied')) {
+            showMessage('An unexpected error occurred. Please refresh the page.', 'error');
+        }
+        e.preventDefault(); // Prevent default error handling
     });
+    
+    // Network error handling
+    window.addEventListener('offline', function() {
+        console.warn('Network offline');
+        showMessage('You are offline. Some features may not work.', 'warning');
+    });
+    
+    window.addEventListener('online', function() {
+        console.log('Network back online');
+        showMessage('Connection restored.', 'success');
+    });
+}
+
+// Cleanup function for page unload
+function cleanupBeforeUnload() {
+    console.log("🧹 Cleaning up before page unload");
+    
+    // Clean up auth listener
+    if (authUnsubscribe && typeof authUnsubscribe === 'function') {
+        authUnsubscribe();
+        authUnsubscribe = null;
+    }
+    
+    // Clean up real-time listeners
+    cleanupRealTimeListeners();
+    
+    // Clear any intervals
+    const maxIntervalId = setTimeout(() => {}, 0);
+    for (let i = 0; i < maxIntervalId; i++) {
+        clearInterval(i);
+    }
+}
+
+// Initialize the page when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("📄 DOM Content Loaded - Starting robust initialization");
+    
+    // Setup cleanup before page unload
+    window.addEventListener('beforeunload', cleanupBeforeUnload);
+    window.addEventListener('pagehide', cleanupBeforeUnload);
+    
+    // Initialize the portal
+    initializeParentPortal();
+    
+    console.log("🎉 Parent portal initialization complete");
 });
