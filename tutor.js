@@ -1790,7 +1790,7 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
 
 /*******************************************************************************
  * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT
- * (Final Version: Auto-Fetch Parent Email from 'parent_users')
+ * (Version: Auto-Sync Parent Data & "Self-Healing" Database)
  ******************************************************************************/
 
 // ==========================================
@@ -1800,6 +1800,12 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
 function showDailyTopicModal(student) {
     const date = new Date();
     const monthName = date.toLocaleString('default', { month: 'long' });
+
+    // Use local date for storage/display consistency
+    const today = new Date();
+    const localDateString = today.getFullYear() + '-' + 
+                            String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+                            String(today.getDate()).padStart(2, '0');
 
     const modalHTML = `
         <div class="modal-overlay">
@@ -1826,7 +1832,7 @@ function showDailyTopicModal(student) {
                     </div>
                     <div class="mt-2 text-xs text-gray-500 flex justify-between">
                         <span>One topic per line recommended.</span>
-                        <span>Date: ${new Date().toLocaleDateString()}</span>
+                        <span>Date: ${localDateString}</span>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1844,6 +1850,7 @@ function showDailyTopicModal(student) {
     loadDailyTopicHistory(student.id);
     setTimeout(() => document.getElementById('topic-topics').focus(), 100);
 
+    // Event Delegation for Edit/Delete buttons
     const historyContainer = document.getElementById('topic-history');
     historyContainer.addEventListener('click', async (e) => {
         const target = e.target;
@@ -1867,18 +1874,21 @@ function showDailyTopicModal(student) {
         const content = topicInput.value.trim();
         if (!content) { showCustomAlert('⚠️ Please enter a topic before saving.'); return; }
         
+        const tutorName = window.tutorData?.name || "Unknown Tutor";
+        const tutorEmail = window.tutorData?.email || "unknown@tutor.com";
         const saveBtn = document.getElementById('save-topic-btn');
         const originalBtnText = saveBtn.innerText;
+        
         saveBtn.disabled = true;
         saveBtn.innerText = "Saving...";
 
         const topicData = {
             studentId: student.id,
             studentName: student.studentName,
-            tutorEmail: window.tutorData.email,
-            tutorName: window.tutorData.name,
+            tutorEmail: tutorEmail,
+            tutorName: tutorName,
             topics: content,
-            date: new Date().toISOString().split('T')[0],
+            date: localDateString, 
             createdAt: new Date()
         };
         
@@ -1899,7 +1909,7 @@ function showDailyTopicModal(student) {
 }
 
 // ------------------------------------------
-// HELPER FUNCTIONS FOR EDITING
+// HELPER FUNCTIONS FOR EDITING (UNCHANGED)
 // ------------------------------------------
 function enableTopicEdit(topicId) {
     document.getElementById(`text-${topicId}`).classList.add('hidden');
@@ -1978,7 +1988,7 @@ async function loadDailyTopicHistory(studentId) {
 
 
 // ==========================================
-// 2. HOMEWORK ASSIGNMENT (With Email Fetch)
+// 2. HOMEWORK ASSIGNMENT (SMART SYNC VERSION)
 // ==========================================
 
 async function uploadToCloudinary(file, studentId) {
@@ -1997,18 +2007,29 @@ async function uploadToCloudinary(file, studentId) {
     });
 }
 
-// *** NEW HELPER: FIND PARENT EMAIL BY PHONE ***
-async function fetchParentEmailByPhone(phone) {
+// *** NEW: Returns object { email, name } instead of just email
+async function fetchParentDataByPhone(phone) {
     if (!phone) return null;
     try {
-        // Query parent_users where 'phone' matches student's parentPhone
-        const q = query(collection(db, "parent_users"), where("phone", "==", phone));
-        const snapshot = await getDocs(q);
+        const cleanPhone = phone.replace(/[\s\-\(\)]/g, ''); 
+        let q = query(collection(db, "parent_users"), where("phone", "==", phone));
+        let snapshot = await getDocs(q);
+        
+        if (snapshot.empty && cleanPhone !== phone) {
+            q = query(collection(db, "parent_users"), where("phone", "==", cleanPhone));
+            snapshot = await getDocs(q);
+        }
+
         if (!snapshot.empty) {
-            return snapshot.docs[0].data().email;
+            const data = snapshot.docs[0].data();
+            // Return both name and email
+            return { 
+                email: data.email, 
+                name: data.fullName || data.name || data.parentName || "Parent" // Handle various naming conventions
+            };
         }
     } catch (error) {
-        console.error("Error fetching parent email:", error);
+        console.error("Error fetching parent data:", error);
     }
     return null;
 }
@@ -2018,6 +2039,11 @@ function showHomeworkModal(student) {
     nextWeek.setDate(nextWeek.getDate() + 7);
     const maxDate = nextWeek.toISOString().split('T')[0];
     let selectedFiles = [];
+
+    // Check if we already have data in the Student object
+    let currentParentName = student.parentName || "Loading...";
+    let currentParentEmail = student.parentEmail || "Searching...";
+    const parentPhone = student.parentPhone || "Not Found";
 
     const modalHTML = `
         <div class="modal-overlay">
@@ -2032,12 +2058,15 @@ function showHomeworkModal(student) {
                         <label for="hw-file" class="file-upload-label"><span class="text-primary-color">Click to upload files</span></label>
                         <div id="file-list-preview" class="hidden mt-2"><ul id="file-list-ul"></ul><button id="remove-all-files-btn" class="btn btn-danger btn-sm w-full mt-2">Clear Files</button></div></div>
                     </div>
-                    <div class="email-settings bg-blue-50 p-3 rounded mt-2">
-                        <label class="flex items-center space-x-2"><input type="checkbox" id="hw-reminder" class="rounded" checked><span class="font-semibold">Notify Parent via Email</span></label>
-                        <div class="text-xs text-gray-500 mt-1">
-                            Parent Phone: ${student.parentPhone || 'Not Found'} <br>
-                            <span id="email-status-text">Email will be automatically found using this phone number.</span>
+                    
+                    <div class="email-settings bg-blue-50 p-3 rounded mt-2 border border-blue-100">
+                        <label class="flex items-center space-x-2 mb-2"><input type="checkbox" id="hw-reminder" class="rounded" checked><span class="font-bold text-blue-900">Notify Parent via Email</span></label>
+                        <div class="grid grid-cols-2 gap-2 text-xs text-gray-700">
+                            <div><span class="font-semibold">Parent:</span> <span id="display-parent-name">${currentParentName}</span></div>
+                            <div><span class="font-semibold">Phone:</span> ${parentPhone}</div>
+                            <div class="col-span-2"><span class="font-semibold">Email:</span> <span id="display-parent-email">${currentParentEmail}</span></div>
                         </div>
+                        <div id="new-data-badge" class="hidden mt-2 text-xs text-green-600 font-bold">✨ New parent details found! Will be saved to student profile.</div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -2051,8 +2080,32 @@ function showHomeworkModal(student) {
     const modal = document.createElement('div');
     modal.innerHTML = modalHTML;
     document.body.appendChild(modal);
-    
-    // File Handling
+
+    // *** AUTO-FETCH LOGIC: Runs immediately if data is missing ***
+    let fetchedParentData = null;
+
+    if (student.parentPhone && (!student.parentEmail || !student.parentName)) {
+        fetchParentDataByPhone(student.parentPhone).then(data => {
+            if (data) {
+                fetchedParentData = data;
+                // Update UI Live
+                document.getElementById('display-parent-name').textContent = data.name;
+                document.getElementById('display-parent-email').textContent = data.email;
+                document.getElementById('display-parent-name').classList.add('text-green-600', 'font-bold');
+                document.getElementById('display-parent-email').classList.add('text-green-600', 'font-bold');
+                document.getElementById('new-data-badge').classList.remove('hidden');
+            } else {
+                document.getElementById('display-parent-name').textContent = "Unknown";
+                document.getElementById('display-parent-email').textContent = "Not found in database";
+            }
+        });
+    } else {
+        // Data already exists, just clear the "Searching..." text if needed
+        if(student.parentName) document.getElementById('display-parent-name').textContent = student.parentName;
+        if(student.parentEmail) document.getElementById('display-parent-email').textContent = student.parentEmail;
+    }
+
+    // File Handling (Standard)
     const fileInput = document.getElementById('hw-file');
     const fileListUl = document.getElementById('file-list-ul');
     fileInput.addEventListener('change', (e) => {
@@ -2094,6 +2147,7 @@ function showHomeworkModal(student) {
 
         if (!title || !desc || !date) { showCustomAlert('Please fill all fields.'); return; }
         
+        const tutorName = window.tutorData?.name || "Unknown Tutor";
         const today = new Date(); today.setHours(0,0,0,0);
         const due = new Date(date); due.setHours(0,0,0,0);
         if(due < today) { showCustomAlert('Due date cannot be past.'); return; }
@@ -2101,77 +2155,97 @@ function showHomeworkModal(student) {
         try {
             saveBtn.disabled = true;
             
-            // --- STEP 1: FETCH PARENT EMAIL ---
-            let parentEmail = "";
-            if (sendEmail) {
-                saveBtn.innerHTML = "🔍 Finding Parent Email...";
-                if (student.parentPhone) {
-                    // Fetch the email using the phone number
-                    parentEmail = await fetchParentEmailByPhone(student.parentPhone);
-                    if (!parentEmail) {
-                        console.warn("No parent found for phone:", student.parentPhone);
-                    } else {
-                        console.log("Found parent email:", parentEmail);
-                    }
+            // --- STEP 1: RESOLVE PARENT DATA ---
+            // Priority: 1. Fetched just now (new), 2. Existing on student, 3. Empty
+            let finalParentEmail = fetchedParentData?.email || student.parentEmail || "";
+            let finalParentName = fetchedParentData?.name || student.parentName || "";
+
+            // If we still don't have it, try one last desperate fetch
+            if (sendEmail && !finalParentEmail && student.parentPhone) {
+                saveBtn.innerHTML = "🔍 Finalizing Parent Info...";
+                const lastCheck = await fetchParentDataByPhone(student.parentPhone);
+                if (lastCheck) {
+                    finalParentEmail = lastCheck.email;
+                    finalParentName = lastCheck.name;
+                    fetchedParentData = lastCheck; // Mark as new so we save it below
+                }
+            }
+
+            // *** CRITICAL UPDATE: SYNC TO STUDENTS COLLECTION ***
+            // If we found new data that wasn't there before, update the student record permanently.
+            if (fetchedParentData) {
+                saveBtn.innerHTML = "💾 Syncing Student Data...";
+                try {
+                    await updateDoc(doc(db, "students", student.id), {
+                        parentEmail: finalParentEmail,
+                        parentName: finalParentName
+                    });
+                    console.log("Student record updated with new parent info.");
+                } catch (updateError) {
+                    console.error("Failed to sync student data (non-fatal):", updateError);
                 }
             }
 
             // --- STEP 2: UPLOAD FILES ---
             saveBtn.innerHTML = `Uploading ${selectedFiles.length} files...`;
             let attachments = [];
-            for (const f of selectedFiles) {
+            if (selectedFiles.length > 0) {
                 try {
-                    const res = await uploadToCloudinary(f, student.id);
-                    attachments.push({url:res.url, name:res.fileName, size:res.bytes, type:res.format});
+                    const uploadPromises = selectedFiles.map(f => uploadToCloudinary(f, student.id));
+                    const results = await Promise.all(uploadPromises);
+                    results.forEach(res => attachments.push({url:res.url, name:res.fileName, size:res.bytes, type:res.format}));
                 } catch(e) { 
-                    showCustomAlert(`Upload failed for ${f.name}`); 
-                    saveBtn.disabled=false; saveBtn.innerHTML="Assign"; 
+                    console.error("Upload Error:", e);
+                    showCustomAlert(`Upload failed: ${e.message}`); 
+                    saveBtn.disabled=false; 
+                    saveBtn.innerHTML="Assign Homework"; 
                     return; 
                 }
             }
 
             // --- STEP 3: SAVE TO FIREBASE ---
             saveBtn.innerHTML = "Saving...";
+            const newHwRef = doc(collection(db, "homework_assignments"));
+            
             const hwData = {
+                id: newHwRef.id,
                 studentId: student.id,
                 studentName: student.studentName,
-                parentEmail: parentEmail, // Use the fetched email
+                parentEmail: finalParentEmail,
+                parentName: finalParentName, // Now storing Name in HW record too
                 parentPhone: student.parentPhone,
-                tutorName: window.tutorData.name,
+                tutorName: tutorName,
                 title: title,
                 description: desc,
                 dueDate: date,
                 assignedDate: new Date(),
                 status: 'assigned',
                 attachments: attachments,
-                fileUrl: attachments[0]?.url || '', // Legacy support
-                fileName: attachments[0]?.name || '' // Legacy support
+                fileUrl: attachments[0]?.url || '', 
+                fileName: attachments[0]?.name || '' 
             };
             
-            await setDoc(doc(collection(db, "homework_assignments")), hwData);
+            await setDoc(newHwRef, hwData);
 
-            // --- STEP 4: SEND EMAIL VIA GOOGLE SCRIPT ---
-            if (sendEmail && parentEmail) {
+            // --- STEP 4: SEND EMAIL ---
+            if (sendEmail && finalParentEmail) {
                 saveBtn.innerHTML = "Sending Email...";
-                
-                // *** YOUR GOOGLE APPS SCRIPT URL ***
                 const GAS_URL = "https://script.google.com/macros/s/AKfycbz9yuiR1egvxRcCLbW1Id-6lxBsYotiID0j_Fpeb9D8RyQGdMPNPPZn8WqOpJ4m_JqJNQ/exec";
                 
                 fetch(GAS_URL, {
                     method: 'POST', mode: 'no-cors',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(hwData)
-                }).then(()=>console.log("Email sent to GAS")).catch(e=>console.error(e));
+                }).catch(e=>console.error(e));
                 
-                // Internal reminder backup
                 await scheduleEmailReminder(hwData, hwData.fileUrl);
             }
 
             modal.remove();
-            showCustomAlert(`✅ Assigned! ${parentEmail ? 'Email sent to ' + parentEmail : '(No email found for parent)'}`);
+            showCustomAlert(`✅ Assigned! ${finalParentEmail ? 'Email sent to ' + finalParentName : '(No email found)'}`);
 
         } catch (error) {
-            console.error(error);
+            console.error("Save Error:", error);
             showCustomAlert("Error assigning homework.");
             saveBtn.disabled = false;
             saveBtn.innerHTML = "Assign Homework";
@@ -2180,15 +2254,21 @@ function showHomeworkModal(student) {
 }
 
 async function scheduleEmailReminder(hwData, fileUrl = '') {
+    if (!hwData.id) return;
     try {
         const d = new Date(hwData.dueDate); d.setDate(d.getDate()-1);
         await setDoc(doc(collection(db, "email_reminders")), {
-            homeworkId: hwData.id || Date.now().toString(),
-            studentId: hwData.studentId, parentEmail: hwData.parentEmail,
-            title: hwData.title, dueDate: hwData.dueDate, reminderDate: d,
-            status: 'scheduled', createdAt: new Date()
+            homeworkId: hwData.id,
+            studentId: hwData.studentId, 
+            parentEmail: hwData.parentEmail,
+            parentName: hwData.parentName || "Parent",
+            title: hwData.title, 
+            dueDate: hwData.dueDate, 
+            reminderDate: d,
+            status: 'scheduled', 
+            createdAt: new Date()
         });
-    } catch(e){ console.error(e); }
+    } catch(e){ console.error("Error scheduling reminder:", e); }
 }
 
 /*******************************************************************************
@@ -6432,3 +6512,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
