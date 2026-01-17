@@ -1700,7 +1700,7 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
         // Combine all results
         allResults = allResultsArrays.flat();
         
-        console.log("🎯 TOTAL REPORTS FOUND:", allResults.length);
+        console.log("🎯 TOTAL RAW REPORTS FOUND:", allResults.length);
         console.log("📊 Sources found:", Array.from(foundSources));
         
         // If NO reports found, try emergency search
@@ -1710,47 +1710,187 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
             allResults = emergencyResults;
         }
         
-        // Remove duplicates
+        // Remove duplicates based on document ID and timestamp
         const uniqueResults = [];
         const seenIds = new Set();
         
         allResults.forEach(result => {
-            const uniqueKey = `${result.collection}_${result.id}_${result.studentName}_${result.timestamp}`;
+            const uniqueKey = `${result.collection}_${result.id}`;
             if (!seenIds.has(uniqueKey)) {
                 seenIds.add(uniqueKey);
                 uniqueResults.push(result);
             }
         });
         
-        // Separate into assessment and monthly
-        const assessmentResults = uniqueResults.filter(r => 
-            r.type === 'assessment' || 
-            r.collection.includes('assessment') || 
-            r.collection.includes('progress') ||
-            (r.reportType && r.reportType.toLowerCase().includes('assessment'))
-        );
+        console.log("🎯 UNIQUE REPORTS AFTER DEDUPLICATION:", uniqueResults.length);
         
-        const monthlyResults = uniqueResults.filter(r => 
-            r.type === 'monthly' || 
-            r.collection.includes('monthly') ||
-            r.collection.includes('submission') ||
-            (r.reportType && r.reportType.toLowerCase().includes('monthly'))
-        );
+        // Now distribute reports to correct students
+        const { assessmentResults, monthlyResults } = distributeReportsToStudents(uniqueResults);
         
-        // Sort by date (newest first)
-        assessmentResults.sort((a, b) => b.timestamp - a.timestamp);
-        monthlyResults.sort((a, b) => b.timestamp - a.timestamp);
-        
-        return { assessmentResults, monthlyResults, searchStats: {
-            totalFound: uniqueResults.length,
-            sources: Array.from(foundSources),
-            collectionsSearched: collectionsToSearch.length
-        }};
+        return { 
+            assessmentResults, 
+            monthlyResults, 
+            allRawResults: uniqueResults, // Keep for debugging
+            searchStats: {
+                totalFound: uniqueResults.length,
+                rawFound: allResults.length,
+                sources: Array.from(foundSources),
+                collectionsSearched: collectionsToSearch.length
+            }
+        };
         
     } catch (error) {
         console.error("❌ Ultimate search error:", error);
         return { assessmentResults: [], monthlyResults: [], searchStats: { error: error.message }};
     }
+}
+
+// NEW FUNCTION: Distribute reports to correct students
+function distributeReportsToStudents(allReports) {
+    console.log("📊 Distributing reports to students...");
+    
+    const assessmentResults = [];
+    const monthlyResults = [];
+    
+    // Get current student mapping
+    const studentNames = Array.from(studentIdMap.keys());
+    console.log("👥 Available students for distribution:", studentNames);
+    
+    allReports.forEach(report => {
+        // Try to determine which student this report belongs to
+        const assignedStudent = findStudentForReport(report);
+        
+        if (assignedStudent) {
+            console.log(`📝 Report assigned to student: ${assignedStudent}`, {
+                reportId: report.id,
+                collection: report.collection,
+                studentIdInReport: report.studentId,
+                studentNameInReport: report.studentName
+            });
+            
+            // Add student info to the report for proper grouping
+            report.assignedStudentName = assignedStudent;
+            report.assignedStudentId = studentIdMap.get(assignedStudent);
+            
+            // Classify as assessment or monthly
+            if (report.type === 'assessment' || 
+                report.collection.includes('assessment') || 
+                report.collection.includes('progress') ||
+                (report.reportType && report.reportType.toLowerCase().includes('assessment'))) {
+                assessmentResults.push(report);
+            } else if (report.type === 'monthly' || 
+                       report.collection.includes('monthly') ||
+                       report.collection.includes('submission') ||
+                       (report.reportType && report.reportType.toLowerCase().includes('monthly'))) {
+                monthlyResults.push(report);
+            }
+        } else {
+            console.warn("⚠️ Could not assign report to any student:", {
+                reportId: report.id,
+                collection: report.collection,
+                studentId: report.studentId,
+                studentName: report.studentName
+            });
+        }
+    });
+    
+    console.log(`📊 Distribution complete: ${assessmentResults.length} assessments, ${monthlyResults.length} monthly reports`);
+    
+    return { assessmentResults, monthlyResults };
+}
+
+// NEW FUNCTION: Find which student a report belongs to
+function findStudentForReport(report) {
+    // Method 1: Match by studentId
+    if (report.studentId) {
+        // Check if this studentId exists in our studentIdMap (value = studentId, key = studentName)
+        for (const [studentName, studentId] of studentIdMap.entries()) {
+            if (studentId === report.studentId) {
+                return studentName;
+            }
+        }
+        
+        // Also check if report.studentId matches any of our student IDs directly
+        if (Array.from(studentIdMap.values()).includes(report.studentId)) {
+            // Find the student name for this ID
+            for (const [studentName, studentId] of studentIdMap.entries()) {
+                if (studentId === report.studentId) {
+                    return studentName;
+                }
+            }
+        }
+    }
+    
+    // Method 2: Match by studentName (exact match)
+    if (report.studentName) {
+        const reportStudentName = safeText(report.studentName);
+        
+        // Check exact match
+        for (const studentName of userChildren) {
+            if (safeText(studentName) === reportStudentName) {
+                return studentName;
+            }
+        }
+        
+        // Check partial match (case-insensitive)
+        for (const studentName of userChildren) {
+            if (studentName.toLowerCase().includes(reportStudentName.toLowerCase()) ||
+                reportStudentName.toLowerCase().includes(studentName.toLowerCase())) {
+                return studentName;
+            }
+        }
+    }
+    
+    // Method 3: Match by student field (alternative field name)
+    if (report.student) {
+        const reportStudent = safeText(report.student);
+        
+        for (const studentName of userChildren) {
+            if (safeText(studentName) === reportStudent) {
+                return studentName;
+            }
+        }
+    }
+    
+    // Method 4: If parent has only one child, assign to that child
+    if (userChildren.length === 1) {
+        console.log(`📝 Assigning report to only child: ${userChildren[0]}`);
+        return userChildren[0];
+    }
+    
+    // Method 5: Last resort - check if any student data matches
+    if (allStudentData.length > 0) {
+        for (const student of allStudentData) {
+            if (student.data) {
+                // Check various fields in student data
+                const studentFields = [
+                    student.data.studentId,
+                    student.data.studentName,
+                    student.data.name,
+                    student.data.id
+                ];
+                
+                const reportFields = [
+                    report.studentId,
+                    report.studentName,
+                    report.student,
+                    report.id
+                ];
+                
+                // Check for any match
+                for (const studentField of studentFields) {
+                    for (const reportField of reportFields) {
+                        if (studentField && reportField && 
+                            safeText(studentField) === safeText(reportField)) {
+                            return student.name;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    return null;
 }
 
 // Generate ALL possible search queries
@@ -2330,13 +2470,17 @@ function showNewReportNotification(type) {
 
 /**
  * Creates a hierarchical accordion view for reports
- * Student Name → Year → Report Type (Assessments/Monthly)
+ * Student Name → Year → Month → Report Type (Assessments/Monthly)
  */
 function createYearlyArchiveReportView(reportsByStudent) {
     let html = '';
     let studentIndex = 0;
     
-    for (const [studentName, reports] of reportsByStudent) {
+    // Sort students alphabetically
+    const sortedStudents = Array.from(reportsByStudent.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]));
+    
+    for (const [studentName, reports] of sortedStudents) {
         const fullName = capitalize(studentName);
         const studentData = reports.studentData;
         
@@ -2345,38 +2489,50 @@ function createYearlyArchiveReportView(reportsByStudent) {
         const monthlyCount = Array.from(reports.monthly.values()).flat().length;
         const totalCount = assessmentCount + monthlyCount;
         
-        // Create student accordion header (ALWAYS SHOW, EVEN WITH ZERO REPORTS)
+        // Create student accordion header with beautiful design
         html += `
-            <div class="accordion-item mb-4 fade-in">
+            <div class="accordion-item mb-6 fade-in">
                 <button onclick="toggleAccordion('student-${studentIndex}')" 
-                        class="accordion-header w-full flex justify-between items-center p-4 bg-gradient-to-r from-green-100 to-green-50 border border-green-300 rounded-lg hover:bg-green-200 transition-all duration-200 hover:shadow-md">
+                        class="accordion-header w-full flex justify-between items-center p-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl hover:bg-green-100 transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1">
                     <div class="flex items-center">
-                        <span class="text-2xl mr-3">👤</span>
+                        <div class="mr-4 p-3 bg-green-100 rounded-full">
+                            <span class="text-2xl text-green-600">👤</span>
+                        </div>
                         <div class="text-left">
-                            <h3 class="font-bold text-green-800 text-lg">${fullName}</h3>
-                            <p class="text-green-600 text-sm">
-                                ${assessmentCount} Assessment(s), ${monthlyCount} Monthly Report(s) • Total: ${totalCount}
-                                ${studentData?.isPending ? ' • <span class="text-yellow-600">(Pending Registration)</span>' : ''}
-                            </p>
+                            <h3 class="font-bold text-green-900 text-xl">${fullName}</h3>
+                            <div class="flex items-center mt-1">
+                                <span class="text-green-600 text-sm">
+                                    ${assessmentCount} Assessment(s) • ${monthlyCount} Monthly Report(s)
+                                </span>
+                                ${studentData?.isPending ? 
+                                    '<span class="ml-3 bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded-full">Pending Registration</span>' : 
+                                    '<span class="ml-3 bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">Active</span>'}
+                            </div>
                         </div>
                     </div>
-                    <div class="flex items-center">
-                        <span id="student-${studentIndex}-arrow" class="accordion-arrow text-green-600 text-xl">▼</span>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-green-700 font-semibold">Total: ${totalCount}</span>
+                        <span id="student-${studentIndex}-arrow" class="accordion-arrow text-green-600 text-2xl transform transition-transform duration-300">▼</span>
                     </div>
                 </button>
-                <div id="student-${studentIndex}-content" class="accordion-content hidden">
+                <div id="student-${studentIndex}-content" class="accordion-content hidden mt-4">
         `;
         
-        // If no reports, show empty state (BUT STILL SHOW THE STUDENT)
+        // If no reports, show beautiful empty state
         if (totalCount === 0) {
             html += `
-                <div class="p-6 bg-gray-50 border border-gray-200 rounded-lg text-center">
-                    <div class="text-4xl mb-3">📄</div>
-                    <h4 class="text-lg font-semibold text-gray-700 mb-2">No Reports Yet</h4>
-                    <p class="text-gray-500">No reports have been generated for ${fullName} yet.</p>
-                    <p class="text-gray-400 text-sm mt-2">Reports will appear here once tutors or assessors submit them.</p>
+                <div class="p-8 bg-gradient-to-br from-gray-50 to-blue-50 border border-gray-200 rounded-xl text-center shadow-sm">
+                    <div class="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-4">
+                        <span class="text-3xl text-blue-600">📄</span>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-800 mb-2">No Reports Yet</h4>
+                    <p class="text-gray-600 max-w-md mx-auto mb-4">No reports have been generated for ${fullName} yet. Reports will appear here once tutors or assessors submit them.</p>
+                    <div class="inline-flex items-center text-sm text-gray-500 bg-gray-100 px-4 py-2 rounded-lg">
+                        <span class="mr-2">🕒</span>
+                        Check back after your child's sessions
+                    </div>
                     ${studentData?.isPending ? 
-                        '<p class="text-yellow-600 text-sm mt-2">⚠️ This student is pending registration. Reports will be available after registration is complete.</p>' : 
+                        '<div class="mt-4 inline-flex items-center text-sm text-yellow-700 bg-yellow-50 px-4 py-2 rounded-lg border border-yellow-200">⚠️ This student is pending registration. Reports will be available after registration is complete.</div>' : 
                         ''}
                 </div>
             `;
@@ -2385,28 +2541,36 @@ function createYearlyArchiveReportView(reportsByStudent) {
             const reportsByYear = new Map();
             
             // Process assessment reports by year
-            for (const [sessionKey, session] of reports.assessments) {
-                session.forEach(report => {
+            for (const [sessionKey, sessionReports] of reports.assessments) {
+                sessionReports.forEach(report => {
                     const year = new Date(report.timestamp * 1000).getFullYear();
                     if (!reportsByYear.has(year)) {
                         reportsByYear.set(year, { assessments: [], monthly: [] });
                     }
-                    reportsByYear.get(year).assessments.push({ sessionKey, session });
+                    reportsByYear.get(year).assessments.push({ 
+                        sessionKey, 
+                        reports: sessionReports,
+                        date: new Date(report.timestamp * 1000)
+                    });
                 });
             }
             
             // Process monthly reports by year
-            for (const [sessionKey, session] of reports.monthly) {
-                session.forEach(report => {
+            for (const [sessionKey, sessionReports] of reports.monthly) {
+                sessionReports.forEach(report => {
                     const year = new Date(report.timestamp * 1000).getFullYear();
                     if (!reportsByYear.has(year)) {
                         reportsByYear.set(year, { assessments: [], monthly: [] });
                     }
-                    reportsByYear.get(year).monthly.push({ sessionKey, session });
+                    reportsByYear.get(year).monthly.push({ 
+                        sessionKey, 
+                        reports: sessionReports,
+                        date: new Date(report.timestamp * 1000)
+                    });
                 });
             }
             
-            // Sort years in descending order
+            // Sort years in descending order (newest first)
             const sortedYears = Array.from(reportsByYear.keys()).sort((a, b) => b - a);
             
             // Create year accordions
@@ -2415,49 +2579,58 @@ function createYearlyArchiveReportView(reportsByStudent) {
                 const yearData = reportsByYear.get(year);
                 const yearAssessmentCount = yearData.assessments.length;
                 const yearMonthlyCount = yearData.monthly.length;
+                const yearTotal = yearAssessmentCount + yearMonthlyCount;
                 
                 html += `
-                    <div class="mb-4 ml-4">
+                    <div class="mb-4 ml-2">
                         <button onclick="toggleAccordion('year-${studentIndex}-${yearIndex}')" 
-                                class="accordion-header w-full flex justify-between items-center p-3 bg-blue-100 border border-blue-300 rounded-lg hover:bg-blue-200 transition-all duration-200">
+                                class="accordion-header w-full flex justify-between items-center p-4 bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-all duration-300">
                             <div class="flex items-center">
-                                <span class="text-xl mr-3">📅</span>
+                                <div class="mr-3 p-2 bg-blue-100 rounded-lg">
+                                    <span class="text-xl text-blue-600">📅</span>
+                                </div>
                                 <div class="text-left">
-                                    <h4 class="font-bold text-blue-800">${year}</h4>
+                                    <h4 class="font-bold text-blue-900">${year}</h4>
                                     <p class="text-blue-600 text-sm">
-                                        ${yearAssessmentCount} Assessment(s), ${yearMonthlyCount} Monthly Report(s)
+                                        ${yearAssessmentCount} Assessment(s) • ${yearMonthlyCount} Monthly Report(s)
                                     </p>
                                 </div>
                             </div>
-                            <span id="year-${studentIndex}-${yearIndex}-arrow" class="accordion-arrow text-blue-600">▼</span>
+                            <div class="flex items-center space-x-3">
+                                <span class="text-blue-700 font-medium">${yearTotal} total</span>
+                                <span id="year-${studentIndex}-${yearIndex}-arrow" class="accordion-arrow text-blue-600 transform transition-transform duration-300">▼</span>
+                            </div>
                         </button>
-                        <div id="year-${studentIndex}-${yearIndex}-content" class="accordion-content hidden ml-4 mt-2">
+                        <div id="year-${studentIndex}-${yearIndex}-content" class="accordion-content hidden ml-6 mt-3">
                 `;
                 
                 // Assessment Reports for this year
                 if (yearAssessmentCount > 0) {
                     html += `
-                        <div class="mb-4">
-                            <h5 class="font-semibold text-gray-700 mb-3 flex items-center">
-                                <span class="mr-2">📊</span> Assessment Reports
-                            </h5>
+                        <div class="mb-6">
+                            <div class="flex items-center mb-4 p-3 bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-100 rounded-lg">
+                                <div class="mr-3 p-2 bg-purple-100 rounded-lg">
+                                    <span class="text-xl text-purple-600">📊</span>
+                                </div>
+                                <div>
+                                    <h5 class="font-bold text-purple-800">Assessment Reports</h5>
+                                    <p class="text-purple-600 text-sm">Test scores and performance metrics</p>
+                                </div>
+                                <span class="ml-auto bg-purple-100 text-purple-800 text-xs font-medium px-3 py-1 rounded-full">${yearAssessmentCount} reports</span>
+                            </div>
                     `;
                     
                     // Group assessments by month
                     const assessmentsByMonth = new Map();
-                    yearData.assessments.forEach(({ sessionKey, session }) => {
-                        session.forEach(report => {
-                            const date = new Date(report.timestamp * 1000);
-                            const month = date.getMonth();
-                            
-                            if (!assessmentsByMonth.has(month)) {
-                                assessmentsByMonth.set(month, []);
-                            }
-                            assessmentsByMonth.get(month).push({ sessionKey, session });
-                        });
+                    yearData.assessments.forEach(({ sessionKey, reports: sessionReports, date }) => {
+                        const month = date.getMonth();
+                        if (!assessmentsByMonth.has(month)) {
+                            assessmentsByMonth.set(month, []);
+                        }
+                        assessmentsByMonth.get(month).push({ sessionKey, reports: sessionReports, date });
                     });
                     
-                    // Sort months in descending order
+                    // Sort months in descending order (newest first)
                     const sortedMonths = Array.from(assessmentsByMonth.keys()).sort((a, b) => b - a);
                     
                     sortedMonths.forEach(month => {
@@ -2465,12 +2638,26 @@ function createYearlyArchiveReportView(reportsByStudent) {
                             'January', 'February', 'March', 'April', 'May', 'June',
                             'July', 'August', 'September', 'October', 'November', 'December'
                         ][month];
+                        const monthAssessments = assessmentsByMonth.get(month);
                         
-                        html += `<h6 class="font-medium text-gray-600 mb-2 ml-2">${monthName}</h6>`;
+                        html += `
+                            <div class="mb-4 ml-2">
+                                <h6 class="font-semibold text-gray-700 mb-3 flex items-center">
+                                    <span class="mr-2 text-gray-500">📌</span>
+                                    ${monthName}
+                                    <span class="ml-2 bg-gray-100 text-gray-700 text-xs font-medium px-2 py-1 rounded-full">${monthAssessments.length} assessments</span>
+                                </h6>
+                                <div class="space-y-4">
+                        `;
                         
-                        assessmentsByMonth.get(month).forEach(({ sessionKey, session }, sessionIndex) => {
-                            html += createAssessmentReportHTML(session, studentIndex, `${year}-${month}-${sessionIndex}`, fullName);
+                        monthAssessments.forEach(({ sessionKey, reports: sessionReports, date }, sessionIndex) => {
+                            html += createAssessmentReportHTML(sessionReports, studentIndex, `${year}-${month}-${sessionIndex}`, fullName, date);
                         });
+                        
+                        html += `
+                                </div>
+                            </div>
+                        `;
                     });
                     
                     html += `</div>`;
@@ -2479,27 +2666,30 @@ function createYearlyArchiveReportView(reportsByStudent) {
                 // Monthly Reports for this year
                 if (yearMonthlyCount > 0) {
                     html += `
-                        <div class="mb-4">
-                            <h5 class="font-semibold text-gray-700 mb-3 flex items-center">
-                                <span class="mr-2">📈</span> Monthly Reports
-                            </h5>
+                        <div class="mb-6">
+                            <div class="flex items-center mb-4 p-3 bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-100 rounded-lg">
+                                <div class="mr-3 p-2 bg-teal-100 rounded-lg">
+                                    <span class="text-xl text-teal-600">📈</span>
+                                </div>
+                                <div>
+                                    <h5 class="font-bold text-teal-800">Monthly Reports</h5>
+                                    <p class="text-teal-600 text-sm">Progress updates and session summaries</p>
+                                </div>
+                                <span class="ml-auto bg-teal-100 text-teal-800 text-xs font-medium px-3 py-1 rounded-full">${yearMonthlyCount} reports</span>
+                            </div>
                     `;
                     
                     // Group monthly reports by month
                     const monthlyByMonth = new Map();
-                    yearData.monthly.forEach(({ sessionKey, session }) => {
-                        session.forEach(report => {
-                            const date = new Date(report.timestamp * 1000);
-                            const month = date.getMonth();
-                            
-                            if (!monthlyByMonth.has(month)) {
-                                monthlyByMonth.set(month, []);
-                            }
-                            monthlyByMonth.get(month).push({ sessionKey, session });
-                        });
+                    yearData.monthly.forEach(({ sessionKey, reports: sessionReports, date }) => {
+                        const month = date.getMonth();
+                        if (!monthlyByMonth.has(month)) {
+                            monthlyByMonth.set(month, []);
+                        }
+                        monthlyByMonth.get(month).push({ sessionKey, reports: sessionReports, date });
                     });
                     
-                    // Sort months in descending order
+                    // Sort months in descending order (newest first)
                     const sortedMonths = Array.from(monthlyByMonth.keys()).sort((a, b) => b - a);
                     
                     sortedMonths.forEach(month => {
@@ -2507,12 +2697,26 @@ function createYearlyArchiveReportView(reportsByStudent) {
                             'January', 'February', 'March', 'April', 'May', 'June',
                             'July', 'August', 'September', 'October', 'November', 'December'
                         ][month];
+                        const monthReports = monthlyByMonth.get(month);
                         
-                        html += `<h6 class="font-medium text-gray-600 mb-2 ml-2">${monthName}</h6>`;
+                        html += `
+                            <div class="mb-4 ml-2">
+                                <h6 class="font-semibold text-gray-700 mb-3 flex items-center">
+                                    <span class="mr-2 text-gray-500">📌</span>
+                                    ${monthName}
+                                    <span class="ml-2 bg-gray-100 text-gray-700 text-xs font-medium px-2 py-1 rounded-full">${monthReports.length} reports</span>
+                                </h6>
+                                <div class="space-y-4">
+                        `;
                         
-                        monthlyByMonth.get(month).forEach(({ sessionKey, session }, sessionIndex) => {
-                            html += createMonthlyReportHTML(session, studentIndex, `${year}-${month}-${sessionIndex}`, fullName);
+                        monthReports.forEach(({ sessionKey, reports: sessionReports, date }, sessionIndex) => {
+                            html += createMonthlyReportHTML(sessionReports, studentIndex, `${year}-${month}-${sessionIndex}`, fullName, date);
                         });
+                        
+                        html += `
+                                </div>
+                            </div>
+                        `;
                     });
                     
                     html += `</div>`;
@@ -2538,81 +2742,212 @@ function createYearlyArchiveReportView(reportsByStudent) {
     return html;
 }
 
-function createAssessmentReportHTML(session, studentIndex, sessionId, fullName) {
-    const firstReport = session[0];
-    const formattedDate = formatDetailedDate(new Date(firstReport.timestamp * 1000), true);
+function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, fullName, date) {
+    const firstReport = sessionReports[0];
+    const formattedDate = formatDetailedDate(date || new Date(firstReport.timestamp * 1000), true);
     
-    const results = session.map(testResult => {
+    // Calculate overall stats
+    let totalCorrect = 0;
+    let totalQuestions = 0;
+    let overallPercentage = 0;
+    
+    const results = sessionReports.map(testResult => {
         const topics = [...new Set(testResult.answers?.map(a => safeText(a.topic)).filter(t => t))] || [];
+        const correct = testResult.score !== undefined ? testResult.score : 0;
+        const total = testResult.totalScoreableQuestions !== undefined ? testResult.totalScoreableQuestions : 0;
+        
+        totalCorrect += correct;
+        totalQuestions += total;
+        
         return {
-            subject: safeText(testResult.subject),
-            correct: testResult.score !== undefined ? testResult.score : 0,
-            total: testResult.totalScoreableQuestions !== undefined ? testResult.totalScoreableQuestions : 0,
+            subject: safeText(testResult.subject || testResult.testSubject || 'General'),
+            correct: correct,
+            total: total,
+            percentage: total > 0 ? Math.round((correct / total) * 100) : 0,
             topics: topics,
         };
     });
     
+    if (totalQuestions > 0) {
+        overallPercentage = Math.round((totalCorrect / totalQuestions) * 100);
+    }
+    
+    // Determine performance color
+    let performanceColor = 'text-red-600';
+    let performanceBg = 'bg-red-100';
+    if (overallPercentage >= 80) {
+        performanceColor = 'text-green-600';
+        performanceBg = 'bg-green-100';
+    } else if (overallPercentage >= 60) {
+        performanceColor = 'text-yellow-600';
+        performanceBg = 'bg-yellow-100';
+    }
+    
     const tableRows = results.map(res => `
-        <tr>
-            <td class="border px-3 py-2">${res.subject.toUpperCase()}</td>
-            <td class="border px-3 py-2 text-center">${res.correct} / ${res.total}</td>
-            <td class="border px-3 py-2 text-sm">${res.topics.join(', ')}</td>
+        <tr class="hover:bg-gray-50 transition-colors duration-200">
+            <td class="border border-gray-200 px-4 py-3 font-medium text-gray-800">${res.subject.toUpperCase()}</td>
+            <td class="border border-gray-200 px-4 py-3 text-center">
+                <span class="font-bold ${res.percentage >= 80 ? 'text-green-600' : res.percentage >= 60 ? 'text-yellow-600' : 'text-red-600'}">
+                    ${res.correct} / ${res.total}
+                </span>
+                <span class="block text-sm ${res.percentage >= 80 ? 'text-green-500' : res.percentage >= 60 ? 'text-yellow-500' : 'text-red-500'}">
+                    ${res.percentage}%
+                </span>
+            </td>
+            <td class="border border-gray-200 px-4 py-3 text-sm text-gray-600">
+                ${res.topics.length > 0 ? res.topics.slice(0, 3).join(', ') : 'Various topics'}
+                ${res.topics.length > 3 ? `<span class="text-gray-400 text-xs ml-1">+${res.topics.length - 3} more</span>` : ''}
+            </td>
         </tr>
     `).join("");
     
     return `
-        <div class="border rounded-lg shadow mb-4 p-4 bg-white hover:shadow-md transition-shadow duration-200" id="assessment-block-${studentIndex}-${sessionId}">
-            <div class="flex justify-between items-center mb-3 border-b pb-2">
-                <h5 class="font-medium text-gray-800">Assessment - ${safeText(formattedDate)}</h5>
+        <div class="border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 p-5 bg-white" id="assessment-block-${studentIndex}-${sessionId}">
+            <div class="flex justify-between items-start mb-4 pb-4 border-b border-gray-100">
+                <div>
+                    <div class="flex items-center mb-2">
+                        <span class="text-green-600 mr-2">📊</span>
+                        <h5 class="font-bold text-gray-800 text-lg">Assessment Report</h5>
+                        <span class="ml-3 ${performanceBg} ${performanceColor} text-xs font-bold px-3 py-1 rounded-full">
+                            ${overallPercentage}% Overall
+                        </span>
+                    </div>
+                    <p class="text-gray-600 text-sm">
+                        <span class="font-medium">Date:</span> ${safeText(formattedDate)}
+                        ${firstReport.tutorName ? ` • <span class="font-medium">Tutor:</span> ${safeText(firstReport.tutorName)}` : ''}
+                    </p>
+                </div>
                 <button onclick="downloadSessionReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}', 'assessment')" 
-                        class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm bg-green-50 px-3 py-1 rounded-lg hover:bg-green-100 transition-all duration-200">
-                    <span class="mr-1">📥</span> Download PDF
+                        class="flex items-center bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5">
+                    <span class="mr-2">📥</span>
+                    <span class="font-medium text-sm">Download PDF</span>
                 </button>
             </div>
             
-            <table class="w-full text-sm mb-3 border border-collapse">
-                <thead class="bg-gray-100">
-                    <tr>
-                        <th class="border px-3 py-2 text-left">Subject</th>
-                        <th class="border px-3 py-2 text-center">Score</th>
-                        <th class="border px-3 py-2 text-left">Topics</th>
-                    </tr>
-                </thead>
-                <tbody>${tableRows}</tbody>
-            </table>
+            <div class="mb-4">
+                <div class="grid grid-cols-3 gap-4 mb-4">
+                    <div class="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                        <p class="text-xs text-blue-600 font-medium">Total Score</p>
+                        <p class="text-xl font-bold text-blue-700">${totalCorrect}/${totalQuestions}</p>
+                    </div>
+                    <div class="bg-green-50 p-3 rounded-lg border border-green-100">
+                        <p class="text-xs text-green-600 font-medium">Overall Percentage</p>
+                        <p class="text-xl font-bold ${performanceColor}">${overallPercentage}%</p>
+                    </div>
+                    <div class="bg-purple-50 p-3 rounded-lg border border-purple-100">
+                        <p class="text-xs text-purple-600 font-medium">Subjects Tested</p>
+                        <p class="text-xl font-bold text-purple-700">${results.length}</p>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto rounded-lg border border-gray-200">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="border-b border-gray-200 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Subject</th>
+                                <th class="border-b border-gray-200 px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Score</th>
+                                <th class="border-b border-gray-200 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Topics Covered</th>
+                            </tr>
+                        </thead>
+                        <tbody>${tableRows}</tbody>
+                    </table>
+                </div>
+            </div>
+            
+            ${firstReport.notes || firstReport.comments ? `
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <div class="flex items-center mb-2">
+                    <span class="text-yellow-500 mr-2">💡</span>
+                    <h6 class="font-semibold text-gray-700">Additional Notes</h6>
+                </div>
+                <p class="text-gray-600 bg-yellow-50 p-3 rounded-lg border border-yellow-100 text-sm">
+                    ${safeText(firstReport.notes || firstReport.comments || 'No additional notes provided.')}
+                </p>
+            </div>
+            ` : ''}
         </div>
     `;
 }
 
-function createMonthlyReportHTML(session, studentIndex, sessionId, fullName) {
-    const firstReport = session[0];
-    const formattedDate = formatDetailedDate(new Date(firstReport.timestamp * 1000), true);
-    const safeTopics = safeText(firstReport.topics ? firstReport.topics.substring(0, 150) + (firstReport.topics.length > 150 ? '...' : '') : 'N/A');
+function createMonthlyReportHTML(sessionReports, studentIndex, sessionId, fullName, date) {
+    const firstReport = sessionReports[0];
+    const formattedDate = formatDetailedDate(date || new Date(firstReport.timestamp * 1000), true);
+    const safeTopics = safeText(firstReport.topics ? firstReport.topics : 'No topics recorded for this session.');
+    const safeProgress = safeText(firstReport.studentProgress || firstReport.progressNotes || 'No progress notes provided.');
+    
+    // Extract month and year for display
+    const reportDate = date || new Date(firstReport.timestamp * 1000);
+    const monthName = reportDate.toLocaleString('default', { month: 'long' });
+    const year = reportDate.getFullYear();
     
     return `
-        <div class="border rounded-lg shadow mb-4 p-4 bg-white hover:shadow-md transition-shadow duration-200" id="monthly-block-${studentIndex}-${sessionId}">
-            <div class="flex justify-between items-center mb-3 border-b pb-2">
-                <h5 class="font-medium text-gray-800">Monthly Report - ${safeText(formattedDate)}</h5>
+        <div class="border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 p-5 bg-white" id="monthly-block-${studentIndex}-${sessionId}">
+            <div class="flex justify-between items-start mb-4 pb-4 border-b border-gray-100">
+                <div>
+                    <div class="flex items-center mb-2">
+                        <span class="text-blue-600 mr-2">📈</span>
+                        <h5 class="font-bold text-gray-800 text-lg">Monthly Progress Report</h5>
+                        <span class="ml-3 bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full">
+                            ${monthName} ${year}
+                        </span>
+                    </div>
+                    <p class="text-gray-600 text-sm">
+                        <span class="font-medium">Submitted:</span> ${safeText(formattedDate)}
+                        ${firstReport.tutorName ? ` • <span class="font-medium">Tutor:</span> ${safeText(firstReport.tutorName)}` : ''}
+                    </p>
+                </div>
                 <button onclick="downloadMonthlyReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}')" 
-                        class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm bg-green-50 px-3 py-1 rounded-lg hover:bg-green-100 transition-all duration-200">
-                    <span class="mr-1">📥</span> Download PDF
+                        class="flex items-center bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-4 py-2 rounded-lg hover:from-blue-600 hover:to-cyan-700 transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5">
+                    <span class="mr-2">📥</span>
+                    <span class="font-medium text-sm">Download PDF</span>
                 </button>
             </div>
             
-            <div class="text-sm text-gray-700 space-y-2">
-                <p><strong class="text-gray-800">Tutor:</strong> ${safeText(firstReport.tutorName || 'N/A')}</p>
-                <p><strong class="text-gray-800">Month:</strong> ${safeText(formattedDate.split(' ')[0])} ${new Date(firstReport.timestamp * 1000).getFullYear()}</p>
-                <div>
-                    <strong class="text-gray-800">Topics Covered:</strong>
-                    <p class="mt-1 bg-gray-50 p-3 rounded border">${safeTopics}</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div class="flex items-center mb-3">
+                        <span class="text-green-500 mr-2">📚</span>
+                        <h6 class="font-semibold text-gray-700">Topics Covered</h6>
+                    </div>
+                    <p class="text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border border-gray-100 text-sm">${safeTopics}</p>
                 </div>
-                ${firstReport.studentProgress ? `
-                <div>
-                    <strong class="text-gray-800">Progress Notes:</strong>
-                    <p class="mt-1 bg-blue-50 p-3 rounded border">${safeText(firstReport.studentProgress)}</p>
+                
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div class="flex items-center mb-3">
+                        <span class="text-purple-500 mr-2">📝</span>
+                        <h6 class="font-semibold text-gray-700">Progress Notes</h6>
+                    </div>
+                    <p class="text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border border-gray-100 text-sm">${safeProgress}</p>
                 </div>
-                ` : ''}
             </div>
+            
+            ${firstReport.areasOfImprovement || firstReport.recommendations ? `
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <div class="flex items-center mb-3">
+                    <span class="text-orange-500 mr-2">🎯</span>
+                    <h6 class="font-semibold text-gray-700">Areas for Improvement & Recommendations</h6>
+                </div>
+                <div class="bg-orange-50 p-4 rounded-lg border border-orange-100">
+                    <p class="text-gray-700 whitespace-pre-wrap text-sm">
+                        ${safeText(firstReport.areasOfImprovement || firstReport.recommendations || 'No specific recommendations provided.')}
+                    </p>
+                </div>
+            </div>
+            ` : ''}
+            
+            ${firstReport.nextSteps || firstReport.futureGoals ? `
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <div class="flex items-center mb-3">
+                    <span class="text-teal-500 mr-2">🚀</span>
+                    <h6 class="font-semibold text-gray-700">Next Steps & Goals</h6>
+                </div>
+                <div class="bg-teal-50 p-4 rounded-lg border border-teal-100">
+                    <p class="text-gray-700 whitespace-pre-wrap text-sm">
+                        ${safeText(firstReport.nextSteps || firstReport.futureGoals || 'No specific goals set for next period.')}
+                    </p>
+                </div>
+            </div>
+            ` : ''}
         </div>
     `;
 }
@@ -2731,20 +3066,20 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             }
         }
 
-        // 3. CRITICAL: FIND ALL CHILDREN USING COMPREHENSIVE SEARCH
+        // 3. CRITICAL: FIND ALL CHILDREN FIRST
         const childrenResult = await comprehensiveFindChildren(parentPhone);
         
-        // Update Global State
+        // Update Global State BEFORE searching for reports
         userChildren = childrenResult.studentNames;
         studentIdMap = childrenResult.studentNameIdMap;
         allStudentData = childrenResult.allStudentData;
 
-        console.log("👥 Found children:", userChildren);
+        console.log("👥 Found children for report distribution:", userChildren);
+        console.log("🆔 Student ID Map:", Array.from(studentIdMap.entries()));
 
         // 4. USER PROFILE & REFERRAL SYNC
         let parentName = null;
         if (allStudentData && allStudentData.length > 0) {
-            // Find the first student record that has a parent name attached
             const studentWithParentInfo = allStudentData.find(s => 
                 s.data && (s.data.parentName || s.data.guardianName || s.data.fatherName || s.data.motherName)
             );
@@ -2780,14 +3115,21 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
 
         if (welcomeMessage) welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
 
-        // 5. REPORT AGGREGATION
-        const { assessmentResults, monthlyResults } = await searchAllReportsForParent(
+        // 5. REPORT AGGREGATION WITH PROPER DISTRIBUTION
+        console.log("🔍 Starting report search with student mapping ready...");
+        const { assessmentResults, monthlyResults, searchStats } = await searchAllReportsForParent(
             parentPhone, 
             currentUserData.email, 
             userId
         );
 
-        // 6. DATA MAPPING
+        console.log("📊 Report distribution results:", {
+            totalAssessments: assessmentResults.length,
+            totalMonthly: monthlyResults.length,
+            searchStats: searchStats
+        });
+
+        // 6. DATA MAPPING - Group reports by student
         const reportsByStudent = new Map();
 
         // A. Initialize containers for ALL known students (Empty or Not)
@@ -2798,80 +3140,89 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                 monthly: new Map(),
                 studentData: studentInfo || { name: studentName, isPending: false }
             });
+            
+            console.log(`📁 Created container for student: ${studentName}`);
         });
 
-        // B. Populate containers with Assessment Data
-        assessmentResults.forEach(result => {
-            const rawName = result.studentName || result.student;
-            if (!rawName) return;
+        // B. Populate containers with Assessment Data - PROPERLY ASSIGNED
+        console.log("📝 Assigning assessment reports to students...");
+        assessmentResults.forEach((report, index) => {
+            const studentName = report.assignedStudentName;
             
-            const studentName = safeText(rawName);
-            
-            // If report belongs to a student NOT in our initial list (rare), add them now
-            if (!reportsByStudent.has(studentName)) {
-                reportsByStudent.set(studentName, { 
-                    assessments: new Map(), 
-                    monthly: new Map(),
-                    studentData: { name: studentName, isPending: false } 
+            if (studentName && reportsByStudent.has(studentName)) {
+                const sessionKey = Math.floor(report.timestamp / 86400);
+                const studentRecord = reportsByStudent.get(studentName);
+                
+                if (!studentRecord.assessments.has(sessionKey)) {
+                    studentRecord.assessments.set(sessionKey, []);
+                }
+                studentRecord.assessments.get(sessionKey).push(report);
+                
+                console.log(`✅ Assessment ${index + 1} assigned to ${studentName}`);
+            } else {
+                console.warn(`⚠️ Assessment ${index + 1} could not be assigned:`, {
+                    studentName: studentName,
+                    availableStudents: Array.from(reportsByStudent.keys())
                 });
-                userChildren.push(studentName);
             }
-
-            const sessionKey = Math.floor(result.timestamp / 86400);
-            const studentRecord = reportsByStudent.get(studentName);
-            
-            if (!studentRecord.assessments.has(sessionKey)) {
-                studentRecord.assessments.set(sessionKey, []);
-            }
-            studentRecord.assessments.get(sessionKey).push(result);
         });
 
-        // C. Populate containers with Monthly Report Data
-        monthlyResults.forEach(result => {
-            const rawName = result.studentName || result.student;
-            if (!rawName) return;
+        // C. Populate containers with Monthly Report Data - PROPERLY ASSIGNED
+        console.log("📝 Assigning monthly reports to students...");
+        monthlyResults.forEach((report, index) => {
+            const studentName = report.assignedStudentName;
             
-            const studentName = safeText(rawName);
-            
-            if (!reportsByStudent.has(studentName)) {
-                reportsByStudent.set(studentName, { 
-                    assessments: new Map(), 
-                    monthly: new Map(),
-                    studentData: { name: studentName, isPending: false } 
+            if (studentName && reportsByStudent.has(studentName)) {
+                const sessionKey = Math.floor(report.timestamp / 86400);
+                const studentRecord = reportsByStudent.get(studentName);
+                
+                if (!studentRecord.monthly.has(sessionKey)) {
+                    studentRecord.monthly.set(sessionKey, []);
+                }
+                studentRecord.monthly.get(sessionKey).push(report);
+                
+                console.log(`✅ Monthly report ${index + 1} assigned to ${studentName}`);
+            } else {
+                console.warn(`⚠️ Monthly report ${index + 1} could not be assigned:`, {
+                    studentName: studentName,
+                    availableStudents: Array.from(reportsByStudent.keys())
                 });
-                userChildren.push(studentName);
             }
-
-            const sessionKey = Math.floor(result.timestamp / 86400);
-            const studentRecord = reportsByStudent.get(studentName);
-            
-            if (!studentRecord.monthly.has(sessionKey)) {
-                studentRecord.monthly.set(sessionKey, []);
-            }
-            studentRecord.monthly.get(sessionKey).push(result);
         });
 
-        // 7. RENDER (Generate the UI)
+        // 7. DEBUG: Show distribution summary
+        console.log("📊 FINAL REPORT DISTRIBUTION SUMMARY:");
+        for (const [studentName, reports] of reportsByStudent) {
+            const assessmentCount = Array.from(reports.assessments.values()).flat().length;
+            const monthlyCount = Array.from(reports.monthly.values()).flat().length;
+            console.log(`   ${studentName}: ${assessmentCount} assessments, ${monthlyCount} monthly reports`);
+        }
+
+        // 8. RENDER (Generate the UI with beautiful design)
         if (reportContent) {
-            // ALWAYS show students, even if zero reports
             const reportsHtml = createYearlyArchiveReportView(reportsByStudent);
             reportContent.innerHTML = reportsHtml;
         }
 
-        // 8. UPDATE CACHE (Short-lived)
+        // 9. UPDATE CACHE (Short-lived)
         try {
             const dataToCache = {
                 timestamp: Date.now(),
                 html: reportContent ? reportContent.innerHTML : '',
                 userData: currentUserData,
-                studentList: userChildren
+                studentList: userChildren,
+                distributionSummary: Array.from(reportsByStudent.entries()).map(([name, reports]) => ({
+                    student: name,
+                    assessments: Array.from(reports.assessments.values()).flat().length,
+                    monthly: Array.from(reports.monthly.values()).flat().length
+                }))
             };
             localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
         } catch (e) {
             console.error("Cache write failed:", e);
         }
 
-        // 9. FINAL UI COMPONENTS
+        // 10. FINAL UI COMPONENTS
         if (authArea && reportArea) {
             authArea.classList.add("hidden");
             reportArea.classList.remove("hidden");
@@ -2887,15 +3238,26 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         console.error("❌ CRITICAL FAILURE in Report Loading:", error);
         if (reportContent) {
             reportContent.innerHTML = `
-                <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded shadow-md">
+                <div class="bg-gradient-to-r from-red-50 to-orange-50 border-l-4 border-red-500 p-6 rounded-xl shadow-md">
                     <div class="flex">
-                        <div class="flex-shrink-0"><span class="text-2xl">⚠️</span></div>
-                        <div class="ml-3">
-                            <h3 class="text-lg font-medium text-red-800">System Error</h3>
+                        <div class="flex-shrink-0">
+                            <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                                <span class="text-2xl text-red-600">⚠️</span>
+                            </div>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-bold text-red-800">System Error</h3>
                             <p class="text-sm text-red-700 mt-1">We encountered an issue loading your dashboard: ${safeText(error.message)}</p>
-                            <button onclick="window.location.reload()" class="mt-3 bg-red-100 text-red-800 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-200">
-                                Reload Page
-                            </button>
+                            <div class="mt-4 flex space-x-3">
+                                <button onclick="window.location.reload()" 
+                                        class="bg-red-100 text-red-800 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-200 transition-colors duration-200">
+                                    🔄 Reload Page
+                                </button>
+                                <button onclick="showDiagnostics()" 
+                                        class="bg-blue-100 text-blue-800 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-200 transition-colors duration-200">
+                                    🛠️ Show Diagnostics
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
