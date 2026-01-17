@@ -696,448 +696,119 @@ async function handlePasswordReset() {
     }
 }
 
-/**
- * ============================================================================
- * SECTION 9: MESSAGING & INBOX MODULE (GOD MODE EDITION)
- * ============================================================================
- */
+// -------------------------------------------------------------------
+// ENHANCED MESSAGING SYSTEM - FIXED FOR NO INDEXES
+// -------------------------------------------------------------------
 
-const messagingSystem = {
-    // State Management
-    state: {
-        currentUserPhone: null, 
-        activeConversationId: null,
-        conversations: [],
-        listeners: { inbox: null, chat: null },
-        tutorMap: new Map() 
-    },
+function showComposeMessageModal() {
+    populateStudentDropdownForMessages();
+    document.getElementById('composeMessageModal').classList.remove('hidden');
+}
 
-    /**
-     * Initialize the Messaging System
-     */
-    init: async function() {
-        const user = firebase.auth().currentUser;
-        if (!user) return;
+function hideComposeMessageModal() {
+    document.getElementById('composeMessageModal').classList.add('hidden');
+    // Reset form
+    document.getElementById('messageRecipient').value = 'tutor';
+    document.getElementById('messageSubject').value = '';
+    document.getElementById('messageStudent').value = '';
+    document.getElementById('messageContent').value = '';
+    document.getElementById('messageUrgent').checked = false;
+}
 
-        // 1. Resolve Parent Phone (ID)
-        if (typeof currentUserData !== 'undefined' && currentUserData?.normalizedPhone) {
-            this.state.currentUserPhone = currentUserData.normalizedPhone;
-        } else {
-            const doc = await db.collection('parent_users').doc(user.uid).get();
-            this.state.currentUserPhone = doc.data()?.normalizedPhone || doc.data()?.phone;
-        }
-
-        if (!this.state.currentUserPhone) return;
-
-        console.log("🚀 Messaging System Active for:", this.state.currentUserPhone);
-
-        // 2. Load Contacts (Tutors + Management)
-        await this.discoverContacts();
-
-        // 3. Inject UI
-        this.injectStyles();
-        this.injectFloatingButton();
-        this.injectInboxModal();
-
-        // 4. Start Real-time Listener
-        this.startInboxListener();
-    },
-
-    /**
-     * Discover Tutors & Management automatically
-     */
-    discoverContacts: async function() {
-        // Always add Management first
-        this.state.tutorMap.set("MANAGEMENT_OFFICE", "School Administration");
-
-        try {
-            // Find tutors linked to my children
-            const studentsSnapshot = await db.collection("students")
-                .where("parentPhone", "==", this.state.currentUserPhone)
-                .get();
-            
-            studentsSnapshot.forEach(doc => {
-                const data = doc.data();
-                // Use tutorUid if available, fallback to email, then name
-                const tutorId = data.tutorUid || data.tutorEmail || data.tutorName;
-                const tutorName = data.tutorName || "Assigned Tutor";
-                
-                if (tutorId) {
-                    this.state.tutorMap.set(tutorId, tutorName);
-                }
-            });
-        } catch (e) {
-            console.warn("Messaging: Could not load tutor contacts", e);
-        }
-    },
-
-    // ========================================================================
-    // DATA LAYER (FIRESTORE)
-    // ========================================================================
-
-    startInboxListener: function() {
-        if (this.state.listeners.inbox) this.state.listeners.inbox(); 
-
-        const myId = this.state.currentUserPhone;
-
-        this.state.listeners.inbox = db.collection('conversations')
-            .where('participants', 'array-contains', myId)
-            .onSnapshot(snapshot => {
-                const rawConversations = [];
-                let totalUnread = 0;
-
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    const ts = data.lastMessageTimestamp?.toDate ? data.lastMessageTimestamp.toDate() : new Date(data.lastMessageTimestamp);
-                    
-                    const isLastMsgFromMe = data.lastSenderId === myId;
-                    const unread = (!isLastMsgFromMe && data.unreadCount > 0) ? data.unreadCount : 0;
-                    totalUnread += unread;
-
-                    // Find who I am talking to
-                    const otherId = data.participants.find(p => p !== myId) || "Unknown";
-
-                    rawConversations.push({
-                        id: doc.id,
-                        ...data,
-                        timestampObj: ts,
-                        unreadCalc: unread,
-                        otherPartyId: otherId
-                    });
-                });
-
-                // Client-side Sort: Newest First
-                this.state.conversations = rawConversations.sort((a, b) => b.timestampObj - a.timestampObj);
-
-                this.updateBadgeCount(totalUnread);
-                this.renderConversationList();
-            });
-    },
-
-    openConversation: function(conversationId, otherPartyName, otherPartyId) {
-        this.state.activeConversationId = conversationId;
-        
-        // UI Updates
-        document.getElementById('msg-chat-view').classList.remove('hidden');
-        document.getElementById('msg-empty-view').classList.add('hidden');
-        document.getElementById('msg-header-name').textContent = otherPartyName;
-        
-        // Mobile Toggle
-        if (window.innerWidth < 768) {
-            document.getElementById('msg-sidebar').classList.add('hidden');
-            document.getElementById('msg-chat-area').classList.remove('hidden');
-        }
-
-        // Reset Unread
-        const convRef = db.collection('conversations').doc(conversationId);
-        convRef.update({ unreadCount: 0 });
-
-        // Listen for Messages
-        if (this.state.listeners.chat) this.state.listeners.chat();
-        
-        const messagesContainer = document.getElementById('msg-bubbles-container');
-        messagesContainer.innerHTML = ''; 
-
-        this.state.listeners.chat = convRef.collection('messages')
-            .orderBy('createdAt', 'asc')
-            .onSnapshot(snapshot => {
-                snapshot.docChanges().forEach(change => {
-                    if (change.type === "added") {
-                        this.renderMessageBubble(change.doc.data());
-                    }
-                });
-                this.scrollToBottom();
-            });
-            
-        // Re-bind Send Button
-        const sendBtn = document.getElementById('msg-send-btn');
-        const newSendBtn = sendBtn.cloneNode(true);
-        sendBtn.parentNode.replaceChild(newSendBtn, sendBtn);
-        
-        newSendBtn.addEventListener('click', () => {
-            const input = document.getElementById('msg-input');
-            const content = input.value.trim();
-            if (!content) return;
-            this.sendMessage(conversationId, content, otherPartyId);
-            input.value = '';
-        });
-        
-        document.getElementById('msg-input').onkeypress = (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                newSendBtn.click();
-            }
-        };
-    },
-
-    sendMessage: async function(convId, content, otherPartyId) {
-        if (!convId || !content) return;
-        const myId = this.state.currentUserPhone;
-        const now = new Date();
-
-        try {
-            const convRef = db.collection('conversations').doc(convId);
-
-            // 1. Add Message
-            await convRef.collection('messages').add({
-                content: content,
-                senderId: myId,
-                createdAt: now,
-                read: false
-            });
-
-            // 2. Update Header (Read-Write Transaction to safely increment)
-            await db.runTransaction(async (transaction) => {
-                const convDoc = await transaction.get(convRef);
-                if (!convDoc.exists) {
-                    transaction.set(convRef, {
-                        participants: [myId, otherPartyId],
-                        lastMessage: content,
-                        lastMessageTimestamp: now,
-                        lastSenderId: myId,
-                        unreadCount: 1
-                    });
-                } else {
-                    const currentUnread = convDoc.data().unreadCount || 0;
-                    transaction.update(convRef, {
-                        lastMessage: content,
-                        lastMessageTimestamp: now,
-                        lastSenderId: myId,
-                        unreadCount: currentUnread + 1
-                    });
-                }
-            });
-        } catch (error) {
-            console.error("Msg Error:", error);
-        }
-    },
-
-    startNewChat: async function(targetId, targetName) {
-        const myId = this.state.currentUserPhone;
-        // Alphabetical ID to prevent duplicates
-        const ids = [myId, targetId].sort();
-        const convId = `${ids[0]}_${ids[1]}`;
-
-        const doc = await db.collection('conversations').doc(convId).get();
-        
-        if (!doc.exists) {
-            await db.collection('conversations').doc(convId).set({
-                participants: [myId, targetId],
-                lastMessage: "Started a new conversation",
-                lastMessageTimestamp: new Date(),
-                unreadCount: 0,
-                lastSenderId: myId
-            });
-        }
-        this.openConversation(convId, targetName, targetId);
-    },
-
-    // ========================================================================
-    // UI RENDERING
-    // ========================================================================
-
-    renderConversationList: function() {
-        const listContainer = document.getElementById('msg-conversations-list');
-        listContainer.innerHTML = '';
-
-        // Add "New Chat" Button always at top
-        const newChatBtn = document.createElement('div');
-        newChatBtn.className = "p-3 bg-blue-50 text-blue-700 text-center font-bold text-sm cursor-pointer hover:bg-blue-100 border-b border-blue-100 transition";
-        newChatBtn.innerHTML = "+ Start New Message";
-        newChatBtn.onclick = () => this.showNewChatOptions();
-        listContainer.appendChild(newChatBtn);
-
-        if (this.state.conversations.length === 0) {
-            const empty = document.createElement('div');
-            empty.className = "text-center py-8 text-gray-400";
-            empty.innerHTML = `<div class="text-4xl mb-2">💬</div><p class="text-sm">No messages yet.</p>`;
-            listContainer.appendChild(empty);
-            return;
-        }
-
-        this.state.conversations.forEach(conv => {
-            const displayName = this.state.tutorMap.get(conv.otherPartyId) || 
-                                (conv.otherPartyId === 'MANAGEMENT_OFFICE' ? 'School Administration' : 'Tutor/Staff');
-            
-            const isActive = this.state.activeConversationId === conv.id;
-            const unreadClass = conv.unreadCalc > 0 ? 'bg-green-50' : '';
-            
-            const div = document.createElement('div');
-            div.className = `p-4 border-b hover:bg-gray-50 cursor-pointer transition-colors ${isActive ? 'bg-blue-50' : ''} ${unreadClass}`;
-            div.innerHTML = `
-                <div class="flex justify-between items-start">
-                    <div class="flex items-center gap-3 overflow-hidden">
-                        <div class="w-10 h-10 rounded-full ${conv.otherPartyId === 'MANAGEMENT_OFFICE' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'} flex items-center justify-center font-bold shrink-0">
-                            ${displayName.charAt(0)}
-                        </div>
-                        <div class="min-w-0">
-                            <h4 class="font-semibold text-gray-900 truncate">${displayName}</h4>
-                            <p class="text-sm text-gray-500 truncate w-32 md:w-40 ${conv.unreadCalc > 0 ? 'font-bold text-gray-800' : ''}">${conv.lastMessage}</p>
-                        </div>
-                    </div>
-                    <div class="text-right shrink-0">
-                         ${conv.unreadCalc > 0 ? `<span class="inline-flex items-center justify-center w-5 h-5 bg-green-500 text-white text-xs font-bold rounded-full mb-1">${conv.unreadCalc}</span>` : ''}
-                    </div>
-                </div>
-            `;
-            div.onclick = () => this.openConversation(conv.id, displayName, conv.otherPartyId);
-            listContainer.appendChild(div);
-        });
-    },
-
-    renderMessageBubble: function(msg) {
-        const isMe = msg.senderId === this.state.currentUserPhone;
-        const container = document.getElementById('msg-bubbles-container');
-        
-        const date = msg.createdAt?.toDate ? msg.createdAt.toDate() : new Date(msg.createdAt);
-        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        const div = document.createElement('div');
-        div.className = `flex w-full mb-4 ${isMe ? 'justify-end' : 'justify-start'}`;
-        div.innerHTML = `
-            <div class="max-w-[75%] md:max-w-[60%] flex flex-col ${isMe ? 'items-end' : 'items-start'}">
-                <div class="px-4 py-2 rounded-2xl shadow-sm text-sm break-words
-                    ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'}">
-                    ${msg.content}
-                </div>
-                <span class="text-[10px] text-gray-400 mt-1 px-1">${timeStr}</span>
-            </div>
-        `;
-        container.appendChild(div);
-    },
-
-    showNewChatOptions: function() {
-        // Build a temporary list of all contacts (Management + Tutors)
-        const listContainer = document.getElementById('msg-conversations-list');
-        listContainer.innerHTML = `
-            <div class="p-3 bg-gray-100 text-gray-600 text-sm font-bold flex justify-between items-center">
-                <span>Select Contact</span>
-                <button onclick="messagingSystem.renderConversationList()" class="text-red-500">Cancel</button>
-            </div>
-        `;
-
-        this.state.tutorMap.forEach((name, id) => {
-            const div = document.createElement('div');
-            div.className = "p-4 border-b hover:bg-gray-50 cursor-pointer flex items-center gap-3";
-            div.innerHTML = `
-                <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold">
-                    ${name.charAt(0)}
-                </div>
-                <span class="font-medium text-gray-800">${name}</span>
-            `;
-            div.onclick = () => this.startNewChat(id, name);
-            listContainer.appendChild(div);
-        });
-    },
-
-    backToInbox: function() {
-        document.getElementById('msg-sidebar').classList.remove('hidden');
-        document.getElementById('msg-chat-area').classList.add('hidden');
-        this.state.activeConversationId = null;
-        if (this.state.listeners.chat) { this.state.listeners.chat(); this.state.listeners.chat = null; }
-        this.renderConversationList(); 
-    },
-
-    updateBadgeCount: function(count) {
-        const badge = document.getElementById('msg-fab-badge');
-        if (badge) {
-            badge.innerText = count > 9 ? '9+' : count;
-            badge.classList.toggle('hidden', count === 0);
-        }
-    },
-
-    scrollToBottom: function() {
-        const container = document.getElementById('msg-bubbles-container');
-        if (container) container.scrollTop = container.scrollHeight;
-    },
-
-    // UI Helpers
-    injectStyles: function() {
-        if (document.getElementById('msg-styles')) return;
-        const style = document.createElement('style');
-        style.id = 'msg-styles';
-        style.textContent = `
-            .msg-fab { position: fixed; bottom: 2rem; right: 2rem; z-index: 50; transition: transform 0.2s; }
-            .msg-fab:hover { transform: scale(1.05); }
-            .msg-modal-backdrop { background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
-            .animate-popIn { animation: popIn 0.2s ease-out; }
-            @keyframes popIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        `;
-        document.head.appendChild(style);
-    },
-
-    injectFloatingButton: function() {
-        if (document.querySelector('.msg-fab')) return;
-        const btn = document.createElement('button');
-        btn.className = "msg-fab flex items-center justify-center w-14 h-14 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full shadow-lg text-white hover:shadow-xl focus:outline-none";
-        btn.innerHTML = `
-            <div class="relative">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                </svg>
-                <span id="msg-fab-badge" class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs flex items-center justify-center font-bold hidden border-2 border-white">0</span>
-            </div>
-        `;
-        btn.onclick = () => document.getElementById('msg-modal').classList.remove('hidden');
-        document.body.appendChild(btn);
-    },
-
-    injectInboxModal: function() {
-        if (document.getElementById('msg-modal')) return;
-        const modal = document.createElement('div');
-        modal.id = 'msg-modal';
-        modal.className = "hidden fixed inset-0 z-[60] msg-modal-backdrop flex items-center justify-center p-4";
-        modal.innerHTML = `
-            <div class="bg-white w-full max-w-5xl h-[80vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-popIn">
-                <div id="msg-sidebar" class="w-full md:w-1/3 border-r border-gray-100 flex flex-col bg-white">
-                    <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                        <h3 class="font-bold text-gray-800 text-lg">Messages</h3>
-                        <button onclick="document.getElementById('msg-modal').classList.add('hidden')" class="md:hidden text-gray-500">Close</button>
-                    </div>
-                    <div id="msg-conversations-list" class="flex-1 overflow-y-auto"></div>
-                </div>
-                <div id="msg-chat-area" class="w-full md:w-2/3 flex flex-col bg-gray-50 relative hidden md:flex">
-                    <div class="md:hidden p-3 bg-white border-b flex items-center shadow-sm">
-                        <button onclick="messagingSystem.backToInbox()" class="mr-3 text-gray-600 font-bold">← Back</button>
-                    </div>
-                    <div id="msg-empty-view" class="flex-1 flex flex-col items-center justify-center text-gray-400 p-8 text-center">
-                        <div class="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">💬</div>
-                        <h3 class="text-xl font-semibold text-gray-600">Your Messages</h3>
-                        <p>Select a conversation or start a new one.</p>
-                    </div>
-                    <div id="msg-chat-view" class="flex-1 flex flex-col hidden h-full">
-                        <div class="p-4 bg-white border-b border-gray-200 shadow-sm flex justify-between items-center z-10">
-                            <h3 id="msg-header-name" class="font-bold text-gray-900 text-lg">Chat</h3>
-                            <button onclick="document.getElementById('msg-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">✕</button>
-                        </div>
-                        <div id="msg-bubbles-container" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
-                        <div class="p-4 bg-white border-t border-gray-200">
-                            <div class="flex items-end gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200 focus-within:ring-2 focus-within:ring-blue-100">
-                                <textarea id="msg-input" rows="1" class="flex-1 bg-transparent border-none focus:ring-0 p-2 resize-none max-h-32 text-gray-700" placeholder="Type a message..."></textarea>
-                                <button id="msg-send-btn" class="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm">➤</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-        modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
+function populateStudentDropdownForMessages() {
+    const studentDropdown = document.getElementById('messageStudent');
+    studentDropdown.innerHTML = '<option value="">Select student (optional)</option>';
+    
+    // Get student names from the userChildren array
+    if (userChildren.length === 0) {
+        studentDropdown.innerHTML += '<option value="" disabled>No students found</option>';
+        return;
     }
-};
 
-// --- AUTO-INTEGRATION HOOK (GOD MODE) ---
-// This safely wraps your existing loadAllReportsForParent function
-// to automatically start the messaging system whenever you log in.
-if (typeof loadAllReportsForParent === 'function') {
-    const originalLoadReportsFn = loadAllReportsForParent;
-    loadAllReportsForParent = async function(parentPhone, userId, forceRefresh = false) {
-        // 1. Run original report loading
-        await originalLoadReportsFn(parentPhone, userId, forceRefresh);
-        // 2. Start Messaging
-        messagingSystem.init();
-    };
-    console.log("✅ Messaging System successfully hooked into Parent Portal");
+    userChildren.forEach(studentName => {
+        const option = document.createElement('option');
+        option.value = studentName;
+        option.textContent = capitalize(studentName);
+        studentDropdown.appendChild(option);
+    });
+}
+
+async function submitMessage() {
+    const recipient = document.getElementById('messageRecipient').value;
+    const subject = document.getElementById('messageSubject').value.trim();
+    const student = document.getElementById('messageStudent').value;
+    const content = document.getElementById('messageContent').value.trim();
+    const isUrgent = document.getElementById('messageUrgent').checked;
+
+    // Validation
+    if (!recipient || !subject || !content) {
+        showMessage('Please fill in all required fields', 'error');
+        return;
+    }
+
+    if (content.length < 10) {
+        showMessage('Please provide a more detailed message (at least 10 characters)', 'error');
+        return;
+    }
+
+    const submitBtn = document.getElementById('submitMessageBtn');
+    submitBtn.disabled = true;
+    document.getElementById('submitMessageText').textContent = 'Sending...';
+    document.getElementById('submitMessageSpinner').classList.remove('hidden');
+
+    try {
+        const user = auth.currentUser;
+        if (!user) {
+            throw new Error('Please sign in to send messages');
+        }
+
+        // Get user data
+        const userDoc = await db.collection('parent_users').doc(user.uid).get();
+        const userData = userDoc.data();
+
+        // Determine recipients based on selection
+        let recipients = [];
+        if (recipient === 'tutor') {
+            recipients = ['tutors'];
+        } else if (recipient === 'management') {
+            recipients = ['management'];
+        } else if (recipient === 'both') {
+            recipients = ['tutors', 'management'];
+        }
+
+        // Create message document in tutor_messages collection
+        const messageData = {
+            parentName: currentUserData?.parentName || userData.parentName || 'Unknown Parent',
+            parentPhone: userData.phone,
+            parentEmail: userData.email,
+            parentUid: user.uid,
+            studentName: student || 'General',
+            recipients: recipients,
+            subject: subject,
+            content: content,
+            isUrgent: isUrgent,
+            status: 'sent',
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            type: 'parent_to_staff',
+            readBy: []
+        };
+
+        // Save to Firestore
+        await db.collection('tutor_messages').add(messageData);
+
+        showMessage('Message sent successfully! Our team will respond within 24-48 hours.', 'success');
+        
+        // Close modal and reset form
+        hideComposeMessageModal();
+
+    } catch (error) {
+        console.error('Message submission error:', error);
+        showMessage('Failed to send message. Please try again.', 'error');
+    } finally {
+        submitBtn.disabled = false;
+        document.getElementById('submitMessageText').textContent = 'Send Message';
+        document.getElementById('submitMessageSpinner').classList.add('hidden');
+    }
 }
 
 // -------------------------------------------------------------------
