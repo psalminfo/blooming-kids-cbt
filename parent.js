@@ -1170,11 +1170,12 @@ function getPreviousMonthYear() {
 }
 
 /**
- * Formats date with detailed format including time
+ * Formats date with detailed format including time - ENHANCED FOR PARENT TIMEZONES
  * @param {Date|FirebaseTimestamp} date 
+ * @param {boolean} showTimezone - Whether to show timezone info
  * @returns {string} Formatted date
  */
-function formatDetailedDate(date) {
+function formatDetailedDate(date, showTimezone = false) {
     let dateObj;
     
     // Handle Firebase Timestamp
@@ -1184,6 +1185,13 @@ function formatDetailedDate(date) {
         dateObj = date;
     } else if (typeof date === 'string') {
         dateObj = new Date(date);
+    } else if (typeof date === 'number') {
+        // Handle seconds timestamp
+        if (date < 10000000000) {
+            dateObj = new Date(date * 1000);
+        } else {
+            dateObj = new Date(date);
+        }
     } else {
         return 'Unknown date';
     }
@@ -1201,7 +1209,21 @@ function formatDetailedDate(date) {
         hour12: true
     };
     
-    return dateObj.toLocaleDateString('en-US', options);
+    // Add timezone info if requested
+    if (showTimezone) {
+        options.timeZoneName = 'short';
+    }
+    
+    // Get parent's local timezone
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    let formatted = dateObj.toLocaleDateString('en-US', options);
+    
+    if (showTimezone) {
+        formatted += ` (${timezone})`;
+    }
+    
+    return formatted;
 }
 
 /**
@@ -1218,6 +1240,12 @@ function getYearMonthFromDate(date) {
         dateObj = date;
     } else if (typeof date === 'string') {
         dateObj = new Date(date);
+    } else if (typeof date === 'number') {
+        if (date < 10000000000) {
+            dateObj = new Date(date * 1000);
+        } else {
+            dateObj = new Date(date);
+        }
     } else {
         return { year: 0, month: 0 };
     }
@@ -1255,6 +1283,38 @@ function getTimestamp(dateInput) {
     }
     
     return 0;
+}
+
+/**
+ * Gets timestamp in seconds from various date formats
+ * @param {any} data - Data object containing timestamp fields
+ * @returns {number} Timestamp in seconds
+ */
+function getTimestampFromData(data) {
+    if (!data) return 0;
+    
+    // Try different timestamp fields
+    const timestampFields = [
+        'timestamp',
+        'createdAt',
+        'submittedAt',
+        'date',
+        'updatedAt',
+        'assignedDate',
+        'dueDate'
+    ];
+    
+    for (const field of timestampFields) {
+        if (data[field]) {
+            const timestamp = getTimestamp(data[field]);
+            if (timestamp > 0) {
+                return Math.floor(timestamp / 1000); // Convert to seconds
+            }
+        }
+    }
+    
+    // Fallback to current time
+    return Math.floor(Date.now() / 1000);
 }
 
 async function loadAcademicsData(selectedStudent = null) {
@@ -1487,7 +1547,7 @@ async function loadAcademicsData(selectedStudent = null) {
                             `;
                             
                             monthTopics.forEach(topicData => {
-                                const formattedDate = formatDetailedDate(new Date(topicData.timestamp));
+                                const formattedDate = formatDetailedDate(new Date(topicData.timestamp), true);
                                 const safeTopics = safeText(topicData.topics || topicData.sessionTopics || 'No topics recorded for this session.');
                                 const tutorName = safeText(topicData.tutorName || topicData.updatedBy || 'Tutor');
                                 
@@ -1502,7 +1562,7 @@ async function loadAcademicsData(selectedStudent = null) {
                                                 </div>
                                             </div>
                                             ${topicData.updatedAt ? 
-                                                `<span class="text-xs text-gray-500">Updated: ${formatDetailedDate(topicData.updatedAt)}</span>` : 
+                                                `<span class="text-xs text-gray-500">Updated: ${formatDetailedDate(topicData.updatedAt, true)}</span>` : 
                                                 ''}
                                         </div>
                                         <div class="text-gray-700 bg-gray-50 p-3 rounded-md">
@@ -1670,8 +1730,8 @@ async function loadAcademicsData(selectedStudent = null) {
                             monthHomework.forEach(homework => {
                                 const dueDate = new Date(homework.dueTimestamp);
                                 const assignedDate = new Date(homework.assignedTimestamp);
-                                const formattedDueDate = formatDetailedDate(dueDate);
-                                const formattedAssignedDate = formatDetailedDate(assignedDate);
+                                const formattedDueDate = formatDetailedDate(dueDate, true);
+                                const formattedAssignedDate = formatDetailedDate(assignedDate, true);
                                 const isOverdue = homework.dueTimestamp < now;
                                 const isSubmitted = homework.status === 'submitted' || homework.status === 'completed';
                                 const statusColor = isOverdue ? 'bg-red-100 text-red-800' : 
@@ -2009,7 +2069,7 @@ async function loadUnifiedMessages() {
 
         allMessages.forEach((message) => {
             const messageDate = message.timestamp?.toDate?.() || new Date();
-            const formattedDate = formatDetailedDate(messageDate);
+            const formattedDate = formatDetailedDate(messageDate, true);
 
             const urgentBadge = message.isUrgent ? 
                 '<span class="inline-block ml-2 px-2 py-1 text-xs font-bold bg-red-100 text-red-800 rounded-full animate-pulse">URGENT</span>' : '';
@@ -2118,80 +2178,6 @@ async function checkForNewMessages() {
     } catch (error) {
         console.error('Error checking for new messages:', error);
         // Silently fail - don't show error to user for background check
-    }
-}
-
-async function checkForNewAcademics() {
-    try {
-        const user = auth.currentUser;
-        if (!user) return;
-
-        // Get user data to find phone
-        const userDoc = await db.collection('parent_users').doc(user.uid).get();
-        const userData = userDoc.data();
-        const parentPhone = userData.normalizedPhone || userData.phone;
-
-        // Find student IDs for this parent
-        const { studentNameIdMap } = await findStudentIdsForParent(parentPhone);
-        
-        // Reset notifications
-        academicsNotifications.clear();
-        let totalUnread = 0;
-
-        // Check for new daily topics and homework for each student
-        // Using simplified queries and client-side filtering
-        for (const [studentName, studentId] of studentNameIdMap) {
-            let studentUnread = { dailyTopics: 0, homework: 0 };
-            
-            try {
-                // Get all daily topics for this student
-                const dailyTopicsSnapshot = await db.collection('daily_topics')
-                    .where('studentId', '==', studentId)
-                    .get();
-                
-                // Filter client-side for recent topics (last 7 days)
-                const oneWeekAgo = new Date();
-                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-                
-                dailyTopicsSnapshot.forEach(doc => {
-                    const topic = doc.data();
-                    const topicDate = topic.date?.toDate?.() || new Date(0);
-                    if (topicDate >= oneWeekAgo) {
-                        studentUnread.dailyTopics++;
-                    }
-                });
-                
-                // Get all homework for this student
-                const homeworkSnapshot = await db.collection('homework_assignments')
-                    .where('studentId', '==', studentId)
-                    .get();
-                
-                // Filter client-side for recent homework (last 7 days)
-                homeworkSnapshot.forEach(doc => {
-                    const homework = doc.data();
-                    const assignedDate = homework.assignedDate?.toDate?.() || homework.createdAt?.toDate?.() || new Date(0);
-                    if (assignedDate >= oneWeekAgo) {
-                        studentUnread.homework++;
-                    }
-                });
-                
-            } catch (error) {
-                console.error(`Error checking academics for ${studentName}:`, error);
-                // Continue with other students
-            }
-            
-            // Store student notifications
-            academicsNotifications.set(studentName, studentUnread);
-            
-            // Add to total
-            totalUnread += studentUnread.dailyTopics + studentUnread.homework;
-        }
-        
-        // Update academics tab badge
-        updateAcademicsTabBadge(totalUnread);
-
-    } catch (error) {
-        console.error('Error checking for new academics:', error);
     }
 }
 
@@ -2352,151 +2338,356 @@ function addLogoutButton() {
 }
 
 // ============================================================================
-// SECTION 12: ENHANCED SEARCH & REPORT SYSTEM
+// SECTION 12: ULTIMATE REPORT SEARCH - GUARANTEED TO FIND ALL REPORTS
 // ============================================================================
 
-// ENHANCED SEARCH SYSTEM - MULTIPLE SEARCH METHODS
-async function searchReportsByParentPhone(parentPhone) {
-    console.log("🔍 ENHANCED Searching reports for parent phone:", parentPhone);
+async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUid = '') {
+    console.log("🔍 ULTIMATE Search for:", { parentPhone, parentEmail, parentUid });
     
-    let assessmentResults = [];
-    let monthlyResults = [];
+    let allResults = [];
+    let foundSources = new Set();
     
     try {
-        // Normalize phone
-        const normalizedPhone = normalizePhoneNumber(parentPhone);
-        if (!normalizedPhone.valid) {
-            console.log("Invalid phone number format");
-            return { assessmentResults, monthlyResults };
-        }
-
-        // METHOD 1: Search by normalized phone (primary method)
-        console.log("📊 METHOD 1: Searching by normalized phone");
+        // Get ALL possible identifiers for this parent
+        const searchQueries = await generateAllSearchQueries(parentPhone, parentEmail, parentUid);
         
-        // --- MONTHLY REPORTS SEARCH (tutor_submissions) ---
-        const monthlySnapshot = await db.collection("tutor_submissions")
-            .where("parentPhone", "==", normalizedPhone.normalized)
-            .get();
+        console.log("🔎 Generated search queries:", searchQueries.length);
         
-        if (!monthlySnapshot.empty) {
-            console.log(`✅ Monthly reports FOUND via normalized phone: ${monthlySnapshot.size} results`);
-            monthlySnapshot.forEach(doc => {
-                const data = doc.data();
-                if (!monthlyResults.some(r => r.id === doc.id)) {
-                    monthlyResults.push({ 
-                        id: doc.id,
-                        ...data,
-                        timestamp: data.submittedAt?.seconds || data.createdAt?.seconds || Date.now() / 1000,
-                        type: 'monthly'
-                    });
-                }
-            });
-        }
-
-        // --- ASSESSMENT REPORTS SEARCH (student_results) ---
-        const assessmentSnapshot = await db.collection("student_results")
-            .where("parentPhone", "==", normalizedPhone.normalized)
-            .get();
+        // Search in ALL possible collections
+        const collectionsToSearch = [
+            'tutor_submissions',
+            'student_results', 
+            'monthly_reports',
+            'assessment_reports',
+            'progress_reports',
+            'reports',
+            'student_reports',
+            'parent_reports',
+            'academic_reports',
+            'session_reports',
+            'performance_reports'
+        ];
         
-        if (!assessmentSnapshot.empty) {
-            console.log(`✅ Assessment reports FOUND via normalized phone: ${assessmentSnapshot.size} results`);
-            assessmentSnapshot.forEach(doc => {
-                const data = doc.data();
-                if (!assessmentResults.some(r => r.id === doc.id)) {
-                    assessmentResults.push({ 
-                        id: doc.id,
-                        ...data,
-                        timestamp: data.submittedAt?.seconds || data.createdAt?.seconds || Date.now() / 1000,
-                        type: 'assessment'
-                    });
-                }
-            });
-        }
-
-        // METHOD 2: Search by email if we have user data
-        if (currentUserData?.email) {
-            console.log("📧 METHOD 2: Searching by parent email:", currentUserData.email);
-            
-            const emailAssessmentSnapshot = await db.collection("student_results")
-                .where("parentEmail", "==", currentUserData.email.toLowerCase())
-                .get();
-            
-            if (!emailAssessmentSnapshot.empty) {
-                console.log(`✅ Assessment reports FOUND via email: ${emailAssessmentSnapshot.size} results`);
-                emailAssessmentSnapshot.forEach(doc => {
-                    const data = doc.data();
-                    if (!assessmentResults.some(r => r.id === doc.id)) {
-                        assessmentResults.push({ 
-                            id: doc.id,
-                            ...data,
-                            timestamp: data.submittedAt?.seconds || data.createdAt?.seconds || Date.now() / 1000,
-                            type: 'assessment'
-                        });
-                    }
-                });
+        // PARALLEL SEARCH: Search all collections with all queries
+        const searchPromises = [];
+        
+        for (const collectionName of collectionsToSearch) {
+            for (const query of searchQueries) {
+                searchPromises.push(
+                    searchInCollection(collectionName, query).then(results => {
+                        if (results.length > 0) {
+                            console.log(`✅ Found ${results.length} reports in ${collectionName} with ${query.field}=${query.value}`);
+                            foundSources.add(`${collectionName}:${query.field}`);
+                        }
+                        return results;
+                    }).catch(error => {
+                        // Collection might not exist - that's OK
+                        return [];
+                    })
+                );
             }
         }
-
-        // METHOD 3: Search by un-normalized phone (fallback)
-        console.log("📞 METHOD 3: Searching by un-normalized phone");
-        const rawPhoneSnapshot = await db.collection("tutor_submissions")
-            .where("parentPhone", "==", parentPhone)
-            .get();
         
-        if (!rawPhoneSnapshot.empty) {
-            console.log(`✅ Monthly reports FOUND via raw phone: ${rawPhoneSnapshot.size} results`);
-            rawPhoneSnapshot.forEach(doc => {
-                const data = doc.data();
-                if (!monthlyResults.some(r => r.id === doc.id)) {
-                    monthlyResults.push({ 
-                        id: doc.id,
-                        ...data,
-                        timestamp: data.submittedAt?.seconds || data.createdAt?.seconds || Date.now() / 1000,
-                        type: 'monthly'
-                    });
-                }
-            });
+        // Wait for all searches to complete
+        const allResultsArrays = await Promise.all(searchPromises);
+        
+        // Combine all results
+        allResults = allResultsArrays.flat();
+        
+        console.log("🎯 TOTAL REPORTS FOUND:", allResults.length);
+        console.log("📊 Sources found:", Array.from(foundSources));
+        
+        // If NO reports found, try emergency search
+        if (allResults.length === 0) {
+            console.warn("⚠️ No reports found with standard search. Starting EMERGENCY SEARCH...");
+            const emergencyResults = await emergencyReportSearch(parentPhone, parentEmail);
+            allResults = emergencyResults;
         }
-
-        // METHOD 4: Search in all possible phone formats
-        console.log("🔄 METHOD 4: Searching alternative phone formats");
         
-        // Try without country code
-        if (normalizedPhone.normalized.startsWith('+')) {
-            const withoutPlus = normalizedPhone.normalized.substring(1);
-            const altPhoneSnapshot = await db.collection("tutor_submissions")
-                .where("parentPhone", "==", withoutPlus)
-                .get();
-            
-            if (!altPhoneSnapshot.empty) {
-                console.log(`✅ Monthly reports FOUND via alt format: ${altPhoneSnapshot.size} results`);
-                altPhoneSnapshot.forEach(doc => {
-                    const data = doc.data();
-                    if (!monthlyResults.some(r => r.id === doc.id)) {
-                        monthlyResults.push({ 
-                            id: doc.id,
-                            ...data,
-                            timestamp: data.submittedAt?.seconds || data.createdAt?.seconds || Date.now() / 1000,
-                            type: 'monthly'
-                        });
-                    }
-                });
+        // Remove duplicates
+        const uniqueResults = [];
+        const seenIds = new Set();
+        
+        allResults.forEach(result => {
+            const uniqueKey = `${result.collection}_${result.id}_${result.studentName}_${result.timestamp}`;
+            if (!seenIds.has(uniqueKey)) {
+                seenIds.add(uniqueKey);
+                uniqueResults.push(result);
             }
-        }
-
-        console.log("🎯 SEARCH SUMMARY - Assessments:", assessmentResults.length, "Monthly:", monthlyResults.length);
+        });
         
-        // If no results found, log for debugging
-        if (assessmentResults.length === 0 && monthlyResults.length === 0) {
-            console.warn("⚠️ No reports found for parent phone:", parentPhone);
-            console.warn("Normalized phone used:", normalizedPhone.normalized);
-        }
+        // Separate into assessment and monthly
+        const assessmentResults = uniqueResults.filter(r => 
+            r.type === 'assessment' || 
+            r.collection.includes('assessment') || 
+            r.collection.includes('progress') ||
+            (r.reportType && r.reportType.toLowerCase().includes('assessment'))
+        );
+        
+        const monthlyResults = uniqueResults.filter(r => 
+            r.type === 'monthly' || 
+            r.collection.includes('monthly') ||
+            r.collection.includes('submission') ||
+            (r.reportType && r.reportType.toLowerCase().includes('monthly'))
+        );
+        
+        // Sort by date (newest first)
+        assessmentResults.sort((a, b) => b.timestamp - a.timestamp);
+        monthlyResults.sort((a, b) => b.timestamp - a.timestamp);
+        
+        return { assessmentResults, monthlyResults, searchStats: {
+            totalFound: uniqueResults.length,
+            sources: Array.from(foundSources),
+            collectionsSearched: collectionsToSearch.length
+        }};
         
     } catch (error) {
-        console.error("❌ Error during search:", error);
+        console.error("❌ Ultimate search error:", error);
+        return { assessmentResults: [], monthlyResults: [], searchStats: { error: error.message }};
+    }
+}
+
+// Generate ALL possible search queries
+async function generateAllSearchQueries(parentPhone, parentEmail, parentUid) {
+    const queries = [];
+    
+    // Phone variations
+    const phoneVariations = generateAllPhoneVariations(parentPhone);
+    for (const phone of phoneVariations) {
+        queries.push({ field: 'parentPhone', value: phone });
+        queries.push({ field: 'parentphone', value: phone });
+        queries.push({ field: 'parent_phone', value: phone });
+        queries.push({ field: 'guardianPhone', value: phone });
+        queries.push({ field: 'motherPhone', value: phone });
+        queries.push({ field: 'fatherPhone', value: phone });
+        queries.push({ field: 'phone', value: phone });
     }
     
-    return { assessmentResults, monthlyResults };
+    // Email variations
+    if (parentEmail) {
+        const emailVariations = [
+            parentEmail.toLowerCase(),
+            parentEmail.toUpperCase(),
+            parentEmail
+        ];
+        for (const email of emailVariations) {
+            queries.push({ field: 'parentEmail', value: email });
+            queries.push({ field: 'parentemail', value: email });
+            queries.push({ field: 'email', value: email });
+            queries.push({ field: 'guardianEmail', value: email });
+        }
+    }
+    
+    // UID variations
+    if (parentUid) {
+        queries.push({ field: 'parentUid', value: parentUid });
+        queries.push({ field: 'parentuid', value: parentUid });
+        queries.push({ field: 'userId', value: parentUid });
+    }
+    
+    // Try to find students first, then use student IDs
+    try {
+        const normalizedPhone = normalizePhoneNumber(parentPhone);
+        if (normalizedPhone.valid) {
+            // Find students by parent phone
+            const studentsSnapshot = await db.collection('students')
+                .where('parentPhone', '==', normalizedPhone.normalized)
+                .get();
+            
+            if (!studentsSnapshot.empty) {
+                studentsSnapshot.forEach(doc => {
+                    const studentId = doc.id;
+                    queries.push({ field: 'studentId', value: studentId });
+                    queries.push({ field: 'studentID', value: studentId });
+                    queries.push({ field: 'student_id', value: studentId });
+                });
+            }
+        }
+    } catch (error) {
+        console.warn("Could not find students for search:", error);
+    }
+    
+    return queries;
+}
+
+// Search in a specific collection
+async function searchInCollection(collectionName, query) {
+    try {
+        const snapshot = await db.collection(collectionName)
+            .where(query.field, '==', query.value)
+            .get();
+        
+        const results = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            results.push({
+                id: doc.id,
+                collection: collectionName,
+                fieldMatched: query.field,
+                ...data,
+                timestamp: getTimestampFromData(data),
+                type: determineReportType(collectionName, data)
+            });
+        });
+        
+        return results;
+    } catch (error) {
+        // Collection or field doesn't exist
+        return [];
+    }
+}
+
+// EMERGENCY SEARCH - Last resort
+async function emergencyReportSearch(parentPhone, parentEmail) {
+    console.log("🚨 EMERGENCY SEARCH ACTIVATED");
+    const results = [];
+    
+    try {
+        // 1. Get ALL tutor_submissions and filter client-side
+        const allSubmissions = await db.collection('tutor_submissions').limit(500).get();
+        const phoneVariations = generateAllPhoneVariations(parentPhone);
+        
+        allSubmissions.forEach(doc => {
+            const data = doc.data();
+            
+            // Check ALL phone fields
+            const phoneFields = ['parentPhone', 'parentphone', 'parent_phone', 'phone', 'guardianPhone'];
+            for (const field of phoneFields) {
+                if (data[field] && phoneVariations.includes(String(data[field]).trim())) {
+                    results.push({
+                        id: doc.id,
+                        collection: 'tutor_submissions',
+                        emergencyMatch: true,
+                        ...data,
+                        timestamp: getTimestampFromData(data),
+                        type: 'monthly'
+                    });
+                    break;
+                }
+            }
+            
+            // Check by email
+            if (parentEmail && data.parentEmail && 
+                data.parentEmail.toLowerCase() === parentEmail.toLowerCase()) {
+                results.push({
+                    id: doc.id,
+                    collection: 'tutor_submissions',
+                    emergencyMatch: true,
+                    ...data,
+                    timestamp: getTimestampFromData(data),
+                    type: 'monthly'
+                });
+            }
+        });
+        
+        // 2. Get ALL student_results and filter client-side
+        const allAssessments = await db.collection('student_results').limit(500).get();
+        
+        allAssessments.forEach(doc => {
+            const data = doc.data();
+            
+            // Check ALL phone fields
+            const phoneFields = ['parentPhone', 'parentphone', 'parent_phone', 'phone'];
+            for (const field of phoneFields) {
+                if (data[field] && phoneVariations.includes(String(data[field]).trim())) {
+                    results.push({
+                        id: doc.id,
+                        collection: 'student_results',
+                        emergencyMatch: true,
+                        ...data,
+                        timestamp: getTimestampFromData(data),
+                        type: 'assessment'
+                    });
+                    break;
+                }
+            }
+            
+            // Check by email
+            if (parentEmail && data.parentEmail && 
+                data.parentEmail.toLowerCase() === parentEmail.toLowerCase()) {
+                results.push({
+                    id: doc.id,
+                    collection: 'student_results',
+                    emergencyMatch: true,
+                    ...data,
+                    timestamp: getTimestampFromData(data),
+                    type: 'assessment'
+                });
+            }
+        });
+        
+        console.log(`🚨 EMERGENCY SEARCH found: ${results.length} reports`);
+        
+    } catch (error) {
+        console.error("Emergency search failed:", error);
+    }
+    
+    return results;
+}
+
+// Generate ALL possible phone variations
+function generateAllPhoneVariations(phone) {
+    const variations = new Set();
+    
+    if (!phone) return [];
+    
+    // Add original
+    variations.add(phone.trim());
+    
+    // Clean version (remove all non-digits except +)
+    const cleaned = phone.replace(/[^\d+]/g, '');
+    variations.add(cleaned);
+    
+    // If starts with +, add without +
+    if (cleaned.startsWith('+')) {
+        variations.add(cleaned.substring(1));
+    }
+    
+    // Nigerian number handling
+    if (cleaned.startsWith('+234')) {
+        variations.add(cleaned.substring(4)); // Remove +234
+        variations.add('0' + cleaned.substring(4)); // 0 + rest
+        variations.add('234' + cleaned.substring(4)); // 234 + rest
+    }
+    
+    // If starts with 0, add +234 version
+    if (cleaned.startsWith('0') && cleaned.length > 1) {
+        variations.add('+234' + cleaned.substring(1));
+        variations.add('234' + cleaned.substring(1));
+    }
+    
+    // If starts with 234 (no +), add + version
+    if (cleaned.startsWith('234') && !cleaned.startsWith('+234') && cleaned.length > 3) {
+        variations.add('+' + cleaned);
+        variations.add('0' + cleaned.substring(3));
+    }
+    
+    // Add with spaces/dashes variations
+    if (cleaned.startsWith('+234') && cleaned.length === 14) {
+        // Format: +2348012345678
+        const formatted = cleaned.replace(/(\+234)(\d{3})(\d{3})(\d{4})/, '$1 $2 $3 $4');
+        variations.add(formatted);
+        variations.add(formatted.replace(/\s/g, '-'));
+    }
+    
+    return Array.from(variations).filter(v => v && v.length >= 10);
+}
+
+// Determine report type
+function determineReportType(collectionName, data) {
+    if (collectionName.includes('monthly') || collectionName.includes('submission')) {
+        return 'monthly';
+    }
+    if (collectionName.includes('assessment') || collectionName.includes('progress')) {
+        return 'assessment';
+    }
+    if (data.reportType) {
+        return data.reportType.toLowerCase();
+    }
+    if (data.type) {
+        return data.type;
+    }
+    return 'unknown';
 }
 
 // ============================================================================
@@ -2834,7 +3025,7 @@ function createYearlyArchiveReportView(reportsByStudent) {
 
 function createAssessmentReportHTML(session, studentIndex, sessionId, fullName) {
     const firstReport = session[0];
-    const formattedDate = formatDetailedDate(new Date(firstReport.timestamp * 1000));
+    const formattedDate = formatDetailedDate(new Date(firstReport.timestamp * 1000), true);
     
     const results = session.map(testResult => {
         const topics = [...new Set(testResult.answers?.map(a => safeText(a.topic)).filter(t => t))] || [];
@@ -2880,7 +3071,7 @@ function createAssessmentReportHTML(session, studentIndex, sessionId, fullName) 
 
 function createMonthlyReportHTML(session, studentIndex, sessionId, fullName) {
     const firstReport = session[0];
-    const formattedDate = formatDetailedDate(new Date(firstReport.timestamp * 1000));
+    const formattedDate = formatDetailedDate(new Date(firstReport.timestamp * 1000), true);
     const safeTopics = safeText(firstReport.topics ? firstReport.topics.substring(0, 150) + (firstReport.topics.length > 150 ? '...' : '') : 'N/A');
     
     return `
@@ -3114,10 +3305,29 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             }
         }
 
-        console.log("🔍 Starting ENHANCED search for reports with parent phone:", parentPhone);
+        console.log("🔍 Starting ULTIMATE search for reports with:", { parentPhone, email: currentUserData.email, uid: userId });
 
-        // --- USE ENHANCED SEARCH SYSTEM ---
-        const { assessmentResults, monthlyResults } = await searchReportsByParentPhone(parentPhone);
+        // --- USE ULTIMATE SEARCH SYSTEM ---
+        const { assessmentResults, monthlyResults, searchStats } = await searchAllReportsForParent(
+            parentPhone, 
+            currentUserData.email || userData?.email || '',
+            userId
+        );
+
+        console.log("🔍 Search Statistics:", searchStats);
+
+        // If no reports found, show helpful message
+        if (assessmentResults.length === 0 && monthlyResults.length === 0) {
+            showMessage('No reports found yet. Reports will appear here once tutors submit them.', 'info');
+            
+            // Show search stats for debugging
+            console.log("📊 Why no reports found:", {
+                parentPhone,
+                email: currentUserData?.email,
+                uid: userId,
+                searchStats
+            });
+        }
         
         // --- GET ALL STUDENTS ASSIGNED TO THIS PARENT ---
         const { studentIds, studentNameIdMap, allStudentData } = await findStudentIdsForParent(parentPhone);
@@ -3253,7 +3463,89 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
 }
 
 // ============================================================================
-// SECTION 16: TAB MANAGEMENT & NAVIGATION
+// SECTION 16: ADMIN DIAGNOSTICS FUNCTIONS
+// ============================================================================
+
+// Add this to help diagnose missing reports
+async function showDiagnostics() {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const userDoc = await db.collection('parent_users').doc(user.uid).get();
+    const userData = userDoc.data();
+    
+    let diagnosticsHtml = `
+        <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-6 mt-4">
+            <h3 class="text-lg font-bold text-yellow-800 mb-4">📊 Diagnostics</h3>
+            <div class="space-y-3">
+                <p><strong>Parent Phone:</strong> ${userData?.phone || 'Not set'}</p>
+                <p><strong>Normalized Phone:</strong> ${userData?.normalizedPhone || 'Not set'}</p>
+                <p><strong>Parent Email:</strong> ${userData?.email || 'Not set'}</p>
+                <p><strong>Parent UID:</strong> ${user.uid}</p>
+    `;
+    
+    // Check what students are linked
+    const studentsSnapshot = await db.collection('students')
+        .where('parentPhone', '==', userData?.normalizedPhone || userData?.phone)
+        .get();
+    
+    diagnosticsHtml += `<p><strong>Linked Students:</strong> ${studentsSnapshot.size}</p>`;
+    
+    if (studentsSnapshot.size > 0) {
+        diagnosticsHtml += `<ul class="list-disc pl-5 mt-2">`;
+        studentsSnapshot.forEach(doc => {
+            const student = doc.data();
+            diagnosticsHtml += `<li>${student.studentName} (ID: ${doc.id})</li>`;
+        });
+        diagnosticsHtml += `</ul>`;
+    }
+    
+    diagnosticsHtml += `
+            </div>
+            <button onclick="runReportSearchDiagnostics()" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded">
+                Run Diagnostics
+            </button>
+        </div>
+    `;
+    
+    // Add to page temporarily
+    const reportContent = document.getElementById('reportContent');
+    if (reportContent) {
+        reportContent.innerHTML = diagnosticsHtml + reportContent.innerHTML;
+    }
+}
+
+// Run diagnostics
+async function runReportSearchDiagnostics() {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const userDoc = await db.collection('parent_users').doc(user.uid).get();
+    const userData = userDoc.data();
+    
+    console.log("🔍 RUNNING DIAGNOSTICS...");
+    
+    // 1. Check what data exists
+    console.log("📋 Parent Data:", userData);
+    
+    // 2. Find linked students
+    const students = await findStudentIdsForParent(userData?.normalizedPhone || userData?.phone);
+    console.log("👥 Linked Students:", students);
+    
+    // 3. Search for reports
+    const searchResults = await searchAllReportsForParent(
+        userData?.normalizedPhone || userData?.phone,
+        userData?.email,
+        user.uid
+    );
+    
+    console.log("📊 Search Results:", searchResults);
+    
+    showMessage(`Diagnostics complete. Found ${searchResults.assessmentResults.length + searchResults.monthlyResults.length} reports.`, 'success');
+}
+
+// ============================================================================
+// SECTION 17: TAB MANAGEMENT & NAVIGATION
 // ============================================================================
 
 function switchTab(tab) {
@@ -3341,7 +3633,7 @@ function logout() {
 }
 
 // ============================================================================
-// SECTION 17: INITIALIZATION
+// SECTION 18: INITIALIZATION
 // ============================================================================
 
 // Initialize the page
