@@ -1,5 +1,5 @@
 // ===================================================================
-// SECTION 1: APP CONFIGURATION & DEPENDENCIES
+// SECTION 1: APP CONFIGURATION & STYLES
 // ===================================================================
 
 firebase.initializeApp({
@@ -14,43 +14,44 @@ firebase.initializeApp({
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// Ensure phone library is loaded
+// Inject Custom CSS for Sleek Transitions
+const style = document.createElement('style');
+style.textContent = `
+    .fade-in { animation: fadeIn 0.4s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .accordion-content { transition: max-height 0.3s ease-out, opacity 0.3s ease-out; max-height: 0; opacity: 0; overflow: hidden; }
+    .accordion-content.open { max-height: 2000px; opacity: 1; }
+    
+    .tab-transition { transition: all 0.3s ease; }
+    .rotate-icon { transition: transform 0.3s ease; }
+    .rotate-icon.open { transform: rotate(180deg); }
+    
+    .loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+`;
+document.head.appendChild(style);
+
+// Load phone library if missing
 if (!document.querySelector('script[src*="libphonenumber"]')) {
-    const libphonenumberScript = document.createElement('script');
-    libphonenumberScript.src = 'https://cdn.jsdelivr.net/npm/libphonenumber-js@1.10.14/bundle/libphonenumber-js.min.js';
-    document.head.appendChild(libphonenumberScript);
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/libphonenumber-js@1.10.14/bundle/libphonenumber-js.min.js';
+    document.head.appendChild(s);
 }
 
 // ===================================================================
-// SECTION 2: UTILITY FUNCTIONS (SECURITY, FORMATTING & UI)
+// SECTION 2: UTILITY FUNCTIONS
 // ===================================================================
 
-/**
- * 🔒 SECURITY: Prevents XSS attacks
- */
 function escapeHtml(unsafe) {
     if (typeof unsafe !== 'string') return unsafe;
-    return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+    return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
-/**
- * 📅 FORMATTING: Restores detailed Date & Time display
- */
 function formatDateTime(timestamp) {
     if (!timestamp) return 'N/A';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp * 1000); // Handle Firestore vs Seconds
-    return date.toLocaleString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric', 
-        hour: '2-digit', 
-        minute: '2-digit' 
-    });
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp * 1000);
+    return date.toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function normalizePhoneNumber(phone) {
@@ -59,9 +60,7 @@ function normalizePhoneNumber(phone) {
         let cleaned = phone.replace(/[^\d+]/g, '').replace(/^0+/, '');
         if (!cleaned.startsWith('+')) cleaned = '+1' + cleaned;
         return { normalized: cleaned, valid: true, error: null };
-    } catch (error) {
-        return { normalized: null, valid: false, error: error.message };
-    }
+    } catch (e) { return { normalized: null, valid: false, error: e.message }; }
 }
 
 function capitalize(str) {
@@ -70,59 +69,66 @@ function capitalize(str) {
 }
 
 function showMessage(message, type) {
-    const existingMessage = document.querySelector('.message-toast');
-    if (existingMessage) existingMessage.remove();
-
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message-toast fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm ${
-        type === 'error' ? 'bg-red-500 text-white' : 
-        type === 'success' ? 'bg-green-500 text-white' : 
-        'bg-blue-500 text-white'
-    }`;
-    messageDiv.textContent = `BKH says: ${message}`;
-    document.body.appendChild(messageDiv);
-    setTimeout(() => { if (messageDiv.parentNode) messageDiv.remove(); }, 5000);
+    const existing = document.querySelector('.message-toast');
+    if (existing) existing.remove();
+    const div = document.createElement('div');
+    div.className = `message-toast fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm fade-in ${type === 'error' ? 'bg-red-500 text-white' : type === 'success' ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'}`;
+    div.textContent = `BKH says: ${message}`;
+    document.body.appendChild(div);
+    setTimeout(() => { if (div.parentNode) div.remove(); }, 5000);
 }
 
 function createCountryCodeDropdown() {
-    const phoneInputContainer = document.getElementById('signupPhone').parentNode;
     if(document.getElementById('countryCode')) return;
-
+    const parent = document.getElementById('signupPhone').parentNode;
     const container = document.createElement('div');
     container.className = 'flex gap-2';
     
-    const countryCodeSelect = document.createElement('select');
-    countryCodeSelect.id = 'countryCode';
-    countryCodeSelect.className = 'w-32 px-3 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200';
-    countryCodeSelect.required = true;
+    const select = document.createElement('select');
+    select.id = 'countryCode';
+    select.className = 'w-32 px-3 py-3 border border-gray-300 rounded-xl focus:outline-none transition-all duration-200';
     
     const countries = [
-        { code: '+1', name: 'USA/Canada (+1)' },
-        { code: '+234', name: 'Nigeria (+234)' },
-        { code: '+44', name: 'UK (+44)' },
-        { code: '+91', name: 'India (+91)' },
-        { code: '+971', name: 'UAE (+971)' }
+        { code: '+1', name: 'USA/Canada (+1)' }, { code: '+234', name: 'Nigeria (+234)' },
+        { code: '+44', name: 'UK (+44)' }, { code: '+91', name: 'India (+91)' }, { code: '+971', name: 'UAE (+971)' }
     ];
-    
-    countries.forEach(country => {
-        const option = document.createElement('option');
-        option.value = country.code;
-        option.textContent = country.name;
-        countryCodeSelect.appendChild(option);
+    countries.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.code; opt.textContent = c.name;
+        select.appendChild(opt);
     });
-    countryCodeSelect.value = '+1';
+    select.value = '+1';
     
-    const phoneInput = document.getElementById('signupPhone');
-    phoneInput.placeholder = 'Phone (No Country Code)';
-    phoneInput.className = 'flex-1 px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200';
+    const input = document.getElementById('signupPhone');
+    input.placeholder = 'Phone (No Country Code)';
     
-    container.appendChild(countryCodeSelect);
-    container.appendChild(phoneInput);
-    phoneInputContainer.appendChild(container);
+    container.appendChild(select);
+    container.appendChild(input);
+    parent.appendChild(container);
+}
+
+function downloadReportPDF(elementId, studentName, type) {
+    const element = document.getElementById(elementId);
+    if (!element) return showMessage('Report content not found', 'error');
+    
+    // Check for html2pdf
+    if (typeof html2pdf === 'undefined') {
+        return showMessage('PDF library loading... please try again in 5 seconds', 'error');
+    }
+
+    const opt = {
+        margin: 0.5,
+        filename: `${type}_Report_${studentName}_${new Date().toISOString().split('T')[0]}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+
+    html2pdf().from(element).set(opt).save();
 }
 
 // ===================================================================
-// SECTION 3: STATE MANAGEMENT & REFERRAL SYSTEM
+// SECTION 3: STATE & REFERRALS
 // ===================================================================
 
 let currentUserData = null;
@@ -134,444 +140,260 @@ let realTimeListeners = [];
 async function generateReferralCode() {
     const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const prefix = 'BKH';
-    let code;
-    let isUnique = false;
-
+    let code; let isUnique = false;
     while (!isUnique) {
-        let suffix = '';
-        for (let i = 0; i < 6; i++) suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+        let suffix = ''; for (let i = 0; i < 6; i++) suffix += chars.charAt(Math.floor(Math.random() * chars.length));
         code = prefix + suffix;
-        const snapshot = await db.collection('parent_users').where('referralCode', '==', code).limit(1).get();
-        if (snapshot.empty) isUnique = true;
+        const snap = await db.collection('parent_users').where('referralCode', '==', code).limit(1).get();
+        if (snap.empty) isUnique = true;
     }
     return code;
 }
 
 async function loadReferralRewards(parentUid) {
-    const rewardsContent = document.getElementById('rewardsContent');
-    rewardsContent.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading rewards data...</p></div>';
+    const container = document.getElementById('rewardsContent');
+    container.innerHTML = '<div class="text-center py-8"><div class="loading-spinner"></div><p class="mt-2 text-green-600">Loading rewards...</p></div>';
 
     try {
         const userDoc = await db.collection('parent_users').doc(parentUid).get();
         if (!userDoc.exists) return;
+        const data = userDoc.data();
         
-        const userData = userDoc.data();
-        const referralCode = userData.referralCode || 'N/A';
-        const totalEarnings = userData.referralEarnings || 0;
+        const snap = await db.collection('referral_transactions').where('ownerUid', '==', parentUid).get();
+        const txs = snap.docs.map(d => d.data()).sort((a,b) => (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0));
         
-        const transactionsSnapshot = await db.collection('referral_transactions').where('ownerUid', '==', parentUid).get();
+        let rows = '';
+        let stats = { pending: 0, paid: 0 };
         
-        let pendingCount = 0, approvedCount = 0, paidCount = 0;
-        let referralsHtml = '';
-
-        if (transactionsSnapshot.empty) {
-            referralsHtml = `<tr><td colspan="4" class="text-center py-4 text-gray-500">No one has used your referral code yet.</td></tr>`;
-        } else {
-            const transactions = transactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            transactions.sort((a, b) => (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0));
-            
-            transactions.forEach(data => {
-                const status = data.status || 'pending';
-                if (status === 'pending') pendingCount++;
-                if (status === 'approved') approvedCount++;
-                if (status === 'paid') paidCount++;
-                
-                const statusColor = status === 'paid' ? 'bg-green-100 text-green-800' : status === 'approved' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800';
-                const safeStudentName = escapeHtml(capitalize(data.referredStudentName || 'Unknown'));
-                const dateStr = formatDateTime(data.timestamp);
-
-                referralsHtml += `
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 text-sm font-medium text-gray-900">${safeStudentName}</td>
-                        <td class="px-4 py-3 text-sm text-gray-500">${dateStr}</td>
-                        <td class="px-4 py-3 text-sm"><span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium ${statusColor}">${capitalize(status)}</span></td>
-                        <td class="px-4 py-3 text-sm text-gray-900 font-bold">₦${(data.rewardAmount || 5000).toLocaleString()}</td>
-                    </tr>`;
-            });
-        }
-        
-        rewardsContent.innerHTML = `
-            <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-8 shadow-md">
-                <h2 class="text-2xl font-bold text-blue-800 mb-1">Your Referral Code</h2>
-                <p class="text-xl font-mono text-blue-600 tracking-wider p-2 bg-white inline-block rounded-lg border border-dashed border-blue-300 select-all">${escapeHtml(referralCode)}</p>
-                <p class="text-blue-700 mt-2">Share this code! Earn ₦5,000 per student.</p>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="bg-green-100 p-6 rounded-xl shadow-lg border-b-4 border-green-600"><p class="text-sm font-medium text-green-700">Total Earnings</p><p class="text-3xl font-extrabold text-green-900 mt-1">₦${totalEarnings.toLocaleString()}</p></div>
-                <div class="bg-yellow-100 p-6 rounded-xl shadow-lg border-b-4 border-yellow-600"><p class="text-sm font-medium text-yellow-700">Pending/Approved</p><p class="text-3xl font-extrabold text-yellow-900 mt-1">${pendingCount + approvedCount}</p></div>
-                <div class="bg-gray-100 p-6 rounded-xl shadow-lg border-b-4 border-gray-600"><p class="text-sm font-medium text-gray-700">Paid Out</p><p class="text-3xl font-extrabold text-gray-900 mt-1">${paidCount}</p></div>
-            </div>
-            <div class="overflow-x-auto bg-white rounded-lg shadow"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reward</th></tr></thead><tbody class="divide-y divide-gray-200">${referralsHtml}</tbody></table></div>
-        `;
-    } catch (error) {
-        console.error('Error loading referral rewards:', error);
-    }
-}
-
-// ===================================================================
-// SECTION 4: BUSINESS LOGIC & USER IDENTIFICATION HELPERS
-// ===================================================================
-
-async function findParentNameFromStudents(parentPhone) {
-    try {
-        const normalizedPhone = normalizePhoneNumber(parentPhone);
-        if (!normalizedPhone.valid) return null;
-
-        const studentsSnapshot = await db.collection("students").where("parentPhone", "==", normalizedPhone.normalized).limit(1).get();
-        if (!studentsSnapshot.empty) return studentsSnapshot.docs[0].data().parentName;
-
-        const pendingSnapshot = await db.collection("pending_students").where("parentPhone", "==", normalizedPhone.normalized).limit(1).get();
-        if (!pendingSnapshot.empty) return pendingSnapshot.docs[0].data().parentName;
-
-        return null;
-    } catch (error) {
-        return null;
-    }
-}
-
-async function findStudentIdsForParent(parentPhone) {
-    try {
-        const normalizedPhone = normalizePhoneNumber(parentPhone);
-        if (!normalizedPhone.valid) return { studentIds: [], studentNameIdMap: new Map(), allStudentData: [] };
-
-        let studentIds = [];
-        let studentNameIdMap = new Map();
-        let allStudentData = [];
-        
-        const processDocs = (snapshot, isPending) => {
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                if (data.studentName) {
-                    if (!studentIds.includes(doc.id)) studentIds.push(doc.id);
-                    studentNameIdMap.set(data.studentName, doc.id);
-                    allStudentData.push({ id: doc.id, name: data.studentName, data: data, isPending });
-                }
-            });
-        };
-
-        const studentsSnapshot = await db.collection("students").where("parentPhone", "==", normalizedPhone.normalized).get();
-        processDocs(studentsSnapshot, false);
-
-        const pendingSnapshot = await db.collection("pending_students").where("parentPhone", "==", normalizedPhone.normalized).get();
-        processDocs(pendingSnapshot, true);
-
-        studentIdMap = studentNameIdMap;
-        return { studentIds, studentNameIdMap, allStudentData };
-    } catch (error) {
-        return { studentIds: [], studentNameIdMap: new Map(), allStudentData: [] };
-    }
-}
-
-// ===================================================================
-// SECTION 5: AUTHENTICATION HANDLERS
-// ===================================================================
-
-function setupRememberMe() {
-    const rememberMe = localStorage.getItem('rememberMe');
-    const savedEmail = localStorage.getItem('savedEmail');
-    if (rememberMe === 'true' && savedEmail) {
-        document.getElementById('loginIdentifier').value = savedEmail;
-        document.getElementById('rememberMe').checked = true;
-    }
-}
-
-function handleRememberMe() {
-    const rememberMe = document.getElementById('rememberMe').checked;
-    const identifier = document.getElementById('loginIdentifier').value.trim();
-    if (rememberMe && identifier) {
-        localStorage.setItem('rememberMe', 'true');
-        localStorage.setItem('savedEmail', identifier);
-    } else {
-        localStorage.removeItem('rememberMe');
-        localStorage.removeItem('savedEmail');
-    }
-}
-
-async function handleSignUp() {
-    const countryCode = document.getElementById('countryCode').value;
-    const localPhone = document.getElementById('signupPhone').value.trim();
-    const email = document.getElementById('signupEmail').value.trim();
-    const password = document.getElementById('signupPassword').value;
-    const confirmPassword = document.getElementById('signupConfirmPassword').value;
-
-    if (!countryCode || !localPhone || !email || !password) return showMessage('Please fill in all fields', 'error');
-    if (password !== confirmPassword) return showMessage('Passwords do not match', 'error');
-
-    const fullPhoneNumber = countryCode + localPhone.replace(/\D/g, '');
-    const normalized = normalizePhoneNumber(fullPhoneNumber);
-    if (!normalized.valid) return showMessage('Invalid phone number format', 'error');
-
-    document.getElementById('signUpBtn').disabled = true;
-    document.getElementById('authLoader').classList.remove('hidden');
-
-    try {
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        const user = userCredential.user;
-        const parentName = await findParentNameFromStudents(normalized.normalized);
-        const referralCode = await generateReferralCode();
-
-        await db.collection('parent_users').doc(user.uid).set({
-            phone: fullPhoneNumber,
-            normalizedPhone: normalized.normalized,
-            email: email,
-            parentName: parentName || 'Parent',
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            referralCode: referralCode,
-            referralEarnings: 0
+        txs.forEach(t => {
+            const status = t.status || 'pending';
+            if(status === 'paid') stats.paid++; else stats.pending++;
+            const color = status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
+            rows += `<tr class="hover:bg-gray-50"><td class="px-4 py-3">${escapeHtml(t.referredStudentName)}</td><td class="px-4 py-3">${formatDateTime(t.timestamp)}</td><td class="px-4 py-3"><span class="px-2 py-1 rounded-full text-xs ${color}">${status}</span></td><td class="px-4 py-3 font-bold">₦${(t.rewardAmount||5000).toLocaleString()}</td></tr>`;
         });
 
-        showMessage('Account created successfully!', 'success');
-        await loadAllReportsForParent(normalized.normalized, user.uid);
-    } catch (error) {
-        showMessage(error.message, 'error');
-    } finally {
-        document.getElementById('signUpBtn').disabled = false;
-        document.getElementById('authLoader').classList.add('hidden');
-    }
+        if(!rows) rows = '<tr><td colspan="4" class="text-center py-4 text-gray-500">No referrals yet.</td></tr>';
+
+        container.innerHTML = `
+            <div class="fade-in">
+                <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-8 shadow-sm">
+                    <h2 class="text-xl font-bold text-blue-800">Your Code</h2>
+                    <p class="text-2xl font-mono text-blue-600 p-2 bg-white inline-block rounded border border-blue-200 mt-2 select-all">${data.referralCode || 'Generating...'}</p>
+                    <p class="text-sm text-blue-700 mt-2">Earn ₦5,000 per student referred!</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div class="bg-green-100 p-4 rounded-lg border-b-4 border-green-500"><p class="text-sm text-green-700">Total Earnings</p><p class="text-2xl font-bold text-green-900">₦${(data.referralEarnings||0).toLocaleString()}</p></div>
+                    <div class="bg-yellow-100 p-4 rounded-lg border-b-4 border-yellow-500"><p class="text-sm text-yellow-700">Pending</p><p class="text-2xl font-bold text-yellow-900">${stats.pending}</p></div>
+                    <div class="bg-gray-100 p-4 rounded-lg border-b-4 border-gray-500"><p class="text-sm text-gray-700">Paid Out</p><p class="text-2xl font-bold text-gray-900">${stats.paid}</p></div>
+                </div>
+                <div class="bg-white rounded-lg shadow overflow-hidden"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reward</th></tr></thead><tbody class="divide-y divide-gray-200">${rows}</tbody></table></div>
+            </div>`;
+    } catch (e) { console.error(e); }
 }
 
-async function handleSignIn() {
-    const identifier = document.getElementById('loginIdentifier').value.trim();
-    const password = document.getElementById('loginPassword').value;
+// ===================================================================
+// SECTION 4: DATA FETCHERS & HELPERS
+// ===================================================================
 
-    if (!identifier || !password) return showMessage('Please fill in all fields', 'error');
+async function findParentNameAndStudents(parentPhone) {
+    const normalized = normalizePhoneNumber(parentPhone);
+    if (!normalized.valid) return { name: null, children: [], map: new Map() };
+    
+    let name = null;
+    let children = [];
+    let map = new Map();
 
-    document.getElementById('signInBtn').disabled = true;
-    document.getElementById('authLoader').classList.remove('hidden');
+    const process = (snap) => {
+        snap.forEach(doc => {
+            const d = doc.data();
+            if (d.parentName) name = d.parentName;
+            if (d.studentName) {
+                map.set(d.studentName, doc.id);
+                children.push({ id: doc.id, name: d.studentName });
+            }
+        });
+    };
+
+    const s1 = await db.collection("students").where("parentPhone", "==", normalized.normalized).get();
+    process(s1);
+    const s2 = await db.collection("pending_students").where("parentPhone", "==", normalized.normalized).get();
+    process(s2);
+
+    userChildren = children.map(c => c.name); // Global update
+    return { name, children, map };
+}
+
+// ===================================================================
+// SECTION 5: AUTHENTICATION
+// ===================================================================
+
+async function handleAuth(type) {
+    const loader = document.getElementById('authLoader');
+    const btn = document.getElementById(type === 'signin' ? 'signInBtn' : 'signUpBtn');
+    btn.disabled = true;
+    loader.classList.remove('hidden');
 
     try {
-        let normalizedPhone;
-        let userId;
+        const email = document.getElementById(type === 'signin' ? 'loginIdentifier' : 'signupEmail').value.trim();
+        const pass = document.getElementById(type === 'signin' ? 'loginPassword' : 'signupPassword').value;
+        
+        if (type === 'signup') {
+            const confirm = document.getElementById('signupConfirmPassword').value;
+            const phone = document.getElementById('signupPhone').value;
+            const code = document.getElementById('countryCode').value;
+            if (pass !== confirm) throw new Error("Passwords don't match");
+            
+            const fullPhone = normalizePhoneNumber(code + phone);
+            if (!fullPhone.valid) throw new Error("Invalid phone");
 
-        if (identifier.includes('@')) {
-            const uc = await auth.signInWithEmailAndPassword(identifier, password);
-            userId = uc.user.uid;
-            const doc = await db.collection('parent_users').doc(userId).get();
-            if (doc.exists) normalizedPhone = doc.data().normalizedPhone;
+            const cred = await auth.createUserWithEmailAndPassword(email, pass);
+            const { name } = await findParentNameAndStudents(fullPhone.normalized);
+            await db.collection('parent_users').doc(cred.user.uid).set({
+                phone: code + phone, normalizedPhone: fullPhone.normalized, email,
+                parentName: name || 'Parent', createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                referralCode: await generateReferralCode(), referralEarnings: 0
+            });
+            showMessage("Account created!", "success");
+            await loadDashboard(fullPhone.normalized, cred.user.uid);
         } else {
-            throw new Error("Please login with Email.");
+            // SignIn
+            if (document.getElementById('rememberMe').checked) {
+                localStorage.setItem('savedEmail', email); localStorage.setItem('rememberMe', 'true');
+            } else {
+                localStorage.removeItem('savedEmail'); localStorage.removeItem('rememberMe');
+            }
+            
+            const cred = await auth.signInWithEmailAndPassword(email, pass);
+            const doc = await db.collection('parent_users').doc(cred.user.uid).get();
+            if(doc.exists) await loadDashboard(doc.data().normalizedPhone, cred.user.uid);
+            else location.reload();
         }
-
-        handleRememberMe();
-
-        if (normalizedPhone) {
-            await loadAllReportsForParent(normalizedPhone, userId);
-        } else {
-             window.location.reload();
-        }
-
-    } catch (error) {
-        showMessage(error.message, 'error');
+    } catch (e) {
+        showMessage(e.message, 'error');
     } finally {
-        document.getElementById('signInBtn').disabled = false;
-        document.getElementById('authLoader').classList.add('hidden');
+        btn.disabled = false;
+        loader.classList.add('hidden');
     }
 }
 
 async function handlePasswordReset() {
     const email = document.getElementById('resetEmail').value.trim();
-    if (!email) return showMessage('Please enter your email address', 'error');
-
-    const sendResetBtn = document.getElementById('sendResetBtn');
-    const resetLoader = document.getElementById('resetLoader');
-    sendResetBtn.disabled = true;
-    resetLoader.classList.remove('hidden');
-
+    if (!email) return showMessage('Enter email', 'error');
     try {
         await auth.sendPasswordResetEmail(email);
-        showMessage('Password reset link sent to your email.', 'success');
+        showMessage('Reset link sent!', 'success');
         document.getElementById('passwordResetModal').classList.add('hidden');
-    } catch (error) {
-        showMessage(error.message || 'Failed to send reset email.', 'error');
-    } finally {
-        sendResetBtn.disabled = false;
-        resetLoader.classList.add('hidden');
+    } catch(e) { showMessage(e.message, 'error'); }
+}
+
+function logout() {
+    localStorage.clear();
+    auth.signOut().then(() => window.location.reload());
+}
+
+// ===================================================================
+// SECTION 6: UNIFIED MESSAGING SYSTEM
+// ===================================================================
+
+function toggleModal(id, show) {
+    const el = document.getElementById(id);
+    if(show) { el.classList.remove('hidden'); el.classList.add('fade-in'); }
+    else el.classList.add('hidden');
+    
+    // Auto-populate student dropdown if composing
+    if(show && id === 'composeMessageModal') {
+        const sel = document.getElementById('messageStudent');
+        sel.innerHTML = '<option value="">General / All</option>';
+        userChildren.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c; opt.textContent = capitalize(c);
+            sel.appendChild(opt);
+        });
     }
-}
-
-// ===================================================================
-// SECTION 6: ENHANCED COMMUNICATION SYSTEM
-// ===================================================================
-
-function showComposeMessageModal() {
-    populateStudentDropdownForMessages();
-    document.getElementById('composeMessageModal').classList.remove('hidden');
-}
-
-function hideComposeMessageModal() {
-    document.getElementById('composeMessageModal').classList.add('hidden');
-    document.getElementById('messageSubject').value = '';
-    document.getElementById('messageContent').value = '';
-}
-
-function populateStudentDropdownForMessages() {
-    const dropdown = document.getElementById('messageStudent');
-    dropdown.innerHTML = '<option value="">Select student (optional)</option>';
-    userChildren.forEach(name => {
-        const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = capitalize(name);
-        dropdown.appendChild(opt);
-    });
 }
 
 async function submitMessage() {
-    const recipient = document.getElementById('messageRecipient').value;
     const subject = document.getElementById('messageSubject').value.trim();
-    const student = document.getElementById('messageStudent').value;
     const content = document.getElementById('messageContent').value.trim();
-    const isUrgent = document.getElementById('messageUrgent').checked;
-
-    if (!subject || !content) return showMessage('Please fill in subject and content', 'error');
+    const student = document.getElementById('messageStudent').value;
+    
+    if (!subject || !content) return showMessage("Subject and content required", "error");
 
     const btn = document.getElementById('submitMessageBtn');
-    btn.disabled = true;
-    btn.textContent = 'Sending...';
+    btn.disabled = true; btn.textContent = "Sending...";
 
     try {
         const user = auth.currentUser;
-        const userDoc = await db.collection('parent_users').doc(user.uid).get();
-        const userData = userDoc.data();
-
-        let recipientsList = recipient === 'tutor' ? ['tutors'] : recipient === 'management' ? ['management'] : ['tutors', 'management'];
-
+        const doc = await db.collection('parent_users').doc(user.uid).get();
         await db.collection('tutor_messages').add({
-            parentName: userData.parentName || 'Parent',
-            parentPhone: userData.phone,
-            parentEmail: userData.email,
-            parentUid: user.uid,
+            parentUid: user.uid, parentName: doc.data().parentName, 
             studentName: student || 'General',
-            recipients: recipientsList,
-            subject: subject,
-            content: content,
-            isUrgent: isUrgent,
-            status: 'sent',
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            type: 'parent_to_staff',
-            readBy: []
+            subject, content, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            type: 'parent_to_staff', recipients: ['tutors', 'management'], isUrgent: document.getElementById('messageUrgent').checked
         });
-
-        showMessage('Message sent successfully!', 'success');
-        hideComposeMessageModal();
-    } catch (error) {
-        console.error(error);
-        showMessage('Failed to send message', 'error');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Send Message';
-    }
+        showMessage("Sent!", "success");
+        toggleModal('composeMessageModal', false);
+    } catch(e) { showMessage("Error sending", "error"); }
+    finally { btn.disabled = false; btn.textContent = "Send Message"; }
 }
 
-function showMessagesModal() {
-    document.getElementById('messagesModal').classList.remove('hidden');
-    loadUnifiedMessages();
-    resetNotificationCount();
-}
-
-function hideMessagesModal() {
-    document.getElementById('messagesModal').classList.add('hidden');
-}
-
-async function loadUnifiedMessages() {
+async function loadMessages() {
     const container = document.getElementById('messagesContent');
-    container.innerHTML = '<div class="text-center py-8"><div class="loading-spinner"></div></div>';
-
+    container.innerHTML = '<div class="text-center"><div class="loading-spinner"></div></div>';
+    
     try {
         const user = auth.currentUser;
-        if (!user) return;
-
-        const msgsSnapshot = await db.collection('tutor_messages').where('parentUid', '==', user.uid).get();
-        const feedbackSnapshot = await db.collection('parent_feedback').where('parentUid', '==', user.uid).get();
-
-        let allItems = [];
-
-        msgsSnapshot.forEach(doc => {
-            const data = doc.data();
-            allItems.push({
-                id: doc.id,
-                isMessage: true,
-                sender: data.type === 'parent_to_staff' ? 'You' : (data.senderName || 'Staff'),
-                subject: data.subject,
-                content: data.content,
-                timestamp: data.timestamp,
-                isUrgent: data.isUrgent,
-                isOutgoing: data.type === 'parent_to_staff'
+        // Fetch BOTH new messages and old feedback
+        const [msgsSnap, fbSnap] = await Promise.all([
+            db.collection('tutor_messages').where('parentUid', '==', user.uid).get(),
+            db.collection('parent_feedback').where('parentUid', '==', user.uid).get()
+        ]);
+        
+        let all = [];
+        
+        // Process New System
+        msgsSnap.forEach(d => {
+            const m = d.data();
+            all.push({
+                id: d.id, sortTime: m.timestamp?.toDate ? m.timestamp.toDate() : new Date(),
+                subject: m.subject, content: m.content,
+                header: m.type === 'parent_to_staff' ? 'Outgoing' : 'Incoming',
+                color: m.type === 'parent_to_staff' ? 'text-blue-600' : 'text-green-600'
             });
         });
 
-        feedbackSnapshot.forEach(doc => {
-            const data = doc.data();
-            if (data.responses && data.responses.length > 0) {
-                data.responses.forEach(resp => {
-                    allItems.push({
-                        id: doc.id,
-                        isMessage: false,
-                        sender: resp.responderName || 'Admin',
-                        subject: `Re: ${data.category}`,
-                        content: resp.responseText,
-                        timestamp: resp.responseDate,
-                        originalMsg: data.message,
-                        isOutgoing: false
+        // Process Old Feedback (Legacy Support)
+        fbSnap.forEach(d => {
+            const f = d.data();
+            if(f.responses && f.responses.length > 0) {
+                f.responses.forEach(r => {
+                    all.push({
+                        id: d.id + 'r', sortTime: r.responseDate?.toDate ? r.responseDate.toDate() : new Date(),
+                        subject: `Re: ${f.category}`, content: `Response: ${r.responseText}\n(Original: ${f.message})`,
+                        header: 'Admin Response', color: 'text-purple-600'
                     });
                 });
             }
         });
 
-        allItems.sort((a, b) => {
-            const tA = a.timestamp?.toDate?.() || new Date(0);
-            const tB = b.timestamp?.toDate?.() || new Date(0);
-            return tB - tA;
-        });
-
-        if (allItems.length === 0) {
-            container.innerHTML = `<div class="text-center py-8 text-gray-500">No messages found.</div>`;
-            return;
-        }
-
-        container.innerHTML = allItems.map(msg => `
-            <div class="bg-white border ${msg.isUrgent ? 'border-red-300' : 'border-gray-200'} rounded-xl p-6 mb-4 shadow-sm">
-                <div class="flex justify-between mb-2">
-                    <h4 class="font-bold text-gray-800">${escapeHtml(msg.subject)} ${msg.isOutgoing ? '<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded ml-2">OUTGOING</span>' : ''}</h4>
-                    <span class="text-xs text-gray-500">${formatDateTime(msg.timestamp)}</span>
+        all.sort((a,b) => b.sortTime - a.sortTime);
+        
+        container.innerHTML = all.length ? all.map(m => `
+            <div class="bg-white border rounded-xl p-4 mb-4 shadow-sm fade-in">
+                <div class="flex justify-between mb-1">
+                    <span class="font-bold text-gray-800">${escapeHtml(m.subject)}</span>
+                    <span class="text-xs text-gray-500">${m.sortTime.toLocaleDateString()}</span>
                 </div>
-                <p class="text-sm text-gray-600 mb-2">From: ${escapeHtml(msg.sender)}</p>
-                ${msg.originalMsg ? `<div class="text-xs bg-gray-50 p-2 mb-2 italic">You said: ${escapeHtml(msg.originalMsg)}</div>` : ''}
-                <div class="bg-green-50 p-3 rounded text-gray-800">${escapeHtml(msg.content)}</div>
-            </div>
-        `).join('');
-
-    } catch (error) {
-        container.innerHTML = '<p class="text-red-500 text-center">Error loading messages.</p>';
-    }
-}
-
-async function checkForNewMessages() {
-    try {
-        const user = auth.currentUser;
-        if (!user) return;
-        const msgs = await db.collection('tutor_messages').where('parentUid', '==', user.uid).get();
-        const count = msgs.size; 
-        if (count > unreadMessagesCount) {
-             const badge = document.getElementById('messagesNotificationBadge');
-             if(badge) { badge.textContent = 'New'; badge.classList.remove('hidden'); }
-        }
-        unreadMessagesCount = count;
-    } catch (e) { console.log("Bg check failed"); }
-}
-
-function resetNotificationCount() {
-    const badge = document.getElementById('messagesNotificationBadge');
-    if(badge) badge.classList.add('hidden');
+                <div class="text-xs mb-2 font-bold ${m.color}">${m.header}</div>
+                <div class="bg-gray-50 p-3 rounded text-sm text-gray-700 whitespace-pre-wrap">${escapeHtml(m.content)}</div>
+            </div>`).join('') : '<p class="text-center text-gray-500">No messages.</p>';
+    } catch(e) { container.innerHTML = '<p class="text-red-500">Error loading.</p>'; }
 }
 
 // ===================================================================
-// SECTION 7: ACADEMICS & NOTIFICATION SYSTEM (UPDATED ACCORDION)
+// SECTION 7: ACADEMICS (AUTO-CLEAR + NESTED ACCORDIONS)
 // ===================================================================
 
-/**
- * 🎓 ACADEMICS DATA LOADER
- * Updated with Student Accordions and Notification Badges
- */
 async function loadAcademicsData() {
     const container = document.getElementById('academicsContent');
     container.innerHTML = '<div class="text-center py-8"><div class="loading-spinner"></div></div>';
@@ -579,341 +401,255 @@ async function loadAcademicsData() {
     try {
         const user = auth.currentUser;
         if (!user) return;
-
-        const userDoc = await db.collection('parent_users').doc(user.uid).get();
-        const parentPhone = userDoc.data().normalizedPhone;
-        const { studentNameIdMap, allStudentData } = await findStudentIdsForParent(parentPhone);
-
-        if (studentNameIdMap.size === 0) {
-            container.innerHTML = '<div class="text-center py-8">No students found.</div>';
-            return;
-        }
-
-        const lastCheck = localStorage.getItem('lastAcademicsCheck') || 0;
-        let totalNewItems = 0;
-        let html = '<div class="space-y-4">';
-        let idx = 0;
-
-        // Process each student
-        const studentNames = Array.from(studentNameIdMap.keys());
+        const uDoc = await db.collection('parent_users').doc(user.uid).get();
+        const { map } = await findParentNameAndStudents(uDoc.data().normalizedPhone);
         
-        for (const name of studentNames) {
-            const id = studentNameIdMap.get(name);
-            let studentNewCount = 0;
+        if (map.size === 0) { container.innerHTML = '<p class="text-center">No students found.</p>'; return; }
 
-            // Fetch Data
-            const [topicsSnap, hwSnap] = await Promise.all([
+        // --- AUTO CLEAR LOGIC (2nd Day Rule) ---
+        const now = new Date();
+        // If today is 1st or 2nd, show prev month too. If 3rd+, show only current month.
+        const cutoffDate = new Date(now.getFullYear(), now.getMonth() - (now.getDate() > 2 ? 0 : 1), 1);
+
+        let html = '<div class="space-y-4 fade-in">';
+        let idx = 0;
+        let totalNew = 0;
+
+        for (const [name, id] of map) {
+            const [tSnap, hSnap] = await Promise.all([
                 db.collection('daily_topics').where('studentId', '==', id).get(),
                 db.collection('homework_assignments').where('studentId', '==', id).get()
             ]);
 
-            // Sort & Check for New Items
-            const topics = topicsSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => {
-                const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
-                const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
-                return dateB - dateA;
-            });
+            const topics = tSnap.docs.map(d => d.data()).filter(t => {
+                const d = t.date?.toDate ? t.date.toDate() : new Date(t.date);
+                return d >= cutoffDate;
+            }).sort((a,b) => (b.date?.toDate?.() || 0) - (a.date?.toDate?.() || 0));
 
-            const hwList = hwSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (a.dueDate?.toDate?.() || 0) - (b.dueDate?.toDate?.() || 0));
+            const homework = hSnap.docs.map(d => d.data()).filter(h => {
+                const d = h.dueDate?.toDate ? h.dueDate.toDate() : new Date(h.dueDate);
+                return d >= cutoffDate;
+            }).sort((a,b) => (a.dueDate?.toDate?.() || 0) - (b.dueDate?.toDate?.() || 0));
 
-            // Logic to check if item is "new" (added after last check)
-            // Note: In a real app, we'd check created_at. Here we approximation using timestamps if available or assumption.
-            // Simplified: If the item timestamp > lastCheck. 
-            // Since topics have dates, we check if the topic date is "future" relative to last check.
-            
-            // Checking Topics
-            topics.forEach(t => {
-                const tDate = t.date?.toDate ? t.date.toDate().getTime() : new Date(t.date).getTime();
-                if (tDate > lastCheck) studentNewCount++;
-            });
+            const newCount = topics.length + homework.length;
+            totalNew += newCount;
 
-            // Checking Homework (using created date if available, or just due date approximation)
-            hwList.forEach(h => {
-                // If homework has a timestamp/createdAt, use it. If not, we skip notification for simplicity or use dueDate if strictly required.
-                // Assuming newer homeworks are naturally at the end or have a timestamp field. 
-                // Let's assume 'createdAt' exists or use fallback.
-                const hDate = h.timestamp?.toDate ? h.timestamp.toDate().getTime() : 0;
-                if (hDate > lastCheck) studentNewCount++;
-            });
-
-            totalNewItems += studentNewCount;
-
-            // --- BUILD ACCORDION HTML ---
             html += `
-            <div class="border rounded-lg overflow-hidden mb-4">
-                <button onclick="toggleAccordion('acad-stu-${idx}')" class="w-full flex justify-between p-4 bg-blue-50 hover:bg-blue-100 transition items-center">
+            <div class="border rounded-xl bg-white shadow-sm overflow-hidden">
+                <button onclick="toggleAccordion('stu-acad-${idx}', this)" class="w-full flex justify-between items-center p-4 bg-green-50 hover:bg-green-100 transition">
                     <div class="flex items-center gap-2">
-                        <span class="font-bold text-blue-900 text-lg">${escapeHtml(capitalize(name))}</span>
-                        ${studentNewCount > 0 ? `<span class="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">New Updates</span>` : ''}
+                        <span class="font-bold text-green-900 text-lg">${escapeHtml(capitalize(name))}</span>
+                        ${newCount > 0 ? `<span class="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">${newCount} Active Items</span>` : ''}
                     </div>
-                    <span class="text-blue-500">▼</span>
+                    <span class="rotate-icon text-green-600">▼</span>
                 </button>
-                
-                <div id="acad-stu-${idx}" class="hidden bg-white p-4">
-                    
-                    <div class="mb-6">
-                        <h4 class="font-bold text-gray-700 mb-3 border-b pb-2 flex items-center">📅 Daily Topics</h4>
-                        ${topics.length === 0 ? '<p class="text-gray-500 italic">No daily topics yet.</p>' : 
-                          `<div class="space-y-3">
-                              ${topics.slice(0, 5).map(t => {
-                                  const dStr = t.date?.toDate ? t.date.toDate().toLocaleDateString() : new Date(t.date).toLocaleDateString();
-                                  return `
-                                  <div class="bg-gray-50 p-3 rounded border border-gray-100">
-                                      <div class="font-semibold text-gray-800 text-sm mb-1">${dStr}</div>
-                                      <p class="text-gray-600 text-sm whitespace-pre-wrap">${escapeHtml(t.topics)}</p>
-                                  </div>`;
-                              }).join('')}
-                           </div>`
-                        }
-                    </div>
+                <div id="stu-acad-${idx}" class="accordion-content bg-white">
+                    <div class="p-4 space-y-4">
+                        
+                        <div class="border rounded-lg">
+                            <button onclick="toggleAccordion('topic-${idx}', this)" class="w-full flex justify-between p-3 bg-gray-50 hover:bg-gray-100 font-semibold text-gray-700 text-sm">
+                                <span>📅 Daily Topics (${topics.length})</span>
+                                <span class="rotate-icon">▼</span>
+                            </button>
+                            <div id="topic-${idx}" class="accordion-content">
+                                <div class="p-3 space-y-2">
+                                    ${topics.length ? topics.map(t => `
+                                        <div class="p-3 border rounded bg-yellow-50">
+                                            <div class="text-xs font-bold text-gray-500 mb-1">${formatDateTime(t.date)}</div>
+                                            <div class="text-sm text-gray-800 whitespace-pre-wrap">${escapeHtml(t.topics)}</div>
+                                        </div>`).join('') : '<p class="text-xs text-gray-400 p-2">No recent topics.</p>'}
+                                </div>
+                            </div>
+                        </div>
 
-                    <div>
-                        <h4 class="font-bold text-gray-700 mb-3 border-b pb-2 flex items-center">📝 Homework</h4>
-                        ${hwList.length === 0 ? '<p class="text-gray-500 italic">No homework assigned.</p>' : 
-                          `<div class="space-y-3">
-                              ${hwList.map(h => {
-                                  const due = h.dueDate?.toDate?.().toLocaleDateString();
-                                  const isOverdue = (h.dueDate?.toDate?.() || new Date()) < new Date();
-                                  return `
-                                  <div class="bg-white border ${isOverdue ? 'border-red-200' : 'border-gray-200'} p-3 rounded shadow-sm">
-                                      <div class="flex justify-between font-semibold text-sm">
-                                          <span>${escapeHtml(h.title)}</span>
-                                          <span class="${isOverdue ? 'text-red-600' : 'text-blue-600'}">Due: ${due}</span>
-                                      </div>
-                                      <p class="text-gray-600 text-sm mt-1">${escapeHtml(h.description)}</p>
-                                      ${h.fileUrl ? `<a href="${h.fileUrl}" target="_blank" class="text-blue-600 text-xs font-bold mt-2 inline-block">📎 Download</a>` : ''}
-                                  </div>`;
-                              }).join('')}
-                           </div>`
-                        }
-                    </div>
+                        <div class="border rounded-lg">
+                            <button onclick="toggleAccordion('hw-${idx}', this)" class="w-full flex justify-between p-3 bg-gray-50 hover:bg-gray-100 font-semibold text-gray-700 text-sm">
+                                <span>📝 Homework (${homework.length})</span>
+                                <span class="rotate-icon">▼</span>
+                            </button>
+                            <div id="hw-${idx}" class="accordion-content">
+                                <div class="p-3 space-y-2">
+                                    ${homework.length ? homework.map(h => {
+                                        const due = h.dueDate?.toDate?.() || new Date();
+                                        const overdue = due < new Date();
+                                        return `
+                                        <div class="p-3 border rounded ${overdue ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}">
+                                            <div class="flex justify-between font-bold text-sm mb-1">
+                                                <span>${escapeHtml(h.title)}</span>
+                                                <span class="${overdue?'text-red-600':'text-blue-600'}">Due: ${due.toLocaleDateString()}</span>
+                                            </div>
+                                            <p class="text-xs text-gray-600">${escapeHtml(h.description)}</p>
+                                            ${h.fileUrl ? `<a href="${h.fileUrl}" target="_blank" class="text-blue-600 text-xs underline block mt-2">Download File</a>` : ''}
+                                        </div>`;
+                                    }).join('') : '<p class="text-xs text-gray-400 p-2">No active homework.</p>'}
+                                </div>
+                            </div>
+                        </div>
 
+                    </div>
                 </div>
             </div>`;
             idx++;
         }
-        
         html += '</div>';
         container.innerHTML = html;
-
-        // Update Main Academics Tab Badge
-        const tabBadge = document.getElementById('academicsNotificationBadge');
-        if (tabBadge) {
-            if (totalNewItems > 0) {
-                tabBadge.textContent = totalNewItems > 9 ? '9+' : totalNewItems;
-                tabBadge.classList.remove('hidden');
-            } else {
-                tabBadge.classList.add('hidden');
-            }
-        }
-
-    } catch (e) {
-        console.error(e);
-        container.innerHTML = '<p class="text-red-500 text-center">Error loading academic data.</p>';
-    }
-}
-
-// ===================================================================
-// SECTION 8: REPORT SEARCH & REAL-TIME MONITORING
-// ===================================================================
-
-async function searchReportsByParentPhone(parentPhone) {
-    let assessmentResults = [];
-    let monthlyResults = [];
-    const normalized = normalizePhoneNumber(parentPhone);
-    if (!normalized.valid) return { assessmentResults, monthlyResults };
-
-    const assSnapshot = await db.collection("student_results").where("parentPhone", "==", normalized.normalized).get();
-    assSnapshot.forEach(doc => assessmentResults.push({ id: doc.id, ...doc.data(), type: 'assessment' }));
-
-    const monSnapshot = await db.collection("tutor_submissions").where("parentPhone", "==", normalized.normalized).get();
-    monSnapshot.forEach(doc => monthlyResults.push({ id: doc.id, ...doc.data(), type: 'monthly' }));
-
-    return { assessmentResults, monthlyResults };
-}
-
-function setupRealTimeMonitoring(parentPhone, userId) {
-    if (realTimeListeners.length > 0) realTimeListeners.forEach(u => u());
-    realTimeListeners = [];
-
-    const norm = normalizePhoneNumber(parentPhone).normalized;
-    
-    realTimeListeners.push(db.collection("student_results").where("parentPhone", "==", norm).onSnapshot(s => {
-        if(s.docChanges().some(c => c.type === 'added')) showMessage('New Assessment Report!', 'success');
-    }));
-
-    realTimeListeners.push(db.collection("tutor_messages").where("parentUid", "==", userId).onSnapshot(s => {
-         if(s.docChanges().some(c => c.type === 'added')) checkForNewMessages();
-    }));
-}
-
-async function manualRefreshReports() {
-    const user = auth.currentUser;
-    if (!user) return;
-    
-    const refreshBtn = document.getElementById('manualRefreshBtn');
-    if (!refreshBtn) return;
-    
-    const originalText = refreshBtn.innerHTML;
-    refreshBtn.innerHTML = '<div class="loading-spinner-small mr-2"></div> Checking...';
-    refreshBtn.disabled = true;
-    
-    try {
-        const userDoc = await db.collection('parent_users').doc(user.uid).get();
-        if (userDoc.exists) {
-            const userData = userDoc.data();
-            await loadAllReportsForParent(userData.normalizedPhone, user.uid);
-            showMessage('Reports refreshed successfully!', 'success');
-        }
-    } catch (error) {
-        console.error('Manual refresh error:', error);
-    } finally {
-        refreshBtn.innerHTML = originalText;
-        refreshBtn.disabled = false;
-    }
-}
-
-// ===================================================================
-// SECTION 9: CORE REPORT RENDERING (ACCORDION SYSTEM)
-// ===================================================================
-
-function downloadSessionReport(studentIndex, sessionIndex, studentName, type) {
-    const element = document.getElementById(`${type === 'assessment' ? 'ass' : 'mon'}-block-${studentIndex}-${sessionIndex}`);
-    if (!element) return showMessage('Report element not found', 'error');
-    
-    const safeName = studentName.replace(/ /g, '_');
-    const opt = { margin: 0.5, filename: `${type}_Report_${safeName}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter' } };
-    
-    if (window.html2pdf) {
-        html2pdf().from(element).set(opt).save();
-    } else {
-        showMessage('PDF Library not loaded. Contact support.', 'error');
-    }
-}
-
-function createAccordionReportView(reportsByStudent) {
-    let html = '';
-    let idx = 0;
-    
-    for (const [studentName, reports] of reportsByStudent) {
-        const hasReports = reports.assessments.length > 0 || reports.monthly.length > 0;
         
-        html += `
-            <div class="accordion-item mb-4 border rounded-lg overflow-hidden">
-                <button onclick="toggleAccordion('stu-${idx}')" class="w-full flex justify-between p-4 bg-green-100 hover:bg-green-200 transition">
-                    <span class="font-bold text-green-900 text-lg">${escapeHtml(capitalize(studentName))}</span>
-                    <span class="text-sm text-green-700">${reports.assessments.length} Assessments, ${reports.monthly.length} Monthly</span>
-                </button>
-                <div id="stu-${idx}" class="hidden bg-white p-4">
-        `;
-
-        if (!hasReports) {
-            html += `<p class="text-gray-500 text-center py-4">No reports found.</p>`;
-        } else {
-            // Render Assessments
-            if(reports.assessments.length > 0) {
-                html += `<h4 class="font-bold text-gray-700 mb-2 border-b pb-1">Assessment Reports</h4>`;
-                let aIdx = 0;
-                reports.assessments.sort((a,b) => b.timestamp - a.timestamp).forEach(rep => {
-                    const dateStr = formatDateTime(rep.timestamp);
-                    html += `
-                        <div class="mb-4 border p-3 rounded bg-gray-50" id="ass-block-${idx}-${aIdx}">
-                            <div class="flex justify-between items-center mb-2">
-                                <span class="font-semibold">${dateStr} - ${escapeHtml(rep.subject || 'General')}</span>
-                                <div class="flex gap-2 items-center">
-                                    <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">Score: ${rep.score}/${rep.totalScoreableQuestions}</span>
-                                    <button onclick="downloadSessionReport(${idx}, ${aIdx}, '${escapeHtml(studentName)}', 'assessment')" class="text-green-600 text-xs font-bold">⬇ PDF</button>
-                                </div>
-                            </div>
-                        </div>`;
-                    aIdx++;
-                });
-            }
-            
-            // Render Monthly
-            if(reports.monthly.length > 0) {
-                html += `<h4 class="font-bold text-gray-700 mt-4 mb-2 border-b pb-1">Monthly Reports</h4>`;
-                let mIdx = 0;
-                reports.monthly.sort((a,b) => b.timestamp - a.timestamp).forEach(rep => {
-                    const dateStr = formatDateTime(rep.timestamp);
-                    html += `
-                        <div class="mb-4 border p-3 rounded bg-gray-50" id="mon-block-${idx}-${mIdx}">
-                            <div class="flex justify-between items-center">
-                                <span class="font-semibold">${dateStr}</span>
-                                <button onclick="downloadSessionReport(${idx}, ${mIdx}, '${escapeHtml(studentName)}', 'monthly')" class="text-green-600 text-xs font-bold">⬇ PDF</button>
-                            </div>
-                            <p class="text-sm text-gray-600 mt-1">Tutor: ${escapeHtml(rep.tutorName || 'N/A')}</p>
-                            <p class="text-sm text-gray-700 mt-2">${escapeHtml(rep.topics?.substring(0,100))}...</p>
-                        </div>`;
-                    mIdx++;
-                });
-            }
+        const badge = document.getElementById('academicsNotificationBadge');
+        if(badge) {
+            if(totalNew > 0) { badge.textContent = totalNew; badge.classList.remove('hidden'); }
+            else badge.classList.add('hidden');
         }
-        
-        html += `</div></div>`;
-        idx++;
-    }
-    return html;
+
+    } catch (e) { console.error(e); container.innerHTML = '<p class="text-red-500">Error loading academics.</p>'; }
 }
 
-function toggleAccordion(id) {
-    const el = document.getElementById(id);
-    el.classList.toggle('hidden');
-}
+// ===================================================================
+// SECTION 8: REPORTS (YEARLY ACCORDION + PDF)
+// ===================================================================
 
-async function loadAllReportsForParent(parentPhone, userId) {
-    const reportContent = document.getElementById("reportContent");
-    const authArea = document.getElementById("authArea");
-    const reportArea = document.getElementById("reportArea");
-    
-    authArea.classList.add("hidden");
-    reportArea.classList.remove("hidden");
+async function loadDashboard(phone, uid) {
+    document.getElementById('authArea').classList.add('hidden');
+    document.getElementById('reportArea').classList.remove('hidden');
     localStorage.setItem('isAuthenticated', 'true');
+    currentUserData = { phone, uid };
 
-    const { assessmentResults, monthlyResults } = await searchReportsByParentPhone(parentPhone);
-    const { studentNameIdMap } = await findStudentIdsForParent(parentPhone);
-    
-    userChildren = Array.from(studentNameIdMap.keys());
-    currentUserData = { parentPhone, userId };
-
-    const reportsByStudent = new Map();
-    userChildren.forEach(name => reportsByStudent.set(name, { assessments: [], monthly: [] }));
-    
-    assessmentResults.forEach(r => { if(reportsByStudent.has(r.studentName)) reportsByStudent.get(r.studentName).assessments.push(r); });
-    monthlyResults.forEach(r => { if(reportsByStudent.has(r.studentName)) reportsByStudent.get(r.studentName).monthly.push(r); });
-
-    reportContent.innerHTML = createAccordionReportView(reportsByStudent);
-
-    loadReferralRewards(userId);
+    loadReferralRewards(uid);
     loadAcademicsData();
-    setupRealTimeMonitoring(parentPhone, userId);
-    addMessagesButton();
     addManualRefreshButton();
+    addMessagesButton();
+
+    const [assSnap, monSnap] = await Promise.all([
+        db.collection("student_results").where("parentPhone", "==", phone).get(),
+        db.collection("tutor_submissions").where("parentPhone", "==", phone).get()
+    ]);
+
+    const grouped = {};
+    const process = (doc, type) => {
+        const d = doc.data();
+        const date = d.timestamp?.toDate ? d.timestamp.toDate() : new Date(d.timestamp * 1000);
+        const year = date.getFullYear();
+        const name = d.studentName || 'Unknown';
+        if (!grouped[year]) grouped[year] = {};
+        if (!grouped[year][name]) grouped[year][name] = { assessment: [], monthly: [] };
+        grouped[year][name][type].push({ id: doc.id, ...d });
+    };
+
+    assSnap.forEach(d => process(d, 'assessment'));
+    monSnap.forEach(d => process(d, 'monthly'));
+
+    const container = document.getElementById('reportContent');
+    let html = '<div class="space-y-4 fade-in">';
+    const years = Object.keys(grouped).sort((a,b) => b - a);
+
+    if (years.length === 0) {
+        container.innerHTML = '<div class="text-center py-10 text-gray-500">No reports available yet.</div>';
+        return;
+    }
+
+    years.forEach((year, yIdx) => {
+        html += `
+        <div class="border rounded-xl bg-white shadow-sm overflow-hidden">
+            <button onclick="toggleAccordion('year-${yIdx}', this)" class="w-full flex justify-between p-4 bg-indigo-50 hover:bg-indigo-100 font-bold text-indigo-900 text-lg transition">
+                <span>📂 ${year} Records</span>
+                <span class="rotate-icon">▼</span>
+            </button>
+            <div id="year-${yIdx}" class="accordion-content">
+                <div class="p-4 space-y-3">
+        `;
+        
+        Object.keys(grouped[year]).forEach((student, sIdx) => {
+            const data = grouped[year][student];
+            html += `
+            <div class="border rounded-lg">
+                <button onclick="toggleAccordion('rep-stu-${yIdx}-${sIdx}', this)" class="w-full flex justify-between p-3 bg-white hover:bg-gray-50 font-semibold text-gray-800 border-b">
+                    <span>👤 ${escapeHtml(capitalize(student))}</span>
+                    <span class="text-xs text-gray-500">${data.assessment.length} Assmts, ${data.monthly.length} Monthly</span>
+                </button>
+                <div id="rep-stu-${yIdx}-${sIdx}" class="accordion-content">
+                    <div class="p-3 grid gap-4">
+                        ${data.assessment.length ? `
+                            <div>
+                                <h5 class="text-xs font-bold text-gray-500 uppercase mb-2">Assessments</h5>
+                                ${data.assessment.map((r, i) => `
+                                    <div id="pdf-ass-${yIdx}-${sIdx}-${i}" class="flex justify-between items-center p-3 bg-blue-50 rounded mb-2 text-sm border border-blue-100">
+                                        <div>
+                                            <div class="font-bold text-gray-800">${formatDateTime(r.timestamp)}</div>
+                                            <div class="text-xs text-gray-600">${r.subject}</div>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-bold text-blue-700 bg-white px-2 py-1 rounded shadow-sm">${r.score}/${r.totalScoreableQuestions}</span>
+                                            <button onclick="downloadReportPDF('pdf-ass-${yIdx}-${sIdx}-${i}', '${escapeHtml(student)}', 'Assessment')" class="text-blue-600 hover:text-blue-800">⬇ PDF</button>
+                                        </div>
+                                    </div>`).join('')}
+                            </div>` : ''}
+                        
+                        ${data.monthly.length ? `
+                            <div>
+                                <h5 class="text-xs font-bold text-gray-500 uppercase mb-2">Monthly Reports</h5>
+                                ${data.monthly.map((r, i) => `
+                                    <div id="pdf-mon-${yIdx}-${sIdx}-${i}" class="p-3 bg-green-50 rounded mb-2 text-sm border border-green-100 relative">
+                                        <button onclick="downloadReportPDF('pdf-mon-${yIdx}-${sIdx}-${i}', '${escapeHtml(student)}', 'Monthly')" class="absolute top-2 right-2 text-green-700 hover:text-green-900 text-xs font-bold">⬇ PDF</button>
+                                        <div class="font-bold text-green-800 mb-1">${formatDateTime(r.timestamp)}</div>
+                                        <div class="text-xs text-gray-600 whitespace-pre-wrap">${escapeHtml(r.topics)}</div>
+                                        <div class="text-xs text-gray-500 mt-1 italic">Tutor: ${escapeHtml(r.tutorName)}</div>
+                                    </div>`).join('')}
+                            </div>` : ''}
+                    </div>
+                </div>
+            </div>`;
+        });
+
+        html += `</div></div></div>`;
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
 }
 
 // ===================================================================
-// SECTION 10: NAVIGATION & INITIALIZATION
+// SECTION 9: NAVIGATION & UI
 // ===================================================================
 
-function addMessagesButton() {
-    const container = document.querySelector('.bg-green-50 .flex.gap-2');
-    if (!container || document.getElementById('viewMessagesBtn')) return;
+function toggleAccordion(id, btn) {
+    const content = document.getElementById(id);
+    const icon = btn.querySelector('.rotate-icon');
+    if (content.classList.contains('open')) {
+        content.classList.remove('open');
+        if(icon) icon.classList.remove('open');
+    } else {
+        content.classList.add('open');
+        if(icon) icon.classList.add('open');
+    }
+}
 
-    const btn = document.createElement('button');
-    btn.id = 'viewMessagesBtn';
-    btn.className = 'bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 relative';
-    btn.innerHTML = '📨 Messages <span id="messagesNotificationBadge" class="hidden absolute -top-2 -right-2 bg-red-500 text-white rounded-full text-xs w-6 h-6 flex items-center justify-center animate-pulse">!</span>';
-    btn.onclick = showMessagesModal;
-    
-    const composeBtn = document.createElement('button');
-    composeBtn.className = 'bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700';
-    composeBtn.innerHTML = '✏️ Compose';
-    composeBtn.onclick = showComposeMessageModal;
+function switchMainTab(tabId) {
+    const tabs = ['report', 'academics', 'rewards'];
+    const active = tabs.find(t => !document.getElementById(`${t}ContentArea`).classList.contains('hidden'));
+    if(active) document.getElementById(`${active}ContentArea`).classList.add('opacity-0', 'transition-opacity', 'duration-300');
 
-    container.insertBefore(composeBtn, container.lastElementChild);
-    container.insertBefore(btn, container.lastElementChild);
-    
-    checkForNewMessages();
+    setTimeout(() => {
+        tabs.forEach(t => {
+            const el = document.getElementById(`${t}ContentArea`);
+            const btn = document.getElementById(`${t}Tab`);
+            el.classList.add('hidden', 'opacity-0'); 
+            el.classList.remove('opacity-100');
+            btn.className = "flex-1 py-4 text-center text-gray-500 hover:text-green-600 font-medium transition-colors duration-300 relative";
+        });
+
+        const newEl = document.getElementById(`${tabId}ContentArea`);
+        newEl.classList.remove('hidden');
+        void newEl.offsetWidth; 
+        newEl.classList.remove('opacity-0');
+        newEl.classList.add('opacity-100');
+
+        const newBtn = document.getElementById(`${tabId}Tab`);
+        newBtn.className = "flex-1 py-4 text-center text-green-600 font-bold border-b-4 border-green-600 transition-colors duration-300 relative";
+        
+        if(tabId === 'academics') {
+            const b = document.getElementById('academicsNotificationBadge');
+            if(b) b.classList.add('hidden');
+        }
+    }, 300);
 }
 
 function addManualRefreshButton() {
@@ -922,97 +658,91 @@ function addManualRefreshButton() {
     
     const refreshBtn = document.createElement('button');
     refreshBtn.id = 'manualRefreshBtn';
-    refreshBtn.onclick = manualRefreshReports;
-    refreshBtn.className = 'bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200';
+    refreshBtn.onclick = () => loadDashboard(currentUserData.phone, currentUserData.uid);
+    refreshBtn.className = 'bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition shadow-sm flex items-center gap-2';
     refreshBtn.innerHTML = '🔄 Refresh';
+    container.appendChild(refreshBtn);
     
-    container.insertBefore(refreshBtn, container.lastElementChild);
-}
-
-function logout() {
-    localStorage.clear();
-    auth.signOut().then(() => window.location.reload());
-}
-
-function switchTab(tab) {
-    if (tab === 'signin') {
-        document.getElementById('signInForm').classList.remove('hidden');
-        document.getElementById('signUpForm').classList.add('hidden');
-        document.getElementById('signInTab').classList.add('tab-active');
-        document.getElementById('signUpTab').classList.remove('tab-active');
-    } else {
-        document.getElementById('signInForm').classList.add('hidden');
-        document.getElementById('signUpForm').classList.remove('hidden');
-        document.getElementById('signUpTab').classList.add('tab-active');
-        document.getElementById('signInTab').classList.remove('tab-active');
+    // Add Logout Button too if missing
+    if(!document.getElementById('logoutBtn')) {
+        const logBtn = document.createElement('button');
+        logBtn.id = 'logoutBtn';
+        logBtn.onclick = logout;
+        logBtn.className = 'bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 transition shadow-sm';
+        logBtn.innerHTML = '🚪 Logout';
+        container.appendChild(logBtn);
     }
 }
 
-function switchMainTab(tab) {
-    // Handle Navigation Styling
-    ['report', 'academics', 'rewards'].forEach(t => {
-        document.getElementById(`${t}ContentArea`).classList.add('hidden');
-        document.getElementById(`${t}Tab`).classList.remove('bg-green-600', 'text-white');
-    });
-    
-    document.getElementById(`${tab}ContentArea`).classList.remove('hidden');
-    document.getElementById(`${tab}Tab`).classList.add('bg-green-600', 'text-white');
-
-    // Handle Logic based on Tab
-    if (tab === 'academics') {
-        // When user views academics, we update their "last viewed" time
-        // This clears the "New" badges effectively on next refresh
-        localStorage.setItem('lastAcademicsCheck', Date.now());
-        
-        // Hide badge immediately for UX
-        const badge = document.getElementById('academicsNotificationBadge');
-        if (badge) badge.classList.add('hidden');
-    }
+function addMessagesButton() {
+    const container = document.querySelector('.bg-green-50 .flex.gap-2');
+    if (!container || document.getElementById('viewMessagesBtn')) return;
+    const btn = document.createElement('button');
+    btn.id = 'viewMessagesBtn';
+    btn.className = 'bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 relative shadow-sm';
+    btn.innerHTML = '📨 Messages';
+    btn.onclick = () => { toggleModal('messagesModal', true); loadMessages(); };
+    container.insertBefore(btn, container.firstChild);
 }
+
+// ===================================================================
+// SECTION 10: INITIALIZATION
+// ===================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    setupRememberMe();
+    if(localStorage.getItem('savedEmail')) {
+        document.getElementById('loginIdentifier').value = localStorage.getItem('savedEmail');
+        document.getElementById('rememberMe').checked = true;
+    }
     createCountryCodeDropdown();
-    
-    // Create Notification Badge for Academics Tab if not present
-    const academicsTab = document.getElementById('academicsTab');
-    if (academicsTab && !document.getElementById('academicsNotificationBadge')) {
-        const badge = document.createElement('span');
-        badge.id = 'academicsNotificationBadge';
-        badge.className = 'hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-pulse';
-        academicsTab.style.position = 'relative';
-        academicsTab.appendChild(badge);
+
+    // Academics Badge
+    const acTab = document.getElementById('academicsTab');
+    if (acTab && !document.getElementById('academicsNotificationBadge')) {
+        const b = document.createElement('span');
+        b.id = 'academicsNotificationBadge';
+        b.className = 'hidden absolute top-2 right-4 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse';
+        acTab.appendChild(b);
     }
 
-    auth.onAuthStateChanged(user => {
-        if (user) {
-            db.collection('parent_users').doc(user.uid).get().then(doc => {
-                if(doc.exists) loadAllReportsForParent(doc.data().normalizedPhone, user.uid);
-            });
-        }
+    auth.onAuthStateChanged(u => {
+        if(u) db.collection('parent_users').doc(u.uid).get().then(d => { if(d.exists) loadDashboard(d.data().normalizedPhone, u.uid); });
+        else document.getElementById('authArea').classList.remove('hidden');
     });
 
-    document.getElementById('signInBtn')?.addEventListener('click', handleSignIn);
-    document.getElementById('signUpBtn')?.addEventListener('click', handleSignUp);
-    document.getElementById('sendResetBtn')?.addEventListener('click', handlePasswordReset);
-    document.getElementById('submitMessageBtn')?.addEventListener('click', submitMessage);
-    document.getElementById('reportTab')?.addEventListener('click', () => switchMainTab('report'));
-    document.getElementById('academicsTab')?.addEventListener('click', () => switchMainTab('academics'));
-    document.getElementById('rewardsTab')?.addEventListener('click', () => switchMainTab('rewards'));
-    document.getElementById('signInTab')?.addEventListener('click', () => switchTab('signin'));
-    document.getElementById('signUpTab')?.addEventListener('click', () => switchTab('signup'));
+    const bind = (id, fn) => { const el = document.getElementById(id); if(el) el.addEventListener('click', fn); };
+    bind('signInBtn', () => handleAuth('signin'));
+    bind('signUpBtn', () => handleAuth('signup'));
+    bind('submitMessageBtn', submitMessage);
+    bind('reportTab', () => switchMainTab('report'));
+    bind('academicsTab', () => switchMainTab('academics'));
+    bind('rewardsTab', () => switchMainTab('rewards'));
+    bind('sendResetBtn', handlePasswordReset);
+    bind('composeMessageBtn', () => toggleModal('composeMessageModal', true));
     
-    const forgotBtn = document.getElementById('forgotPasswordBtn');
-    if(forgotBtn) forgotBtn.addEventListener('click', () => document.getElementById("passwordResetModal").classList.remove("hidden"));
-    
-    const cancelResetBtn = document.getElementById('cancelResetBtn');
-    if(cancelResetBtn) cancelResetBtn.addEventListener('click', () => document.getElementById("passwordResetModal").classList.add("hidden"));
-
-    document.getElementById('rememberMe')?.addEventListener('change', handleRememberMe);
-    
-    window.onclick = (e) => {
-        if (e.target.classList.contains('fixed')) { 
-            e.target.classList.add('hidden');
+    // Auth Switch Logic
+    const switchAuth = (t) => {
+        const signin = document.getElementById('signInForm');
+        const signup = document.getElementById('signUpForm');
+        const inTab = document.getElementById('signInTab');
+        const upTab = document.getElementById('signUpTab');
+        
+        if(t === 'in') { 
+            signin.classList.remove('hidden'); signup.classList.add('hidden'); 
+            inTab.classList.add('text-green-600', 'border-b-2', 'border-green-600');
+            upTab.classList.remove('text-green-600', 'border-b-2', 'border-green-600');
+        } else {
+            signin.classList.add('hidden'); signup.classList.remove('hidden');
+            upTab.classList.add('text-green-600', 'border-b-2', 'border-green-600');
+            inTab.classList.remove('text-green-600', 'border-b-2', 'border-green-600');
         }
     };
+    bind('signInTab', () => switchAuth('in'));
+    bind('signUpTab', () => switchAuth('up'));
+    
+    // Forgot Password Modal Triggers
+    bind('forgotPasswordBtn', () => toggleModal('passwordResetModal', true));
+    bind('cancelResetBtn', () => toggleModal('passwordResetModal', false));
+
+    window.onclick = (e) => { if(e.target.classList.contains('fixed')) e.target.classList.add('hidden'); };
 });
