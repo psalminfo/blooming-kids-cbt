@@ -11,6 +11,11 @@ firebase.initializeApp({
 const db = firebase.firestore();
 const auth = firebase.auth();
 
+// Load libphonenumber-js for phone number validation
+const libphonenumberScript = document.createElement('script');
+libphonenumberScript.src = 'https://cdn.jsdelivr.net/npm/libphonenumber-js@1.10.14/bundle/libphonenumber-js.min.js';
+document.head.appendChild(libphonenumberScript);
+
 // ============================================================================
 // SECTION 1: CYBER SECURITY & UTILITY FUNCTIONS
 // ============================================================================
@@ -262,73 +267,177 @@ function createCountryCodeDropdown() {
     }
 }
 
-// ENHANCED PHONE NORMALIZATION FUNCTION - BETTER GLOBAL SUPPORT
-function normalizePhoneNumber(phone) {
+// ENHANCED MULTI-NORMALIZATION FUNCTION FOR ALL COUNTRIES
+function multiNormalizePhoneNumber(phone) {
     if (!phone || typeof phone !== 'string') {
-        return { normalized: null, valid: false, error: 'Invalid input' };
+        return [{ normalized: null, country: null, valid: false, error: 'Invalid input', attempt: 'failed' }];
     }
 
-    console.log("🔧 Normalizing phone:", phone);
+    console.log("🔧 Starting multi-normalization for:", phone);
+    
+    const normalizationAttempts = [];
     
     try {
         // Clean the phone number - remove all non-digit characters except +
         let cleaned = phone.replace(/[^\d+]/g, '');
         
-        // If empty after cleaning, return error
-        if (!cleaned) {
-            return { normalized: null, valid: false, error: 'Empty phone number' };
+        // ATTEMPT 1: Standard normalization (current logic)
+        let attempt1 = null;
+        try {
+            const parsed1 = libphonenumber.parsePhoneNumberFromString(cleaned);
+            if (parsed1 && parsed1.isValid()) {
+                attempt1 = {
+                    normalized: parsed1.format('E.164'),
+                    country: parsed1.country,
+                    valid: true,
+                    attempt: 'standard'
+                };
+                normalizationAttempts.push(attempt1);
+                console.log("🔧 Attempt 1 (Standard):", attempt1.normalized);
+            }
+        } catch (e) {
+            console.log("🔧 Attempt 1 failed:", e.message);
         }
-        
-        // Check if it already has a country code
-        if (cleaned.startsWith('+')) {
-            // Already has country code, validate format
-            // Remove any extra plus signs
-            cleaned = '+' + cleaned.substring(1).replace(/\+/g, '');
-            
-            return {
-                normalized: cleaned,
-                valid: true,
-                error: null
-            };
-        } else {
-            // No country code, add +1 as default for global compatibility
-            // Remove leading zeros if present
-            cleaned = cleaned.replace(/^0+/, '');
-            
-            // Check if it looks like a local number that might need a country code
-            if (cleaned.length <= 10) {
-                // Local number, add +1 (USA/Canada default)
-                cleaned = '+1' + cleaned;
-            } else if (cleaned.length > 10) {
-                // Might already have country code without +
-                // Check if it starts with a known country code pattern
-                const knownCodes = ['234', '44', '91', '86', '33', '49', '81', '61', '55', '7'];
-                const possibleCode = cleaned.substring(0, 3);
-                
-                if (knownCodes.includes(possibleCode)) {
-                    cleaned = '+' + cleaned;
-                } else {
-                    // Default to +1 for unknown long numbers
-                    cleaned = '+1' + cleaned;
+
+        // ATTEMPT 2: Country code correction for common patterns
+        let attempt2 = null;
+        try {
+            // US/Canada patterns
+            if (cleaned.match(/^(1)?(469|214|972|713|281|832|210|817)/) && !cleaned.startsWith('+')) {
+                const usNumber = '+1' + cleaned.replace(/^1/, '');
+                const parsed2 = libphonenumber.parsePhoneNumberFromString(usNumber);
+                if (parsed2 && parsed2.isValid()) {
+                    attempt2 = {
+                        normalized: parsed2.format('E.164'),
+                        country: parsed2.country,
+                        valid: true,
+                        attempt: 'us_correction'
+                    };
+                    normalizationAttempts.push(attempt2);
+                    console.log("🔧 Attempt 2 (US Correction):", attempt2.normalized);
                 }
             }
             
-            // Ensure format is correct
-            return {
-                normalized: cleaned,
-                valid: true,
-                error: null
-            };
+            // UK patterns
+            if (cleaned.match(/^(44)?(20|7|1|2|3|8|9)/) && !cleaned.startsWith('+')) {
+                const ukNumber = '+44' + cleaned.replace(/^44/, '');
+                const parsed2 = libphonenumber.parsePhoneNumberFromString(ukNumber);
+                if (parsed2 && parsed2.isValid()) {
+                    attempt2 = {
+                        normalized: parsed2.format('E.164'),
+                        country: parsed2.country,
+                        valid: true,
+                        attempt: 'uk_correction'
+                    };
+                    normalizationAttempts.push(attempt2);
+                    console.log("🔧 Attempt 2 (UK Correction):", attempt2.normalized);
+                }
+            }
+            
+            // Nigeria patterns
+            if (cleaned.match(/^(234)?(80|70|81|90|91)/) && !cleaned.startsWith('+')) {
+                const ngNumber = '+234' + cleaned.replace(/^234/, '');
+                const parsed2 = libphonenumber.parsePhoneNumberFromString(ngNumber);
+                if (parsed2 && parsed2.isValid()) {
+                    attempt2 = {
+                        normalized: parsed2.format('E.164'),
+                        country: parsed2.country,
+                        valid: true,
+                        attempt: 'nigeria_correction'
+                    };
+                    normalizationAttempts.push(attempt2);
+                    console.log("🔧 Attempt 2 (Nigeria Correction):", attempt2.normalized);
+                }
+            }
+        } catch (e) {
+            console.log("🔧 Attempt 2 failed:", e.message);
         }
+
+        // ATTEMPT 3: Area code only (for numbers that lost country code)
+        let attempt3 = null;
+        try {
+            // Common area codes that might be missing country codes
+            const areaCodePatterns = [
+                { code: '1', patterns: [/^(469|214|972|713|281|832|210|817)/] }, // US
+                { code: '44', patterns: [/^(20|7|1|2|3|8|9)/] }, // UK
+                { code: '234', patterns: [/^(80|70|81|90|91)/] }, // Nigeria
+                { code: '33', patterns: [/^(1|2|3|4|5)/] }, // France
+                { code: '49', patterns: [/^(15|16|17|17)/] }, // Germany
+                { code: '91', patterns: [/^(98|99|90|80)/] }, // India
+            ];
+            
+            for (const country of areaCodePatterns) {
+                for (const pattern of country.patterns) {
+                    if (pattern.test(cleaned) && !cleaned.startsWith('+')) {
+                        const correctedNumber = '+' + country.code + cleaned;
+                        const parsed3 = libphonenumber.parsePhoneNumberFromString(correctedNumber);
+                        if (parsed3 && parsed3.isValid()) {
+                            attempt3 = {
+                                normalized: parsed3.format('E.164'),
+                                country: parsed3.country,
+                                valid: true,
+                                attempt: 'area_code_correction'
+                            };
+                            normalizationAttempts.push(attempt3);
+                            console.log("🔧 Attempt 3 (Area Code Correction):", attempt3.normalized);
+                            break;
+                        }
+                    }
+                }
+                if (attempt3) break;
+            }
+        } catch (e) {
+            console.log("🔧 Attempt 3 failed:", e.message);
+        }
+
+        // ATTEMPT 4: Digits only (fallback)
+        let attempt4 = null;
+        try {
+            const digitsOnly = cleaned.replace(/\D/g, '');
+            if (digitsOnly.length >= 8 && digitsOnly.length <= 15) {
+                attempt4 = {
+                    normalized: digitsOnly,
+                    country: null,
+                    valid: true,
+                    attempt: 'digits_only'
+                };
+                normalizationAttempts.push(attempt4);
+                console.log("🔧 Attempt 4 (Digits Only):", attempt4.normalized);
+            }
+        } catch (e) {
+            console.log("🔧 Attempt 4 failed:", e.message);
+        }
+
+        // Return all valid normalization attempts
+        if (normalizationAttempts.length > 0) {
+            console.log("🎯 Multi-normalization results:", normalizationAttempts.map(a => a.normalized));
+            return normalizationAttempts;
+        }
+
+        return [{ 
+            normalized: null, 
+            country: null, 
+            valid: false, 
+            error: 'No valid normalization found',
+            attempt: 'failed'
+        }];
         
     } catch (error) {
-        console.error("❌ Phone normalization error:", error);
-        return { 
+        console.error("❌ Multi-normalization error:", error);
+        return [{ 
             normalized: null, 
+            country: null, 
             valid: false, 
-            error: safeText(error.message)
-        };
+            error: error.message,
+            attempt: 'error'
+        }];
     }
+}
+
+// Simple phone cleaning - fallback if library not loaded
+function cleanPhoneNumber(phone) {
+    if (!phone) return '';
+    return phone.trim();
 }
 
 // ============================================================================
@@ -343,6 +452,7 @@ let unreadMessagesCount = 0;
 let unreadAcademicsCount = 0;
 let realTimeListeners = [];
 let academicsNotifications = new Map(); // studentName -> {dailyTopics: count, homework: count}
+let unreadResponsesCount = 0; // Track unread responses
 
 // ============================================================================
 // SECTION 4: UI MESSAGE SYSTEM
@@ -574,38 +684,41 @@ async function handleSignInFull(identifier, password, signInBtn, authLoader) {
  */
 async function handleSignUpFull(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader) {
     try {
-        // 1. Normalize Phone Number
-        let fullPhoneInput = localPhone;
-        if (!localPhone.startsWith('+')) {
-            fullPhoneInput = countryCode + localPhone;
+        // 1. Combine country code with local phone number
+        const fullPhoneNumber = countryCode + localPhone.replace(/\D/g, '');
+        
+        // 2. Use multi-normalization for phone validation
+        const phoneValidations = multiNormalizePhoneNumber(fullPhoneNumber);
+        const validVersions = phoneValidations.filter(v => v.valid && v.normalized);
+        
+        if (validVersions.length === 0) {
+            throw new Error('Invalid phone number format. Please check your phone number.');
         }
-        
-        const normalizedResult = normalizePhoneNumber(fullPhoneInput);
-        
-        if (!normalizedResult.valid) {
-            throw new Error(`Invalid phone number: ${normalizedResult.error}`);
-        }
-        
-        const finalPhone = normalizedResult.normalized;
-        console.log("📱 Processing signup with normalized phone:", finalPhone);
 
-        // 2. Create Authentication User
+        // 3. Use the first valid normalized version
+        const normalizedPhone = validVersions[0].normalized;
+
+        // 4. Create Authentication User
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
 
-        // 3. Generate Referral Code
+        // 5. Find parent name from existing data
+        const parentName = await findParentNameFromStudents(normalizedPhone);
+        
+        // 6. Generate Referral Code
         const referralCode = await generateReferralCode();
 
-        // 4. Save User Data to Firestore
+        // 7. Save User Data to Firestore
         await db.collection('parent_users').doc(user.uid).set({
+            phone: fullPhoneNumber, // Store full number with country code
+            normalizedPhone: normalizedPhone, // Store normalized version
+            countryCode: countryCode, // Store selected country code
+            localPhone: localPhone, // Store local number part
             email: email,
-            phone: finalPhone, // Normalized +CountryCode format
-            normalizedPhone: finalPhone, // Explicit field for searching
-            parentName: 'Parent', // Default name
+            parentName: parentName || 'Parent',
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             referralCode: referralCode,
             referralEarnings: 0,
-            uid: user.uid
         });
 
         console.log("✅ Account created and profile saved for:", user.uid);
@@ -657,6 +770,79 @@ async function handlePasswordResetFull(email, sendResetBtn, resetLoader) {
     } finally {
         if (sendResetBtn) sendResetBtn.disabled = false;
         if (resetLoader) resetLoader.classList.add('hidden');
+    }
+}
+
+// Find parent name from students collection
+async function findParentNameFromStudents(parentPhone) {
+    try {
+        console.log("Searching for parent name with phone:", parentPhone);
+        
+        // Use multi-normalization to get all possible phone versions
+        const normalizedVersions = multiNormalizePhoneNumber(parentPhone);
+        const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
+        
+        // Search with each normalized version
+        for (const version of validVersions) {
+            console.log(`🔍 Searching parent name with: ${version.normalized} (${version.attempt})`);
+            
+            // PRIMARY SEARCH: students collection
+            const studentsSnapshot = await db.collection("students")
+                .where("normalizedParentPhone", "==", version.normalized)
+                .limit(1)
+                .get();
+
+            if (!studentsSnapshot.empty) {
+                const studentDoc = studentsSnapshot.docs[0];
+                const studentData = studentDoc.data();
+                const parentName = studentData.parentName;
+                
+                if (parentName) {
+                    console.log("Found parent name in students collection:", parentName);
+                    return parentName;
+                }
+            }
+
+            // SECONDARY SEARCH: pending_students collection
+            const pendingStudentsSnapshot = await db.collection("pending_students")
+                .where("normalizedParentPhone", "==", version.normalized)
+                .limit(1)
+                .get();
+
+            if (!pendingStudentsSnapshot.empty) {
+                const pendingStudentDoc = pendingStudentsSnapshot.docs[0];
+                const pendingStudentData = pendingStudentDoc.data();
+                const parentName = pendingStudentData.parentName;
+                
+                if (parentName) {
+                    console.log("Found parent name in pending_students collection:", parentName);
+                    return parentName;
+                }
+            }
+
+            // FALLBACK SEARCH: original phone fields
+            const fallbackStudentsSnapshot = await db.collection("students")
+                .where("parentPhone", "==", version.normalized)
+                .limit(1)
+                .get();
+
+            if (!fallbackStudentsSnapshot.empty) {
+                const studentDoc = fallbackStudentsSnapshot.docs[0];
+                const studentData = studentDoc.data();
+                const parentName = studentData.parentName;
+                
+                if (parentName) {
+                    console.log("Found parent name in students collection (fallback):", parentName);
+                    return parentName;
+                }
+            }
+        }
+
+        console.log("No parent name found in any collection with any normalization");
+        return null;
+    } catch (error) {
+        console.error("Error finding parent name:", error);
+        return null;
     }
 }
 
@@ -1524,35 +1710,464 @@ async function checkForNewAcademics() {
 }
 
 // ============================================================================
-// SECTION 9: MESSAGING - DISABLED (REMOVED FOR NOW)
+// SECTION 9: FEEDBACK SYSTEM FUNCTIONS
 // ============================================================================
 
-// All messaging functions removed as requested
+function showFeedbackModal() {
+    populateStudentDropdown();
+    document.getElementById('feedbackModal').classList.remove('hidden');
+}
 
-// ============================================================================
-// SECTION 10: NOTIFICATION SYSTEM WITHOUT COMPLEX QUERIES
-// ============================================================================
+function hideFeedbackModal() {
+    document.getElementById('feedbackModal').classList.add('hidden');
+    // Reset form
+    document.getElementById('feedbackCategory').value = '';
+    document.getElementById('feedbackPriority').value = '';
+    document.getElementById('feedbackStudent').value = '';
+    document.getElementById('feedbackMessage').value = '';
+}
 
-async function checkForNewMessages() {
-    // Function kept but not used since messaging is disabled
-    return;
+function populateStudentDropdown() {
+    const studentDropdown = document.getElementById('feedbackStudent');
+    studentDropdown.innerHTML = '<option value="">Select student</option>';
+    
+    // Get student names from the report headers that are already displayed
+    const studentHeaders = document.querySelectorAll('[class*="bg-green-100"] h2');
+    
+    if (studentHeaders.length === 0) {
+        studentDropdown.innerHTML += '<option value="" disabled>No students found - please wait for reports to load</option>';
+        return;
+    }
+
+    studentHeaders.forEach(header => {
+        const studentName = header.textContent.trim();
+        const option = document.createElement('option');
+        option.value = studentName;
+        option.textContent = studentName;
+        studentDropdown.appendChild(option);
+    });
+}
+
+async function submitFeedback() {
+    const category = document.getElementById('feedbackCategory').value;
+    const priority = document.getElementById('feedbackPriority').value;
+    const student = document.getElementById('feedbackStudent').value;
+    const message = document.getElementById('feedbackMessage').value;
+
+    // Validation
+    if (!category || !priority || !student || !message) {
+        showMessage('Please fill in all required fields', 'error');
+        return;
+    }
+
+    if (message.length < 10) {
+        showMessage('Please provide a more detailed message (at least 10 characters)', 'error');
+        return;
+    }
+
+    const submitBtn = document.getElementById('submitFeedbackBtn');
+    submitBtn.disabled = true;
+    document.getElementById('submitFeedbackText').textContent = 'Submitting...';
+    document.getElementById('submitFeedbackSpinner').classList.remove('hidden');
+
+    try {
+        const user = auth.currentUser;
+        if (!user) {
+            throw new Error('Please sign in to submit feedback');
+        }
+
+        // Get user data
+        const userDoc = await db.collection('parent_users').doc(user.uid).get();
+        const userData = userDoc.data();
+
+        // Create feedback document
+        const feedbackData = {
+            parentName: currentUserData?.parentName || userData.parentName || 'Unknown Parent',
+            parentPhone: userData.phone,
+            parentEmail: userData.email,
+            studentName: student,
+            category: category,
+            priority: priority,
+            message: message,
+            status: 'New',
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            emailSent: false,
+            parentUid: user.uid, // Add parent UID for querying responses
+            responses: [] // Initialize empty responses array
+        };
+
+        // Save to Firestore
+        await db.collection('parent_feedback').add(feedbackData);
+
+        showMessage('Thank you! Your feedback has been submitted successfully. We will respond within 24-48 hours.', 'success');
+        
+        // Close modal and reset form
+        hideFeedbackModal();
+
+    } catch (error) {
+        console.error('Feedback submission error:', error);
+        showMessage('Failed to submit feedback. Please try again.', 'error');
+    } finally {
+        submitBtn.disabled = false;
+        document.getElementById('submitFeedbackText').textContent = 'Submit Feedback';
+        document.getElementById('submitFeedbackSpinner').classList.add('hidden');
+    }
+}
+
+// Admin Responses Functions with Notification Counter
+function showResponsesModal() {
+    document.getElementById('responsesModal').classList.remove('hidden');
+    loadAdminResponses();
+    // Reset notification count when user views responses
+    resetNotificationCount();
+}
+
+function hideResponsesModal() {
+    document.getElementById('responsesModal').classList.add('hidden');
+}
+
+async function loadAdminResponses() {
+    const responsesContent = document.getElementById('responsesContent');
+    responsesContent.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading responses...</p></div>';
+
+    try {
+        const user = auth.currentUser;
+        if (!user) {
+            throw new Error('Please sign in to view responses');
+        }
+
+        // Query feedback where parentUid matches current user AND responses array exists and is not empty
+        const feedbackSnapshot = await db.collection('parent_feedback')
+            .where('parentUid', '==', user.uid)
+            .get();
+
+        if (feedbackSnapshot.empty) {
+            responsesContent.innerHTML = `
+                <div class="text-center py-12">
+                    <div class="text-6xl mb-4">📭</div>
+                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Responses Yet</h3>
+                    <p class="text-gray-500 max-w-md mx-auto">You haven't received any responses from our staff yet. We'll respond to your feedback within 24-48 hours.</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Filter feedback that has responses
+        const feedbackWithResponses = [];
+        feedbackSnapshot.forEach(doc => {
+            const feedback = { id: doc.id, ...doc.data() };
+            if (feedback.responses && feedback.responses.length > 0) {
+                feedbackWithResponses.push(feedback);
+            }
+        });
+
+        if (feedbackWithResponses.length === 0) {
+            responsesContent.innerHTML = `
+                <div class="text-center py-12">
+                    <div class="text-6xl mb-4">📭</div>
+                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Responses Yet</h3>
+                    <p class="text-gray-500 max-w-md mx-auto">You haven't received any responses from our staff yet. We'll respond to your feedback within 24-48 hours.</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Sort by most recent response
+        feedbackWithResponses.sort((a, b) => {
+            const aDate = a.responses[0]?.responseDate?.toDate() || new Date(0);
+            const bDate = b.responses[0]?.responseDate?.toDate() || new Date(0);
+            return bDate - aDate;
+        });
+
+        responsesContent.innerHTML = '';
+
+        feedbackWithResponses.forEach((feedback) => {
+            feedback.responses.forEach((response, index) => {
+                const responseDate = response.responseDate?.toDate() || feedback.timestamp?.toDate() || new Date();
+                const formattedDate = responseDate.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                const responseElement = document.createElement('div');
+                responseElement.className = 'bg-white border border-gray-200 rounded-xl p-6 mb-4';
+                responseElement.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="flex flex-wrap gap-2">
+                            <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${getCategoryColor(feedback.category)}">
+                                ${feedback.category}
+                            </span>
+                            <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${getPriorityColor(feedback.priority)}">
+                                ${feedback.priority} Priority
+                            </span>
+                        </div>
+                        <span class="text-sm text-gray-500">${formattedDate}</span>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h4 class="font-semibold text-gray-800 mb-2">Regarding: ${feedback.studentName}</h4>
+                        <p class="text-gray-700 bg-gray-50 p-4 rounded-lg border">${safeText(feedback.message)}</p>
+                    </div>
+                    
+                    <div class="response-bubble">
+                        <div class="response-header">📨 Response from ${response.responderName || 'Admin'}:</div>
+                        <p class="text-gray-700 mt-2">${safeText(response.responseText)}</p>
+                        <div class="text-sm text-gray-500 mt-2">
+                            Responded by: ${response.responderName || 'Admin Staff'} 
+                            ${response.responderEmail ? `(${safeText(response.responderEmail)})` : ''}
+                        </div>
+                    </div>
+                `;
+
+                responsesContent.appendChild(responseElement);
+            });
+        });
+
+    } catch (error) {
+        console.error('Error loading responses:', error);
+        responsesContent.innerHTML = `
+            <div class="text-center py-8">
+                <div class="text-4xl mb-4">❌</div>
+                <h3 class="text-xl font-bold text-red-700 mb-2">Error Loading Responses</h3>
+                <p class="text-gray-500">Unable to load responses at this time. Please try again later.</p>
+            </div>
+        `;
+    }
+}
+
+// Notification System for Responses
+async function checkForNewResponses() {
+    try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const feedbackSnapshot = await db.collection('parent_feedback')
+            .where('parentUid', '==', user.uid)
+            .get();
+
+        let totalResponses = 0;
+        
+        feedbackSnapshot.forEach(doc => {
+            const feedback = doc.data();
+            if (feedback.responses && feedback.responses.length > 0) {
+                totalResponses += feedback.responses.length;
+            }
+        });
+
+        // Update notification badge
+        updateNotificationBadge(totalResponses > 0 ? totalResponses : 0);
+        
+        // Store for later use
+        unreadResponsesCount = totalResponses;
+
+    } catch (error) {
+        console.error('Error checking for new responses:', error);
+    }
 }
 
 function updateNotificationBadge(count) {
-    // Function kept but not used since messaging is disabled
-    return;
+    let badge = document.getElementById('responseNotificationBadge');
+    const viewResponsesBtn = document.getElementById('viewResponsesBtn');
+    
+    if (!viewResponsesBtn) return;
+    
+    if (!badge) {
+        badge = document.createElement('span');
+        badge.id = 'responseNotificationBadge';
+        badge.className = 'absolute -top-2 -right-2 bg-red-500 text-white rounded-full text-xs w-6 h-6 flex items-center justify-center font-bold animate-pulse';
+        viewResponsesBtn.style.position = 'relative';
+        viewResponsesBtn.appendChild(badge);
+    }
+    
+    if (count > 0) {
+        badge.textContent = count > 9 ? '9+' : count;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
 }
 
 function resetNotificationCount() {
-    // Function kept but not used since messaging is disabled
-    return;
+    // When user views responses, mark them as read and reset counter
+    updateNotificationBadge(0);
+    unreadResponsesCount = 0;
+}
+
+function getCategoryColor(category) {
+    const colors = {
+        'Feedback': 'bg-blue-100 text-blue-800',
+        'Request': 'bg-green-100 text-green-800',
+        'Complaint': 'bg-red-100 text-red-800',
+        'Suggestion': 'bg-purple-100 text-purple-800'
+    };
+    return colors[category] || 'bg-gray-100 text-gray-800';
+}
+
+function getPriorityColor(priority) {
+    const colors = {
+        'Low': 'bg-gray-100 text-gray-800',
+        'Medium': 'bg-yellow-100 text-yellow-800',
+        'High': 'bg-orange-100 text-orange-800',
+        'Urgent': 'bg-red-100 text-red-800'
+    };
+    return colors[priority] || 'bg-gray-100 text-gray-800';
+}
+
+// Add View Responses button to the welcome section with notification badge
+function addViewResponsesButton() {
+    const welcomeSection = document.querySelector('.bg-green-50');
+    if (!welcomeSection) return;
+    
+    const buttonContainer = welcomeSection.querySelector('.flex.gap-2');
+    if (!buttonContainer) return;
+    
+    // Check if button already exists
+    if (document.getElementById('viewResponsesBtn')) return;
+    
+    const viewResponsesBtn = document.createElement('button');
+    viewResponsesBtn.id = 'viewResponsesBtn';
+    viewResponsesBtn.onclick = showResponsesModal;
+    viewResponsesBtn.className = 'bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 btn-glow flex items-center justify-center relative';
+    viewResponsesBtn.innerHTML = '<span class="mr-2">📨</span> View Responses';
+    
+    // Insert before the logout button
+    buttonContainer.insertBefore(viewResponsesBtn, buttonContainer.lastElementChild);
+    
+    // Check for responses to show notification
+    setTimeout(() => {
+        checkForNewResponses();
+    }, 1000);
+}
+
+// ============================================================================
+// SECTION 10: HYBRID REAL-TIME MONITORING SYSTEM
+// ============================================================================
+
+function setupRealTimeMonitoring(parentPhone, parentEmail, userId) {
+    // Clear any existing listeners
+    cleanupRealTimeListeners();
+    
+    console.log("🔍 Setting up real-time monitoring for:", parentPhone);
+    
+    // Get normalized phone versions for monitoring
+    const normalizedVersions = multiNormalizePhoneNumber(parentPhone);
+    const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
+    
+    // Monitor assessment reports
+    validVersions.forEach(version => {
+        const assessmentListener = db.collection("student_results")
+            .where("normalizedParentPhone", "==", version.normalized)
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === "added") {
+                        console.log("🆕 NEW ASSESSMENT REPORT DETECTED!");
+                        showNewReportNotification('assessment');
+                        // Reload reports after a short delay
+                        setTimeout(() => {
+                            loadAllReportsForParent(parentPhone, userId);
+                        }, 2000);
+                    }
+                });
+            });
+        realTimeListeners.push(assessmentListener);
+    });
+    
+    // Monitor monthly reports
+    validVersions.forEach(version => {
+        const monthlyListener = db.collection("tutor_submissions")
+            .where("normalizedParentPhone", "==", version.normalized)
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === "added") {
+                        console.log("🆕 NEW MONTHLY REPORT DETECTED!");
+                        showNewReportNotification('monthly');
+                        // Reload reports after a short delay
+                        setTimeout(() => {
+                            loadAllReportsForParent(parentPhone, userId);
+                        }, 2000);
+                    }
+                });
+            });
+        realTimeListeners.push(monthlyListener);
+    });
+    
+    // Also monitor by email if available
+    if (parentEmail) {
+        const emailAssessmentListener = db.collection("student_results")
+            .where("parentEmail", "==", parentEmail)
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === "added") {
+                        console.log("🆕 NEW ASSESSMENT REPORT DETECTED VIA EMAIL!");
+                        showNewReportNotification('assessment');
+                        setTimeout(() => {
+                            loadAllReportsForParent(parentPhone, userId);
+                        }, 2000);
+                    }
+                });
+            });
+        realTimeListeners.push(emailAssessmentListener);
+        
+        const emailMonthlyListener = db.collection("tutor_submissions")
+            .where("parentEmail", "==", parentEmail)
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === "added") {
+                        console.log("🆕 NEW MONTHLY REPORT DETECTED VIA EMAIL!");
+                        showNewReportNotification('monthly');
+                        setTimeout(() => {
+                            loadAllReportsForParent(parentPhone, userId);
+                        }, 2000);
+                    }
+                });
+            });
+        realTimeListeners.push(emailMonthlyListener);
+    }
+    
+    // Monitor academics periodically
+    setInterval(() => {
+        checkForNewAcademics();
+    }, 30000);
+}
+
+function cleanupRealTimeListeners() {
+    realTimeListeners.forEach(unsubscribe => {
+        if (typeof unsubscribe === 'function') {
+            unsubscribe();
+        }
+    });
+    realTimeListeners = [];
+    console.log("🧹 Cleaned up real-time listeners");
+}
+
+function showNewReportNotification(type) {
+    const reportType = type === 'assessment' ? 'Assessment Report' : 'Monthly Report';
+    showMessage(`New ${reportType} available! Loading now...`, 'success');
+    
+    // Add a visual indicator in the UI
+    const existingIndicator = document.getElementById('newReportIndicator');
+    if (existingIndicator) {
+        existingIndicator.remove();
+    }
+    
+    const indicator = document.createElement('div');
+    indicator.id = 'newReportIndicator';
+    indicator.className = 'fixed top-20 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-40 animate-pulse fade-in';
+    indicator.innerHTML = `📄 New ${safeText(reportType)} Available!`;
+    document.body.appendChild(indicator);
+    
+    // Remove after 5 seconds
+    setTimeout(() => {
+        indicator.remove();
+    }, 5000);
 }
 
 // ============================================================================
 // SECTION 11: NAVIGATION BUTTONS & DYNAMIC UI
 // ============================================================================
-
-// Add Messages button removed as requested
 
 // MANUAL REFRESH FUNCTION
 async function manualRefreshReportsV2() {
@@ -1654,9 +2269,9 @@ function generateAllPhoneFormatsForSearch(phone) {
     if (!phone) return Array.from(formats);
     
     // Get the normalized version first
-    const normalized = normalizePhoneNumber(phone);
-    if (normalized.valid) {
-        formats.add(normalized.normalized);
+    const normalized = multiNormalizePhoneNumber(phone);
+    if (normalized[0].valid) {
+        formats.add(normalized[0].normalized);
     }
     
     // Add the original
@@ -1683,7 +2298,6 @@ function generateAllPhoneFormatsForSearch(phone) {
     
     return Array.from(formats);
 }
-
 
 async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUid = '') {
     console.log("🔍 ULTIMATE Search for:", { parentPhone, parentEmail, parentUid });
@@ -1985,8 +2599,8 @@ async function generateAllSearchQueries(parentPhone, parentEmail, parentUid) {
     
     // Try to find students first, then use student IDs
     try {
-        const normalizedPhone = normalizePhoneNumber(parentPhone);
-        if (normalizedPhone.valid) {
+        const normalizedPhone = multiNormalizePhoneNumber(parentPhone);
+        if (normalizedPhone[0].valid) {
             // Find students by parent phone - CHECK ALL PHONE VARIATIONS
             for (const phoneVar of allPhoneVersions) {
                 try {
@@ -2426,90 +3040,7 @@ function determineReportType(collectionName, data) {
 }
 
 // ============================================================================
-// SECTION 13: REAL-TIME MONITORING WITHOUT COMPLEX QUERIES
-// ============================================================================
-
-function setupRealTimeMonitoring(parentPhone, userId) {
-    // Clear any existing listeners
-    cleanupRealTimeListeners();
-    
-    // Normalize phone
-    const normalizedPhone = normalizePhoneNumber(parentPhone);
-    if (!normalizedPhone.valid) {
-        return;
-    }
-    
-    // Monitor monthly reports
-    const monthlyListener = db.collection("tutor_submissions")
-        .where("parentPhone", "==", normalizedPhone.normalized)
-        .onSnapshot((snapshot) => {
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === "added") {
-                    console.log("🆕 NEW MONTHLY REPORT DETECTED!");
-                    showNewReportNotification('monthly');
-                }
-            });
-        }, (error) => {
-            console.error("Monthly reports listener error:", error);
-        });
-    realTimeListeners.push(monthlyListener);
-    
-    // Monitor assessment reports
-    const assessmentListener = db.collection("student_results")
-        .where("parentPhone", "==", normalizedPhone.normalized)
-        .onSnapshot((snapshot) => {
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === "added") {
-                    console.log("🆕 NEW ASSESSMENT REPORT DETECTED!");
-                    showNewReportNotification('assessment');
-                }
-            });
-        }, (error) => {
-            console.error("Assessment reports listener error:", error);
-        });
-    realTimeListeners.push(assessmentListener);
-    
-    // Monitor academics periodically
-    setInterval(() => {
-        checkForNewAcademics();
-    }, 30000);
-}
-
-function cleanupRealTimeListeners() {
-    realTimeListeners.forEach(unsubscribe => {
-        if (typeof unsubscribe === 'function') {
-            unsubscribe();
-        }
-    });
-    realTimeListeners = [];
-}
-
-function showNewReportNotification(type) {
-    const reportType = type === 'assessment' ? 'Assessment Report' : 
-                      type === 'monthly' ? 'Monthly Report' : 'New Update';
-    
-    showMessage(`New ${reportType} available!`, 'success');
-    
-    // Add a visual indicator in the UI
-    const existingIndicator = document.getElementById('newReportIndicator');
-    if (existingIndicator) {
-        existingIndicator.remove();
-    }
-    
-    const indicator = document.createElement('div');
-    indicator.id = 'newReportIndicator';
-    indicator.className = 'fixed top-20 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-40 animate-pulse fade-in';
-    indicator.innerHTML = `📄 New ${safeText(reportType)} Available!`;
-    document.body.appendChild(indicator);
-    
-    // Remove after 5 seconds
-    setTimeout(() => {
-        indicator.remove();
-    }, 5000);
-}
-
-// ============================================================================
-// SECTION 14: YEARLY ARCHIVES REPORTS SYSTEM WITH ACCORDIONS
+// SECTION 13: YEARLY ARCHIVES REPORTS SYSTEM WITH ACCORDIONS
 // ============================================================================
 
 /**
@@ -2858,7 +3389,7 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
                     </div>
                     <p class="text-gray-600 text-sm">
                         <span class="font-medium">Date:</span> ${safeText(formattedDate)}
-                        ${firstReport.tutorName ? ` • <span class="font-medium">Tutor:</span> ${safeText(firstReport.tutorName)}` : ''}
+                        ${firstReport.tutorName ? ` • <span class="font-medium">Tutor:</span> ${safeText(firstReport.tutorName)}</span>` : ''}
                     </p>
                 </div>
                 <button onclick="downloadSessionReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}', 'assessment')" 
@@ -2937,7 +3468,7 @@ function createMonthlyReportHTML(sessionReports, studentIndex, sessionId, fullNa
                     </div>
                     <p class="text-gray-600 text-sm">
                         <span class="font-medium">Submitted:</span> ${safeText(formattedDate)}
-                        ${firstReport.tutorName ? ` • <span class="font-medium">Tutor:</span> ${safeText(firstReport.tutorName)}` : ''}
+                        ${firstReport.tutorName ? ` • <span class="font-medium">Tutor:</span> ${safeText(firstReport.tutorName)}</span>` : ''}
                     </p>
                 </div>
                 <button onclick="downloadMonthlyReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}')" 
@@ -3050,7 +3581,7 @@ function toggleAccordion(elementId) {
 }
 
 // ============================================================================
-// SECTION 15: MAIN REPORT LOADING FUNCTION (FIXED & VERIFIED)
+// SECTION 14: MAIN REPORT LOADING FUNCTION (FIXED & VERIFIED)
 // ============================================================================
 
 async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false) {
@@ -3096,11 +3627,14 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                         }
 
                         // Re-initialize dynamic components
+                        addViewResponsesButton();
                         addManualRefreshButton();
                         addLogoutButton();
                         loadReferralRewards(userId);
                         loadAcademicsData();
-                        setupRealTimeMonitoring(parentPhone, userId);
+                        const userDoc = await db.collection('parent_users').doc(userId).get();
+                        const userData = userDoc.data();
+                        setupRealTimeMonitoring(parentPhone, userData.email, userId);
                         
                         return;
                     }
@@ -3272,9 +3806,12 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             reportArea.classList.remove("hidden");
         }
         
+        addViewResponsesButton();
         addManualRefreshButton();
         addLogoutButton();
-        setupRealTimeMonitoring(parentPhone, userId);
+        const userDocData = await db.collection('parent_users').doc(userId).get();
+        const userDocDataValue = userDocData.data();
+        setupRealTimeMonitoring(parentPhone, userDocDataValue.email, userId);
         loadReferralRewards(userId);
         loadAcademicsData();
 
@@ -3313,7 +3850,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
 }
 
 // ============================================================================
-// SECTION 16: ADMIN DIAGNOSTICS FUNCTIONS
+// SECTION 15: ADMIN DIAGNOSTICS FUNCTIONS
 // ============================================================================
 
 // Add this to help diagnose missing reports
@@ -3390,7 +3927,7 @@ async function runReportSearchDiagnostics() {
 }
 
 // ============================================================================
-// SECTION 17: TAB MANAGEMENT & NAVIGATION
+// SECTION 16: TAB MANAGEMENT & NAVIGATION
 // ============================================================================
 
 function switchMainTab(tab) {
@@ -3440,6 +3977,29 @@ function switchMainTab(tab) {
     }
 }
 
+function switchTab(tab) {
+    const signInTab = document.getElementById('signInTab');
+    const signUpTab = document.getElementById('signUpTab');
+    const signInForm = document.getElementById('signInForm');
+    const signUpForm = document.getElementById('signUpForm');
+
+    if (tab === 'signin') {
+        signInTab?.classList.remove('tab-inactive');
+        signInTab?.classList.add('tab-active');
+        signUpTab?.classList.remove('tab-active');
+        signUpTab?.classList.add('tab-inactive');
+        signInForm?.classList.remove('hidden');
+        signUpForm?.classList.add('hidden');
+    } else {
+        signUpTab?.classList.remove('tab-inactive');
+        signUpTab?.classList.add('tab-active');
+        signInTab?.classList.remove('tab-active');
+        signInTab?.classList.add('tab-inactive');
+        signUpForm?.classList.remove('hidden');
+        signInForm?.classList.add('hidden');
+    }
+}
+
 function logout() {
     // Clear remember me on logout
     localStorage.removeItem('rememberMe');
@@ -3455,7 +4015,7 @@ function logout() {
 }
 
 // ============================================================================
-// SECTION 18: UNIFIED AUTH & DATA MANAGER - FIXES RELOADING & MISSING CHILDREN
+// SECTION 17: UNIFIED AUTH & DATA MANAGER - FIXES RELOADING & MISSING CHILDREN
 // ============================================================================
 
 class UnifiedAuthManager {
@@ -3689,7 +4249,9 @@ class UnifiedAuthManager {
      */
     async setupRealtimeMonitoring() {
         try {
-            setupRealTimeMonitoring(this.currentUser.normalizedPhone, this.currentUser.uid);
+            const userDoc = await db.collection('parent_users').doc(this.currentUser.uid).get();
+            const userData = userDoc.data();
+            setupRealTimeMonitoring(this.currentUser.normalizedPhone, userData.email, this.currentUser.uid);
         } catch (error) {
             console.error("⚠️ Error setting up monitoring:", error);
             // Non-critical, don't throw
@@ -3700,6 +4262,7 @@ class UnifiedAuthManager {
      * Setup UI components
      */
     setupUIComponents() {
+        addViewResponsesButton();
         addManualRefreshButton();
         addLogoutButton();
     }
@@ -3733,7 +4296,7 @@ class UnifiedAuthManager {
 const authManager = new UnifiedAuthManager();
 
 // ============================================================================
-// 2. COMPREHENSIVE CHILDREN FINDER (Finds ALL Children)
+// SECTION 18: COMPREHENSIVE CHILDREN FINDER (Finds ALL Children)
 // ============================================================================
 
 /**
@@ -3883,7 +4446,7 @@ async function comprehensiveFindChildren(parentPhone) {
 }
 
 // ============================================================================
-// 3. NEW INITIALIZATION FUNCTION
+// SECTION 19: NEW INITIALIZATION FUNCTION
 // ============================================================================
 
 /**
@@ -3912,7 +4475,7 @@ function initializeParentPortalV2() {
 }
 
 // ============================================================================
-// HELPER FUNCTIONS
+// SECTION 20: HELPER FUNCTIONS
 // ============================================================================
 
 // Setup Remember Me Functionality
@@ -4026,27 +4589,18 @@ function handlePasswordReset() {
     handlePasswordResetFull(email, sendResetBtn, resetLoader);
 }
 
-// Basic tab switching functions
-function switchTab(tab) {
-    const signInTab = document.getElementById('signInTab');
-    const signUpTab = document.getElementById('signUpTab');
-    const signInForm = document.getElementById('signInForm');
-    const signUpForm = document.getElementById('signUpForm');
+// Modal functions
+function showPasswordResetModal() {
+    const modal = document.getElementById("passwordResetModal");
+    if (modal) {
+        modal.classList.remove("hidden");
+    }
+}
 
-    if (tab === 'signin') {
-        signInTab?.classList.remove('tab-inactive');
-        signInTab?.classList.add('tab-active');
-        signUpTab?.classList.remove('tab-active');
-        signUpTab?.classList.add('tab-inactive');
-        signInForm?.classList.remove('hidden');
-        signUpForm?.classList.add('hidden');
-    } else {
-        signUpTab?.classList.remove('tab-inactive');
-        signUpTab?.classList.add('tab-active');
-        signInTab?.classList.remove('tab-active');
-        signInTab?.classList.add('tab-inactive');
-        signUpForm?.classList.remove('hidden');
-        signInForm?.classList.add('hidden');
+function hidePasswordResetModal() {
+    const modal = document.getElementById("passwordResetModal");
+    if (modal) {
+        modal.classList.add("hidden");
     }
 }
 
@@ -4106,6 +4660,13 @@ function setupEventListeners() {
         rememberMeCheckbox.addEventListener("change", handleRememberMe);
     }
     
+    // Feedback
+    const submitFeedbackBtn = document.getElementById("submitFeedbackBtn");
+    if (submitFeedbackBtn) {
+        submitFeedbackBtn.removeEventListener("click", submitFeedback);
+        submitFeedbackBtn.addEventListener("click", submitFeedback);
+    }
+    
     // Enter key support
     const loginPassword = document.getElementById('loginPassword');
     if (loginPassword) {
@@ -4159,21 +4720,6 @@ function handleResetEnter(e) {
     if (e.key === 'Enter') handlePasswordReset();
 }
 
-// Modal functions
-function showPasswordResetModal() {
-    const modal = document.getElementById("passwordResetModal");
-    if (modal) {
-        modal.classList.remove("hidden");
-    }
-}
-
-function hidePasswordResetModal() {
-    const modal = document.getElementById("passwordResetModal");
-    if (modal) {
-        modal.classList.add("hidden");
-    }
-}
-
 // Setup global error handler
 function setupGlobalErrorHandler() {
     // Prevent unhandled promise rejections
@@ -4220,3 +4766,18 @@ document.addEventListener('DOMContentLoaded', function() {
 window.authManager = authManager;
 window.comprehensiveFindChildren = comprehensiveFindChildren;
 window.manualRefreshReportsV2 = manualRefreshReportsV2;
+window.showFeedbackModal = showFeedbackModal;
+window.hideFeedbackModal = hideFeedbackModal;
+window.showResponsesModal = showResponsesModal;
+window.hideResponsesModal = hideResponsesModal;
+window.loadAcademicsData = loadAcademicsData;
+window.toggleAcademicsAccordion = toggleAcademicsAccordion;
+window.onStudentSelected = onStudentSelected;
+window.downloadSessionReport = downloadSessionReport;
+window.downloadMonthlyReport = downloadMonthlyReport;
+window.toggleAccordion = toggleAccordion;
+window.switchMainTab = switchMainTab;
+window.switchTab = switchTab;
+window.logout = logout;
+window.showDiagnostics = showDiagnostics;
+window.runReportSearchDiagnostics = runReportSearchDiagnostics;
