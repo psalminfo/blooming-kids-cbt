@@ -4,7 +4,7 @@ import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 // ##################################################################
-// # SECTION 0: CONFIGURATION & STYLES (INTEGRATED)
+// # SECTION 0: CONFIGURATION, STYLES & LOGIC LAYER
 // ##################################################################
 
 // --- Global state ---
@@ -98,18 +98,29 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// --- Subject Categorization (Existing) ---
+// --- Pay Scheme Configuration (RESTORED) ---
+const PAY_SCHEMES = {
+    NEW_TUTOR: {
+        academic: { "Preschool-Grade 2": {2: 50000, 3: 60000, 5: 100000}, "Grade 3-8": {2: 60000, 3: 70000, 5: 110000}, "Subject Teachers": {1: 30000, 2: 60000, 3: 70000} },
+        specialized: { individual: { "Music": 30000, "Native Language": 20000, "Foreign Language": 25000, "Coding": 30000, "ICT": 10000, "Chess": 25000, "Public Speaking": 25000, "English Proficiency": 25000, "Counseling Programs": 25000}, group: { "Music": 25000, "Native Language": 20000, "Foreign Language": 20000, "Chess": 20000, "Public Speaking": 20000, "English Proficiency": 20000, "Counseling Programs": 20000 } }
+    },
+    OLD_TUTOR: {
+        academic: { "Preschool-Grade 2": {2: 60000, 3: 70000, 5: 110000}, "Grade 3-8": {2: 70000, 3: 80000, 5: 120000}, "Subject Teachers": {1: 35000, 2: 70000, 3: 90000} },
+        specialized: { individual: { "Music": 35000, "Native Language": 25000, "Foreign Language": 30000, "Coding": 35000, "ICT": 12000, "Chess": 30000, "Public Speaking": 30000, "English Proficiency": 30000, "Counseling Programs": 30000 }, group: { "Music": 25000, "Native Language": 20000, "Foreign Language": 20000, "Chess": 20000, "Public Speaking": 20000, "English Proficiency": 20000, "Counseling Programs": 20000 } }
+    },
+    MANAGEMENT: {
+        academic: { "Preschool-Grade 2": {2: 70000, 3: 85000, 5: 120000}, "Grade 3-8": {2: 80000, 3: 90000, 5: 130000}, "Subject Teachers": {1: 40000, 2: 80000, 3: 100000} },
+        specialized: { individual: { "Music": 40000, "Native Language": 30000, "Foreign Language": 35000, "Coding": 40000, "Chess": 35000, "Public Speaking": 35000, "English Proficiency": 35000, "Counseling Programs": 35000 }, group: { "Music": 25000, "Native Language": 20000, "Foreign Language": 20000, "Chess": 20000, "Public Speaking": 20000, "English Proficiency": 20000, "Counseling Programs": 20000 } }
+    }
+};
+
 const SUBJECT_CATEGORIES = {
     "Native Language": ["Yoruba", "Igbo", "Hausa"],
     "Foreign Language": ["French", "German", "Spanish", "Arabic"],
     "Specialized": ["Music", "Coding","ICT", "Chess", "Public Speaking", "English Proficiency", "Counseling Programs"]
 };
 
-// ##################################################################
-// # SECTION 1: UTILITIES & MODAL LOGIC (NEW FEATURES)
-// ##################################################################
-
-// --- Phone Normalization ---
+// --- Utilities (RESTORED) ---
 function normalizePhoneNumber(phone) {
     if (!phone) return '';
     let cleaned = phone.toString().trim().replace(/\D/g, '');
@@ -118,13 +129,113 @@ function normalizePhoneNumber(phone) {
     return '+' + cleaned;
 }
 
-// --- Custom Alert ---
+function getCurrentMonthYear() {
+    const now = new Date();
+    return now.toLocaleString('default', { month: 'long', year: 'numeric' });
+}
+
 function showCustomAlert(message) {
     const d = document.createElement('div');
     d.className = 'modal-overlay';
     d.innerHTML = `<div class="modal-content" style="max-width:300px"><div class="modal-body text-center"><p>${message}</p><button class="btn btn-primary mt-4" id="custom-alert-ok">OK</button></div></div>`;
     document.body.appendChild(d);
     document.getElementById('custom-alert-ok').onclick = () => d.remove();
+}
+
+// --- Persistence Functions (RESTORED) ---
+async function saveReportsToFirestore(tutorEmail, reports) {
+    try {
+        await setDoc(doc(db, "tutor_saved_reports", tutorEmail), { reports: reports, lastUpdated: new Date() }, { merge: true });
+    } catch (error) { console.warn('Error saving to Firestore:', error); saveReportsToLocalStorage(tutorEmail, reports); }
+}
+
+async function loadReportsFromFirestore(tutorEmail) {
+    try {
+        const docSnap = await getDoc(doc(db, "tutor_saved_reports", tutorEmail));
+        return docSnap.exists() ? docSnap.data().reports || {} : loadReportsFromLocalStorage(tutorEmail);
+    } catch (error) { return loadReportsFromLocalStorage(tutorEmail); }
+}
+
+async function clearAllReportsFromFirestore(tutorEmail) {
+    try {
+        await updateDoc(doc(db, "tutor_saved_reports", tutorEmail), { reports: {}, lastUpdated: new Date() });
+    } catch (error) { clearAllReportsFromLocalStorage(tutorEmail); }
+}
+
+// Fallback Local Storage
+const getLocalReportsKey = (tutorEmail) => `savedReports_${tutorEmail}`;
+function saveReportsToLocalStorage(tutorEmail, reports) { try { localStorage.setItem(getLocalReportsKey(tutorEmail), JSON.stringify(reports)); } catch (e) {} }
+function loadReportsFromLocalStorage(tutorEmail) { try { const s = localStorage.getItem(getLocalReportsKey(tutorEmail)); return s ? JSON.parse(s) : {}; } catch (e) { return {}; } }
+function clearAllReportsFromLocalStorage(tutorEmail) { try { localStorage.removeItem(getLocalReportsKey(tutorEmail)); } catch (e) {} }
+
+// --- Employment & TIN Logic (RESTORED) ---
+function shouldShowEmploymentPopup(tutor) {
+    if (tutor.employmentDate) return false;
+    const last = localStorage.getItem(`employmentPopup_${tutor.email}`);
+    return !last || last !== new Date().toISOString().slice(0, 7);
+}
+
+function showEmploymentDatePopup(tutor) {
+    const html = `<div class="modal-overlay"><div class="modal-content max-w-md"><div class="modal-header"><h3>Employment Information</h3></div><div class="modal-body"><p class="mb-4">Please provide your employment start date.</p><input type="month" id="employment-date" class="form-input"></div><div class="modal-footer"><button id="save-employment-btn" class="btn btn-primary">Save</button></div></div></div>`;
+    const m = document.createElement('div'); m.innerHTML = html; document.body.appendChild(m);
+    document.getElementById('save-employment-btn').onclick = async () => {
+        const date = document.getElementById('employment-date').value;
+        if (!date) return showCustomAlert('Please select a date.');
+        await updateDoc(doc(db, "tutors", tutor.id), { employmentDate: date });
+        localStorage.setItem(`employmentPopup_${tutor.email}`, new Date().toISOString().slice(0, 7));
+        m.remove(); showCustomAlert('Saved!');
+        window.tutorData.employmentDate = date;
+    };
+}
+
+function shouldShowTINPopup(tutor) {
+    if (tutor.tinNumber) return false;
+    const last = localStorage.getItem(`tinPopup_${tutor.email}`);
+    return !last || last !== new Date().toISOString().slice(0, 7);
+}
+
+function showTINPopup(tutor) {
+    const html = `<div class="modal-overlay"><div class="modal-content max-w-md"><div class="modal-header"><h3>TIN Number</h3></div><div class="modal-body"><p class="mb-4">Please provide your TIN.</p><input type="text" id="tin-number" class="form-input" placeholder="Enter TIN"></div><div class="modal-footer"><button id="no-tin-btn" class="btn btn-secondary">I don't have TIN</button><button id="save-tin-btn" class="btn btn-primary">Save TIN</button></div></div></div>`;
+    const m = document.createElement('div'); m.innerHTML = html; document.body.appendChild(m);
+    document.getElementById('no-tin-btn').onclick = () => { localStorage.setItem(`tinPopup_${tutor.email}`, new Date().toISOString().slice(0, 7)); m.remove(); };
+    document.getElementById('save-tin-btn').onclick = async () => {
+        const tin = document.getElementById('tin-number').value.trim();
+        if (!tin) return showCustomAlert('Please enter TIN.');
+        await updateDoc(doc(db, "tutors", tutor.id), { tinNumber: tin });
+        m.remove(); showCustomAlert('TIN Saved!');
+        window.tutorData.tinNumber = tin;
+    };
+}
+
+function getTutorPayScheme(tutor) {
+    if (tutor.isManagementStaff) return PAY_SCHEMES.MANAGEMENT;
+    if (!tutor.employmentDate) return PAY_SCHEMES.NEW_TUTOR;
+    const emp = new Date(tutor.employmentDate + '-01');
+    const diff = (new Date().getFullYear() - emp.getFullYear()) * 12 + (new Date().getMonth() - emp.getMonth());
+    return diff >= 12 ? PAY_SCHEMES.OLD_TUTOR : PAY_SCHEMES.NEW_TUTOR;
+}
+
+function findSpecializedSubject(subjects) {
+    for (const [cat, list] of Object.entries(SUBJECT_CATEGORIES)) {
+        for (const sub of subjects) { if (list.includes(sub)) return { category: cat, subject: sub }; }
+    }
+    return null;
+}
+
+function calculateSuggestedFee(student, payScheme) {
+    const grade = student.grade;
+    const days = parseInt(student.days) || 0;
+    const subjects = student.subjects || [];
+    
+    const spec = findSpecializedSubject(subjects);
+    if (spec) return payScheme.specialized[student.groupClass ? 'group' : 'individual'][spec.category] || 0;
+    
+    let gradeCat = "Grade 3-8";
+    if (["Preschool", "Kindergarten"].includes(grade) || grade.includes("Grade 1") || grade.includes("Grade 2")) gradeCat = "Preschool-Grade 2";
+    else if (parseInt(grade.replace('Grade ', '')) >= 9) return 0;
+    
+    const isSub = subjects.some(s => ["Math", "English", "Science"].includes(s)) && parseInt(grade.replace('Grade ', '')) >= 5;
+    return isSub ? (payScheme.academic["Subject Teachers"][days] || 0) : (payScheme.academic[gradeCat][days] || 0);
 }
 
 // --- Cloudinary Upload ---
@@ -345,6 +456,322 @@ async function showScheduleCalendarModal() {
     html += `</div>`;
     document.getElementById('cal-body').innerHTML = html;
 }
+
+// ##################################################################
+// # SECTION 1: DASHBOARD & REPORTING (NEW & MERGED)
+// ##################################################################
+
+async function loadStudentDropdowns(email) {
+    const q = query(collection(db, "students"), where("tutorEmail", "==", email));
+    const snap = await getDocs(q);
+    studentCache = [];
+    const topicSel = document.getElementById('topic-student-sel');
+    const hwSel = document.getElementById('hw-student-sel');
+
+    snap.forEach(d => {
+        const s = { id: d.id, ...d.data() };
+        if (!['archived','graduated'].includes(s.status)) {
+            studentCache.push(s);
+            const opt = `<option value="${s.id}">${s.studentName}</option>`;
+            if (topicSel) topicSel.innerHTML += opt;
+            if (hwSel) hwSel.innerHTML += opt;
+        }
+    });
+}
+
+function renderTutorDashboard(container, tutor) {
+    if (!tutor) { console.error("No tutor data"); return; }
+    window.tutorData = tutor;
+
+    container.innerHTML = `
+        <div class="hero-section">
+            <h1 class="hero-title">Welcome, ${tutor.name || 'Tutor'}! 👋</h1>
+            <p>Manage your students, schedules, and reports.</p>
+            <div class="mt-4">
+                <input type="text" id="searchName" class="p-2 border rounded text-black" placeholder="Search by parent name..." style="min-width: 250px;">
+                <button id="searchBtn" class="bg-white text-green-700 font-bold px-4 py-2 rounded hover:bg-gray-100 ml-2">Search</button>
+            </div>
+        </div>
+        
+        <div class="student-actions-container">
+            <div class="student-action-card">
+                <h3 class="font-bold mb-2">📅 Schedule</h3>
+                <button id="view-cal" class="btn btn-info w-full mb-2">View Calendar</button>
+                <button id="setup-sched" class="btn btn-primary w-full">Set Up Schedules</button>
+            </div>
+            
+            <div class="student-action-card">
+                <h3 class="font-bold mb-2">📚 Today's Topic</h3>
+                <select id="topic-student-sel" class="form-input mb-2"><option value="">Select Student...</option></select>
+                <button id="add-topic" class="btn btn-secondary w-full" disabled>Add Topic</button>
+            </div>
+            
+            <div class="student-action-card">
+                <h3 class="font-bold mb-2">📝 Homework</h3>
+                <select id="hw-student-sel" class="form-input mb-2"><option value="">Select Student...</option></select>
+                <button id="assign-hw" class="btn btn-warning w-full" disabled>Assign Homework</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header"><h3 class="font-bold">📋 Recent Activity / Pending Grading</h3></div>
+            <div class="card-body">
+                <div id="pendingReportsContainer" class="space-y-4">
+                    <p class="text-gray-500">Loading pending submissions...</p>
+                </div>
+                <div id="gradedReportsContainer" class="space-y-4 mt-8 pt-8 border-t">
+                    <h4 class="font-semibold text-gray-500 mb-4">Graded History</h4>
+                    <p class="text-gray-500">Loading graded submissions...</p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Load Data
+    loadStudentDropdowns(tutor.email);
+    
+    // Use the ORIGINAL robust report loader to ensure grading works
+    loadTutorReports(tutor.email);
+
+    // Event Listeners
+    document.getElementById('searchBtn').addEventListener('click', async () => {
+        const name = document.getElementById('searchName').value.trim();
+        await loadTutorReports(tutor.email, name || null);
+    });
+
+    document.getElementById('view-cal').onclick = showScheduleCalendarModal;
+    document.getElementById('setup-sched').onclick = () => checkAndShowSchedulePopup(tutor);
+    
+    const topicSel = document.getElementById('topic-student-sel');
+    const topicBtn = document.getElementById('add-topic');
+    topicSel.onchange = () => topicBtn.disabled = !topicSel.value;
+    topicBtn.onclick = () => {
+        const s = studentCache.find(x => x.id === topicSel.value);
+        if (s) showDailyTopicModal(s);
+    };
+
+    const hwSel = document.getElementById('hw-student-sel');
+    const hwBtn = document.getElementById('assign-hw');
+    hwSel.onchange = () => hwBtn.disabled = !hwSel.value;
+    hwBtn.onclick = () => {
+        const s = studentCache.find(x => x.id === hwSel.value);
+        if (s) showHomeworkModal(s);
+    };
+}
+
+// UPDATED: Load reports from BOTH student_results AND tutor_submissions
+async function loadTutorReports(tutorEmail, parentName = null) {
+    const pendingReportsContainer = document.getElementById('pendingReportsContainer');
+    const gradedReportsContainer = document.getElementById('gradedReportsContainer');
+    pendingReportsContainer.innerHTML = `<div class="spinner"></div>`;
+    if (gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-gray-500">Loading...</p>`;
+
+    try {
+        // QUERY 1: Multiple-choice tests from student_results
+        let assessmentsQuery = query(
+            collection(db, "student_results"), 
+            where("tutorEmail", "==", tutorEmail)
+        );
+
+        if (parentName) {
+            assessmentsQuery = query(assessmentsQuery, where("parentName", "==", parentName));
+        }
+
+        // QUERY 2: Creative writing submissions from tutor_submissions
+        let creativeWritingQuery = query(
+            collection(db, "tutor_submissions"),
+            where("tutorEmail", "==", tutorEmail),
+            where("type", "==", "creative_writing")
+        );
+
+        if (parentName) {
+            creativeWritingQuery = query(creativeWritingQuery, where("parentName", "==", parentName));
+        }
+
+        // Fetch from both collections simultaneously
+        const [assessmentsSnapshot, creativeWritingSnapshot] = await Promise.all([
+            getDocs(assessmentsQuery),
+            getDocs(creativeWritingQuery)
+        ]);
+
+        let pendingHTML = '';
+        let gradedHTML = '';
+
+        // Process multiple-choice test results
+        assessmentsSnapshot.forEach(doc => {
+            const data = doc.data();
+            
+            // Check if this assessment needs tutor feedback (creative writing or pending review)
+            const needsFeedback = data.answers && data.answers.some(answer => 
+                answer.type === 'creative-writing' && 
+                (!answer.tutorReport || answer.tutorReport.trim() === '')
+            );
+
+            const reportCardHTML = `
+                <div class="border rounded-lg p-4 shadow-sm bg-white mb-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 class="font-bold text-lg">${data.studentName}</h4>
+                            <p class="text-sm text-gray-600">Grade: ${data.grade} | Parent: ${data.parentName || 'N/A'}</p>
+                            <p class="text-xs text-gray-500 mt-1">Submitted: ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
+                        </div>
+                        <span class="badge ${needsFeedback ? 'badge-warning' : 'badge-success'}">${needsFeedback ? 'Needs Grading' : 'Graded'}</span>
+                    </div>
+                    
+                    <div class="mt-4 border-t pt-4">
+                        ${data.answers ? data.answers.map((answer, idx) => {
+                            if (answer.type === 'creative-writing') {
+                                return `
+                                    <div class="mb-3 p-3 bg-gray-50 rounded">
+                                        <p class="font-semibold text-sm">Creative Writing:</p>
+                                        <p class="italic text-gray-700 my-2 p-2 bg-white border rounded">${answer.textAnswer || "No response"}</p>
+                                        ${answer.fileUrl ? `<a href="${answer.fileUrl}" target="_blank" class="text-green-600 hover:underline text-sm">📄 Download Attachment</a>` : ''}
+                                        
+                                        ${!answer.tutorReport ? `
+                                            <div class="mt-3">
+                                                <textarea class="tutor-report form-input" rows="3" placeholder="Write your feedback here..."></textarea>
+                                                <button class="submit-report-btn btn btn-primary btn-sm mt-2" data-doc-id="${doc.id}" data-collection="student_results" data-answer-index="${idx}">Submit Feedback</button>
+                                            </div>
+                                        ` : `
+                                            <div class="mt-3 p-2 bg-green-50 border border-green-100 rounded">
+                                                <p class="text-sm font-semibold text-green-800">Your Feedback:</p>
+                                                <p class="text-sm text-green-700">${answer.tutorReport}</p>
+                                            </div>
+                                        `}
+                                    </div>
+                                `;
+                            }
+                            return '';
+                        }).join('') : '<p>No assessment data available.</p>'}
+                    </div>
+                </div>
+            `;
+
+            if (needsFeedback) {
+                pendingHTML += reportCardHTML;
+            } else {
+                gradedHTML += reportCardHTML;
+            }
+        });
+
+        // Process creative writing submissions
+        creativeWritingSnapshot.forEach(doc => {
+            const data = doc.data();
+            const needsFeedback = !data.tutorReport || data.tutorReport.trim() === '';
+
+            const creativeWritingHTML = `
+                <div class="border rounded-lg p-4 shadow-sm bg-white mb-4 border-l-4 border-blue-500">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 class="font-bold text-lg">${data.studentName}</h4>
+                            <p class="text-sm text-gray-600">Type: Creative Writing Assignment</p>
+                            <p class="text-xs text-gray-500 mt-1">Submitted: ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
+                        </div>
+                         <span class="badge ${needsFeedback ? 'badge-warning' : 'badge-success'}">${needsFeedback ? 'Needs Grading' : 'Graded'}</span>
+                    </div>
+
+                    <div class="mt-4 border-t pt-4">
+                        <div class="mb-3 p-3 bg-blue-50 rounded">
+                            <p class="font-semibold text-sm">Prompt: ${data.questionText || 'Creative Writing Assignment'}</p>
+                            <p class="italic text-gray-700 my-2 p-3 bg-white border rounded">${data.textAnswer || "No response"}</p>
+                            ${data.fileUrl ? `<a href="${data.fileUrl}" target="_blank" class="text-green-600 hover:underline text-sm block mb-2">📄 Download Attached File</a>` : ''}
+                            
+                            ${!data.tutorReport ? `
+                                <div class="mt-3">
+                                    <textarea class="tutor-report form-input" rows="3" placeholder="Write your feedback here..."></textarea>
+                                    <button class="submit-report-btn btn btn-primary btn-sm mt-2" data-doc-id="${doc.id}" data-collection="tutor_submissions">Submit Feedback</button>
+                                </div>
+                            ` : `
+                                <div class="mt-3 p-2 bg-green-50 border border-green-100 rounded">
+                                    <p class="text-sm font-semibold text-green-800">Your Feedback:</p>
+                                    <p class="text-sm text-green-700">${data.tutorReport}</p>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            if (needsFeedback) {
+                pendingHTML += creativeWritingHTML;
+            } else {
+                gradedHTML += creativeWritingHTML;
+            }
+        });
+
+        pendingReportsContainer.innerHTML = pendingHTML || `<p class="text-gray-500 italic">No pending submissions found.</p>`;
+        if (gradedReportsContainer) gradedReportsContainer.innerHTML = gradedHTML || `<p class="text-gray-500 italic">No graded submissions found.</p>`;
+
+        // Attach event listeners for the submit buttons
+        document.querySelectorAll('.submit-report-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const docId = e.target.getAttribute('data-doc-id');
+                const collectionName = e.target.getAttribute('data-collection');
+                const answerIndex = e.target.getAttribute('data-answer-index');
+                // Find the closest textarea relative to the button
+                const reportTextarea = e.target.parentElement.querySelector('.tutor-report');
+                const tutorReport = reportTextarea.value.trim();
+                
+                if (tutorReport) {
+                    try {
+                        const docRef = doc(db, collectionName, docId);
+                        
+                        if (collectionName === "student_results" && answerIndex !== null) {
+                            const docSnap = await getDoc(docRef);
+                            const currentData = docSnap.data();
+                            const updatedAnswers = [...currentData.answers];
+                            updatedAnswers[parseInt(answerIndex)] = {
+                                ...updatedAnswers[parseInt(answerIndex)],
+                                tutorReport: tutorReport,
+                                gradedAt: new Date()
+                            };
+                            await updateDoc(docRef, { 
+                                answers: updatedAnswers,
+                                hasTutorFeedback: true
+                            });
+                        } else {
+                            await updateDoc(docRef, { 
+                                tutorReport: tutorReport,
+                                gradedAt: new Date(),
+                                status: "graded"
+                            });
+                        }
+                        
+                        showCustomAlert('Feedback submitted successfully!');
+                        loadTutorReports(tutorEmail, parentName); // Refresh
+                    } catch (error) {
+                        console.error("Error submitting feedback:", error);
+                        showCustomAlert('Failed to submit feedback. Please try again.');
+                    }
+                } else {
+                    showCustomAlert('Please write some feedback before submitting.');
+                }
+            });
+        });
+    } catch (error) {
+        console.error("Error loading tutor reports:", error);
+        pendingReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
+    }
+}
+
+// --- Listen for Admin Settings ---
+const settingsDocRef = doc(db, "settings", "global_settings");
+onSnapshot(settingsDocRef, (docSnap) => {
+    if (docSnap.exists()) {
+        const data = docSnap.data();
+        isSubmissionEnabled = data.isReportEnabled;
+        isTutorAddEnabled = data.isTutorAddEnabled;
+        isSummerBreakEnabled = data.isSummerBreakEnabled;
+        isBypassApprovalEnabled = data.bypassPendingApproval;
+        showStudentFees = data.showStudentFees;
+        showEditDeleteButtons = data.showEditDeleteButtons;
+
+        const mainContent = document.getElementById('mainContent');
+        if (mainContent && mainContent.querySelector('#student-list-view')) {
+            renderStudentDatabase(mainContent, window.tutorData);
+        }
+    }
+});
 
 // ##################################################################
 // # SECTION 2: NEW TUTOR DASHBOARD (MERGED)
@@ -2254,3 +2681,4 @@ validationStyles.textContent = `
     }
 `;
 document.head.appendChild(validationStyles);
+
