@@ -4,7 +4,7 @@ import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 // ##################################################################
-// # SECTION 0: CONFIGURATION, STYLES & LOGIC LAYER
+// # SECTION 0: CONFIGURATION, STYLES & CORE LOGIC
 // ##################################################################
 
 // --- Global state ---
@@ -98,7 +98,7 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// --- Pay Scheme Configuration (RESTORED) ---
+// --- Pay Scheme Configuration ---
 const PAY_SCHEMES = {
     NEW_TUTOR: {
         academic: { "Preschool-Grade 2": {2: 50000, 3: 60000, 5: 100000}, "Grade 3-8": {2: 60000, 3: 70000, 5: 110000}, "Subject Teachers": {1: 30000, 2: 60000, 3: 70000} },
@@ -120,7 +120,7 @@ const SUBJECT_CATEGORIES = {
     "Specialized": ["Music", "Coding","ICT", "Chess", "Public Speaking", "English Proficiency", "Counseling Programs"]
 };
 
-// --- Utilities (RESTORED) ---
+// --- Utilities ---
 function normalizePhoneNumber(phone) {
     if (!phone) return '';
     let cleaned = phone.toString().trim().replace(/\D/g, '');
@@ -142,7 +142,7 @@ function showCustomAlert(message) {
     document.getElementById('custom-alert-ok').onclick = () => d.remove();
 }
 
-// --- Persistence Functions (RESTORED) ---
+// --- Persistence Functions ---
 async function saveReportsToFirestore(tutorEmail, reports) {
     try {
         await setDoc(doc(db, "tutor_saved_reports", tutorEmail), { reports: reports, lastUpdated: new Date() }, { merge: true });
@@ -168,7 +168,7 @@ function saveReportsToLocalStorage(tutorEmail, reports) { try { localStorage.set
 function loadReportsFromLocalStorage(tutorEmail) { try { const s = localStorage.getItem(getLocalReportsKey(tutorEmail)); return s ? JSON.parse(s) : {}; } catch (e) { return {}; } }
 function clearAllReportsFromLocalStorage(tutorEmail) { try { localStorage.removeItem(getLocalReportsKey(tutorEmail)); } catch (e) {} }
 
-// --- Employment & TIN Logic (RESTORED) ---
+// --- Employment & TIN Logic ---
 function shouldShowEmploymentPopup(tutor) {
     if (tutor.employmentDate) return false;
     const last = localStorage.getItem(`employmentPopup_${tutor.email}`);
@@ -237,6 +237,10 @@ function calculateSuggestedFee(student, payScheme) {
     const isSub = subjects.some(s => ["Math", "English", "Science"].includes(s)) && parseInt(grade.replace('Grade ', '')) >= 5;
     return isSub ? (payScheme.academic["Subject Teachers"][days] || 0) : (payScheme.academic[gradeCat][days] || 0);
 }
+
+// ##################################################################
+// # SECTION 1: NEW FEATURES LOGIC (Cloudinary, Schedule, Topics, Homework)
+// ##################################################################
 
 // --- Cloudinary Upload ---
 async function uploadToCloudinary(file) {
@@ -458,7 +462,7 @@ async function showScheduleCalendarModal() {
 }
 
 // ##################################################################
-// # SECTION 1: DASHBOARD & REPORTING (NEW & MERGED)
+// # SECTION 2: NEW TUTOR DASHBOARD (MERGED)
 // ##################################################################
 
 async function loadStudentDropdowns(email) {
@@ -529,8 +533,6 @@ function renderTutorDashboard(container, tutor) {
 
     // Load Data
     loadStudentDropdowns(tutor.email);
-    
-    // Use the ORIGINAL robust report loader to ensure grading works
     loadTutorReports(tutor.email);
 
     // Event Listeners
@@ -2681,4 +2683,5 @@ validationStyles.textContent = `
     }
 `;
 document.head.appendChild(validationStyles);
+
 
