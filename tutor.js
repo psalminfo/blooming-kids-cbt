@@ -773,6 +773,33 @@ onSnapshot(settingsDocRef, (docSnap) => {
 });
 
 // ##################################################################
+// # SECTION 2: OLDER FUNCTIONS THAT ARE STILL NEEDED
+// ##################################################################
+
+// ... [rest of the file remains the same - these functions are only called but not redefined]
+
+// Auth state listener and other functions remain unchanged
+onAuthStateChanged(auth, async (user) => {
+    if (!user) window.location.href = 'index.html';
+    else {
+        const tutorQuery = query(collection(db, "tutors"), where("email", "==", user.email));
+        const tutorSnapshot = await getDocs(tutorQuery);
+        
+        if (!tutorSnapshot.empty) {
+            const tutorDoc = tutorSnapshot.docs[0];
+            const tutor = { id: tutorDoc.id, ...tutorDoc.data() };
+            renderTutorDashboard(document.getElementById('mainContent'), tutor);
+            
+            // Show popups if needed
+            if (shouldShowEmploymentPopup(tutor)) showEmploymentDatePopup(tutor);
+            else if (shouldShowTINPopup(tutor)) showTINPopup(tutor);
+        }
+    }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth).then(() => window.location.href = 'index.html'));
+
+// ##################################################################
 // # SECTION 2: NEW TUTOR DASHBOARD (MERGED)
 // ##################################################################
 
@@ -2994,6 +3021,7 @@ validationStyles.textContent = `
     }
 `;
 document.head.appendChild(validationStyles);
+
 
 
 
