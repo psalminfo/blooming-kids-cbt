@@ -1,11 +1,46 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc, deleteField, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
-// --- Inject CSS for transitioning button ---
+// ##################################################################
+// # SECTION 0: CONFIGURATION, STYLES & CORE LOGIC
+// ##################################################################
+
+// --- Global state ---
+let isSubmissionEnabled = false;
+let isTutorAddEnabled = false;
+let isSummerBreakEnabled = false;
+let isBypassApprovalEnabled = false;
+let showStudentFees = false;
+let showEditDeleteButtons = false;
+let studentCache = []; // Cache for dropdowns
+
+// --- Cloudinary Config ---
+const CLOUDINARY_CONFIG = { cloudName: 'dwjq7j5zp', uploadPreset: 'tutor_homework', apiKey: '963245294794452' };
+
+// --- Constants ---
+const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const ROBUST_TIME_SLOTS = [];
+for (let hour = 6; hour <= 23; hour++) {
+    ['00', '15', '30', '45'].forEach(min => {
+        const displayHour = hour > 12 ? hour - 12 : hour;
+        ROBUST_TIME_SLOTS.push({ 
+            value: `${hour.toString().padStart(2,'0')}:${min}`, 
+            label: `${displayHour === 0 ? 12 : displayHour}:${min} ${hour >= 12 ? 'PM' : 'AM'}` 
+        });
+    });
+}
+['00', '01', '02'].forEach(hour => {
+    ['00', '15', '30', '45'].forEach(min => {
+        ROBUST_TIME_SLOTS.push({ value: `${hour}:${min}`, label: `${hour === '00' ? 12 : parseInt(hour)}:${min} AM` });
+    });
+});
+
+// --- Inject CSS (Merged Styles) ---
 const style = document.createElement('style');
 style.textContent = `
+    /* --- Original Button Styles --- */
     #add-transitioning-btn {
         display: block !important;
         background: orange !important;
@@ -16,379 +51,359 @@ style.textContent = `
         cursor: pointer !important;
         margin: 5px !important;
     }
-    #add-transitioning-btn:hover {
-        background: darkorange !important;
+    #add-transitioning-btn:hover { background: darkorange !important; }
+
+    /* --- New Dashboard Core Variables --- */
+    :root { 
+        --primary-color: #10b981; 
+        --primary-dark: #059669; 
+        --primary-light: #d1fae5; 
+        --secondary-color: #6366f1; 
+        --danger-color: #ef4444; 
+        --warning-color: #f59e0b; 
+        --info-color: #3b82f6; 
+        --dark-color: #1f2937; 
+        --light-color: #f9fafb; 
+        --border-color: #e5e7eb; 
+        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+        --radius: 0.5rem; 
+        --radius-lg: 0.75rem; 
     }
+
+    /* --- New Dashboard Components --- */
+    .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+    .card { background: white; border-radius: var(--radius-lg); box-shadow: var(--shadow); border: 1px solid var(--border-color); }
+    .card-body { padding: 1.5rem; }
+    .card-header { padding: 1.5rem; border-bottom: 1px solid var(--border-color); }
+    
+    .hero-section { background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%); border-radius: var(--radius-lg); color: white; padding: 2rem; margin-bottom: 2rem; }
+    .hero-title { font-size: 1.875rem; font-weight: 700; margin-bottom: 0.5rem; }
+    
+    .student-actions-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-top: 1.5rem; margin-bottom: 2rem; }
+    .student-action-card { border: 1px solid var(--border-color); border-radius: var(--radius); padding: 1rem; transition: all 0.2s ease; background: white; }
+    .student-action-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+
+    .form-input { width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border-color); border-radius: var(--radius); margin-bottom: 0.5rem; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.625rem 1.25rem; border-radius: var(--radius); font-weight: 500; cursor: pointer; border: none; transition: 0.2s; }
+    .btn-primary { background: var(--primary-color); color: white; }
+    .btn-secondary { background: white; border: 1px solid var(--border-color); color: var(--dark-color); }
+    .btn-info { background: var(--info-color); color: white; }
+    .btn-warning { background: var(--warning-color); color: white; }
+    .btn-danger { background: var(--danger-color); color: white; }
+    .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.75rem; }
+    .w-full { width: 100%; }
+
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 1rem; }
+    .modal-content { background: white; border-radius: var(--radius-lg); width: 100%; max-height: 90vh; overflow-y: auto; padding: 0; }
+    .modal-header { padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; }
+    .modal-body { padding: 1.5rem; }
+    .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 0.75rem; }
+    
+    .calendar-view { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.5rem; }
+    .calendar-day { background: var(--light-color); border: 1px solid var(--border-color); padding: 0.75rem; min-height: 100px; border-radius: var(--radius); }
+    .calendar-event { background: white; border-left: 3px solid var(--primary-color); padding: 0.375rem; margin-bottom: 0.25rem; font-size: 0.75rem; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+
+    .hidden { display: none !important; }
+    .spinner { border: 2px solid var(--border-color); border-top-color: var(--primary-color); border-radius: 50%; width: 1.5rem; height: 1.5rem; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .badge { padding: 0.25rem 0.75rem; border-radius: 99px; font-size: 0.75rem; font-weight: 600; }
+    .badge-warning { background: #fef3c7; color: #92400e; }
+    .badge-success { background: var(--primary-light); color: var(--primary-dark); }
+    .badge-info { background: #dbeafe; color: #1e40af; }
+    
+    /* --- Student Database Styles (from old tutor file) --- */
+    .status-indicator { padding: 0.25rem 0.75rem; border-radius: 99px; font-size: 0.75rem; font-weight: 600; display: inline-block; }
+    .border-l-4 { border-left-width: 4px; }
+    .border-blue-500 { border-color: #3b82f6; }
+    .bg-blue-50 { background-color: #eff6ff; }
+    .bg-yellow-100 { background-color: #fef3c7; }
+    .text-yellow-800 { color: #92400e; }
+    .bg-green-50 { background-color: #f0fdf4; }
+    .text-green-800 { color: #166534; }
+    .bg-red-50 { background-color: #fef2f2; }
+    .border-red-400 { border-color: #f87171; }
+    .text-red-600 { color: #dc2626; }
+    .text-red-700 { color: #b91c1c; }
+    .bg-gray-100 { background-color: #f3f4f6; }
+    .shadow-inner { box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06); }
+    
+    /* --- Table Styles --- */
+    .min-w-full { min-width: 100%; }
+    .divide-y > :not([hidden]) ~ :not([hidden]) { border-top-width: 1px; }
+    .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: #e5e7eb; }
+    .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+    .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+    .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+    .text-left { text-align: left; }
+    .text-xs { font-size: 0.75rem; }
+    .text-sm { font-size: 0.875rem; }
+    .font-medium { font-weight: 500; }
+    .uppercase { text-transform: uppercase; }
+    .whitespace-nowrap { white-space: nowrap; }
+    .bg-white { background-color: white; }
+    .overflow-x-auto { overflow-x: auto; }
+    .space-x-2 > :not([hidden]) ~ :not([hidden]) { margin-left: 0.5rem; }
+    
+    /* --- Grid and Flex Utilities --- */
+    .grid { display: grid; }
+    .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .sm\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .gap-2 { gap: 0.5rem; }
+    .flex { display: flex; }
+    .items-center { align-items: center; }
+    .justify-end { justify-content: flex-end; }
+    .space-x-2 > * + * { margin-left: 0.5rem; }
+    .space-y-2 > * + * { margin-top: 0.5rem; }
+    .space-y-4 > * + * { margin-top: 1rem; }
+    .mt-1 { margin-top: 0.25rem; }
+    .mt-2 { margin-top: 0.5rem; }
+    .mt-3 { margin-top: 0.75rem; }
+    .mt-4 { margin-top: 1rem; }
+    .mt-6 { margin-top: 1.5rem; }
+    .mb-2 { margin-bottom: 0.5rem; }
+    .mb-3 { margin-bottom: 0.75rem; }
+    .mb-4 { margin-bottom: 1rem; }
+    .mb-6 { margin-bottom: 1.5rem; }
+    .ml-2 { margin-left: 0.5rem; }
+    
+    /* --- Text Colors --- */
+    .text-gray-500 { color: #6b7280; }
+    .text-gray-600 { color: #4b5563; }
+    .text-gray-700 { color: #374151; }
+    .text-blue-500 { color: #3b82f6; }
+    .text-blue-600 { color: #2563eb; }
+    .text-blue-800 { color: #1e40af; }
+    .text-green-600 { color: #059669; }
+    .text-green-700 { color: #047857; }
+    .text-green-800 { color: #065f46; }
+    .text-yellow-600 { color: #d97706; }
+    .text-orange-600 { color: #ea580c; }
+    .text-orange-800 { color: #9a3412; }
+    .text-red-500 { color: #ef4444; }
+    
+    /* --- Background Colors --- */
+    .bg-orange-100 { background-color: #ffedd5; }
+    .bg-gray-50 { background-color: #f9fafb; }
+    .bg-blue-50 { background-color: #eff6ff; }
+    .bg-green-50 { background-color: #f0fdf4; }
+    .bg-yellow-50 { background-color: #fefce8; }
+    .bg-yellow-500 { background-color: #eab308; }
+    .bg-blue-500 { background-color: #3b82f6; }
+    .bg-red-500 { background-color: #ef4444; }
+    .bg-green-500 { background-color: #10b981; }
+    .bg-green-600 { background-color: #059669; }
+    .bg-green-700 { background-color: #047857; }
+    .bg-orange-600 { background-color: #ea580c; }
+    .bg-orange-700 { background-color: #c2410c; }
+    .bg-gray-500 { background-color: #6b7280; }
+    
+    /* --- Borders --- */
+    .border { border-width: 1px; }
+    .border-t { border-top-width: 1px; }
+    .border-l-4 { border-left-width: 4px; }
+    .rounded { border-radius: 0.25rem; }
+    .rounded-lg { border-radius: 0.5rem; }
+    .rounded-full { border-radius: 9999px; }
+    
+    /* --- Shadows --- */
+    .shadow-sm { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+    .shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+    .shadow-xl { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
+    
+    /* --- Padding --- */
+    .p-2 { padding: 0.5rem; }
+    .p-3 { padding: 0.75rem; }
+    .p-4 { padding: 1rem; }
+    .p-6 { padding: 1.5rem; }
+    .p-8 { padding: 2rem; }
+    .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+    .px-4 { padding-left: 1rem; padding-right: 1rem; }
+    .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+    .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+    .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+    .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+    
+    /* --- Font Weights --- */
+    .font-normal { font-weight: 400; }
+    .font-semibold { font-weight: 600; }
+    .font-bold { font-weight: 700; }
+    
+    /* --- Display --- */
+    .block { display: block; }
+    .inline-block { display: inline-block; }
+    
+    /* --- Cursor --- */
+    .cursor-pointer { cursor: pointer; }
+    
+    /* --- Hover Effects --- */
+    .hover\\:bg-green-700:hover { background-color: #047857; }
+    .hover\\:bg-orange-700:hover { background-color: #c2410c; }
+    .hover\\:underline:hover { text-decoration: underline; }
+    
+    /* --- Opacity --- */
+    .opacity-50 { opacity: 0.5; }
+    
+    /* --- Cursor --- */
+    .cursor-not-allowed { cursor: not-allowed; }
+    
+    /* --- Position --- */
+    .relative { position: relative; }
+    .absolute { position: absolute; }
+    .fixed { position: fixed; }
+    .inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
+    
+    /* --- Z-index --- */
+    .z-50 { z-index: 50; }
+    
+    /* --- Overflow --- */
+    .overflow-y-auto { overflow-y: auto; }
+    
+    /* --- Max Height/Width --- */
+    .max-h-48 { max-height: 12rem; }
+    .max-w-md { max-width: 28rem; }
+    .max-w-lg { max-width: 32rem; }
+    .max-w-2xl { max-width: 42rem; }
+    
+    /* --- Details/Summary Styling --- */
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+    
+    /* --- Validation Styles --- */
+    .border-red-300 { border-color: #fca5a5 !important; }
+    .border-green-300 { border-color: #86efac !important; }
+    .border-red-500 { border-color: #ef4444 !important; }
+    .border-green-500 { border-color: #22c55e !important; }
+    
+    /* --- Float --- */
+    .float-right { float: right; }
+    
+    /* --- Text Style --- */
+    .italic { font-style: italic; }
 `;
 document.head.appendChild(style);
-
-// --- Global state to hold report submission status ---
-let isSubmissionEnabled = false;
-let isTutorAddEnabled = false;
-let isSummerBreakEnabled = false;
-let isBypassApprovalEnabled = false;
-// NEW: Global state for new admin settings
-let showStudentFees = false;
-let showEditDeleteButtons = false;
 
 // --- Pay Scheme Configuration ---
 const PAY_SCHEMES = {
     NEW_TUTOR: {
-        academic: {
-            "Preschool-Grade 2": {2: 50000, 3: 60000, 5: 100000},
-            "Grade 3-8": {2: 60000, 3: 70000, 5: 110000},
-            "Subject Teachers": {1: 30000, 2: 60000, 3: 70000}
-        },
-        specialized: {
-            individual: {
-                "Music": 30000,
-                "Native Language": 20000,
-                "Foreign Language": 25000,
-                "Coding": 30000,
-                "ICT": 10000,
-                "Chess": 25000,
-                "Public Speaking": 25000,
-                "English Proficiency": 25000,
-                "Counseling Programs": 25000}
-        },
-        group: {
-            "Music": 25000,
-            "Native Language": 20000,
-            "Foreign Language": 20000,
-            "Chess": 20000,
-            "Public Speaking": 20000,
-            "English Proficiency": 20000,
-            "Counseling Programs": 20000
-        }
+        academic: { "Preschool-Grade 2": {2: 50000, 3: 60000, 5: 100000}, "Grade 3-8": {2: 60000, 3: 70000, 5: 110000}, "Subject Teachers": {1: 30000, 2: 60000, 3: 70000} },
+        specialized: { individual: { "Music": 30000, "Native Language": 20000, "Foreign Language": 25000, "Coding": 30000, "ICT": 10000, "Chess": 25000, "Public Speaking": 25000, "English Proficiency": 25000, "Counseling Programs": 25000}, group: { "Music": 25000, "Native Language": 20000, "Foreign Language": 20000, "Chess": 20000, "Public Speaking": 20000, "English Proficiency": 20000, "Counseling Programs": 20000 } }
     },
     OLD_TUTOR: {
-        academic: {
-            "Preschool-Grade 2": {2: 60000, 3: 70000, 5: 110000},
-            "Grade 3-8": {2: 70000, 3: 80000, 5: 120000},
-            "Subject Teachers": {1: 35000, 2: 70000, 3: 90000}
-        },
-        specialized: {
-            individual: {
-                "Music": 35000,
-                "Native Language": 25000,
-                "Foreign Language": 30000,
-                "Coding": 35000,
-                "ICT": 12000,
-                "Chess": 30000,
-                "Public Speaking": 30000,
-                "English Proficiency": 30000,
-                "Counseling Programs": 30000
-            },
-            group: {
-                "Music": 25000,
-                "Native Language": 20000,
-                "Foreign Language": 20000,
-                "Chess": 20000,
-                "Public Speaking": 20000,
-                "English Proficiency": 20000,
-                "Counseling Programs": 20000
-            }
-        }
+        academic: { "Preschool-Grade 2": {2: 60000, 3: 70000, 5: 110000}, "Grade 3-8": {2: 70000, 3: 80000, 5: 120000}, "Subject Teachers": {1: 35000, 2: 70000, 3: 90000} },
+        specialized: { individual: { "Music": 35000, "Native Language": 25000, "Foreign Language": 30000, "Coding": 35000, "ICT": 12000, "Chess": 30000, "Public Speaking": 30000, "English Proficiency": 30000, "Counseling Programs": 30000 }, group: { "Music": 25000, "Native Language": 20000, "Foreign Language": 20000, "Chess": 20000, "Public Speaking": 20000, "English Proficiency": 20000, "Counseling Programs": 20000 } }
     },
     MANAGEMENT: {
-        academic: {
-            "Preschool-Grade 2": {2: 70000, 3: 85000, 5: 120000},
-            "Grade 3-8": {2: 80000, 3: 90000, 5: 130000},
-            "Subject Teachers": {1: 40000, 2: 80000, 3: 100000}
-        },
-        specialized: {
-            individual: {
-                "Music": 40000,
-                "Native Language": 30000,
-                "Foreign Language": 35000,
-                "Coding": 40000,
-                "Chess": 35000,
-                "Public Speaking": 35000,
-                "English Proficiency": 35000,
-                "Counseling Programs": 35000
-            },
-            group: {
-                "Music": 25000,
-                "Native Language": 20000,
-                "Foreign Language": 20000,
-                "Chess": 20000,
-                "Public Speaking": 20000,
-                "English Proficiency": 20000,
-                "Counseling Programs": 20000
-            }
-        }
+        academic: { "Preschool-Grade 2": {2: 70000, 3: 85000, 5: 120000}, "Grade 3-8": {2: 80000, 3: 90000, 5: 130000}, "Subject Teachers": {1: 40000, 2: 80000, 3: 100000} },
+        specialized: { individual: { "Music": 40000, "Native Language": 30000, "Foreign Language": 35000, "Coding": 40000, "Chess": 35000, "Public Speaking": 35000, "English Proficiency": 35000, "Counseling Programs": 35000 }, group: { "Music": 25000, "Native Language": 20000, "Foreign Language": 20000, "Chess": 20000, "Public Speaking": 20000, "English Proficiency": 20000, "Counseling Programs": 20000 } }
     }
 };
 
-// --- Subject Categorization ---
 const SUBJECT_CATEGORIES = {
     "Native Language": ["Yoruba", "Igbo", "Hausa"],
     "Foreign Language": ["French", "German", "Spanish", "Arabic"],
     "Specialized": ["Music", "Coding","ICT", "Chess", "Public Speaking", "English Proficiency", "Counseling Programs"]
 };
 
-// --- Phone Number Normalization Function ---
+// --- Utilities ---
 function normalizePhoneNumber(phone) {
     if (!phone) return '';
-    
-    // Remove all non-digit characters except leading +
-    let cleaned = phone.toString().trim();
-    
-    // If it already starts with +, keep it
-    if (cleaned.startsWith('+')) {
-        // Ensure there are only digits after the +
-        const digits = cleaned.substring(1).replace(/\D/g, '');
-        return '+' + digits;
-    }
-    
-    // If it starts with 0, assume it's a local number and add +234
-    if (cleaned.startsWith('0')) {
-        const digits = cleaned.replace(/\D/g, '');
-        if (digits.startsWith('0')) {
-            return '+234' + digits.substring(1);
-        }
-    }
-    
-    // If it starts with country code without +, add +
-    if (cleaned.match(/^234/)) {
-        const digits = cleaned.replace(/\D/g, '');
-        return '+' + digits;
-    }
-    
-    // If it's just digits, check length and add appropriate prefix
-    const digits = cleaned.replace(/\D/g, '');
-    
-    // For Nigerian numbers (10 digits starting with 7, 8, or 9)
-    if (digits.length === 10 && /^[789]/.test(digits)) {
-        return '+234' + digits;
-    }
-    
-    // For other international numbers, just add + if not present
-    if (digits.length >= 10 && !cleaned.startsWith('+')) {
-        return '+' + digits;
-    }
-    
-    // If we can't determine, return as is with + added if it's just digits
-    if (/^\d+$/.test(cleaned) && !cleaned.startsWith('+')) {
-        return '+' + cleaned;
-    }
-    
-    return cleaned;
+    let cleaned = phone.toString().trim().replace(/\D/g, '');
+    if (cleaned.startsWith('0')) cleaned = '234' + cleaned.substring(1);
+    if (!cleaned.startsWith('234')) cleaned = '234' + cleaned;
+    return '+' + cleaned;
 }
 
-// --- Firestore Functions for Report Persistence (Cross-Device) ---
+function getCurrentMonthYear() {
+    const now = new Date();
+    return now.toLocaleString('default', { month: 'long', year: 'numeric' });
+}
+
+function showCustomAlert(message) {
+    const d = document.createElement('div');
+    d.className = 'modal-overlay';
+    d.innerHTML = `<div class="modal-content" style="max-width:300px"><div class="modal-body text-center"><p>${message}</p><button class="btn btn-primary mt-4" id="custom-alert-ok">OK</button></div></div>`;
+    document.body.appendChild(d);
+    document.getElementById('custom-alert-ok').onclick = () => d.remove();
+}
+
+// --- Persistence Functions ---
 async function saveReportsToFirestore(tutorEmail, reports) {
     try {
-        const reportRef = doc(db, "tutor_saved_reports", tutorEmail);
-        
-        // Use setDoc with merge: true instead of updateDoc
-        await setDoc(reportRef, {
-            reports: reports,
-            lastUpdated: new Date()
-        }, { merge: true });
-        
-    } catch (error) {
-        console.warn('Error saving to Firestore:', error);
-        // Fallback to localStorage
-        saveReportsToLocalStorage(tutorEmail, reports);
-    }
+        await setDoc(doc(db, "tutor_saved_reports", tutorEmail), { reports: reports, lastUpdated: new Date() }, { merge: true });
+    } catch (error) { console.warn('Error saving to Firestore:', error); saveReportsToLocalStorage(tutorEmail, reports); }
 }
 
 async function loadReportsFromFirestore(tutorEmail) {
     try {
-        const reportRef = doc(db, "tutor_saved_reports", tutorEmail);
-        const docSnap = await getDoc(reportRef);
-        
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            return data.reports || {};
-        } else {
-            // Fallback to localStorage if no Firestore data
-            return loadReportsFromLocalStorage(tutorEmail);
-        }
-    } catch (error) {
-        console.warn('Error loading from Firestore, using localStorage:', error);
-        return loadReportsFromLocalStorage(tutorEmail);
-    }
+        const docSnap = await getDoc(doc(db, "tutor_saved_reports", tutorEmail));
+        return docSnap.exists() ? docSnap.data().reports || {} : loadReportsFromLocalStorage(tutorEmail);
+    } catch (error) { return loadReportsFromLocalStorage(tutorEmail); }
 }
 
 async function clearAllReportsFromFirestore(tutorEmail) {
     try {
-        const reportRef = doc(db, "tutor_saved_reports", tutorEmail);
-        await updateDoc(reportRef, {
-            reports: {},
-            lastUpdated: new Date()
-        });
-    } catch (error) {
-        console.warn('Error clearing Firestore reports:', error);
-        clearAllReportsFromLocalStorage(tutorEmail);
-    }
+        await updateDoc(doc(db, "tutor_saved_reports", tutorEmail), { reports: {}, lastUpdated: new Date() });
+    } catch (error) { clearAllReportsFromLocalStorage(tutorEmail); }
 }
 
-// --- Local Storage Functions for Report Persistence (Fallback) ---
+// Fallback Local Storage
 const getLocalReportsKey = (tutorEmail) => `savedReports_${tutorEmail}`;
+function saveReportsToLocalStorage(tutorEmail, reports) { try { localStorage.setItem(getLocalReportsKey(tutorEmail), JSON.stringify(reports)); } catch (e) {} }
+function loadReportsFromLocalStorage(tutorEmail) { try { const s = localStorage.getItem(getLocalReportsKey(tutorEmail)); return s ? JSON.parse(s) : {}; } catch (e) { return {}; } }
+function clearAllReportsFromLocalStorage(tutorEmail) { try { localStorage.removeItem(getLocalReportsKey(tutorEmail)); } catch (e) {} }
 
-function saveReportsToLocalStorage(tutorEmail, reports) {
-    try {
-        const key = getLocalReportsKey(tutorEmail);
-        localStorage.setItem(key, JSON.stringify(reports));
-    } catch (error) {
-        console.warn('Error saving to local storage:', error);
-    }
-}
-
-function loadReportsFromLocalStorage(tutorEmail) {
-    try {
-        const key = getLocalReportsKey(tutorEmail);
-        const saved = localStorage.getItem(key);
-        return saved ? JSON.parse(saved) : {};
-    } catch (error) {
-        console.warn('Error loading from local storage, using empty object:', error);
-        return {};
-    }
-}
-
-function clearAllReportsFromLocalStorage(tutorEmail) {
-    try {
-        const key = getLocalReportsKey(tutorEmail);
-        localStorage.removeItem(key);
-    } catch (error) {
-        console.warn('Error clearing local storage:', error);
-    }
-}
-
-// --- Employment Date Functions ---
+// --- Employment & TIN Logic ---
 function shouldShowEmploymentPopup(tutor) {
-    // Don't show if already has employment date
     if (tutor.employmentDate) return false;
-    
-    // Show on first login each month until they provide it
-    const lastPopupShown = localStorage.getItem(`employmentPopup_${tutor.email}`);
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-    
-    return !lastPopupShown || lastPopupShown !== currentMonth;
+    const last = localStorage.getItem(`employmentPopup_${tutor.email}`);
+    return !last || last !== new Date().toISOString().slice(0, 7);
 }
 
 function showEmploymentDatePopup(tutor) {
-    const popupHTML = `
-        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
-                <h3 class="text-xl font-bold mb-4">Employment Information</h3>
-                <p class="text-sm text-gray-600 mb-4">Please provide your employment start date to help us calculate your payments accurately.</p>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block font-semibold">Month & Year of Employment</label>
-                        <input type="month" id="employment-date" class="w-full mt-1 p-2 border rounded" 
-                               max="${new Date().toISOString().slice(0, 7)}">
-                    </div>
-                    <div class="flex justify-end space-x-2 mt-6">
-                        <button id="save-employment-btn" class="bg-green-600 text-white px-6 py-2 rounded">Save</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const popup = document.createElement('div');
-    popup.innerHTML = popupHTML;
-    document.body.appendChild(popup);
-
-    document.getElementById('save-employment-btn').addEventListener('click', async () => {
-        const employmentDate = document.getElementById('employment-date').value;
-        if (!employmentDate) {
-            showCustomAlert('Please select your employment month and year.');
-            return;
-        }
-
-        try {
-            const tutorRef = doc(db, "tutors", tutor.id);
-            await updateDoc(tutorRef, { employmentDate: employmentDate });
-            localStorage.setItem(`employmentPopup_${tutor.email}`, new Date().toISOString().slice(0, 7));
-            popup.remove();
-            showCustomAlert('Employment date saved successfully!');
-            window.tutorData.employmentDate = employmentDate;
-        } catch (error) {
-            console.error("Error saving employment date:", error);
-            showCustomAlert('Error saving employment date. Please try again.');
-        }
-    });
+    const html = `<div class="modal-overlay"><div class="modal-content max-w-md"><div class="modal-header"><h3>Employment Information</h3></div><div class="modal-body"><p class="mb-4">Please provide your employment start date.</p><input type="month" id="employment-date" class="form-input"></div><div class="modal-footer"><button id="save-employment-btn" class="btn btn-primary">Save</button></div></div></div>`;
+    const m = document.createElement('div'); m.innerHTML = html; document.body.appendChild(m);
+    document.getElementById('save-employment-btn').onclick = async () => {
+        const date = document.getElementById('employment-date').value;
+        if (!date) return showCustomAlert('Please select a date.');
+        await updateDoc(doc(db, "tutors", tutor.id), { employmentDate: date });
+        localStorage.setItem(`employmentPopup_${tutor.email}`, new Date().toISOString().slice(0, 7));
+        m.remove(); showCustomAlert('Saved!');
+        window.tutorData.employmentDate = date;
+    };
 }
 
-// --- TIN Functions ---
 function shouldShowTINPopup(tutor) {
-    // Don't show if already has TIN
     if (tutor.tinNumber) return false;
-    
-    // Show on first login each month until they provide it
-    const lastPopupShown = localStorage.getItem(`tinPopup_${tutor.email}`);
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-    
-    return !lastPopupShown || lastPopupShown !== currentMonth;
+    const last = localStorage.getItem(`tinPopup_${tutor.email}`);
+    return !last || last !== new Date().toISOString().slice(0, 7);
 }
 
 function showTINPopup(tutor) {
-    const popupHTML = `
-        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
-                <h3 class="text-xl font-bold mb-4">Tax Identification Number (TIN)</h3>
-                <p class="text-sm text-gray-600 mb-4">Please provide your TIN for payment processing and tax documentation.</p>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block font-semibold">Tax Identification Number (TIN)</label>
-                        <input type="text" id="tin-number" class="w-full mt-1 p-2 border rounded" 
-                               placeholder="Enter your TIN" maxlength="20">
-                    </div>
-                    <div class="flex justify-end space-x-2 mt-6">
-                        <button id="no-tin-btn" class="bg-gray-500 text-white px-6 py-2 rounded">I don't have TIN</button>
-                        <button id="save-tin-btn" class="bg-green-600 text-white px-6 py-2 rounded">Save TIN</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const popup = document.createElement('div');
-    popup.innerHTML = popupHTML;
-    document.body.appendChild(popup);
-
-    document.getElementById('no-tin-btn').addEventListener('click', () => {
-        // Just close the popup - it will show again next month
-        localStorage.setItem(`tinPopup_${tutor.email}`, new Date().toISOString().slice(0, 7));
-        popup.remove();
-    });
-
-    document.getElementById('save-tin-btn').addEventListener('click', async () => {
-        const tinNumber = document.getElementById('tin-number').value.trim();
-        if (!tinNumber) {
-            showCustomAlert('Please enter your TIN or click "I don\'t have TIN".');
-            return;
-        }
-
-        try {
-            const tutorRef = doc(db, "tutors", tutor.id);
-            await updateDoc(tutorRef, { tinNumber: tinNumber });
-            // Don't set localStorage for TIN popup - it should never show again once TIN is provided
-            popup.remove();
-            showCustomAlert('TIN saved successfully!');
-            window.tutorData.tinNumber = tinNumber;
-        } catch (error) {
-            console.error("Error saving TIN:", error);
-            showCustomAlert('Error saving TIN. Please try again.');
-        }
-    });
+    const html = `<div class="modal-overlay"><div class="modal-content max-w-md"><div class="modal-header"><h3>TIN Number</h3></div><div class="modal-body"><p class="mb-4">Please provide your TIN.</p><input type="text" id="tin-number" class="form-input" placeholder="Enter TIN"></div><div class="modal-footer"><button id="no-tin-btn" class="btn btn-secondary">I don't have TIN</button><button id="save-tin-btn" class="btn btn-primary">Save TIN</button></div></div></div>`;
+    const m = document.createElement('div'); m.innerHTML = html; document.body.appendChild(m);
+    document.getElementById('no-tin-btn').onclick = () => { localStorage.setItem(`tinPopup_${tutor.email}`, new Date().toISOString().slice(0, 7)); m.remove(); };
+    document.getElementById('save-tin-btn').onclick = async () => {
+        const tin = document.getElementById('tin-number').value.trim();
+        if (!tin) return showCustomAlert('Please enter TIN.');
+        await updateDoc(doc(db, "tutors", tutor.id), { tinNumber: tin });
+        m.remove(); showCustomAlert('TIN Saved!');
+        window.tutorData.tinNumber = tin;
+    };
 }
 
 function getTutorPayScheme(tutor) {
     if (tutor.isManagementStaff) return PAY_SCHEMES.MANAGEMENT;
-    
     if (!tutor.employmentDate) return PAY_SCHEMES.NEW_TUTOR;
-    
-    const employmentDate = new Date(tutor.employmentDate + '-01');
-    const currentDate = new Date();
-    const monthsDiff = (currentDate.getFullYear() - employmentDate.getFullYear()) * 12 + 
-                      (currentDate.getMonth() - employmentDate.getMonth());
-    
-    return monthsDiff >= 12 ? PAY_SCHEMES.OLD_TUTOR : PAY_SCHEMES.NEW_TUTOR;
+    const emp = new Date(tutor.employmentDate + '-01');
+    const diff = (new Date().getFullYear() - emp.getFullYear()) * 12 + (new Date().getMonth() - emp.getMonth());
+    return diff >= 12 ? PAY_SCHEMES.OLD_TUTOR : PAY_SCHEMES.NEW_TUTOR;
+}
+
+function findSpecializedSubject(subjects) {
+    for (const [cat, list] of Object.entries(SUBJECT_CATEGORIES)) {
+        for (const sub of subjects) { if (list.includes(sub)) return { category: cat, subject: sub }; }
+    }
+    return null;
 }
 
 function calculateSuggestedFee(student, payScheme) {
@@ -396,106 +411,346 @@ function calculateSuggestedFee(student, payScheme) {
     const days = parseInt(student.days) || 0;
     const subjects = student.subjects || [];
     
-    // Check for specialized subjects first
-    const specializedSubject = findSpecializedSubject(subjects);
-    if (specializedSubject) {
-        const isGroupClass = student.groupClass || false;
-        const feeType = isGroupClass ? 'group' : 'individual';
-        return payScheme.specialized[feeType][specializedSubject.category] || 0;
-    }
+    const spec = findSpecializedSubject(subjects);
+    if (spec) return payScheme.specialized[student.groupClass ? 'group' : 'individual'][spec.category] || 0;
     
-    // Handle academic subjects
-    let gradeCategory = "Grade 3-8"; // Default
+    let gradeCat = "Grade 3-8";
+    if (["Preschool", "Kindergarten"].includes(grade) || grade.includes("Grade 1") || grade.includes("Grade 2")) gradeCat = "Preschool-Grade 2";
+    else if (parseInt(grade.replace('Grade ', '')) >= 9) return 0;
     
-    if (grade === "Preschool" || grade === "Kindergarten" || grade.includes("Grade 1") || grade.includes("Grade 2")) {
-        gradeCategory = "Preschool-Grade 2";
-    } else if (parseInt(grade.replace('Grade ', '')) >= 9) {
-        return 0; // Manual entry for Grade 9+
-    }
-    
-    // Check if it's subject teaching (Math, English, Science for higher grades)
-    const isSubjectTeacher = subjects.some(subj => ["Math", "English", "Science"].includes(subj)) && 
-                            parseInt(grade.replace('Grade ', '')) >= 5;
-    
-    if (isSubjectTeacher) {
-        return payScheme.academic["Subject Teachers"][days] || 0;
-    } else {
-        return payScheme.academic[gradeCategory][days] || 0;
-    }
+    const isSub = subjects.some(s => ["Math", "English", "Science"].includes(s)) && parseInt(grade.replace('Grade ', '')) >= 5;
+    return isSub ? (payScheme.academic["Subject Teachers"][days] || 0) : (payScheme.academic[gradeCat][days] || 0);
 }
 
-function findSpecializedSubject(subjects) {
-    for (const [category, subjectList] of Object.entries(SUBJECT_CATEGORIES)) {
-        for (const subject of subjects) {
-            if (subjectList.includes(subject)) {
-                return { category, subject };
+// ##################################################################
+// # SECTION 1: TUTOR DASHBOARD & NEW FEATURES (MERGED)
+// ##################################################################
+
+// --- Cloudinary Upload ---
+async function uploadToCloudinary(file) {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+    fd.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/upload`, { method: 'POST', body: fd });
+    const data = await res.json();
+    return { url: data.secure_url, name: file.name };
+}
+
+// --- Schedule Logic (Bulk Setup) ---
+let schedulePopup = null;
+let allStudents = [], scheduledStudents = new Set(), currentStudentIndex = 0;
+
+async function checkAndShowSchedulePopup(tutor) {
+    try {
+        const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+        const snap = await getDocs(q);
+        allStudents = []; scheduledStudents.clear();
+        snap.forEach(d => {
+            const s = { id: d.id, ...d.data() };
+            if (!['archived', 'graduated'].includes(s.status)) {
+                allStudents.push(s);
+                if (s.schedule && s.schedule.length > 0) scheduledStudents.add(s.id);
             }
+        });
+        
+        const unscheduled = allStudents.filter(s => !scheduledStudents.has(s.id));
+        if (unscheduled.length > 0) {
+            showBulkSchedulePopup(unscheduled[0], tutor, unscheduled.length);
+        } else {
+            showCustomAlert("✅ All students have schedules!");
         }
-    }
-    return null;
+    } catch (e) { console.error(e); showCustomAlert("Error loading students."); }
 }
 
-// Function to get current month for reports
-function getCurrentMonthYear() {
-    const now = new Date();
-    return now.toLocaleString('default', { month: 'long', year: 'numeric' });
-}
-
-// Listen for changes to the admin settings in real-time
-const settingsDocRef = doc(db, "settings", "global_settings");
-onSnapshot(settingsDocRef, (docSnap) => {
-    if (docSnap.exists()) {
-        const data = docSnap.data();
-        isSubmissionEnabled = data.isReportEnabled;
-        isTutorAddEnabled = data.isTutorAddEnabled;
-        isSummerBreakEnabled = data.isSummerBreakEnabled;
-        isBypassApprovalEnabled = data.bypassPendingApproval;
-        // NEW: Update the new global settings
-        showStudentFees = data.showStudentFees;
-        showEditDeleteButtons = data.showEditDeleteButtons;
-
-        // Re-render the student database if the page is currently active
-        const mainContent = document.getElementById('mainContent');
-        if (mainContent.querySelector('#student-list-view')) {
-            renderStudentDatabase(mainContent, window.tutorData);
-        }
-    }
-});
-
-// ##################################################################
-// # SECTION 1: TUTOR DASHBOARD - UPDATED TO FETCH FROM BOTH COLLECTIONS
-// ##################################################################
-function renderTutorDashboard(container, tutor) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Welcome, ${tutor.name}</h2>
-            <div class="mb-4">
-                <input type="text" id="searchName" class="w-full mt-1 p-2 border rounded" placeholder="Search by parent name...">
-                <button id="searchBtn" class="bg-green-600 text-white px-4 py-2 rounded mt-2 hover:bg-green-700">Search</button>
+function showBulkSchedulePopup(student, tutor, remaining) {
+    if (schedulePopup) schedulePopup.remove();
+    const existing = student.schedule || [];
+    
+    const html = `
+    <div class="modal-overlay">
+        <div class="modal-content max-w-2xl">
+            <div class="modal-header"><h3>📅 Schedule: ${student.studentName}</h3><span class="badge badge-info">${remaining} Left</span></div>
+            <div class="modal-body">
+                <div id="schedule-entries" class="space-y-4"></div>
+                <button id="add-entry" class="btn btn-secondary w-full mt-3">+ Add Slot</button>
+            </div>
+            <div class="modal-footer">
+                <button id="skip-btn" class="btn btn-secondary">Skip</button>
+                <button id="save-sched-btn" class="btn btn-primary">Save & Next</button>
             </div>
         </div>
-        <div id="pendingReportsContainer" class="space-y-4">
-            <p class="text-gray-500">Loading pending submissions...</p>
+    </div>`;
+    
+    schedulePopup = document.createElement('div');
+    schedulePopup.innerHTML = html;
+    document.body.appendChild(schedulePopup);
+
+    const renderEntry = (data = null) => `
+        <div class="schedule-entry bg-gray-50 p-3 rounded border relative">
+            <button class="remove-btn absolute top-0 right-0 text-red-500 p-1">✕</button>
+            <div class="grid grid-cols-3 gap-2">
+                <select class="s-day form-input">${DAYS_OF_WEEK.map(d => `<option value="${d}" ${data && data.day === d ? 'selected' : ''}>${d}</option>`).join('')}</select>
+                <select class="s-start form-input">${ROBUST_TIME_SLOTS.map(t => `<option value="${t.value}" ${data && data.start === t.value ? 'selected' : ''}>${t.label}</option>`).join('')}</select>
+                <select class="s-end form-input">${ROBUST_TIME_SLOTS.map(t => `<option value="${t.value}" ${data && data.end === t.value ? 'selected' : ''}>${t.label}</option>`).join('')}</select>
+            </div>
+        </div>`;
+
+    const container = document.getElementById('schedule-entries');
+    if (existing.length) existing.forEach(e => container.innerHTML += renderEntry(e));
+    else container.innerHTML += renderEntry();
+
+    container.addEventListener('click', e => { if (e.target.classList.contains('remove-btn')) e.target.closest('.schedule-entry').remove(); });
+    document.getElementById('add-entry').onclick = () => container.insertAdjacentHTML('beforeend', renderEntry());
+    
+    document.getElementById('save-sched-btn').onclick = async () => {
+        const schedule = [];
+        document.querySelectorAll('.schedule-entry').forEach(el => {
+            schedule.push({
+                day: el.querySelector('.s-day').value,
+                start: el.querySelector('.s-start').value,
+                end: el.querySelector('.s-end').value
+            });
+        });
+        
+        await updateDoc(doc(db, "students", student.id), { schedule });
+        scheduledStudents.add(student.id);
+        moveNext(tutor);
+    };
+    
+    document.getElementById('skip-btn').onclick = () => { currentStudentIndex++; moveNext(tutor); };
+
+    function moveNext(t) {
+        schedulePopup.remove();
+        const pending = allStudents.filter(s => !scheduledStudents.has(s.id));
+        if (pending.length > 0 && currentStudentIndex < pending.length) {
+            showBulkSchedulePopup(pending[currentStudentIndex], t, pending.length);
+        } else {
+            showCustomAlert("Done with queue!");
+        }
+    }
+}
+
+// --- Topic Modal ---
+function showDailyTopicModal(student) {
+    const html = `
+    <div class="modal-overlay">
+        <div class="modal-content max-w-lg">
+            <div class="modal-header"><h3>📚 Daily Topic: ${student.studentName}</h3></div>
+            <div class="modal-body">
+                <label class="form-label">Enter Topic</label>
+                <textarea id="topic-txt" class="form-input" rows="4"></textarea>
+            </div>
+            <div class="modal-footer"><button class="btn btn-primary" id="save-topic">Save</button><button class="btn btn-secondary" id="close-topic">Close</button></div>
         </div>
-        <div id="gradedReportsContainer" class="space-y-4 hidden">
-            <p class="text-gray-500">Loading graded submissions...</p>
+    </div>`;
+    const m = document.createElement('div'); m.innerHTML = html; document.body.appendChild(m);
+    document.getElementById('close-topic').onclick = () => m.remove();
+    
+    document.getElementById('save-topic').onclick = async () => {
+        const txt = document.getElementById('topic-txt').value;
+        if (!txt) return;
+        await setDoc(doc(collection(db, "daily_topics")), {
+            studentId: student.id, studentName: student.studentName,
+            topics: txt, date: new Date().toISOString().split('T')[0], createdAt: new Date()
+        });
+        m.remove(); showCustomAlert("Topic Saved!");
+    };
+}
+
+// --- Homework Modal ---
+function showHomeworkModal(student) {
+    const html = `
+    <div class="modal-overlay">
+        <div class="modal-content max-w-lg">
+            <div class="modal-header"><h3>📝 Assign Homework: ${student.studentName}</h3></div>
+            <div class="modal-body">
+                <input id="hw-title" class="form-input" placeholder="Title">
+                <textarea id="hw-desc" class="form-input" placeholder="Instructions"></textarea>
+                <input id="hw-date" type="date" class="form-input">
+                <input id="hw-file" type="file" class="form-input">
+            </div>
+            <div class="modal-footer"><button id="save-hw" class="btn btn-primary">Assign</button><button class="btn btn-secondary" id="close-hw">Cancel</button></div>
+        </div>
+    </div>`;
+    const m = document.createElement('div'); m.innerHTML = html; document.body.appendChild(m);
+    document.getElementById('close-hw').onclick = () => m.remove();
+    
+    document.getElementById('save-hw').onclick = async () => {
+        const title = document.getElementById('hw-title').value;
+        const desc = document.getElementById('hw-desc').value;
+        const date = document.getElementById('hw-date').value;
+        const file = document.getElementById('hw-file').files[0];
+        
+        if (!title || !date) return showCustomAlert("Title and Date required");
+        
+        document.getElementById('save-hw').innerText = "Uploading...";
+        let attachment = null;
+        if (file) attachment = await uploadToCloudinary(file);
+        
+        await addDoc(collection(db, "homework_assignments"), {
+            studentId: student.id, studentName: student.studentName,
+            title, description: desc, dueDate: date,
+            attachments: attachment ? [attachment] : [],
+            createdAt: new Date(), status: 'assigned',
+            parentEmail: student.parentEmail || ''
+        });
+        
+        m.remove(); showCustomAlert("Homework Assigned!");
+    };
+}
+
+// --- Calendar Modal ---
+function formatScheduleTime(time) {
+    const [h, m] = time.split(':').map(Number);
+    const p = h >= 12 ? 'PM' : 'AM';
+    return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${p}`;
+}
+
+async function showScheduleCalendarModal() {
+    const m = document.createElement('div'); m.className = 'modal-overlay';
+    m.innerHTML = `<div class="modal-content max-w-6xl"><div class="modal-header"><h3>📅 Calendar</h3><button class="btn btn-secondary" id="close-cal">Close</button></div><div class="modal-body" id="cal-body"><div class="spinner"></div></div></div>`;
+    document.body.appendChild(m);
+    document.getElementById('close-cal').onclick = () => m.remove();
+
+    const q = query(collection(db, "students"), where("tutorEmail", "==", window.tutorData.email));
+    const snap = await getDocs(q);
+    const scheduleMap = {};
+    DAYS_OF_WEEK.forEach(d => scheduleMap[d] = []);
+
+    snap.forEach(d => {
+        const s = d.data();
+        if (s.schedule) {
+            s.schedule.forEach(slot => {
+                scheduleMap[slot.day].push({ ...slot, student: s.studentName, grade: s.grade });
+            });
+        }
+    });
+
+    let html = `<div class="calendar-view">`;
+    DAYS_OF_WEEK.forEach(day => {
+        scheduleMap[day].sort((a,b) => a.start.localeCompare(b.start));
+        html += `<div class="calendar-day"><div class="font-bold mb-2 border-bottom">${day}</div>`;
+        if (scheduleMap[day].length === 0) html += `<div class="text-gray-400 text-xs">No classes</div>`;
+        scheduleMap[day].forEach(ev => {
+            html += `<div class="calendar-event">
+                <div class="font-bold">${ev.student}</div>
+                <div>${formatScheduleTime(ev.start)} - ${formatScheduleTime(ev.end)}</div>
+                <div class="text-xs text-gray-500">${ev.grade}</div>
+            </div>`;
+        });
+        html += `</div>`;
+    });
+    html += `</div>`;
+    document.getElementById('cal-body').innerHTML = html;
+}
+
+// --- Load Student Dropdowns (Single Declaration) ---
+async function loadStudentDropdowns(email) {
+    const q = query(collection(db, "students"), where("tutorEmail", "==", email));
+    const snap = await getDocs(q);
+    studentCache = [];
+    const topicSel = document.getElementById('topic-student-sel');
+    const hwSel = document.getElementById('hw-student-sel');
+
+    if (topicSel) topicSel.innerHTML = '<option value="">Select Student...</option>';
+    if (hwSel) hwSel.innerHTML = '<option value="">Select Student...</option>';
+
+    snap.forEach(d => {
+        const s = { id: d.id, ...d.data() };
+        if (!['archived','graduated'].includes(s.status)) {
+            studentCache.push(s);
+            const opt = `<option value="${s.id}">${s.studentName}</option>`;
+            if (topicSel) topicSel.innerHTML += opt;
+            if (hwSel) hwSel.innerHTML += opt;
+        }
+    });
+}
+
+function renderTutorDashboard(container, tutor) {
+    if (!tutor) { console.error("No tutor data"); return; }
+    window.tutorData = tutor;
+
+    container.innerHTML = `
+        <div class="hero-section">
+            <h1 class="hero-title">Welcome, ${tutor.name || 'Tutor'}! 👋</h1>
+            <p>Manage your students, schedules, and reports.</p>
+            <div class="mt-4">
+                <input type="text" id="searchName" class="p-2 border rounded text-black" placeholder="Search by parent name..." style="min-width: 250px;">
+                <button id="searchBtn" class="bg-white text-green-700 font-bold px-4 py-2 rounded hover:bg-gray-100 ml-2">Search</button>
+            </div>
+        </div>
+        
+        <div class="student-actions-container">
+            <div class="student-action-card">
+                <h3 class="font-bold mb-2">📅 Schedule</h3>
+                <button id="view-cal" class="btn btn-info w-full mb-2">View Calendar</button>
+                <button id="setup-sched" class="btn btn-primary w-full">Set Up Schedules</button>
+            </div>
+            
+            <div class="student-action-card">
+                <h3 class="font-bold mb-2">📚 Today's Topic</h3>
+                <select id="topic-student-sel" class="form-input mb-2"><option value="">Select Student...</option></select>
+                <button id="add-topic" class="btn btn-secondary w-full" disabled>Add Topic</button>
+            </div>
+            
+            <div class="student-action-card">
+                <h3 class="font-bold mb-2">📝 Homework</h3>
+                <select id="hw-student-sel" class="form-input mb-2"><option value="">Select Student...</option></select>
+                <button id="assign-hw" class="btn btn-warning w-full" disabled>Assign Homework</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header"><h3 class="font-bold">📋 Recent Activity / Pending Grading</h3></div>
+            <div class="card-body">
+                <div id="pendingReportsContainer" class="space-y-4">
+                    <p class="text-gray-500">Loading pending submissions...</p>
+                </div>
+                <div id="gradedReportsContainer" class="space-y-4 mt-8 pt-8 border-t">
+                    <h4 class="font-semibold text-gray-500 mb-4">Graded History</h4>
+                    <p class="text-gray-500">Loading graded submissions...</p>
+                </div>
+            </div>
         </div>
     `;
 
+    // Load Data
+    loadStudentDropdowns(tutor.email);
+    loadTutorReports(tutor.email);
+
+    // Event Listeners
     document.getElementById('searchBtn').addEventListener('click', async () => {
         const name = document.getElementById('searchName').value.trim();
         await loadTutorReports(tutor.email, name || null);
     });
 
-    loadTutorReports(tutor.email);
+    document.getElementById('view-cal').onclick = showScheduleCalendarModal;
+    document.getElementById('setup-sched').onclick = () => checkAndShowSchedulePopup(tutor);
+    
+    const topicSel = document.getElementById('topic-student-sel');
+    const topicBtn = document.getElementById('add-topic');
+    topicSel.onchange = () => topicBtn.disabled = !topicSel.value;
+    topicBtn.onclick = () => {
+        const s = studentCache.find(x => x.id === topicSel.value);
+        if (s) showDailyTopicModal(s);
+    };
+
+    const hwSel = document.getElementById('hw-student-sel');
+    const hwBtn = document.getElementById('assign-hw');
+    hwSel.onchange = () => hwBtn.disabled = !hwSel.value;
+    hwBtn.onclick = () => {
+        const s = studentCache.find(x => x.id === hwSel.value);
+        if (s) showHomeworkModal(s);
+    };
 }
 
 // UPDATED: Load reports from BOTH student_results AND tutor_submissions
 async function loadTutorReports(tutorEmail, parentName = null) {
     const pendingReportsContainer = document.getElementById('pendingReportsContainer');
     const gradedReportsContainer = document.getElementById('gradedReportsContainer');
-    pendingReportsContainer.innerHTML = `<p class="text-gray-500">Loading pending submissions...</p>`;
-    if (gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-gray-500">Loading graded submissions...</p>`;
+    pendingReportsContainer.innerHTML = `<div class="spinner"></div>`;
+    if (gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-gray-500">Loading...</p>`;
 
     try {
         // QUERY 1: Multiple-choice tests from student_results
@@ -525,8 +780,6 @@ async function loadTutorReports(tutorEmail, parentName = null) {
             getDocs(creativeWritingQuery)
         ]);
 
-        console.log(`Found ${assessmentsSnapshot.size} test results and ${creativeWritingSnapshot.size} creative writing submissions`);
-
         let pendingHTML = '';
         let gradedHTML = '';
 
@@ -542,26 +795,34 @@ async function loadTutorReports(tutorEmail, parentName = null) {
 
             const reportCardHTML = `
                 <div class="border rounded-lg p-4 shadow-sm bg-white mb-4">
-                    <p><strong>Student:</strong> ${data.studentName}</p>
-                    <p><strong>Parent Name:</strong> ${data.parentName || 'N/A'}</p>
-                    <p><strong>Grade:</strong> ${data.grade}</p>
-                    <p><strong>Type:</strong> Multiple-Choice Test</p>
-                    <p><strong>Submitted At:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 class="font-bold text-lg">${data.studentName}</h4>
+                            <p class="text-sm text-gray-600">Grade: ${data.grade} | Parent: ${data.parentName || 'N/A'}</p>
+                            <p class="text-xs text-gray-500 mt-1">Submitted: ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
+                        </div>
+                        <span class="badge ${needsFeedback ? 'badge-warning' : 'badge-success'}">${needsFeedback ? 'Needs Grading' : 'Graded'}</span>
+                    </div>
+                    
                     <div class="mt-4 border-t pt-4">
-                        <h4 class="font-semibold">Assessment Details:</h4>
-                        ${data.answers ? data.answers.map(answer => {
+                        ${data.answers ? data.answers.map((answer, idx) => {
                             if (answer.type === 'creative-writing') {
                                 return `
                                     <div class="mb-3 p-3 bg-gray-50 rounded">
-                                        <p><strong>Creative Writing:</strong></p>
-                                        <p class="italic">${answer.textAnswer || "No response"}</p>
-                                        ${answer.fileUrl ? `<a href="${answer.fileUrl}" target="_blank" class="text-green-600 hover:underline">Download File</a>` : ''}
-                                        <p class="mt-2"><strong>Status:</strong> ${answer.tutorReport ? 'Graded' : 'Pending Review'}</p>
+                                        <p class="font-semibold text-sm">Creative Writing:</p>
+                                        <p class="italic text-gray-700 my-2 p-2 bg-white border rounded">${answer.textAnswer || "No response"}</p>
+                                        ${answer.fileUrl ? `<a href="${answer.fileUrl}" target="_blank" class="text-green-600 hover:underline text-sm">📄 Download Attachment</a>` : ''}
+                                        
                                         ${!answer.tutorReport ? `
-                                            <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your feedback here..."></textarea>
-                                            <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}" data-collection="student_results" data-answer-index="${data.answers.indexOf(answer)}">Submit Feedback</button>
+                                            <div class="mt-3">
+                                                <textarea class="tutor-report form-input" rows="3" placeholder="Write your feedback here..."></textarea>
+                                                <button class="submit-report-btn btn btn-primary btn-sm mt-2" data-doc-id="${doc.id}" data-collection="student_results" data-answer-index="${idx}">Submit Feedback</button>
+                                            </div>
                                         ` : `
-                                            <p class="mt-2"><strong>Tutor's Feedback:</strong> ${answer.tutorReport || 'N/A'}</p>
+                                            <div class="mt-3 p-2 bg-green-50 border border-green-100 rounded">
+                                                <p class="text-sm font-semibold text-green-800">Your Feedback:</p>
+                                                <p class="text-sm text-green-700">${answer.tutorReport}</p>
+                                            </div>
                                         `}
                                     </div>
                                 `;
@@ -586,24 +847,31 @@ async function loadTutorReports(tutorEmail, parentName = null) {
 
             const creativeWritingHTML = `
                 <div class="border rounded-lg p-4 shadow-sm bg-white mb-4 border-l-4 border-blue-500">
-                    <p><strong>Student:</strong> ${data.studentName}</p>
-                    <p><strong>Parent Name:</strong> ${data.parentName || 'N/A'}</p>
-                    <p><strong>Grade:</strong> ${data.grade}</p>
-                    <p><strong>Type:</strong> Creative Writing Assignment</p>
-                    <p><strong>Submitted At:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 class="font-bold text-lg">${data.studentName}</h4>
+                            <p class="text-sm text-gray-600">Type: Creative Writing Assignment</p>
+                            <p class="text-xs text-gray-500 mt-1">Submitted: ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
+                        </div>
+                         <span class="badge ${needsFeedback ? 'badge-warning' : 'badge-success'}">${needsFeedback ? 'Needs Grading' : 'Graded'}</span>
+                    </div>
+
                     <div class="mt-4 border-t pt-4">
-                        <h4 class="font-semibold">Creative Writing Submission:</h4>
                         <div class="mb-3 p-3 bg-blue-50 rounded">
-                            <p><strong>Writing Prompt:</strong> ${data.questionText || 'Creative Writing Assignment'}</p>
-                            <p class="mt-2"><strong>Student's Writing:</strong></p>
-                            <p class="italic bg-white p-3 rounded border">${data.textAnswer || "No response"}</p>
-                            ${data.fileUrl ? `<a href="${data.fileUrl}" target="_blank" class="text-green-600 hover:underline mt-2 block">Download Attached File</a>` : ''}
-                            <p class="mt-2"><strong>Status:</strong> ${data.tutorReport ? 'Graded' : 'Pending Review'}</p>
+                            <p class="font-semibold text-sm">Prompt: ${data.questionText || 'Creative Writing Assignment'}</p>
+                            <p class="italic text-gray-700 my-2 p-3 bg-white border rounded">${data.textAnswer || "No response"}</p>
+                            ${data.fileUrl ? `<a href="${data.fileUrl}" target="_blank" class="text-green-600 hover:underline text-sm block mb-2">📄 Download Attached File</a>` : ''}
+                            
                             ${!data.tutorReport ? `
-                                <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your feedback here..."></textarea>
-                                <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}" data-collection="tutor_submissions">Submit Feedback</button>
+                                <div class="mt-3">
+                                    <textarea class="tutor-report form-input" rows="3" placeholder="Write your feedback here..."></textarea>
+                                    <button class="submit-report-btn btn btn-primary btn-sm mt-2" data-doc-id="${doc.id}" data-collection="tutor_submissions">Submit Feedback</button>
+                                </div>
                             ` : `
-                                <p class="mt-2"><strong>Tutor's Feedback:</strong> ${data.tutorReport || 'N/A'}</p>
+                                <div class="mt-3 p-2 bg-green-50 border border-green-100 rounded">
+                                    <p class="text-sm font-semibold text-green-800">Your Feedback:</p>
+                                    <p class="text-sm text-green-700">${data.tutorReport}</p>
+                                </div>
                             `}
                         </div>
                     </div>
@@ -617,16 +885,17 @@ async function loadTutorReports(tutorEmail, parentName = null) {
             }
         });
 
-        pendingReportsContainer.innerHTML = pendingHTML || `<p class="text-gray-500">No pending submissions found.</p>`;
-        if (gradedReportsContainer) gradedReportsContainer.innerHTML = gradedHTML || `<p class="text-gray-500">No graded submissions found.</p>`;
+        pendingReportsContainer.innerHTML = pendingHTML || `<p class="text-gray-500 italic">No pending submissions found.</p>`;
+        if (gradedReportsContainer) gradedReportsContainer.innerHTML = gradedHTML || `<p class="text-gray-500 italic">No graded submissions found.</p>`;
 
-        // UPDATED: Submit feedback to the correct collection
+        // Attach event listeners for the submit buttons
         document.querySelectorAll('.submit-report-btn').forEach(button => {
             button.addEventListener('click', async (e) => {
                 const docId = e.target.getAttribute('data-doc-id');
                 const collectionName = e.target.getAttribute('data-collection');
                 const answerIndex = e.target.getAttribute('data-answer-index');
-                const reportTextarea = e.target.closest('.bg-gray-50, .bg-blue-50').querySelector('.tutor-report');
+                // Find the closest textarea relative to the button
+                const reportTextarea = e.target.parentElement.querySelector('.tutor-report');
                 const tutorReport = reportTextarea.value.trim();
                 
                 if (tutorReport) {
@@ -634,23 +903,19 @@ async function loadTutorReports(tutorEmail, parentName = null) {
                         const docRef = doc(db, collectionName, docId);
                         
                         if (collectionName === "student_results" && answerIndex !== null) {
-                            // Update specific answer in student_results
                             const docSnap = await getDoc(docRef);
                             const currentData = docSnap.data();
-                            
                             const updatedAnswers = [...currentData.answers];
                             updatedAnswers[parseInt(answerIndex)] = {
                                 ...updatedAnswers[parseInt(answerIndex)],
                                 tutorReport: tutorReport,
                                 gradedAt: new Date()
                             };
-                            
                             await updateDoc(docRef, { 
                                 answers: updatedAnswers,
                                 hasTutorFeedback: true
                             });
                         } else {
-                            // Update entire creative writing submission in tutor_submissions
                             await updateDoc(docRef, { 
                                 tutorReport: tutorReport,
                                 gradedAt: new Date(),
@@ -659,7 +924,7 @@ async function loadTutorReports(tutorEmail, parentName = null) {
                         }
                         
                         showCustomAlert('Feedback submitted successfully!');
-                        loadTutorReports(tutorEmail, parentName); // Refresh the list
+                        loadTutorReports(tutorEmail, parentName); // Refresh
                     } catch (error) {
                         console.error("Error submitting feedback:", error);
                         showCustomAlert('Failed to submit feedback. Please try again.');
@@ -672,13 +937,11 @@ async function loadTutorReports(tutorEmail, parentName = null) {
     } catch (error) {
         console.error("Error loading tutor reports:", error);
         pendingReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
-        if (gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
     }
 }
 
-// [The rest of your existing code remains exactly the same - no changes needed below this line]
 // ##################################################################
-// # SECTION 2: STUDENT DATABASE (MERGED FUNCTIONALITY) - UPDATED TO EXCLUDE ARCHIVED STUDENTS
+// # SECTION 2: STUDENT DATABASE FUNCTIONALITY (MERGED FROM OLD FILE)
 // ##################################################################
 
 // Helper function to generate the new student form fields
@@ -705,7 +968,7 @@ function getNewStudentFormFields() {
         "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry", "Microbiology"],
         "Pre-College Exams": ["SAT", "IGCSE", "A-Levels", "SSCE", "JAMB"],
         "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa", "Arabic"],
-        "Tech Courses": ["Coding","ICT", "Stop motion animation", "Computer Appreciation", "Digital Entrepeneurship", "Animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
+        "Tech Courses": ["Coding","ICT", "Stop motion animation", "Computer Appreciation", "Digital Entrepreneurship", "Animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
         "Support Programs": ["Bible study", "Counseling Programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills", "English Proficiency"]
     };
 
@@ -725,12 +988,12 @@ function getNewStudentFormFields() {
     </div>`;
 
     return `
-        <input type="text" id="new-parent-name" class="w-full mt-1 p-2 border rounded" placeholder="Parent Name">
-        <input type="tel" id="new-parent-phone" class="w-full mt-1 p-2 border rounded" placeholder="Parent Phone Number">
-        <input type="text" id="new-student-name" class="w-full mt-1 p-2 border rounded" placeholder="Student Name">
-        <select id="new-student-grade" class="w-full mt-1 p-2 border rounded">${gradeOptions}</select>
+        <input type="text" id="new-parent-name" class="form-input" placeholder="Parent Name">
+        <input type="tel" id="new-parent-phone" class="form-input" placeholder="Parent Phone Number">
+        <input type="text" id="new-student-name" class="form-input" placeholder="Student Name">
+        <select id="new-student-grade" class="form-input">${gradeOptions}</select>
         ${subjectsHTML}
-        <select id="new-student-days" class="w-full mt-1 p-2 border rounded">
+        <select id="new-student-days" class="form-input">
             <option value="">Select Days per Week</option>
             ${Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
         </select>
@@ -740,7 +1003,7 @@ function getNewStudentFormFields() {
                 <span class="text-sm font-semibold">Group Class</span>
             </label>
         </div>
-        <select id="new-student-fee" class="w-full mt-1 p-2 border rounded">${feeOptions}</select>
+        <select id="new-student-fee" class="form-input">${feeOptions}</select>
     `;
 }
 
@@ -782,7 +1045,7 @@ function showEditStudentModal(student) {
         "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry", "Microbiology"],
         "Pre-College Exams": ["SAT", "IGCSE", "A-Levels", "SSCE", "JAMB"],
         "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa", "Arabic"],
-        "Tech Courses": ["Coding","ICT", "Stop motion animation",  "Computer Appreciation", "Digital Entrepeneurship", "Animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
+        "Tech Courses": ["Coding","ICT", "Stop motion animation",  "Computer Appreciation", "Digital Entrepreneurship", "Animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
         "Support Programs": ["Bible study", "Counseling Programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills", "English Proficiency"]
     };
 
@@ -809,24 +1072,24 @@ function showEditStudentModal(student) {
         <div class="space-y-4">
             <div>
                 <label class="block font-semibold">Parent Name</label>
-                <input type="text" id="edit-parent-name" class="w-full mt-1 p-2 border rounded" value="${student.parentName || ''}" placeholder="Parent Name">
+                <input type="text" id="edit-parent-name" class="form-input" value="${student.parentName || ''}" placeholder="Parent Name">
             </div>
             <div>
                 <label class="block font-semibold">Parent Phone Number</label>
-                <input type="tel" id="edit-parent-phone" class="w-full mt-1 p-2 border rounded" value="${student.parentPhone || ''}" placeholder="Parent Phone Number">
+                <input type="tel" id="edit-parent-phone" class="form-input" value="${student.parentPhone || ''}" placeholder="Parent Phone Number">
             </div>
             <div>
                 <label class="block font-semibold">Student Name</label>
-                <input type="text" id="edit-student-name" class="w-full mt-1 p-2 border rounded" value="${student.studentName || ''}" placeholder="Student Name">
+                <input type="text" id="edit-student-name" class="form-input" value="${student.studentName || ''}" placeholder="Student Name">
             </div>
             <div>
                 <label class="block font-semibold">Grade</label>
-                <select id="edit-student-grade" class="w-full mt-1 p-2 border rounded">${gradeOptions}</select>
+                <select id="edit-student-grade" class="form-input">${gradeOptions}</select>
             </div>
             ${subjectsHTML}
             <div>
                 <label class="block font-semibold">Days per Week</label>
-                <select id="edit-student-days" class="w-full mt-1 p-2 border rounded">${daysOptions}</select>
+                <select id="edit-student-days" class="form-input">${daysOptions}</select>
             </div>
             <div id="edit-group-class-container" class="${findSpecializedSubject(student.subjects || []) ? '' : 'hidden'}">
                 <label class="flex items-center space-x-2">
@@ -836,19 +1099,19 @@ function showEditStudentModal(student) {
             </div>
             <div>
                 <label class="block font-semibold">Fee (₦)</label>
-                <input type="text" id="edit-student-fee" class="w-full mt-1 p-2 border rounded" 
+                <input type="text" id="edit-student-fee" class="form-input" 
                        value="${(student.studentFee || 0).toLocaleString()}" 
                        placeholder="Enter fee (e.g., 50,000)">
             </div>
             <div class="flex justify-end space-x-2 mt-6">
-                <button id="cancel-edit-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
-                <button id="save-edit-btn" class="bg-green-600 text-white px-6 py-2 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Save Changes</button>
+                <button id="cancel-edit-btn" class="btn btn-secondary">Cancel</button>
+                <button id="save-edit-btn" class="btn btn-primary" data-student-id="${student.id}" data-collection="${student.collection}">Save Changes</button>
             </div>
         </div>`;
 
     const editModal = document.createElement('div');
-    editModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
-    editModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto">${editFormHTML}</div>`;
+    editModal.className = 'modal-overlay';
+    editModal.innerHTML = `<div class="modal-content max-w-lg">${editFormHTML}</div>`;
     document.body.appendChild(editModal);
 
     document.getElementById('cancel-edit-btn').addEventListener('click', () => editModal.remove());
@@ -921,15 +1184,15 @@ async function renderStudentDatabase(container, tutor) {
         return;
     }
 
-    // CHANGED: Load reports from Firestore (cross-device) instead of localStorage
+    // Load reports from Firestore (cross-device) instead of localStorage
     let savedReports = await loadReportsFromFirestore(tutor.email);
 
     // Fetch students and all of the tutor's historical submissions
-    // CHANGED: Filter out archived, graduated, and transferred students
+    // Filter out archived, graduated, and transferred students
     const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
     const pendingStudentQuery = query(collection(db, "pending_students"), where("tutorEmail", "==", tutor.email));
     
-    // --- START: MODIFICATION (NO INDEX REQUIRED) ---
+    // Get all submissions for current month
     const allSubmissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutor.email));
 
     const [studentsSnapshot, pendingStudentsSnapshot, allSubmissionsSnapshot] = await Promise.all([
@@ -938,7 +1201,7 @@ async function renderStudentDatabase(container, tutor) {
         getDocs(allSubmissionsQuery)
     ]);
 
-    // CHANGED: Filter out archived, graduated, and transferred students on client side
+    // Filter out archived, graduated, and transferred students on client side
     let approvedStudents = studentsSnapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data(), isPending: false, collection: "students" }))
         .filter(student => {
@@ -989,6 +1252,7 @@ async function renderStudentDatabase(container, tutor) {
     }
 
     const studentsCount = students.length;
+    let approvedStudentsList = approvedStudents; // Make available to inner functions
 
     function renderUI() {
         let studentsHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">My Students (${studentsCount})</h2>`;
@@ -1004,11 +1268,11 @@ async function renderStudentDatabase(container, tutor) {
         
         // Show "Add Student" button only when admin enables it
         if (isTutorAddEnabled) {
-            studentsHTML += `<button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Student</button>`;
+            studentsHTML += `<button id="add-student-btn" class="btn btn-primary">Add Student</button>`;
         }
         
         // ALWAYS show "Add Transitioning" button regardless of admin setting
-        studentsHTML += `<button id="add-transitioning-btn" class="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700">Add Transitioning</button>`;
+        studentsHTML += `<button id="add-transitioning-btn" class="btn" style="background: orange; color: white;">Add Transitioning</button>`;
         
         studentsHTML += `</div></div>`;
         
@@ -1020,7 +1284,11 @@ async function renderStudentDatabase(container, tutor) {
             studentsHTML += `
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
-                        <thead><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student Name</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th></tr></thead>
+                        <thead><tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        </tr></thead>
                         <tbody class="bg-white divide-y divide-gray-200">`;
             
             students.forEach(student => {
@@ -1050,24 +1318,24 @@ async function renderStudentDatabase(container, tutor) {
                     statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>${transitioningIndicator}`;
 
                     if (isSummerBreakEnabled && !isStudentOnBreak) {
-                        actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Break</button>`;
+                        actionsHTML += `<button class="summer-break-btn btn btn-warning btn-sm" data-student-id="${student.id}">Break</button>`;
                     } else if (isStudentOnBreak) {
                         actionsHTML += `<span class="text-gray-400">On Break</span>`;
                     }
 
                     if (isSubmissionEnabled && !isStudentOnBreak) {
-                        if (approvedStudents.length === 1) {
-                            actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-is-transitioning="${isTransitioning}">Submit Report</button>`;
+                        if (approvedStudentsList.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1) {
+                            actionsHTML += `<button class="submit-single-report-btn btn btn-primary btn-sm" data-student-id="${student.id}" data-is-transitioning="${isTransitioning}">Submit Report</button>`;
                         } else {
-                            actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-is-transitioning="${isTransitioning}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
+                            actionsHTML += `<button class="enter-report-btn btn btn-primary btn-sm" data-student-id="${student.id}" data-is-transitioning="${isTransitioning}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
                         }
                     } else if (!isStudentOnBreak) {
                         actionsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
                     }
                     
                     if (showEditDeleteButtons && !isStudentOnBreak) {
-                        actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Edit</button>`;
-                        actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Delete</button>`;
+                        actionsHTML += `<button class="edit-student-btn-tutor btn btn-info btn-sm" data-student-id="${student.id}" data-collection="${student.collection}">Edit</button>`;
+                        actionsHTML += `<button class="delete-student-btn-tutor btn btn-danger btn-sm" data-student-id="${student.id}" data-collection="${student.collection}">Delete</button>`;
                     }
                 }
                 
@@ -1092,20 +1360,20 @@ async function renderStudentDatabase(container, tutor) {
                         <p class="text-sm text-gray-600 mb-2">As you are part of the management staff, please set your monthly management fee before final submission.</p>
                         <div class="flex items-center space-x-2">
                             <label for="management-fee-input" class="font-semibold">Fee (₦):</label>
-                            <input type="number" id="management-fee-input" class="p-2 border rounded w-full" value="${tutor.managementFee || 0}">
-                            <button id="save-management-fee-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Save Fee</button>
+                            <input type="number" id="management-fee-input" class="form-input" value="${tutor.managementFee || 0}">
+                            <button id="save-management-fee-btn" class="btn btn-primary">Save Fee</button>
                         </div>
                     </div>`;
             }
             
-            if (approvedStudents.length > 1 && isSubmissionEnabled) {
-                const submittableStudents = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length;
+            if (approvedStudentsList.length > 1 && isSubmissionEnabled) {
+                const submittableStudents = approvedStudentsList.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length;
                 const allReportsSaved = Object.keys(savedReports).length === submittableStudents && submittableStudents > 0;
                 
                 if (submittableStudents > 0) {
                     studentsHTML += `
                         <div class="mt-6 text-right">
-                            <button id="submit-all-reports-btn" class="bg-green-700 text-white px-6 py-3 rounded-lg font-bold ${!allReportsSaved ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-800'}" ${!allReportsSaved ? 'disabled' : ''}>
+                            <button id="submit-all-reports-btn" class="btn btn-primary ${!allReportsSaved ? 'opacity-50 cursor-not-allowed' : ''}" ${!allReportsSaved ? 'disabled' : ''}>
                                 Submit All Reports
                             </button>
                         </div>`;
@@ -1142,7 +1410,7 @@ async function renderStudentDatabase(container, tutor) {
         }
 
         const existingReport = savedReports[student.id] || {};
-        const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
+        const isSingleApprovedStudent = approvedStudentsList.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
         const currentMonthYear = getCurrentMonthYear();
         
         const reportFormHTML = `
@@ -1151,21 +1419,21 @@ async function renderStudentDatabase(container, tutor) {
                 <p class="text-sm font-semibold text-blue-800">Month: ${currentMonthYear}</p>
             </div>
             <div class="space-y-4">
-                <div><label class="block font-semibold">Introduction</label><textarea id="report-intro" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.introduction || ''}</textarea></div>
-                <div><label class="block font-semibold">Topics & Remarks</label><textarea id="report-topics" class="w-full mt-1 p-2 border rounded" rows="3">${existingReport.topics || ''}</textarea></div>
-                <div><label class="block font-semibold">Progress & Achievements</label><textarea id="report-progress" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.progress || ''}</textarea></div>
-                <div><label class="block font-semibold">Strengths & Weaknesses</label><textarea id="report-sw" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.strengthsWeaknesses || ''}</textarea></div>
-                <div><label class="block font-semibold">Recommendations</label><textarea id="report-recs" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.recommendations || ''}</textarea></div>
-                <div><label class="block font-semibold">General Comments</label><textarea id="report-general" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.generalComments || ''}</textarea></div>
+                <div><label class="block font-semibold">Introduction</label><textarea id="report-intro" class="form-input" rows="2">${existingReport.introduction || ''}</textarea></div>
+                <div><label class="block font-semibold">Topics & Remarks</label><textarea id="report-topics" class="form-input" rows="3">${existingReport.topics || ''}</textarea></div>
+                <div><label class="block font-semibold">Progress & Achievements</label><textarea id="report-progress" class="form-input" rows="2">${existingReport.progress || ''}</textarea></div>
+                <div><label class="block font-semibold">Strengths & Weaknesses</label><textarea id="report-sw" class="form-input" rows="2">${existingReport.strengthsWeaknesses || ''}</textarea></div>
+                <div><label class="block font-semibold">Recommendations</label><textarea id="report-recs" class="form-input" rows="2">${existingReport.recommendations || ''}</textarea></div>
+                <div><label class="block font-semibold">General Comments</label><textarea id="report-general" class="form-input" rows="2">${existingReport.generalComments || ''}</textarea></div>
                 <div class="flex justify-end space-x-2">
-                    <button id="cancel-report-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
-                    <button id="modal-action-btn" class="bg-green-600 text-white px-6 py-2 rounded">${isSingleApprovedStudent ? 'Proceed to Submit' : 'Save Report'}</button>
+                    <button id="cancel-report-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="modal-action-btn" class="btn btn-primary">${isSingleApprovedStudent ? 'Proceed to Submit' : 'Save Report'}</button>
                 </div>
             </div>`;
         
         const reportModal = document.createElement('div');
-        reportModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
-        reportModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl mx-auto">${reportFormHTML}</div>`;
+        reportModal.className = 'modal-overlay';
+        reportModal.innerHTML = `<div class="modal-content max-w-2xl">${reportFormHTML}</div>`;
         document.body.appendChild(reportModal);
 
         document.getElementById('cancel-report-btn').addEventListener('click', () => reportModal.remove());
@@ -1198,22 +1466,22 @@ async function renderStudentDatabase(container, tutor) {
             <div class="space-y-4">
                 <div>
                     <label class="block font-semibold">Current Fee (₦)</label>
-                    <input type="number" id="confirm-student-fee" class="w-full mt-1 p-2 border rounded" 
+                    <input type="number" id="confirm-student-fee" class="form-input" 
                            value="${student.studentFee || 0}" 
                            placeholder="Enter fee amount">
                 </div>
                 <div class="flex justify-end space-x-2 mt-6">
-                    <button id="cancel-fee-confirm-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
-                    <button id="confirm-fee-btn" class="bg-green-600 text-white px-6 py-2 rounded">Confirm Fee & Save</button>
+                    <button id="cancel-fee-confirm-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="confirm-fee-btn" class="btn btn-primary">Confirm Fee & Save</button>
                 </div>
             </div>`;
 
         const feeModal = document.createElement('div');
-        feeModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
-        feeModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto">${feeConfirmationHTML}</div>`;
+        feeModal.className = 'modal-overlay';
+        feeModal.innerHTML = `<div class="modal-content max-w-lg">${feeConfirmationHTML}</div>`;
         document.body.appendChild(feeModal);
 
-        const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
+        const isSingleApprovedStudent = approvedStudentsList.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
 
         document.getElementById('cancel-fee-confirm-btn').addEventListener('click', () => feeModal.remove());
         document.getElementById('confirm-fee-btn').addEventListener('click', async () => {
@@ -1242,7 +1510,7 @@ async function renderStudentDatabase(container, tutor) {
             if (isSingleApprovedStudent) {
                 showAccountDetailsModal([reportData]);
             } else {
-                // CHANGED: Save to Firestore instead of localStorage for cross-device access
+                // Save to Firestore instead of localStorage for cross-device access
                 savedReports[student.id] = reportData;
                 await saveReportsToFirestore(tutor.email, savedReports);
                 showCustomAlert(`${student.studentName}'s report has been saved.`);
@@ -1258,24 +1526,24 @@ async function renderStudentDatabase(container, tutor) {
             <div class="space-y-4">
                 <div>
                     <label class="block font-semibold">Beneficiary Bank Name</label>
-                    <input type="text" id="beneficiary-bank" class="w-full mt-1 p-2 border rounded" placeholder="e.g., Zenith Bank">
+                    <input type="text" id="beneficiary-bank" class="form-input" placeholder="e.g., Zenith Bank">
                 </div>
                 <div>
                     <label class="block font-semibold">Beneficiary Account Number</label>
-                    <input type="text" id="beneficiary-account" class="w-full mt-1 p-2 border rounded" placeholder="Your 10-digit account number">
+                    <input type="text" id="beneficiary-account" class="form-input" placeholder="Your 10-digit account number">
                 </div>
                 <div>
                     <label class="block font-semibold">Beneficiary Name</label>
-                    <input type="text" id="beneficiary-name" class="w-full mt-1 p-2 border rounded" placeholder="Your full name as on the account">
+                    <input type="text" id="beneficiary-name" class="form-input" placeholder="Your full name as on the account">
                 </div>
                 <div class="flex justify-end space-x-2 mt-6">
-                    <button id="cancel-account-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
-                    <button id="confirm-submit-btn" class="bg-green-600 text-white px-6 py-2 rounded">Confirm & Submit Report(s)</button>
+                    <button id="cancel-account-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="confirm-submit-btn" class="btn btn-primary">Confirm & Submit Report(s)</button>
                 </div>
             </div>`;
         const accountModal = document.createElement('div');
-        accountModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
-        accountModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto">${accountFormHTML}</div>`;
+        accountModal.className = 'modal-overlay';
+        accountModal.innerHTML = `<div class="modal-content max-w-lg">${accountFormHTML}</div>`;
         document.body.appendChild(accountModal);
 
         document.getElementById('cancel-account-btn').addEventListener('click', () => accountModal.remove());
@@ -1325,7 +1593,7 @@ async function renderStudentDatabase(container, tutor) {
 
         try {
             await batch.commit();
-            // CHANGED: Clear from Firestore instead of localStorage
+            // Clear from Firestore instead of localStorage
             await clearAllReportsFromFirestore(tutor.email);
             showCustomAlert(`Successfully submitted ${reportsArray.length} report(s)!`);
             await renderStudentDatabase(container, tutor);
@@ -1335,34 +1603,24 @@ async function renderStudentDatabase(container, tutor) {
         }
     }
 
-    function showCustomAlert(message) {
-        const alertModal = document.createElement('div');
-        alertModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
-        alertModal.innerHTML = `
-            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
-                <p class="mb-4">${message}</p>
-                <button id="alert-ok-btn" class="bg-green-600 text-white px-6 py-2 rounded float-right">OK</button>
-            </div>`;
-        document.body.appendChild(alertModal);
-        document.getElementById('alert-ok-btn').addEventListener('click', () => alertModal.remove());
-    }
-
     // Function to show confirmation for adding transitioning student
     function showTransitioningConfirmation() {
         const confirmationHTML = `
-            <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-                <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
-                    <h3 class="text-xl font-bold mb-4 text-orange-600">Add Transitioning Student</h3>
-                    <p class="text-sm text-gray-600 mb-4">
-                        <strong>Please confirm:</strong> Transitioning students skip monthly report writing and go directly to fee confirmation. 
-                        They will be marked with orange indicators and their fees will be included in pay advice.
-                    </p>
-                    <p class="text-sm text-orange-600 font-semibold mb-4">
-                        Are you sure you want to add a transitioning student?
-                    </p>
-                    <div class="flex justify-end space-x-2">
-                        <button id="cancel-transitioning-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
-                        <button id="confirm-transitioning-btn" class="bg-green-600 text-white px-6 py-2 rounded">Yes, Add Transitioning</button>
+            <div class="modal-overlay">
+                <div class="modal-content max-w-md">
+                    <div class="modal-header"><h3 class="text-orange-600">Add Transitioning Student</h3></div>
+                    <div class="modal-body">
+                        <p class="text-sm text-gray-600 mb-4">
+                            <strong>Please confirm:</strong> Transitioning students skip monthly report writing and go directly to fee confirmation. 
+                            They will be marked with orange indicators and their fees will be included in pay advice.
+                        </p>
+                        <p class="text-sm text-orange-600 font-semibold mb-4">
+                            Are you sure you want to add a transitioning student?
+                        </p>
+                        <div class="modal-footer">
+                            <button id="cancel-transitioning-btn" class="btn btn-secondary">Cancel</button>
+                            <button id="confirm-transitioning-btn" class="btn btn-primary">Yes, Add Transitioning</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1551,20 +1809,20 @@ async function renderStudentDatabase(container, tutor) {
             });
         });
 
-       document.querySelectorAll('.summer-break-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-        const studentId = btn.getAttribute('data-student-id');
-        const student = students.find(s => s.id === studentId);
-        
-        // Add confirmation dialog
-        if (confirm(`Are you sure you want to put ${student.studentName} on Break?`)) {
-            const studentRef = doc(db, "students", studentId);
-            await updateDoc(studentRef, { summerBreak: true });
-            showCustomAlert(`${student.studentName} has been marked as on Break.`);
-            renderStudentDatabase(container, tutor);
-        }
-    });
-});
+        document.querySelectorAll('.summer-break-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const student = students.find(s => s.id === studentId);
+                
+                // Add confirmation dialog
+                if (confirm(`Are you sure you want to put ${student.studentName} on Break?`)) {
+                    const studentRef = doc(db, "students", studentId);
+                    await updateDoc(studentRef, { summerBreak: true });
+                    showCustomAlert(`${student.studentName} has been marked as on Break.`);
+                    renderStudentDatabase(container, tutor);
+                }
+            });
+        });
 
         const submitAllBtn = document.getElementById('submit-all-reports-btn');
         if (submitAllBtn) {
@@ -1624,71 +1882,83 @@ async function renderStudentDatabase(container, tutor) {
 }
 
 // ##################################################################
-// # SECTION 3: MAIN APP INITIALIZATION
+// # SECTION 3: MAIN APP INITIALIZATION & NAVIGATION
 // ##################################################################
-document.addEventListener('DOMContentLoaded', async () => {
-    onAuthStateChanged(auth, async (user) => {
-        if (user) {
-            const tutorQuery = query(collection(db, "tutors"), where("email", "==", user.email.trim()));
-            const querySnapshot = await getDocs(tutorQuery);
-            if (!querySnapshot.empty) {
-                const tutorDoc = querySnapshot.docs[0];
-                const tutorData = { id: tutorDoc.id, ...tutorDoc.data() };
-                window.tutorData = tutorData;
-                
-                // Show employment date popup if needed
-                if (shouldShowEmploymentPopup(tutorData)) {
-                    showEmploymentDatePopup(tutorData);
-                }
-                
-                // Show TIN popup if needed
-                if (shouldShowTINPopup(tutorData)) {
-                    showTINPopup(tutorData);
-                }
-                
-                renderTutorDashboard(document.getElementById('mainContent'), tutorData);
-            } else {
-                console.error("No matching tutor found.");
-                document.getElementById('mainContent').innerHTML = `<p class="text-red-500">Error: No tutor profile found for your email.</p>`;
+
+// --- Listen for Admin Settings ---
+const settingsDocRef = doc(db, "settings", "global_settings");
+onSnapshot(settingsDocRef, (docSnap) => {
+    if (docSnap.exists()) {
+        const data = docSnap.data();
+        isSubmissionEnabled = data.isReportEnabled;
+        isTutorAddEnabled = data.isTutorAddEnabled;
+        isSummerBreakEnabled = data.isSummerBreakEnabled;
+        isBypassApprovalEnabled = data.bypassPendingApproval;
+        showStudentFees = data.showStudentFees;
+        showEditDeleteButtons = data.showEditDeleteButtons;
+
+        const mainContent = document.getElementById('mainContent');
+        if (mainContent && mainContent.querySelector('#student-list-view')) {
+            renderStudentDatabase(mainContent, window.tutorData);
+        }
+    }
+});
+
+// Auth state listener
+onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+        window.location.href = 'index.html';
+    } else {
+        const tutorQuery = query(collection(db, "tutors"), where("email", "==", user.email));
+        const tutorSnapshot = await getDocs(tutorQuery);
+        
+        if (!tutorSnapshot.empty) {
+            const tutorDoc = tutorSnapshot.docs[0];
+            const tutor = { id: tutorDoc.id, ...tutorDoc.data() };
+            window.tutorData = tutor;
+            renderTutorDashboard(document.getElementById('mainContent'), tutor);
+            
+            // Show popups if needed
+            if (shouldShowEmploymentPopup(tutor)) {
+                showEmploymentDatePopup(tutor);
+            } else if (shouldShowTINPopup(tutor)) {
+                showTINPopup(tutor);
             }
         } else {
-            window.location.href = 'login.html';
+            document.getElementById('mainContent').innerHTML = `<p class="text-red-500">Error: No tutor profile found for your email.</p>`;
         }
-    });
+    }
+});
 
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-        signOut(auth).then(() => {
-            window.location.href = 'tutor-auth.html';
-        }).catch(error => {
-            console.error("Error signing out:", error);
-        });
-    });
-
-    document.getElementById('navDashboard').addEventListener('click', () => {
-        if (window.tutorData) {
-            renderTutorDashboard(document.getElementById('mainContent'), window.tutorData);
-        }
-    });
-
-    document.getElementById('navStudentDatabase').addEventListener('click', () => {
-        if (window.tutorData) {
-            renderStudentDatabase(document.getElementById('mainContent'), window.tutorData);
-        }
-    });
-
-    // ##################################################################
-    // # SECTION 4: AUTO-REGISTERED STUDENTS NAVIGATION (NEW - ADDED AT BOTTOM)
-    // ##################################################################
-    document.getElementById('navAutoStudents').addEventListener('click', () => {
-        if (window.tutorData) {
-            renderAutoRegisteredStudents(document.getElementById('mainContent'), window.tutorData);
-        }
+// Navigation
+document.getElementById('logoutBtn').addEventListener('click', () => {
+    signOut(auth).then(() => {
+        window.location.href = 'index.html';
+    }).catch(error => {
+        console.error("Error signing out:", error);
     });
 });
 
+document.getElementById('navDashboard').addEventListener('click', () => {
+    if (window.tutorData) {
+        renderTutorDashboard(document.getElementById('mainContent'), window.tutorData);
+    }
+});
+
+document.getElementById('navStudentDatabase').addEventListener('click', () => {
+    if (window.tutorData) {
+        renderStudentDatabase(document.getElementById('mainContent'), window.tutorData);
+    }
+});
+
 // ##################################################################
-// # SECTION 5: AUTO-REGISTERED STUDENTS DISPLAY (NEW - ADDED AT BOTTOM)
+// # SECTION 4: AUTO-REGISTERED STUDENTS FUNCTIONALITY
 // ##################################################################
+document.getElementById('navAutoStudents').addEventListener('click', () => {
+    if (window.tutorData) {
+        renderAutoRegisteredStudents(document.getElementById('mainContent'), window.tutorData);
+    }
+});
 
 function renderAutoRegisteredStudents(container, tutor) {
     container.innerHTML = `
@@ -1706,7 +1976,6 @@ function renderAutoRegisteredStudents(container, tutor) {
 
 async function loadAutoRegisteredStudents(tutorEmail) {
     // Query both collections for auto-registered students
-    // CHANGED: Filter out archived students
     const studentsQuery = query(collection(db, "students"), 
         where("tutorEmail", "==", tutorEmail),
         where("autoRegistered", "==", true));
@@ -1769,8 +2038,8 @@ function renderAutoStudentsList(students) {
             "🆕 Awaiting Approval";
             
         const statusClass = student.collection === "students" ? 
-            'bg-blue-100 text-blue-800' : 
-            'bg-yellow-100 text-yellow-800';
+            'badge-info' : 
+            'badge-warning';
         
         html += `
             <tr>
@@ -1780,7 +2049,7 @@ function renderAutoStudentsList(students) {
                     <div class="text-xs text-gray-400">${student.parentEmail || 'No email'}</div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <span class="px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">
+                    <span class="${statusClass}">
                         ${status}
                     </span>
                 </td>
@@ -1788,7 +2057,7 @@ function renderAutoStudentsList(students) {
                     ${student.testSubject || 'General Test'}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap space-x-2">
-                    <button class="complete-student-btn bg-green-600 text-white px-3 py-1 rounded text-sm" 
+                    <button class="complete-student-btn btn btn-primary btn-sm" 
                             data-student-id="${student.id}" data-collection="${student.collection}">
                         Complete Profile
                     </button>
@@ -1812,459 +2081,3 @@ function renderAutoStudentsList(students) {
         });
     });
 }
-
-// ##################################################################
-// # SECTION 6: SUBMISSION ERROR HANDLING WITH IMMEDIATE FEEDBACK
-// ##################################################################
-
-// Function to validate account details before submission
-function validateAccountDetails(accountDetails) {
-    const errors = [];
-    
-    if (!accountDetails.beneficiaryBank || accountDetails.beneficiaryBank.trim() === '') {
-        errors.push("• Beneficiary Bank Name is required");
-    }
-    
-    if (!accountDetails.beneficiaryAccount || accountDetails.beneficiaryAccount.trim() === '') {
-        errors.push("• Beneficiary Account Number is required");
-    } else if (!/^\d{10}$/.test(accountDetails.beneficiaryAccount.trim())) {
-        errors.push("• Account Number must be 10 digits");
-    }
-    
-    if (!accountDetails.beneficiaryName || accountDetails.beneficiaryName.trim() === '') {
-        errors.push("• Beneficiary Name is required");
-    }
-    
-    return errors;
-}
-
-// Function to validate report data
-function validateReportData(reportData) {
-    const errors = [];
-    
-    if (!reportData.studentName || reportData.studentName.trim() === '') {
-        errors.push("• Student Name is required");
-    }
-    
-    if (!reportData.grade || reportData.grade.trim() === '') {
-        errors.push("• Student Grade is required");
-    }
-    
-    if (!reportData.parentName || reportData.parentName.trim() === '') {
-        errors.push("• Parent Name is required");
-    }
-    
-    if (!reportData.parentPhone || reportData.parentPhone.trim() === '') {
-        errors.push("• Parent Phone Number is required");
-    }
-    
-    return errors;
-}
-
-// Function to show submission error popup
-function showSubmissionErrorPopup(errorMessages, onRetryCallback = null) {
-    const errorModalHTML = `
-        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
-                <div class="flex items-center mb-4">
-                    <div class="flex-shrink-0">
-                        <svg class="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                    <h3 class="ml-3 text-lg font-bold text-red-700">Submission Error</h3>
-                </div>
-                
-                <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
-                    <p class="text-sm text-red-700 mb-2">Please fix the following issues:</p>
-                    <ul class="text-sm text-red-600 list-disc pl-5 space-y-1">
-                        ${errorMessages.map(error => `<li>${error}</li>`).join('')}
-                    </ul>
-                </div>
-                
-                <p class="text-sm text-gray-600 mb-4">Once you fix these issues, try submitting again.</p>
-                
-                <div class="flex justify-end space-x-2">
-                    <button id="error-popup-ok-btn" class="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700">OK</button>
-                    ${onRetryCallback ? 
-                        `<button id="error-popup-retry-btn" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Fix & Retry</button>` 
-                        : ''}
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const errorModal = document.createElement('div');
-    errorModal.innerHTML = errorModalHTML;
-    document.body.appendChild(errorModal);
-    
-    // Focus on the OK button by default
-    const okBtn = document.getElementById('error-popup-ok-btn');
-    if (okBtn) okBtn.focus();
-    
-    document.getElementById('error-popup-ok-btn').addEventListener('click', () => {
-        errorModal.remove();
-    });
-    
-    if (onRetryCallback) {
-        document.getElementById('error-popup-retry-btn').addEventListener('click', () => {
-            errorModal.remove();
-            onRetryCallback();
-        });
-    }
-    
-    // Close on escape key
-    errorModal.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            errorModal.remove();
-        }
-    });
-}
-
-// Function to show submission success popup
-function showSubmissionSuccessPopup(message) {
-    const successModalHTML = `
-        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
-                <div class="flex items-center mb-4">
-                    <div class="flex-shrink-0">
-                        <svg class="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                        </svg>
-                    </div>
-                    <h3 class="ml-3 text-lg font-bold text-green-700">Success!</h3>
-                </div>
-                
-                <p class="text-gray-700 mb-6">${message}</p>
-                
-                <div class="flex justify-end">
-                    <button id="success-popup-ok-btn" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">OK</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const successModal = document.createElement('div');
-    successModal.innerHTML = successModalHTML;
-    document.body.appendChild(successModal);
-    
-    document.getElementById('success-popup-ok-btn').addEventListener('click', () => {
-        successModal.remove();
-    });
-    
-    // Auto-close after 5 seconds
-    setTimeout(() => {
-        if (document.body.contains(successModal)) {
-            successModal.remove();
-        }
-    }, 5000);
-}
-
-// Override the existing account details modal submission to add validation
-const originalAccountDetailsModal = window.showAccountDetailsModal;
-
-window.showAccountDetailsModal = function(reportsArray) {
-    // First validate all reports
-    const reportErrors = [];
-    reportsArray.forEach((report, index) => {
-        const errors = validateReportData(report);
-        if (errors.length > 0) {
-            reportErrors.push({
-                student: report.studentName,
-                errors: errors
-            });
-        }
-    });
-    
-    if (reportErrors.length > 0) {
-        const errorMessages = [];
-        reportErrors.forEach(reportError => {
-            errorMessages.push(`<strong>${reportError.student}:</strong>`);
-            reportError.errors.forEach(error => errorMessages.push(error));
-        });
-        showSubmissionErrorPopup(errorMessages);
-        return;
-    }
-    
-    const accountFormHTML = `
-        <h3 class="text-xl font-bold mb-4">Enter Your Payment Details</h3>
-        <p class="text-sm text-gray-600 mb-4">Please provide your bank details for payment processing. This is required before final submission.</p>
-        <div class="space-y-4">
-            <div>
-                <label class="block font-semibold">Beneficiary Bank Name</label>
-                <input type="text" id="beneficiary-bank" class="w-full mt-1 p-2 border rounded" placeholder="e.g., Zenith Bank">
-            </div>
-            <div>
-                <label class="block font-semibold">Beneficiary Account Number</label>
-                <input type="text" id="beneficiary-account" class="w-full mt-1 p-2 border rounded" placeholder="Your 10-digit account number">
-            </div>
-            <div>
-                <label class="block font-semibold">Beneficiary Name</label>
-                <input type="text" id="beneficiary-name" class="w-full mt-1 p-2 border rounded" placeholder="Your full name as on the account">
-            </div>
-            <div class="flex justify-end space-x-2 mt-6">
-                <button id="cancel-account-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
-                <button id="confirm-submit-btn" class="bg-green-600 text-white px-6 py-2 rounded">Confirm & Submit Report(s)</button>
-            </div>
-        </div>`;
-    
-    const accountModal = document.createElement('div');
-    accountModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
-    accountModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto">${accountFormHTML}</div>`;
-    document.body.appendChild(accountModal);
-    
-    // Add validation indicators
-    const bankInput = document.getElementById('beneficiary-bank');
-    const accountInput = document.getElementById('beneficiary-account');
-    const nameInput = document.getElementById('beneficiary-name');
-    
-    function validateInput(input, isValid) {
-        if (isValid) {
-            input.classList.remove('border-red-500');
-            input.classList.add('border-green-500');
-        } else {
-            input.classList.remove('border-green-500');
-            input.classList.add('border-red-500');
-        }
-    }
-    
-    bankInput.addEventListener('input', () => {
-        validateInput(bankInput, bankInput.value.trim() !== '');
-    });
-    
-    accountInput.addEventListener('input', () => {
-        const isValid = /^\d{10}$/.test(accountInput.value.trim());
-        validateInput(accountInput, isValid);
-    });
-    
-    nameInput.addEventListener('input', () => {
-        validateInput(nameInput, nameInput.value.trim() !== '');
-    });
-    
-    document.getElementById('cancel-account-btn').addEventListener('click', () => accountModal.remove());
-    
-    document.getElementById('confirm-submit-btn').addEventListener('click', async () => {
-        const accountDetails = {
-            beneficiaryBank: bankInput.value.trim(),
-            beneficiaryAccount: accountInput.value.trim(),
-            beneficiaryName: nameInput.value.trim(),
-        };
-        
-        // Validate account details
-        const validationErrors = validateAccountDetails(accountDetails);
-        
-        if (validationErrors.length > 0) {
-            showSubmissionErrorPopup(validationErrors, () => {
-                // Retry callback - reopen the modal
-                window.showAccountDetailsModal(reportsArray);
-            });
-            accountModal.remove();
-            return;
-        }
-        
-        accountModal.remove();
-        
-        // Show processing indicator
-        const processingHTML = `
-            <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-                <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
-                    <div class="flex flex-col items-center">
-                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
-                        <h3 class="text-lg font-bold text-gray-700">Submitting Reports...</h3>
-                        <p class="text-sm text-gray-600 mt-2">Please wait while we submit your reports.</p>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        const processingModal = document.createElement('div');
-        processingModal.innerHTML = processingHTML;
-        document.body.appendChild(processingModal);
-        
-        try {
-            await submitAllReports(reportsArray, accountDetails);
-            processingModal.remove();
-            showSubmissionSuccessPopup(`Successfully submitted ${reportsArray.length} report(s)!`);
-        } catch (error) {
-            processingModal.remove();
-            showSubmissionErrorPopup([`Submission failed: ${error.message}`]);
-        }
-    });
-};
-
-// Also override the single student submission to add validation
-const originalShowReportModal = window.showReportModal;
-
-window.showReportModal = function(student) {
-    // Keep your existing logic for transitioning students
-    if (student.isTransitioning) {
-        const currentMonthYear = getCurrentMonthYear();
-        const reportData = {
-            studentId: student.id, 
-            studentName: student.studentName, 
-            grade: student.grade,
-            parentName: student.parentName, 
-            parentPhone: student.parentPhone,
-            normalizedParentPhone: normalizePhoneNumber(student.parentPhone), // ADDED: Normalized phone
-            reportMonth: currentMonthYear,
-            introduction: "Transitioning student - no monthly report required.",
-            topics: "Transitioning student - no monthly report required.",
-            progress: "Transitioning student - no monthly report required.",
-            strengthsWeaknesses: "Transitioning student - no monthly report required.",
-            recommendations: "Transitioning student - no monthly report required.",
-            generalComments: "Transitioning student - no monthly report required.",
-            isTransitioning: true
-        };
-        
-        showFeeConfirmationModal(student, reportData);
-        return;
-    }
-    
-    // Rest of your existing code with validation added
-    const existingReport = savedReports[student.id] || {};
-    const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
-    const currentMonthYear = getCurrentMonthYear();
-    
-    const reportFormHTML = `
-        <h3 class="text-xl font-bold mb-4">Monthly Report for ${student.studentName}</h3>
-        <div class="bg-blue-50 p-3 rounded-lg mb-4">
-            <p class="text-sm font-semibold text-blue-800">Month: ${currentMonthYear}</p>
-            <p class="text-xs text-blue-600 mt-1">All fields are required for submission</p>
-        </div>
-        <div class="space-y-4">
-            <div>
-                <label class="block font-semibold">Introduction</label>
-                <textarea id="report-intro" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter introduction...">${existingReport.introduction || ''}</textarea>
-            </div>
-            <div>
-                <label class="block font-semibold">Topics & Remarks</label>
-                <textarea id="report-topics" class="w-full mt-1 p-2 border rounded required-field" rows="3" placeholder="Enter topics and remarks...">${existingReport.topics || ''}</textarea>
-            </div>
-            <div>
-                <label class="block font-semibold">Progress & Achievements</label>
-                <textarea id="report-progress" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter progress and achievements...">${existingReport.progress || ''}</textarea>
-            </div>
-            <div>
-                <label class="block font-semibold">Strengths & Weaknesses</label>
-                <textarea id="report-sw" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter strengths and weaknesses...">${existingReport.strengthsWeaknesses || ''}</textarea>
-            </div>
-            <div>
-                <label class="block font-semibold">Recommendations</label>
-                <textarea id="report-recs" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter recommendations...">${existingReport.recommendations || ''}</textarea>
-            </div>
-            <div>
-                <label class="block font-semibold">General Comments</label>
-                <textarea id="report-general" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter general comments...">${existingReport.generalComments || ''}</textarea>
-            </div>
-            <div class="flex justify-end space-x-2">
-                <button id="cancel-report-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
-                <button id="modal-action-btn" class="bg-green-600 text-white px-6 py-2 rounded">${isSingleApprovedStudent ? 'Proceed to Submit' : 'Save Report'}</button>
-            </div>
-        </div>`;
-    
-    const reportModal = document.createElement('div');
-    reportModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
-    reportModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl mx-auto">${reportFormHTML}</div>`;
-    document.body.appendChild(reportModal);
-    
-    // Add real-time validation
-    const textareas = reportModal.querySelectorAll('.required-field');
-    textareas.forEach(textarea => {
-        textarea.addEventListener('input', function() {
-            if (this.value.trim() === '') {
-                this.classList.add('border-red-300');
-                this.classList.remove('border-green-300');
-            } else {
-                this.classList.remove('border-red-300');
-                this.classList.add('border-green-300');
-            }
-        });
-    });
-    
-    document.getElementById('cancel-report-btn').addEventListener('click', () => reportModal.remove());
-    
-    document.getElementById('modal-action-btn').addEventListener('click', async () => {
-        // Validate all fields
-        const requiredFields = ['report-intro', 'report-topics', 'report-progress', 'report-sw', 'report-recs', 'report-general'];
-        const missingFields = [];
-        const fieldLabels = {
-            'report-intro': 'Introduction',
-            'report-topics': 'Topics & Remarks',
-            'report-progress': 'Progress & Achievements',
-            'report-sw': 'Strengths & Weaknesses',
-            'report-recs': 'Recommendations',
-            'report-general': 'General Comments'
-        };
-        
-        requiredFields.forEach(fieldId => {
-            const field = document.getElementById(fieldId);
-            if (!field.value.trim()) {
-                missingFields.push(fieldLabels[fieldId]);
-            }
-        });
-        
-        if (missingFields.length > 0) {
-            showSubmissionErrorPopup([
-                "Please complete all report fields:",
-                ...missingFields.map(field => `• ${field}`)
-            ]);
-            return;
-        }
-        
-        const reportData = {
-            studentId: student.id, 
-            studentName: student.studentName, 
-            grade: student.grade,
-            parentName: student.parentName, 
-            parentPhone: student.parentPhone,
-            normalizedParentPhone: normalizePhoneNumber(student.parentPhone), // ADDED: Normalized phone
-            reportMonth: currentMonthYear,
-            introduction: document.getElementById('report-intro').value,
-            topics: document.getElementById('report-topics').value,
-            progress: document.getElementById('report-progress').value,
-            strengthsWeaknesses: document.getElementById('report-sw').value,
-            recommendations: document.getElementById('report-recs').value,
-            generalComments: document.getElementById('report-general').value
-        };
-        
-        reportModal.remove();
-        showFeeConfirmationModal(student, reportData);
-    });
-};
-
-// Global error handler for any submission failures
-window.addEventListener('unhandledrejection', (event) => {
-    if (event.reason && event.reason.message && event.reason.message.includes('Firebase')) {
-        console.error('Submission error:', event.reason);
-        showSubmissionErrorPopup([
-            "A network error occurred during submission.",
-            "Please check your internet connection and try again.",
-            "Error details: " + event.reason.message
-        ]);
-    }
-});
-
-// Add CSS for validation styling
-const validationStyles = document.createElement('style');
-validationStyles.textContent = `
-    .border-red-300 {
-        border-color: #fca5a5 !important;
-    }
-    .border-green-300 {
-        border-color: #86efac !important;
-    }
-    .border-red-500 {
-        border-color: #ef4444 !important;
-    }
-    .border-green-500 {
-        border-color: #22c55e !important;
-    }
-    .animate-spin {
-        animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-    }
-`;
-document.head.appendChild(validationStyles);
