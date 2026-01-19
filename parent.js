@@ -2426,87 +2426,179 @@ function determineReportType(collectionName, data) {
 }
 
 // ============================================================================
-// SECTION 13: REAL-TIME MONITORING WITHOUT COMPLEX QUERIES
+// SECTION 13: COMPREHENSIVE SEARCH & DISTRIBUTION SYSTEM
 // ============================================================================
 
-function setupRealTimeMonitoring(parentPhone, userId) {
-    // Clear any existing listeners
-    cleanupRealTimeListeners();
+/**
+ * The Master Search Function
+ * Finds reports across ALL collections and ensures they are assigned to students
+ */
+async function searchAllReportsForParent(parentPhone, parentEmail, parentUid) {
+    console.log("🔍 ULTIMATE Search Started for:", { parentPhone, parentEmail, parentUid });
     
-    // Normalize phone
-    const normalizedPhone = normalizePhoneNumber(parentPhone);
-    if (!normalizedPhone.valid) {
-        return;
-    }
-    
-    // Monitor monthly reports
-    const monthlyListener = db.collection("tutor_submissions")
-        .where("parentPhone", "==", normalizedPhone.normalized)
-        .onSnapshot((snapshot) => {
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === "added") {
-                    console.log("🆕 NEW MONTHLY REPORT DETECTED!");
-                    showNewReportNotification('monthly');
-                }
-            });
-        }, (error) => {
-            console.error("Monthly reports listener error:", error);
-        });
-    realTimeListeners.push(monthlyListener);
-    
-    // Monitor assessment reports
-    const assessmentListener = db.collection("student_results")
-        .where("parentPhone", "==", normalizedPhone.normalized)
-        .onSnapshot((snapshot) => {
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === "added") {
-                    console.log("🆕 NEW ASSESSMENT REPORT DETECTED!");
-        showNewReportNotification('assessment');
-        loadAllReportsForParent(parentPhone, userId, true); // 
-                }
-            });
-        }, (error) => {
-            console.error("Assessment reports listener error:", error);
-        });
-    realTimeListeners.push(assessmentListener);
-    
-    // Monitor academics periodically
-    setInterval(() => {
-        checkForNewAcademics();
-    }, 30000);
-}
+    const searchStats = { 
+        queriesGenerated: 0, 
+        collectionsScanned: 0, 
+        reportsFound: 0 
+    };
 
-function cleanupRealTimeListeners() {
-    realTimeListeners.forEach(unsubscribe => {
-        if (typeof unsubscribe === 'function') {
-            unsubscribe();
+    // Generate phone variations for aggressive searching
+    const phoneVariations = (function(phone) {
+        if (!phone) return [];
+        const clean = phone.replace(/\D/g, ''); 
+        const basics = [phone, clean, `+${clean}`];
+        if (clean.startsWith('234')) {
+            basics.push('0' + clean.substring(3)); 
+            basics.push(clean.substring(3)); 
+        }
+        return [...new Set(basics)];
+    })(parentPhone);
+
+    const searchTerms = [...phoneVariations, parentEmail, parentUid].filter(Boolean);
+    searchStats.queriesGenerated = searchTerms.length;
+
+    const collections = [
+        'student_results', 'tutor_submissions', 'monthly_reports', 
+        'assessment_reports', 'progress_reports', 'academic_reports',
+        'learning_reports', 'reports', 'submissions', 'evaluations', 'assessments'
+    ];
+    searchStats.collectionsScanned = collections.length;
+
+    const searchFields = [
+        'parentPhone', 'phone', 'phoneNumber', 'guardianPhone', 
+        'parentEmail', 'email', 'parent_email', 
+        'parentUid', 'userId', 'uid', 'submittedBy'
+    ];
+
+    let allFoundReports = [];
+
+    // Use Promise.all to fetch everything in parallel but AWAIT it to fix the race condition
+    const searchPromises = collections.map(async (collectionName) => {
+        try {
+            const snapshot = await db.collection(collectionName)
+                .orderBy('timestamp', 'desc')
+                .limit(100)
+                .get();
+
+            if (snapshot.empty) return;
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                let match = false;
+
+                for (const field of searchFields) {
+                    if (data[field] && searchTerms.includes(String(data[field]))) {
+                        match = true;
+                        break;
+                    }
+                }
+
+                if (!match && parentPhone) {
+                    const docPhone = data.parentPhone || data.phone || data.guardianPhone;
+                    if (docPhone && normalizePhoneNumber(docPhone) === normalizePhoneNumber(parentPhone)) {
+                        match = true;
+                    }
+                }
+
+                if (match) {
+                    allFoundReports.push({
+                        id: doc.id,
+                        sourceCollection: collectionName,
+                        ...data,
+                        timestamp: data.timestamp || (data.date ? new Date(data.date).getTime() / 1000 : Date.now() / 1000)
+                    });
+                }
+            });
+        } catch (err) {
+            console.warn(`⚠️ Collection ${collectionName} skip:`, err.message);
         }
     });
-    realTimeListeners = [];
+
+    await Promise.all(searchPromises);
+
+    // Deduplicate
+    const uniqueReports = Array.from(new Set(allFoundReports.map(a => a.id)))
+        .map(id => allFoundReports.find(a => a.id === id));
+
+    console.log(`✅ Found ${uniqueReports.length} total reports.`);
+
+    // Map to students
+    const { assessmentResults, monthlyResults } = distributeReportsToStudents(uniqueReports);
+
+    return { assessmentResults, monthlyResults, searchStats };
 }
 
-function showNewReportNotification(type) {
-    const reportType = type === 'assessment' ? 'Assessment Report' : 
-                      type === 'monthly' ? 'Monthly Report' : 'New Update';
-    
-    showMessage(`New ${reportType} available!`, 'success');
-    
-    // Add a visual indicator in the UI
-    const existingIndicator = document.getElementById('newReportIndicator');
-    if (existingIndicator) {
-        existingIndicator.remove();
-    }
-    
-    const indicator = document.createElement('div');
-    indicator.id = 'newReportIndicator';
-    indicator.className = 'fixed top-20 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-40 animate-pulse fade-in';
-    indicator.innerHTML = `📄 New ${safeText(reportType)} Available!`;
-    document.body.appendChild(indicator);
-    
-    // Remove after 5 seconds
-    setTimeout(() => {
-        indicator.remove();
-    }, 5000);
+/**
+ * Links raw reports to specific children using Fuzzy Matching
+ */
+function distributeReportsToStudents(reports) {
+    const assessmentResults = [];
+    const monthlyResults = [];
+    const knownChildren = window.userChildren || []; 
+
+    reports.forEach(report => {
+        const isMonthly = report.type === 'monthly' || 
+                         report.reportType === 'monthly' || 
+                         report.sourceCollection.includes('monthly') ||
+                         report.sourceCollection.includes('tutor_submissions');
+
+        let assignedName = null;
+        const reportStudentName = report.studentName || report.name || report.childName;
+
+        if (reportStudentName) {
+            const lowerReportName = reportStudentName.toLowerCase().trim();
+            
+            // 1. Exact/Case-Insensitive Match
+            assignedName = knownChildren.find(child => child.toLowerCase().trim() === lowerReportName);
+            
+            // 2. Fuzzy Match
+            if (!assignedName) {
+                assignedName = knownChildren.find(child => 
+                    lowerReportName.includes(child.toLowerCase().trim()) || 
+                    child.toLowerCase().trim().includes(lowerReportName)
+                );
+            }
+        }
+
+        // 3. Fallback to first child if only one exists
+        if (!assignedName && knownChildren.length === 1) {
+            assignedName = knownChildren[0];
+        }
+
+        // 4. Create new category if totally unassigned
+        if (!assignedName) {
+            assignedName = reportStudentName ? capitalize(reportStudentName) : "Unassigned Student";
+            if (!knownChildren.includes(assignedName)) {
+                knownChildren.push(assignedName);
+                window.userChildren = knownChildren;
+            }
+        }
+
+        report.assignedStudentName = assignedName;
+
+        if (isMonthly) {
+            monthlyResults.push(report);
+        } else {
+            assessmentResults.push(report);
+        }
+    });
+
+    return { assessmentResults, monthlyResults };
+}
+
+// Internal Dependencies for Section 13
+function normalizePhoneNumber(phone) {
+    if (!phone) return "";
+    return String(phone).replace(/\D/g, "").replace(/^0/, "234");
+}
+
+function capitalize(str) {
+    if (!str) return "";
+    return str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+}
+
+function safeText(text, fallback = "N/A") {
+    return text && String(text).trim() !== "" ? text : fallback;
 }
 
 // ============================================================================
