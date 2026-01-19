@@ -2461,7 +2461,8 @@ function setupRealTimeMonitoring(parentPhone, userId) {
             snapshot.docChanges().forEach((change) => {
                 if (change.type === "added") {
                     console.log("🆕 NEW ASSESSMENT REPORT DETECTED!");
-                    showNewReportNotification('assessment');
+        showNewReportNotification('assessment');
+        loadAllReportsForParent(parentPhone, userId, true); // 
                 }
             });
         }, (error) => {
