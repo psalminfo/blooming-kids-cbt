@@ -1645,226 +1645,386 @@ function addLogoutButton() {
 
 // ============================================================================
 // SECTION 12: ULTIMATE REPORT SEARCH - GUARANTEED TO FIND ALL REPORTS
-// (Architecturally aligned with parent.js constraints)
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-// 1. REPORT SEARCH METHODS (STRICT ARCHITECTURE)
-// ----------------------------------------------------------------------------
+// NEW FUNCTION: Generate all possible phone formats for searching
+function generateAllPhoneFormatsForSearch(phone) {
+    const formats = new Set();
+    
+    if (!phone) return Array.from(formats);
+    
+    // Get the normalized version first
+    const normalized = normalizePhoneNumber(phone);
+    if (normalized.valid) {
+        formats.add(normalized.normalized);
+    }
+    
+    // Add the original
+    formats.add(phone);
+    
+    // Add common formatted versions
+    const digitsOnly = phone.replace(/\D/g, '');
+    
+    if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
+        // US/Canada format: +1 (XXX) XXX-XXXX
+        const formatted1 = `+1 (${digitsOnly.substring(1, 4)}) ${digitsOnly.substring(4, 7)}-${digitsOnly.substring(7)}`;
+        formats.add(formatted1);
+        
+        // Another common format: +1-XXX-XXX-XXXX
+        const formatted2 = `+1-${digitsOnly.substring(1, 4)}-${digitsOnly.substring(4, 7)}-${digitsOnly.substring(7)}`;
+        formats.add(formatted2);
+    }
+    
+    // Also add with spaces: +1 XXX XXX XXXX
+    if (digitsOnly.length >= 10) {
+        const withSpaces = `+${digitsOnly.substring(0, 1)} ${digitsOnly.substring(1, 4)} ${digitsOnly.substring(4, 7)} ${digitsOnly.substring(7)}`;
+        formats.add(withSpaces);
+    }
+    
+    return Array.from(formats);
+}
 
-/**
- * ULTIMATE Search for Parent Reports - Architected for 100% Coverage
- * Strictly follows parent.js collection/field constraints
- */
+
 async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUid = '') {
     console.log("🔍 ULTIMATE Search for:", { parentPhone, parentEmail, parentUid });
     
-    let allAssessmentResults = [];
-    let allMonthlyResults = [];
+    let allResults = [];
     let foundSources = new Set();
     
     try {
-        // STRICT: Use only the 4 target collections
-        const targetCollections = [
-            'student_results',
-            'tutor_submissions', 
-            'students',
-            'pending_students'
+        // Get ALL possible identifiers for this parent
+        const searchQueries = await generateAllSearchQueries(parentPhone, parentEmail, parentUid);
+        
+        console.log("🔎 Generated search queries:", searchQueries.length);
+        
+        // Search in ALL possible collections
+        const collectionsToSearch = [
+            'tutor_submissions',
+            'student_results', 
+            'monthly_reports',
+            'assessment_reports',
+            'progress_reports',
+            'reports',
+            'student_reports',
+            'parent_reports',
+            'academic_reports',
+            'session_reports',
+            'performance_reports'
         ];
         
-        // STRICT: Use only the 3 priority fields
-        const priorityFields = [
-            'normalizedParentPhone',  // Primary Key
-            'parentPhone',            // Fallback Key
-            'parentEmail'             // Secondary Fallback
-        ];
-        
-        // Generate all phone variations (MAINTAIN EXISTING LOGIC)
-        const allPhoneVersions = generateAllPhoneVariationsForStrictSearch(parentPhone);
-        
-        // PARALLEL SEARCH across all collections and fields
+        // PARALLEL SEARCH: Search all collections with all queries
         const searchPromises = [];
         
-        for (const collectionName of targetCollections) {
-            for (const field of priorityFields) {
-                // Skip email field for phone-only variations
-                if (field === 'parentEmail' && !parentEmail) continue;
-                
-                // Get appropriate values for this field
-                const searchValues = field === 'parentEmail' 
-                    ? [parentEmail.toLowerCase(), parentEmail.toUpperCase(), parentEmail]
-                    : allPhoneVersions;
-                
-                for (const value of searchValues) {
-                    if (!value || value.trim() === '') continue;
-                    
-                    searchPromises.push(
-                        searchInCollectionStrict(collectionName, field, value).then(results => {
-                            if (results.length > 0) {
-                                console.log(`✅ Found ${results.length} reports in ${collectionName} with ${field}=${value}`);
-                                foundSources.add(`${collectionName}:${field}`);
-                                
-                                // CLASSIFY reports according to parent.js logic
-                                results.forEach(result => {
-                                    if (collectionName === 'student_results') {
-                                        allAssessmentResults.push({
-                                            ...result,
-                                            type: 'assessment',
-                                            timestamp: result.submittedAt?.seconds || Date.now() / 1000
-                                        });
-                                    } else if (collectionName === 'tutor_submissions') {
-                                        allMonthlyResults.push({
-                                            ...result,
-                                            type: 'monthly',
-                                            timestamp: result.submittedAt?.seconds || Date.now() / 1000
-                                        });
-                                    }
-                                    // students and pending_students are for parent info only
-                                });
-                            }
-                            return results;
-                        }).catch(error => {
-                            // Collection/field might not exist - that's OK
-                            if (error.code !== 'failed-precondition' && error.code !== 'invalid-argument') {
-                                console.warn(`Search error in ${collectionName} for ${field}=${value}:`, error.message);
-                            }
-                            return [];
-                        })
-                    );
-                }
+        for (const collectionName of collectionsToSearch) {
+            for (const query of searchQueries) {
+                searchPromises.push(
+                    searchInCollection(collectionName, query).then(results => {
+                        if (results.length > 0) {
+                            console.log(`✅ Found ${results.length} reports in ${collectionName} with ${query.field}=${query.value}`);
+                            foundSources.add(`${collectionName}:${query.field}`);
+                        }
+                        return results;
+                    }).catch(error => {
+                        // Collection might not exist - that's OK
+                        return [];
+                    })
+                );
             }
         }
         
         // Wait for all searches to complete
-        await Promise.all(searchPromises);
+        const allResultsArrays = await Promise.all(searchPromises);
         
-        console.log("🎯 Search Complete:", {
-            assessments: allAssessmentResults.length,
-            monthly: allMonthlyResults.length,
-            sources: Array.from(foundSources)
-        });
+        // Combine all results
+        allResults = allResultsArrays.flat();
         
-        // If NO reports found, use parent.js fallback strategy
-        if (allAssessmentResults.length === 0 && allMonthlyResults.length === 0) {
-            console.warn("⚠️ No reports found with strict search. Using parent.js fallback...");
-            const fallbackResults = await performParentJsFallbackSearch(parentPhone, parentEmail);
-            allAssessmentResults = fallbackResults.assessmentResults;
-            allMonthlyResults = fallbackResults.monthlyResults;
+        console.log("🎯 TOTAL RAW REPORTS FOUND:", allResults.length);
+        console.log("📊 Sources found:", Array.from(foundSources));
+        
+        // If NO reports found, try emergency search
+        if (allResults.length === 0) {
+            console.warn("⚠️ No reports found with standard search. Starting EMERGENCY SEARCH...");
+            const emergencyResults = await emergencyReportSearch(parentPhone, parentEmail);
+            allResults = emergencyResults;
         }
         
-        // Remove duplicates (MAINTAIN EXISTING parent.js DEDUPLICATION LOGIC)
-        const uniqueAssessments = deduplicateReports(allAssessmentResults, 'assessment');
-        const uniqueMonthly = deduplicateReports(allMonthlyResults, 'monthly');
+        // Remove duplicates based on document ID and timestamp
+        const uniqueResults = [];
+        const seenIds = new Set();
         
-        // DISTRIBUTE reports to correct students (MERGE LOGIC)
-        const distributedResults = distributeReportsToStudentsStrict(
-            uniqueAssessments, 
-            uniqueMonthly
-        );
+        allResults.forEach(result => {
+            const uniqueKey = `${result.collection}_${result.id}`;
+            if (!seenIds.has(uniqueKey)) {
+                seenIds.add(uniqueKey);
+                uniqueResults.push(result);
+            }
+        });
         
-        return {
-            assessmentResults: distributedResults.assessments,
-            monthlyResults: distributedResults.monthly,
+        console.log("🎯 UNIQUE REPORTS AFTER DEDUPLICATION:", uniqueResults.length);
+        
+        // Now distribute reports to correct students
+        const { assessmentResults, monthlyResults } = distributeReportsToStudents(uniqueResults);
+        
+        return { 
+            assessmentResults, 
+            monthlyResults, 
+            allRawResults: uniqueResults, // Keep for debugging
             searchStats: {
-                totalFound: uniqueAssessments.length + uniqueMonthly.length,
-                assessmentsFound: uniqueAssessments.length,
-                monthlyFound: uniqueMonthly.length,
+                totalFound: uniqueResults.length,
+                rawFound: allResults.length,
                 sources: Array.from(foundSources),
-                usedFallback: allAssessmentResults.length === 0 && allMonthlyResults.length === 0
+                collectionsSearched: collectionsToSearch.length
             }
         };
         
     } catch (error) {
         console.error("❌ Ultimate search error:", error);
-        
-        // ERROR HANDLING: MERGE parent.js and new error handling
-        const errorMessage = `Search failed: ${error.message}. `;
-        
-        // Try parent.js simple search as last resort
-        try {
-            console.log("🔄 Attempting parent.js simple search as fallback...");
-            const simpleResults = await performMultiLayerSearch(parentPhone, parentEmail, parentUid);
-            return simpleResults;
-        } catch (fallbackError) {
-            console.error("❌ All search methods failed:", fallbackError);
-            return { 
-                assessmentResults: [], 
-                monthlyResults: [], 
-                searchStats: { 
-                    error: errorMessage + "All fallbacks failed.",
-                    emergencyMode: true 
-                }
-            };
-        }
+        return { assessmentResults: [], monthlyResults: [], searchStats: { error: error.message }};
     }
 }
 
-/**
- * Generate phone variations for strict search
- * MAINTAINS EXISTING parent.js phone matching logic
- */
-function generateAllPhoneVariationsForStrictSearch(phone) {
-    const variations = new Set();
+// NEW FUNCTION: Distribute reports to correct students
+function distributeReportsToStudents(allReports) {
+    console.log("📊 Distributing reports to students...");
     
-    if (!phone || typeof phone !== 'string') return [];
+    const assessmentResults = [];
+    const monthlyResults = [];
     
-    // 1. Use parent.js multiNormalizePhoneNumber function
-    const normalizedVersions = multiNormalizePhoneNumber(phone);
-    const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
+    // Get current student mapping
+    const studentNames = Array.from(studentIdMap.keys());
+    console.log("👥 Available students for distribution:", studentNames);
     
-    // Add all valid normalized versions
-    validVersions.forEach(v => {
-        variations.add(v.normalized);
+    allReports.forEach(report => {
+        // Try to determine which student this report belongs to
+        const assignedStudent = findStudentForReport(report);
+        
+        if (assignedStudent) {
+            // Add student info to the report for proper grouping
+            report.assignedStudentName = assignedStudent;
+            report.assignedStudentId = studentIdMap.get(assignedStudent);
+            
+            // Classify as assessment or monthly
+            if (report.type === 'assessment' || 
+                report.collection.includes('assessment') || 
+                report.collection.includes('progress') ||
+                (report.reportType && report.reportType.toLowerCase().includes('assessment'))) {
+                assessmentResults.push(report);
+            } else if (report.type === 'monthly' || 
+                       report.collection.includes('monthly') ||
+                       report.collection.includes('submission') ||
+                       (report.reportType && report.reportType.toLowerCase().includes('monthly'))) {
+                monthlyResults.push(report);
+            }
+        } else {
+            console.warn("⚠️ Could not assign report to any student:", {
+                reportId: report.id,
+                collection: report.collection,
+                studentId: report.studentId,
+                studentName: report.studentName
+            });
+        }
     });
     
-    // 2. Add original phone
-    variations.add(phone.trim());
+    console.log(`📊 Distribution complete: ${assessmentResults.length} assessments, ${monthlyResults.length} monthly reports`);
     
-    // 3. Add basic cleaned version (parent.js logic)
-    const basicCleaned = phone.replace(/[^\d+]/g, '');
-    variations.add(basicCleaned);
-    
-    // 4. Add common formatted versions (from parent.js patterns)
-    if (basicCleaned.length === 10 || (basicCleaned.length === 11 && basicCleaned.startsWith('1'))) {
-        // US/Canada patterns from parent.js
-        if (basicCleaned.match(/^(1)?(469|214|972|713|281|832|210|817)/)) {
-            const usNumber = '+1' + basicCleaned.replace(/^1/, '');
-            variations.add(usNumber);
-            variations.add(usNumber.replace('+1', '1'));
-        }
-        
-        // UK patterns from parent.js
-        if (basicCleaned.match(/^(44)?(20|7|1|2|3|8|9)/)) {
-            const ukNumber = '+44' + basicCleaned.replace(/^44/, '');
-            variations.add(ukNumber);
-        }
-        
-        // Nigeria patterns from parent.js
-        if (basicCleaned.match(/^(234)?(80|70|81|90|91)/)) {
-            const ngNumber = '+234' + basicCleaned.replace(/^234/, '');
-            variations.add(ngNumber);
-        }
-    }
-    
-    // 5. Add digits-only fallback (parent.js logic)
-    const digitsOnly = phone.replace(/\D/g, '');
-    if (digitsOnly.length >= 8 && digitsOnly.length <= 15) {
-        variations.add(digitsOnly);
-    }
-    
-    // Filter and return
-    return Array.from(variations)
-        .filter(v => v && v.length >= 7 && v.length <= 20)
-        .filter((v, i, arr) => arr.indexOf(v) === i);
+    return { assessmentResults, monthlyResults };
 }
 
-/**
- * Strict collection search - follows parent.js field priorities
- */
-async function searchInCollectionStrict(collectionName, field, value) {
+// NEW FUNCTION: Find which student a report belongs to
+function findStudentForReport(report) {
+    // Method 1: Match by studentId
+    if (report.studentId) {
+        // Check if this studentId exists in our studentIdMap (value = studentId, key = studentName)
+        for (const [studentName, studentId] of studentIdMap.entries()) {
+            if (studentId === report.studentId) {
+                return studentName;
+            }
+        }
+        
+        // Also check if report.studentId matches any of our student IDs directly
+        if (Array.from(studentIdMap.values()).includes(report.studentId)) {
+            // Find the student name for this ID
+            for (const [studentName, studentId] of studentIdMap.entries()) {
+                if (studentId === report.studentId) {
+                    return studentName;
+                }
+            }
+        }
+    }
+    
+    // Method 2: Match by studentName (exact match)
+    if (report.studentName) {
+        const reportStudentName = safeText(report.studentName);
+        
+        // Check exact match
+        for (const studentName of userChildren) {
+            if (safeText(studentName) === reportStudentName) {
+                return studentName;
+            }
+        }
+        
+        // Check partial match (case-insensitive)
+        for (const studentName of userChildren) {
+            if (studentName.toLowerCase().includes(reportStudentName.toLowerCase()) ||
+                reportStudentName.toLowerCase().includes(studentName.toLowerCase())) {
+                return studentName;
+            }
+        }
+    }
+    
+    // Method 3: Match by student field (alternative field name)
+    if (report.student) {
+        const reportStudent = safeText(report.student);
+        
+        for (const studentName of userChildren) {
+            if (safeText(studentName) === reportStudent) {
+                return studentName;
+            }
+        }
+    }
+    
+    // Method 4: If parent has only one child, assign to that child
+    if (userChildren.length === 1) {
+        return userChildren[0];
+    }
+    
+    // Method 5: Last resort - check if any student data matches
+    if (allStudentData.length > 0) {
+        for (const student of allStudentData) {
+            if (student.data) {
+                // Check various fields in student data
+                const studentFields = [
+                    student.data.studentId,
+                    student.data.studentName,
+                    student.data.name,
+                    student.data.id
+                ];
+                
+                const reportFields = [
+                    report.studentId,
+                    report.studentName,
+                    report.student,
+                    report.id
+                ];
+                
+                // Check for any match
+                for (const studentField of studentFields) {
+                    for (const reportField of reportFields) {
+                        if (studentField && reportField && 
+                            safeText(studentField) === safeText(reportField)) {
+                            return student.name;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    return null;
+}
+
+// Generate ALL possible search queries
+async function generateAllSearchQueries(parentPhone, parentEmail, parentUid) {
+    const queries = [];
+    
+    // Phone variations - USING ENHANCED FUNCTION WITH FORMATS
+    const phoneVariations = generateAllPhoneVariations(parentPhone);
+    const phoneFormats = generateAllPhoneFormatsForSearch(parentPhone);
+    const allPhoneVersions = [...new Set([...phoneVariations, ...phoneFormats])];
+    console.log(`📱 Generated ${allPhoneVersions.length} phone versions for search`);
+
+    for (const phone of allPhoneVersions) {
+        queries.push({ field: 'parentPhone', value: phone });
+        queries.push({ field: 'parentphone', value: phone });
+        queries.push({ field: 'parent_phone', value: phone });
+        queries.push({ field: 'guardianPhone', value: phone });
+        queries.push({ field: 'motherPhone', value: phone });
+        queries.push({ field: 'fatherPhone', value: phone });
+        queries.push({ field: 'phone', value: phone });
+        queries.push({ field: 'parent_contact', value: phone });
+        queries.push({ field: 'contact_number', value: phone });
+        queries.push({ field: 'contactPhone', value: phone });
+        // ADD THIS CRITICAL FIELD:
+        queries.push({ field: 'normalizedParentPhone', value: phone });
+    }
+    
+    // Email variations
+    if (parentEmail) {
+        const emailVariations = [
+            parentEmail.toLowerCase(),
+            parentEmail.toUpperCase(),
+            parentEmail
+        ];
+        for (const email of emailVariations) {
+            queries.push({ field: 'parentEmail', value: email });
+            queries.push({ field: 'parentemail', value: email });
+            queries.push({ field: 'email', value: email });
+            queries.push({ field: 'guardianEmail', value: email });
+            queries.push({ field: 'parent_email', value: email });
+            queries.push({ field: 'contact_email', value: email });
+        }
+    }
+    
+    // UID variations
+    if (parentUid) {
+        queries.push({ field: 'parentUid', value: parentUid });
+        queries.push({ field: 'parentuid', value: parentUid });
+        queries.push({ field: 'userId', value: parentUid });
+        queries.push({ field: 'user_id', value: parentUid });
+        queries.push({ field: 'createdBy', value: parentUid });
+        queries.push({ field: 'ownerUid', value: parentUid });
+    }
+    
+    // Try to find students first, then use student IDs
+    try {
+        const normalizedPhone = normalizePhoneNumber(parentPhone);
+        if (normalizedPhone.valid) {
+            // Find students by parent phone - CHECK ALL PHONE VARIATIONS
+            for (const phoneVar of allPhoneVersions) {
+                try {
+                    const studentsSnapshot = await db.collection('students')
+                        .where('parentPhone', '==', phoneVar)
+                        .get();
+                    
+                    if (!studentsSnapshot.empty) {
+                        studentsSnapshot.forEach(doc => {
+                            const studentId = doc.id;
+                            const studentData = doc.data();
+                            
+                            // Add student ID queries
+                            queries.push({ field: 'studentId', value: studentId });
+                            queries.push({ field: 'studentID', value: studentId });
+                            queries.push({ field: 'student_id', value: studentId });
+                            queries.push({ field: 'studentId', value: studentId.toLowerCase() });
+                            queries.push({ field: 'studentId', value: studentId.toUpperCase() });
+                            
+                            // Also add student name queries
+                            if (studentData.studentName) {
+                                const studentName = safeText(studentData.studentName);
+                                queries.push({ field: 'studentName', value: studentName });
+                                queries.push({ field: 'student_name', value: studentName });
+                                queries.push({ field: 'student', value: studentName });
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.warn(`Error searching students with phone ${phoneVar}:`, error.message);
+                }
+            }
+        }
+    } catch (error) {
+        console.warn("Could not find students for search:", error);
+    }
+    
+    console.log(`🔍 Total search queries generated: ${queries.length}`);
+    return queries;
+}
+
+// Search in a specific collection
+async function searchInCollection(collectionName, query) {
     try {
         const snapshot = await db.collection(collectionName)
-            .where(field, '==', value)
+            .where(query.field, '==', query.value)
             .get();
         
         const results = [];
@@ -1873,513 +2033,388 @@ async function searchInCollectionStrict(collectionName, field, value) {
             results.push({
                 id: doc.id,
                 collection: collectionName,
-                fieldMatched: field,
-                valueMatched: value,
-                ...data
+                fieldMatched: query.field,
+                valueMatched: query.value,
+                ...data,
+                timestamp: getTimestampFromData(data),
+                type: determineReportType(collectionName, data)
             });
         });
         
         return results;
     } catch (error) {
-        throw error; // Propagate for handling
+        // Collection or field doesn't exist
+        if (error.code !== 'failed-precondition' && error.code !== 'invalid-argument') {
+            console.warn(`Search error in ${collectionName} for ${query.field}=${query.value}:`, error.message);
+        }
+        return [];
     }
 }
 
-/**
- * Parent.js fallback search - maintains existing logic
- */
-async function performParentJsFallbackSearch(parentPhone, parentEmail) {
-    // This replicates the parent.js multi-layer search logic
-    let assessmentResults = [];
-    let monthlyResults = [];
-    
-    // Use parent.js multiNormalizePhoneNumber
-    const normalizedVersions = multiNormalizePhoneNumber(parentPhone);
-    const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
-    
-    // Assessment search (parent.js logic)
-    for (const version of validVersions) {
-        try {
-            const snapshot = await db.collection("student_results")
-                .where("normalizedParentPhone", "==", version.normalized)
-                .get();
-            
-            if (!snapshot.empty) {
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    assessmentResults.push({ 
-                        id: doc.id,
-                        ...data,
-                        timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                        type: 'assessment'
-                    });
-                });
-                break;
-            }
-        } catch (error) {
-            // Continue to next version
-        }
-    }
-    
-    // Monthly search (parent.js logic)
-    for (const version of validVersions) {
-        try {
-            const snapshot = await db.collection("tutor_submissions")
-                .where("normalizedParentPhone", "==", version.normalized)
-                .get();
-            
-            if (!snapshot.empty) {
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    monthlyResults.push({ 
-                        id: doc.id,
-                        ...data,
-                        timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                        type: 'monthly'
-                    });
-                });
-                break;
-            }
-        } catch (error) {
-            // Continue to next version
-        }
-    }
-    
-    return { assessmentResults, monthlyResults };
-}
-
-// ----------------------------------------------------------------------------
-// 2. REPORT TYPES & DATA SOURCES (INTEGRATION LOGIC)
-// ----------------------------------------------------------------------------
-
-/**
- * Determine report type with MERGED classification logic
- */
-function determineReportTypeMerged(report, collectionName) {
-    // PRIMARY: Use parent.js classification logic
-    if (collectionName === 'student_results') return 'assessment';
-    if (collectionName === 'tutor_submissions') return 'monthly';
-    
-    // SECONDARY: Check report data fields (new logic)
-    if (report.reportType) {
-        const type = report.reportType.toLowerCase();
-        if (type.includes('assessment')) return 'assessment';
-        if (type.includes('monthly')) return 'monthly';
-        if (type.includes('progress')) return 'assessment';
-    }
-    
-    // TERTIARY: Check type field
-    if (report.type) {
-        if (report.type === 'assessment' || report.type === 'monthly') {
-            return report.type;
-        }
-    }
-    
-    // FALLBACK: Based on data structure (parent.js logic)
-    if (report.subject !== undefined || report.score !== undefined) {
-        return 'assessment';
-    }
-    if (report.introduction !== undefined || report.topics !== undefined) {
-        return 'monthly';
-    }
-    
-    return 'unknown';
-}
-
-/**
- * Distribute reports to students with MERGED logic
- */
-function distributeReportsToStudentsStrict(assessmentResults, monthlyResults) {
-    console.log("📊 Distributing reports to students with merged logic...");
-    
-    const distributedAssessments = [];
-    const distributedMonthly = [];
-    
-    // Get current student list from parent.js
-    const availableStudents = userChildren || [];
-    
-    // HYBRIDIZED distribution logic
-    assessmentResults.forEach(report => {
-        const assignedStudent = findBestStudentMatch(report, availableStudents);
-        if (assignedStudent) {
-            distributedAssessments.push({
-                ...report,
-                assignedStudentName: assignedStudent,
-                // Maintain parent.js data structure
-                studentName: report.studentName || assignedStudent
-            });
-        } else if (availableStudents.length === 1) {
-            // Fallback: assign to only child (parent.js logic)
-            distributedAssessments.push({
-                ...report,
-                assignedStudentName: availableStudents[0],
-                studentName: report.studentName || availableStudents[0]
-            });
-        }
-    });
-    
-    monthlyResults.forEach(report => {
-        const assignedStudent = findBestStudentMatch(report, availableStudents);
-        if (assignedStudent) {
-            distributedMonthly.push({
-                ...report,
-                assignedStudentName: assignedStudent,
-                // Maintain parent.js data structure
-                studentName: report.studentName || assignedStudent
-            });
-        } else if (availableStudents.length === 1) {
-            // Fallback: assign to only child
-            distributedMonthly.push({
-                ...report,
-                assignedStudentName: availableStudents[0],
-                studentName: report.studentName || availableStudents[0]
-            });
-        }
-    });
-    
-    console.log(`📊 Distribution complete: ${distributedAssessments.length} assessments, ${distributedMonthly.length} monthly reports`);
-    
-    return {
-        assessments: distributedAssessments,
-        monthly: distributedMonthly
-    };
-}
-
-/**
- * Find best student match with merged logic
- */
-function findBestStudentMatch(report, availableStudents) {
-    if (!availableStudents || availableStudents.length === 0) return null;
-    
-    const reportStudentName = safeText(report.studentName || report.student);
-    
-    // METHOD 1: Exact name match (parent.js logic)
-    for (const student of availableStudents) {
-        if (nameMatches(student, reportStudentName)) {
-            return student;
-        }
-    }
-    
-    // METHOD 2: Partial match (parent.js logic)
-    for (const student of availableStudents) {
-        const studentLower = student.toLowerCase();
-        const reportLower = reportStudentName.toLowerCase();
-        
-        if (studentLower.includes(reportLower) || reportLower.includes(studentLower)) {
-            return student;
-        }
-    }
-    
-    // METHOD 3: Student ID matching (new logic)
-    if (report.studentId) {
-        // Check if we have student ID mapping
-        for (const [studentName, studentId] of studentIdMap?.entries() || []) {
-            if (studentId === report.studentId) {
-                return studentName;
-            }
-        }
-    }
-    
-    return null;
-}
-
-// ----------------------------------------------------------------------------
-// 3. REPORT DISPLAY DESIGN (STRICT UI CONSISTENCY)
-// ----------------------------------------------------------------------------
-
-// NOTE: All display logic remains EXACTLY as in parent.js
-// We only enhance the data feeding into the existing display system
-
-/**
- * Enhanced loadAllReportsForParent with ultimate search
- * MAINTAINS ALL parent.js UI/display logic exactly
- */
-async function loadAllReportsForParentEnhanced(parentPhone, userId, forceRefresh = false) {
-    // ... [Keep all parent.js cache logic exactly as is] ...
+// EMERGENCY SEARCH - Last resort
+async function emergencyReportSearch(parentPhone, parentEmail) {
+    console.log("🚨 EMERGENCY SEARCH ACTIVATED");
+    const results = [];
     
     try {
-        // Get user data
-        const userDoc = await db.collection('parent_users').doc(userId).get();
-        const userData = userDoc.data();
-        const parentEmail = userData.email;
+        // 1. Get ALL tutor_submissions and filter client-side
+        const allSubmissions = await db.collection('tutor_submissions').limit(1000).get();
+        const phoneVariations = generateAllPhoneVariations(parentPhone);
+        const phoneFormats = generateAllPhoneFormatsForSearch(parentPhone);
+        const allPhoneVersions = [...new Set([...phoneVariations, ...phoneFormats])];
         
-        // USE ULTIMATE SEARCH instead of performMultiLayerSearch
-        const { assessmentResults, monthlyResults, searchStats } = 
-            await searchAllReportsForParent(parentPhone, parentEmail, userId);
+        console.log(`🔍 Emergency scanning ${allSubmissions.size} tutor submissions`);
         
-        console.log("🎯 Enhanced search results:", searchStats);
-        
-        // REST OF FUNCTION IDENTICAL TO parent.js
-        // Only the data source changes, not the display logic
-        
-        // Process and display reports using EXISTING parent.js logic
-        if (assessmentResults.length === 0 && monthlyResults.length === 0) {
-            // Use parent.js "no reports" UI exactly
-            return displayNoReportsState();
-        }
-        
-        // Group reports by student (parent.js logic)
-        const studentsMap = new Map();
-        
-        // Process assessment reports (parent.js logic)
-        assessmentResults.forEach(result => {
-            const studentName = result.studentName || result.assignedStudentName;
-            if (!studentsMap.has(studentName)) {
-                studentsMap.set(studentName, { assessments: [], monthly: [] });
+        allSubmissions.forEach(doc => {
+            const data = doc.data();
+            let matched = false;
+            
+            // Check ALL phone fields with ALL variations
+            const phoneFields = ['parentPhone', 'parentphone', 'parent_phone', 'phone', 'guardianPhone', 'contact_number', 'normalizedParentPhone'];
+            for (const field of phoneFields) {
+                if (data[field]) {
+                    const fieldValue = String(data[field]).trim();
+                    for (const phoneVar of allPhoneVersions) {
+                        if (fieldValue === phoneVar || fieldValue.includes(phoneVar)) {
+                            results.push({
+                                id: doc.id,
+                                collection: 'tutor_submissions',
+                                emergencyMatch: true,
+                                matchedField: field,
+                                matchedValue: fieldValue,
+                                ...data,
+                                timestamp: getTimestampFromData(data),
+                                type: 'monthly'
+                            });
+                            matched = true;
+                            break;
+                        }
+                    }
+                    if (matched) break;
+                }
             }
-            studentsMap.get(studentName).assessments.push(result);
+            
+            // Check by email
+            if (!matched && parentEmail) {
+                const emailFields = ['parentEmail', 'parentemail', 'email', 'guardianEmail'];
+                for (const field of emailFields) {
+                    if (data[field] && data[field].toLowerCase() === parentEmail.toLowerCase()) {
+                        results.push({
+                            id: doc.id,
+                            collection: 'tutor_submissions',
+                            emergencyMatch: true,
+                            matchedField: field,
+                            matchedValue: data[field],
+                            ...data,
+                            timestamp: getTimestampFromData(data),
+                            type: 'monthly'
+                        });
+                        matched = true;
+                        break;
+                    }
+                }
+            }
+            
+            // Check by student name (if we have students in userChildren)
+            if (!matched && userChildren.length > 0) {
+                const studentName = data.studentName || data.student;
+                if (studentName && userChildren.includes(safeText(studentName))) {
+                    results.push({
+                        id: doc.id,
+                        collection: 'tutor_submissions',
+                        emergencyMatch: true,
+                        matchedField: 'studentName',
+                        matchedValue: studentName,
+                        ...data,
+                        timestamp: getTimestampFromData(data),
+                        type: 'monthly'
+                    });
+                }
+            }
         });
         
-        // Process monthly reports (parent.js logic)
-        monthlyResults.forEach(report => {
-            const studentName = report.studentName || report.assignedStudentName;
-            if (!studentsMap.has(studentName)) {
-                studentsMap.set(studentName, { assessments: [], monthly: [] });
+        // 2. Get ALL student_results and filter client-side
+        const allAssessments = await db.collection('student_results').limit(1000).get();
+        
+        console.log(`🔍 Emergency scanning ${allAssessments.size} assessment results`);
+        
+        allAssessments.forEach(doc => {
+            const data = doc.data();
+            let matched = false;
+            
+            // Check ALL phone fields with ALL variations
+            const phoneFields = ['parentPhone', 'parentphone', 'parent_phone', 'phone', 'normalizedParentPhone'];
+            for (const field of phoneFields) {
+                if (data[field]) {
+                    const fieldValue = String(data[field]).trim();
+                    for (const phoneVar of allPhoneVersions) {
+                        if (fieldValue === phoneVar || fieldValue.includes(phoneVar)) {
+                            results.push({
+                                id: doc.id,
+                                collection: 'student_results',
+                                emergencyMatch: true,
+                                matchedField: field,
+                                matchedValue: fieldValue,
+                                ...data,
+                                timestamp: getTimestampFromData(data),
+                                type: 'assessment'
+                            });
+                            matched = true;
+                            break;
+                        }
+                    }
+                    if (matched) break;
+                }
             }
-            studentsMap.get(studentName).monthly.push(report);
+            
+            // Check by email
+            if (!matched && parentEmail) {
+                const emailFields = ['parentEmail', 'parentemail', 'email'];
+                for (const field of emailFields) {
+                    if (data[field] && data[field].toLowerCase() === parentEmail.toLowerCase()) {
+                        results.push({
+                            id: doc.id,
+                            collection: 'student_results',
+                            emergencyMatch: true,
+                            matchedField: field,
+                            matchedValue: data[field],
+                            ...data,
+                            timestamp: getTimestampFromData(data),
+                            type: 'assessment'
+                        });
+                        matched = true;
+                        break;
+                    }
+                }
+            }
+            
+            // Check by student name (if we have students in userChildren)
+            if (!matched && userChildren.length > 0) {
+                const studentName = data.studentName || data.student;
+                if (studentName && userChildren.includes(safeText(studentName))) {
+                    results.push({
+                        id: doc.id,
+                        collection: 'student_results',
+                        emergencyMatch: true,
+                        matchedField: 'studentName',
+                        matchedValue: studentName,
+                        ...data,
+                        timestamp: getTimestampFromData(data),
+                        type: 'assessment'
+                    });
+                }
+            }
         });
         
-        userChildren = Array.from(studentsMap.keys());
-        
-        // DISPLAY LOGIC: IDENTICAL TO parent.js
-        // [All display generation code remains exactly the same]
-        
-        // Cache saving (parent.js logic)
-        // [Remains exactly the same]
+        console.log(`🚨 EMERGENCY SEARCH found: ${results.length} reports`);
         
     } catch (error) {
-        // ERROR HANDLING: Merged logic
-        console.error("Enhanced report loading error:", error);
-        
-        // Try parent.js original method as fallback
-        try {
-            console.log("🔄 Falling back to original parent.js search...");
-            return await loadAllReportsForParent(parentPhone, userId, forceRefresh);
-        } catch (fallbackError) {
-            // Use parent.js error display
-            showMessage("Sorry, there was an error loading the reports. Please try again.", "error");
-        }
+        console.error("Emergency search failed:", error);
     }
+    
+    return results;
 }
 
-// ----------------------------------------------------------------------------
-// 4. DATA PROCESSING & ENHANCEMENTS (MERGED LOGIC)
-// ----------------------------------------------------------------------------
-
-/**
- * Deduplicate reports with merged logic
- */
-function deduplicateReports(reports, reportType) {
-    const uniqueReports = [];
-    const seenKeys = new Set();
-    
-    reports.forEach(report => {
-        // Create unique key based on report type
-        let uniqueKey;
-        
-        if (reportType === 'assessment') {
-            // Parent.js logic: day-based grouping
-            const sessionKey = Math.floor((report.timestamp || Date.now() / 1000) / 86400);
-            uniqueKey = `${report.studentName}_${sessionKey}_${report.subject || 'assessment'}`;
-        } else {
-            // Monthly: Use collection + ID
-            uniqueKey = `${report.collection}_${report.id}`;
-        }
-        
-        if (!seenKeys.has(uniqueKey)) {
-            seenKeys.add(uniqueKey);
-            uniqueReports.push(report);
-        }
-    });
-    
-    return uniqueReports;
-}
-
-/**
- * Enhanced phone processing with merged logic
- */
-function processPhoneForSearch(phone) {
-    // 1. Use parent.js multiNormalizePhoneNumber
-    const parentJsResults = multiNormalizePhoneNumber(phone);
-    
-    // 2. Add enhanced variations
-    const enhancedVariations = generateEnhancedPhoneVariations(phone);
-    
-    // 3. Combine and deduplicate
-    const allVariations = new Set();
-    
-    parentJsResults.forEach(result => {
-        if (result.valid && result.normalized) {
-            allVariations.add(result.normalized);
-        }
-    });
-    
-    enhancedVariations.forEach(variation => {
-        allVariations.add(variation);
-    });
-    
-    return Array.from(allVariations);
-}
-
-function generateEnhancedPhoneVariations(phone) {
+// Generate ALL possible phone variations with better global support
+function generateAllPhoneVariations(phone) {
     const variations = new Set();
     
-    // Add common global formats
-    const digitsOnly = phone.replace(/\D/g, '');
+    if (!phone || typeof phone !== 'string') return [];
     
-    // International format variations
-    if (digitsOnly.length >= 10) {
-        // With plus
-        variations.add('+' + digitsOnly);
-        
-        // Common country code additions
-        if (digitsOnly.length === 10) {
-            variations.add('+1' + digitsOnly); // US/Canada
-            variations.add('+234' + digitsOnly); // Nigeria
-            variations.add('+44' + digitsOnly); // UK
-        }
-        
-        // Space-separated formats
-        if (digitsOnly.length === 10) {
-            variations.add(digitsOnly.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3'));
-            variations.add(digitsOnly.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3'));
+    // Add original
+    variations.add(phone.trim());
+    
+    // Basic cleaned version (remove all non-digits except +)
+    const basicCleaned = phone.replace(/[^\d+]/g, '');
+    variations.add(basicCleaned);
+    
+    // If starts with +, add without +
+    if (basicCleaned.startsWith('+')) {
+        variations.add(basicCleaned.substring(1));
+    }
+    
+    // Global phone number handling patterns
+    const countryCodePatterns = [
+        { code: '+1', length: 11 },
+        { code: '+234', length: 14 },
+        { code: '+44', length: 13 },
+        { code: '+91', length: 13 },
+        { code: '+86', length: 14 },
+        { code: '+33', length: 12 },
+        { code: '+49', length: 13 },
+        { code: '+81', length: 13 },
+        { code: '+61', length: 12 },
+        { code: '+55', length: 13 },
+        { code: '+7', length: 12 },
+        { code: '+20', length: 13 },
+        { code: '+27', length: 12 },
+        { code: '+34', length: 12 },
+        { code: '+39', length: 12 },
+        { code: '+52', length: 13 },
+        { code: '+62', length: 13 },
+        { code: '+82', length: 13 },
+        { code: '+90', length: 13 },
+        { code: '+92', length: 13 },
+        { code: '+966', length: 14 },
+        { code: '+971', length: 13 },
+        { code: '+233', length: 13 },
+        { code: '+254', length: 13 },
+        { code: '+255', length: 13 },
+        { code: '+256', length: 13 },
+        { code: '+237', length: 13 },
+        { code: '+251', length: 13 },
+        { code: '+250', length: 13 },
+        { code: '+260', length: 13 },
+        { code: '+263', length: 13 },
+        { code: '+265', length: 13 },
+        { code: '+267', length: 13 },
+        { code: '+268', length: 13 },
+        { code: '+269', length: 13 }
+    ];
+    
+    // Try to identify and generate variations for each country code pattern
+    for (const pattern of countryCodePatterns) {
+        if (basicCleaned.startsWith(pattern.code)) {
+            // Remove country code
+            const withoutCode = basicCleaned.substring(pattern.code.length);
+            variations.add(withoutCode);
+            
+            // Add with 0 prefix (common in many countries)
+            variations.add('0' + withoutCode);
+            
+            // Add with country code without +
+            variations.add(pattern.code.substring(1) + withoutCode);
+            
+            // Add local format variations
+            if (withoutCode.length >= 7) {
+                // Common local formats based on country
+                if (pattern.code === '+1') {
+                    // US/Canada format: (XXX) XXX-XXXX
+                    if (withoutCode.length === 10) {
+                        variations.add('(' + withoutCode.substring(0, 3) + ') ' + withoutCode.substring(3, 6) + '-' + withoutCode.substring(6));
+                    }
+                } else if (pattern.code === '+44') {
+                    // UK format: 0XXX XXX XXXX
+                    if (withoutCode.length === 10) {
+                        variations.add('0' + withoutCode.substring(0, 4) + ' ' + withoutCode.substring(4, 7) + ' ' + withoutCode.substring(7));
+                    }
+                } else {
+                    // Generic formats for other countries
+                    if (withoutCode.length >= 10) {
+                        variations.add(withoutCode.substring(0, 3) + '-' + withoutCode.substring(3));
+                        variations.add(withoutCode.substring(0, 4) + '-' + withoutCode.substring(4));
+                        variations.add('(' + withoutCode.substring(0, 3) + ') ' + withoutCode.substring(3));
+                    }
+                }
+            }
         }
     }
     
-    return Array.from(variations);
-}
-
-// ----------------------------------------------------------------------------
-// 5. ERROR HANDLING & USER EXPERIENCE (MERGED LOGIC)
-// ----------------------------------------------------------------------------
-
-/**
- * Enhanced error handling with merged logic
- */
-function handleReportError(error, context) {
-    console.error(`Report error in ${context}:`, error);
-    
-    // PARENT.JS ERROR HANDLING
-    let userMessage = 'Sorry, there was an error loading the reports. ';
-    
-    // ENHANCED ERROR TYPES
-    if (error.code === 'permission-denied') {
-        userMessage += 'Permission denied. Please contact support.';
-    } else if (error.code === 'unavailable') {
-        userMessage += 'Network unavailable. Please check your connection.';
-    } else if (error.message?.includes('quota')) {
-        userMessage += 'Service temporarily limited. Please try again later.';
-    } else {
-        // Parent.js default
-        userMessage += 'Please try again.';
+    // If starts with 0 (local number), try adding common country codes
+    if (basicCleaned.startsWith('0') && basicCleaned.length > 1) {
+        const localNumber = basicCleaned.substring(1);
+        
+        // Try adding common country codes from our list
+        for (const pattern of countryCodePatterns) {
+            if (pattern.code !== '+1' || localNumber.length === 10) {
+                variations.add(pattern.code + localNumber);
+                variations.add(pattern.code.substring(1) + localNumber);
+            }
+        }
+        
+        // Also try without the 0
+        variations.add(localNumber);
     }
     
-    // Show message (parent.js function)
-    showMessage(userMessage, 'error');
+    // If it's just digits (no +), try adding + and common codes
+    if (/^\d+$/.test(basicCleaned)) {
+        // Check if it might already include a country code
+        if (basicCleaned.length >= 9) {
+            variations.add('+' + basicCleaned);
+            
+            // Try to match with known country codes
+            for (const pattern of countryCodePatterns) {
+                const codeWithoutPlus = pattern.code.substring(1);
+                if (basicCleaned.startsWith(codeWithoutPlus)) {
+                    const localPart = basicCleaned.substring(codeWithoutPlus.length);
+                    variations.add(pattern.code + localPart);
+                }
+            }
+            
+            // Special handling for common patterns
+            if (basicCleaned.length === 10) {
+                variations.add('+1' + basicCleaned);
+            } else if (basicCleaned.length === 11 && basicCleaned.startsWith('1')) {
+                variations.add('+' + basicCleaned);
+                variations.add('+1' + basicCleaned.substring(1));
+            } else if (basicCleaned.length === 11 && basicCleaned.startsWith('0')) {
+                variations.add('+234' + basicCleaned.substring(1));
+            }
+        }
+    }
     
-    // Enhanced logging
-    logErrorToAnalytics({
-        context,
-        error: error.message,
-        code: error.code,
-        timestamp: Date.now()
+    // Add formatted versions with spaces/dashes for all variations
+    const allVariations = Array.from(variations);
+    allVariations.forEach(variation => {
+        if (variation && variation.length >= 7) {
+            // Remove any existing formatting first
+            const digitsOnly = variation.replace(/[^\d+]/g, '');
+            
+            // Add space-separated versions (common formats)
+            if (digitsOnly.length === 10) {
+                // XXX XXX XXXX format
+                const spaced1 = digitsOnly.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3');
+                if (spaced1 !== variation) variations.add(spaced1);
+                
+                // (XXX) XXX-XXXX format
+                const spaced2 = digitsOnly.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
+                if (spaced2 !== variation) variations.add(spaced2);
+            } else if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
+                // 1 XXX XXX XXXX format (US/Canada with country code)
+                const spaced3 = digitsOnly.replace(/(\d{1})(\d{3})(\d{3})(\d{4})/, '$1 $2 $3 $4');
+                if (spaced3 !== variation) variations.add(spaced3);
+            } else if (digitsOnly.length >= 10) {
+                // Generic spacing for other lengths
+                const spacedGeneric = digitsOnly.replace(/(\d{3})(?=\d)/g, '$1 ');
+                if (spacedGeneric !== variation) variations.add(spacedGeneric);
+            }
+            
+            // Add dash-separated versions
+            if (digitsOnly.length >= 10) {
+                const dashed = digitsOnly.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+                if (dashed !== variation) variations.add(dashed);
+            }
+        }
     });
     
-    // Return safe state
-    return {
-        assessmentResults: [],
-        monthlyResults: [],
-        error: error.message,
-        recovered: false
-    };
+    // Filter out invalid variations and return
+    const finalVariations = Array.from(variations)
+        .filter(v => v && v.length >= 7)
+        .filter(v => v.length <= 20)
+        .filter(v => !v.includes('undefined'))
+        .filter((v, i, arr) => arr.indexOf(v) === i);
+    
+    return finalVariations;
 }
 
-/**
- * Robust data validation with merged logic
- */
-function validateReportData(report, reportType) {
-    const errors = [];
-    
-    // Parent.js validations
-    if (!report.studentName && !report.assignedStudentName) {
-        errors.push('Missing student name');
+// Determine report type
+function determineReportType(collectionName, data) {
+    if (collectionName.includes('monthly') || collectionName.includes('submission')) {
+        return 'monthly';
     }
-    
-    if (reportType === 'assessment') {
-        if (report.score === undefined || report.totalScoreableQuestions === undefined) {
-            errors.push('Invalid assessment scores');
-        }
+    if (collectionName.includes('assessment') || collectionName.includes('progress')) {
+        return 'assessment';
     }
-    
-    if (reportType === 'monthly') {
-        if (!report.introduction && !report.topics && !report.progress) {
-            errors.push('Monthly report missing content');
-        }
+    if (data.reportType) {
+        return data.reportType.toLowerCase();
     }
-    
-    // Enhanced validations
-    if (!report.timestamp) {
-        report.timestamp = Date.now() / 1000;
-        console.warn('Added missing timestamp to report');
+    if (data.type) {
+        return data.type;
     }
-    
-    return {
-        isValid: errors.length === 0,
-        errors,
-        report: errors.length === 0 ? report : null
-    };
-}
-
-// ----------------------------------------------------------------------------
-// INTEGRATION WITH EXISTING parent.js
-// ----------------------------------------------------------------------------
-
-// Replace the existing performMultiLayerSearch call with enhanced version
-// In the loadAllReportsForParent function, replace:
-// const { assessmentResults, monthlyResults } = await performMultiLayerSearch(parentPhone, parentEmail, userId);
-// WITH:
-// const { assessmentResults, monthlyResults } = await searchAllReportsForParent(parentPhone, parentEmail, userId);
-
-// Add the new functions to the global scope
-// Ensure they don't conflict with existing parent.js functions
-
-// Helper function (if not exists)
-function safeText(text) {
-    if (!text) return '';
-    return String(text).trim();
-}
-
-// Global state (if not exists)
-let studentIdMap = new Map();
-let allStudentData = [];
-
-// ----------------------------------------------------------------------------
-// INITIALIZATION
-// ----------------------------------------------------------------------------
-
-// This section should be added to the DOMContentLoaded event listener
-// to enhance the existing functionality without breaking it
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Existing parent.js initialization...
-    
-    // Enhanced initialization
-    initializeEnhancedReportSystem();
-});
-
-function initializeEnhancedReportSystem() {
-    console.log("🚀 Initializing enhanced report system...");
-    
-    // Add enhanced search capability while maintaining backward compatibility
-    window.enhancedSearchAllReportsForParent = searchAllReportsForParent;
-    window.loadAllReportsForParentEnhanced = loadAllReportsForParentEnhanced;
-    
-    // Override the main function if in development mode
-    if (window.location.href.includes('devmode=true')) {
-        console.log("🔧 Development mode: Enhanced search enabled");
-        // Optional: Replace the main function for testing
-        // window.loadAllReportsForParent = loadAllReportsForParentEnhanced;
+    if (data.collection) {
+        return data.collection.toLowerCase();
     }
+    return 'unknown';
 }
 
 // ============================================================================
