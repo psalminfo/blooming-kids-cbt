@@ -1799,6 +1799,13 @@ function distributeReportsToStudents(allReports) {
         const assignedStudent = findStudentForReport(report);
         
         if (assignedStudent) {
+            console.log(`📝 Report assigned to student: ${assignedStudent}`, {
+                reportId: report.id,
+                collection: report.collection,
+                studentIdInReport: report.studentId,
+                studentNameInReport: report.studentName
+            });
+            
             // Add student info to the report for proper grouping
             report.assignedStudentName = assignedStudent;
             report.assignedStudentId = studentIdMap.get(assignedStudent);
@@ -1885,6 +1892,7 @@ function findStudentForReport(report) {
     
     // Method 4: If parent has only one child, assign to that child
     if (userChildren.length === 1) {
+        console.log(`📝 Assigning report to only child: ${userChildren[0]}`);
         return userChildren[0];
     }
     
@@ -1931,7 +1939,7 @@ async function generateAllSearchQueries(parentPhone, parentEmail, parentUid) {
     const phoneVariations = generateAllPhoneVariations(parentPhone);
     const phoneFormats = generateAllPhoneFormatsForSearch(parentPhone);
     const allPhoneVersions = [...new Set([...phoneVariations, ...phoneFormats])];
-    console.log(`📱 Generated ${allPhoneVersions.length} phone versions for search`);
+    console.log(`📱 Generated ${allPhoneVersions.length} phone versions for search (${phoneVariations.length} variations + ${phoneFormats.length} formats)`);
 
     for (const phone of allPhoneVersions) {
         queries.push({ field: 'parentPhone', value: phone });
@@ -2069,7 +2077,7 @@ async function emergencyReportSearch(parentPhone, parentEmail) {
             const data = doc.data();
             let matched = false;
             
-            // Check ALL phone fields with ALL variations
+            // Check ALL phone fields with ALL variations - FIXED SYNTAX ERROR
             const phoneFields = ['parentPhone', 'parentphone', 'parent_phone', 'phone', 'guardianPhone', 'contact_number', 'normalizedParentPhone'];
             for (const field of phoneFields) {
                 if (data[field]) {
