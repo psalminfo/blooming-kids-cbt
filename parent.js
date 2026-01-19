@@ -2426,179 +2426,86 @@ function determineReportType(collectionName, data) {
 }
 
 // ============================================================================
-// SECTION 13: COMPREHENSIVE SEARCH & DISTRIBUTION SYSTEM
+// SECTION 13: REAL-TIME MONITORING WITHOUT COMPLEX QUERIES
 // ============================================================================
 
-/**
- * The Master Search Function
- * Finds reports across ALL collections and ensures they are assigned to students
- */
-async function searchAllReportsForParent(parentPhone, parentEmail, parentUid) {
-    console.log("🔍 ULTIMATE Search Started for:", { parentPhone, parentEmail, parentUid });
+function setupRealTimeMonitoring(parentPhone, userId) {
+    // Clear any existing listeners
+    cleanupRealTimeListeners();
     
-    const searchStats = { 
-        queriesGenerated: 0, 
-        collectionsScanned: 0, 
-        reportsFound: 0 
-    };
-
-    // Generate phone variations for aggressive searching
-    const phoneVariations = (function(phone) {
-        if (!phone) return [];
-        const clean = phone.replace(/\D/g, ''); 
-        const basics = [phone, clean, `+${clean}`];
-        if (clean.startsWith('234')) {
-            basics.push('0' + clean.substring(3)); 
-            basics.push(clean.substring(3)); 
-        }
-        return [...new Set(basics)];
-    })(parentPhone);
-
-    const searchTerms = [...phoneVariations, parentEmail, parentUid].filter(Boolean);
-    searchStats.queriesGenerated = searchTerms.length;
-
-    const collections = [
-        'student_results', 'tutor_submissions', 'monthly_reports', 
-        'assessment_reports', 'progress_reports', 'academic_reports',
-        'learning_reports', 'reports', 'submissions', 'evaluations', 'assessments'
-    ];
-    searchStats.collectionsScanned = collections.length;
-
-    const searchFields = [
-        'parentPhone', 'phone', 'phoneNumber', 'guardianPhone', 
-        'parentEmail', 'email', 'parent_email', 
-        'parentUid', 'userId', 'uid', 'submittedBy'
-    ];
-
-    let allFoundReports = [];
-
-    // Use Promise.all to fetch everything in parallel but AWAIT it to fix the race condition
-    const searchPromises = collections.map(async (collectionName) => {
-        try {
-            const snapshot = await db.collection(collectionName)
-                .orderBy('timestamp', 'desc')
-                .limit(100)
-                .get();
-
-            if (snapshot.empty) return;
-
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                let match = false;
-
-                for (const field of searchFields) {
-                    if (data[field] && searchTerms.includes(String(data[field]))) {
-                        match = true;
-                        break;
-                    }
-                }
-
-                if (!match && parentPhone) {
-                    const docPhone = data.parentPhone || data.phone || data.guardianPhone;
-                    if (docPhone && normalizePhoneNumber(docPhone) === normalizePhoneNumber(parentPhone)) {
-                        match = true;
-                    }
-                }
-
-                if (match) {
-                    allFoundReports.push({
-                        id: doc.id,
-                        sourceCollection: collectionName,
-                        ...data,
-                        timestamp: data.timestamp || (data.date ? new Date(data.date).getTime() / 1000 : Date.now() / 1000)
-                    });
+    // Normalize phone
+    const normalizedPhone = normalizePhoneNumber(parentPhone);
+    if (!normalizedPhone.valid) {
+        return;
+    }
+    
+    // Monitor monthly reports
+    const monthlyListener = db.collection("tutor_submissions")
+        .where("parentPhone", "==", normalizedPhone.normalized)
+        .onSnapshot((snapshot) => {
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === "added") {
+                    console.log("🆕 NEW MONTHLY REPORT DETECTED!");
+                    showNewReportNotification('monthly');
                 }
             });
-        } catch (err) {
-            console.warn(`⚠️ Collection ${collectionName} skip:`, err.message);
+        }, (error) => {
+            console.error("Monthly reports listener error:", error);
+        });
+    realTimeListeners.push(monthlyListener);
+    
+    // Monitor assessment reports
+    const assessmentListener = db.collection("student_results")
+        .where("parentPhone", "==", normalizedPhone.normalized)
+        .onSnapshot((snapshot) => {
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === "added") {
+                    console.log("🆕 NEW ASSESSMENT REPORT DETECTED!");
+                    showNewReportNotification('assessment');
+                }
+            });
+        }, (error) => {
+            console.error("Assessment reports listener error:", error);
+        });
+    realTimeListeners.push(assessmentListener);
+    
+    // Monitor academics periodically
+    setInterval(() => {
+        checkForNewAcademics();
+    }, 30000);
+}
+
+function cleanupRealTimeListeners() {
+    realTimeListeners.forEach(unsubscribe => {
+        if (typeof unsubscribe === 'function') {
+            unsubscribe();
         }
     });
-
-    await Promise.all(searchPromises);
-
-    // Deduplicate
-    const uniqueReports = Array.from(new Set(allFoundReports.map(a => a.id)))
-        .map(id => allFoundReports.find(a => a.id === id));
-
-    console.log(`✅ Found ${uniqueReports.length} total reports.`);
-
-    // Map to students
-    const { assessmentResults, monthlyResults } = distributeReportsToStudents(uniqueReports);
-
-    return { assessmentResults, monthlyResults, searchStats };
+    realTimeListeners = [];
 }
 
-/**
- * Links raw reports to specific children using Fuzzy Matching
- */
-function distributeReportsToStudents(reports) {
-    const assessmentResults = [];
-    const monthlyResults = [];
-    const knownChildren = window.userChildren || []; 
-
-    reports.forEach(report => {
-        const isMonthly = report.type === 'monthly' || 
-                         report.reportType === 'monthly' || 
-                         report.sourceCollection.includes('monthly') ||
-                         report.sourceCollection.includes('tutor_submissions');
-
-        let assignedName = null;
-        const reportStudentName = report.studentName || report.name || report.childName;
-
-        if (reportStudentName) {
-            const lowerReportName = reportStudentName.toLowerCase().trim();
-            
-            // 1. Exact/Case-Insensitive Match
-            assignedName = knownChildren.find(child => child.toLowerCase().trim() === lowerReportName);
-            
-            // 2. Fuzzy Match
-            if (!assignedName) {
-                assignedName = knownChildren.find(child => 
-                    lowerReportName.includes(child.toLowerCase().trim()) || 
-                    child.toLowerCase().trim().includes(lowerReportName)
-                );
-            }
-        }
-
-        // 3. Fallback to first child if only one exists
-        if (!assignedName && knownChildren.length === 1) {
-            assignedName = knownChildren[0];
-        }
-
-        // 4. Create new category if totally unassigned
-        if (!assignedName) {
-            assignedName = reportStudentName ? capitalize(reportStudentName) : "Unassigned Student";
-            if (!knownChildren.includes(assignedName)) {
-                knownChildren.push(assignedName);
-                window.userChildren = knownChildren;
-            }
-        }
-
-        report.assignedStudentName = assignedName;
-
-        if (isMonthly) {
-            monthlyResults.push(report);
-        } else {
-            assessmentResults.push(report);
-        }
-    });
-
-    return { assessmentResults, monthlyResults };
-}
-
-// Internal Dependencies for Section 13
-function normalizePhoneNumber(phone) {
-    if (!phone) return "";
-    return String(phone).replace(/\D/g, "").replace(/^0/, "234");
-}
-
-function capitalize(str) {
-    if (!str) return "";
-    return str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-}
-
-function safeText(text, fallback = "N/A") {
-    return text && String(text).trim() !== "" ? text : fallback;
+function showNewReportNotification(type) {
+    const reportType = type === 'assessment' ? 'Assessment Report' : 
+                      type === 'monthly' ? 'Monthly Report' : 'New Update';
+    
+    showMessage(`New ${reportType} available!`, 'success');
+    
+    // Add a visual indicator in the UI
+    const existingIndicator = document.getElementById('newReportIndicator');
+    if (existingIndicator) {
+        existingIndicator.remove();
+    }
+    
+    const indicator = document.createElement('div');
+    indicator.id = 'newReportIndicator';
+    indicator.className = 'fixed top-20 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-40 animate-pulse fade-in';
+    indicator.innerHTML = `📄 New ${safeText(reportType)} Available!`;
+    document.body.appendChild(indicator);
+    
+    // Remove after 5 seconds
+    setTimeout(() => {
+        indicator.remove();
+    }, 5000);
 }
 
 // ============================================================================
@@ -2879,235 +2786,212 @@ function createYearlyArchiveReportView(reportsByStudent) {
     return html;
 }
 
-// Generate a templated recommendation (from old system)
-function generateTemplatedRecommendation(studentName, tutorName, results) {
-    const strengths = [];
-    const weaknesses = [];
-    results.forEach(res => {
-        const percentage = res.total > 0 ? (res.correct / res.total) * 100 : 0;
-        const topicList = res.topics && res.topics.length > 0 ? res.topics : [res.subject];
-        if (percentage >= 75) {
-            strengths.push(...topicList);
-        } else if (percentage < 50) {
-            weaknesses.push(...topicList);
-        }
-    });
-
-    const uniqueStrengths = [...new Set(strengths)];
-    const uniqueWeaknesses = [...new Set(weaknesses)];
-
-    let praiseClause = "";
-    if (uniqueStrengths.length > 2) {
-        praiseClause = `It was great to see ${studentName} demonstrate a solid understanding of several key concepts, particularly in areas like ${uniqueStrengths[0]} and ${uniqueStrengths[1]}. `;
-    } else if (uniqueStrengths.length > 0) {
-        praiseClause = `${studentName} showed strong potential, especially in the topic of ${uniqueStrengths.join(', ')}. `;
-    } else {
-        praiseClause = `${studentName} has put in a commendable effort on this initial assessment. `;
-    }
-
-    let improvementClause = "";
-    if (uniqueWeaknesses.length > 2) {
-        improvementClause = `Our next step will be to focus on building more confidence in a few areas, such as ${uniqueWeaknesses[0]} and ${uniqueWeaknesses[1]}. `;
-    } else if (uniqueWeaknesses.length > 0) {
-        improvementClause = `To continue this positive progress, our focus will be on the topic of ${uniqueWeaknesses.join(', ')}. `;
-    } else {
-        improvementClause = "We will continue to build on these fantastic results and explore more advanced topics. ";
-    }
-
-    const closingStatement = `With personalized support from their tutor, ${tutorName}, at Blooming Kids House, we are very confident that ${studentName} will master these skills and unlock their full potential.`;
-    return praiseClause + improvementClause + closingStatement;
-}
-
 function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, fullName, date) {
     const firstReport = sessionReports[0];
-    const formattedDate = date.toLocaleString('en-US', {
-        dateStyle: 'long',
-        timeStyle: 'short'
-    });
+    const formattedDate = formatDetailedDate(date || new Date(firstReport.timestamp * 1000), true);
     
-    const tutorName = firstReport.tutorName || 'N/A';
-    const parentPhone = firstReport.parentPhone || 'N/A';
-    const grade = firstReport.grade || 'N/A';
-    const studentCountry = firstReport.studentCountry || 'N/A';
-
-    // Calculate results for summary
+    // Calculate overall stats
+    let totalCorrect = 0;
+    let totalQuestions = 0;
+    let overallPercentage = 0;
+    
     const results = sessionReports.map(testResult => {
         const topics = [...new Set(testResult.answers?.map(a => safeText(a.topic)).filter(t => t))] || [];
         const correct = testResult.score !== undefined ? testResult.score : 0;
         const total = testResult.totalScoreableQuestions !== undefined ? testResult.totalScoreableQuestions : 0;
         
+        totalCorrect += correct;
+        totalQuestions += total;
+        
         return {
             subject: safeText(testResult.subject || testResult.testSubject || 'General'),
             correct: correct,
             total: total,
+            percentage: total > 0 ? Math.round((correct / total) * 100) : 0,
             topics: topics,
         };
     });
     
-    // Generate recommendation
-    const recommendation = generateTemplatedRecommendation(fullName, tutorName, results);
+    if (totalQuestions > 0) {
+        overallPercentage = Math.round((totalCorrect / totalQuestions) * 100);
+    }
     
-    const creativeWritingAnswer = sessionReports[0].answers?.find(a => a.type === 'creative-writing');
-    const tutorReport = creativeWritingAnswer?.tutorReport || 'Pending review.';
+    // Determine performance color
+    let performanceColor = 'text-red-600';
+    let performanceBg = 'bg-red-100';
+    if (overallPercentage >= 80) {
+        performanceColor = 'text-green-600';
+        performanceBg = 'bg-green-100';
+    } else if (overallPercentage >= 60) {
+        performanceColor = 'text-yellow-600';
+        performanceBg = 'bg-yellow-100';
+    }
     
-    const tableRows = results.map(res => `<tr><td class="border px-2 py-1 text-left">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`).join("");
-    const topicsTableRows = results.map(res => `<tr><td class="border px-2 py-1 font-semibold text-left">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-left">${res.topics.join(', ') || 'N/A'}</td></tr>`).join("");
+    const tableRows = results.map(res => `
+        <tr class="hover:bg-gray-50 transition-colors duration-200">
+            <td class="border border-gray-200 px-4 py-3 font-medium text-gray-800">${res.subject.toUpperCase()}</td>
+            <td class="border border-gray-200 px-4 py-3 text-center">
+                <span class="font-bold ${res.percentage >= 80 ? 'text-green-600' : res.percentage >= 60 ? 'text-yellow-600' : 'text-red-600'}">
+                    ${res.correct} / ${res.total}
+                </span>
+                <span class="block text-sm ${res.percentage >= 80 ? 'text-green-500' : res.percentage >= 60 ? 'text-yellow-500' : 'text-red-500'}">
+                    ${res.percentage}%
+                </span>
+            </td>
+            <td class="border border-gray-200 px-4 py-3 text-sm text-gray-600">
+                ${res.topics.length > 0 ? res.topics.slice(0, 3).join(', ') : 'Various topics'}
+                ${res.topics.length > 3 ? `<span class="text-gray-400 text-xs ml-1">+${res.topics.length - 3} more</span>` : ''}
+            </td>
+        </tr>
+    `).join("");
     
-    // Canvas ID for chart (must be unique)
-    const chartCanvasId = `chart-${studentIndex}-${sessionId.replace(/[^a-zA-Z0-9]/g, '-')}`;
-
-    // Add dataset attribute for Section 15 to pick up
-    // We encode the results as JSON in a data-attribute so the graph can be drawn
-    const chartData = encodeURIComponent(JSON.stringify(results));
-
     return `
-        <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="assessment-block-${studentIndex}-${sessionId}">
-            <div class="text-center mb-6 border-b pb-4">
-                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
-                     alt="Blooming Kids House Logo" 
-                     class="h-16 w-auto mx-auto mb-3">
-                <h2 class="text-2xl font-bold text-green-800">Assessment Report</h2>
-                <p class="text-gray-600">Date: ${formattedDate}</p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
+        <div class="border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 p-5 bg-white" id="assessment-block-${studentIndex}-${sessionId}">
+            <div class="flex justify-between items-start mb-4 pb-4 border-b border-gray-100">
                 <div>
-                    <p><strong>Student's Name:</strong> ${fullName}</p>
-                    <p><strong>Parent's Phone:</strong> ${parentPhone}</p>
-                    <p><strong>Grade:</strong> ${grade}</p>
+                    <div class="flex items-center mb-2">
+                        <span class="text-green-600 mr-2">📊</span>
+                        <h5 class="font-bold text-gray-800 text-lg">Assessment Report</h5>
+                        <span class="ml-3 ${performanceBg} ${performanceColor} text-xs font-bold px-3 py-1 rounded-full">
+                            ${overallPercentage}% Overall
+                        </span>
+                    </div>
+                    <p class="text-gray-600 text-sm">
+                        <span class="font-medium">Date:</span> ${safeText(formattedDate)}
+                        ${firstReport.tutorName ? ` • <span class="font-medium">Tutor:</span> ${safeText(firstReport.tutorName)}` : ''}
+                    </p>
                 </div>
-                <div>
-                    <p><strong>Tutor:</strong> ${tutorName}</p>
-                    <p><strong>Location:</strong> ${studentCountry}</p>
-                </div>
-            </div>
-            
-            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Performance Summary</h3>
-            <table class="w-full text-sm mb-4 border border-collapse">
-                <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr></thead>
-                <tbody>${tableRows}</tbody>
-            </table>
-            
-            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Knowledge & Skill Analysis</h3>
-            <table class="w-full text-sm mb-4 border border-collapse">
-                <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-left">Topics Covered</th></tr></thead>
-                <tbody>${topicsTableRows}</tbody>
-            </table>
-            
-            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Tutor's Recommendation</h3>
-            <p class="mb-2 text-gray-700 leading-relaxed">${recommendation}</p>
-
-            ${creativeWritingAnswer ? `
-            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Creative Writing Feedback</h3>
-            <p class="mb-2 text-gray-700"><strong>Tutor's Report:</strong> ${tutorReport}</p>
-            ` : ''}
-
-            ${results.length > 0 ? `
-            <canvas id="${chartCanvasId}" class="w-full h-48 mb-4 assessment-chart-canvas" data-results="${chartData}"></canvas>
-            ` : ''}
-            
-            <div class="bg-yellow-50 p-4 rounded-lg mt-6">
-                <h3 class="text-lg font-semibold mb-1 text-green-700">Director's Message</h3>
-                <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
-            </div>
-            
-            <div class="mt-6 text-center">
-                <button onclick="downloadSessionReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}', 'assessment')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
-                    Download Assessment PDF
+                <button onclick="downloadSessionReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}', 'assessment')" 
+                        class="flex items-center bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5">
+                    <span class="mr-2">📥</span>
+                    <span class="font-medium text-sm">Download PDF</span>
                 </button>
             </div>
+            
+            <div class="mb-4">
+                <div class="grid grid-cols-3 gap-4 mb-4">
+                    <div class="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                        <p class="text-xs text-blue-600 font-medium">Total Score</p>
+                        <p class="text-xl font-bold text-blue-700">${totalCorrect}/${totalQuestions}</p>
+                    </div>
+                    <div class="bg-green-50 p-3 rounded-lg border border-green-100">
+                        <p class="text-xs text-green-600 font-medium">Overall Percentage</p>
+                        <p class="text-xl font-bold ${performanceColor}">${overallPercentage}%</p>
+                    </div>
+                    <div class="bg-purple-50 p-3 rounded-lg border border-purple-100">
+                        <p class="text-xs text-purple-600 font-medium">Subjects Tested</p>
+                        <p class="text-xl font-bold text-purple-700">${results.length}</p>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto rounded-lg border border-gray-200">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="border-b border-gray-200 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Subject</th>
+                                <th class="border-b border-gray-200 px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Score</th>
+                                <th class="border-b border-gray-200 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Topics Covered</th>
+                            </tr>
+                        </thead>
+                        <tbody>${tableRows}</tbody>
+                    </table>
+                </div>
+            </div>
+            
+            ${firstReport.notes || firstReport.comments ? `
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <div class="flex items-center mb-2">
+                    <span class="text-yellow-500 mr-2">💡</span>
+                    <h6 class="font-semibold text-gray-700">Additional Notes</h6>
+                </div>
+                <p class="text-gray-600 bg-yellow-50 p-3 rounded-lg border border-yellow-100 text-sm">
+                    ${safeText(firstReport.notes || firstReport.comments || 'No additional notes provided.')}
+                </p>
+            </div>
+            ` : ''}
         </div>
     `;
 }
 
 function createMonthlyReportHTML(sessionReports, studentIndex, sessionId, fullName, date) {
-    const monthlyReport = sessionReports[0];
-    const formattedDate = date.toLocaleString('en-US', {
-        dateStyle: 'long',
-        timeStyle: 'short'
-    });
+    const firstReport = sessionReports[0];
+    const formattedDate = formatDetailedDate(date || new Date(firstReport.timestamp * 1000), true);
+    const safeTopics = safeText(firstReport.topics ? firstReport.topics : 'No topics recorded for this session.');
+    const safeProgress = safeText(firstReport.studentProgress || firstReport.progressNotes || 'No progress notes provided.');
     
-    // Safely get fields
-    const studentName = monthlyReport.studentName || fullName;
-    const parentName = monthlyReport.parentName || 'N/A';
-    const parentPhone = monthlyReport.parentPhone || 'N/A';
-    const grade = monthlyReport.grade || 'N/A';
-    const tutorName = monthlyReport.tutorName || 'N/A';
+    // Extract month and year for display
+    const reportDate = date || new Date(firstReport.timestamp * 1000);
+    const monthName = reportDate.toLocaleString('default', { month: 'long' });
+    const year = reportDate.getFullYear();
     
     return `
-        <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="monthly-block-${studentIndex}-${sessionId}">
-            <div class="text-center mb-6 border-b pb-4">
-                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
-                     alt="Blooming Kids House Logo" 
-                     class="h-16 w-auto mx-auto mb-3">
-                <h2 class="text-2xl font-bold text-green-800">MONTHLY LEARNING REPORT</h2>
-                <p class="text-gray-600">Date: ${formattedDate}</p>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
+        <div class="border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 p-5 bg-white" id="monthly-block-${studentIndex}-${sessionId}">
+            <div class="flex justify-between items-start mb-4 pb-4 border-b border-gray-100">
                 <div>
-                    <p><strong>Student's Name:</strong> ${studentName}</p>
-                    <p><strong>Parent's Name:</strong> ${parentName}</p>
-                    <p><strong>Parent's Phone:</strong> ${parentPhone}</p>
+                    <div class="flex items-center mb-2">
+                        <span class="text-blue-600 mr-2">📈</span>
+                        <h5 class="font-bold text-gray-800 text-lg">Monthly Progress Report</h5>
+                        <span class="ml-3 bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full">
+                            ${monthName} ${year}
+                        </span>
+                    </div>
+                    <p class="text-gray-600 text-sm">
+                        <span class="font-medium">Submitted:</span> ${safeText(formattedDate)}
+                        ${firstReport.tutorName ? ` • <span class="font-medium">Tutor:</span> ${safeText(firstReport.tutorName)}` : ''}
+                    </p>
                 </div>
-                <div>
-                    <p><strong>Grade:</strong> ${grade}</p>
-                    <p><strong>Tutor's Name:</strong> ${tutorName}</p>
-                </div>
-            </div>
-
-            ${monthlyReport.introduction ? `
-            <div class="mb-6">
-                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">INTRODUCTION</h3>
-                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.introduction}</p>
-            </div>
-            ` : ''}
-
-            ${monthlyReport.topics ? `
-            <div class="mb-6">
-                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">TOPICS & REMARKS</h3>
-                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.topics}</p>
-            </div>
-            ` : ''}
-
-            ${monthlyReport.progress ? `
-            <div class="mb-6">
-                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">PROGRESS & ACHIEVEMENTS</h3>
-                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.progress}</p>
-            </div>
-            ` : ''}
-
-            ${monthlyReport.strengthsWeaknesses ? `
-            <div class="mb-6">
-                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">STRENGTHS AND WEAKNESSES</h3>
-                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.strengthsWeaknesses}</p>
-            </div>
-            ` : ''}
-
-            ${monthlyReport.recommendations ? `
-            <div class="mb-6">
-                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">RECOMMENDATIONS</h3>
-                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.recommendations}</p>
-            </div>
-            ` : ''}
-
-            ${monthlyReport.generalComments ? `
-            <div class="mb-6">
-                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">GENERAL TUTOR'S COMMENTS</h3>
-                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.generalComments}</p>
-            </div>
-            ` : ''}
-
-            <div class="text-right mt-8 pt-4 border-t">
-                <p class="text-gray-600">Best regards,</p>
-                <p class="font-semibold text-green-800">${tutorName}</p>
-            </div>
-
-            <div class="mt-6 text-center">
-                <button onclick="downloadMonthlyReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
-                    Download Monthly Report PDF
+                <button onclick="downloadMonthlyReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}')" 
+                        class="flex items-center bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-4 py-2 rounded-lg hover:from-blue-600 hover:to-cyan-700 transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5">
+                    <span class="mr-2">📥</span>
+                    <span class="font-medium text-sm">Download PDF</span>
                 </button>
             </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div class="flex items-center mb-3">
+                        <span class="text-green-500 mr-2">📚</span>
+                        <h6 class="font-semibold text-gray-700">Topics Covered</h6>
+                    </div>
+                    <p class="text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border border-gray-100 text-sm">${safeTopics}</p>
+                </div>
+                
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div class="flex items-center mb-3">
+                        <span class="text-purple-500 mr-2">📝</span>
+                        <h6 class="font-semibold text-gray-700">Progress Notes</h6>
+                    </div>
+                    <p class="text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border border-gray-100 text-sm">${safeProgress}</p>
+                </div>
+            </div>
+            
+            ${firstReport.areasOfImprovement || firstReport.recommendations ? `
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <div class="flex items-center mb-3">
+                    <span class="text-orange-500 mr-2">🎯</span>
+                    <h6 class="font-semibold text-gray-700">Areas for Improvement & Recommendations</h6>
+                </div>
+                <div class="bg-orange-50 p-4 rounded-lg border border-orange-100">
+                    <p class="text-gray-700 whitespace-pre-wrap text-sm">
+                        ${safeText(firstReport.areasOfImprovement || firstReport.recommendations || 'No specific recommendations provided.')}
+                    </p>
+                </div>
+            </div>
+            ` : ''}
+            
+            ${firstReport.nextSteps || firstReport.futureGoals ? `
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <div class="flex items-center mb-3">
+                    <span class="text-teal-500 mr-2">🚀</span>
+                    <h6 class="font-semibold text-gray-700">Next Steps & Goals</h6>
+                </div>
+                <div class="bg-teal-50 p-4 rounded-lg border border-teal-100">
+                    <p class="text-gray-700 whitespace-pre-wrap text-sm">
+                        ${safeText(firstReport.nextSteps || firstReport.futureGoals || 'No specific goals set for next period.')}
+                    </p>
+                </div>
+            </div>
+            ` : ''}
         </div>
     `;
 }
@@ -3217,12 +3101,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                         loadReferralRewards(userId);
                         loadAcademicsData();
                         setupRealTimeMonitoring(parentPhone, userId);
-
-                        // Re-render charts from cached HTML
-                        // We need to re-run the chart creation logic because canvas elements are cleared
-                        setTimeout(() => {
-                            renderAssessmentCharts();
-                        }, 500);
                         
                         return;
                     }
@@ -3388,7 +3266,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             console.error("Cache write failed:", e);
         }
 
-        // 10. FINAL UI COMPONENTS & CHART RENDERING
+        // 10. FINAL UI COMPONENTS
         if (authArea && reportArea) {
             authArea.classList.add("hidden");
             reportArea.classList.remove("hidden");
@@ -3399,12 +3277,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         setupRealTimeMonitoring(parentPhone, userId);
         loadReferralRewards(userId);
         loadAcademicsData();
-
-        // **KEY UPDATE: RENDER CHARTS**
-        // This function finds all canvas elements created in Section 14 and draws the charts
-        setTimeout(() => {
-            renderAssessmentCharts();
-        }, 100);
 
     } catch (error) {
         console.error("❌ CRITICAL FAILURE in Report Loading:", error);
@@ -3438,59 +3310,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
     } finally {
         if (authLoader) authLoader.classList.add("hidden");
     }
-}
-
-// Helper function to render charts (extracted for clarity)
-function renderAssessmentCharts() {
-    console.log("📊 Rendering assessment charts...");
-    const canvasElements = document.querySelectorAll('.assessment-chart-canvas');
-    
-    canvasElements.forEach(canvas => {
-        try {
-            // Get data from data attribute we set in Section 14
-            const resultsJson = decodeURIComponent(canvas.getAttribute('data-results'));
-            if (!resultsJson) return;
-            
-            const results = JSON.parse(resultsJson);
-            
-            // Check if chart already exists on this canvas
-            if (Chart.getChart(canvas)) {
-                return; // Already rendered
-            }
-            
-            new Chart(canvas, {
-                type: 'bar',
-                data: {
-                    labels: results.map(r => r.subject.toUpperCase()),
-                    datasets: [
-                        { 
-                            label: 'Correct Answers', 
-                            data: results.map(s => s.correct), 
-                            backgroundColor: '#4CAF50' 
-                        }, 
-                        { 
-                            label: 'Incorrect/Unanswered', 
-                            data: results.map(s => s.total - s.correct), 
-                            backgroundColor: '#FFCD56' 
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    scales: { 
-                        x: { stacked: true }, 
-                        y: { stacked: true, beginAtZero: true } 
-                    },
-                    plugins: { 
-                        title: { display: true, text: 'Score Distribution by Subject' } 
-                    }
-                }
-            });
-            
-        } catch (err) {
-            console.error("Error rendering chart:", err);
-        }
-    });
 }
 
 // ============================================================================
