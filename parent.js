@@ -2071,9 +2071,10 @@ function findBestStudentMatch(report, availableStudents) {
     }
     
     // METHOD 3: Student ID matching (new logic)
-    if (report.studentId) {
+    // Check if studentIdMap is defined before using it
+    if (report.studentId && typeof studentIdMap !== 'undefined') {
         // Check if we have student ID mapping
-        for (const [studentName, studentId] of studentIdMap?.entries() || []) {
+        for (const [studentName, studentId] of studentIdMap.entries()) {
             if (studentId === report.studentId) {
                 return studentName;
             }
@@ -2139,7 +2140,15 @@ async function loadAllReportsForParentEnhanced(parentPhone, userId, forceRefresh
             studentsMap.get(studentName).monthly.push(report);
         });
         
-        userChildren = Array.from(studentsMap.keys());
+    // FIX: Don't redeclare userChildren if it already exists - just update it
+        if (typeof userChildren !== 'undefined') {
+            // Update existing userChildren array
+            userChildren.length = 0; // Clear existing
+            Array.from(studentsMap.keys()).forEach(key => userChildren.push(key));
+        } else {
+            // Create if it doesn't exist
+            userChildren = Array.from(studentsMap.keys());
+        }
         
         // DISPLAY LOGIC: IDENTICAL TO parent.js
         // [All display generation code remains exactly the same]
@@ -2350,8 +2359,21 @@ function safeText(text) {
 }
 
 // Global state (if not exists)
-let studentIdMap = new Map();
-let allStudentData = [];
+// REMOVED DUPLICATE DECLARATION - This should only exist once in the entire parent.js file
+// If studentIdMap is already declared elsewhere, remove this line:
+// let studentIdMap = new Map();
+
+// Check if studentIdMap already exists, if not, create it
+if (typeof studentIdMap === 'undefined') {
+    // FIX: Use var instead of let/const to avoid redeclaration errors
+    var studentIdMap = new Map();
+}
+
+// Check if allStudentData already exists
+if (typeof allStudentData === 'undefined') {
+    // FIX: Use var instead of let/const
+    var allStudentData = [];
+}
 
 // ----------------------------------------------------------------------------
 // INITIALIZATION
