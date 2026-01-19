@@ -87,6 +87,16 @@
             margin-right: 8px;
             vertical-align: middle;
         }
+        .loading-spinner-small {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #10b981;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+        }
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -127,6 +137,33 @@
             font-weight: 600;
             color: #065f46;
             margin-bottom: 4px;
+        }
+        /* Accordion Styles */
+        .accordion-header {
+            transition: all 0.3s ease;
+        }
+        .accordion-header:hover {
+            background-color: #bbf7d0 !important;
+        }
+        .accordion-content {
+            transition: all 0.3s ease;
+            max-height: 0;
+            overflow: hidden;
+        }
+        .accordion-content.hidden {
+            max-height: 0;
+        }
+        .accordion-content:not(.hidden) {
+            max-height: 5000px;
+        }
+        .preserve-whitespace {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        /* Message urgent styling */
+        .urgent-message {
+            border-left: 4px solid #ef4444;
+            background-color: #fef2f2;
         }
     </style>
 </head>
@@ -207,11 +244,14 @@
                         <label for="signupPhone" class="block text-sm font-medium text-gray-700 mb-2">
                             Phone Number
                         </label>
-                        <input id="signupPhone" 
-                               type="tel" 
-                               placeholder="Enter your phone number (any format)"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required>
+                        <div id="phoneInputContainer">
+                            <!-- Country code dropdown will be inserted here by JavaScript -->
+                            <input id="signupPhone" 
+                                   type="tel" 
+                                   placeholder="Enter your phone number (any format)"
+                                   class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                                   required>
+                        </div>
                     </div>
                     
                     <div>
@@ -269,12 +309,9 @@
                         <p class="text-green-600">Thank you for being part of Blooming Kids House family</p>
                     </div>
                     <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                        <button onclick="showFeedbackModal()" 
-                                class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 btn-glow flex items-center justify-center">
-                            <span class="mr-2">📝</span> Feedback & Requests
-                        </button>
+                        <!-- Buttons will be added here by JavaScript -->
                         <button onclick="logout()" 
-                                class="bg-red-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-600 transition-all duration-200 flex items-center justify-center">
+                                class="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition-all duration-200 btn-glow flex items-center justify-center">
                             <span class="mr-2">🚪</span> Logout
                         </button>
                     </div>
@@ -284,6 +321,9 @@
             <div class="flex mb-6 rounded-xl overflow-hidden shadow-lg border border-green-200">
                 <button id="reportTab" class="flex-1 py-3 font-semibold tab-active-main hover:bg-green-500 transition-all duration-200">
                     <span class="mr-2">📄</span> Progress Reports
+                </button>
+                <button id="academicsTab" class="flex-1 py-3 font-semibold tab-inactive-main hover:bg-green-100 transition-all duration-200">
+                    <span class="mr-2">📚</span> Academics
                 </button>
                 <button id="rewardsTab" class="flex-1 py-3 font-semibold tab-inactive-main hover:bg-green-100 transition-all duration-200">
                     <span class="mr-2">🎁</span> Rewards Dashboard
@@ -305,87 +345,99 @@
                 </div>
                 
                 <div id="reportContent" class="space-y-6">
-                    </div>
+                    <!-- Accordion reports will be inserted here by JavaScript -->
+                </div>
+            </div>
+            
+            <div id="academicsContentArea" class="hidden">
+                <h2 class="text-2xl font-bold text-green-800 mb-6">Academic Progress & Assignments</h2>
+                <div id="academicsContent" class="bg-white rounded-xl card-glow p-6 min-h-[400px]">
+                    <!-- Academics data will be inserted here by JavaScript -->
+                </div>
             </div>
             
             <div id="rewardsContentArea" class="hidden">
                 <h2 class="text-2xl font-bold text-green-800 mb-6">Parent Referral Rewards</h2>
                 <div id="rewardsContent" class="bg-white rounded-xl card-glow p-6 min-h-[400px]">
-                    </div>
+                    <!-- Rewards data will be inserted here by JavaScript -->
+                </div>
             </div>
         </div>
 
-        <div id="feedbackModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+        <!-- NEW: Compose Message Modal (replaces Feedback Modal) -->
+        <div id="composeMessageModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
             <div class="bg-white rounded-2xl p-6 md:p-8 max-w-2xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-2xl font-bold text-gray-800">Feedback & Requests</h3>
-                    <button onclick="hideFeedbackModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
+                    <h3 class="text-2xl font-bold text-gray-800">Compose Message</h3>
+                    <button id="cancelMessageBtn" class="text-gray-500 hover:text-gray-700 text-2xl">
                         &times;
                     </button>
                 </div>
                 
-                <p class="text-gray-600 mb-6">We value your feedback. Please share your thoughts, requests, or concerns with us.</p>
+                <p class="text-gray-600 mb-6">Send a message to our tutors or management team.</p>
                 
                 <div class="space-y-4">
                     <div>
-                        <label for="feedbackCategory" class="block text-sm font-medium text-gray-700 mb-2">
-                            Category *
+                        <label for="messageRecipient" class="block text-sm font-medium text-gray-700 mb-2">
+                            Send To *
                         </label>
-                        <select id="feedbackCategory" 
+                        <select id="messageRecipient" 
                                 class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
                                 required>
-                            <option value="">Select a category</option>
-                            <option value="Feedback">Feedback</option>
-                            <option value="Request">Request</option>
-                            <option value="Complaint">Complaint</option>
-                            <option value="Suggestion">Suggestion</option>
+                            <option value="">Select recipient</option>
+                            <option value="tutor">My Child's Tutor</option>
+                            <option value="management">Management Team</option>
+                            <option value="both">Both Tutor & Management</option>
                         </select>
                     </div>
 
                     <div>
-                        <label for="feedbackPriority" class="block text-sm font-medium text-gray-700 mb-2">
-                            Priority *
+                        <label for="messageSubject" class="block text-sm font-medium text-gray-700 mb-2">
+                            Subject *
                         </label>
-                        <select id="feedbackPriority" 
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                                required>
-                            <option value="">Select priority level</option>
-                            <option value="Low">Low</option>
-                            <option value="Medium">Medium</option>
-                            <option value="High">High</option>
-                            <option value="Urgent">Urgent</option>
+                        <input id="messageSubject" 
+                               type="text" 
+                               placeholder="Enter message subject"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required>
+                    </div>
+
+                    <div>
+                        <label for="messageStudent" class="block text-sm font-medium text-gray-700 mb-2">
+                            Regarding Student (Optional)
+                        </label>
+                        <select id="messageStudent" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200">
+                            <option value="">Select student (optional)</option>
                         </select>
                     </div>
 
                     <div>
-                        <label for="feedbackStudent" class="block text-sm font-medium text-gray-700 mb-2">
-                            Regarding Student *
-                        </label>
-                        <select id="feedbackStudent" 
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                                required>
-                            <option value="">Select student</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label for="feedbackMessage" class="block text-sm font-medium text-gray-700 mb-2">
+                        <label for="messageContent" class="block text-sm font-medium text-gray-700 mb-2">
                             Message *
                         </label>
-                        <textarea id="feedbackMessage" 
+                        <textarea id="messageContent" 
                                   rows="6"
-                                  placeholder="Please provide detailed feedback, request, or concern..."
-                                  class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                                  placeholder="Type your message here..."
+                                  class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200 preserve-whitespace"
                                   required></textarea>
+                    </div>
+
+                    <div class="flex items-center">
+                        <input id="messageUrgent" type="checkbox" class="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded">
+                        <label for="messageUrgent" class="ml-2 block text-sm text-gray-700">
+                            Mark as Urgent
+                        </label>
+                        <span class="ml-2 text-xs text-red-600">(Only for truly urgent matters)</span>
                     </div>
                     
                     <div class="flex flex-col sm:flex-row gap-2 pt-4">
-                        <button id="submitFeedbackBtn" 
+                        <button id="submitMessageBtn" 
                                 class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
-                            <span id="submitFeedbackText">Submit Feedback</span>
-                            <div id="submitFeedbackSpinner" class="loading-spinner hidden"></div>
+                            <span id="submitMessageText">Send Message</span>
+                            <div id="submitMessageSpinner" class="loading-spinner hidden"></div>
                         </button>
-                        <button onclick="hideFeedbackModal()" 
+                        <button id="cancelMessageBtn2" 
                                 class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">
                             Cancel
                         </button>
@@ -394,26 +446,36 @@
 
                 <div class="mt-6 text-center">
                     <p class="text-sm text-gray-500">
-                        Your feedback will be sent to our management team and you'll receive a response within 24-48 hours.
+                        Your message will be delivered to the selected recipients. You'll receive a response within 24-48 hours.
                     </p>
                 </div>
             </div>
         </div>
 
-        <div id="responsesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+        <!-- NEW: Messages Modal (replaces Responses Modal) -->
+        <div id="messagesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
             <div class="bg-white rounded-2xl p-6 md:p-8 max-w-4xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-2xl font-bold text-gray-800">Admin Responses to Your Feedback</h3>
-                    <button onclick="hideResponsesModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
+                    <h3 class="text-2xl font-bold text-gray-800">📨 Messages</h3>
+                    <button id="cancelMessagesModalBtn" class="text-gray-500 hover:text-gray-700 text-2xl">
                         &times;
                     </button>
                 </div>
                 
-                <div id="responsesContent" class="space-y-4">
-                    </div>
+                <div class="mb-4 flex justify-between items-center">
+                    <p class="text-gray-600">Your messages from tutors and management.</p>
+                    <button onclick="showComposeMessageModal()" 
+                            class="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 btn-glow flex items-center text-sm">
+                        <span class="mr-2">✏️</span> Compose New
+                    </button>
+                </div>
+                
+                <div id="messagesContent" class="space-y-4">
+                    <!-- Messages will be inserted here by JavaScript -->
+                </div>
 
                 <div class="mt-6 text-center">
-                    <button onclick="hideResponsesModal()" 
+                    <button onclick="hideMessagesModal()" 
                             class="bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 transition-all duration-200">
                         Close
                     </button>
