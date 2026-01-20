@@ -1559,35 +1559,40 @@ function showTINPopup(tutor) {
 
 // --- CONFIGURATION & HELPERS ---
 
-// Generate granular time slots (15-minute increments)
+// Generate granular time slots (15-minute increments) - Extended to 6:00 AM
 const generateTimeSlots = () => {
     const slots = [];
-    // From 6:00 AM to 11:00 PM (23:00)
+    
+    // From 12:00 AM to 6:00 AM (overnight classes)
+    for (let hour = 0; hour < 6; hour++) {
+        const hourStr = hour.toString().padStart(2, '0');
+        const minutes = ['00', '15', '30', '45'];
+        
+        minutes.forEach(min => {
+            const value = `${hourStr}:${min}`;
+            let labelHour = hour === 0 ? 12 : hour;
+            const label = `${labelHour}:${min} AM`;
+            slots.push({ value, label });
+        });
+    }
+    
+    // From 6:00 AM to 11:00 PM (daytime classes)
     for (let hour = 6; hour <= 23; hour++) {
         const hourStr = hour.toString().padStart(2, '0');
         const minutes = ['00', '15', '30', '45'];
         
         minutes.forEach(min => {
-            // Format: "14:15"
             const value = `${hourStr}:${min}`;
-            // Label: "02:15 PM"
             let labelHour = hour > 12 ? hour - 12 : hour;
-            if (labelHour === 0) labelHour = 12; // Handle midnight/noon if needed, though strictly 6am-11pm here
+            if (labelHour === 0) labelHour = 12;
             const ampm = hour >= 12 ? 'PM' : 'AM';
             const label = `${labelHour}:${min} ${ampm}`;
             
             slots.push({ value, label });
         });
     }
-    // Add late night/overnight slots if needed (e.g. up to 2 AM)
-    ['00', '01', '02'].forEach(hour => {
-        const minutes = ['00', '15', '30', '45'];
-        minutes.forEach(min => {
-            const value = `${hour}:${min}`;
-            const label = `${hour === '00' ? 12 : parseInt(hour)}:${min} AM`; // Simple AM handling
-            slots.push({ value, label });
-        });
-    });
+    
+    // Add late night/overnight slots up to 6:00 AM (already covered above)
     return slots;
 };
 
@@ -1598,13 +1603,21 @@ let allStudents = [];
 let scheduledStudents = new Set(); 
 let currentStudentIndex = 0;
 let schedulePopup = null;
-let isFirstScheduleCheck = true; 
+let isFirstScheduleCheck = true;
+
+// Track if schedule popup is currently showing
+let isSchedulePopupActive = false;
 
 /**
- * Main function to check for unscheduled students and trigger the UI.
- * Now includes robust error handling and proper list management.
+ * Main function to check for unscheduled students (optional, not forced)
+ * Now returns a promise that resolves to true if popup was shown
  */
-async function checkAndShowSchedulePopup(tutor) {
+async function checkAndShowSchedulePopup(tutor, forceShow = false) {
+    // Don't show if another popup is active
+    if (isSchedulePopupActive && !forceShow) {
+        return false;
+    }
+    
     try {
         const studentsQuery = query(
             collection(db, "students"), 
@@ -1634,34 +1647,106 @@ async function checkAndShowSchedulePopup(tutor) {
         currentStudentIndex = 0;
         
         if (studentsWithoutSchedule.length > 0) {
-            // Show popup for the first unscheduled student (Index 0)
-            showBulkSchedulePopup(studentsWithoutSchedule[0], tutor, studentsWithoutSchedule.length);
-            isFirstScheduleCheck = false; 
-            return true;
+            // Check if we should show popup (only on first check or if forced)
+            if (forceShow || isFirstScheduleCheck) {
+                showBulkSchedulePopup(studentsWithoutSchedule[0], tutor, studentsWithoutSchedule.length);
+                isFirstScheduleCheck = false;
+                isSchedulePopupActive = true;
+                return true;
+            }
         } else {
             // Everyone is scheduled
             if (isFirstScheduleCheck) {
                 console.log("Auto-check: All students scheduled. Silent.");
-                isFirstScheduleCheck = false; 
-                return false;
-            } else {
-                showCustomAlert('✅ All students have been scheduled!');
-                return false;
+                isFirstScheduleCheck = false;
             }
+            // Don't show alert automatically - only if manually triggered
         }
+        
+        return false;
         
     } catch (error) {
         console.error("Error checking schedules:", error);
-        showCustomAlert('Error loading students. Please check your connection.');
+        // Only show error if manually triggered
+        if (forceShow) {
+            showCustomAlert('Error loading students. Please check your connection.');
+        }
         return false;
     }
 }
 
 /**
+ * Manual trigger for schedule management (from UI button)
+ */
+function showScheduleManagementPopup(tutor) {
+    checkAndShowSchedulePopup(tutor, true); // Force show
+}
+
+/**
+ * Function to delete a student's schedule (for use in student profile)
+ */
+async function deleteStudentSchedule(studentId, studentName) {
+    if (!confirm(`Are you sure you want to delete the schedule for ${studentName}?`)) return;
+    
+    try {
+        // Update Student Doc (Remove schedule field)
+        const studentRef = doc(db, "students", studentId);
+        await updateDoc(studentRef, { 
+            schedule: deleteField() 
+        });
+        
+        // Delete specific Schedule Doc
+        const scheduleRef = doc(db, "schedules", `sched_${studentId}`);
+        await deleteDoc(scheduleRef);
+        
+        // Show success message
+        if (window.showCustomAlert) {
+            showCustomAlert(`✅ Schedule deleted for ${studentName}`);
+        } else {
+            alert(`Schedule deleted for ${studentName}`);
+        }
+        
+        // Refresh if on student profile page
+        if (typeof loadStudentData === 'function') {
+            loadStudentData(studentId);
+        }
+        
+        return true;
+        
+    } catch (error) {
+        console.error("Error deleting schedule:", error);
+        if (window.showCustomAlert) {
+            showCustomAlert('Error deleting schedule.');
+        } else {
+            alert('Error deleting schedule.');
+        }
+        return false;
+    }
+}
+
+/**
+ * Helper function to add schedule deletion to student profile page
+ */
+function addScheduleDeleteButtonToProfile(studentId, studentName) {
+    // Check if we're on a student profile page and button doesn't exist
+    const profileActions = document.querySelector('.profile-actions, .student-profile-actions');
+    if (profileActions && !document.getElementById('delete-schedule-btn')) {
+        const deleteBtn = document.createElement('button');
+        deleteBtn.id = 'delete-schedule-btn';
+        deleteBtn.className = 'btn btn-danger btn-sm';
+        deleteBtn.innerHTML = '🗑️ Delete Schedule';
+        deleteBtn.onclick = () => deleteStudentSchedule(studentId, studentName);
+        profileActions.appendChild(deleteBtn);
+    }
+}
+
+/**
  * Renders the scheduling modal.
- * Now supports clearing schedules and granular times.
+ * Now supports clearing schedules and granular times up to 6:00 AM.
  */
 function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
+    isSchedulePopupActive = true;
+    
     if (schedulePopup && document.body.contains(schedulePopup)) {
         schedulePopup.remove();
     }
@@ -1673,8 +1758,13 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
         <div class="modal-overlay">
             <div class="modal-content max-w-2xl">
                 <div class="modal-header">
-                    <h3 class="modal-title">📅 Set Schedule for ${student.studentName}</h3>
-                    <span class="badge badge-info">Queue: ${remainingCount} Remaining</span>
+                    <h3 class="modal-title">📅 Schedule Management</h3>
+                    <div class="flex items-center gap-2">
+                        <span class="badge badge-info">Queue: ${remainingCount} Remaining</span>
+                        <button id="close-schedule-btn" class="btn btn-ghost btn-sm text-gray-500 text-xs">
+                            ✕ Close
+                        </button>
+                    </div>
                 </div>
                 <div class="modal-body">
                     <div class="mb-4 p-3 bg-blue-50 rounded-lg flex justify-between items-center">
@@ -1682,23 +1772,37 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
                             <p class="text-sm text-blue-700">Student: <strong>${student.studentName}</strong> | Grade: ${student.grade}</p>
                             <p class="text-xs text-blue-600">${student.subjects ? student.subjects.join(', ') : 'No subjects'}</p>
                         </div>
-                        <button id="clear-schedule-btn" class="btn btn-danger btn-sm text-xs">
-                            🗑️ Delete Entire Schedule
-                        </button>
+                        <div class="flex gap-2">
+                            <button id="clear-schedule-btn" class="btn btn-danger btn-sm text-xs">
+                                🗑️ Delete Schedule
+                            </button>
+                        </div>
                     </div>
                     
-                    <div id="schedule-entries" class="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                        </div>
+                    <div class="mb-3 p-2 bg-yellow-50 rounded text-sm">
+                        <p class="text-yellow-700">ℹ️ Schedule classes from 12:00 AM to 6:00 AM for overnight sessions.</p>
+                    </div>
+                    
+                    <div id="schedule-entries" class="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
+                    </div>
                     
                     <button id="add-schedule-entry" class="btn btn-secondary btn-sm mt-3 w-full border-dashed border-2">
                         ＋ Add Another Time Slot
                     </button>
                 </div>
                 <div class="modal-footer justify-between">
-                    <button id="skip-schedule-btn" class="btn btn-ghost text-gray-500">Skip / Later</button>
-                    <button id="save-schedule-btn" class="btn btn-primary" data-student-id="${student.id}">
-                        💾 Save Schedule & Next
-                    </button>
+                    <div>
+                        <button id="skip-schedule-btn" class="btn btn-ghost text-gray-500">Skip Student</button>
+                        <button id="skip-all-btn" class="btn btn-ghost text-gray-500 text-xs">Skip All Remaining</button>
+                    </div>
+                    <div>
+                        <button id="save-schedule-btn" class="btn btn-primary" data-student-id="${student.id}">
+                            💾 Save Schedule
+                        </button>
+                        <button id="save-next-btn" class="btn btn-success ml-2">
+                            Save & Next →
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1749,7 +1853,7 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
         existingSchedule.forEach(entry => {
             const div = document.createElement('div');
             div.innerHTML = createRowHTML(entry);
-            entriesContainer.appendChild(div.firstElementChild); // Append the inner div
+            entriesContainer.appendChild(div.firstElementChild);
         });
     } else {
         // Add one empty row
@@ -1760,25 +1864,42 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
 
     // --- EVENT LISTENERS ---
 
-    // 1. Add Row
+    // 1. Close popup
+    document.getElementById('close-schedule-btn').addEventListener('click', () => {
+        schedulePopup.remove();
+        isSchedulePopupActive = false;
+        currentStudentIndex = 0; // Reset for next time
+    });
+
+    // 2. Add Row
     document.getElementById('add-schedule-entry').addEventListener('click', () => {
         const div = document.createElement('div');
-        div.innerHTML = createRowHTML(); // Defaults
+        div.innerHTML = createRowHTML();
         entriesContainer.appendChild(div.firstElementChild);
     });
 
-    // 2. Remove Row (Delegated)
+    // 3. Remove Row (Delegated)
     entriesContainer.addEventListener('click', (e) => {
         if (e.target.classList.contains('remove-schedule-btn')) {
             const row = e.target.closest('.schedule-entry');
-            // Allow removing even if it's the last one (user might want to clear manually)
-            row.remove();
+            // If only one row left and removing it, ask if they want to clear all
+            if (document.querySelectorAll('.schedule-entry').length === 1) {
+                if (confirm("This is the last time slot. Remove it to clear the schedule?")) {
+                    row.remove();
+                    // Add an empty row for convenience
+                    const div = document.createElement('div');
+                    div.innerHTML = createRowHTML();
+                    entriesContainer.appendChild(div.firstElementChild);
+                }
+            } else {
+                row.remove();
+            }
         }
     });
 
-    // 3. Delete Entire Schedule (Database Wipe)
+    // 4. Delete Entire Schedule (Database Wipe)
     document.getElementById('clear-schedule-btn').addEventListener('click', async () => {
-        if (!confirm(`Are you sure you want to completely delete the schedule for ${student.studentName}?`)) return;
+        if (!confirm(`Are you sure you want to delete the schedule for ${student.studentName}?`)) return;
 
         try {
             // Update Student Doc (Remove field)
@@ -1788,23 +1909,45 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
             // Delete specific Schedule Doc
             await deleteDoc(doc(db, "schedules", `sched_${student.id}`));
 
-            showCustomAlert(`🗑️ Schedule deleted for ${student.studentName}`);
+            showCustomAlert(`✅ Schedule deleted for ${student.studentName}`);
             
-            // Handle queue logic (treat as scheduled/handled)
-            scheduledStudents.delete(student.id); // Ensure they are removed from 'scheduled' set if they were there
-            // But wait... if we delete their schedule, they technically go back to "unscheduled" list?
-            // User flow: If I delete it, I probably want to skip them for now.
-            
-            moveToNextStudent(false); // False = Don't mark as scheduled
+            // Mark as unscheduled and move to next
+            scheduledStudents.delete(student.id);
+            moveToNextStudent(false); // Don't mark as scheduled
 
         } catch (error) {
             console.error("Error deleting schedule:", error);
-            showCustomAlert('Error deleting schedule.');
+            showCustomAlert('❌ Error deleting schedule.');
         }
     });
 
-    // 4. Save & Next
+    // 5. Save Schedule (without moving to next)
     document.getElementById('save-schedule-btn').addEventListener('click', async () => {
+        await saveCurrentSchedule(student, false);
+    });
+
+    // 6. Save & Next
+    document.getElementById('save-next-btn').addEventListener('click', async () => {
+        await saveCurrentSchedule(student, true);
+    });
+
+    // 7. Skip Student
+    document.getElementById('skip-schedule-btn').addEventListener('click', () => {
+        moveToNextStudent(false);
+    });
+
+    // 8. Skip All Remaining
+    document.getElementById('skip-all-btn').addEventListener('click', () => {
+        if (confirm("Skip all remaining students without scheduling?")) {
+            schedulePopup.remove();
+            isSchedulePopupActive = false;
+            currentStudentIndex = 0;
+            showCustomAlert("Skipped all remaining students. You can schedule them later from the Students page.");
+        }
+    });
+
+    // --- SCHEDULE SAVING LOGIC ---
+    async function saveCurrentSchedule(student, moveToNext = false) {
         const entryDivs = document.querySelectorAll('.schedule-entry');
         const schedule = [];
         let hasError = false;
@@ -1815,10 +1958,20 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
             const start = div.querySelector('.schedule-start').value;
             const end = div.querySelector('.schedule-end').value;
             
-            // Basic Logic Validation
-            const validation = validateScheduleTime(start, end); // Assumes this helper exists globally or in prev section
-            if (!validation.valid) {
-                showCustomAlert(`⚠️ ${day}: ${validation.message}`);
+            // Basic validation
+            if (!start || !end) {
+                showCustomAlert(`⚠️ Please fill in all time slots for ${day}`);
+                hasError = true;
+                break;
+            }
+            
+            // Time validation
+            const startTime = parseInt(start.replace(':', ''));
+            const endTime = parseInt(end.replace(':', ''));
+            
+            // Allow overnight sessions (end time can be earlier than start time)
+            if (startTime === endTime) {
+                showCustomAlert(`⚠️ ${day}: Start and end times cannot be the same`);
                 hasError = true;
                 break;
             }
@@ -1826,17 +1979,15 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
             schedule.push({ 
                 day, 
                 start, 
-                end,
-                isOvernight: validation.isOvernight || false,
-                duration: validation.duration
+                end
             });
         }
         
         if (hasError) return;
         
         if (schedule.length === 0) {
-            // If they save with empty list, treat as "Skip" or "Delete"
-            if(confirm("No times slots added. Do you want to save this as an empty schedule (unscheduled)?")) {
+            // If empty schedule, treat as delete
+            if(confirm("No time slots added. Delete the existing schedule?")) {
                 document.getElementById('clear-schedule-btn').click();
                 return;
             } else {
@@ -1845,11 +1996,11 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
         }
         
         try {
-            // A. Update Student Profile (Primary Storage)
+            // A. Update Student Profile
             const studentRef = doc(db, "students", student.id);
             await updateDoc(studentRef, { schedule });
             
-            // B. Update/Create Central Schedule (Deterministic ID to prevent duplicates)
+            // B. Update/Create Central Schedule
             const scheduleRef = doc(db, "schedules", `sched_${student.id}`);
             await setDoc(scheduleRef, {
                 studentId: student.id,
@@ -1857,58 +2008,92 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
                 tutorEmail: window.tutorData.email,
                 tutorName: window.tutorData.name,
                 schedule: schedule,
-                updatedAt: new Date() // Useful for sorting
-            }, { merge: true }); // Merge ensures we don't overwrite other fields if they exist
+                updatedAt: new Date()
+            }, { merge: true });
             
             showCustomAlert('✅ Schedule saved successfully!');
             
-            // Mark as scheduled and move on
-            moveToNextStudent(true);
+            if (moveToNext) {
+                // Mark as scheduled and move on
+                scheduledStudents.add(student.id);
+                moveToNextStudent(true);
+            }
             
         } catch (error) {
-            console.error("Error saving:", error);
+            console.error("Error saving schedule:", error);
             showCustomAlert('❌ System Error: Could not save schedule.');
         }
-    });
-    
-    // 5. Skip
-    document.getElementById('skip-schedule-btn').addEventListener('click', () => {
-        moveToNextStudent(false); // False = Do not mark as scheduled
-    });
+    }
 
     // --- QUEUE MANAGEMENT LOGIC ---
     function moveToNextStudent(markAsScheduled) {
         schedulePopup.remove();
+        isSchedulePopupActive = false;
 
         if (markAsScheduled) {
             scheduledStudents.add(student.id);
         } else {
-            // If skipping, we just increment the index to look at the next one in the CURRENT list
             currentStudentIndex++;
         }
 
-        // Recalculate the remaining list based on the Set
+        // Recalculate remaining list
         const remainingList = allStudents.filter(s => !scheduledStudents.has(s.id));
         
-        // If we marked as scheduled, the list is now 1 shorter, so index 0 is the next guy.
-        // If we skipped, we incremented index, so we look at the new index.
-        const nextIndex = markAsScheduled ? 0 : currentStudentIndex;
-
-        if (remainingList.length > 0 && nextIndex < remainingList.length) {
-            setTimeout(() => {
-                showBulkSchedulePopup(remainingList[nextIndex], tutor, remainingList.length);
-            }, 400); // Small delay for UX transition
-        } else {
-            // End of queue
-            if (!markAsScheduled && remainingList.length > 0) {
-                 showCustomAlert('End of list (Skipped remaining students).');
+        if (remainingList.length > 0) {
+            const nextIndex = markAsScheduled ? 0 : currentStudentIndex;
+            
+            if (nextIndex < remainingList.length) {
+                setTimeout(() => {
+                    isSchedulePopupActive = true;
+                    showBulkSchedulePopup(remainingList[nextIndex], tutor, remainingList.length);
+                }, 400);
             } else {
-                 showCustomAlert('🎉 All active students are now scheduled!');
+                // End of list reached via skipping
+                currentStudentIndex = 0;
+                showCustomAlert('End of student list. You can always schedule students individually from their profiles.');
             }
-            // Reset index for next time
+        } else {
+            // All done
             currentStudentIndex = 0;
+            showCustomAlert('🎉 All active students are now scheduled!');
         }
     }
+}
+
+// --- ALERT FUNCTION ENHANCEMENT ---
+// Ensure showCustomAlert exists and works properly
+if (typeof showCustomAlert !== 'function') {
+    window.showCustomAlert = function(message, type = 'info') {
+        // Remove any existing alerts
+        const existingAlert = document.querySelector('.custom-alert');
+        if (existingAlert) existingAlert.remove();
+        
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `custom-alert fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transform transition-transform duration-300 ${
+            type === 'error' ? 'bg-red-100 border-red-400 text-red-700' :
+            type === 'success' ? 'bg-green-100 border-green-400 text-green-700' :
+            'bg-blue-100 border-blue-400 text-blue-700'
+        } border-l-4`;
+        
+        alertDiv.innerHTML = `
+            <div class="flex items-center">
+                <span class="mr-2">${type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️'}</span>
+                <span class="font-medium">${message}</span>
+                <button class="ml-4 text-gray-500 hover:text-gray-700" onclick="this.parentElement.parentElement.remove()">
+                    ✕
+                </button>
+            </div>
+        `;
+        
+        document.body.appendChild(alertDiv);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (alertDiv.parentElement) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    };
 }
 
 /*******************************************************************************
@@ -5400,3 +5585,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
