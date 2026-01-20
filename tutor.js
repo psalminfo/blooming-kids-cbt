@@ -4023,10 +4023,11 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
 }
 
 /*******************************************************************************
- * SECTION 12: STUDENT DATABASE MANAGEMENT (LEGACY EXACT RESTORATION)
+ * SECTION 12: STUDENT DATABASE MANAGEMENT (LEGACY EXACT RESTORATION - FIXED)
  ******************************************************************************/
 
-// --- Helper Functions from Old File (Required for the UI) ---
+// --- Helper Functions from Old File ---
+// NOTE: cleanGradeString has been removed from here because it exists globally in Section 5.
 
 function getNewStudentFormFields() {
     // Exact copy of the old form generator with the old containers
@@ -4087,14 +4088,6 @@ function getNewStudentFormFields() {
         </div>
         <select id="new-student-fee" class="w-full mt-1 p-2 border rounded">${feeOptions}</select>
     `;
-}
-
-function cleanGradeString(grade) {
-    if (grade && grade.toLowerCase().includes("grade")) {
-        return grade;
-    } else {
-        return `Grade ${grade}`;
-    }
 }
 
 function showEditStudentModal(student) {
@@ -4213,12 +4206,12 @@ function showEditStudentModal(student) {
         const studentFee = parseFloat(feeValue.replace(/,/g, ''));
 
         if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
-            alert('Please fill in all parent and student details correctly, including at least one subject.');
+            if (typeof showCustomAlert === 'function') showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.'); else alert('Please fill in all parent and student details correctly, including at least one subject.');
             return;
         }
 
         if (isNaN(studentFee) || studentFee < 0) {
-            alert('Please enter a valid fee amount.');
+            if (typeof showCustomAlert === 'function') showCustomAlert('Please enter a valid fee amount.'); else alert('Please enter a valid fee amount.');
             return;
         }
 
@@ -4240,19 +4233,18 @@ function showEditStudentModal(student) {
             await updateDoc(studentRef, studentData);
             
             editModal.remove();
-            // Assuming showCustomAlert exists in main scope, else we use alert
             if (typeof showCustomAlert === 'function') showCustomAlert('Student details updated successfully!'); else alert('Student details updated successfully!');
             
             const mainContent = document.getElementById('mainContent');
             renderStudentDatabase(mainContent, window.tutorData);
         } catch (error) {
             console.error("Error updating student:", error);
-            alert(`An error occurred: ${error.message}`);
+            if (typeof showCustomAlert === 'function') showCustomAlert(`An error occurred: ${error.message}`); else alert(`An error occurred: ${error.message}`);
         }
     });
 }
 
-// --- Main Student Database Function (Containing the exact old container layout) ---
+// --- Main Student Database Function ---
 
 async function renderStudentDatabase(container, tutor) {
     if (!container) {
@@ -4323,7 +4315,6 @@ async function renderStudentDatabase(container, tutor) {
     const studentsCount = students.length;
 
     function renderUI() {
-        // EXACT OLD CONTAINER STRUCTURE
         let studentsHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">My Students (${studentsCount})</h2>`;
         
         studentsHTML += `
@@ -4437,12 +4428,11 @@ async function renderStudentDatabase(container, tutor) {
             }
         }
         
-        // THIS IS THE EXACT CONTAINER ID AND CLASSES FROM THE OLD FILE
         container.innerHTML = `<div id="student-list-view" class="bg-white p-6 rounded-lg shadow-md">${studentsHTML}</div>`;
         attachEventListeners();
     }
 
-    // --- Internal Functions (Alerts, Modals, Submission Logic) ---
+    // --- Internal Functions ---
     function showCustomAlert(message) {
         const alertModal = document.createElement('div');
         alertModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
@@ -4454,9 +4444,6 @@ async function renderStudentDatabase(container, tutor) {
         document.body.appendChild(alertModal);
         document.getElementById('alert-ok-btn').addEventListener('click', () => alertModal.remove());
     }
-
-    // ... (All other nested functions like showFeeConfirmationModal, submitAllReports, etc. are handled by the scoped context or global overrides if defined) ...
-    // Note: Since I included the global overrides above (window.showAccountDetailsModal), the listeners inside renderUI will work correctly with them.
     
     function attachEventListeners() {
         // Group class toggle
@@ -4474,17 +4461,12 @@ async function renderStudentDatabase(container, tutor) {
             });
         }
         
-        // Button Listeners
         const transitioningBtn = document.getElementById('add-transitioning-btn');
         if (transitioningBtn) transitioningBtn.addEventListener('click', () => { showTransitioningConfirmation(); });
 
         const studentBtn = document.getElementById('add-student-btn');
         if (studentBtn && isTutorAddEnabled) {
             studentBtn.addEventListener('click', async () => {
-                // ... (Logic for adding student is complex, reusing addTransitioningStudent as template) ...
-                // Note: For brevity in this replacement block, ensure you have the full add logic. 
-                // Since this is a "how to", I'm providing the critical UI parts. 
-                // The full add logic is below.
                 const parentName = document.getElementById('new-parent-name').value.trim();
                 const parentPhone = document.getElementById('new-parent-phone').value.trim();
                 const studentName = document.getElementById('new-student-name').value.trim();
@@ -5035,5 +5017,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
