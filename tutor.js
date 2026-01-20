@@ -1554,12 +1554,10 @@ function showTINPopup(tutor) {
 }
 
 /*******************************************************************************
- * SECTION 7: SCHEDULE MANAGEMENT (OPTIONAL & USER-CONTROLLED)
+ * SECTION 7: SCHEDULE MANAGEMENT (SIMPLE & ONE-TIME ONLY)
  ******************************************************************************/
 
-// --- CONFIGURATION & HELPERS ---
-
-// Generate granular time slots (15-minute increments) - Extended to 6:00 AM
+// Generate time slots (12:00 AM to 6:00 AM for overnight classes)
 const generateTimeSlots = () => {
     const slots = [];
     
@@ -1567,28 +1565,23 @@ const generateTimeSlots = () => {
     for (let hour = 0; hour < 6; hour++) {
         const hourStr = hour.toString().padStart(2, '0');
         const minutes = ['00', '15', '30', '45'];
-        
         minutes.forEach(min => {
             const value = `${hourStr}:${min}`;
             let labelHour = hour === 0 ? 12 : hour;
-            const label = `${labelHour}:${min} AM`;
-            slots.push({ value, label });
+            slots.push({ value, label: `${labelHour}:${min} AM` });
         });
     }
     
-    // From 6:00 AM to 11:00 PM (daytime classes)
+    // From 6:00 AM to 11:00 PM
     for (let hour = 6; hour <= 23; hour++) {
         const hourStr = hour.toString().padStart(2, '0');
         const minutes = ['00', '15', '30', '45'];
-        
         minutes.forEach(min => {
             const value = `${hourStr}:${min}`;
             let labelHour = hour > 12 ? hour - 12 : hour;
             if (labelHour === 0) labelHour = 12;
             const ampm = hour >= 12 ? 'PM' : 'AM';
-            const label = `${labelHour}:${min} ${ampm}`;
-            
-            slots.push({ value, label });
+            slots.push({ value, label: `${labelHour}:${min} ${ampm}` });
         });
     }
     
@@ -1597,49 +1590,38 @@ const generateTimeSlots = () => {
 
 const ROBUST_TIME_SLOTS = generateTimeSlots();
 
-// Schedule Management State
+// State variables
 let allStudents = [];
-let scheduledStudents = new Set(); 
+let scheduledStudents = new Set();
 let currentStudentIndex = 0;
 let schedulePopup = null;
 
-// Track if popup has been shown in this session and user preference
-let hasShownInitialPopup = false;
-let userPrefersNoPopup = false;
+// SIMPLE FLAG - Shows only once per session
+let hasPopupBeenShownThisSession = false;
 
 /**
- * Check local storage for user preference about popup
- */
-function checkPopupPreference() {
-    const preference = localStorage.getItem('schedulePopupPreference');
-    return preference === 'never';
-}
-
-/**
- * Save user preference to local storage
- */
-function savePopupPreference(preference) {
-    localStorage.setItem('schedulePopupPreference', preference);
-}
-
-/**
- * Main function to check for unscheduled students - SHOWS ONLY ONCE EVER
+ * MAIN FUNCTION: Check for unscheduled students
+ * Shows popup ONLY ONCE when tutor first loads the dashboard
  */
 async function checkAndShowSchedulePopup(tutor) {
-    // Check if user has opted out of popups
-    if (checkPopupPreference()) {
-        console.log("User has opted out of schedule popups");
+    // DON'T SHOW if:
+    // 1. Already shown in this session
+    // 2. User is on a different page (not dashboard)
+    // 3. Another modal is open
+    
+    if (hasPopupBeenShownThisSession) {
         return false;
     }
     
-    // Check if we've already shown the popup in this session or ever before
-    const hasShownBefore = localStorage.getItem('hasShownSchedulePopup');
-    if (hasShownBefore === 'true' || hasShownInitialPopup) {
-        console.log("Schedule popup already shown before, not showing again");
+    // Check if we're on the dashboard (optional)
+    const isDashboard = window.location.pathname.includes('dashboard') || 
+                       window.location.pathname.includes('index');
+    
+    if (!isDashboard) {
         return false;
     }
     
-    // Don't show if another popup is active
+    // Check if any modal is already open
     if (document.querySelector('.modal-overlay')) {
         return false;
     }
@@ -1652,33 +1634,34 @@ async function checkAndShowSchedulePopup(tutor) {
         const studentsSnapshot = await getDocs(studentsQuery);
         
         allStudents = [];
-        scheduledStudents.clear(); 
+        scheduledStudents.clear();
+        
+        // Count unscheduled students
+        let unscheduledCount = 0;
         
         studentsSnapshot.forEach(doc => {
             const student = { id: doc.id, ...doc.data() };
-            // Filter active students only
             if (!['archived', 'graduated', 'transferred'].includes(student.status)) {
                 allStudents.push(student);
-                // Check if student has a valid schedule
                 if (student.schedule && Array.isArray(student.schedule) && student.schedule.length > 0) {
                     scheduledStudents.add(student.id);
+                } else {
+                    unscheduledCount++;
                 }
             }
         });
         
-        // Filter students that need scheduling
-        const studentsWithoutSchedule = allStudents.filter(student => !scheduledStudents.has(student.id));
-        
-        // Reset index for the new batch
-        currentStudentIndex = 0;
-        
-        if (studentsWithoutSchedule.length > 0) {
-            // Mark that we've shown the popup (persistently)
-            localStorage.setItem('hasShownSchedulePopup', 'true');
-            hasShownInitialPopup = true;
+        // Only show if there are unscheduled students
+        if (unscheduledCount > 0) {
+            // Mark that we've shown it (ONLY for this browser session)
+            hasPopupBeenShownThisSession = true;
             
-            // Show the popup
-            showBulkSchedulePopup(studentsWithoutSchedule[0], tutor, studentsWithoutSchedule.length);
+            // Show the popup after a short delay (better UX)
+            setTimeout(() => {
+                const unscheduledStudents = allStudents.filter(s => !scheduledStudents.has(s.id));
+                showBulkSchedulePopup(unscheduledStudents[0], tutor, unscheduledCount);
+            }, 1000); // 1 second delay
+            
             return true;
         }
         
@@ -1691,35 +1674,71 @@ async function checkAndShowSchedulePopup(tutor) {
 }
 
 /**
- * Manual trigger for schedule management (from UI button)
- * This bypasses the "once ever" rule
+ * MANUAL TRIGGER - For when tutor wants to manage schedules
+ * Call this from a button like: "Manage Student Schedules"
  */
-function showScheduleManagementPopup(tutor) {
-    // Clear the flag to allow showing again
-    localStorage.removeItem('hasShownSchedulePopup');
-    hasShownInitialPopup = false;
-    checkAndShowSchedulePopup(tutor);
+function showManualScheduleManager(tutor) {
+    // This bypasses the "once per session" rule
+    checkUnscheduledStudentsAndShowPopup(tutor, true);
 }
 
 /**
- * Reset schedule popup flag (for testing or admin purposes)
+ * Helper function for manual trigger
  */
-function resetSchedulePopupFlag() {
-    localStorage.removeItem('hasShownSchedulePopup');
-    hasShownInitialPopup = false;
-    userPrefersNoPopup = false;
-    localStorage.removeItem('schedulePopupPreference');
-    console.log("Schedule popup flag reset");
+async function checkUnscheduledStudentsAndShowPopup(tutor, isManual = false) {
+    try {
+        const studentsQuery = query(
+            collection(db, "students"), 
+            where("tutorEmail", "==", tutor.email)
+        );
+        const studentsSnapshot = await getDocs(studentsQuery);
+        
+        allStudents = [];
+        scheduledStudents.clear();
+        
+        studentsSnapshot.forEach(doc => {
+            const student = { id: doc.id, ...doc.data() };
+            if (!['archived', 'graduated', 'transferred'].includes(student.status)) {
+                allStudents.push(student);
+                if (student.schedule && Array.isArray(student.schedule) && student.schedule.length > 0) {
+                    scheduledStudents.add(student.id);
+                }
+            }
+        });
+        
+        const unscheduledStudents = allStudents.filter(s => !scheduledStudents.has(s.id));
+        
+        if (unscheduledStudents.length > 0) {
+            // If manual, don't set the flag (allow multiple opens)
+            if (!isManual) {
+                hasPopupBeenShownThisSession = true;
+            }
+            
+            showBulkSchedulePopup(unscheduledStudents[0], tutor, unscheduledStudents.length);
+            return true;
+        } else {
+            if (isManual) {
+                showCustomAlert('🎉 All students already have schedules!', 'success');
+            }
+            return false;
+        }
+        
+    } catch (error) {
+        console.error("Error:", error);
+        showCustomAlert('Error loading students', 'error');
+        return false;
+    }
 }
 
 /**
  * Function to delete a student's schedule
+ * Call this from student profile page
  */
 async function deleteStudentSchedule(studentId, studentName) {
-    // Create a proper confirmation dialog
+    // Use our enhanced confirmation dialog
     const confirmed = await showConfirmDialog(
-        `Delete Schedule for ${studentName}`,
-        `Are you sure you want to delete the schedule for ${studentName}? This action cannot be undone.`,
+        'Delete Schedule',
+        `Delete the schedule for ${studentName}?`,
         'Delete',
         'Cancel'
     );
@@ -1727,20 +1746,17 @@ async function deleteStudentSchedule(studentId, studentName) {
     if (!confirmed) return false;
     
     try {
-        // Update Student Doc (Remove schedule field)
+        // Remove from student document
         const studentRef = doc(db, "students", studentId);
-        await updateDoc(studentRef, { 
-            schedule: deleteField() 
-        });
+        await updateDoc(studentRef, { schedule: deleteField() });
         
-        // Delete specific Schedule Doc
+        // Remove from schedules collection
         const scheduleRef = doc(db, "schedules", `sched_${studentId}`);
         await deleteDoc(scheduleRef);
         
-        // Show success message
         showCustomAlert(`✅ Schedule deleted for ${studentName}`, 'success');
         
-        // Refresh if on student profile page
+        // Refresh if on student profile
         if (typeof loadStudentData === 'function') {
             loadStudentData(studentId);
         }
@@ -1749,80 +1765,64 @@ async function deleteStudentSchedule(studentId, studentName) {
         
     } catch (error) {
         console.error("Error deleting schedule:", error);
-        showCustomAlert('❌ Error deleting schedule.', 'error');
+        showCustomAlert('❌ Error deleting schedule', 'error');
         return false;
     }
 }
 
 /**
- * Renders the scheduling modal with proper close handlers
+ * Schedule popup with proper close handlers
  */
 function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
-    if (schedulePopup && document.body.contains(schedulePopup)) {
+    // Close any existing popup
+    if (schedulePopup) {
         schedulePopup.remove();
     }
     
-    // Check if student already has data
     const existingSchedule = student.schedule || [];
-
+    
     const popupHTML = `
-        <div class="modal-overlay">
+        <div class="modal-overlay" id="schedule-modal">
             <div class="modal-content max-w-2xl">
                 <div class="modal-header">
-                    <h3 class="modal-title">📅 Schedule Management</h3>
+                    <h3 class="modal-title">Schedule Student</h3>
                     <div class="flex items-center gap-2">
-                        <span class="badge badge-info">${remainingCount} unscheduled</span>
-                        <button id="close-schedule-btn" class="btn btn-ghost btn-sm text-gray-500 hover:text-gray-700">
-                            ✕
-                        </button>
+                        <span class="badge">${remainingCount} to go</span>
+                        <button class="close-modal-btn btn btn-sm btn-ghost">✕</button>
                     </div>
                 </div>
+                
                 <div class="modal-body">
-                    <div class="mb-4 p-4 bg-blue-50 rounded-lg">
-                        <div class="flex justify-between items-center mb-2">
-                            <div>
-                                <p class="text-sm font-semibold text-blue-800">${student.studentName}</p>
-                                <p class="text-xs text-blue-600">Grade ${student.grade} • ${student.subjects ? student.subjects.join(', ') : 'No subjects'}</p>
-                            </div>
-                            <button id="clear-schedule-btn" class="btn btn-danger btn-sm">
-                                🗑️ Delete Schedule
-                            </button>
-                        </div>
-                        <div class="flex items-center justify-between mt-3">
-                            <div class="text-xs text-blue-700">
-                                ℹ️ Schedule classes anytime (including overnight)
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <input type="checkbox" id="dont-show-again" class="checkbox checkbox-xs">
-                                <label for="dont-show-again" class="text-xs text-gray-600 cursor-pointer">Don't show again</label>
-                            </div>
-                        </div>
+                    <div class="student-info mb-4 p-4 bg-blue-50 rounded-lg">
+                        <h4 class="font-semibold text-blue-800">${student.studentName}</h4>
+                        <p class="text-sm text-blue-600">Grade ${student.grade} • ${student.subjects?.join(', ') || 'No subjects'}</p>
                     </div>
                     
-                    <div id="schedule-entries" class="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
+                    <div id="schedule-entries" class="space-y-3 mb-4 max-h-[50vh] overflow-y-auto">
+                        <!-- Time slots will go here -->
                     </div>
                     
-                    <button id="add-schedule-entry" class="btn btn-outline btn-sm mt-4 w-full border-dashed">
-                        ＋ Add Time Slot
+                    <button id="add-time-btn" class="btn btn-outline w-full mb-4">
+                        ＋ Add Another Time
                     </button>
-                </div>
-                <div class="modal-footer justify-between border-t pt-4">
-                    <div>
-                        <button id="skip-schedule-btn" class="btn btn-ghost text-gray-500 hover:text-gray-700">
-                            Skip This Student
-                        </button>
-                        <button id="close-and-dont-show" class="btn btn-ghost text-xs text-gray-400 hover:text-gray-600">
-                            Close & Don't Show Again
-                        </button>
-                    </div>
+                    
                     <div class="flex gap-2">
-                        <button id="save-schedule-btn" class="btn btn-primary">
-                            💾 Save
+                        <button id="delete-schedule-btn" class="btn btn-danger flex-1">
+                            🗑️ Delete Schedule
                         </button>
-                        <button id="save-next-btn" class="btn btn-success">
-                            Save & Next
+                        <button id="skip-student-btn" class="btn btn-ghost">
+                            Skip
                         </button>
                     </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button id="save-btn" class="btn btn-primary">
+                        Save
+                    </button>
+                    <button id="save-next-btn" class="btn btn-success">
+                        Save & Next Student
+                    </button>
                 </div>
             </div>
         </div>
@@ -1832,113 +1832,45 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
     schedulePopup.innerHTML = popupHTML;
     document.body.appendChild(schedulePopup);
     
-    // --- Helper to Create Row HTML ---
-    const createRowHTML = (data = null) => {
-        const dayVal = data ? data.day : 'Monday';
-        const startVal = data ? data.start : '09:00';
-        const endVal = data ? data.end : '10:00';
-
-        return `
-        <div class="schedule-entry bg-gray-50 p-3 rounded-lg border relative hover:shadow-sm transition-shadow">
-            <button class="remove-schedule-btn absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow hover:bg-red-600 transition-colors">
-                ✕
-            </button>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                    <label class="text-xs font-medium text-gray-600">Day</label>
-                    <select class="select select-bordered select-sm w-full schedule-day">
-                        ${DAYS_OF_WEEK.map(day => `<option value="${day}" ${day === dayVal ? 'selected' : ''}>${day}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label class="text-xs font-medium text-gray-600">Start Time</label>
-                    <select class="select select-bordered select-sm w-full schedule-start">
-                        ${ROBUST_TIME_SLOTS.map(slot => `<option value="${slot.value}" ${slot.value === startVal ? 'selected' : ''}>${slot.label}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label class="text-xs font-medium text-gray-600">End Time</label>
-                    <select class="select select-bordered select-sm w-full schedule-end">
-                        ${ROBUST_TIME_SLOTS.map(slot => `<option value="${slot.value}" ${slot.value === endVal ? 'selected' : ''}>${slot.label}</option>`).join('')}
-                    </select>
-                </div>
-            </div>
-        </div>`;
-    };
-
-    // --- Render Initial Rows ---
+    // Render time slots
     const entriesContainer = document.getElementById('schedule-entries');
     
     if (existingSchedule.length > 0) {
-        existingSchedule.forEach(entry => {
-            const div = document.createElement('div');
-            div.innerHTML = createRowHTML(entry);
-            entriesContainer.appendChild(div.firstElementChild);
+        existingSchedule.forEach(slot => {
+            addTimeSlotRow(entriesContainer, slot);
         });
     } else {
-        const div = document.createElement('div');
-        div.innerHTML = createRowHTML();
-        entriesContainer.appendChild(div.firstElementChild);
+        addTimeSlotRow(entriesContainer);
     }
-
+    
     // --- EVENT LISTENERS ---
-
-    // 1. Close button
-    document.getElementById('close-schedule-btn').addEventListener('click', closeSchedulePopup);
-
-    // 2. Close overlay (click outside)
+    
+    // CLOSE button
+    document.querySelector('.close-modal-btn').addEventListener('click', closePopup);
+    
+    // CLOSE when clicking outside
     document.querySelector('.modal-overlay').addEventListener('click', (e) => {
-        if (e.target.classList.contains('modal-overlay')) {
-            closeSchedulePopup();
+        if (e.target.id === 'schedule-modal') {
+            closePopup();
         }
     });
-
-    // 3. Close & Don't Show Again button
-    document.getElementById('close-and-dont-show').addEventListener('click', () => {
-        const dontShowAgain = document.getElementById('dont-show-again').checked;
-        if (dontShowAgain) {
-            savePopupPreference('never');
-            showCustomAlert('Schedule popups disabled. Enable in settings if needed.', 'info');
+    
+    // CLOSE with Escape key
+    const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+            closePopup();
+            document.removeEventListener('keydown', handleEscape);
         }
-        closeSchedulePopup();
+    };
+    document.addEventListener('keydown', handleEscape);
+    
+    // Add time button
+    document.getElementById('add-time-btn').addEventListener('click', () => {
+        addTimeSlotRow(entriesContainer);
     });
-
-    // 4. Add Row
-    document.getElementById('add-schedule-entry').addEventListener('click', () => {
-        const div = document.createElement('div');
-        div.innerHTML = createRowHTML();
-        entriesContainer.appendChild(div.firstElementChild);
-    });
-
-    // 5. Remove Row
-    entriesContainer.addEventListener('click', (e) => {
-        if (e.target.classList.contains('remove-schedule-btn')) {
-            const row = e.target.closest('.schedule-entry');
-            const totalRows = document.querySelectorAll('.schedule-entry').length;
-            
-            if (totalRows === 1) {
-                showConfirmDialog(
-                    'Remove Last Time Slot',
-                    'This is the last time slot. Removing it will clear the schedule. Continue?',
-                    'Remove',
-                    'Cancel'
-                ).then(confirmed => {
-                    if (confirmed) {
-                        row.remove();
-                        // Add empty row for convenience
-                        const div = document.createElement('div');
-                        div.innerHTML = createRowHTML();
-                        entriesContainer.appendChild(div.firstElementChild);
-                    }
-                });
-            } else {
-                row.remove();
-            }
-        }
-    });
-
-    // 6. Delete Entire Schedule
-    document.getElementById('clear-schedule-btn').addEventListener('click', async () => {
+    
+    // Delete schedule button
+    document.getElementById('delete-schedule-btn').addEventListener('click', async () => {
         const confirmed = await showConfirmDialog(
             'Delete Schedule',
             `Delete schedule for ${student.studentName}?`,
@@ -1946,354 +1878,176 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
             'Cancel'
         );
         
-        if (!confirmed) return;
-
-        try {
-            const studentRef = doc(db, "students", student.id);
-            await updateDoc(studentRef, { schedule: deleteField() });
-
-            await deleteDoc(doc(db, "schedules", `sched_${student.id}`));
-
-            showCustomAlert(`✅ Schedule deleted for ${student.studentName}`, 'success');
-            
-            // Mark as unscheduled and move to next
-            scheduledStudents.delete(student.id);
-            moveToNextStudent(false);
-
-        } catch (error) {
-            console.error("Error deleting schedule:", error);
-            showCustomAlert('❌ Error deleting schedule.', 'error');
+        if (confirmed) {
+            try {
+                const studentRef = doc(db, "students", student.id);
+                await updateDoc(studentRef, { schedule: deleteField() });
+                await deleteDoc(doc(db, "schedules", `sched_${student.id}`));
+                
+                showCustomAlert(`✅ Schedule deleted`, 'success');
+                moveToNextStudent(false);
+            } catch (error) {
+                showCustomAlert('❌ Error deleting', 'error');
+            }
         }
     });
-
-    // 7. Save Schedule
-    document.getElementById('save-schedule-btn').addEventListener('click', () => {
-        saveCurrentSchedule(student, false);
-    });
-
-    // 8. Save & Next
-    document.getElementById('save-next-btn').addEventListener('click', () => {
-        saveCurrentSchedule(student, true);
-    });
-
-    // 9. Skip Student
-    document.getElementById('skip-schedule-btn').addEventListener('click', () => {
+    
+    // Skip button
+    document.getElementById('skip-student-btn').addEventListener('click', () => {
         moveToNextStudent(false);
     });
-
-    // Close function
-    function closeSchedulePopup() {
-        if (schedulePopup && document.body.contains(schedulePopup)) {
-            schedulePopup.remove();
-        }
-        // Don't reset index, user might come back
-    }
-
-    // --- SCHEDULE SAVING LOGIC ---
-    async function saveCurrentSchedule(student, moveToNext = false) {
-        const entryDivs = document.querySelectorAll('.schedule-entry');
-        const schedule = [];
-        let hasError = false;
+    
+    // Save button
+    document.getElementById('save-btn').addEventListener('click', () => {
+        saveSchedule(student, false);
+    });
+    
+    // Save & Next button
+    document.getElementById('save-next-btn').addEventListener('click', () => {
+        saveSchedule(student, true);
+    });
+    
+    // Helper to add time slot row
+    function addTimeSlotRow(container, data = null) {
+        const row = document.createElement('div');
+        row.className = 'time-slot-row p-3 bg-gray-50 rounded border relative';
         
-        for (const div of entryDivs) {
-            const day = div.querySelector('.schedule-day').value;
-            const start = div.querySelector('.schedule-start').value;
-            const end = div.querySelector('.schedule-end').value;
-            
-            if (!start || !end) {
-                showCustomAlert(`⚠️ Please fill in all time slots for ${day}`, 'error');
-                hasError = true;
-                break;
+        const day = data?.day || 'Monday';
+        const start = data?.start || '09:00';
+        const end = data?.end || '10:00';
+        
+        row.innerHTML = `
+            <button class="remove-row-btn absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs">✕</button>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                    <label class="text-xs font-medium">Day</label>
+                    <select class="select select-bordered select-sm w-full">
+                        ${DAYS_OF_WEEK.map(d => `<option value="${d}" ${d === day ? 'selected' : ''}>${d}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-medium">Start</label>
+                    <select class="select select-bordered select-sm w-full">
+                        ${ROBUST_TIME_SLOTS.map(s => `<option value="${s.value}" ${s.value === start ? 'selected' : ''}>${s.label}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-medium">End</label>
+                    <select class="select select-bordered select-sm w-full">
+                        ${ROBUST_TIME_SLOTS.map(s => `<option value="${s.value}" ${s.value === end ? 'selected' : ''}>${s.label}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(row);
+        
+        // Remove row button
+        row.querySelector('.remove-row-btn').addEventListener('click', () => {
+            if (container.children.length > 1) {
+                row.remove();
+            } else {
+                showCustomAlert('Need at least one time slot', 'error');
             }
+        });
+    }
+    
+    // Close popup function
+    function closePopup() {
+        if (schedulePopup) {
+            schedulePopup.remove();
+            schedulePopup = null;
+        }
+        document.removeEventListener('keydown', handleEscape);
+    }
+    
+    // Save schedule function
+    async function saveSchedule(student, moveToNext) {
+        const rows = document.querySelectorAll('.time-slot-row');
+        const schedule = [];
+        
+        for (const row of rows) {
+            const day = row.querySelector('select:nth-child(1)').value;
+            const start = row.querySelector('select:nth-child(2)').value;
+            const end = row.querySelector('select:nth-child(3)').value;
             
-            const startTime = parseInt(start.replace(':', ''));
-            const endTime = parseInt(end.replace(':', ''));
-            
-            if (startTime === endTime) {
-                showCustomAlert(`⚠️ ${day}: Start and end times cannot be the same`, 'error');
-                hasError = true;
-                break;
+            if (start === end) {
+                showCustomAlert('Start and end times cannot be same', 'error');
+                return;
             }
             
             schedule.push({ day, start, end });
         }
         
-        if (hasError) return;
-        
         if (schedule.length === 0) {
-            showConfirmDialog(
-                'Empty Schedule',
-                'No time slots added. Delete existing schedule?',
-                'Delete',
-                'Cancel'
-            ).then(confirmed => {
-                if (confirmed) {
-                    document.getElementById('clear-schedule-btn').click();
-                }
-            });
+            showCustomAlert('Add at least one time slot', 'error');
             return;
         }
         
         try {
+            // Save to student
             const studentRef = doc(db, "students", student.id);
             await updateDoc(studentRef, { schedule });
             
+            // Save to schedules collection
             const scheduleRef = doc(db, "schedules", `sched_${student.id}`);
             await setDoc(scheduleRef, {
                 studentId: student.id,
                 studentName: student.studentName,
-                tutorEmail: window.tutorData.email,
-                tutorName: window.tutorData.name,
-                schedule: schedule,
+                tutorEmail: tutor.email,
+                schedule,
                 updatedAt: new Date()
             }, { merge: true });
             
-            showCustomAlert('✅ Schedule saved successfully!', 'success');
+            showCustomAlert('✅ Schedule saved', 'success');
             
             if (moveToNext) {
-                scheduledStudents.add(student.id);
                 moveToNextStudent(true);
+            } else {
+                closePopup();
             }
             
         } catch (error) {
-            console.error("Error saving schedule:", error);
-            showCustomAlert('❌ Error saving schedule.', 'error');
+            console.error("Save error:", error);
+            showCustomAlert('❌ Error saving schedule', 'error');
         }
     }
-
-    // --- QUEUE MANAGEMENT ---
+    
+    // Move to next student
     function moveToNextStudent(markAsScheduled) {
-        closeSchedulePopup();
-
+        closePopup();
+        
         if (markAsScheduled) {
             scheduledStudents.add(student.id);
-        } else {
-            currentStudentIndex++;
         }
-
-        const remainingList = allStudents.filter(s => !scheduledStudents.has(s.id));
         
-        if (remainingList.length > 0) {
-            const nextIndex = markAsScheduled ? 0 : currentStudentIndex;
-            
-            if (nextIndex < remainingList.length) {
-                setTimeout(() => {
-                    showBulkSchedulePopup(remainingList[nextIndex], tutor, remainingList.length);
-                }, 500);
-            } else {
-                showCustomAlert('All students processed!', 'success');
-                currentStudentIndex = 0;
-            }
+        const remaining = allStudents.filter(s => !scheduledStudents.has(s.id));
+        
+        if (remaining.length > 0) {
+            setTimeout(() => {
+                showBulkSchedulePopup(remaining[0], tutor, remaining.length);
+            }, 500);
         } else {
             showCustomAlert('🎉 All students scheduled!', 'success');
-            currentStudentIndex = 0;
         }
     }
 }
 
-// --- ENHANCED ALERT & CONFIRMATION SYSTEM ---
+// --- HOW TO USE THIS IN YOUR APP ---
 
-/**
- * Enhanced alert function with proper close handling
- */
-window.showCustomAlert = function(message, type = 'info', duration = 5000) {
-    // Remove existing alerts
-    document.querySelectorAll('.custom-alert').forEach(alert => alert.remove());
-    
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `custom-alert fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transform transition-all duration-300 ${
-        type === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
-        type === 'success' ? 'bg-green-50 border-green-200 text-green-800' :
-        'bg-blue-50 border-blue-200 text-blue-800'
-    } border-l-4 max-w-md`;
-    
-    alertDiv.style.transform = 'translateX(120%)';
-    
-    const icon = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
-    
-    alertDiv.innerHTML = `
-        <div class="flex items-start">
-            <span class="text-lg mr-3 mt-0.5">${icon}</span>
-            <div class="flex-1">
-                <p class="font-medium">${message}</p>
-            </div>
-            <button class="ml-3 text-gray-400 hover:text-gray-600 transition-colors close-alert-btn">
-                ✕
-            </button>
-        </div>
-    `;
-    
-    document.body.appendChild(alertDiv);
-    
-    // Animate in
-    setTimeout(() => {
-        alertDiv.style.transform = 'translateX(0)';
-    }, 10);
-    
-    // Close button handler
-    alertDiv.querySelector('.close-alert-btn').addEventListener('click', () => {
-        alertDiv.style.transform = 'translateX(120%)';
-        setTimeout(() => {
-            if (alertDiv.parentElement) {
-                alertDiv.remove();
-            }
-        }, 300);
-    });
-    
-    // Auto-close after duration
-    if (duration > 0) {
-        setTimeout(() => {
-            if (alertDiv.parentElement) {
-                alertDiv.style.transform = 'translateX(120%)';
-                setTimeout(() => alertDiv.remove(), 300);
-            }
-        }, duration);
-    }
-    
-    return alertDiv;
-};
+// 1. On dashboard load (only shows once):
+// In your dashboard initialization:
+// checkAndShowSchedulePopup(currentTutor);
 
-/**
- * Enhanced confirmation dialog with promise
- */
-window.showConfirmDialog = function(title, message, confirmText = 'OK', cancelText = 'Cancel') {
-    return new Promise((resolve) => {
-        // Remove existing dialogs
-        document.querySelectorAll('.confirm-dialog').forEach(dialog => dialog.remove());
-        
-        const dialogDiv = document.createElement('div');
-        dialogDiv.className = 'confirm-dialog fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4';
-        
-        dialogDiv.innerHTML = `
-            <div class="bg-white rounded-lg shadow-xl max-w-md w-full transform transition-all duration-300 scale-95">
-                <div class="p-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">${title}</h3>
-                    <p class="text-gray-600 mb-6">${message}</p>
-                    <div class="flex justify-end gap-3">
-                        <button class="btn btn-ghost text-gray-600 hover:text-gray-800 cancel-btn">
-                            ${cancelText}
-                        </button>
-                        <button class="btn ${confirmText.toLowerCase().includes('delete') ? 'btn-danger' : 'btn-primary'} confirm-btn">
-                            ${confirmText}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(dialogDiv);
-        
-        // Animate in
-        setTimeout(() => {
-            dialogDiv.querySelector('div > div').style.transform = 'scale(1)';
-        }, 10);
-        
-        // Button handlers
-        dialogDiv.querySelector('.confirm-btn').addEventListener('click', () => {
-            dialogDiv.querySelector('div > div').style.transform = 'scale(0.95)';
-            setTimeout(() => {
-                dialogDiv.remove();
-                resolve(true);
-            }, 200);
-        });
-        
-        dialogDiv.querySelector('.cancel-btn').addEventListener('click', () => {
-            dialogDiv.querySelector('div > div').style.transform = 'scale(0.95)';
-            setTimeout(() => {
-                dialogDiv.remove();
-                resolve(false);
-            }, 200);
-        });
-        
-        // Close on overlay click
-        dialogDiv.addEventListener('click', (e) => {
-            if (e.target === dialogDiv) {
-                dialogDiv.querySelector('div > div').style.transform = 'scale(0.95)';
-                setTimeout(() => {
-                    dialogDiv.remove();
-                    resolve(false);
-                }, 200);
-            }
-        });
-        
-        // Close on Escape key
-        const handleEscape = (e) => {
-            if (e.key === 'Escape') {
-                dialogDiv.querySelector('div > div').style.transform = 'scale(0.95)';
-                setTimeout(() => {
-                    dialogDiv.remove();
-                    resolve(false);
-                }, 200);
-                document.removeEventListener('keydown', handleEscape);
-            }
-        };
-        document.addEventListener('keydown', handleEscape);
-    });
-};
+// 2. Manual trigger button (add this to your HTML):
+// <button onclick="showManualScheduleManager(currentTutor)" class="btn btn-primary">
+//     📅 Manage Student Schedules
+// </button>
 
-// Add CSS for alerts and dialogs
-const style = document.createElement('style');
-style.textContent = `
-    .custom-alert {
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-    }
-    
-    .confirm-dialog > div > div {
-        transition: transform 0.2s ease-out;
-    }
-    
-    .modal-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 1000;
-        padding: 1rem;
-        animation: fadeIn 0.2s ease-out;
-    }
-    
-    .modal-content {
-        background: white;
-        border-radius: 0.5rem;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        animation: slideUp 0.3s ease-out;
-    }
-    
-    .modal-header {
-        padding: 1rem 1.5rem;
-        border-bottom: 1px solid #e5e7eb;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    .modal-body {
-        padding: 1.5rem;
-        max-height: 70vh;
-        overflow-y: auto;
-    }
-    
-    .modal-footer {
-        padding: 1rem 1.5rem;
-        border-top: 1px solid #e5e7eb;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-    
-    @keyframes slideUp {
-        from { transform: translateY(20px); opacity: 0; }
-        to { transform: translateY(0); opacity: 1; }
-    }
-`;
-document.head.appendChild(style);
+// 3. Delete schedule from student profile:
+// <button onclick="deleteStudentSchedule('${studentId}', '${studentName}')" class="btn btn-danger">
+//     Delete Schedule
+// </button>
 
 /*******************************************************************************
  * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT
@@ -5784,5 +5538,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
