@@ -42,7 +42,8 @@ function sanitizeInput(input) {
 
 // Safe text content helper (doesn't escape HTML for rendering)
 function safeText(text) {
-    if (typeof text !== 'string') return text;
+    if (!text) return '';
+    if (typeof text !== 'string') return String(text);
     return text.trim();
 }
 
@@ -164,6 +165,47 @@ function injectCustomCSS() {
         /* Tab transitions */
         .tab-transition {
             transition: all 0.3s ease;
+        }
+        
+        /* Chart containers */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        
+        /* Progress report specific accordion styles */
+        .progress-accordion-content {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+        
+        .progress-accordion-content.hidden {
+            max-height: 0 !important;
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        
+        .progress-accordion-content:not(.hidden) {
+            max-height: 5000px;
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        /* Performance indicator colors */
+        .performance-excellent {
+            color: #10B981;
+            background-color: #D1FAE5;
+        }
+        
+        .performance-good {
+            color: #F59E0B;
+            background-color: #FEF3C7;
+        }
+        
+        .performance-needs-improvement {
+            color: #EF4444;
+            background-color: #FEE2E2;
         }
     `;
     document.head.appendChild(style);
@@ -343,6 +385,7 @@ let unreadMessagesCount = 0;
 let unreadAcademicsCount = 0;
 let realTimeListeners = [];
 let academicsNotifications = new Map(); // studentName -> {dailyTopics: count, homework: count}
+let charts = new Map(); // Store chart instances
 
 // ============================================================================
 // SECTION 4: UI MESSAGE SYSTEM
@@ -1644,7 +1687,7 @@ function addLogoutButton() {
 }
 
 // ============================================================================
-// SECTION 12: ULTIMATE REPORT SEARCH - GUARANTEED TO FIND ALL REPORTS
+// SECTION 12: ULTIMATE REPORT SEARCH - OPTIMIZED VERSION
 // ============================================================================
 
 // NEW FUNCTION: Generate all possible phone formats for searching
@@ -1684,67 +1727,72 @@ function generateAllPhoneFormatsForSearch(phone) {
     return Array.from(formats);
 }
 
-
+// OPTIMIZED VERSION: Faster search with better query optimization
 async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUid = '') {
-    console.log("🔍 ULTIMATE Search for:", { parentPhone, parentEmail, parentUid });
+    console.log("🔍 OPTIMIZED Search for:", { parentPhone, parentEmail, parentUid });
     
     let allResults = [];
     let foundSources = new Set();
     
     try {
-        // Get ALL possible identifiers for this parent
-        const searchQueries = await generateAllSearchQueries(parentPhone, parentEmail, parentUid);
+        // Get optimized search queries (limit to most important fields)
+        const searchQueries = await generateOptimizedSearchQueries(parentPhone, parentEmail, parentUid);
         
-        console.log("🔎 Generated search queries:", searchQueries.length);
+        console.log("🔎 Generated optimized search queries:", searchQueries.length);
         
-        // Search in ALL possible collections
-        const collectionsToSearch = [
+        // Search in only the most important collections
+        const primaryCollections = [
             'tutor_submissions',
-            'student_results', 
-            'monthly_reports',
-            'assessment_reports',
-            'progress_reports',
-            'reports',
-            'student_reports',
-            'parent_reports',
-            'academic_reports',
-            'session_reports',
-            'performance_reports'
+            'student_results'
         ];
         
-        // PARALLEL SEARCH: Search all collections with all queries
-        const searchPromises = [];
+        // Secondary collections (only if primary fails)
+        const secondaryCollections = [
+            'monthly_reports',
+            'assessment_reports'
+        ];
         
-        for (const collectionName of collectionsToSearch) {
+        // Search primary collections first
+        for (const collectionName of primaryCollections) {
             for (const query of searchQueries) {
-                searchPromises.push(
-                    searchInCollection(collectionName, query).then(results => {
-                        if (results.length > 0) {
-                            console.log(`✅ Found ${results.length} reports in ${collectionName} with ${query.field}=${query.value}`);
-                            foundSources.add(`${collectionName}:${query.field}`);
-                        }
-                        return results;
-                    }).catch(error => {
-                        // Collection might not exist - that's OK
-                        return [];
-                    })
-                );
+                try {
+                    const results = await searchInCollection(collectionName, query);
+                    if (results.length > 0) {
+                        console.log(`✅ Found ${results.length} reports in ${collectionName} with ${query.field}=${query.value}`);
+                        foundSources.add(`${collectionName}:${query.field}`);
+                        allResults = allResults.concat(results);
+                    }
+                } catch (error) {
+                    // Silently continue
+                }
             }
         }
         
-        // Wait for all searches to complete
-        const allResultsArrays = await Promise.all(searchPromises);
+        console.log("🎯 PRIMARY REPORTS FOUND:", allResults.length);
         
-        // Combine all results
-        allResults = allResultsArrays.flat();
+        // If NO reports found in primary collections, try secondary
+        if (allResults.length === 0) {
+            console.log("⚠️ No reports in primary collections, searching secondary...");
+            for (const collectionName of secondaryCollections) {
+                for (const query of searchQueries) {
+                    try {
+                        const results = await searchInCollection(collectionName, query);
+                        if (results.length > 0) {
+                            console.log(`✅ Found ${results.length} reports in ${collectionName} with ${query.field}=${query.value}`);
+                            foundSources.add(`${collectionName}:${query.field}`);
+                            allResults = allResults.concat(results);
+                        }
+                    } catch (error) {
+                        // Silently continue
+                    }
+                }
+            }
+        }
         
-        console.log("🎯 TOTAL RAW REPORTS FOUND:", allResults.length);
-        console.log("📊 Sources found:", Array.from(foundSources));
-        
-        // If NO reports found, try emergency search
+        // Still no reports? Try emergency search (but limit results)
         if (allResults.length === 0) {
             console.warn("⚠️ No reports found with standard search. Starting EMERGENCY SEARCH...");
-            const emergencyResults = await emergencyReportSearch(parentPhone, parentEmail);
+            const emergencyResults = await emergencyReportSearchOptimized(parentPhone, parentEmail);
             allResults = emergencyResults;
         }
         
@@ -1768,93 +1816,84 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
         return { 
             assessmentResults, 
             monthlyResults, 
-            allRawResults: uniqueResults, // Keep for debugging
+            allRawResults: uniqueResults,
             searchStats: {
                 totalFound: uniqueResults.length,
                 rawFound: allResults.length,
-                sources: Array.from(foundSources),
-                collectionsSearched: collectionsToSearch.length
+                sources: Array.from(foundSources)
             }
         };
         
     } catch (error) {
-        console.error("❌ Ultimate search error:", error);
+        console.error("❌ Optimized search error:", error);
         return { assessmentResults: [], monthlyResults: [], searchStats: { error: error.message }};
     }
 }
 
-// NEW FUNCTION: Distribute reports to correct students
-function distributeReportsToStudents(allReports) {
-    console.log("📊 Distributing reports to students...");
+// Generate OPTIMIZED search queries (fewer, more targeted)
+async function generateOptimizedSearchQueries(parentPhone, parentEmail, parentUid) {
+    const queries = [];
     
-    const assessmentResults = [];
-    const monthlyResults = [];
+    // Phone variations - LIMIT to most important formats
+    const normalizedPhone = normalizePhoneNumber(parentPhone);
+    if (normalizedPhone.valid) {
+        // Only use the normalized version for primary search
+        queries.push({ field: 'parentPhone', value: normalizedPhone.normalized });
+        queries.push({ field: 'normalizedParentPhone', value: normalizedPhone.normalized });
+        queries.push({ field: 'phone', value: normalizedPhone.normalized });
+    }
     
-    // Get current student mapping
-    const studentNames = Array.from(studentIdMap.keys());
-    console.log("👥 Available students for distribution:", studentNames);
+    // Email variations
+    if (parentEmail) {
+        queries.push({ field: 'parentEmail', value: parentEmail.toLowerCase() });
+        queries.push({ field: 'email', value: parentEmail.toLowerCase() });
+    }
     
-    allReports.forEach(report => {
-        // Try to determine which student this report belongs to
-        const assignedStudent = findStudentForReport(report);
-        
-        if (assignedStudent) {
-            console.log(`📝 Report assigned to student: ${assignedStudent}`, {
-                reportId: report.id,
-                collection: report.collection,
-                studentIdInReport: report.studentId,
-                studentNameInReport: report.studentName
-            });
+    // UID variations
+    if (parentUid) {
+        queries.push({ field: 'parentUid', value: parentUid });
+        queries.push({ field: 'userId', value: parentUid });
+    }
+    
+    // Try to find student IDs once
+    try {
+        if (normalizedPhone.valid) {
+            // Find students by normalized phone
+            const studentsSnapshot = await db.collection('students')
+                .where('parentPhone', '==', normalizedPhone.normalized)
+                .limit(10)
+                .get();
             
-            // Add student info to the report for proper grouping
-            report.assignedStudentName = assignedStudent;
-            report.assignedStudentId = studentIdMap.get(assignedStudent);
-            
-            // Classify as assessment or monthly
-            if (report.type === 'assessment' || 
-                report.collection.includes('assessment') || 
-                report.collection.includes('progress') ||
-                (report.reportType && report.reportType.toLowerCase().includes('assessment'))) {
-                assessmentResults.push(report);
-            } else if (report.type === 'monthly' || 
-                       report.collection.includes('monthly') ||
-                       report.collection.includes('submission') ||
-                       (report.reportType && report.reportType.toLowerCase().includes('monthly'))) {
-                monthlyResults.push(report);
+            if (!studentsSnapshot.empty) {
+                studentsSnapshot.forEach(doc => {
+                    const studentId = doc.id;
+                    const studentData = doc.data();
+                    
+                    // Add student ID queries
+                    queries.push({ field: 'studentId', value: studentId });
+                    
+                    // Also add student name queries
+                    if (studentData.studentName) {
+                        queries.push({ field: 'studentName', value: safeText(studentData.studentName) });
+                    }
+                });
             }
-        } else {
-            console.warn("⚠️ Could not assign report to any student:", {
-                reportId: report.id,
-                collection: report.collection,
-                studentId: report.studentId,
-                studentName: report.studentName
-            });
         }
-    });
+    } catch (error) {
+        console.warn("Could not find students for search:", error);
+    }
     
-    console.log(`📊 Distribution complete: ${assessmentResults.length} assessments, ${monthlyResults.length} monthly reports`);
-    
-    return { assessmentResults, monthlyResults };
+    console.log(`🔍 Optimized search queries: ${queries.length}`);
+    return queries;
 }
 
 // NEW FUNCTION: Find which student a report belongs to
 function findStudentForReport(report) {
     // Method 1: Match by studentId
     if (report.studentId) {
-        // Check if this studentId exists in our studentIdMap (value = studentId, key = studentName)
         for (const [studentName, studentId] of studentIdMap.entries()) {
             if (studentId === report.studentId) {
                 return studentName;
-            }
-        }
-        
-        // Also check if report.studentId matches any of our student IDs directly
-        if (Array.from(studentIdMap.values()).includes(report.studentId)) {
-            // Find the student name for this ID
-            for (const [studentName, studentId] of studentIdMap.entries()) {
-                if (studentId === report.studentId) {
-                    return studentName;
-                }
             }
         }
     }
@@ -1869,60 +1908,21 @@ function findStudentForReport(report) {
                 return studentName;
             }
         }
-        
-        // Check partial match (case-insensitive)
-        for (const studentName of userChildren) {
-            if (studentName.toLowerCase().includes(reportStudentName.toLowerCase()) ||
-                reportStudentName.toLowerCase().includes(studentName.toLowerCase())) {
-                return studentName;
-            }
-        }
     }
     
-    // Method 3: Match by student field (alternative field name)
-    if (report.student) {
-        const reportStudent = safeText(report.student);
-        
-        for (const studentName of userChildren) {
-            if (safeText(studentName) === reportStudent) {
-                return studentName;
-            }
-        }
-    }
-    
-    // Method 4: If parent has only one child, assign to that child
+    // Method 3: If parent has only one child, assign to that child
     if (userChildren.length === 1) {
-        console.log(`📝 Assigning report to only child: ${userChildren[0]}`);
         return userChildren[0];
     }
     
-    // Method 5: Last resort - check if any student data matches
+    // Method 4: Check report for any matching student data
     if (allStudentData.length > 0) {
         for (const student of allStudentData) {
             if (student.data) {
-                // Check various fields in student data
-                const studentFields = [
-                    student.data.studentId,
-                    student.data.studentName,
-                    student.data.name,
-                    student.data.id
-                ];
-                
-                const reportFields = [
-                    report.studentId,
-                    report.studentName,
-                    report.student,
-                    report.id
-                ];
-                
-                // Check for any match
-                for (const studentField of studentFields) {
-                    for (const reportField of reportFields) {
-                        if (studentField && reportField && 
-                            safeText(studentField) === safeText(reportField)) {
-                            return student.name;
-                        }
-                    }
+                // Check if report references this student
+                if ((report.studentId && report.studentId === student.id) ||
+                    (report.studentName && safeText(report.studentName) === safeText(student.name))) {
+                    return student.name;
                 }
             }
         }
@@ -1931,101 +1931,44 @@ function findStudentForReport(report) {
     return null;
 }
 
-// Generate ALL possible search queries
-async function generateAllSearchQueries(parentPhone, parentEmail, parentUid) {
-    const queries = [];
+// OPTIMIZED emergency search
+async function emergencyReportSearchOptimized(parentPhone, parentEmail) {
+    console.log("🚨 OPTIMIZED EMERGENCY SEARCH ACTIVATED");
+    const results = [];
     
-    // Phone variations - USING ENHANCED FUNCTION WITH FORMATS
-    const phoneVariations = generateAllPhoneVariations(parentPhone);
-    const phoneFormats = generateAllPhoneFormatsForSearch(parentPhone);
-    const allPhoneVersions = [...new Set([...phoneVariations, ...phoneFormats])];
-    console.log(`📱 Generated ${allPhoneVersions.length} phone versions for search (${phoneVariations.length} variations + ${phoneFormats.length} formats)`);
-
-    for (const phone of allPhoneVersions) {
-        queries.push({ field: 'parentPhone', value: phone });
-        queries.push({ field: 'parentphone', value: phone });
-        queries.push({ field: 'parent_phone', value: phone });
-        queries.push({ field: 'guardianPhone', value: phone });
-        queries.push({ field: 'motherPhone', value: phone });
-        queries.push({ field: 'fatherPhone', value: phone });
-        queries.push({ field: 'phone', value: phone });
-        queries.push({ field: 'parent_contact', value: phone });
-        queries.push({ field: 'contact_number', value: phone });
-        queries.push({ field: 'contactPhone', value: phone });
-        // ADD THIS CRITICAL FIELD:
-        queries.push({ field: 'normalizedParentPhone', value: phone });
-    }
-    
-    // Email variations
-    if (parentEmail) {
-        const emailVariations = [
-            parentEmail.toLowerCase(),
-            parentEmail.toUpperCase(),
-            parentEmail
-        ];
-        for (const email of emailVariations) {
-            queries.push({ field: 'parentEmail', value: email });
-            queries.push({ field: 'parentemail', value: email });
-            queries.push({ field: 'email', value: email });
-            queries.push({ field: 'guardianEmail', value: email });
-            queries.push({ field: 'parent_email', value: email });
-            queries.push({ field: 'contact_email', value: email });
-        }
-    }
-    
-    // UID variations
-    if (parentUid) {
-        queries.push({ field: 'parentUid', value: parentUid });
-        queries.push({ field: 'parentuid', value: parentUid });
-        queries.push({ field: 'userId', value: parentUid });
-        queries.push({ field: 'user_id', value: parentUid });
-        queries.push({ field: 'createdBy', value: parentUid });
-        queries.push({ field: 'ownerUid', value: parentUid });
-    }
-    
-    // Try to find students first, then use student IDs
     try {
+        // Only search tutor_submissions (most likely collection)
+        const submissionsSnapshot = await db.collection('tutor_submissions').limit(500).get();
         const normalizedPhone = normalizePhoneNumber(parentPhone);
+        
         if (normalizedPhone.valid) {
-            // Find students by parent phone - CHECK ALL PHONE VARIATIONS
-            for (const phoneVar of allPhoneVersions) {
-                try {
-                    const studentsSnapshot = await db.collection('students')
-                        .where('parentPhone', '==', phoneVar)
-                        .get();
-                    
-                    if (!studentsSnapshot.empty) {
-                        studentsSnapshot.forEach(doc => {
-                            const studentId = doc.id;
-                            const studentData = doc.data();
-                            
-                            // Add student ID queries
-                            queries.push({ field: 'studentId', value: studentId });
-                            queries.push({ field: 'studentID', value: studentId });
-                            queries.push({ field: 'student_id', value: studentId });
-                            queries.push({ field: 'studentId', value: studentId.toLowerCase() });
-                            queries.push({ field: 'studentId', value: studentId.toUpperCase() });
-                            
-                            // Also add student name queries
-                            if (studentData.studentName) {
-                                const studentName = safeText(studentData.studentName);
-                                queries.push({ field: 'studentName', value: studentName });
-                                queries.push({ field: 'student_name', value: studentName });
-                                queries.push({ field: 'student', value: studentName });
-                            }
-                        });
-                    }
-                } catch (error) {
-                    console.warn(`Error searching students with phone ${phoneVar}:`, error.message);
+            console.log(`🔍 Emergency scanning ${submissionsSnapshot.size} tutor submissions`);
+            
+            submissionsSnapshot.forEach(doc => {
+                const data = doc.data();
+                
+                // Check normalized phone field
+                if (data.normalizedParentPhone === normalizedPhone.normalized || 
+                    data.parentPhone === normalizedPhone.normalized) {
+                    results.push({
+                        id: doc.id,
+                        collection: 'tutor_submissions',
+                        emergencyMatch: true,
+                        ...data,
+                        timestamp: getTimestampFromData(data),
+                        type: 'monthly'
+                    });
                 }
-            }
+            });
         }
+        
+        console.log(`🚨 OPTIMIZED EMERGENCY SEARCH found: ${results.length} reports`);
+        
     } catch (error) {
-        console.warn("Could not find students for search:", error);
+        console.error("Optimized emergency search failed:", error);
     }
     
-    console.log(`🔍 Total search queries generated: ${queries.length}`);
-    return queries;
+    return results;
 }
 
 // Search in a specific collection
@@ -2033,6 +1976,7 @@ async function searchInCollection(collectionName, query) {
     try {
         const snapshot = await db.collection(collectionName)
             .where(query.field, '==', query.value)
+            .limit(100) // LIMIT results for performance
             .get();
         
         const results = [];
@@ -2052,178 +1996,11 @@ async function searchInCollection(collectionName, query) {
         return results;
     } catch (error) {
         // Collection or field doesn't exist
-        if (error.code !== 'failed-precondition' && error.code !== 'invalid-argument') {
-            console.warn(`Search error in ${collectionName} for ${query.field}=${query.value}:`, error.message);
-        }
         return [];
     }
 }
 
-// EMERGENCY SEARCH - Last resort
-async function emergencyReportSearch(parentPhone, parentEmail) {
-    console.log("🚨 EMERGENCY SEARCH ACTIVATED");
-    const results = [];
-    
-    try {
-        // 1. Get ALL tutor_submissions and filter client-side
-        const allSubmissions = await db.collection('tutor_submissions').limit(1000).get();
-        const phoneVariations = generateAllPhoneVariations(parentPhone);
-        const phoneFormats = generateAllPhoneFormatsForSearch(parentPhone);
-        const allPhoneVersions = [...new Set([...phoneVariations, ...phoneFormats])];
-        
-        console.log(`🔍 Emergency scanning ${allSubmissions.size} tutor submissions`);
-        
-        allSubmissions.forEach(doc => {
-            const data = doc.data();
-            let matched = false;
-            
-            // Check ALL phone fields with ALL variations - FIXED SYNTAX ERROR
-            const phoneFields = ['parentPhone', 'parentphone', 'parent_phone', 'phone', 'guardianPhone', 'contact_number', 'normalizedParentPhone'];
-            for (const field of phoneFields) {
-                if (data[field]) {
-                    const fieldValue = String(data[field]).trim();
-                    for (const phoneVar of allPhoneVersions) {
-                        if (fieldValue === phoneVar || fieldValue.includes(phoneVar)) {
-                            results.push({
-                                id: doc.id,
-                                collection: 'tutor_submissions',
-                                emergencyMatch: true,
-                                matchedField: field,
-                                matchedValue: fieldValue,
-                                ...data,
-                                timestamp: getTimestampFromData(data),
-                                type: 'monthly'
-                            });
-                            matched = true;
-                            break;
-                        }
-                    }
-                    if (matched) break;
-                }
-            }
-            
-            // Check by email
-            if (!matched && parentEmail) {
-                const emailFields = ['parentEmail', 'parentemail', 'email', 'guardianEmail'];
-                for (const field of emailFields) {
-                    if (data[field] && data[field].toLowerCase() === parentEmail.toLowerCase()) {
-                        results.push({
-                            id: doc.id,
-                            collection: 'tutor_submissions',
-                            emergencyMatch: true,
-                            matchedField: field,
-                            matchedValue: data[field],
-                            ...data,
-                            timestamp: getTimestampFromData(data),
-                            type: 'monthly'
-                        });
-                        matched = true;
-                        break;
-                    }
-                }
-            }
-            
-            // Check by student name (if we have students in userChildren)
-            if (!matched && userChildren.length > 0) {
-                const studentName = data.studentName || data.student;
-                if (studentName && userChildren.includes(safeText(studentName))) {
-                    results.push({
-                        id: doc.id,
-                        collection: 'tutor_submissions',
-                        emergencyMatch: true,
-                        matchedField: 'studentName',
-                        matchedValue: studentName,
-                        ...data,
-                        timestamp: getTimestampFromData(data),
-                        type: 'monthly'
-                    });
-                }
-            }
-        });
-        
-        // 2. Get ALL student_results and filter client-side
-        const allAssessments = await db.collection('student_results').limit(1000).get();
-        
-        console.log(`🔍 Emergency scanning ${allAssessments.size} assessment results`);
-        
-        allAssessments.forEach(doc => {
-            const data = doc.data();
-            let matched = false;
-            
-            // Check ALL phone fields with ALL variations
-            const phoneFields = ['parentPhone', 'parentphone', 'parent_phone', 'phone', 'normalizedParentPhone'];
-            for (const field of phoneFields) {
-                if (data[field]) {
-                    const fieldValue = String(data[field]).trim();
-                    for (const phoneVar of allPhoneVersions) {
-                        if (fieldValue === phoneVar || fieldValue.includes(phoneVar)) {
-                            results.push({
-                                id: doc.id,
-                                collection: 'student_results',
-                                emergencyMatch: true,
-                                matchedField: field,
-                                matchedValue: fieldValue,
-                                ...data,
-                                timestamp: getTimestampFromData(data),
-                                type: 'assessment'
-                            });
-                            matched = true;
-                            break;
-                        }
-                    }
-                    if (matched) break;
-                }
-            }
-            
-            // Check by email
-            if (!matched && parentEmail) {
-                const emailFields = ['parentEmail', 'parentemail', 'email'];
-                for (const field of emailFields) {
-                    if (data[field] && data[field].toLowerCase() === parentEmail.toLowerCase()) {
-                        results.push({
-                            id: doc.id,
-                            collection: 'student_results',
-                            emergencyMatch: true,
-                            matchedField: field,
-                            matchedValue: data[field],
-                            ...data,
-                            timestamp: getTimestampFromData(data),
-                            type: 'assessment'
-                        });
-                        matched = true;
-                        break;
-                    }
-                }
-            }
-            
-            // Check by student name (if we have students in userChildren)
-            if (!matched && userChildren.length > 0) {
-                const studentName = data.studentName || data.student;
-                if (studentName && userChildren.includes(safeText(studentName))) {
-                    results.push({
-                        id: doc.id,
-                        collection: 'student_results',
-                        emergencyMatch: true,
-                        matchedField: 'studentName',
-                        matchedValue: studentName,
-                        ...data,
-                        timestamp: getTimestampFromData(data),
-                        type: 'assessment'
-                    });
-                }
-            }
-        });
-        
-        console.log(`🚨 EMERGENCY SEARCH found: ${results.length} reports`);
-        
-    } catch (error) {
-        console.error("Emergency search failed:", error);
-    }
-    
-    return results;
-}
-
-// Generate ALL possible phone variations with better global support
+// Generate ALL possible phone variations
 function generateAllPhoneVariations(phone) {
     const variations = new Set();
     
@@ -2232,7 +2009,7 @@ function generateAllPhoneVariations(phone) {
     // Add original
     variations.add(phone.trim());
     
-    // Basic cleaned version (remove all non-digits except +)
+    // Basic cleaned version
     const basicCleaned = phone.replace(/[^\d+]/g, '');
     variations.add(basicCleaned);
     
@@ -2241,168 +2018,11 @@ function generateAllPhoneVariations(phone) {
         variations.add(basicCleaned.substring(1));
     }
     
-    // Global phone number handling patterns
-    const countryCodePatterns = [
-        { code: '+1', length: 11 },
-        { code: '+234', length: 14 },
-        { code: '+44', length: 13 },
-        { code: '+91', length: 13 },
-        { code: '+86', length: 14 },
-        { code: '+33', length: 12 },
-        { code: '+49', length: 13 },
-        { code: '+81', length: 13 },
-        { code: '+61', length: 12 },
-        { code: '+55', length: 13 },
-        { code: '+7', length: 12 },
-        { code: '+20', length: 13 },
-        { code: '+27', length: 12 },
-        { code: '+34', length: 12 },
-        { code: '+39', length: 12 },
-        { code: '+52', length: 13 },
-        { code: '+62', length: 13 },
-        { code: '+82', length: 13 },
-        { code: '+90', length: 13 },
-        { code: '+92', length: 13 },
-        { code: '+966', length: 14 },
-        { code: '+971', length: 13 },
-        { code: '+233', length: 13 },
-        { code: '+254', length: 13 },
-        { code: '+255', length: 13 },
-        { code: '+256', length: 13 },
-        { code: '+237', length: 13 },
-        { code: '+251', length: 13 },
-        { code: '+250', length: 13 },
-        { code: '+260', length: 13 },
-        { code: '+263', length: 13 },
-        { code: '+265', length: 13 },
-        { code: '+267', length: 13 },
-        { code: '+268', length: 13 },
-        { code: '+269', length: 13 }
-    ];
-    
-    // Try to identify and generate variations for each country code pattern
-    for (const pattern of countryCodePatterns) {
-        if (basicCleaned.startsWith(pattern.code)) {
-            // Remove country code
-            const withoutCode = basicCleaned.substring(pattern.code.length);
-            variations.add(withoutCode);
-            
-            // Add with 0 prefix (common in many countries)
-            variations.add('0' + withoutCode);
-            
-            // Add with country code without +
-            variations.add(pattern.code.substring(1) + withoutCode);
-            
-            // Add local format variations
-            if (withoutCode.length >= 7) {
-                // Common local formats based on country
-                if (pattern.code === '+1') {
-                    // US/Canada format: (XXX) XXX-XXXX
-                    if (withoutCode.length === 10) {
-                        variations.add('(' + withoutCode.substring(0, 3) + ') ' + withoutCode.substring(3, 6) + '-' + withoutCode.substring(6));
-                    }
-                } else if (pattern.code === '+44') {
-                    // UK format: 0XXX XXX XXXX
-                    if (withoutCode.length === 10) {
-                        variations.add('0' + withoutCode.substring(0, 4) + ' ' + withoutCode.substring(4, 7) + ' ' + withoutCode.substring(7));
-                    }
-                } else {
-                    // Generic formats for other countries
-                    if (withoutCode.length >= 10) {
-                        variations.add(withoutCode.substring(0, 3) + '-' + withoutCode.substring(3));
-                        variations.add(withoutCode.substring(0, 4) + '-' + withoutCode.substring(4));
-                        variations.add('(' + withoutCode.substring(0, 3) + ') ' + withoutCode.substring(3));
-                    }
-                }
-            }
-        }
-    }
-    
-    // If starts with 0 (local number), try adding common country codes
-    if (basicCleaned.startsWith('0') && basicCleaned.length > 1) {
-        const localNumber = basicCleaned.substring(1);
-        
-        // Try adding common country codes from our list
-        for (const pattern of countryCodePatterns) {
-            if (pattern.code !== '+1' || localNumber.length === 10) {
-                variations.add(pattern.code + localNumber);
-                variations.add(pattern.code.substring(1) + localNumber);
-            }
-        }
-        
-        // Also try without the 0
-        variations.add(localNumber);
-    }
-    
-    // If it's just digits (no +), try adding + and common codes
-    if (/^\d+$/.test(basicCleaned)) {
-        // Check if it might already include a country code
-        if (basicCleaned.length >= 9) {
-            variations.add('+' + basicCleaned);
-            
-            // Try to match with known country codes
-            for (const pattern of countryCodePatterns) {
-                const codeWithoutPlus = pattern.code.substring(1);
-                if (basicCleaned.startsWith(codeWithoutPlus)) {
-                    const localPart = basicCleaned.substring(codeWithoutPlus.length);
-                    variations.add(pattern.code + localPart);
-                }
-            }
-            
-            // Special handling for common patterns
-            if (basicCleaned.length === 10) {
-                variations.add('+1' + basicCleaned);
-            } else if (basicCleaned.length === 11 && basicCleaned.startsWith('1')) {
-                variations.add('+' + basicCleaned);
-                variations.add('+1' + basicCleaned.substring(1));
-            } else if (basicCleaned.length === 11 && basicCleaned.startsWith('0')) {
-                variations.add('+234' + basicCleaned.substring(1));
-            }
-        }
-    }
-    
-    // Add formatted versions with spaces/dashes for all variations
-    const allVariations = Array.from(variations);
-    allVariations.forEach(variation => {
-        if (variation && variation.length >= 7) {
-            // Remove any existing formatting first
-            const digitsOnly = variation.replace(/[^\d+]/g, '');
-            
-            // Add space-separated versions (common formats)
-            if (digitsOnly.length === 10) {
-                // XXX XXX XXXX format
-                const spaced1 = digitsOnly.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3');
-                if (spaced1 !== variation) variations.add(spaced1);
-                
-                // (XXX) XXX-XXXX format
-                const spaced2 = digitsOnly.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
-                if (spaced2 !== variation) variations.add(spaced2);
-            } else if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
-                // 1 XXX XXX XXXX format (US/Canada with country code)
-                const spaced3 = digitsOnly.replace(/(\d{1})(\d{3})(\d{3})(\d{4})/, '$1 $2 $3 $4');
-                if (spaced3 !== variation) variations.add(spaced3);
-            } else if (digitsOnly.length >= 10) {
-                // Generic spacing for other lengths
-                const spacedGeneric = digitsOnly.replace(/(\d{3})(?=\d)/g, '$1 ');
-                if (spacedGeneric !== variation) variations.add(spacedGeneric);
-            }
-            
-            // Add dash-separated versions
-            if (digitsOnly.length >= 10) {
-                const dashed = digitsOnly.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
-                if (dashed !== variation) variations.add(dashed);
-            }
-        }
-    });
-    
-    // Filter out invalid variations and return
-    const finalVariations = Array.from(variations)
+    // Return limited variations for performance
+    return Array.from(variations)
         .filter(v => v && v.length >= 7)
         .filter(v => v.length <= 20)
-        .filter(v => !v.includes('undefined'))
         .filter((v, i, arr) => arr.indexOf(v) === i);
-    
-    return finalVariations;
 }
 
 // Determine report type
@@ -2418,9 +2038,6 @@ function determineReportType(collectionName, data) {
     }
     if (data.type) {
         return data.type;
-    }
-    if (data.collection) {
-        return data.collection.toLowerCase();
     }
     return 'unknown';
 }
@@ -2472,7 +2089,7 @@ function setupRealTimeMonitoring(parentPhone, userId) {
     // Monitor academics periodically
     setInterval(() => {
         checkForNewAcademics();
-    }, 30000);
+    }, 60000); // Reduced from 30 to 60 seconds
 }
 
 function cleanupRealTimeListeners() {
@@ -2482,6 +2099,14 @@ function cleanupRealTimeListeners() {
         }
     });
     realTimeListeners = [];
+    
+    // Clean up charts
+    charts.forEach(chart => {
+        if (chart && typeof chart.destroy === 'function') {
+            chart.destroy();
+        }
+    });
+    charts.clear();
 }
 
 function showNewReportNotification(type) {
@@ -2509,7 +2134,7 @@ function showNewReportNotification(type) {
 }
 
 // ============================================================================
-// SECTION 14: YEARLY ARCHIVES REPORTS SYSTEM WITH ACCORDIONS
+// SECTION 14: YEARLY ARCHIVES REPORTS SYSTEM WITH ACCORDIONS & CHARTS
 // ============================================================================
 
 /**
@@ -2645,7 +2270,7 @@ function createYearlyArchiveReportView(reportsByStudent) {
                                 <span id="year-${studentIndex}-${yearIndex}-arrow" class="accordion-arrow text-blue-600 transform transition-transform duration-300">▼</span>
                             </div>
                         </button>
-                        <div id="year-${studentIndex}-${yearIndex}-content" class="accordion-content hidden ml-6 mt-3">
+                        <div id="year-${studentIndex}-${yearIndex}-content" class="progress-accordion-content hidden ml-6 mt-3">
                 `;
                 
                 // Assessment Reports for this year
@@ -2786,9 +2411,11 @@ function createYearlyArchiveReportView(reportsByStudent) {
     return html;
 }
 
+// Create assessment report with chart
 function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, fullName, date) {
     const firstReport = sessionReports[0];
     const formattedDate = formatDetailedDate(date || new Date(firstReport.timestamp * 1000), true);
+    const chartId = `chart-${studentIndex}-${sessionId}`;
     
     // Calculate overall stats
     let totalCorrect = 0;
@@ -2845,6 +2472,68 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
         </tr>
     `).join("");
     
+    // Prepare chart data
+    const chartData = {
+        labels: results.map(r => r.subject),
+        datasets: [{
+            label: 'Percentage Score',
+            data: results.map(r => r.percentage),
+            backgroundColor: results.map(r => 
+                r.percentage >= 80 ? 'rgba(16, 185, 129, 0.5)' : 
+                r.percentage >= 60 ? 'rgba(245, 158, 11, 0.5)' : 
+                'rgba(239, 68, 68, 0.5)'
+            ),
+            borderColor: results.map(r => 
+                r.percentage >= 80 ? 'rgba(16, 185, 129, 1)' : 
+                r.percentage >= 60 ? 'rgba(245, 158, 11, 1)' : 
+                'rgba(239, 68, 68, 1)'
+            ),
+            borderWidth: 2,
+            borderRadius: 5,
+            borderSkipped: false,
+        }]
+    };
+    
+    const chartConfig = {
+        type: 'bar',
+        data: chartData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.raw}%`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    };
+    
     return `
         <div class="border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 p-5 bg-white" id="assessment-block-${studentIndex}-${sessionId}">
             <div class="flex justify-between items-start mb-4 pb-4 border-b border-gray-100">
@@ -2884,6 +2573,17 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
                     </div>
                 </div>
                 
+                <!-- Performance Chart -->
+                <div class="mb-6">
+                    <h6 class="font-semibold text-gray-700 mb-3 flex items-center">
+                        <span class="mr-2">📈</span>
+                        Performance by Subject
+                    </h6>
+                    <div class="chart-container">
+                        <canvas id="${chartId}"></canvas>
+                    </div>
+                </div>
+                
                 <div class="overflow-x-auto rounded-lg border border-gray-200">
                     <table class="w-full text-sm">
                         <thead class="bg-gray-50">
@@ -2910,6 +2610,16 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
             </div>
             ` : ''}
         </div>
+        <script>
+            // Defer chart creation until after DOM is ready
+            setTimeout(() => {
+                const ctx = document.getElementById('${chartId}');
+                if (ctx) {
+                    const chart = new Chart(ctx, ${JSON.stringify(chartConfig)});
+                    window.charts.set('${chartId}', chart);
+                }
+            }, 100);
+        </script>
     `;
 }
 
@@ -3050,7 +2760,7 @@ function toggleAccordion(elementId) {
 }
 
 // ============================================================================
-// SECTION 15: MAIN REPORT LOADING FUNCTION (FIXED & VERIFIED)
+// SECTION 15: MAIN REPORT LOADING FUNCTION (OPTIMIZED)
 // ============================================================================
 
 async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false) {
@@ -3119,7 +2829,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         allStudentData = childrenResult.allStudentData;
 
         console.log("👥 Found children for report distribution:", userChildren);
-        console.log("🆔 Student ID Map:", Array.from(studentIdMap.entries()));
 
         // 4. USER PROFILE & REFERRAL SYNC
         let parentName = null;
@@ -3159,15 +2868,15 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
 
         if (welcomeMessage) welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
 
-        // 5. REPORT AGGREGATION WITH PROPER DISTRIBUTION
-        console.log("🔍 Starting report search with student mapping ready...");
+        // 5. OPTIMIZED REPORT AGGREGATION
+        console.log("🔍 Starting optimized report search...");
         const { assessmentResults, monthlyResults, searchStats } = await searchAllReportsForParent(
             parentPhone, 
             currentUserData.email, 
             userId
         );
 
-        console.log("📊 Report distribution results:", {
+        console.log("📊 Optimized search results:", {
             totalAssessments: assessmentResults.length,
             totalMonthly: monthlyResults.length,
             searchStats: searchStats
@@ -3176,7 +2885,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         // 6. DATA MAPPING - Group reports by student
         const reportsByStudent = new Map();
 
-        // A. Initialize containers for ALL known students (Empty or Not)
+        // A. Initialize containers for ALL known students (including those with NO reports)
         userChildren.forEach(studentName => {
             const studentInfo = allStudentData.find(s => s.name === studentName);
             reportsByStudent.set(studentName, { 
@@ -3184,14 +2893,11 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                 monthly: new Map(),
                 studentData: studentInfo || { name: studentName, isPending: false }
             });
-            
-            console.log(`📁 Created container for student: ${studentName}`);
         });
 
-        // B. Populate containers with Assessment Data - PROPERLY ASSIGNED
-        console.log("📝 Assigning assessment reports to students...");
-        assessmentResults.forEach((report, index) => {
-            const studentName = report.assignedStudentName;
+        // B. Populate containers with Assessment Data
+        assessmentResults.forEach((report) => {
+            const studentName = findStudentForReport(report);
             
             if (studentName && reportsByStudent.has(studentName)) {
                 const sessionKey = Math.floor(report.timestamp / 86400);
@@ -3201,20 +2907,12 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                     studentRecord.assessments.set(sessionKey, []);
                 }
                 studentRecord.assessments.get(sessionKey).push(report);
-                
-                console.log(`✅ Assessment ${index + 1} assigned to ${studentName}`);
-            } else {
-                console.warn(`⚠️ Assessment ${index + 1} could not be assigned:`, {
-                    studentName: studentName,
-                    availableStudents: Array.from(reportsByStudent.keys())
-                });
             }
         });
 
-        // C. Populate containers with Monthly Report Data - PROPERLY ASSIGNED
-        console.log("📝 Assigning monthly reports to students...");
-        monthlyResults.forEach((report, index) => {
-            const studentName = report.assignedStudentName;
+        // C. Populate containers with Monthly Report Data
+        monthlyResults.forEach((report) => {
+            const studentName = findStudentForReport(report);
             
             if (studentName && reportsByStudent.has(studentName)) {
                 const sessionKey = Math.floor(report.timestamp / 86400);
@@ -3224,13 +2922,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                     studentRecord.monthly.set(sessionKey, []);
                 }
                 studentRecord.monthly.get(sessionKey).push(report);
-                
-                console.log(`✅ Monthly report ${index + 1} assigned to ${studentName}`);
-            } else {
-                console.warn(`⚠️ Monthly report ${index + 1} could not be assigned:`, {
-                    studentName: studentName,
-                    availableStudents: Array.from(reportsByStudent.keys())
-                });
             }
         });
 
@@ -3248,18 +2939,13 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             reportContent.innerHTML = reportsHtml;
         }
 
-        // 9. UPDATE CACHE (Short-lived)
+        // 9. UPDATE CACHE
         try {
             const dataToCache = {
                 timestamp: Date.now(),
                 html: reportContent ? reportContent.innerHTML : '',
                 userData: currentUserData,
-                studentList: userChildren,
-                distributionSummary: Array.from(reportsByStudent.entries()).map(([name, reports]) => ({
-                    student: name,
-                    assessments: Array.from(reports.assessments.values()).flat().length,
-                    monthly: Array.from(reports.monthly.values()).flat().length
-                }))
+                studentList: userChildren
             };
             localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
         } catch (e) {
@@ -3312,11 +2998,33 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
     }
 }
 
+// Distribute reports to students
+function distributeReportsToStudents(allReports) {
+    const assessmentResults = [];
+    const monthlyResults = [];
+    
+    allReports.forEach(report => {
+        const assignedStudent = findStudentForReport(report);
+        
+        if (assignedStudent) {
+            report.assignedStudentName = assignedStudent;
+            report.assignedStudentId = studentIdMap.get(assignedStudent);
+            
+            if (report.type === 'assessment') {
+                assessmentResults.push(report);
+            } else if (report.type === 'monthly') {
+                monthlyResults.push(report);
+            }
+        }
+    });
+    
+    return { assessmentResults, monthlyResults };
+}
+
 // ============================================================================
 // SECTION 16: ADMIN DIAGNOSTICS FUNCTIONS
 // ============================================================================
 
-// Add this to help diagnose missing reports
 async function showDiagnostics() {
     const user = auth.currentUser;
     if (!user) return;
@@ -3455,7 +3163,7 @@ function logout() {
 }
 
 // ============================================================================
-// SECTION 18: UNIFIED AUTH & DATA MANAGER - FIXES RELOADING & MISSING CHILDREN
+// SECTION 18: UNIFIED AUTH & DATA MANAGER - OPTIMIZED
 // ============================================================================
 
 class UnifiedAuthManager {
@@ -3500,13 +3208,11 @@ class UnifiedAuthManager {
 
         // Prevent rapid successive calls
         if (this.isProcessing) {
-            console.log("⏸️ Auth change already processing, ignoring");
             return;
         }
 
         // Debounce to prevent loops
         if (timeSinceLastProcess < this.DEBOUNCE_MS) {
-            console.log(`⏸️ Debouncing auth change (${timeSinceLastProcess}ms since last)`);
             return;
         }
 
@@ -3541,7 +3247,7 @@ class UnifiedAuthManager {
     }
 
     /**
-     * Load user dashboard - SINGLE ENTRY POINT
+     * Load user dashboard - OPTIMIZED VERSION
      */
     async loadUserDashboard(user) {
         console.log("📊 Loading dashboard for user");
@@ -3576,13 +3282,11 @@ class UnifiedAuthManager {
             // 2. Update UI immediately (prevent feeling of lag)
             this.showDashboardUI();
 
-            // 3. Load all data in parallel (faster)
-            await Promise.all([
-                this.loadAllChildrenAndReports(),
-                this.loadReferralsData(),
-                this.loadAcademicsData(),
-                this.setupRealtimeMonitoring()
-            ]);
+            // 3. Load data in sequence (not parallel) to reduce load time
+            await this.loadAllChildrenAndReports();
+            await this.loadReferralsData();
+            await this.loadAcademicsData();
+            await this.setupRealtimeMonitoring();
 
             // 4. Setup UI components
             this.setupUIComponents();
@@ -3631,7 +3335,7 @@ class UnifiedAuthManager {
     }
 
     /**
-     * Load all children and reports - COMPREHENSIVE SEARCH
+     * Load all children and reports - OPTIMIZED
      */
     async loadAllChildrenAndReports() {
         console.log("🔍 Searching for all children and reports");
@@ -3747,116 +3451,81 @@ async function comprehensiveFindChildren(parentPhone) {
     const studentNameIdMap = new Map(); // studentName -> studentId
 
     try {
-        // 1. Generate ALL phone variations
-        const phoneVariations = generateAllPhoneVariations(parentPhone);
+        // 1. Generate phone variations
+        const normalizedPhone = normalizePhoneNumber(parentPhone);
+        if (!normalizedPhone.valid) {
+            return {
+                studentIds: [],
+                studentNameIdMap: new Map(),
+                allStudentData: [],
+                studentNames: []
+            };
+        }
 
-        // 2. Search in students collection
-        for (const phoneVar of phoneVariations) {
-            try {
-                const snapshot = await db.collection('students')
-                    .where('parentPhone', '==', phoneVar)
-                    .get();
+        // 2. Search in students collection first
+        try {
+            const snapshot = await db.collection('students')
+                .where('parentPhone', '==', normalizedPhone.normalized)
+                .get();
 
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    const studentId = doc.id;
-                    const studentName = safeText(data.studentName || data.name || 'Unknown');
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const studentId = doc.id;
+                const studentName = safeText(data.studentName || data.name || 'Unknown');
 
-                    if (studentName !== 'Unknown' && !allChildren.has(studentId)) {
-                        allChildren.set(studentId, {
-                            id: studentId,
-                            name: studentName,
-                            data: data,
-                            isPending: false,
-                            collection: 'students'
-                        });
-                        
-                        // Handle duplicate names
-                        if (studentNameIdMap.has(studentName)) {
-                            const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
-                            studentNameIdMap.set(uniqueName, studentId);
-                        } else {
-                            studentNameIdMap.set(studentName, studentId);
-                        }
+                if (studentName !== 'Unknown' && !allChildren.has(studentId)) {
+                    allChildren.set(studentId, {
+                        id: studentId,
+                        name: studentName,
+                        data: data,
+                        isPending: false,
+                        collection: 'students'
+                    });
+                    
+                    // Handle duplicate names
+                    if (studentNameIdMap.has(studentName)) {
+                        const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
+                        studentNameIdMap.set(uniqueName, studentId);
+                    } else {
+                        studentNameIdMap.set(studentName, studentId);
                     }
-                });
-            } catch (error) {
-                // Silently continue
-            }
+                }
+            });
+        } catch (error) {
+            // Silently continue
         }
 
         // 3. Search in pending_students collection
-        for (const phoneVar of phoneVariations) {
-            try {
-                const snapshot = await db.collection('pending_students')
-                    .where('parentPhone', '==', phoneVar)
-                    .get();
+        try {
+            const snapshot = await db.collection('pending_students')
+                .where('parentPhone', '==', normalizedPhone.normalized)
+                .get();
 
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    const studentId = doc.id;
-                    const studentName = safeText(data.studentName || data.name || 'Unknown');
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const studentId = doc.id;
+                const studentName = safeText(data.studentName || data.name || 'Unknown');
 
-                    if (studentName !== 'Unknown' && !allChildren.has(studentId)) {
-                        allChildren.set(studentId, {
-                            id: studentId,
-                            name: studentName,
-                            data: data,
-                            isPending: true,
-                            collection: 'pending_students'
-                        });
-                        
-                        // Handle duplicate names
-                        if (studentNameIdMap.has(studentName)) {
-                            const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
-                            studentNameIdMap.set(uniqueName, studentId);
-                        } else {
-                            studentNameIdMap.set(studentName, studentId);
-                        }
-                    }
-                });
-            } catch (error) {
-                // Silently continue
-            }
-        }
-
-        // 4. Emergency backup search - check by email if available
-        const userDoc = await db.collection('parent_users')
-            .where('normalizedPhone', '==', parentPhone)
-            .limit(1)
-            .get();
-
-        if (!userDoc.empty) {
-            const userData = userDoc.docs[0].data();
-            if (userData.email) {
-                try {
-                    const emailSnapshot = await db.collection('students')
-                        .where('parentEmail', '==', userData.email)
-                        .get();
-
-                    emailSnapshot.forEach(doc => {
-                        const data = doc.data();
-                        const studentId = doc.id;
-                        const studentName = safeText(data.studentName || data.name || 'Unknown');
-
-                        if (studentName !== 'Unknown' && !allChildren.has(studentId)) {
-                            allChildren.set(studentId, {
-                                id: studentId,
-                                name: studentName,
-                                data: data,
-                                isPending: false,
-                                collection: 'students'
-                            });
-                            
-                            if (!studentNameIdMap.has(studentName)) {
-                                studentNameIdMap.set(studentName, studentId);
-                            }
-                        }
+                if (studentName !== 'Unknown' && !allChildren.has(studentId)) {
+                    allChildren.set(studentId, {
+                        id: studentId,
+                        name: studentName,
+                        data: data,
+                        isPending: true,
+                        collection: 'pending_students'
                     });
-                } catch (error) {
-                    // Silently continue
+                    
+                    // Handle duplicate names
+                    if (studentNameIdMap.has(studentName)) {
+                        const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
+                        studentNameIdMap.set(uniqueName, studentId);
+                    } else {
+                        studentNameIdMap.set(studentName, studentId);
+                    }
                 }
-            }
+            });
+        } catch (error) {
+            // Silently continue
         }
 
         // 5. Return results
@@ -3890,7 +3559,7 @@ async function comprehensiveFindChildren(parentPhone) {
  * NEW initialization function
  */
 function initializeParentPortalV2() {
-    console.log("🚀 Initializing Parent Portal V2 (No Reload Edition)");
+    console.log("🚀 Initializing Parent Portal V2 (Optimized Edition)");
 
     // 1. Setup UI first
     setupRememberMe();
