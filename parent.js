@@ -1,5 +1,3 @@
-[file name]: updated_parent_js.txt
-[file content begin]
 // Firebase config for the 'bloomingkidsassessment' project
 firebase.initializeApp({
     apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
