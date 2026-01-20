@@ -1904,11 +1904,20 @@ async function generateOptimizedSearchQueries(parentPhone, parentEmail, parentUi
 }
 
 // NEW FUNCTION: Find which student a report belongs to
+// NEW FUNCTION: Find which student a report belongs to
 function findStudentForReport(report) {
+    console.log("🔍 DEBUG findStudentForReport called for:", {
+        reportId: report.id,
+        reportStudentName: report.studentName,
+        reportStudentId: report.studentId,
+        availableStudents: Array.from(studentIdMap.keys())
+    });
+    
     // Method 1: Match by studentId
-    if (report.studentId) {
+    if (report.studentId && studentIdMap) {
         for (const [studentName, studentId] of studentIdMap.entries()) {
             if (studentId === report.studentId) {
+                console.log("✅ Matched by studentId:", studentName);
                 return studentName;
             }
         }
@@ -1921,6 +1930,23 @@ function findStudentForReport(report) {
         // Check exact match
         for (const studentName of userChildren) {
             if (safeText(studentName) === reportStudentName) {
+                console.log("✅ Matched by exact name:", studentName);
+                return studentName;
+            }
+        }
+        
+        // Check case-insensitive match
+        for (const studentName of userChildren) {
+            if (safeText(studentName).toLowerCase() === reportStudentName.toLowerCase()) {
+                console.log("✅ Matched by case-insensitive name:", studentName);
+                return studentName;
+            }
+        }
+        
+        // Check if report studentName contains any student name
+        for (const studentName of userChildren) {
+            if (reportStudentName.toLowerCase().includes(safeText(studentName).toLowerCase())) {
+                console.log("✅ Matched by partial name (report contains):", studentName);
                 return studentName;
             }
         }
@@ -1928,22 +1954,25 @@ function findStudentForReport(report) {
     
     // Method 3: If parent has only one child, assign to that child
     if (userChildren.length === 1) {
+        console.log("✅ Assigned to only child:", userChildren[0]);
         return userChildren[0];
     }
     
-    // Method 4: Check report for any matching student data
+    // Method 4: Check allStudentData for matches
     if (allStudentData.length > 0) {
         for (const student of allStudentData) {
             if (student.data) {
                 // Check if report references this student
                 if ((report.studentId && report.studentId === student.id) ||
                     (report.studentName && safeText(report.studentName) === safeText(student.name))) {
+                    console.log("✅ Matched via allStudentData:", student.name);
                     return student.name;
                 }
             }
         }
     }
     
+    console.log("❌ Could not match report to any student");
     return null;
 }
 
