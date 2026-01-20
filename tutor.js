@@ -8,7 +8,7 @@ import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 /*******************************************************************************
- * SECTION 2: STYLES & CSS (UPDATED WITH MODAL POSITIONING FIX)
+ * SECTION 2: STYLES & CSS
  ******************************************************************************/
 
 const style = document.createElement('style');
@@ -32,351 +32,6 @@ style.textContent = `
         --radius: 0.5rem;
         --radius-lg: 0.75rem;
         --success-color: #10b981;
-    }
-
-    /* Fixed positioning for modals */
-    .fixed {
-        position: fixed !important;
-    }
-
-    .inset-0 {
-        top: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        left: 0 !important;
-    }
-
-    .bg-gray-600 {
-        background-color: #4b5563 !important;
-    }
-
-    .bg-opacity-50 {
-        opacity: 0.5 !important;
-    }
-
-    .overflow-y-auto {
-        overflow-y: auto !important;
-    }
-
-    .h-full {
-        height: 100% !important;
-    }
-
-    .w-full {
-        width: 100% !important;
-    }
-
-    .flex {
-        display: flex !important;
-    }
-
-    .items-center {
-        align-items: center !important;
-    }
-
-    .justify-center {
-        justify-content: center !important;
-    }
-
-    .z-50 {
-        z-index: 50 !important;
-    }
-
-    /* Modal content styling */
-    .relative {
-        position: relative !important;
-    }
-
-    .bg-white {
-        background-color: #ffffff !important;
-    }
-
-    .p-8 {
-        padding: 2rem !important;
-    }
-
-    .rounded-lg {
-        border-radius: 0.5rem !important;
-    }
-
-    .shadow-xl {
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
-    }
-
-    .max-w-2xl {
-        max-width: 42rem !important;
-    }
-
-    .max-w-md {
-        max-width: 28rem !important;
-    }
-
-    .max-w-lg {
-        max-width: 32rem !important;
-    }
-
-    .mx-auto {
-        margin-left: auto !important;
-        margin-right: auto !important;
-    }
-
-    /* Text styling */
-    .text-xl {
-        font-size: 1.25rem !important;
-        line-height: 1.75rem !important;
-    }
-
-    .font-bold {
-        font-weight: 700 !important;
-    }
-
-    .mb-4 {
-        margin-bottom: 1rem !important;
-    }
-
-    .text-green-700 {
-        color: #047857 !important;
-    }
-
-    .text-blue-800 {
-        color: #1e40af !important;
-    }
-
-    .text-blue-700 {
-        color: #1d4ed8 !important;
-    }
-
-    .text-gray-600 {
-        color: #4b5563 !important;
-    }
-
-    .text-sm {
-        font-size: 0.875rem !important;
-        line-height: 1.25rem !important;
-    }
-
-    .text-gray-500 {
-        color: #6b7280 !important;
-    }
-
-    .font-semibold {
-        font-weight: 600 !important;
-    }
-
-    .text-lg {
-        font-size: 1.125rem !important;
-        line-height: 1.75rem !important;
-    }
-
-    .text-blue-600 {
-        color: #2563eb !important;
-    }
-
-    .text-xs {
-        font-size: 0.75rem !important;
-        line-height: 1rem !important;
-    }
-
-    /* Form elements */
-    .space-y-4 > * + * {
-        margin-top: 1rem !important;
-    }
-
-    .mt-1 {
-        margin-top: 0.25rem !important;
-    }
-
-    .p-2 {
-        padding: 0.5rem !important;
-    }
-
-    .border {
-        border-width: 1px !important;
-        border-style: solid !important;
-    }
-
-    .rounded {
-        border-radius: 0.25rem !important;
-    }
-
-    /* Button styling */
-    .bg-green-600 {
-        background-color: #059669 !important;
-    }
-
-    .bg-gray-500 {
-        background-color: #6b7280 !important;
-    }
-
-    .bg-red-500 {
-        background-color: #ef4444 !important;
-    }
-
-    .text-white {
-        color: #ffffff !important;
-    }
-
-    .px-6 {
-        padding-left: 1.5rem !important;
-        padding-right: 1.5rem !important;
-    }
-
-    .py-2 {
-        padding-top: 0.5rem !important;
-        padding-bottom: 0.5rem !important;
-    }
-
-    .hover\\:bg-green-700:hover {
-        background-color: #047857 !important;
-    }
-
-    .hover\\:bg-gray-700:hover {
-        background-color: #374151 !important;
-    }
-
-    .float-right {
-        float: right !important;
-    }
-
-    /* Background colors */
-    .bg-blue-50 {
-        background-color: #eff6ff !important;
-    }
-
-    .bg-green-50 {
-        background-color: #f0fdf4 !important;
-    }
-
-    .bg-red-50 {
-        background-color: #fef2f2 !important;
-    }
-
-    .bg-orange-50 {
-        background-color: #fff7ed !important;
-    }
-
-    /* Border colors */
-    .border-red-400 {
-        border-color: #f87171 !important;
-    }
-
-    .border-l-4 {
-        border-left-width: 4px !important;
-    }
-
-    /* Status indicators */
-    .bg-orange-100 {
-        background-color: #ffedd5 !important;
-    }
-
-    .text-orange-800 {
-        color: #9a3412 !important;
-    }
-
-    .px-2 {
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-    }
-
-    .py-1 {
-        padding-top: 0.25rem !important;
-        padding-bottom: 0.25rem !important;
-    }
-
-    .rounded-full {
-        border-radius: 9999px !important;
-    }
-
-    /* Flex utilities */
-    .justify-end {
-        justify-content: flex-end !important;
-    }
-
-    .space-x-2 > * + * {
-        margin-left: 0.5rem !important;
-    }
-
-    .mt-6 {
-        margin-top: 1.5rem !important;
-    }
-
-    /* Alert/notification colors */
-    .text-red-500 {
-        color: #ef4444 !important;
-    }
-
-    .text-green-600 {
-        color: #059669 !important;
-    }
-
-    /* List styling */
-    .list-disc {
-        list-style-type: disc !important;
-    }
-
-    .pl-5 {
-        padding-left: 1.25rem !important;
-    }
-
-    /* Special modal colors */
-    .text-orange-600 {
-        color: #ea580c !important;
-    }
-
-    /* SVG icons */
-    .h-6 {
-        height: 1.5rem !important;
-    }
-
-    .w-6 {
-        width: 1.5rem !important;
-    }
-
-    .text-red-600 {
-        color: #dc2626 !important;
-    }
-
-    .ml-3 {
-        margin-left: 0.75rem !important;
-    }
-
-    /* Animation for processing */
-    .animate-spin {
-        animation: spin 1s linear infinite !important;
-    }
-
-    @keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-    }
-
-    .h-12 {
-        height: 3rem !important;
-    }
-
-    .w-12 {
-        width: 3rem !important;
-    }
-
-    .border-b-2 {
-        border-bottom-width: 2px !important;
-    }
-
-    /* Validation styles */
-    .border-red-300 {
-        border-color: #fca5a5 !important;
-    }
-
-    .border-green-300 {
-        border-color: #86efac !important;
-    }
-
-    .border-red-500 {
-        border-color: #ef4444 !important;
-    }
-
-    .border-green-500 {
-        border-color: #22c55e !important;
     }
 
     /* Active Tab Styling */
@@ -660,6 +315,10 @@ style.textContent = `
         border: 2px solid var(--border-color);
         border-top-color: var(--primary-color);
         border-radius: 50%;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
     }
 
     /* Hero Section */
@@ -1920,7 +1579,7 @@ const generateTimeSlots = () => {
             slots.push({ value, label });
         });
     }
-    // Add late night/overnight slots if needed (e.g., up to 2 AM)
+    // Add late night/overnight slots if needed (e.g. up to 2 AM)
     ['00', '01', '02'].forEach(hour => {
         const minutes = ['00', '15', '30', '45'];
         minutes.forEach(min => {
@@ -2011,10 +1670,10 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
     const existingSchedule = student.schedule || [];
 
     const popupHTML = `
-        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-            <div class="relative mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-lg bg-white">
+        <div class="modal-overlay">
+            <div class="modal-content max-w-2xl">
                 <div class="modal-header">
-                    <h3 class="text-xl font-bold mb-4">📅 Set Schedule for ${student.studentName}</h3>
+                    <h3 class="modal-title">📅 Set Schedule for ${student.studentName}</h3>
                     <span class="badge badge-info">Queue: ${remainingCount} Remaining</span>
                 </div>
                 <div class="modal-body">
@@ -2272,10 +1931,10 @@ function showDailyTopicModal(student) {
                             String(today.getDate()).padStart(2, '0');
 
     const modalHTML = `
-        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-            <div class="relative mx-auto p-5 border w-full max-w-lg shadow-lg rounded-lg bg-white">
+        <div class="modal-overlay">
+            <div class="modal-content max-w-lg">
                 <div class="modal-header">
-                    <h3 class="text-xl font-bold mb-4">📚 Daily Topic: ${student.studentName}</h3>
+                    <h3 class="modal-title">📚 Daily Topic: ${student.studentName}</h3>
                 </div>
                 <div class="modal-body">
                     <div id="topic-history-container" class="mb-5 bg-blue-50 p-3 rounded-lg border border-blue-100 hidden">
@@ -2427,7 +2086,20 @@ async function loadDailyTopicHistory(studentId) {
         data.forEach(d => {
             if (d.parsedDate.getMonth() === now.getMonth() && d.parsedDate.getFullYear() === now.getFullYear()) {
                 count++;
-                html += `<li class="flex flex-col border-b border-blue-100 last:border-0 pb-2">`;
+                html += `<li class="flex flex-col border-b border-blue-100 last:border-0 pb-2">
+                    <div class="flex justify-between w-full">
+                        <div class="flex-1 mr-2"><span class="font-bold text-blue-600 text-xs">${d.parsedDate.toLocaleDateString(undefined,{month:'short',day:'numeric'})}: </span>
+                        <span id="text-${d.id}" class="text-sm">${d.topics}</span>
+                        <div id="input-container-${d.id}" class="hidden"><textarea id="input-${d.id}" class="w-full text-sm border rounded p-1" rows="2"></textarea></div></div>
+                        <div class="flex space-x-1">
+                            <button id="btn-edit-${d.id}" data-action="edit" data-id="${d.id}" class="text-gray-400 hover:text-blue-600">✏️</button>
+                            <button id="btn-delete-${d.id}" data-action="delete" data-id="${d.id}" class="text-gray-400 hover:text-red-600">🗑️</button>
+                            <div id="action-btns-${d.id}" class="hidden flex space-x-1">
+                                <button data-action="save" data-id="${d.id}" class="text-green-600">✅</button>
+                                <button data-action="cancel" data-id="${d.id}" class="text-red-500">❌</button>
+                            </div>
+                        </div>
+                    </div></li>`;
             }
         });
         html += '</ul>';
@@ -2436,6 +2108,7 @@ async function loadDailyTopicHistory(studentId) {
         document.getElementById('topic-count-badge').textContent = count;
     } catch (e) { console.error(e); container.innerHTML = '<p class="text-red-500">Error loading history.</p>'; }
 }
+
 
 // ==========================================
 // 2. HOMEWORK ASSIGNMENT (SMART SYNC VERSION)
@@ -2496,9 +2169,9 @@ function showHomeworkModal(student) {
     const parentPhone = student.parentPhone || "Not Found";
 
     const modalHTML = `
-        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-            <div class="relative mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-lg bg-white">
-                <div class="modal-header"><h3 class="text-xl font-bold mb-4">📝 Assign Homework for ${student.studentName}</h3></div>
+        <div class="modal-overlay">
+            <div class="modal-content max-w-2xl">
+                <div class="modal-header"><h3 class="modal-title">📝 Assign Homework for ${student.studentName}</h3></div>
                 <div class="modal-body">
                     <div class="form-group"><label class="form-label">Title *</label><input type="text" id="hw-title" class="form-input" required></div>
                     <div class="form-group"><label class="form-label">Description *</label><textarea id="hw-description" class="form-input form-textarea" required></textarea></div>
@@ -3357,10 +3030,10 @@ initializeFloatingMessagingButton();
 // View Schedule Calendar for All Students
 function showScheduleCalendarModal() {
     const modalHTML = `
-        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-            <div class="relative mx-auto p-5 border w-full max-w-6xl shadow-lg rounded-lg bg-white">
+        <div class="modal-overlay">
+            <div class="modal-content max-w-6xl">
                 <div class="modal-header">
-                    <h3 class="text-xl font-bold mb-4">📅 Weekly Schedule Calendar</h3>
+                    <h3 class="modal-title">📅 Weekly Schedule Calendar</h3>
                     <div class="action-buttons">
                         <button id="print-calendar-btn" class="btn btn-secondary btn-sm">📄 Print/PDF</button>
                         <button id="edit-schedule-btn" class="btn btn-primary btn-sm">✏️ Edit Schedules</button>
@@ -3546,10 +3219,10 @@ function renderCalendarView(students) {
 // Edit Schedule Modal
 function showEditScheduleModal(student) {
     const modalHTML = `
-        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-            <div class="relative mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-lg bg-white">
+        <div class="modal-overlay">
+            <div class="modal-content max-w-2xl">
                 <div class="modal-header">
-                    <h3 class="text-xl font-bold mb-4">✏️ Edit Schedule for ${student.studentName}</h3>
+                    <h3 class="modal-title">✏️ Edit Schedule for ${student.studentName}</h3>
                 </div>
                 <div class="modal-body">
                     <div class="mb-4 p-3 bg-blue-50 rounded-lg">
@@ -4291,7 +3964,7 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
 }
 
 /*******************************************************************************
- * SECTION 12: STUDENT DATABASE MANAGEMENT (UPDATED WITH PROPER MODAL STYLING)
+ * SECTION 12: STUDENT DATABASE MANAGEMENT
  ******************************************************************************/
 
 // Enhanced Student Database
@@ -4477,8 +4150,8 @@ function showEditStudentModal(student) {
         </div>`;
 
     const editModal = document.createElement('div');
-    editModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50';
-    editModal.innerHTML = `<div class="relative mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-lg bg-white">${editFormHTML}</div>`;
+    editModal.className = 'modal-overlay';
+    editModal.innerHTML = `<div class="modal-content max-w-2xl">${editFormHTML}</div>`;
     document.body.appendChild(editModal);
 
     document.getElementById('cancel-edit-btn').addEventListener('click', () => editModal.remove());
@@ -4541,183 +4214,6 @@ function showEditStudentModal(student) {
             console.error("Error updating student:", error);
             showCustomAlert(`❌ An error occurred: ${error.message}`);
         }
-    });
-}
-
-// ==========================================
-// REPORT MODAL AND FEE CONFIRMATION MODAL
-// ==========================================
-
-function showReportModal(student) {
-    const existingReport = savedReports[student.id] || {};
-    const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
-    const currentMonthYear = getCurrentMonthYear();
-    
-    const reportFormHTML = `
-        <h3 class="text-xl font-bold mb-4">📝 Monthly Report for ${student.studentName}</h3>
-        <div class="bg-blue-50 p-4 rounded-lg mb-4">
-            <p class="font-semibold text-blue-800">Month: ${currentMonthYear}</p>
-        </div>
-        <div class="space-y-4">
-            <div class="form-group">
-                <label class="form-label">Introduction</label>
-                <textarea id="report-intro" class="form-input form-textarea report-textarea" rows="3">${existingReport.introduction || ''}</textarea>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Topics & Remarks</label>
-                <textarea id="report-topics" class="form-input form-textarea report-textarea" rows="4">${existingReport.topics || ''}</textarea>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Progress & Achievements</label>
-                <textarea id="report-progress" class="form-input form-textarea report-textarea" rows="3">${existingReport.progress || ''}</textarea>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Strengths & Weaknesses</label>
-                <textarea id="report-sw" class="form-input form-textarea report-textarea" rows="3">${existingReport.strengthsWeaknesses || ''}</textarea>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Recommendations</label>
-                <textarea id="report-recs" class="form-input form-textarea report-textarea" rows="3">${existingReport.recommendations || ''}</textarea>
-            </div>
-            <div class="form-group">
-                <label class="form-label">General Comments</label>
-                <textarea id="report-general" class="form-input form-textarea report-textarea" rows="3">${existingReport.generalComments || ''}</textarea>
-            </div>
-            <div class="flex justify-end space-x-2 mt-6">
-                <button id="cancel-report-btn" class="btn btn-secondary">Cancel</button>
-                <button id="modal-action-btn" class="btn btn-primary">${isSingleApprovedStudent ? 'Proceed to Submit' : 'Save Report'}</button>
-            </div>
-        </div>`;
-    
-    const reportModal = document.createElement('div');
-    reportModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50';
-    reportModal.innerHTML = `<div class="relative mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-lg bg-white">${reportFormHTML}</div>`;
-    document.body.appendChild(reportModal);
-
-    document.getElementById('cancel-report-btn').addEventListener('click', () => reportModal.remove());
-    document.getElementById('modal-action-btn').addEventListener('click', async () => {
-        const reportData = {
-            studentId: student.id, 
-            studentName: student.studentName, 
-            grade: student.grade,
-            parentName: student.parentName, 
-            parentPhone: student.parentPhone,
-            normalizedParentPhone: normalizePhoneNumber(student.parentPhone),
-            reportMonth: currentMonthYear,
-            introduction: document.getElementById('report-intro').value,
-            topics: document.getElementById('report-topics').value,
-            progress: document.getElementById('report-progress').value,
-            strengthsWeaknesses: document.getElementById('report-sw').value,
-            recommendations: document.getElementById('report-recs').value,
-            generalComments: document.getElementById('report-general').value
-        };
-
-        reportModal.remove();
-        showFeeConfirmationModal(student, reportData);
-    });
-}
-
-function showFeeConfirmationModal(student, reportData) {
-    const feeConfirmationHTML = `
-        <h3 class="text-xl font-bold mb-4">💰 Confirm Fee for ${student.studentName}</h3>
-        <p class="text-sm text-gray-600 mb-4">Please verify the monthly fee for this student before saving the report.</p>
-        <div class="space-y-4">
-            <div class="form-group">
-                <label class="form-label">Current Fee (₦)</label>
-                <input type="number" id="confirm-student-fee" class="form-input" 
-                       value="${student.studentFee || 0}" 
-                       placeholder="Enter fee amount">
-            </div>
-            <div class="flex justify-end space-x-2 mt-6">
-                <button id="cancel-fee-confirm-btn" class="btn btn-secondary">Cancel</button>
-                <button id="confirm-fee-btn" class="btn btn-primary">Confirm Fee & Save</button>
-            </div>
-        </div>`;
-
-    const feeModal = document.createElement('div');
-    feeModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50';
-    feeModal.innerHTML = `<div class="relative mx-auto p-5 border w-full max-w-lg shadow-lg rounded-lg bg-white">${feeConfirmationHTML}</div>`;
-    document.body.appendChild(feeModal);
-
-    const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
-
-    document.getElementById('cancel-fee-confirm-btn').addEventListener('click', () => feeModal.remove());
-    document.getElementById('confirm-fee-btn').addEventListener('click', async () => {
-        const newFeeValue = document.getElementById('confirm-student-fee').value;
-        const newFee = parseFloat(newFeeValue);
-
-        if (isNaN(newFee) || newFee < 0) {
-            showCustomAlert('Please enter a valid, non-negative fee amount.');
-            return;
-        }
-
-        if (newFee !== student.studentFee) {
-            try {
-                const studentRef = doc(db, student.collection, student.id);
-                await updateDoc(studentRef, { studentFee: newFee });
-                student.studentFee = newFee; 
-                showCustomAlert('✅ Student fee has been updated successfully!');
-            } catch (error) {
-                console.error("Error updating student fee:", error);
-                showCustomAlert(`❌ Failed to update fee: ${error.message}`);
-            }
-        }
-
-        feeModal.remove();
-
-        if (isSingleApprovedStudent) {
-            showAccountDetailsModal([reportData]);
-        } else {
-            savedReports[student.id] = reportData;
-            await saveReportsToFirestore(tutor.email, savedReports);
-            showCustomAlert(`✅ ${student.studentName}'s report has been saved.`);
-            renderUI(); 
-        }
-    });
-}
-
-function showAccountDetailsModal(reportsArray) {
-    const accountFormHTML = `
-        <h3 class="text-xl font-bold mb-4">🏦 Enter Your Payment Details</h3>
-        <p class="text-sm text-gray-600 mb-4">Please provide your bank details for payment processing.</p>
-        <div class="space-y-4">
-            <div class="form-group">
-                <label class="form-label">Beneficiary Bank Name *</label>
-                <input type="text" id="beneficiary-bank" class="form-input" placeholder="e.g., Zenith Bank" required>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Beneficiary Account Number *</label>
-                <input type="text" id="beneficiary-account" class="form-input" placeholder="Your 10-digit account number" required>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Beneficiary Name *</label>
-                <input type="text" id="beneficiary-name" class="form-input" placeholder="Your full name as on the account" required>
-            </div>
-            <div class="flex justify-end space-x-2 mt-6">
-                <button id="cancel-account-btn" class="btn btn-secondary">Cancel</button>
-                <button id="confirm-submit-btn" class="btn btn-primary">Confirm & Submit Report(s)</button>
-            </div>
-        </div>`;
-    const accountModal = document.createElement('div');
-    accountModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50';
-    accountModal.innerHTML = `<div class="relative mx-auto p-5 border w-full max-w-lg shadow-lg rounded-lg bg-white">${accountFormHTML}</div>`;
-    document.body.appendChild(accountModal);
-
-    document.getElementById('cancel-account-btn').addEventListener('click', () => accountModal.remove());
-    document.getElementById('confirm-submit-btn').addEventListener('click', async () => {
-        const accountDetails = {
-            beneficiaryBank: document.getElementById('beneficiary-bank').value.trim(),
-            beneficiaryAccount: document.getElementById('beneficiary-account').value.trim(),
-            beneficiaryName: document.getElementById('beneficiary-name').value.trim(),
-        };
-
-        if (!accountDetails.beneficiaryBank || !accountDetails.beneficiaryAccount || !accountDetails.beneficiaryName) {
-            showCustomAlert("❌ Please fill in all bank account details before submitting.");
-            return;
-        }
-
-        accountModal.remove();
-        await submitAllReports(reportsArray, accountDetails);
     });
 }
 
@@ -4956,12 +4452,244 @@ async function renderStudentDatabase(container, tutor) {
         attachEventListeners();
     }
 
+    function showReportModal(student) {
+        if (student.isTransitioning) {
+            const currentMonthYear = getCurrentMonthYear();
+            const reportData = {
+                studentId: student.id, 
+                studentName: student.studentName, 
+                grade: student.grade,
+                parentName: student.parentName, 
+                parentPhone: student.parentPhone,
+                normalizedParentPhone: normalizePhoneNumber(student.parentPhone),
+                reportMonth: currentMonthYear,
+                introduction: "Transitioning student - no monthly report required.",
+                topics: "Transitioning student - no monthly report required.",
+                progress: "Transitioning student - no monthly report required.",
+                strengthsWeaknesses: "Transitioning student - no monthly report required.",
+                recommendations: "Transitioning student - no monthly report required.",
+                generalComments: "Transitioning student - no monthly report required.",
+                isTransitioning: true
+            };
+            
+            showFeeConfirmationModal(student, reportData);
+            return;
+        }
+
+        const existingReport = savedReports[student.id] || {};
+        const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
+        const currentMonthYear = getCurrentMonthYear();
+        
+        const reportFormHTML = `
+            <h3 class="text-xl font-bold mb-4">📝 Monthly Report for ${student.studentName}</h3>
+            <div class="bg-blue-50 p-4 rounded-lg mb-4">
+                <p class="font-semibold text-blue-800">Month: ${currentMonthYear}</p>
+            </div>
+            <div class="space-y-4">
+                <div class="form-group">
+                    <label class="form-label">Introduction</label>
+                    <textarea id="report-intro" class="form-input form-textarea report-textarea" rows="3">${existingReport.introduction || ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Topics & Remarks</label>
+                    <textarea id="report-topics" class="form-input form-textarea report-textarea" rows="4">${existingReport.topics || ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Progress & Achievements</label>
+                    <textarea id="report-progress" class="form-input form-textarea report-textarea" rows="3">${existingReport.progress || ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Strengths & Weaknesses</label>
+                    <textarea id="report-sw" class="form-input form-textarea report-textarea" rows="3">${existingReport.strengthsWeaknesses || ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Recommendations</label>
+                    <textarea id="report-recs" class="form-input form-textarea report-textarea" rows="3">${existingReport.recommendations || ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">General Comments</label>
+                    <textarea id="report-general" class="form-input form-textarea report-textarea" rows="3">${existingReport.generalComments || ''}</textarea>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-report-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="modal-action-btn" class="btn btn-primary">${isSingleApprovedStudent ? 'Proceed to Submit' : 'Save Report'}</button>
+                </div>
+            </div>`;
+        
+        const reportModal = document.createElement('div');
+        reportModal.className = 'modal-overlay';
+        reportModal.innerHTML = `<div class="modal-content max-w-4xl">${reportFormHTML}</div>`;
+        document.body.appendChild(reportModal);
+
+        document.getElementById('cancel-report-btn').addEventListener('click', () => reportModal.remove());
+        document.getElementById('modal-action-btn').addEventListener('click', async () => {
+            const reportData = {
+                studentId: student.id, 
+                studentName: student.studentName, 
+                grade: student.grade,
+                parentName: student.parentName, 
+                parentPhone: student.parentPhone,
+                normalizedParentPhone: normalizePhoneNumber(student.parentPhone),
+                reportMonth: currentMonthYear,
+                introduction: document.getElementById('report-intro').value,
+                topics: document.getElementById('report-topics').value,
+                progress: document.getElementById('report-progress').value,
+                strengthsWeaknesses: document.getElementById('report-sw').value,
+                recommendations: document.getElementById('report-recs').value,
+                generalComments: document.getElementById('report-general').value
+            };
+
+            reportModal.remove();
+            showFeeConfirmationModal(student, reportData);
+        });
+    }
+
+    function showFeeConfirmationModal(student, reportData) {
+        const feeConfirmationHTML = `
+            <h3 class="text-xl font-bold mb-4">💰 Confirm Fee for ${student.studentName}</h3>
+            <p class="text-sm text-gray-600 mb-4">Please verify the monthly fee for this student before saving the report.</p>
+            <div class="space-y-4">
+                <div class="form-group">
+                    <label class="form-label">Current Fee (₦)</label>
+                    <input type="number" id="confirm-student-fee" class="form-input" 
+                           value="${student.studentFee || 0}" 
+                           placeholder="Enter fee amount">
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-fee-confirm-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="confirm-fee-btn" class="btn btn-primary">Confirm Fee & Save</button>
+                </div>
+            </div>`;
+
+        const feeModal = document.createElement('div');
+        feeModal.className = 'modal-overlay';
+        feeModal.innerHTML = `<div class="modal-content max-w-lg">${feeConfirmationHTML}</div>`;
+        document.body.appendChild(feeModal);
+
+        const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
+
+        document.getElementById('cancel-fee-confirm-btn').addEventListener('click', () => feeModal.remove());
+        document.getElementById('confirm-fee-btn').addEventListener('click', async () => {
+            const newFeeValue = document.getElementById('confirm-student-fee').value;
+            const newFee = parseFloat(newFeeValue);
+
+            if (isNaN(newFee) || newFee < 0) {
+                showCustomAlert('Please enter a valid, non-negative fee amount.');
+                return;
+            }
+
+            if (newFee !== student.studentFee) {
+                try {
+                    const studentRef = doc(db, student.collection, student.id);
+                    await updateDoc(studentRef, { studentFee: newFee });
+                    student.studentFee = newFee; 
+                    showCustomAlert('✅ Student fee has been updated successfully!');
+                } catch (error) {
+                    console.error("Error updating student fee:", error);
+                    showCustomAlert(`❌ Failed to update fee: ${error.message}`);
+                }
+            }
+
+            feeModal.remove();
+
+            if (isSingleApprovedStudent) {
+                showAccountDetailsModal([reportData]);
+            } else {
+                savedReports[student.id] = reportData;
+                await saveReportsToFirestore(tutor.email, savedReports);
+                showCustomAlert(`✅ ${student.studentName}'s report has been saved.`);
+                renderUI(); 
+            }
+        });
+    }
+
+    function showAccountDetailsModal(reportsArray) {
+        const accountFormHTML = `
+            <h3 class="text-xl font-bold mb-4">🏦 Enter Your Payment Details</h3>
+            <p class="text-sm text-gray-600 mb-4">Please provide your bank details for payment processing.</p>
+            <div class="space-y-4">
+                <div class="form-group">
+                    <label class="form-label">Beneficiary Bank Name *</label>
+                    <input type="text" id="beneficiary-bank" class="form-input" placeholder="e.g., Zenith Bank" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Beneficiary Account Number *</label>
+                    <input type="text" id="beneficiary-account" class="form-input" placeholder="Your 10-digit account number" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Beneficiary Name *</label>
+                    <input type="text" id="beneficiary-name" class="form-input" placeholder="Your full name as on the account" required>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-account-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="confirm-submit-btn" class="btn btn-primary">Confirm & Submit Report(s)</button>
+                </div>
+            </div>`;
+        const accountModal = document.createElement('div');
+        accountModal.className = 'modal-overlay';
+        accountModal.innerHTML = `<div class="modal-content max-w-lg">${accountFormHTML}</div>`;
+        document.body.appendChild(accountModal);
+
+        document.getElementById('cancel-account-btn').addEventListener('click', () => accountModal.remove());
+        document.getElementById('confirm-submit-btn').addEventListener('click', async () => {
+            const accountDetails = {
+                beneficiaryBank: document.getElementById('beneficiary-bank').value.trim(),
+                beneficiaryAccount: document.getElementById('beneficiary-account').value.trim(),
+                beneficiaryName: document.getElementById('beneficiary-name').value.trim(),
+            };
+
+            if (!accountDetails.beneficiaryBank || !accountDetails.beneficiaryAccount || !accountDetails.beneficiaryName) {
+                showCustomAlert("❌ Please fill in all bank account details before submitting.");
+                return;
+            }
+
+            accountModal.remove();
+            await submitAllReports(reportsArray, accountDetails);
+        });
+    }
+    
+    async function submitAllReports(reportsArray, accountDetails) {
+        if (reportsArray.length === 0) {
+            showCustomAlert("No reports to submit.");
+            return;
+        }
+
+        const batch = writeBatch(db);
+        reportsArray.forEach(report => {
+            const newReportRef = doc(collection(db, "tutor_submissions"));
+            
+            const finalReportData = {
+                tutorEmail: tutor.email,
+                tutorName: tutor.name,
+                submittedAt: new Date(),
+                ...report,
+                ...accountDetails
+            };
+            
+            if (!finalReportData.normalizedParentPhone && finalReportData.parentPhone) {
+                finalReportData.normalizedParentPhone = normalizePhoneNumber(finalReportData.parentPhone);
+            }
+            
+            batch.set(newReportRef, finalReportData);
+        });
+
+        try {
+            await batch.commit();
+            await clearAllReportsFromFirestore(tutor.email);
+            showCustomAlert(`✅ Successfully submitted ${reportsArray.length} report(s)!`);
+            await renderStudentDatabase(container, tutor);
+        } catch (error) {
+            console.error("Error submitting reports:", error);
+            showCustomAlert(`❌ Error: ${error.message}`);
+        }
+    }
+
     function showTransitioningConfirmation() {
         const confirmationHTML = `
-            <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                <div class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-lg bg-white">
+            <div class="modal-overlay">
+                <div class="modal-content">
                     <div class="modal-header">
-                        <h3 class="text-xl font-bold text-orange-600">🔄 Add Transitioning Student</h3>
+                        <h3 class="modal-title text-orange-600">🔄 Add Transitioning Student</h3>
                     </div>
                     <div class="modal-body">
                         <p class="text-sm text-gray-600 mb-4">
@@ -4971,7 +4699,7 @@ async function renderStudentDatabase(container, tutor) {
                         <p class="text-sm text-orange-600 font-semibold mb-4">
                             Are you sure you want to add a transitioning student?
                         </p>
-                        <div class="flex justify-end space-x-2 mt-6">
+                        <div class="modal-footer">
                             <button id="cancel-transitioning-btn" class="btn btn-secondary">Cancel</button>
                             <button id="confirm-transitioning-btn" class="btn btn-primary">Yes, Add Transitioning</button>
                         </div>
@@ -5672,4 +5400,3 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
-
