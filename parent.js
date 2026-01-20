@@ -3192,4 +3192,3 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById("academicsTab")?.addEventListener("click", () => switchMainTab('academics'));
     // --- END: NEW MAIN TAB SWITCHING LISTENERS ---
 });
-[file content end]
