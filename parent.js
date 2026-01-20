@@ -1811,7 +1811,23 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
         console.log("🎯 UNIQUE REPORTS AFTER DEDUPLICATION:", uniqueResults.length);
         
         // Now distribute reports to correct students
-        const { assessmentResults, monthlyResults } = distributeReportsToStudents(uniqueResults);
+       // DEBUG: Log what reports were found
+console.log("🔍 DEBUG: All raw reports found:", allReports.map(r => ({
+    id: r.id,
+    studentName: r.studentName,
+    studentId: r.studentId,
+    type: r.type,
+    timestamp: r.timestamp
+})));
+
+// DEBUG: Log student mapping
+console.log("👥 DEBUG: Student mapping available:", Array.from(studentIdMap.entries()));
+
+// Distribute reports to students
+const { assessmentResults, monthlyResults } = distributeReportsToStudents(allReports);
+
+// DEBUG: Log distribution results
+console.log("📊 DEBUG: After distribution - Assessments:", assessmentResults.length, "Monthly:", monthlyResults.length);
         
         return { 
             assessmentResults, 
