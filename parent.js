@@ -1,386 +1,340 @@
 /**
- * GOD MODE: STANDALONE PROGRESS REPORT SYSTEM
- * Encapsulated logic for fetching, analyzing, and rendering student reports.
+ * STANDALONE PROGRESS REPORT MODULE
+ * Includes Firebase Initialization to prevent "No Firebase App" error
  */
 
-const ProgressReportSystem = {
-    // Configuration
-    config: {
-        containerId: 'reportContent',
-        loaderId: 'reportLoader',
-        emptyId: 'emptyState',
-        db: firebase.firestore(), // Assumes firebase is initialized globally [cite: 2]
-    },
+// 1. INITIALIZE FIREBASE (Must happen first)
+// Checking apps.length prevents double-initialization errors if this script is loaded twice
+if (!firebase.apps.length) {
+    firebase.initializeApp({
+        apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
+        authDomain: "bloomingkidsassessment.firebaseapp.com",
+        projectId: "bloomingkidsassessment",
+        storageBucket: "bloomingkidsassessment.appspot.com",
+        messagingSenderId: "238975054977",
+        appId: "1:238975054977:web:87c70b4db044998a204980"
+    }); [cite_start]// [cite: 1]
+}
 
-    // State
-    state: {
-        currentUser: null,
-        listeners: [],
-        chartInstances: []
-    },
+// 2. DEFINE SERVICES
+const db = firebase.firestore(); [cite_start]// [cite: 2]
+let currentUserData = null; 
 
-    /**
-     * PRIMARY ENTRY POINT: Call this to load the tab
-     * @param {string} parentPhone - The raw phone number of the parent
-     * @param {string} parentEmail - (Optional) Email for fallback search
-     * @param {string} userId - (Optional) Firebase UID for caching/logging
-     */
-    async init(parentPhone, parentEmail = null, userId = null) {
-        console.log("🚀 Initializing Progress Report System for:", parentPhone);
-        
-        this.state.currentUser = { phone: parentPhone, email: parentEmail, uid: userId };
-        this.toggleLoader(true);
+/**
+ * MAIN ENTRY POINT: Load Reports
+ * Call this function when the tab is opened.
+ * @param {string} parentPhone - The parent's phone number to search for.
+ * @param {string} userId - The parent's Firebase UID (optional, for caching).
+ * @param {boolean} forceRefresh - Bypass cache if true.
+ */
+async function loadProgressReports(parentPhone, userId, forceRefresh = false) {
+    const reportContent = document.getElementById("reportContent");
+    const loader = document.getElementById("reportLoader");
+    
+    // Safety check for UI elements
+    if (!reportContent || !loader) {
+        console.error("Critical Error: Missing #reportContent or #reportLoader in HTML");
+        return;
+    }
 
-        try {
-            // 1. cleanup existing charts/listeners
-            this.cleanup();
+    loader.classList.remove("hidden");
+    reportContent.innerHTML = ""; 
 
-            // 2. Perform the "Enhanced Multi-Layer Search" 
-            const { assessmentResults, monthlyResults } = await this.performMultiLayerSearch(parentPhone, parentEmail);
+    try {
+        console.log(`🔍 Starting Report Search for: ${parentPhone}`);
 
-            // 3. Render results
-            if (assessmentResults.length === 0 && monthlyResults.length === 0) {
-                this.renderEmptyState();
-                // Even if empty, setup listeners for real-time updates [cite: 316]
-                this.setupRealTimeListeners(parentPhone, parentEmail);
-            } else {
-                this.renderReports(assessmentResults, monthlyResults);
-                this.setupRealTimeListeners(parentPhone, parentEmail);
-            }
+        // Perform Search
+        const searchResults = await performMultiLayerSearch(parentPhone, null, userId);
+        const { assessmentResults, monthlyResults } = searchResults;
 
-        } catch (error) {
-            console.error("❌ Critical Report System Error:", error);
-            document.getElementById(this.config.containerId).innerHTML = 
-                `<div class="text-red-500 text-center p-4">Error loading data: ${error.message}</div>`;
-        } finally {
-            this.toggleLoader(false);
-        }
-    },
-
-    // --- CORE LOGIC: DATA FETCHING ---
-
-    /**
-     * Implements the "Enhanced Multi-Layer Search" from the original code 
-     */
-    async performMultiLayerSearch(parentPhone, parentEmail) {
-        let assessmentResults = [];
-        let monthlyResults = [];
-        
-        // 1. Normalize Phone Number (Critical for matching)
-        const normalizedVersions = this.multiNormalizePhoneNumber(parentPhone); // 
-        const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
-
-        console.log(`🔍 Searching with versions:`, validVersions.map(v => v.normalized));
-
-        // 2. Search Assessments
-        for (const version of validVersions) {
-            // Layer 1: Normalized Field [cite: 275]
-            let snapshot = await this.config.db.collection("student_results")
-                .where("normalizedParentPhone", "==", version.normalized).get();
-            
-            if (snapshot.empty) {
-                // Layer 2: Legacy Field [cite: 282]
-                snapshot = await this.config.db.collection("student_results")
-                    .where("parentPhone", "==", version.normalized).get();
-            }
-
-            if (!snapshot.empty) {
-                snapshot.forEach(doc => {
-                    if (!assessmentResults.some(r => r.id === doc.id)) {
-                        assessmentResults.push({ id: doc.id, ...doc.data(), type: 'assessment' });
-                    }
-                });
-                break; // Found results, stop trying other phone versions
-            }
+        // Handle No Results
+        if (assessmentResults.length === 0 && monthlyResults.length === 0) {
+            renderEmptyState(reportContent);
+            return;
         }
 
-        // Layer 3: Email Fallback for Assessments [cite: 289]
-        if (assessmentResults.length === 0 && parentEmail) {
-            const emailSnapshot = await this.config.db.collection("student_results")
-                .where("parentEmail", "==", parentEmail).get();
-            emailSnapshot.forEach(doc => {
-                if (!assessmentResults.some(r => r.id === doc.id)) {
-                    assessmentResults.push({ id: doc.id, ...doc.data(), type: 'assessment' });
-                }
-            });
+        // Process & Render
+        const studentsMap = groupReportsByStudent(assessmentResults, monthlyResults);
+        renderStudentReports(studentsMap, reportContent);
+
+    } catch (error) {
+        console.error("Error loading reports:", error);
+        reportContent.innerHTML = `<div class="text-red-500 text-center p-4">Error loading reports: ${error.message}</div>`;
+    } finally {
+        loader.classList.add("hidden");
+    }
+}
+
+// --- CORE RENDERING LOGIC ---
+
+function groupReportsByStudent(assessments, monthly) {
+    const map = new Map();
+    
+    const initStudent = (name) => {
+        if (!map.has(name)) map.set(name, { assessments: [], monthly: [] });
+    };
+
+    assessments.forEach(r => {
+        initStudent(r.studentName);
+        map.get(r.studentName).assessments.push(r);
+    });
+
+    monthly.forEach(r => {
+        initStudent(r.studentName);
+        map.get(r.studentName).monthly.push(r);
+    });
+
+    return map;
+}
+
+function renderStudentReports(studentsMap, container) {
+    let studentIndex = 0;
+
+    for (const [studentName, data] of studentsMap) {
+        const fullName = capitalize(studentName);
+
+        [cite_start]// Student Header [cite: 404]
+        container.innerHTML += `
+            <div class="bg-green-100 border-l-4 border-green-600 p-4 rounded-lg mb-6 mt-8">
+                <h2 class="text-xl font-bold text-green-800">${fullName}</h2>
+                <p class="text-green-600">Student Record</p>
+            </div>
+        `;
+
+        // Render Assessments
+        if (data.assessments.length > 0) {
+            renderAssessments(data.assessments, container, studentIndex, fullName);
         }
 
-        // 3. Search Monthly Reports (Same logic applied to tutor_submissions) [cite: 295]
-        for (const version of validVersions) {
-            let snapshot = await this.config.db.collection("tutor_submissions")
-                .where("normalizedParentPhone", "==", version.normalized).get();
-            
-            if (snapshot.empty) {
-                snapshot = await this.config.db.collection("tutor_submissions")
-                    .where("parentPhone", "==", version.normalized).get();
-            }
-
-            if (!snapshot.empty) {
-                snapshot.forEach(doc => {
-                    if (!monthlyResults.some(r => r.id === doc.id)) {
-                        monthlyResults.push({ id: doc.id, ...doc.data(), type: 'monthly' });
-                    }
-                });
-                break;
-            }
+        // Render Monthly Reports
+        if (data.monthly.length > 0) {
+            renderMonthlyReports(data.monthly, container, studentIndex, fullName);
         }
 
-        return { assessmentResults, monthlyResults };
-    },
+        studentIndex++;
+    }
+}
 
-    // --- CORE LOGIC: RENDERING ---
+function renderAssessments(assessments, container, studentIndex, studentName) {
+    // Group assessments by session (date)
+    const sessions = new Map();
+    assessments.forEach(res => {
+        const key = Math.floor(res.timestamp / 86400); 
+        if (!sessions.has(key)) sessions.set(key, []);
+        sessions.get(key).push(res);
+    });
 
-    renderReports(assessments, monthlyReports) {
-        const container = document.getElementById(this.config.containerId);
-        container.innerHTML = "";
-        document.getElementById(this.config.emptyId).classList.add('hidden');
-
-        // Group by Student Name [cite: 399]
-        const studentsMap = new Map();
+    let sessionIndex = 0;
+    for (const [_, session] of sessions) {
+        const meta = session[0];
+        const dateStr = new Date(meta.timestamp * 1000).toLocaleDateString();
         
-        [...assessments, ...monthlyReports].forEach(item => {
-            const name = item.studentName || "Unknown Student";
-            if (!studentsMap.has(name)) studentsMap.set(name, { assessments: [], monthly: [] });
-            
-            if (item.type === 'assessment') studentsMap.get(name).assessments.push(item);
-            else studentsMap.get(name).monthly.push(item);
-        });
+        // Calculate Scores
+        const results = session.map(t => ({
+            subject: t.subject,
+            correct: t.score || 0,
+            total: t.totalScoreableQuestions || 0,
+            topics: t.answers?.map(a => a.topic).filter(Boolean) || []
+        }));
 
-        // Render per student
-        let studentIndex = 0;
-        studentsMap.forEach((data, studentName) => {
-            // Student Header [cite: 404]
-            const fullName = this.capitalize(studentName);
-            container.innerHTML += `
-                <div class="bg-green-100 border-l-4 border-green-600 p-4 rounded-lg mb-6 sticky top-0 z-10 shadow-sm">
-                    <h2 class="text-xl font-bold text-green-800">${fullName}</h2>
-                    <p class="text-green-600 text-sm">Showing all academic records</p>
-                </div>
-            `;
+        const recommendation = generateTemplatedRecommendation(studentName, "The Tutor", results);
 
-            // 1. Render Assessments [cite: 406]
-            data.assessments.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); // Sort by date desc
-            data.assessments.forEach((report, idx) => {
-                container.innerHTML += this.generateAssessmentHTML(report, studentIndex, idx, fullName);
-                
-                // Initialize Charts after DOM insertion [cite: 442]
-                setTimeout(() => this.renderChart(report, studentIndex, idx), 0);
-            });
-
-            // 2. Render Monthly Reports [cite: 450]
-            data.monthly.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-            data.monthly.forEach((report, idx) => {
-                container.innerHTML += this.generateMonthlyHTML(report, studentIndex, idx, fullName);
-            });
-
-            studentIndex++;
-        });
-    },
-
-    generateAssessmentHTML(data, sIdx, rIdx, fullName) {
-        const date = new Date((data.timestamp || data.submittedAt.seconds) * 1000).toLocaleDateString();
-        const score = data.score || data.correct || 0;
-        const total = data.totalScoreableQuestions || data.total || 0;
-        
-        // Use the template logic from [cite: 417-442]
-        return `
-            <div class="border rounded-xl shadow-md mb-8 p-6 bg-white transition-all hover:shadow-lg" id="assessment-${sIdx}-${rIdx}">
-                <div class="flex justify-between items-start border-b pb-4 mb-4">
+        [cite_start]// HTML Template [cite: 420]
+        const html = `
+            <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="assessment-block-${studentIndex}-${sessionIndex}">
+                <div class="flex justify-between border-b pb-4 mb-4">
                     <div>
                         <h3 class="text-lg font-bold text-green-800">Assessment Report</h3>
-                        <p class="text-gray-500 text-sm">${data.subject ? data.subject.toUpperCase() : 'General'} • ${date}</p>
+                        <p class="text-sm text-gray-500">${dateStr}</p>
                     </div>
                     <div class="text-right">
-                        <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-bold">
-                            Score: ${score}/${total}
-                        </span>
+                        <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Grade: ${meta.grade}</span>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                         <h4 class="font-semibold text-gray-700 mb-2">Topic Analysis</h4>
-                         <ul class="list-disc pl-5 text-gray-600 text-sm space-y-1">
-                            ${(data.topics || []).map(t => `<li>${t}</li>`).join('') || '<li>General Assessment</li>'}
-                         </ul>
-                    </div>
-                    <div class="h-48">
-                        <canvas id="chart-${sIdx}-${rIdx}"></canvas>
-                    </div>
+                <table class="w-full text-sm mb-4 border border-collapse">
+                    <thead class="bg-gray-50"><tr><th class="border p-2 text-left">Subject</th><th class="border p-2 text-center">Score</th></tr></thead>
+                    <tbody>
+                        ${results.map(r => `<tr><td class="border p-2">${r.subject.toUpperCase()}</td><td class="border p-2 text-center font-bold">${r.correct}/${r.total}</td></tr>`).join('')}
+                    </tbody>
+                </table>
+
+                <div class="bg-gray-50 p-4 rounded mb-4">
+                    <h4 class="font-semibold text-green-700 text-sm mb-2">Tutor's Recommendation</h4>
+                    <p class="text-sm text-gray-700 leading-relaxed">${recommendation}</p>
                 </div>
 
-                <div class="mt-6 bg-yellow-50 p-4 rounded-lg">
-                    <h4 class="text-sm font-bold text-yellow-800 uppercase mb-1">Tutor Recommendation</h4>
-                    <p class="text-gray-700 italic text-sm">
-                        ${this.generateRecommendation(fullName, data)}
-                    </p>
+                <div class="h-48 w-full mb-4">
+                    <canvas id="chart-${studentIndex}-${sessionIndex}"></canvas>
                 </div>
 
-                <div class="mt-4 text-center">
-                    <button onclick="ProgressReportSystem.downloadPDF('assessment-${sIdx}-${rIdx}', '${fullName}_Assessment')" 
-                            class="text-green-600 hover:text-green-800 font-semibold text-sm flex items-center justify-center w-full">
-                        <span>📥</span> <span class="ml-2">Download PDF Report</span>
+                <div class="text-center mt-4">
+                    <button onclick="downloadSessionReport(${studentIndex}, ${sessionIndex}, '${studentName}', 'assessment')" class="text-green-600 hover:underline text-sm font-semibold">
+                        ⬇ Download PDF
                     </button>
                 </div>
             </div>
         `;
-    },
 
-    generateMonthlyHTML(data, sIdx, rIdx, fullName) {
-        // Based on logic from [cite: 454-486]
-        const sections = [
-            { title: "Introduction", content: data.introduction },
-            { title: "Topics Covered", content: data.topics },
-            { title: "Progress", content: data.progress },
-            { title: "Areas for Improvement", content: data.strengthsWeaknesses },
-            { title: "Recommendations", content: data.recommendations }
-        ].filter(s => s.content);
+        container.insertAdjacentHTML('beforeend', html);
+        initChart(`chart-${studentIndex}-${sessionIndex}`, results);
+        sessionIndex++;
+    }
+}
 
-        return `
-            <div class="border border-blue-100 rounded-xl shadow-md mb-8 p-6 bg-white" id="monthly-${sIdx}-${rIdx}">
-                <div class="text-center border-b pb-4 mb-4">
-                    <h3 class="text-xl font-bold text-blue-800">Monthly Learning Report</h3>
-                    <p class="text-gray-500 text-sm">${new Date((data.timestamp || 0) * 1000).toLocaleDateString()}</p>
-                </div>
+function renderMonthlyReports(reports, container, studentIndex, studentName) {
+    let reportIndex = 0;
+    reports.forEach(report => {
+        const dateStr = new Date(report.timestamp * 1000).toLocaleDateString();
 
-                <div class="space-y-4">
-                    ${sections.map(s => `
-                        <div>
-                            <h4 class="font-bold text-gray-700 text-sm uppercase border-b border-gray-100 pb-1 mb-1">${s.title}</h4>
-                            <p class="text-gray-600 text-sm leading-relaxed">${s.content}</p>
-                        </div>
-                    `).join('')}
-                </div>
+        const html = `
+            <div class="border rounded-lg shadow mb-8 p-6 bg-white relative overflow-hidden" id="monthly-block-${studentIndex}-${reportIndex}">
+                <div class="absolute top-0 left-0 w-2 h-full bg-blue-500"></div>
+                <div class="pl-4">
+                    <h3 class="text-lg font-bold text-blue-800 mb-1">Monthly Learning Report</h3>
+                    <p class="text-sm text-gray-500 mb-4">${dateStr}</p>
+                    
+                    ${renderSection("Progress & Achievements", report.progress)}
+                    ${renderSection("Topics Covered", report.topics)}
+                    ${renderSection("Tutor's Comments", report.generalComments)}
 
-                <div class="mt-6 pt-4 border-t text-center">
-                    <button onclick="ProgressReportSystem.downloadPDF('monthly-${sIdx}-${rIdx}', '${fullName}_Monthly_Report')" 
-                            class="text-blue-600 hover:text-blue-800 font-semibold text-sm">
-                        <span>📥</span> Download Official Monthly Report
-                    </button>
+                    <div class="text-center mt-6 border-t pt-4">
+                        <button onclick="downloadMonthlyReport(${studentIndex}, ${reportIndex}, '${studentName}')" class="text-blue-600 hover:underline text-sm font-semibold">
+                            ⬇ Download Monthly Report PDF
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
-    },
+        container.insertAdjacentHTML('beforeend', html);
+        reportIndex++;
+    });
+}
 
-    // --- UTILITIES ---
+// --- HELPER FUNCTIONS ---
 
-    renderChart(data, sIdx, rIdx) {
-        const ctx = document.getElementById(`chart-${sIdx}-${rIdx}`);
-        if (!ctx) return;
-        
-        // Chart Config from [cite: 443]
-        const correct = data.score || data.correct || 0;
-        const total = data.totalScoreableQuestions || data.total || 0;
-        
+function initChart(canvasId, data) {
+    const ctx = document.getElementById(canvasId);
+    if (ctx && typeof Chart !== 'undefined') {
         new Chart(ctx, {
-            type: 'doughnut',
+            type: 'bar',
             data: {
-                labels: ['Correct', 'Incorrect/Missed'],
-                datasets: [{
-                    data: [correct, total - correct],
-                    backgroundColor: ['#4CAF50', '#FFCD56'],
-                    borderWidth: 0
-                }]
+                labels: data.map(r => r.subject.toUpperCase()),
+                datasets: [
+                    { label: 'Correct', data: data.map(s => s.correct), backgroundColor: '#4CAF50' },
+                    { label: 'Missed', data: data.map(s => s.total - s.correct), backgroundColor: '#FFCD56' }
+                ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { position: 'right' } }
+                scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
             }
         });
-    },
-
-    generateRecommendation(name, data) {
-        // simplified version of [cite: 104]
-        const percentage = (data.score / data.total) * 100;
-        if (percentage > 80) return `${name} is showing excellent mastery! We will advance to more complex topics.`;
-        if (percentage > 50) return `${name} is doing well. We will reinforce core concepts to build confidence.`;
-        return `${name} needs a bit more support here. We will review these topics in our next session.`;
-    },
-
-    downloadPDF(elementId, filename) {
-        const element = document.getElementById(elementId);
-        // Configuration from [cite: 498]
-        const opt = {
-            margin: 0.5,
-            filename: `${filename}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2 },
-            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-        };
-        html2pdf().from(element).set(opt).save();
-    },
-
-    refresh() {
-        if(this.state.currentUser) {
-            this.init(this.state.currentUser.phone, this.state.currentUser.email, this.state.currentUser.uid);
-        }
-    },
-
-    toggleLoader(show) {
-        const loader = document.getElementById(this.config.loaderId);
-        const content = document.getElementById(this.config.containerId);
-        if (show) {
-            loader.classList.remove('hidden');
-            content.classList.add('opacity-50');
-        } else {
-            loader.classList.add('hidden');
-            content.classList.remove('opacity-50');
-        }
-    },
-
-    renderEmptyState() {
-        document.getElementById(this.config.emptyId).classList.remove('hidden');
-    },
-
-    cleanup() {
-        this.state.listeners.forEach(unsub => unsub && unsub());
-        this.state.listeners = [];
-    },
-
-    capitalize(str) {
-        return str ? str.replace(/\b\w/g, l => l.toUpperCase()) : "";
-    },
-    
-    setupRealTimeListeners(phone, email) {
-       // Logic from [cite: 317-332] - stripped for brevity but functional
-       // Connects to Firestore onSnapshot
-    },
-
-    /**
-     * CRITICAL: The Robust Phone Normalizer [cite: 18-54]
-     * Required because parent phone formats vary wildly.
-     */
-    multiNormalizePhoneNumber(phone) {
-        if (!phone || typeof phone !== 'string') return [{ valid: false }];
-        
-        let cleaned = phone.replace(/[^\d+]/g, '');
-        const attempts = [];
-        
-        // 1. Standard libphonenumber parsing
-        try {
-            const parsed = libphonenumber.parsePhoneNumberFromString(cleaned);
-            if (parsed && parsed.isValid()) {
-                attempts.push({ normalized: parsed.format('E.164'), valid: true });
-            }
-        } catch(e) {}
-
-        // 2. Nigeria Specific Fix (Common issue) [cite: 33]
-        if (cleaned.match(/^(234)?(80|70|81|90|91)/) && !cleaned.startsWith('+')) {
-             const ngNumber = '+234' + cleaned.replace(/^234/, '');
-             attempts.push({ normalized: ngNumber, valid: true });
-        }
-        
-        // 3. Fallback: Digits only [cite: 46]
-        const digits = cleaned.replace(/\D/g, '');
-        if (digits.length > 7) attempts.push({ normalized: digits, valid: true });
-
-        return attempts.length > 0 ? attempts : [{ valid: false }];
     }
+}
+
+function renderSection(title, content) {
+    if (!content) return '';
+    return `
+        <div class="mb-4">
+            <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wide mb-1">${title}</h4>
+            <p class="text-sm text-gray-600 whitespace-pre-wrap">${content}</p>
+        </div>
+    `;
+}
+
+function renderEmptyState(container) {
+    container.innerHTML = `
+        <div class="text-center py-16 bg-gray-50 rounded-lg">
+            <div class="text-5xl mb-4">📊</div>
+            <h3 class="text-xl font-bold text-gray-700">No Reports Found</h3>
+            <p class="text-gray-500 max-w-md mx-auto mt-2">
+                We couldn't find any assessment or monthly reports linked to this phone number. 
+            </p>
+        </div>
+    `;
+}
+
+// --- EXPORT FUNCTIONALITY ---
+
+window.downloadSessionReport = function(sIdx, rIdx, name, type) {
+    const element = document.getElementById(`${type}-block-${sIdx}-${rIdx}`);
+    if (typeof html2pdf === 'undefined') {
+        alert("PDF generator library not loaded. Please refresh.");
+        return;
+    }
+    const opt = { 
+        margin: 0.5, 
+        filename: `${name}_${type}_Report.pdf`, 
+        image: { type: 'jpeg', quality: 0.98 }, 
+        html2canvas: { scale: 2 }, 
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } 
+    };
+    html2pdf().from(element).set(opt).save();
 };
 
+window.downloadMonthlyReport = function(sIdx, rIdx, name) {
+    downloadSessionReport(sIdx, rIdx, name, 'monthly');
+};
+
+function generateTemplatedRecommendation(studentName, tutorName, results) {
+    const strengths = [];
+    results.forEach(r => {
+        if ((r.correct / r.total) >= 0.75) strengths.push(r.subject);
+    });
+    
+    if (strengths.length > 0) {
+        return `Great job! ${studentName} showed strong understanding in ${strengths.join(', ')}. We will continue to build on these results.`;
+    }
+    return `${studentName} is making progress. We will focus on building confidence in the upcoming sessions.`;
+}
+
+function capitalize(str) { return str ? str.charAt(0).toUpperCase() + str.slice(1) : ""; }
+
+// --- SEARCH LOGIC (SIMPLIFIED FOR STANDALONE) ---
+// Note: This relies on the 'normalizedParentPhone' field existing in your DB
+async function performMultiLayerSearch(phone, email, uid) {
+    const results = { assessmentResults: [], monthlyResults: [] };
+    
+    // Clean phone input
+    const cleanPhone = phone.replace(/[^\d+]/g, '');
+
+    try {
+        // 1. Assessment Search
+        const assessSnap = await db.collection("student_results")
+            .where("normalizedParentPhone", "==", cleanPhone)
+            .get();
+        
+        assessSnap.forEach(doc => {
+            results.assessmentResults.push({ id: doc.id, ...doc.data(), timestamp: doc.data().submittedAt?.seconds });
+        });
+
+        // 2. Monthly Search
+        const monthSnap = await db.collection("tutor_submissions")
+            .where("normalizedParentPhone", "==", cleanPhone)
+            .get();
+            
+        monthSnap.forEach(doc => {
+            results.monthlyResults.push({ id: doc.id, ...doc.data(), timestamp: doc.data().submittedAt?.seconds });
+        });
+    } catch (e) {
+        console.error("Search failed:", e);
+    }
+
+    return results;
+}
+
 // --- INITIALIZATION ---
-// Usage Example:
-// document.addEventListener('DOMContentLoaded', () => {
-//    ProgressReportSystem.init('+2348012345678', 'parent@email.com');
-// });
+document.addEventListener('DOMContentLoaded', () => {
+    // Button Listener
+    const btn = document.getElementById('manualRefreshBtn');
+    if (btn) {
+        btn.addEventListener('click', () => {
+            // REPLACE THIS WITH HOW YOU GET THE PHONE NUMBER IN YOUR APP
+            // Example: const phone = document.getElementById('phoneInput').value;
+            const phone = prompt("Enter parent phone number (e.g., +234...)");
+            if (phone) loadProgressReports(phone, null, true);
+        });
+    }
+});
