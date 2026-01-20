@@ -1,5 +1,3 @@
-[file name]: tutor.js
-[file content begin]
 /*******************************************************************************
  * SECTION 1: IMPORTS & INITIAL SETUP
  ******************************************************************************/
@@ -5674,3 +5672,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
