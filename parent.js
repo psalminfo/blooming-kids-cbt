@@ -2138,8 +2138,56 @@ function showNewReportNotification(type) {
 // ============================================================================
 
 /**
+ * Generates a unique, personalized recommendation using a smart template.
+ * It summarizes performance instead of just listing topics.
+ * @param {string} studentName The name of the student.
+ * @param {string} tutorName The name of the tutor.
+ * @param {Array} results The student's test results.
+ * @returns {string} A personalized recommendation string.
+ */
+function generateTemplatedRecommendation(studentName, tutorName, results) {
+    const strengths = [];
+    const weaknesses = [];
+    results.forEach(res => {
+        const percentage = res.total > 0 ? (res.correct / res.total) * 100 : 0;
+        const topicList = res.topics.length > 0 ? res.topics : [res.subject];
+        if (percentage >= 75) {
+            strengths.push(...topicList);
+        } else if (percentage < 50) {
+            weaknesses.push(...topicList);
+        }
+    });
+
+    const uniqueStrengths = [...new Set(strengths)];
+    const uniqueWeaknesses = [...new Set(weaknesses)];
+
+    let praiseClause = "";
+    if (uniqueStrengths.length > 2) {
+        praiseClause = `It was great to see ${studentName} demonstrate a solid understanding of several key concepts, particularly in areas like ${uniqueStrengths[0]} and ${uniqueStrengths[1]}. `;
+    } else if (uniqueStrengths.length > 0) {
+        praiseClause = `${studentName} showed strong potential, especially in the topic of ${uniqueStrengths.join(', ')}. `;
+    } else {
+        praiseClause = `${studentName} has put in a commendable effort on this initial assessment. `;
+    }
+
+    let improvementClause = "";
+    if (uniqueWeaknesses.length > 2) {
+        improvementClause = `Our next step will be to focus on building more confidence in a few areas, such as ${uniqueWeaknesses[0]} and ${uniqueWeaknesses[1]}. `;
+    } else if (uniqueWeaknesses.length > 0) {
+        improvementClause = `To continue this positive progress, our focus will be on the topic of ${uniqueWeaknesses.join(', ')}. `;
+    } else {
+        improvementClause = "We will continue to build on these fantastic results and explore more advanced topics. ";
+    }
+
+    const closingStatement = `With personalized support from their tutor, ${tutorName}, at Blooming Kids House, we are very confident that ${studentName} will master these skills and unlock their full potential.`;
+
+    return praiseClause + improvementClause + closingStatement;
+}
+
+/**
  * Creates a hierarchical accordion view for reports
  * Student Name → Year → Month → Report Type (Assessments/Monthly)
+ * EXACTLY matches old tutor.js wording and logic
  */
 function createYearlyArchiveReportView(reportsByStudent) {
     let html = '';
@@ -2273,7 +2321,7 @@ function createYearlyArchiveReportView(reportsByStudent) {
                         <div id="year-${studentIndex}-${yearIndex}-content" class="progress-accordion-content hidden ml-6 mt-3">
                 `;
                 
-                // Assessment Reports for this year
+                // Assessment Reports for this year - EXACTLY as in old tutor.js
                 if (yearAssessmentCount > 0) {
                     html += `
                         <div class="mb-6">
@@ -2332,7 +2380,7 @@ function createYearlyArchiveReportView(reportsByStudent) {
                     html += `</div>`;
                 }
                 
-                // Monthly Reports for this year
+                // Monthly Reports for this year - EXACTLY as in old tutor.js
                 if (yearMonthlyCount > 0) {
                     html += `
                         <div class="mb-6">
@@ -2411,204 +2459,157 @@ function createYearlyArchiveReportView(reportsByStudent) {
     return html;
 }
 
-// Create assessment report with chart
+// Create assessment report with EXACT wording and logic from old tutor.js
 function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, fullName, date) {
     const firstReport = sessionReports[0];
     const formattedDate = formatDetailedDate(date || new Date(firstReport.timestamp * 1000), true);
-    const chartId = `chart-${studentIndex}-${sessionId}`;
     
-    // Calculate overall stats
-    let totalCorrect = 0;
-    let totalQuestions = 0;
-    let overallPercentage = 0;
+    // Get tutor name
+    let tutorName = 'N/A';
+    const tutorEmail = firstReport.tutorEmail;
+    if (tutorEmail && tutorEmail !== 'N/A') {
+        // Try to fetch tutor name from tutors collection
+        try {
+            // Note: This might need to be async in production
+            const tutorDoc = db.collection("tutors").doc(tutorEmail).get();
+            if (tutorDoc.exists) {
+                tutorName = tutorDoc.data().name;
+            }
+        } catch (error) {
+            console.log("Could not fetch tutor name:", error);
+        }
+    }
     
     const results = sessionReports.map(testResult => {
         const topics = [...new Set(testResult.answers?.map(a => safeText(a.topic)).filter(t => t))] || [];
-        const correct = testResult.score !== undefined ? testResult.score : 0;
-        const total = testResult.totalScoreableQuestions !== undefined ? testResult.totalScoreableQuestions : 0;
-        
-        totalCorrect += correct;
-        totalQuestions += total;
-        
         return {
             subject: safeText(testResult.subject || testResult.testSubject || 'General'),
-            correct: correct,
-            total: total,
-            percentage: total > 0 ? Math.round((correct / total) * 100) : 0,
+            correct: testResult.score !== undefined ? testResult.score : 0,
+            total: testResult.totalScoreableQuestions !== undefined ? testResult.totalScoreableQuestions : 0,
             topics: topics,
         };
     });
-    
-    if (totalQuestions > 0) {
-        overallPercentage = Math.round((totalCorrect / totalQuestions) * 100);
-    }
-    
-    // Determine performance color
-    let performanceColor = 'text-red-600';
-    let performanceBg = 'bg-red-100';
-    if (overallPercentage >= 80) {
-        performanceColor = 'text-green-600';
-        performanceBg = 'bg-green-100';
-    } else if (overallPercentage >= 60) {
-        performanceColor = 'text-yellow-600';
-        performanceBg = 'bg-yellow-100';
-    }
-    
+
+    // Generate tutor recommendation EXACTLY as in old tutor.js
+    const recommendation = generateTemplatedRecommendation(fullName, tutorName, results);
+
     const tableRows = results.map(res => `
-        <tr class="hover:bg-gray-50 transition-colors duration-200">
-            <td class="border border-gray-200 px-4 py-3 font-medium text-gray-800">${res.subject.toUpperCase()}</td>
-            <td class="border border-gray-200 px-4 py-3 text-center">
-                <span class="font-bold ${res.percentage >= 80 ? 'text-green-600' : res.percentage >= 60 ? 'text-yellow-600' : 'text-red-600'}">
-                    ${res.correct} / ${res.total}
-                </span>
-                <span class="block text-sm ${res.percentage >= 80 ? 'text-green-500' : res.percentage >= 60 ? 'text-yellow-500' : 'text-red-500'}">
-                    ${res.percentage}%
-                </span>
-            </td>
-            <td class="border border-gray-200 px-4 py-3 text-sm text-gray-600">
-                ${res.topics.length > 0 ? res.topics.slice(0, 3).join(', ') : 'Various topics'}
-                ${res.topics.length > 3 ? `<span class="text-gray-400 text-xs ml-1">+${res.topics.length - 3} more</span>` : ''}
-            </td>
+        <tr>
+            <td class="border px-2 py-1">${res.subject.toUpperCase()}</td>
+            <td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td>
         </tr>
     `).join("");
-    
-    // Prepare chart data
-    const chartData = {
-        labels: results.map(r => r.subject),
-        datasets: [{
-            label: 'Percentage Score',
-            data: results.map(r => r.percentage),
-            backgroundColor: results.map(r => 
-                r.percentage >= 80 ? 'rgba(16, 185, 129, 0.5)' : 
-                r.percentage >= 60 ? 'rgba(245, 158, 11, 0.5)' : 
-                'rgba(239, 68, 68, 0.5)'
-            ),
-            borderColor: results.map(r => 
-                r.percentage >= 80 ? 'rgba(16, 185, 129, 1)' : 
-                r.percentage >= 60 ? 'rgba(245, 158, 11, 1)' : 
-                'rgba(239, 68, 68, 1)'
-            ),
-            borderWidth: 2,
-            borderRadius: 5,
-            borderSkipped: false,
-        }]
-    };
-    
+
+    const topicsTableRows = results.map(res => `
+        <tr>
+            <td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td>
+            <td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td>
+        </tr>
+    `).join("");
+
+    // Check for creative writing answer
+    const creativeWritingAnswer = firstReport.answers?.find(a => a.type === 'creative-writing');
+    const tutorReport = creativeWritingAnswer?.tutorReport || 'Pending review.';
+
+    // Prepare chart data EXACTLY as in old tutor.js
+    const chartId = `chart-${studentIndex}-${sessionId}`;
     const chartConfig = {
         type: 'bar',
-        data: chartData,
+        data: {
+            labels: results.map(r => r.subject.toUpperCase()),
+            datasets: [
+                { 
+                    label: 'Correct Answers', 
+                    data: results.map(s => s.correct), 
+                    backgroundColor: '#4CAF50' 
+                }, 
+                { 
+                    label: 'Incorrect/Unanswered', 
+                    data: results.map(s => s.total - s.correct), 
+                    backgroundColor: '#FFCD56' 
+                }
+            ]
+        },
         options: {
             responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return `${context.dataset.label}: ${context.raw}%`;
-                        }
-                    }
-                }
+            scales: { 
+                x: { stacked: true }, 
+                y: { stacked: true, beginAtZero: true } 
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: {
-                        callback: function(value) {
-                            return value + '%';
-                        }
-                    },
-                    grid: {
-                        color: 'rgba(0, 0, 0, 0.05)'
-                    }
-                },
-                x: {
-                    grid: {
-                        display: false
-                    }
-                }
+            plugins: { 
+                title: { 
+                    display: true, 
+                    text: 'Score Distribution by Subject' 
+                } 
             }
         }
     };
-    
+
     return `
-        <div class="border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 p-5 bg-white" id="assessment-block-${studentIndex}-${sessionId}">
-            <div class="flex justify-between items-start mb-4 pb-4 border-b border-gray-100">
+        <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="assessment-block-${studentIndex}-${sessionId}">
+            <!-- EXACT SAME HEADER AS OLD TUTOR.JS -->
+            <div class="text-center mb-6 border-b pb-4">
+                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
+                     alt="Blooming Kids House Logo" 
+                     class="h-16 w-auto mx-auto mb-3">
+                <h2 class="text-2xl font-bold text-green-800">Assessment Report</h2>
+                <p class="text-gray-600">Date: ${formattedDate}</p>
+            </div>
+
+            <!-- EXACT SAME INFO GRID AS OLD TUTOR.JS -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
                 <div>
-                    <div class="flex items-center mb-2">
-                        <span class="text-green-600 mr-2">📊</span>
-                        <h5 class="font-bold text-gray-800 text-lg">Assessment Report</h5>
-                        <span class="ml-3 ${performanceBg} ${performanceColor} text-xs font-bold px-3 py-1 rounded-full">
-                            ${overallPercentage}% Overall
-                        </span>
-                    </div>
-                    <p class="text-gray-600 text-sm">
-                        <span class="font-medium">Date:</span> ${safeText(formattedDate)}
-                        ${firstReport.tutorName ? ` • <span class="font-medium">Tutor:</span> ${safeText(firstReport.tutorName)}` : ''}
-                    </p>
+                    <p><strong>Student's Name:</strong> ${fullName}</p>
+                    <p><strong>Parent's Phone:</strong> ${firstReport.parentPhone || 'N/A'}</p>
+                    <p><strong>Grade:</strong> ${firstReport.grade}</p>
                 </div>
-                <button onclick="downloadSessionReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}', 'assessment')" 
-                        class="flex items-center bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5">
-                    <span class="mr-2">📥</span>
-                    <span class="font-medium text-sm">Download PDF</span>
+                <div>
+                    <p><strong>Tutor:</strong> ${tutorName || 'N/A'}</p>
+                    <p><strong>Location:</strong> ${firstReport.studentCountry || 'N/A'}</p>
+                </div>
+            </div>
+            
+            <!-- EXACT SAME PERFORMANCE SUMMARY AS OLD TUTOR.JS -->
+            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Performance Summary</h3>
+            <table class="w-full text-sm mb-4 border border-collapse">
+                <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr></thead>
+                <tbody>${tableRows}</tbody>
+            </table>
+            
+            <!-- EXACT SAME KNOWLEDGE & SKILL ANALYSIS AS OLD TUTOR.JS -->
+            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Knowledge & Skill Analysis</h3>
+            <table class="w-full text-sm mb-4 border border-collapse">
+                <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-left">Topics Covered</th></tr></thead>
+                <tbody>${topicsTableRows}</tbody>
+            </table>
+            
+            <!-- EXACT SAME TUTOR'S RECOMMENDATION AS OLD TUTOR.JS -->
+            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Tutor's Recommendation</h3>
+            <p class="mb-2 text-gray-700 leading-relaxed">${recommendation}</p>
+
+            ${creativeWritingAnswer ? `
+            <!-- EXACT SAME CREATIVE WRITING FEEDBACK AS OLD TUTOR.JS -->
+            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Creative Writing Feedback</h3>
+            <p class="mb-2 text-gray-700"><strong>Tutor's Report:</strong> ${tutorReport}</p>
+            ` : ''}
+
+            ${results.length > 0 ? `
+            <!-- EXACT SAME CHART AS OLD TUTOR.JS -->
+            <canvas id="${chartId}" class="w-full h-48 mb-4"></canvas>
+            ` : ''}
+            
+            <!-- EXACT SAME DIRECTOR'S MESSAGE AS OLD TUTOR.JS -->
+            <div class="bg-yellow-50 p-4 rounded-lg mt-6">
+                <h3 class="text-lg font-semibold mb-1 text-green-700">Director's Message</h3>
+                <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
+            </div>
+            
+            <!-- EXACT SAME DOWNLOAD BUTTON AS OLD TUTOR.JS -->
+            <div class="mt-6 text-center">
+                <button onclick="downloadSessionReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}', 'assessment')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
+                    Download Assessment PDF
                 </button>
             </div>
-            
-            <div class="mb-4">
-                <div class="grid grid-cols-3 gap-4 mb-4">
-                    <div class="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                        <p class="text-xs text-blue-600 font-medium">Total Score</p>
-                        <p class="text-xl font-bold text-blue-700">${totalCorrect}/${totalQuestions}</p>
-                    </div>
-                    <div class="bg-green-50 p-3 rounded-lg border border-green-100">
-                        <p class="text-xs text-green-600 font-medium">Overall Percentage</p>
-                        <p class="text-xl font-bold ${performanceColor}">${overallPercentage}%</p>
-                    </div>
-                    <div class="bg-purple-50 p-3 rounded-lg border border-purple-100">
-                        <p class="text-xs text-purple-600 font-medium">Subjects Tested</p>
-                        <p class="text-xl font-bold text-purple-700">${results.length}</p>
-                    </div>
-                </div>
-                
-                <!-- Performance Chart -->
-                <div class="mb-6">
-                    <h6 class="font-semibold text-gray-700 mb-3 flex items-center">
-                        <span class="mr-2">📈</span>
-                        Performance by Subject
-                    </h6>
-                    <div class="chart-container">
-                        <canvas id="${chartId}"></canvas>
-                    </div>
-                </div>
-                
-                <div class="overflow-x-auto rounded-lg border border-gray-200">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="border-b border-gray-200 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Subject</th>
-                                <th class="border-b border-gray-200 px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Score</th>
-                                <th class="border-b border-gray-200 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Topics Covered</th>
-                            </tr>
-                        </thead>
-                        <tbody>${tableRows}</tbody>
-                    </table>
-                </div>
-            </div>
-            
-            ${firstReport.notes || firstReport.comments ? `
-            <div class="mt-4 pt-4 border-t border-gray-100">
-                <div class="flex items-center mb-2">
-                    <span class="text-yellow-500 mr-2">💡</span>
-                    <h6 class="font-semibold text-gray-700">Additional Notes</h6>
-                </div>
-                <p class="text-gray-600 bg-yellow-50 p-3 rounded-lg border border-yellow-100 text-sm">
-                    ${safeText(firstReport.notes || firstReport.comments || 'No additional notes provided.')}
-                </p>
-            </div>
-            ` : ''}
         </div>
         <script>
             // Defer chart creation until after DOM is ready
@@ -2623,85 +2624,95 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
     `;
 }
 
+// Create monthly report with EXACT wording and logic from old tutor.js
 function createMonthlyReportHTML(sessionReports, studentIndex, sessionId, fullName, date) {
     const firstReport = sessionReports[0];
     const formattedDate = formatDetailedDate(date || new Date(firstReport.timestamp * 1000), true);
-    const safeTopics = safeText(firstReport.topics ? firstReport.topics : 'No topics recorded for this session.');
-    const safeProgress = safeText(firstReport.studentProgress || firstReport.progressNotes || 'No progress notes provided.');
-    
-    // Extract month and year for display
-    const reportDate = date || new Date(firstReport.timestamp * 1000);
-    const monthName = reportDate.toLocaleString('default', { month: 'long' });
-    const year = reportDate.getFullYear();
     
     return `
-        <div class="border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 p-5 bg-white" id="monthly-block-${studentIndex}-${sessionId}">
-            <div class="flex justify-between items-start mb-4 pb-4 border-b border-gray-100">
+        <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="monthly-block-${studentIndex}-${sessionId}">
+            <!-- EXACT SAME HEADER AS OLD TUTOR.JS -->
+            <div class="text-center mb-6 border-b pb-4">
+                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
+                     alt="Blooming Kids House Logo" 
+                     class="h-16 w-auto mx-auto mb-3">
+                <h2 class="text-2xl font-bold text-green-800">MONTHLY LEARNING REPORT</h2>
+                <p class="text-gray-600">Date: ${formattedDate}</p>
+            </div>
+            
+            <!-- EXACT SAME INFO GRID AS OLD TUTOR.JS -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
                 <div>
-                    <div class="flex items-center mb-2">
-                        <span class="text-blue-600 mr-2">📈</span>
-                        <h5 class="font-bold text-gray-800 text-lg">Monthly Progress Report</h5>
-                        <span class="ml-3 bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full">
-                            ${monthName} ${year}
-                        </span>
-                    </div>
-                    <p class="text-gray-600 text-sm">
-                        <span class="font-medium">Submitted:</span> ${safeText(formattedDate)}
-                        ${firstReport.tutorName ? ` • <span class="font-medium">Tutor:</span> ${safeText(firstReport.tutorName)}` : ''}
-                    </p>
+                    <p><strong>Student's Name:</strong> ${firstReport.studentName || 'N/A'}</p>
+                    <p><strong>Parent's Name:</strong> ${firstReport.parentName || 'N/A'}</p>
+                    <p><strong>Parent's Phone:</strong> ${firstReport.parentPhone || 'N/A'}</p>
                 </div>
-                <button onclick="downloadMonthlyReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}')" 
-                        class="flex items-center bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-4 py-2 rounded-lg hover:from-blue-600 hover:to-cyan-700 transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5">
-                    <span class="mr-2">📥</span>
-                    <span class="font-medium text-sm">Download PDF</span>
+                <div>
+                    <p><strong>Grade:</strong> ${firstReport.grade || 'N/A'}</p>
+                    <p><strong>Tutor's Name:</strong> ${firstReport.tutorName || 'N/A'}</p>
+                </div>
+            </div>
+
+            ${firstReport.introduction ? `
+            <!-- EXACT SAME INTRODUCTION AS OLD TUTOR.JS -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">INTRODUCTION</h3>
+                <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.introduction)}</p>
+            </div>
+            ` : ''}
+
+            ${firstReport.topics ? `
+            <!-- EXACT SAME TOPICS & REMARKS AS OLD TUTOR.JS -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">TOPICS & REMARKS</h3>
+                <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.topics)}</p>
+            </div>
+            ` : ''}
+
+            ${firstReport.progress ? `
+            <!-- EXACT SAME PROGRESS & ACHIEVEMENTS AS OLD TUTOR.JS -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">PROGRESS & ACHIEVEMENTS</h3>
+                <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.progress)}</p>
+            </div>
+            ` : ''}
+
+            ${firstReport.strengthsWeaknesses ? `
+            <!-- EXACT SAME STRENGTHS AND WEAKNESSES AS OLD TUTOR.JS -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">STRENGTHS AND WEAKNESSES</h3>
+                <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.strengthsWeaknesses)}</p>
+            </div>
+            ` : ''}
+
+            ${firstReport.recommendations ? `
+            <!-- EXACT SAME RECOMMENDATIONS AS OLD TUTOR.JS -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">RECOMMENDATIONS</h3>
+                <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.recommendations)}</p>
+            </div>
+            ` : ''}
+
+            ${firstReport.generalComments ? `
+            <!-- EXACT SAME GENERAL TUTOR'S COMMENTS AS OLD TUTOR.JS -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">GENERAL TUTOR'S COMMENTS</h3>
+                <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.generalComments)}</p>
+            </div>
+            ` : ''}
+
+            <!-- EXACT SAME SIGNATURE AS OLD TUTOR.JS -->
+            <div class="text-right mt-8 pt-4 border-t">
+                <p class="text-gray-600">Best regards,</p>
+                <p class="font-semibold text-green-800">${firstReport.tutorName || 'N/A'}</p>
+            </div>
+
+            <!-- EXACT SAME DOWNLOAD BUTTON AS OLD TUTOR.JS -->
+            <div class="mt-6 text-center">
+                <button onclick="downloadMonthlyReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
+                    Download Monthly Report PDF
                 </button>
             </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <div class="flex items-center mb-3">
-                        <span class="text-green-500 mr-2">📚</span>
-                        <h6 class="font-semibold text-gray-700">Topics Covered</h6>
-                    </div>
-                    <p class="text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border border-gray-100 text-sm">${safeTopics}</p>
-                </div>
-                
-                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <div class="flex items-center mb-3">
-                        <span class="text-purple-500 mr-2">📝</span>
-                        <h6 class="font-semibold text-gray-700">Progress Notes</h6>
-                    </div>
-                    <p class="text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border border-gray-100 text-sm">${safeProgress}</p>
-                </div>
-            </div>
-            
-            ${firstReport.areasOfImprovement || firstReport.recommendations ? `
-            <div class="mt-4 pt-4 border-t border-gray-100">
-                <div class="flex items-center mb-3">
-                    <span class="text-orange-500 mr-2">🎯</span>
-                    <h6 class="font-semibold text-gray-700">Areas for Improvement & Recommendations</h6>
-                </div>
-                <div class="bg-orange-50 p-4 rounded-lg border border-orange-100">
-                    <p class="text-gray-700 whitespace-pre-wrap text-sm">
-                        ${safeText(firstReport.areasOfImprovement || firstReport.recommendations || 'No specific recommendations provided.')}
-                    </p>
-                </div>
-            </div>
-            ` : ''}
-            
-            ${firstReport.nextSteps || firstReport.futureGoals ? `
-            <div class="mt-4 pt-4 border-t border-gray-100">
-                <div class="flex items-center mb-3">
-                    <span class="text-teal-500 mr-2">🚀</span>
-                    <h6 class="font-semibold text-gray-700">Next Steps & Goals</h6>
-                </div>
-                <div class="bg-teal-50 p-4 rounded-lg border border-teal-100">
-                    <p class="text-gray-700 whitespace-pre-wrap text-sm">
-                        ${safeText(firstReport.nextSteps || firstReport.futureGoals || 'No specific goals set for next period.')}
-                    </p>
-                </div>
-            </div>
-            ` : ''}
         </div>
     `;
 }
