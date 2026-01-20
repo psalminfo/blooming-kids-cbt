@@ -2293,8 +2293,11 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
         }
         
         if (schedule.length === 0) {
-            showCustomAlert('Add at least one time slot', 'error');
-            return;
+            // FIXED:
+setTimeout(() => {
+    showCustomAlert('Add at least one time slot', 'error');
+}, 100);
+return;
         }
         
         try {
@@ -6001,6 +6004,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
