@@ -60,14 +60,16 @@
             background-color: #d1fae5;
             color: #065f46;
         }
-        /* NEW: Main Content Tabs */
+        /* Main Content Tabs */
         .tab-active-main {
             background-color: #10b981;
             color: white;
+            position: relative;
         }
         .tab-inactive-main {
             background-color: #ecfdf5;
             color: #059669;
+            position: relative;
         }
         .fade-in {
             animation: fadeIn 0.5s ease-in;
@@ -145,25 +147,106 @@
         .accordion-header:hover {
             background-color: #bbf7d0 !important;
         }
-        .accordion-content {
-            transition: all 0.3s ease;
-            max-height: 0;
-            overflow: hidden;
+        /* Slide Down Animation */
+        .slide-down {
+            animation: slideDown 0.3s ease-out;
         }
-        .accordion-content.hidden {
-            max-height: 0;
-        }
-        .accordion-content:not(.hidden) {
-            max-height: 5000px;
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+                max-height: 0;
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+                max-height: 5000px;
+            }
         }
         .preserve-whitespace {
             white-space: pre-wrap;
             word-break: break-word;
         }
+        /* Notification Badge */
+        .notification-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background-color: #ef4444;
+            color: white;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            min-width: 1.25rem;
+            height: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 0.25rem;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
         /* Message urgent styling */
         .urgent-message {
             border-left: 4px solid #ef4444;
             background-color: #fef2f2;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a1;
+        }
+        /* Academics Section Specific */
+        .academics-student-selector {
+            background: linear-gradient(to right, #3b82f6, #1d4ed8);
+            color: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .topic-item {
+            transition: all 0.2s ease;
+            border-left: 4px solid #3b82f6;
+        }
+        .topic-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+        }
+        .homework-item {
+            transition: all 0.2s ease;
+            border-left: 4px solid #8b5cf6;
+        }
+        .homework-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+        }
+        .status-overdue {
+            background-color: #fef2f2;
+            color: #dc2626;
+            border-color: #fca5a5;
+        }
+        .status-pending {
+            background-color: #eff6ff;
+            color: #1d4ed8;
+            border-color: #93c5fd;
+        }
+        .status-submitted {
+            background-color: #f0fdf4;
+            color: #15803d;
+            border-color: #86efac;
         }
     </style>
 </head>
@@ -351,6 +434,12 @@
             
             <div id="academicsContentArea" class="hidden">
                 <h2 class="text-2xl font-bold text-green-800 mb-6">Academic Progress & Assignments</h2>
+                
+                <!-- Student Selection Dropdown Container -->
+                <div id="academicsStudentDropdown" class="mb-6">
+                    <!-- Student dropdown will be inserted here by JavaScript -->
+                </div>
+                
                 <div id="academicsContent" class="bg-white rounded-xl card-glow p-6 min-h-[400px]">
                     <!-- Academics data will be inserted here by JavaScript -->
                 </div>
@@ -364,80 +453,78 @@
             </div>
         </div>
 
-        <!-- NEW: Compose Message Modal (replaces Feedback Modal) -->
-        <div id="composeMessageModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+        <!-- Feedback Modal -->
+        <div id="feedbackModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
             <div class="bg-white rounded-2xl p-6 md:p-8 max-w-2xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-2xl font-bold text-gray-800">Compose Message</h3>
-                    <button id="cancelMessageBtn" class="text-gray-500 hover:text-gray-700 text-2xl">
+                    <h3 class="text-2xl font-bold text-gray-800">Send Feedback</h3>
+                    <button onclick="hideFeedbackModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
                         &times;
                     </button>
                 </div>
                 
-                <p class="text-gray-600 mb-6">Send a message to our tutors or management team.</p>
+                <p class="text-gray-600 mb-6">We value your feedback! Please fill out the form below.</p>
                 
                 <div class="space-y-4">
                     <div>
-                        <label for="messageRecipient" class="block text-sm font-medium text-gray-700 mb-2">
-                            Send To *
+                        <label for="feedbackCategory" class="block text-sm font-medium text-gray-700 mb-2">
+                            Category *
                         </label>
-                        <select id="messageRecipient" 
+                        <select id="feedbackCategory" 
                                 class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
                                 required>
-                            <option value="">Select recipient</option>
-                            <option value="tutor">My Child's Tutor</option>
-                            <option value="management">Management Team</option>
-                            <option value="both">Both Tutor & Management</option>
+                            <option value="">Select category</option>
+                            <option value="Feedback">General Feedback</option>
+                            <option value="Request">Special Request</option>
+                            <option value="Complaint">Complaint</option>
+                            <option value="Suggestion">Suggestion</option>
                         </select>
                     </div>
 
                     <div>
-                        <label for="messageSubject" class="block text-sm font-medium text-gray-700 mb-2">
-                            Subject *
+                        <label for="feedbackPriority" class="block text-sm font-medium text-gray-700 mb-2">
+                            Priority *
                         </label>
-                        <input id="messageSubject" 
-                               type="text" 
-                               placeholder="Enter message subject"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required>
-                    </div>
-
-                    <div>
-                        <label for="messageStudent" class="block text-sm font-medium text-gray-700 mb-2">
-                            Regarding Student (Optional)
-                        </label>
-                        <select id="messageStudent" 
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200">
-                            <option value="">Select student (optional)</option>
+                        <select id="feedbackPriority" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                                required>
+                            <option value="">Select priority</option>
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                            <option value="Urgent">Urgent</option>
                         </select>
                     </div>
 
                     <div>
-                        <label for="messageContent" class="block text-sm font-medium text-gray-700 mb-2">
-                            Message *
+                        <label for="feedbackStudent" class="block text-sm font-medium text-gray-700 mb-2">
+                            Regarding Student *
                         </label>
-                        <textarea id="messageContent" 
+                        <select id="feedbackStudent" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                                required>
+                            <option value="">Select student</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="feedbackMessage" class="block text-sm font-medium text-gray-700 mb-2">
+                            Your Message *
+                        </label>
+                        <textarea id="feedbackMessage" 
                                   rows="6"
-                                  placeholder="Type your message here..."
+                                  placeholder="Please provide details about your feedback..."
                                   class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200 preserve-whitespace"
                                   required></textarea>
                     </div>
-
-                    <div class="flex items-center">
-                        <input id="messageUrgent" type="checkbox" class="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded">
-                        <label for="messageUrgent" class="ml-2 block text-sm text-gray-700">
-                            Mark as Urgent
-                        </label>
-                        <span class="ml-2 text-xs text-red-600">(Only for truly urgent matters)</span>
-                    </div>
                     
                     <div class="flex flex-col sm:flex-row gap-2 pt-4">
-                        <button id="submitMessageBtn" 
+                        <button id="submitFeedbackBtn" 
                                 class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
-                            <span id="submitMessageText">Send Message</span>
-                            <div id="submitMessageSpinner" class="loading-spinner hidden"></div>
+                            <span id="submitFeedbackText">Submit Feedback</span>
+                            <div id="submitFeedbackSpinner" class="loading-spinner hidden"></div>
                         </button>
-                        <button id="cancelMessageBtn2" 
+                        <button onclick="hideFeedbackModal()" 
                                 class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">
                             Cancel
                         </button>
@@ -446,36 +533,30 @@
 
                 <div class="mt-6 text-center">
                     <p class="text-sm text-gray-500">
-                        Your message will be delivered to the selected recipients. You'll receive a response within 24-48 hours.
+                        Your feedback is important to us. We'll respond within 24-48 hours.
                     </p>
                 </div>
             </div>
         </div>
 
-        <!-- NEW: Messages Modal (replaces Responses Modal) -->
-        <div id="messagesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+        <!-- Admin Responses Modal -->
+        <div id="responsesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
             <div class="bg-white rounded-2xl p-6 md:p-8 max-w-4xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-2xl font-bold text-gray-800">📨 Messages</h3>
-                    <button id="cancelMessagesModalBtn" class="text-gray-500 hover:text-gray-700 text-2xl">
+                    <h3 class="text-2xl font-bold text-gray-800">📨 Admin Responses</h3>
+                    <button onclick="hideResponsesModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
                         &times;
                     </button>
                 </div>
                 
-                <div class="mb-4 flex justify-between items-center">
-                    <p class="text-gray-600">Your messages from tutors and management.</p>
-                    <button onclick="showComposeMessageModal()" 
-                            class="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 btn-glow flex items-center text-sm">
-                        <span class="mr-2">✏️</span> Compose New
-                    </button>
-                </div>
+                <p class="text-gray-600 mb-6">Responses from our staff to your feedback.</p>
                 
-                <div id="messagesContent" class="space-y-4">
-                    <!-- Messages will be inserted here by JavaScript -->
+                <div id="responsesContent" class="space-y-4">
+                    <!-- Responses will be inserted here by JavaScript -->
                 </div>
 
                 <div class="mt-6 text-center">
-                    <button onclick="hideMessagesModal()" 
+                    <button onclick="hideResponsesModal()" 
                             class="bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 transition-all duration-200">
                         Close
                     </button>
