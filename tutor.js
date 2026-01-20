@@ -1599,6 +1599,338 @@ let schedulePopup = null;
 // SIMPLE FLAG - Shows only once per session
 let hasPopupBeenShownThisSession = false;
 
+// Inject CSS for modals if not already present
+function injectScheduleCSS() {
+    // Check if CSS is already injected
+    if (document.getElementById('schedule-css')) return;
+    
+    const css = document.createElement('style');
+    css.id = 'schedule-css';
+    css.textContent = `
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+            animation: fadeIn 0.2s ease-out;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.3s ease-out;
+            width: 100%;
+            max-width: 32rem;
+        }
+        
+        .modal-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-body {
+            padding: 1.5rem;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            border-radius: 9999px;
+            background-color: #3b82f6;
+            color: white;
+        }
+        
+        .badge-info {
+            background-color: #3b82f6;
+        }
+        
+        .time-slot-row {
+            position: relative;
+            padding: 1rem;
+            background-color: #f9fafb;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+            margin-bottom: 0.75rem;
+        }
+        
+        .remove-row-btn {
+            position: absolute;
+            top: -0.5rem;
+            right: -0.5rem;
+            background-color: #ef4444;
+            color: white;
+            border-radius: 9999px;
+            width: 1.5rem;
+            height: 1.5rem;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .remove-row-btn:hover {
+            background-color: #dc2626;
+        }
+        
+        .student-info {
+            background-color: #eff6ff;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        /* Button styles */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            border-radius: 0.375rem;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-sm {
+            padding: 0.25rem 0.75rem;
+            font-size: 0.75rem;
+        }
+        
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+        
+        .btn-success {
+            background-color: #10b981;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background-color: #059669;
+        }
+        
+        .btn-danger {
+            background-color: #ef4444;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+        
+        .btn-ghost {
+            background-color: transparent;
+            color: #6b7280;
+            border-color: #e5e7eb;
+        }
+        
+        .btn-ghost:hover {
+            background-color: #f9fafb;
+            color: #374151;
+        }
+        
+        .btn-outline {
+            background-color: transparent;
+            color: #3b82f6;
+            border: 2px dashed #d1d5db;
+        }
+        
+        .btn-outline:hover {
+            background-color: #eff6ff;
+            border-color: #3b82f6;
+        }
+        
+        /* Form controls */
+        .select {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.875rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            background-color: white;
+        }
+        
+        .select-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+        
+        .select-bordered {
+            border: 1px solid #d1d5db;
+        }
+        
+        .select-bordered:focus {
+            outline: none;
+            border-color: #3b82f6;
+            ring: 2px;
+            ring-color: #93c5fd;
+        }
+        
+        .grid {
+            display: grid;
+        }
+        
+        .grid-cols-1 {
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+        }
+        
+        @media (min-width: 768px) {
+            .md\\:grid-cols-3 {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+        
+        .gap-3 {
+            gap: 0.75rem;
+        }
+        
+        .space-y-3 > * + * {
+            margin-top: 0.75rem;
+        }
+        
+        .mb-4 {
+            margin-bottom: 1rem;
+        }
+        
+        .max-h-\\[50vh\\] {
+            max-height: 50vh;
+        }
+        
+        .overflow-y-auto {
+            overflow-y: auto;
+        }
+        
+        .w-full {
+            width: 100%;
+        }
+        
+        .flex {
+            display: flex;
+        }
+        
+        .flex-col {
+            flex-direction: column;
+        }
+        
+        .items-center {
+            align-items: center;
+        }
+        
+        .justify-between {
+            justify-content: space-between;
+        }
+        
+        .gap-2 {
+            gap: 0.5rem;
+        }
+        
+        .font-semibold {
+            font-weight: 600;
+        }
+        
+        .text-sm {
+            font-size: 0.875rem;
+        }
+        
+        .text-xs {
+            font-size: 0.75rem;
+        }
+        
+        .text-blue-800 {
+            color: #1e40af;
+        }
+        
+        .text-blue-600 {
+            color: #2563eb;
+        }
+        
+        .relative {
+            position: relative;
+        }
+        
+        .absolute {
+            position: absolute;
+        }
+        
+        .p-4 {
+            padding: 1rem;
+        }
+        
+        .p-3 {
+            padding: 0.75rem;
+        }
+        
+        .rounded-lg {
+            border-radius: 0.5rem;
+        }
+        
+        .border {
+            border: 1px solid #e5e7eb;
+        }
+        
+        .bg-blue-50 {
+            background-color: #eff6ff;
+        }
+        
+        .bg-gray-50 {
+            background-color: #f9fafb;
+        }
+        
+        .flex-1 {
+            flex: 1 1 0%;
+        }
+    `;
+    
+    document.head.appendChild(css);
+}
+
 /**
  * MAIN FUNCTION: Check for unscheduled students
  * Shows popup ONLY ONCE when tutor first loads the dashboard
@@ -1614,8 +1946,11 @@ async function checkAndShowSchedulePopup(tutor) {
     }
     
     // Check if we're on the dashboard (optional)
-    const isDashboard = window.location.pathname.includes('dashboard') || 
-                       window.location.pathname.includes('index');
+    const path = window.location.pathname.toLowerCase();
+    const isDashboard = path.includes('dashboard') || 
+                       path.includes('index') ||
+                       path === '/' ||
+                       path.includes('home');
     
     if (!isDashboard) {
         return false;
@@ -1625,6 +1960,9 @@ async function checkAndShowSchedulePopup(tutor) {
     if (document.querySelector('.modal-overlay')) {
         return false;
     }
+    
+    // Inject CSS
+    injectScheduleCSS();
     
     try {
         const studentsQuery = query(
@@ -1678,56 +2016,14 @@ async function checkAndShowSchedulePopup(tutor) {
  * Call this from a button like: "Manage Student Schedules"
  */
 function showManualScheduleManager(tutor) {
-    // This bypasses the "once per session" rule
-    checkUnscheduledStudentsAndShowPopup(tutor, true);
-}
-
-/**
- * Helper function for manual trigger
- */
-async function checkUnscheduledStudentsAndShowPopup(tutor, isManual = false) {
-    try {
-        const studentsQuery = query(
-            collection(db, "students"), 
-            where("tutorEmail", "==", tutor.email)
-        );
-        const studentsSnapshot = await getDocs(studentsQuery);
-        
-        allStudents = [];
-        scheduledStudents.clear();
-        
-        studentsSnapshot.forEach(doc => {
-            const student = { id: doc.id, ...doc.data() };
-            if (!['archived', 'graduated', 'transferred'].includes(student.status)) {
-                allStudents.push(student);
-                if (student.schedule && Array.isArray(student.schedule) && student.schedule.length > 0) {
-                    scheduledStudents.add(student.id);
-                }
-            }
-        });
-        
-        const unscheduledStudents = allStudents.filter(s => !scheduledStudents.has(s.id));
-        
-        if (unscheduledStudents.length > 0) {
-            // If manual, don't set the flag (allow multiple opens)
-            if (!isManual) {
-                hasPopupBeenShownThisSession = true;
-            }
-            
-            showBulkSchedulePopup(unscheduledStudents[0], tutor, unscheduledStudents.length);
-            return true;
-        } else {
-            if (isManual) {
-                showCustomAlert('🎉 All students already have schedules!', 'success');
-            }
-            return false;
-        }
-        
-    } catch (error) {
-        console.error("Error:", error);
-        showCustomAlert('Error loading students', 'error');
-        return false;
-    }
+    // Inject CSS first
+    injectScheduleCSS();
+    
+    // Reset flag to allow showing
+    hasPopupBeenShownThisSession = false;
+    
+    // Call the main function
+    checkAndShowSchedulePopup(tutor);
 }
 
 /**
@@ -1771,6 +2067,23 @@ async function deleteStudentSchedule(studentId, studentName) {
 }
 
 /**
+ * Add schedule delete button to student profile
+ */
+function addScheduleDeleteButtonToProfile(studentId, studentName) {
+    // Find a container for action buttons
+    const profileActions = document.querySelector('.profile-actions, .student-actions, .actions-container');
+    
+    if (profileActions && !document.getElementById('delete-schedule-btn')) {
+        const deleteBtn = document.createElement('button');
+        deleteBtn.id = 'delete-schedule-btn';
+        deleteBtn.className = 'btn btn-danger btn-sm';
+        deleteBtn.innerHTML = '🗑️ Delete Schedule';
+        deleteBtn.onclick = () => deleteStudentSchedule(studentId, studentName);
+        profileActions.appendChild(deleteBtn);
+    }
+}
+
+/**
  * Schedule popup with proper close handlers
  */
 function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
@@ -1783,17 +2096,17 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
     
     const popupHTML = `
         <div class="modal-overlay" id="schedule-modal">
-            <div class="modal-content max-w-2xl">
+            <div class="modal-content">
                 <div class="modal-header">
-                    <h3 class="modal-title">Schedule Student</h3>
+                    <h3 class="modal-title">📅 Schedule Student</h3>
                     <div class="flex items-center gap-2">
-                        <span class="badge">${remainingCount} to go</span>
+                        <span class="badge badge-info">${remainingCount} to go</span>
                         <button class="close-modal-btn btn btn-sm btn-ghost">✕</button>
                     </div>
                 </div>
                 
                 <div class="modal-body">
-                    <div class="student-info mb-4 p-4 bg-blue-50 rounded-lg">
+                    <div class="student-info">
                         <h4 class="font-semibold text-blue-800">${student.studentName}</h4>
                         <p class="text-sm text-blue-600">Grade ${student.grade} • ${student.subjects?.join(', ') || 'No subjects'}</p>
                     </div>
@@ -1910,30 +2223,30 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
     // Helper to add time slot row
     function addTimeSlotRow(container, data = null) {
         const row = document.createElement('div');
-        row.className = 'time-slot-row p-3 bg-gray-50 rounded border relative';
+        row.className = 'time-slot-row';
         
         const day = data?.day || 'Monday';
         const start = data?.start || '09:00';
         const end = data?.end || '10:00';
         
         row.innerHTML = `
-            <button class="remove-row-btn absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs">✕</button>
+            <button class="remove-row-btn">✕</button>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                    <label class="text-xs font-medium">Day</label>
-                    <select class="select select-bordered select-sm w-full">
+                <div class="flex flex-col">
+                    <label class="text-xs font-medium mb-1">Day</label>
+                    <select class="select select-bordered select-sm">
                         ${DAYS_OF_WEEK.map(d => `<option value="${d}" ${d === day ? 'selected' : ''}>${d}</option>`).join('')}
                     </select>
                 </div>
-                <div>
-                    <label class="text-xs font-medium">Start</label>
-                    <select class="select select-bordered select-sm w-full">
+                <div class="flex flex-col">
+                    <label class="text-xs font-medium mb-1">Start Time</label>
+                    <select class="select select-bordered select-sm">
                         ${ROBUST_TIME_SLOTS.map(s => `<option value="${s.value}" ${s.value === start ? 'selected' : ''}>${s.label}</option>`).join('')}
                     </select>
                 </div>
-                <div>
-                    <label class="text-xs font-medium">End</label>
-                    <select class="select select-bordered select-sm w-full">
+                <div class="flex flex-col">
+                    <label class="text-xs font-medium mb-1">End Time</label>
+                    <select class="select select-bordered select-sm">
                         ${ROBUST_TIME_SLOTS.map(s => `<option value="${s.value}" ${s.value === end ? 'selected' : ''}>${s.label}</option>`).join('')}
                     </select>
                 </div>
@@ -1967,9 +2280,9 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
         const schedule = [];
         
         for (const row of rows) {
-            const day = row.querySelector('select:nth-child(1)').value;
-            const start = row.querySelector('select:nth-child(2)').value;
-            const end = row.querySelector('select:nth-child(3)').value;
+            const day = row.querySelector('div > div:nth-child(1) select').value;
+            const start = row.querySelector('div > div:nth-child(2) select').value;
+            const end = row.querySelector('div > div:nth-child(3) select').value;
             
             if (start === end) {
                 showCustomAlert('Start and end times cannot be same', 'error');
@@ -2033,21 +2346,171 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
     }
 }
 
-// --- HOW TO USE THIS IN YOUR APP ---
+// Enhanced Alert System
+if (typeof showCustomAlert !== 'function') {
+    window.showCustomAlert = function(message, type = 'info', duration = 5000) {
+        // Remove existing alerts
+        document.querySelectorAll('.custom-alert').forEach(alert => alert.remove());
+        
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `custom-alert fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transform transition-transform duration-300 ${
+            type === 'error' ? 'bg-red-100 border-red-400 text-red-700' :
+            type === 'success' ? 'bg-green-100 border-green-400 text-green-700' :
+            'bg-blue-100 border-blue-400 text-blue-700'
+        } border-l-4 max-w-md`;
+        
+        alertDiv.style.transform = 'translateX(120%)';
+        
+        alertDiv.innerHTML = `
+            <div class="flex items-center">
+                <span class="mr-2 text-lg">${type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️'}</span>
+                <div class="flex-1">
+                    <p class="font-medium">${message}</p>
+                </div>
+                <button class="close-alert-btn ml-3 text-gray-500 hover:text-gray-700 text-lg">
+                    ✕
+                </button>
+            </div>
+        `;
+        
+        document.body.appendChild(alertDiv);
+        
+        // Animate in
+        setTimeout(() => {
+            alertDiv.style.transform = 'translateX(0)';
+        }, 10);
+        
+        // Close button
+        alertDiv.querySelector('.close-alert-btn').addEventListener('click', () => {
+            alertDiv.style.transform = 'translateX(120%)';
+            setTimeout(() => {
+                if (alertDiv.parentElement) {
+                    alertDiv.remove();
+                }
+            }, 300);
+        });
+        
+        // Auto close
+        if (duration > 0) {
+            setTimeout(() => {
+                if (alertDiv.parentElement) {
+                    alertDiv.style.transform = 'translateX(120%)';
+                    setTimeout(() => alertDiv.remove(), 300);
+                }
+            }, duration);
+        }
+    };
+}
 
-// 1. On dashboard load (only shows once):
-// In your dashboard initialization:
-// checkAndShowSchedulePopup(currentTutor);
+// Enhanced Confirmation Dialog
+if (typeof showConfirmDialog !== 'function') {
+    window.showConfirmDialog = function(title, message, confirmText = 'OK', cancelText = 'Cancel') {
+        return new Promise((resolve) => {
+            // Remove existing dialogs
+            document.querySelectorAll('.confirm-dialog').forEach(dialog => dialog.remove());
+            
+            const dialogDiv = document.createElement('div');
+            dialogDiv.className = 'confirm-dialog fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4';
+            
+            dialogDiv.innerHTML = `
+                <div class="bg-white rounded-lg shadow-xl max-w-md w-full transform transition-transform duration-200 scale-95">
+                    <div class="p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">${title}</h3>
+                        <p class="text-gray-600 mb-6">${message}</p>
+                        <div class="flex justify-end gap-3">
+                            <button class="cancel-btn btn btn-ghost text-gray-600 hover:text-gray-800 px-4 py-2">
+                                ${cancelText}
+                            </button>
+                            <button class="confirm-btn btn ${confirmText.toLowerCase().includes('delete') ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} text-white px-4 py-2 rounded">
+                                ${confirmText}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(dialogDiv);
+            
+            // Animate in
+            setTimeout(() => {
+                dialogDiv.querySelector('div > div').style.transform = 'scale(1)';
+            }, 10);
+            
+            // Button handlers
+            const confirmBtn = dialogDiv.querySelector('.confirm-btn');
+            const cancelBtn = dialogDiv.querySelector('.cancel-btn');
+            
+            confirmBtn.addEventListener('click', () => {
+                dialogDiv.querySelector('div > div').style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    dialogDiv.remove();
+                    resolve(true);
+                }, 200);
+            });
+            
+            cancelBtn.addEventListener('click', () => {
+                dialogDiv.querySelector('div > div').style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    dialogDiv.remove();
+                    resolve(false);
+                }, 200);
+            });
+            
+            // Close on overlay click
+            dialogDiv.addEventListener('click', (e) => {
+                if (e.target === dialogDiv) {
+                    dialogDiv.querySelector('div > div').style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        dialogDiv.remove();
+                        resolve(false);
+                    }, 200);
+                }
+            });
+            
+            // Close on Escape key
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    dialogDiv.querySelector('div > div').style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        dialogDiv.remove();
+                        resolve(false);
+                    }, 200);
+                    document.removeEventListener('keydown', handleEscape);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        });
+    };
+}
 
-// 2. Manual trigger button (add this to your HTML):
-// <button onclick="showManualScheduleManager(currentTutor)" class="btn btn-primary">
-//     📅 Manage Student Schedules
-// </button>
+// Add CSS for alerts and confirm dialogs
+function injectAlertCSS() {
+    if (document.getElementById('alert-css')) return;
+    
+    const css = document.createElement('style');
+    css.id = 'alert-css';
+    css.textContent = `
+        .custom-alert {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .confirm-dialog > div > div {
+            transition: transform 0.2s ease-out;
+        }
+        
+        .confirm-dialog .btn {
+            transition: all 0.2s;
+        }
+    `;
+    document.head.appendChild(css);
+}
 
-// 3. Delete schedule from student profile:
-// <button onclick="deleteStudentSchedule('${studentId}', '${studentName}')" class="btn btn-danger">
-//     Delete Schedule
-// </button>
+// Inject alert CSS when page loads
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectAlertCSS);
+} else {
+    injectAlertCSS();
+}
 
 /*******************************************************************************
  * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT
@@ -5538,6 +6001,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
