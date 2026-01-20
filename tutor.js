@@ -1554,7 +1554,7 @@ function showTINPopup(tutor) {
 }
 
 /*******************************************************************************
- * SECTION 7: SCHEDULE MANAGEMENT (SIMPLE & ONE-TIME ONLY)
+ * SECTION 7: SCHEDULE MANAGEMENT (FIXED - NO LISTENER ACCUMULATION)
  ******************************************************************************/
 
 // Generate time slots (12:00 AM to 6:00 AM for overnight classes)
@@ -1590,11 +1590,21 @@ const generateTimeSlots = () => {
 
 const ROBUST_TIME_SLOTS = generateTimeSlots();
 
-// State variables
+// State variables - SINGLE SOURCE OF TRUTH
 let allStudents = [];
 let scheduledStudents = new Set();
 let currentStudentIndex = 0;
 let schedulePopup = null;
+
+// Store event handlers for cleanup
+let escapeKeyHandler = null;
+let overlayClickHandler = null;
+let closeButtonHandler = null;
+let addTimeButtonHandler = null;
+let deleteScheduleButtonHandler = null;
+let skipButtonHandler = null;
+let saveButtonHandler = null;
+let saveNextButtonHandler = null;
 
 // SIMPLE FLAG - Shows only once per session
 let hasPopupBeenShownThisSession = false;
@@ -1931,6 +1941,25 @@ function injectScheduleCSS() {
     document.head.appendChild(css);
 }
 
+// Cleanup function - removes ALL event listeners
+function cleanupEventListeners() {
+    // Remove all event listeners
+    if (escapeKeyHandler) {
+        document.removeEventListener('keydown', escapeKeyHandler);
+        escapeKeyHandler = null;
+    }
+    
+    // Note: For other handlers, we can't directly remove them without reference
+    // So we'll nullify all stored handlers
+    overlayClickHandler = null;
+    closeButtonHandler = null;
+    addTimeButtonHandler = null;
+    deleteScheduleButtonHandler = null;
+    skipButtonHandler = null;
+    saveButtonHandler = null;
+    saveNextButtonHandler = null;
+}
+
 /**
  * MAIN FUNCTION: Check for unscheduled students
  * Shows popup ONLY ONCE when tutor first loads the dashboard
@@ -2012,18 +2041,57 @@ async function checkAndShowSchedulePopup(tutor) {
 }
 
 /**
- * MANUAL TRIGGER - For when tutor wants to manage schedules
+ * MANUAL SCHEDULE MANAGER - Always works, even if all schedules are set
  * Call this from a button like: "Manage Student Schedules"
  */
-function showManualScheduleManager(tutor) {
-    // Inject CSS first
+async function showManualScheduleManager(tutor) {
+    // Clean up any existing popup first
+    cleanupEventListeners();
+    if (schedulePopup) {
+        schedulePopup.remove();
+        schedulePopup = null;
+    }
+    
+    // Inject CSS
     injectScheduleCSS();
     
-    // Reset flag to allow showing
-    hasPopupBeenShownThisSession = false;
-    
-    // Call the main function
-    checkAndShowSchedulePopup(tutor);
+    try {
+        const studentsQuery = query(
+            collection(db, "students"), 
+            where("tutorEmail", "==", tutor.email)
+        );
+        const studentsSnapshot = await getDocs(studentsQuery);
+        
+        allStudents = [];
+        scheduledStudents.clear();
+        
+        studentsSnapshot.forEach(doc => {
+            const student = { id: doc.id, ...doc.data() };
+            if (!['archived', 'graduated', 'transferred'].includes(student.status)) {
+                allStudents.push(student);
+                if (student.schedule && Array.isArray(student.schedule) && student.schedule.length > 0) {
+                    scheduledStudents.add(student.id);
+                }
+            }
+        });
+        
+        // Get ALL students (not just unscheduled) for manual management
+        const activeStudents = allStudents.filter(s => !['archived', 'graduated', 'transferred'].includes(s.status));
+        
+        if (activeStudents.length > 0) {
+            // Always show the popup for manual management
+            showBulkSchedulePopup(activeStudents[0], tutor, activeStudents.length);
+            return true;
+        } else {
+            showCustomAlert('No active students found', 'info');
+            return false;
+        }
+        
+    } catch (error) {
+        console.error("Error loading students:", error);
+        showCustomAlert('Error loading students', 'error');
+        return false;
+    }
 }
 
 /**
@@ -2084,11 +2152,13 @@ function addScheduleDeleteButtonToProfile(studentId, studentName) {
 }
 
 /**
- * Schedule popup with proper close handlers
+ * Schedule popup with FIXED event listener handling
  */
 function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
-    // Close any existing popup
-    if (schedulePopup) {
+    // Clean up any existing popup and listeners FIRST
+    cleanupEventListeners();
+    
+    if (schedulePopup && document.body.contains(schedulePopup)) {
         schedulePopup.remove();
     }
     
@@ -2100,8 +2170,8 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
                 <div class="modal-header">
                     <h3 class="modal-title">📅 Schedule Student</h3>
                     <div class="flex items-center gap-2">
-                        <span class="badge badge-info">${remainingCount} to go</span>
-                        <button class="close-modal-btn btn btn-sm btn-ghost">✕</button>
+                        <span class="badge badge-info">${remainingCount} remaining</span>
+                        <button id="close-modal-btn" class="btn btn-sm btn-ghost">✕</button>
                     </div>
                 </div>
                 
@@ -2116,7 +2186,7 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
                     </div>
                     
                     <button id="add-time-btn" class="btn btn-outline w-full mb-4">
-                        ＋ Add Another Time
+                        ＋ Add Another Time Slot
                     </button>
                     
                     <div class="flex gap-2">
@@ -2124,14 +2194,14 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
                             🗑️ Delete Schedule
                         </button>
                         <button id="skip-student-btn" class="btn btn-ghost">
-                            Skip
+                            Skip Student
                         </button>
                     </div>
                 </div>
                 
                 <div class="modal-footer">
                     <button id="save-btn" class="btn btn-primary">
-                        Save
+                        Save Schedule
                     </button>
                     <button id="save-next-btn" class="btn btn-success">
                         Save & Next Student
@@ -2156,34 +2226,38 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
         addTimeSlotRow(entriesContainer);
     }
     
-    // --- EVENT LISTENERS ---
+    // --- EVENT LISTENER SETUP (ONE-TIME, NO ACCUMULATION) ---
     
-    // CLOSE button
-    document.querySelector('.close-modal-btn').addEventListener('click', closePopup);
+    // CLOSE button - using event delegation pattern
+    const closeModalBtn = document.getElementById('close-modal-btn');
+    closeButtonHandler = () => closePopup();
+    closeModalBtn.addEventListener('click', closeButtonHandler);
     
     // CLOSE when clicking outside
-    document.querySelector('.modal-overlay').addEventListener('click', (e) => {
+    const modalOverlay = document.querySelector('.modal-overlay');
+    overlayClickHandler = (e) => {
         if (e.target.id === 'schedule-modal') {
             closePopup();
         }
-    });
+    };
+    modalOverlay.addEventListener('click', overlayClickHandler);
     
     // CLOSE with Escape key
-    const handleEscape = (e) => {
+    escapeKeyHandler = (e) => {
         if (e.key === 'Escape') {
             closePopup();
-            document.removeEventListener('keydown', handleEscape);
         }
     };
-    document.addEventListener('keydown', handleEscape);
+    document.addEventListener('keydown', escapeKeyHandler);
     
     // Add time button
-    document.getElementById('add-time-btn').addEventListener('click', () => {
-        addTimeSlotRow(entriesContainer);
-    });
+    const addTimeBtn = document.getElementById('add-time-btn');
+    addTimeButtonHandler = () => addTimeSlotRow(entriesContainer);
+    addTimeBtn.addEventListener('click', addTimeButtonHandler);
     
     // Delete schedule button
-    document.getElementById('delete-schedule-btn').addEventListener('click', async () => {
+    const deleteScheduleBtn = document.getElementById('delete-schedule-btn');
+    deleteScheduleButtonHandler = async () => {
         const confirmed = await showConfirmDialog(
             'Delete Schedule',
             `Delete schedule for ${student.studentName}?`,
@@ -2203,22 +2277,23 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
                 showCustomAlert('❌ Error deleting', 'error');
             }
         }
-    });
+    };
+    deleteScheduleBtn.addEventListener('click', deleteScheduleButtonHandler);
     
     // Skip button
-    document.getElementById('skip-student-btn').addEventListener('click', () => {
-        moveToNextStudent(false);
-    });
+    const skipBtn = document.getElementById('skip-student-btn');
+    skipButtonHandler = () => moveToNextStudent(false);
+    skipBtn.addEventListener('click', skipButtonHandler);
     
     // Save button
-    document.getElementById('save-btn').addEventListener('click', () => {
-        saveSchedule(student, false);
-    });
+    const saveBtn = document.getElementById('save-btn');
+    saveButtonHandler = () => saveSchedule(student, false);
+    saveBtn.addEventListener('click', saveButtonHandler);
     
     // Save & Next button
-    document.getElementById('save-next-btn').addEventListener('click', () => {
-        saveSchedule(student, true);
-    });
+    const saveNextBtn = document.getElementById('save-next-btn');
+    saveNextButtonHandler = () => saveSchedule(student, true);
+    saveNextBtn.addEventListener('click', saveNextButtonHandler);
     
     // Helper to add time slot row
     function addTimeSlotRow(container, data = null) {
@@ -2234,19 +2309,19 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div class="flex flex-col">
                     <label class="text-xs font-medium mb-1">Day</label>
-                    <select class="select select-bordered select-sm">
+                    <select class="select select-bordered select-sm day-select">
                         ${DAYS_OF_WEEK.map(d => `<option value="${d}" ${d === day ? 'selected' : ''}>${d}</option>`).join('')}
                     </select>
                 </div>
                 <div class="flex flex-col">
                     <label class="text-xs font-medium mb-1">Start Time</label>
-                    <select class="select select-bordered select-sm">
+                    <select class="select select-bordered select-sm start-select">
                         ${ROBUST_TIME_SLOTS.map(s => `<option value="${s.value}" ${s.value === start ? 'selected' : ''}>${s.label}</option>`).join('')}
                     </select>
                 </div>
                 <div class="flex flex-col">
                     <label class="text-xs font-medium mb-1">End Time</label>
-                    <select class="select select-bordered select-sm">
+                    <select class="select select-bordered select-sm end-select">
                         ${ROBUST_TIME_SLOTS.map(s => `<option value="${s.value}" ${s.value === end ? 'selected' : ''}>${s.label}</option>`).join('')}
                     </select>
                 </div>
@@ -2255,23 +2330,26 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
         
         container.appendChild(row);
         
-        // Remove row button
-        row.querySelector('.remove-row-btn').addEventListener('click', () => {
+        // Remove row button - using event delegation on the container
+        row.querySelector('.remove-row-btn').addEventListener('click', function() {
             if (container.children.length > 1) {
                 row.remove();
             } else {
-                showCustomAlert('Need at least one time slot', 'error');
+                setTimeout(() => {
+                    showCustomAlert('Need at least one time slot', 'error');
+                }, 100);
             }
         });
     }
     
     // Close popup function
     function closePopup() {
+        cleanupEventListeners();
+        
         if (schedulePopup) {
             schedulePopup.remove();
             schedulePopup = null;
         }
-        document.removeEventListener('keydown', handleEscape);
     }
     
     // Save schedule function
@@ -2280,12 +2358,14 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
         const schedule = [];
         
         for (const row of rows) {
-            const day = row.querySelector('div > div:nth-child(1) select').value;
-            const start = row.querySelector('div > div:nth-child(2) select').value;
-            const end = row.querySelector('div > div:nth-child(3) select').value;
+            const day = row.querySelector('.day-select').value;
+            const start = row.querySelector('.start-select').value;
+            const end = row.querySelector('.end-select').value;
             
             if (start === end) {
-                showCustomAlert('Start and end times cannot be same', 'error');
+                setTimeout(() => {
+                    showCustomAlert('Start and end times cannot be same', 'error');
+                }, 100);
                 return;
             }
             
@@ -2293,11 +2373,10 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
         }
         
         if (schedule.length === 0) {
-            // FIXED:
-setTimeout(() => {
-    showCustomAlert('Add at least one time slot', 'error');
-}, 100);
-return;
+            setTimeout(() => {
+                showCustomAlert('Add at least one time slot', 'error');
+            }, 100);
+            return;
         }
         
         try {
@@ -2384,7 +2463,7 @@ if (typeof showCustomAlert !== 'function') {
         }, 10);
         
         // Close button
-        alertDiv.querySelector('.close-alert-btn').addEventListener('click', () => {
+        alertDiv.querySelector('.close-alert-btn').addEventListener('click', function() {
             alertDiv.style.transform = 'translateX(120%)';
             setTimeout(() => {
                 if (alertDiv.parentElement) {
@@ -2443,24 +2522,27 @@ if (typeof showConfirmDialog !== 'function') {
             const confirmBtn = dialogDiv.querySelector('.confirm-btn');
             const cancelBtn = dialogDiv.querySelector('.cancel-btn');
             
-            confirmBtn.addEventListener('click', () => {
+            const confirmHandler = () => {
                 dialogDiv.querySelector('div > div').style.transform = 'scale(0.95)';
                 setTimeout(() => {
                     dialogDiv.remove();
                     resolve(true);
                 }, 200);
-            });
+            };
             
-            cancelBtn.addEventListener('click', () => {
+            const cancelHandler = () => {
                 dialogDiv.querySelector('div > div').style.transform = 'scale(0.95)';
                 setTimeout(() => {
                     dialogDiv.remove();
                     resolve(false);
                 }, 200);
-            });
+            };
+            
+            confirmBtn.addEventListener('click', confirmHandler);
+            cancelBtn.addEventListener('click', cancelHandler);
             
             // Close on overlay click
-            dialogDiv.addEventListener('click', (e) => {
+            const overlayHandler = (e) => {
                 if (e.target === dialogDiv) {
                     dialogDiv.querySelector('div > div').style.transform = 'scale(0.95)';
                     setTimeout(() => {
@@ -2468,20 +2550,21 @@ if (typeof showConfirmDialog !== 'function') {
                         resolve(false);
                     }, 200);
                 }
-            });
+            };
+            dialogDiv.addEventListener('click', overlayHandler);
             
             // Close on Escape key
-            const handleEscape = (e) => {
+            const escapeHandler = (e) => {
                 if (e.key === 'Escape') {
                     dialogDiv.querySelector('div > div').style.transform = 'scale(0.95)';
                     setTimeout(() => {
                         dialogDiv.remove();
                         resolve(false);
                     }, 200);
-                    document.removeEventListener('keydown', handleEscape);
+                    document.removeEventListener('keydown', escapeHandler);
                 }
             };
-            document.addEventListener('keydown', handleEscape);
+            document.addEventListener('keydown', escapeHandler);
         });
     };
 }
@@ -2513,6 +2596,21 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', injectAlertCSS);
 } else {
     injectAlertCSS();
+}
+
+// Add schedule management button to your UI
+function addScheduleManagementButton(tutor) {
+    // Add this to your navigation or dashboard
+    const navContainer = document.querySelector('.nav-menu, .sidebar, .dashboard-header');
+    
+    if (navContainer && !document.getElementById('schedule-manager-btn')) {
+        const scheduleBtn = document.createElement('button');
+        scheduleBtn.id = 'schedule-manager-btn';
+        scheduleBtn.className = 'btn btn-primary btn-sm';
+        scheduleBtn.innerHTML = '📅 Manage Schedules';
+        scheduleBtn.onclick = () => showManualScheduleManager(tutor);
+        navContainer.appendChild(scheduleBtn);
+    }
 }
 
 /*******************************************************************************
@@ -6004,6 +6102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
