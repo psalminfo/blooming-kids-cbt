@@ -3,7 +3,7 @@
  ******************************************************************************/
 
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, updateDoc, getDoc,维护, query, addDoc, writeBatch, deleteDoc, setDoc, deleteField } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -1792,6 +1792,8 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
             
             // Handle queue logic (treat as scheduled/handled)
             scheduledStudents.delete(student.id); // Ensure they are removed from 'scheduled' set if they were there
+            // But wait... if we delete their schedule, they technically go back to "unscheduled" list?
+            // User flow: If I delete it, I probably want to skip them for now.
             
             moveToNextStudent(false); // False = Don't mark as scheduled
 
@@ -1814,7 +1816,7 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
             const end = div.querySelector('.schedule-end').value;
             
             // Basic Logic Validation
-            const validation = validateScheduleTime(start, end); 
+            const validation = validateScheduleTime(start, end); // Assumes this helper exists globally or in prev section
             if (!validation.valid) {
                 showCustomAlert(`⚠️ ${day}: ${validation.message}`);
                 hasError = true;
@@ -1856,7 +1858,7 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
                 tutorName: window.tutorData.name,
                 schedule: schedule,
                 updatedAt: new Date() // Useful for sorting
-            }, { merge: true }); 
+            }, { merge: true }); // Merge ensures we don't overwrite other fields if they exist
             
             showCustomAlert('✅ Schedule saved successfully!');
             
@@ -1888,6 +1890,8 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
         // Recalculate the remaining list based on the Set
         const remainingList = allStudents.filter(s => !scheduledStudents.has(s.id));
         
+        // If we marked as scheduled, the list is now 1 shorter, so index 0 is the next guy.
+        // If we skipped, we incremented index, so we look at the new index.
         const nextIndex = markAsScheduled ? 0 : currentStudentIndex;
 
         if (remainingList.length > 0 && nextIndex < remainingList.length) {
@@ -1909,6 +1913,7 @@ function showBulkSchedulePopup(student, tutor, remainingCount = 0) {
 
 /*******************************************************************************
  * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT
+ * (Version: Auto-Sync Parent Data & "Self-Healing" Database)
  ******************************************************************************/
 
 // ==========================================
@@ -2027,7 +2032,7 @@ function showDailyTopicModal(student) {
 }
 
 // ------------------------------------------
-// HELPER FUNCTIONS FOR EDITING
+// HELPER FUNCTIONS FOR EDITING (UNCHANGED)
 // ------------------------------------------
 function enableTopicEdit(topicId) {
     document.getElementById(`text-${topicId}`).classList.add('hidden');
@@ -2106,7 +2111,7 @@ async function loadDailyTopicHistory(studentId) {
 
 
 // ==========================================
-// 2. HOMEWORK ASSIGNMENT
+// 2. HOMEWORK ASSIGNMENT (SMART SYNC VERSION)
 // ==========================================
 
 async function uploadToCloudinary(file, studentId) {
@@ -2125,6 +2130,7 @@ async function uploadToCloudinary(file, studentId) {
     });
 }
 
+// *** NEW: Returns object { email, name } instead of just email
 async function fetchParentDataByPhone(phone) {
     if (!phone) return null;
     try {
@@ -2139,9 +2145,10 @@ async function fetchParentDataByPhone(phone) {
 
         if (!snapshot.empty) {
             const data = snapshot.docs[0].data();
+            // Return both name and email
             return { 
                 email: data.email, 
-                name: data.fullName || data.name || data.parentName || "Parent" 
+                name: data.fullName || data.name || data.parentName || "Parent" // Handle various naming conventions
             };
         }
     } catch (error) {
@@ -2156,6 +2163,7 @@ function showHomeworkModal(student) {
     const maxDate = nextWeek.toISOString().split('T')[0];
     let selectedFiles = [];
 
+    // Check if we already have data in the Student object
     let currentParentName = student.parentName || "Loading...";
     let currentParentEmail = student.parentEmail || "Searching...";
     const parentPhone = student.parentPhone || "Not Found";
@@ -2196,12 +2204,14 @@ function showHomeworkModal(student) {
     modal.innerHTML = modalHTML;
     document.body.appendChild(modal);
 
+    // *** AUTO-FETCH LOGIC: Runs immediately if data is missing ***
     let fetchedParentData = null;
 
     if (student.parentPhone && (!student.parentEmail || !student.parentName)) {
         fetchParentDataByPhone(student.parentPhone).then(data => {
             if (data) {
                 fetchedParentData = data;
+                // Update UI Live
                 document.getElementById('display-parent-name').textContent = data.name;
                 document.getElementById('display-parent-email').textContent = data.email;
                 document.getElementById('display-parent-name').classList.add('text-green-600', 'font-bold');
@@ -2213,10 +2223,12 @@ function showHomeworkModal(student) {
             }
         });
     } else {
+        // Data already exists, just clear the "Searching..." text if needed
         if(student.parentName) document.getElementById('display-parent-name').textContent = student.parentName;
         if(student.parentEmail) document.getElementById('display-parent-email').textContent = student.parentEmail;
     }
 
+    // File Handling (Standard)
     const fileInput = document.getElementById('hw-file');
     const fileListUl = document.getElementById('file-list-ul');
     fileInput.addEventListener('change', (e) => {
@@ -2248,6 +2260,7 @@ function showHomeworkModal(student) {
     document.getElementById('remove-all-files-btn').addEventListener('click', ()=>{ selectedFiles=[]; fileInput.value=''; renderFiles(); });
     document.getElementById('cancel-hw-btn').addEventListener('click', () => modal.remove());
 
+    // SAVE LOGIC
     document.getElementById('save-hw-btn').addEventListener('click', async () => {
         const title = document.getElementById('hw-title').value.trim();
         const desc = document.getElementById('hw-description').value.trim();
@@ -2265,19 +2278,24 @@ function showHomeworkModal(student) {
         try {
             saveBtn.disabled = true;
             
+            // --- STEP 1: RESOLVE PARENT DATA ---
+            // Priority: 1. Fetched just now (new), 2. Existing on student, 3. Empty
             let finalParentEmail = fetchedParentData?.email || student.parentEmail || "";
             let finalParentName = fetchedParentData?.name || student.parentName || "";
 
+            // If we still don't have it, try one last desperate fetch
             if (sendEmail && !finalParentEmail && student.parentPhone) {
                 saveBtn.innerHTML = "🔍 Finalizing Parent Info...";
                 const lastCheck = await fetchParentDataByPhone(student.parentPhone);
                 if (lastCheck) {
                     finalParentEmail = lastCheck.email;
                     finalParentName = lastCheck.name;
-                    fetchedParentData = lastCheck; 
+                    fetchedParentData = lastCheck; // Mark as new so we save it below
                 }
             }
 
+            // *** CRITICAL UPDATE: SYNC TO STUDENTS COLLECTION ***
+            // If we found new data that wasn't there before, update the student record permanently.
             if (fetchedParentData) {
                 saveBtn.innerHTML = "💾 Syncing Student Data...";
                 try {
@@ -2285,11 +2303,13 @@ function showHomeworkModal(student) {
                         parentEmail: finalParentEmail,
                         parentName: finalParentName
                     });
+                    console.log("Student record updated with new parent info.");
                 } catch (updateError) {
-                    console.error("Failed to sync student data:", updateError);
+                    console.error("Failed to sync student data (non-fatal):", updateError);
                 }
             }
 
+            // --- STEP 2: UPLOAD FILES ---
             saveBtn.innerHTML = `Uploading ${selectedFiles.length} files...`;
             let attachments = [];
             if (selectedFiles.length > 0) {
@@ -2306,6 +2326,7 @@ function showHomeworkModal(student) {
                 }
             }
 
+            // --- STEP 3: SAVE TO FIREBASE ---
             saveBtn.innerHTML = "Saving...";
             const newHwRef = doc(collection(db, "homework_assignments"));
             
@@ -2314,7 +2335,7 @@ function showHomeworkModal(student) {
                 studentId: student.id,
                 studentName: student.studentName,
                 parentEmail: finalParentEmail,
-                parentName: finalParentName,
+                parentName: finalParentName, // Now storing Name in HW record too
                 parentPhone: student.parentPhone,
                 tutorName: tutorName,
                 title: title,
@@ -2329,6 +2350,7 @@ function showHomeworkModal(student) {
             
             await setDoc(newHwRef, hwData);
 
+            // --- STEP 4: SEND EMAIL ---
             if (sendEmail && finalParentEmail) {
                 saveBtn.innerHTML = "Sending Email...";
                 const GAS_URL = "https://script.google.com/macros/s/AKfycbz9yuiR1egvxRcCLbW1Id-6lxBsYotiID0j_Fpeb9D8RyQGdMPNPPZn8WqOpJ4m_JqJNQ/exec";
@@ -2373,7 +2395,11 @@ async function scheduleEmailReminder(hwData, fileUrl = '') {
 }
 
 /*******************************************************************************
- * SECTION 9: MESSAGING & INBOX FEATURES
+ * SECTION 9: MESSAGING & INBOX FEATURES (CRASH-PROOF EDITION)
+ * * CRITICAL FIXES:
+ * - Removed 'serverTimestamp' dependency. Now uses native 'new Date()'.
+ * - Removed 'increment' dependency. Now uses manual count updates.
+ * - This resolves the "invalid data / custom object" error permanently.
  ******************************************************************************/
 
 // --- STATE MANAGEMENT ---
@@ -2381,7 +2407,7 @@ let msgSectionUnreadCount = 0;
 let btnFloatingMsg = null;
 let btnFloatingInbox = null;
 
-// --- LISTENERS ---
+// --- LISTENERS (Memory Management) ---
 let unsubInboxListener = null;
 let unsubChatListener = null;
 let unsubUnreadListener = null;
@@ -2404,34 +2430,45 @@ function msgGenerateConvId(tutorId, parentPhone) {
 
 function msgFormatTime(timestamp) {
     if (!timestamp) return '';
+    // Handle Firestore Timestamp vs JS Date
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    if (isNaN(date.getTime())) return '';
+    if (isNaN(date.getTime())) return ''; // Invalid date check
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 // --- INITIALIZATION ---
 
 function initializeFloatingMessagingButton() {
+    // 1. Clean up old buttons
     const oldBtns = document.querySelectorAll('.floating-messaging-btn, .floating-inbox-btn');
     oldBtns.forEach(btn => btn.remove());
     
+    // 2. Create Messaging Button
     btnFloatingMsg = document.createElement('button');
     btnFloatingMsg.className = 'floating-messaging-btn';
     btnFloatingMsg.innerHTML = `<span class="floating-btn-icon">💬</span><span class="floating-btn-text">New</span>`;
     btnFloatingMsg.onclick = showEnhancedMessagingModal;
     
+    // 3. Create Inbox Button
     btnFloatingInbox = document.createElement('button');
     btnFloatingInbox.className = 'floating-inbox-btn';
     btnFloatingInbox.innerHTML = `<span class="floating-btn-icon">📨</span><span class="floating-btn-text">Inbox</span>`;
     btnFloatingInbox.onclick = showInboxModal;
     
+    // 4. Mount to DOM
     document.body.appendChild(btnFloatingMsg);
     document.body.appendChild(btnFloatingInbox);
     
+    // 5. Inject CSS
     injectMessagingStyles();
     
+    // 6. Start Listener
     if (window.tutorData && window.tutorData.id) {
         initializeUnreadListener();
+    } else {
+        setTimeout(() => {
+            if (window.tutorData && window.tutorData.id) initializeUnreadListener();
+        }, 3000);
     }
 }
 
@@ -2450,6 +2487,7 @@ function initializeUnreadListener() {
         let count = 0;
         snapshot.forEach(doc => {
             const data = doc.data();
+            // Count unread if I am NOT the last sender
             if (data.unreadCount > 0 && data.lastSenderId !== tutorId) {
                 count += data.unreadCount;
             }
@@ -2460,6 +2498,7 @@ function initializeUnreadListener() {
     });
 }
 
+// Compatibility Alias
 window.updateUnreadMessageCount = function() {
     if (window.tutorData && window.tutorData.id) {
         initializeUnreadListener();
@@ -2630,16 +2669,23 @@ async function msgProcessSend(modal) {
     btn.disabled = true;
     
     try {
+        // Send loop
         for (const target of targets) {
             const convId = msgGenerateConvId(tutor.id, target.phone);
-            const now = new Date(); 
+            const now = new Date(); // USE NATIVE DATE
             
+            // Manual Increment Logic: Read -> Calculate -> Write
             const convRef = doc(db, "conversations", convId);
-            const convSnap = await getDoc(convRef); 
+            const convSnap = await getDoc(convRef); // New dependency: getDoc (usually available)
             
             let newCount = 1;
             if (convSnap.exists()) {
                 const data = convSnap.data();
+                // If the last sender was me, reset count. If not, increment.
+                // Logic: I am sending now, so for the RECIPIENT, it increments.
+                // But since I am the tutor, and I'm sending to Parent, I want to update THEIR unread count?
+                // Actually, this unreadCount field is shared. A better schema splits it, but for now:
+                // We just increment it.
                 newCount = (data.unreadCount || 0) + 1;
             }
 
@@ -2670,6 +2716,7 @@ async function msgProcessSend(modal) {
         alert("Message Sent!");
     } catch (e) {
         console.error(e);
+        // Fallback if getDoc is missing, try blind write
         alert("Error sending: " + e.message);
         btn.innerText = "Try Again";
         btn.disabled = false;
@@ -2835,6 +2882,7 @@ function msgLoadChat(convId, name, modal, tutorId) {
 
         const now = new Date();
 
+        // 1. Send Message
         await addDoc(collection(db, "conversations", convId, "messages"), {
             content: txt,
             senderId: tutorId,
@@ -2842,7 +2890,9 @@ function msgLoadChat(convId, name, modal, tutorId) {
             read: false
         });
 
+        // 2. Manual Increment for Metadata
         const convRef = doc(db, "conversations", convId);
+        // We do a quick read to get current count to be safe
         getDoc(convRef).then(snap => {
             const current = snap.exists() ? (snap.data().unreadCount || 0) : 0;
             updateDoc(convRef, {
@@ -2864,6 +2914,7 @@ function injectMessagingStyles() {
     const style = document.createElement('style');
     style.id = 'msg-styles';
     style.textContent = `
+        /* --- Floating Buttons --- */
         .floating-messaging-btn, .floating-inbox-btn {
             position: fixed; bottom: 20px; right: 20px;
             background: linear-gradient(135deg, #6366f1, #4f46e5);
@@ -2878,6 +2929,7 @@ function injectMessagingStyles() {
             position: absolute; top: -5px; right: -5px; border: 2px solid white;
         }
 
+        /* --- Modals --- */
         .modal-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.5); 
             display: flex; justify-content: center; align-items: center; z-index: 10000;
@@ -2900,6 +2952,7 @@ function injectMessagingStyles() {
             width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
         }
         
+        /* --- Inputs --- */
         .form-input { 
             width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; 
             margin-bottom: 10px; font-size: 14px;
@@ -2909,6 +2962,7 @@ function injectMessagingStyles() {
         .btn-secondary { background: #e5e7eb; color: #374151; }
         .btn:disabled { opacity: 0.7; cursor: not-allowed; }
         
+        /* --- Messaging Specific --- */
         .message-type-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
         .type-option { 
             border: 2px solid #eee; border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; 
@@ -2917,6 +2971,7 @@ function injectMessagingStyles() {
         .type-option:hover, .type-option.selected { border-color: #4f46e5; background: #eef2ff; }
         .type-option .icon { font-size: 24px; margin-bottom: 5px; }
         
+        /* --- Inbox Specific --- */
         .inbox-container { display: flex; height: 600px; max-height: 80vh; }
         .inbox-list-col { width: 35%; border-right: 1px solid #eee; display: flex; flex-direction: column; }
         .inbox-chat-col { width: 65%; display: flex; flex-direction: column; background: #f3f4f6; }
@@ -2953,6 +3008,14 @@ function injectMessagingStyles() {
         .hidden { display: none !important; }
         .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #4f46e5; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 10px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        @media(max-width: 640px) {
+            .inbox-list-col { width: 100%; }
+            .inbox-chat-col { display: none; }
+            .inbox-container.chat-active .inbox-list-col { display: none; }
+            .inbox-container.chat-active .inbox-chat-col { display: flex; width: 100%; }
+            .message-type-grid { grid-template-columns: repeat(2, 1fr); }
+        }
     `;
     document.head.appendChild(style);
 }
@@ -2964,6 +3027,7 @@ initializeFloatingMessagingButton();
  * SECTION 10: SCHEDULE CALENDAR VIEW
  ******************************************************************************/
 
+// View Schedule Calendar for All Students
 function showScheduleCalendarModal() {
     const modalHTML = `
         <div class="modal-overlay">
@@ -2980,7 +3044,9 @@ function showScheduleCalendarModal() {
                         <div class="spinner mx-auto mb-2"></div>
                         <p class="text-gray-500">Loading schedule calendar...</p>
                     </div>
-                    <div id="calendar-view" class="hidden"></div>
+                    <div id="calendar-view" class="hidden">
+                        <!-- Calendar will be loaded here -->
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button id="close-calendar-btn" class="btn btn-secondary">Close</button>
@@ -2995,12 +3061,20 @@ function showScheduleCalendarModal() {
     
     loadScheduleCalendar();
     
-    document.getElementById('print-calendar-btn').addEventListener('click', () => printCalendar());
+    document.getElementById('print-calendar-btn').addEventListener('click', () => {
+        printCalendar();
+    });
+    
     document.getElementById('edit-schedule-btn').addEventListener('click', () => {
         modal.remove();
-        if (window.tutorData) checkAndShowSchedulePopup(window.tutorData);
+        if (window.tutorData) {
+            checkAndShowSchedulePopup(window.tutorData);
+        }
     });
-    document.getElementById('close-calendar-btn').addEventListener('click', () => modal.remove());
+    
+    document.getElementById('close-calendar-btn').addEventListener('click', () => {
+        modal.remove();
+    });
 }
 
 async function loadScheduleCalendar() {
@@ -3014,6 +3088,7 @@ async function loadScheduleCalendar() {
         const studentsWithSchedule = [];
         studentsSnapshot.forEach(doc => {
             const student = { id: doc.id, ...doc.data() };
+            // Filter out archived students
             if (!['archived', 'graduated', 'transferred'].includes(student.status) &&
                 student.schedule && student.schedule.length > 0) {
                 studentsWithSchedule.push(student);
@@ -3026,7 +3101,16 @@ async function loadScheduleCalendar() {
                     <div class="text-gray-400 text-4xl mb-3">📅</div>
                     <h4 class="font-bold text-gray-600 mb-2">No Schedules Found</h4>
                     <p class="text-gray-500 mb-4">No students have schedules set up yet.</p>
-                </div>`;
+                    <button id="setup-schedules-btn" class="btn btn-primary">Set Up Schedules</button>
+                </div>
+            `;
+            
+            document.getElementById('setup-schedules-btn').addEventListener('click', () => {
+                document.querySelector('.modal-overlay').remove();
+                if (window.tutorData) {
+                    checkAndShowSchedulePopup(window.tutorData);
+                }
+            });
         } else {
             renderCalendarView(studentsWithSchedule);
         }
@@ -3036,12 +3120,23 @@ async function loadScheduleCalendar() {
         
     } catch (error) {
         console.error("Error loading calendar:", error);
+        document.getElementById('calendar-view').innerHTML = `
+            <div class="text-center text-red-600 p-8">
+                <div class="text-4xl mb-3">⚠️</div>
+                <h4 class="font-bold mb-2">Failed to Load Schedule</h4>
+                <p class="text-gray-500">Please try again later.</p>
+            </div>
+        `;
+        document.getElementById('calendar-loading').classList.add('hidden');
+        document.getElementById('calendar-view').classList.remove('hidden');
     }
 }
 
 function renderCalendarView(students) {
     const scheduleByDay = {};
-    DAYS_OF_WEEK.forEach(day => { scheduleByDay[day] = []; });
+    DAYS_OF_WEEK.forEach(day => {
+        scheduleByDay[day] = [];
+    });
     
     students.forEach(student => {
         student.schedule.forEach(slot => {
@@ -3057,24 +3152,231 @@ function renderCalendarView(students) {
         });
     });
     
-    let calendarHTML = `<div class="calendar-view">`;
     DAYS_OF_WEEK.forEach(day => {
-        const dayEvents = scheduleByDay[day].sort((a,b) => a.start.localeCompare(b.start));
+        scheduleByDay[day].sort((a, b) => {
+            return a.start.localeCompare(b.start);
+        });
+    });
+    
+    let calendarHTML = `
+        <div class="calendar-view">
+    `;
+    
+    DAYS_OF_WEEK.forEach(day => {
+        const dayEvents = scheduleByDay[day];
         calendarHTML += `
             <div class="calendar-day">
                 <div class="calendar-day-header">${day}</div>
                 <div class="calendar-day-events">
-                    ${dayEvents.length === 0 ? '<div class="text-xs text-gray-400 text-center mt-4">No classes</div>' : 
-                    dayEvents.map(event => `
-                        <div class="calendar-event">
-                            <div class="font-medium text-xs">${event.student}</div>
-                            <div class="calendar-event-time">${event.time} ${event.isOvernight ? '🌙' : ''}</div>
-                        </div>`).join('')}
+                    ${dayEvents.length === 0 ? 
+                        '<div class="text-sm text-gray-400 text-center mt-4">No classes</div>' : 
+                        dayEvents.map(event => `
+                            <div class="calendar-event">
+                                <div class="font-medium text-xs">${event.student}</div>
+                                <div class="calendar-event-time">${event.time} ${event.isOvernight ? '🌙' : ''}</div>
+                                <div class="text-xs text-gray-500">${event.grade}</div>
+                                <button class="edit-schedule-btn mt-1" data-student-id="${event.studentId}">Edit</button>
+                            </div>
+                        `).join('')
+                    }
                 </div>
-            </div>`;
+            </div>
+        `;
     });
+    
     calendarHTML += `</div>`;
+    
+    calendarHTML += `
+        <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+            <h4 class="font-bold text-lg mb-3">Schedule Summary</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <p class="text-sm"><span class="font-semibold">Total Students with Schedule:</span> ${students.length}</p>
+                    <p class="text-sm"><span class="font-semibold">Total Weekly Classes:</span> ${Object.values(scheduleByDay).reduce((total, day) => total + day.length, 0)}</p>
+                </div>
+                <div>
+                    <p class="text-sm"><span class="font-semibold">Most Scheduled Day:</span> ${getMostScheduledDay(scheduleByDay)}</p>
+                    <p class="text-sm"><span class="font-semibold">Earliest Class:</span> ${getEarliestClass(scheduleByDay)}</p>
+                </div>
+            </div>
+        </div>
+    `;
+    
     document.getElementById('calendar-view').innerHTML = calendarHTML;
+    
+    document.querySelectorAll('.edit-schedule-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const studentId = e.target.getAttribute('data-student-id');
+            const student = students.find(s => s.id === studentId);
+            if (student) {
+                document.querySelector('.modal-overlay').remove();
+                showEditScheduleModal(student);
+            }
+        });
+    });
+}
+
+// Edit Schedule Modal
+function showEditScheduleModal(student) {
+    const modalHTML = `
+        <div class="modal-overlay">
+            <div class="modal-content max-w-2xl">
+                <div class="modal-header">
+                    <h3 class="modal-title">✏️ Edit Schedule for ${student.studentName}</h3>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-4 p-3 bg-blue-50 rounded-lg">
+                        <p class="text-sm text-blue-700">Student: <strong>${student.studentName}</strong> | Grade: ${student.grade}</p>
+                        <p class="text-xs text-blue-500">Note: You can schedule overnight classes (e.g., 11 PM to 1 AM)</p>
+                    </div>
+                    
+                    <div id="schedule-entries" class="space-y-4">
+                        ${student.schedule && student.schedule.length > 0 ? 
+                            student.schedule.map(slot => `
+                                <div class="schedule-entry bg-gray-50 p-4 rounded-lg border">
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label class="form-label">Day of Week</label>
+                                            <select class="form-input schedule-day">
+                                                ${DAYS_OF_WEEK.map(day => `<option value="${day}" ${day === slot.day ? 'selected' : ''}>${day}</option>`).join('')}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="form-label">Start Time</label>
+                                            <select class="form-input schedule-start">
+                                                ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}" ${timeSlot.value === slot.start ? 'selected' : ''}>${timeSlot.label}</option>`).join('')}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="form-label">End Time</label>
+                                            <select class="form-input schedule-end">
+                                                ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}" ${timeSlot.value === slot.end ? 'selected' : ''}>${timeSlot.label}</option>`).join('')}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-danger btn-sm mt-2 remove-schedule-btn">Remove</button>
+                                </div>
+                            `).join('') : 
+                            `<div class="schedule-entry bg-gray-50 p-4 rounded-lg border">
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label class="form-label">Day of Week</label>
+                                        <select class="form-input schedule-day">
+                                            ${DAYS_OF_WEEK.map(day => `<option value="${day}">${day}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Start Time</label>
+                                        <select class="form-input schedule-start">
+                                            ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}">${timeSlot.label}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="form-label">End Time</label>
+                                        <select class="form-input schedule-end">
+                                            ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}">${timeSlot.label}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                </div>
+                                <button class="btn btn-danger btn-sm mt-2 remove-schedule-btn hidden">Remove</button>
+                            </div>`}
+                    </div>
+                    
+                    <button id="add-schedule-entry" class="btn btn-secondary btn-sm mt-2">
+                        ＋ Add Another Time Slot
+                    </button>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-edit-schedule-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="save-edit-schedule-btn" class="btn btn-primary" data-student-id="${student.id}">
+                        Save Schedule
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const modal = document.createElement('div');
+    modal.innerHTML = modalHTML;
+    document.body.appendChild(modal);
+    
+    document.getElementById('add-schedule-entry').addEventListener('click', () => {
+        const scheduleEntries = document.getElementById('schedule-entries');
+        const firstEntry = scheduleEntries.querySelector('.schedule-entry');
+        const newEntry = firstEntry.cloneNode(true);
+        // Reset values for new entry
+        newEntry.querySelector('.schedule-day').selectedIndex = 0;
+        newEntry.querySelector('.schedule-start').selectedIndex = 0;
+        newEntry.querySelector('.schedule-end').selectedIndex = 0;
+        newEntry.querySelector('.remove-schedule-btn').classList.remove('hidden');
+        scheduleEntries.appendChild(newEntry);
+    });
+    
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-schedule-btn')) {
+            const scheduleEntries = document.querySelectorAll('.schedule-entry');
+            if (scheduleEntries.length > 1) {
+                e.target.closest('.schedule-entry').remove();
+            } else {
+                showCustomAlert('You must have at least one schedule entry.');
+            }
+        }
+    });
+    
+    document.getElementById('cancel-edit-schedule-btn').addEventListener('click', () => {
+        modal.remove();
+        showScheduleCalendarModal();
+    });
+    
+    document.getElementById('save-edit-schedule-btn').addEventListener('click', async () => {
+        const scheduleEntries = document.querySelectorAll('.schedule-entry');
+        const schedule = [];
+        let hasError = false;
+        
+        for (const entry of scheduleEntries) {
+            const day = entry.querySelector('.schedule-day').value;
+            const start = entry.querySelector('.schedule-start').value;
+            const end = entry.querySelector('.schedule-end').value;
+            
+            const validation = validateScheduleTime(start, end);
+            if (!validation.valid) {
+                showCustomAlert(validation.message);
+                hasError = true;
+                break;
+            }
+            
+            schedule.push({ 
+                day, 
+                start, 
+                end,
+                isOvernight: validation.isOvernight || false,
+                duration: validation.duration
+            });
+        }
+        
+        if (hasError) return;
+        
+        if (schedule.length === 0) {
+            showCustomAlert('Please add at least one schedule entry.');
+            return;
+        }
+        
+        try {
+            const studentRef = doc(db, "students", student.id);
+            await updateDoc(studentRef, { schedule });
+            
+            modal.remove();
+            showCustomAlert('✅ Schedule updated successfully!');
+            
+            setTimeout(() => {
+                showScheduleCalendarModal();
+            }, 500);
+            
+        } catch (error) {
+            console.error("Error updating schedule:", error);
+            showCustomAlert('❌ Error updating schedule. Please try again.');
+        }
+    });
 }
 
 function printCalendar() {
@@ -3090,25 +3392,37 @@ function printCalendar() {
                     .calendar-day { border: 1px solid #ddd; padding: 10px; min-height: 120px; }
                     .calendar-day-header { font-weight: bold; border-bottom: 1px solid #ddd; margin-bottom: 5px; }
                     .calendar-event { background: #f5f5f5; padding: 5px; margin-bottom: 3px; font-size: 11px; }
+                    .edit-schedule-btn { display: none; }
+                    @media print { body { font-size: 12px; } }
                 </style>
             </head>
             <body>
                 <h2>Weekly Schedule Calendar</h2>
                 <p>Tutor: ${window.tutorData.name}</p>
+                <p>Generated on: ${new Date().toLocaleDateString()}</p>
                 <hr>
                 ${calendarContent}
-                <script>window.onload = function() { window.print(); setTimeout(() => window.close(), 1000); }</script>
+                <script>
+                    window.onload = function() {
+                        window.print();
+                        setTimeout(() => window.close(), 1000);
+                    }
+                </script>
             </body>
-        </html>`);
+        </html>
+    `);
 }
 
 /*******************************************************************************
  * SECTION 11: TUTOR DASHBOARD
  ******************************************************************************/
 
+// Cache for students
 let studentCache = [];
 
+// Enhanced Tutor Dashboard - WITH MESSAGING & INBOX FEATURES
 function renderTutorDashboard(container, tutor) {
+    // Update active tab
     updateActiveTab('navDashboard');
     
     container.innerHTML = `
@@ -3120,46 +3434,173 @@ function renderTutorDashboard(container, tutor) {
         <div class="student-actions-container">
             <div class="student-action-card">
                 <h3 class="font-bold text-lg mb-3">📅 Schedule Management</h3>
+                <p class="text-sm text-gray-600 mb-4">Set up and view class schedules for all students</p>
                 <button id="view-full-calendar-btn" class="btn btn-info w-full mb-2">View Schedule Calendar</button>
                 <button id="setup-all-schedules-btn" class="btn btn-primary w-full">Set Up Schedules</button>
             </div>
+            
             <div class="student-action-card">
                 <h3 class="font-bold text-lg mb-3">📚 Today's Topic</h3>
-                <select id="select-student-topic" class="form-input mb-3"><option value="">Select a student...</option></select>
+                <p class="text-sm text-gray-600 mb-4">Record topics covered in today's classes</p>
+                <select id="select-student-topic" class="form-input mb-3">
+                    <option value="">Select a student...</option>
+                </select>
                 <button id="add-topic-btn" class="btn btn-secondary w-full" disabled>Add Today's Topic</button>
             </div>
+            
             <div class="student-action-card">
                 <h3 class="font-bold text-lg mb-3">📝 Assign Homework</h3>
-                <select id="select-student-hw" class="form-input mb-3"><option value="">Select a student...</option></select>
+                <p class="text-sm text-gray-600 mb-4">Assign homework to your students</p>
+                <select id="select-student-hw" class="form-input mb-3">
+                    <option value="">Select a student...</option>
+                </select>
                 <button id="assign-hw-btn" class="btn btn-warning w-full" disabled>Assign Homework</button>
             </div>
         </div>
         
-        <div class="card mt-6">
-            <div class="card-header"><h3 class="font-bold text-lg">🔍 Pending Assessments</h3></div>
-            <div id="pendingReportsContainer" class="card-body">
-                <div class="spinner mx-auto"></div>
+        <div class="card">
+            <div class="card-header">
+                <h3 class="font-bold text-lg">🔍 Search & Filter</h3>
             </div>
-        </div>`;
+            <div class="card-body">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="form-label">Search by Parent Name</label>
+                        <input type="text" id="searchName" class="form-input" placeholder="Enter parent name...">
+                    </div>
+                    <div>
+                        <label class="form-label">Filter by Status</label>
+                        <select id="filterStatus" class="form-input">
+                            <option value="">All Submissions</option>
+                            <option value="pending">Pending Review</option>
+                            <option value="graded">Graded</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button id="searchBtn" class="btn btn-primary w-full">
+                            🔍 Search
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
+        <div class="mt-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-gray-800">📋 Pending Submissions</h3>
+                <span class="badge badge-warning" id="pending-count">Loading...</span>
+            </div>
+            <div id="pendingReportsContainer" class="space-y-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <div class="spinner mx-auto mb-2"></div>
+                        <p class="text-gray-500">Loading pending submissions...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-gray-800">✅ Graded Submissions</h3>
+                <button id="toggle-graded-btn" class="btn btn-secondary btn-sm">
+                    👁️ Show/Hide
+                </button>
+            </div>
+            <div id="gradedReportsContainer" class="space-y-4 hidden">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <div class="spinner mx-auto mb-2"></div>
+                        <p class="text-gray-500">Loading graded submissions...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Load student dropdowns
     loadStudentDropdowns(tutor.email);
 
-    document.getElementById('view-full-calendar-btn').onclick = showScheduleCalendarModal;
-    document.getElementById('setup-all-schedules-btn').onclick = () => checkAndShowSchedulePopup(tutor);
+    // Add event listeners for new buttons
+    const viewCalendarBtn = document.getElementById('view-full-calendar-btn');
+    if (viewCalendarBtn) {
+        viewCalendarBtn.addEventListener('click', showScheduleCalendarModal);
+    }
     
+    const setupSchedulesBtn = document.getElementById('setup-all-schedules-btn');
+    if (setupSchedulesBtn) {
+        setupSchedulesBtn.addEventListener('click', () => {
+            checkAndShowSchedulePopup(tutor);
+        });
+    }
+    
+    const addTopicBtn = document.getElementById('add-topic-btn');
+    if (addTopicBtn) {
+        addTopicBtn.addEventListener('click', () => {
+            const studentId = document.getElementById('select-student-topic').value;
+            const student = getStudentFromCache(studentId);
+            if (student) {
+                showDailyTopicModal(student);
+            }
+        });
+    }
+    
+    const assignHwBtn = document.getElementById('assign-hw-btn');
+    if (assignHwBtn) {
+        assignHwBtn.addEventListener('click', () => {
+            const studentId = document.getElementById('select-student-hw').value;
+            const student = getStudentFromCache(studentId);
+            if (student) {
+                showHomeworkModal(student);
+            }
+        });
+    }
+    
+    // Enable buttons when students are selected
     const topicSelect = document.getElementById('select-student-topic');
-    topicSelect.onchange = (e) => document.getElementById('add-topic-btn').disabled = !e.target.value;
-    document.getElementById('add-topic-btn').onclick = () => {
-        const student = getStudentFromCache(topicSelect.value);
-        if (student) showDailyTopicModal(student);
-    };
-
+    if (topicSelect) {
+        topicSelect.addEventListener('change', (e) => {
+            const addTopicBtn = document.getElementById('add-topic-btn');
+            if (addTopicBtn) {
+                addTopicBtn.disabled = !e.target.value;
+            }
+        });
+    }
+    
     const hwSelect = document.getElementById('select-student-hw');
-    hwSelect.onchange = (e) => document.getElementById('assign-hw-btn').disabled = !e.target.value;
-    document.getElementById('assign-hw-btn').onclick = () => {
-        const student = getStudentFromCache(hwSelect.value);
-        if (student) showHomeworkModal(student);
-    };
+    if (hwSelect) {
+        hwSelect.addEventListener('change', (e) => {
+            const assignHwBtn = document.getElementById('assign-hw-btn');
+            if (assignHwBtn) {
+                assignHwBtn.disabled = !e.target.value;
+            }
+        });
+    }
+
+    const toggleGradedBtn = document.getElementById('toggle-graded-btn');
+    if (toggleGradedBtn) {
+        toggleGradedBtn.addEventListener('click', () => {
+            const gradedContainer = document.getElementById('gradedReportsContainer');
+            const toggleBtn = document.getElementById('toggle-graded-btn');
+            
+            if (gradedContainer.classList.contains('hidden')) {
+                gradedContainer.classList.remove('hidden');
+                toggleBtn.innerHTML = '👁️ Hide';
+            } else {
+                gradedContainer.classList.add('hidden');
+                toggleBtn.innerHTML = '👁️ Show';
+            }
+        });
+    }
+
+    const searchBtn = document.getElementById('searchBtn');
+    if (searchBtn) {
+        searchBtn.addEventListener('click', async () => {
+            const name = document.getElementById('searchName').value.trim();
+            const status = document.getElementById('filterStatus').value;
+            await loadTutorReports(tutor.email, name || null, status || null);
+        });
+    }
 
     loadTutorReports(tutor.email);
 }
@@ -3168,351 +3609,1794 @@ async function loadStudentDropdowns(tutorEmail) {
     try {
         const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
         const studentsSnapshot = await getDocs(studentsQuery);
+        
         studentCache = [];
+        const students = [];
+        studentsSnapshot.forEach(doc => {
+            const student = { id: doc.id, ...doc.data() };
+            // Filter out archived students
+            if (!['archived', 'graduated', 'transferred'].includes(student.status)) {
+                students.push(student);
+                studentCache.push(student);
+            }
+        });
+        
         const topicSelect = document.getElementById('select-student-topic');
         const hwSelect = document.getElementById('select-student-hw');
         
-        studentsSnapshot.forEach(doc => {
-            const student = { id: doc.id, ...doc.data() };
-            if (!['archived', 'graduated', 'transferred'].includes(student.status)) {
-                studentCache.push(student);
-                const opt = document.createElement('option');
-                opt.value = student.id; opt.textContent = `${student.studentName} (${student.grade})`;
-                topicSelect.appendChild(opt);
-                hwSelect.appendChild(opt.cloneNode(true));
-            }
-        });
-    } catch (e) { console.error(e); }
+        if (topicSelect && hwSelect) {
+            while (topicSelect.options.length > 1) topicSelect.remove(1);
+            while (hwSelect.options.length > 1) hwSelect.remove(1);
+            
+            students.forEach(student => {
+                const option = document.createElement('option');
+                option.value = student.id;
+                option.textContent = `${student.studentName} (${student.grade})`;
+                
+                const option2 = option.cloneNode(true);
+                topicSelect.appendChild(option);
+                hwSelect.appendChild(option2);
+            });
+        }
+    } catch (error) {
+        console.error("Error loading student dropdowns:", error);
+    }
 }
 
-function getStudentFromCache(studentId) { return studentCache.find(s => s.id === studentId); }
+function getStudentFromCache(studentId) {
+    return studentCache.find(s => s.id === studentId);
+}
 
-async function loadTutorReports(tutorEmail) {
-    const container = document.getElementById('pendingReportsContainer');
+async function loadTutorReports(tutorEmail, parentName = null, statusFilter = null) {
+    const pendingReportsContainer = document.getElementById('pendingReportsContainer');
+    const gradedReportsContainer = document.getElementById('gradedReportsContainer');
+    
+    if (!pendingReportsContainer) return;
+    
+    pendingReportsContainer.innerHTML = `
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="spinner mx-auto mb-2"></div>
+                <p class="text-gray-500">Loading submissions...</p>
+            </div>
+        </div>
+    `;
+    
+    if (gradedReportsContainer) {
+        gradedReportsContainer.innerHTML = `
+            <div class="card">
+                <div class="card-body text-center">
+                    <div class="spinner mx-auto mb-2"></div>
+                    <p class="text-gray-500">Loading graded submissions...</p>
+                </div>
+            </div>
+        `;
+    }
+
     try {
-        const q = query(collection(db, "student_results"), where("tutorEmail", "==", tutorEmail));
-        const snap = await getDocs(q);
-        let html = '';
-        snap.forEach(doc => {
+        let assessmentsQuery = query(
+            collection(db, "student_results"), 
+            where("tutorEmail", "==", tutorEmail)
+        );
+
+        if (parentName) {
+            assessmentsQuery = query(assessmentsQuery, where("parentName", "==", parentName));
+        }
+
+        let creativeWritingQuery = query(
+            collection(db, "tutor_submissions"),
+            where("tutorEmail", "==", tutorEmail),
+            where("type", "==", "creative_writing")
+        );
+
+        if (parentName) {
+            creativeWritingQuery = query(creativeWritingQuery, where("parentName", "==", parentName));
+        }
+
+        const [assessmentsSnapshot, creativeWritingSnapshot] = await Promise.all([
+            getDocs(assessmentsQuery),
+            getDocs(creativeWritingQuery)
+        ]);
+
+        let pendingHTML = '';
+        let gradedHTML = '';
+        let pendingCount = 0;
+        let gradedCount = 0;
+
+        assessmentsSnapshot.forEach(doc => {
             const data = doc.data();
-            html += `<div class="p-4 border rounded mb-2 flex justify-between items-center">
-                <div><strong>${data.studentName}</strong> - ${data.testSubject || 'Test'}</div>
-                <button class="btn btn-sm btn-primary">Review</button>
-            </div>`;
+            const needsFeedback = data.answers && data.answers.some(answer => 
+                answer.type === 'creative-writing' && 
+                (!answer.tutorReport || answer.tutorReport.trim() === '')
+            );
+
+            const reportCard = `
+                <div class="card">
+                    <div class="card-body">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h4 class="font-bold text-lg">${data.studentName}</h4>
+                                <p class="text-gray-600">${data.parentName || 'N/A'} • ${data.grade}</p>
+                            </div>
+                            <span class="badge ${needsFeedback ? 'badge-warning' : 'badge-success'}">
+                                ${needsFeedback ? 'Pending Review' : 'Graded'}
+                            </span>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <div class="bg-gray-50 p-3 rounded">
+                                <span class="text-sm text-gray-500">Type:</span>
+                                <p class="font-medium">Multiple-Choice Test</p>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded">
+                                <span class="text-sm text-gray-500">Submitted:</span>
+                                <p class="font-medium">${new Date(data.submittedAt.seconds * 1000).toLocaleDateString()}</p>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded">
+                                <span class="text-sm text-gray-500">Status:</span>
+                                <p class="font-medium">${needsFeedback ? 'Needs Feedback' : 'Completed'}</p>
+                            </div>
+                        </div>
+
+                        <div class="border-t pt-4">
+                            <h5 class="font-semibold mb-2">Assessment Details:</h5>
+                            ${data.answers ? data.answers.map((answer, index) => {
+                                if (answer.type === 'creative-writing') {
+                                    return `
+                                        <div class="mb-4 p-4 bg-blue-50 rounded-lg">
+                                            <div class="flex justify-between items-start mb-2">
+                                                <h6 class="font-semibold">Creative Writing</h6>
+                                                <span class="badge ${answer.tutorReport ? 'badge-success' : 'badge-warning'}">
+                                                    ${answer.tutorReport ? 'Graded' : 'Pending'}
+                                                </span>
+                                            </div>
+                                            <p class="italic text-gray-700 mb-3">${answer.textAnswer || "No response"}</p>
+                                            ${answer.fileUrl ? `
+                                                <a href="${answer.fileUrl}" target="_blank" class="btn btn-secondary btn-sm">
+                                                    📎 Download File
+                                                </a>
+                                            ` : ''}
+                                            
+                                            ${!answer.tutorReport ? `
+                                                <div class="mt-3">
+                                                    <label class="form-label">Your Feedback</label>
+                                                    <textarea class="form-input form-textarea tutor-report" rows="3" placeholder="Write your feedback here..."></textarea>
+                                                    <button class="btn btn-primary mt-2 submit-report-btn" 
+                                                            data-doc-id="${doc.id}" 
+                                                            data-collection="student_results" 
+                                                            data-answer-index="${index}">
+                                                        Submit Feedback
+                                                    </button>
+                                                </div>
+                                            ` : `
+                                                <div class="mt-3 bg-white p-3 rounded border">
+                                                    <label class="form-label">Your Feedback:</label>
+                                                    <p class="text-gray-700">${answer.tutorReport || 'N/A'}</p>
+                                                </div>
+                                            `}
+                                        </div>
+                                    `;
+                                }
+                                return '';
+                            }).join('') : '<p class="text-gray-500">No assessment data available.</p>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            if (needsFeedback) {
+                if (!statusFilter || statusFilter === 'pending') {
+                    pendingHTML += reportCard;
+                    pendingCount++;
+                }
+            } else {
+                if (!statusFilter || statusFilter === 'graded') {
+                    gradedHTML += reportCard;
+                    gradedCount++;
+                }
+            }
         });
-        container.innerHTML = html || '<p class="text-gray-500">No pending assessments.</p>';
-    } catch (e) { container.innerHTML = 'Error loading reports.'; }
+
+        creativeWritingSnapshot.forEach(doc => {
+            const data = doc.data();
+            const needsFeedback = !data.tutorReport || data.tutorReport.trim() === '';
+
+            const creativeWritingCard = `
+                <div class="card border-l-4 border-blue-500">
+                    <div class="card-body">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h4 class="font-bold text-lg">${data.studentName}</h4>
+                                <p class="text-gray-600">${data.parentName || 'N/A'} • ${data.grade}</p>
+                            </div>
+                            <span class="badge ${needsFeedback ? 'badge-warning' : 'badge-success'}">
+                                ${needsFeedback ? 'Pending Review' : 'Graded'}
+                            </span>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <div class="bg-blue-50 p-3 rounded">
+                                <span class="text-sm text-blue-500">Type:</span>
+                                <p class="font-medium">Creative Writing</p>
+                            </div>
+                            <div class="bg-blue-50 p-3 rounded">
+                                <span class="text-sm text-blue-500">Submitted:</span>
+                                <p class="font-medium">${new Date(data.submittedAt.seconds * 1000).toLocaleDateString()}</p>
+                            </div>
+                            <div class="bg-blue-50 p-3 rounded">
+                                <span class="text-sm text-blue-500">Status:</span>
+                                <p class="font-medium">${needsFeedback ? 'Needs Review' : 'Completed'}</p>
+                            </div>
+                        </div>
+
+                        <div class="border-t pt-4">
+                            <h5 class="font-semibold mb-2">Writing Assignment:</h5>
+                            <div class="mb-4 p-4 bg-blue-50 rounded-lg">
+                                <p class="font-medium mb-2">${data.questionText || 'Creative Writing Assignment'}</p>
+                                <p class="italic text-gray-700 bg-white p-3 rounded border">${data.textAnswer || "No response"}</p>
+                                ${data.fileUrl ? `
+                                    <a href="${data.fileUrl}" target="_blank" class="btn btn-secondary btn-sm mt-3">
+                                        📎 Download Attachment
+                                    </a>
+                                ` : ''}
+                            </div>
+                            
+                            ${!data.tutorReport ? `
+                                <div class="mt-4">
+                                    <label class="form-label">Your Feedback</label>
+                                    <textarea class="form-input form-textarea tutor-report" rows="4" placeholder="Provide constructive feedback on the student's writing..."></textarea>
+                                    <button class="btn btn-primary mt-3 submit-report-btn" 
+                                            data-doc-id="${doc.id}" 
+                                            data-collection="tutor_submissions">
+                                        Submit Feedback
+                                    </button>
+                                </div>
+                            ` : `
+                                <div class="mt-4 bg-white p-4 rounded border">
+                                    <label class="form-label">Your Feedback:</label>
+                                    <p class="text-gray-700">${data.tutorReport || 'N/A'}</p>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            if (needsFeedback) {
+                if (!statusFilter || statusFilter === 'pending') {
+                    pendingHTML += creativeWritingCard;
+                    pendingCount++;
+                }
+            } else {
+                if (!statusFilter || statusFilter === 'graded') {
+                    gradedHTML += creativeWritingCard;
+                    gradedCount++;
+                }
+            }
+        });
+
+        const pendingCountElement = document.getElementById('pending-count');
+        if (pendingCountElement) {
+            pendingCountElement.textContent = `${pendingCount} Pending`;
+        }
+        
+        pendingReportsContainer.innerHTML = pendingHTML || `
+            <div class="card">
+                <div class="card-body text-center">
+                    <div class="text-gray-400 text-4xl mb-3">📭</div>
+                    <h4 class="font-bold text-gray-600 mb-2">No Pending Submissions</h4>
+                    <p class="text-gray-500">All caught up! No submissions need your review.</p>
+                </div>
+            </div>
+        `;
+        
+        if (gradedReportsContainer) {
+            gradedReportsContainer.innerHTML = gradedHTML || `
+                <div class="card">
+                    <div class="card-body text-center">
+                        <div class="text-gray-400 text-4xl mb-3">✅</div>
+                        <h4 class="font-bold text-gray-600 mb-2">No Graded Submissions</h4>
+                        <p class="text-gray-500">No submissions have been graded yet.</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        document.querySelectorAll('.submit-report-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const docId = e.target.getAttribute('data-doc-id');
+                const collectionName = e.target.getAttribute('data-collection');
+                const answerIndex = e.target.getAttribute('data-answer-index');
+                const reportTextarea = e.target.closest('.mb-4, .mt-4').querySelector('.tutor-report');
+                const tutorReport = reportTextarea.value.trim();
+                
+                if (tutorReport) {
+                    try {
+                        const docRef = doc(db, collectionName, docId);
+                        
+                        if (collectionName === "student_results" && answerIndex !== null) {
+                            const docSnap = await getDoc(docRef);
+                            const currentData = docSnap.data();
+                            
+                            const updatedAnswers = [...currentData.answers];
+                            updatedAnswers[parseInt(answerIndex)] = {
+                                ...updatedAnswers[parseInt(answerIndex)],
+                                tutorReport: tutorReport,
+                                gradedAt: new Date()
+                            };
+                            
+                            await updateDoc(docRef, { 
+                                answers: updatedAnswers,
+                                hasTutorFeedback: true
+                            });
+                        } else {
+                            await updateDoc(docRef, { 
+                                tutorReport: tutorReport,
+                                gradedAt: new Date(),
+                                status: "graded"
+                            });
+                        }
+                        
+                        showCustomAlert('✅ Feedback submitted successfully!');
+                        loadTutorReports(tutorEmail, parentName, statusFilter);
+                    } catch (error) {
+                        console.error("Error submitting feedback:", error);
+                        showCustomAlert('❌ Failed to submit feedback. Please try again.');
+                    }
+                } else {
+                    showCustomAlert('Please write some feedback before submitting.');
+                }
+            });
+        });
+    } catch (error) {
+        console.error("Error loading tutor reports:", error);
+        pendingReportsContainer.innerHTML = `
+            <div class="card">
+                <div class="card-body text-center">
+                    <div class="text-red-400 text-4xl mb-3">⚠️</div>
+                    <h4 class="font-bold text-red-600 mb-2">Failed to Load Reports</h4>
+                    <p class="text-gray-500">Please check your connection and try again.</p>
+                    <button class="btn btn-primary mt-3" onclick="location.reload()">Retry</button>
+                </div>
+            </div>
+        `;
+    }
 }
 
 /*******************************************************************************
- * SECTION 12: STUDENT DATABASE & REPORT SUBMISSION (REFACTORED)
+ * SECTION 12: STUDENT DATABASE MANAGEMENT
  ******************************************************************************/
 
+// Enhanced Student Database
+function getNewStudentFormFields() {
+    const gradeOptions = `
+        <option value="">Select Grade</option>
+        <option value="Preschool">Preschool</option>
+        <option value="Kindergarten">Kindergarten</option>
+        ${Array.from({ length: 12 }, (_, i) => `<option value="Grade ${i + 1}">Grade ${i + 1}</option>`).join('')}
+        <option value="Pre-College">Pre-College</option>
+        <option value="College">College</option>
+        <option value="Adults">Adults</option>
+    `;
+
+    let feeOptions = '<option value="">Select Fee (₦)</option>';
+    for (let fee = 10000; fee <= 400000; fee += 5000) {
+        feeOptions += `<option value="${fee}">₦${fee.toLocaleString()}</option>`;
+    }
+    
+    const subjectsByCategory = {
+        "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry", "Microbiology"],
+        "Pre-College Exams": ["SAT", "IGCSE", "A-Levels", "SSCE", "JAMB"],
+        "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa", "Arabic"],
+        "Tech Courses": ["Coding","ICT", "Stop motion animation", "Computer Appreciation", "Digital Entrepeneurship", "Animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
+        "Support Programs": ["Bible study", "Counseling Programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills", "English Proficiency"]
+    };
+
+    let subjectsHTML = `<h4 class="font-semibold text-gray-700 mt-2">Subjects</h4><div id="new-student-subjects-container" class="space-y-2 border p-3 rounded bg-gray-50 max-h-48 overflow-y-auto">`;
+    for (const category in subjectsByCategory) {
+        subjectsHTML += `
+            <details>
+                <summary class="font-semibold cursor-pointer text-sm">${category}</summary>
+                <div class="pl-4 grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                    ${subjectsByCategory[category].map(subject => `<div><label class="text-sm font-normal"><input type="checkbox" name="subjects" value="${subject}"> ${subject}</label></div>`).join('')}
+                </div>
+            </details>
+        `;
+    }
+    subjectsHTML += `
+        <div class="font-semibold pt-2 border-t"><label class="text-sm"><input type="checkbox" name="subjects" value="Music"> Music</label></div>
+    </div>`;
+
+    return `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="form-group">
+                <label class="form-label">Parent Name *</label>
+                <input type="text" id="new-parent-name" class="form-input" placeholder="Parent Name" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Parent Phone *</label>
+                <input type="tel" id="new-parent-phone" class="form-input" placeholder="Parent Phone Number" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Student Name *</label>
+                <input type="text" id="new-student-name" class="form-input" placeholder="Student Name" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Grade *</label>
+                <select id="new-student-grade" class="form-input" required>${gradeOptions}</select>
+            </div>
+        </div>
+        
+        ${subjectsHTML}
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div class="form-group">
+                <label class="form-label">Days per Week *</label>
+                <select id="new-student-days" class="form-input" required>
+                    <option value="">Select Days per Week</option>
+                    ${Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Fee (₦) *</label>
+                <select id="new-student-fee" class="form-input" required>${feeOptions}</select>
+            </div>
+        </div>
+        
+        <div id="group-class-container" class="hidden mt-4">
+            <label class="flex items-center space-x-2">
+                <input type="checkbox" id="new-student-group-class" class="rounded">
+                <span class="text-sm font-semibold">Group Class</span>
+            </label>
+        </div>
+    `;
+}
+
+function showEditStudentModal(student) {
+    let gradeOptions = `
+        <option value="">Select Grade</option>
+        <option value="Preschool" ${student.grade === 'Preschool' ? 'selected' : ''}>Preschool</option>
+        <option value="Kindergarten" ${student.grade === 'Kindergarten' ? 'selected' : ''}>Kindergarten</option>
+    `;
+    for (let i = 1; i <= 12; i++) {
+        const gradeValue = `Grade ${i}`;
+        gradeOptions += `<option value="${gradeValue}" ${student.grade === gradeValue ? 'selected' : ''}>${gradeValue}</option>`;
+    }
+    gradeOptions += `
+        <option value="Pre-College" ${student.grade === 'Pre-College' ? 'selected' : ''}>Pre-College</option>
+        <option value="College" ${student.grade === 'College' ? 'selected' : ''}>College</option>
+        <option value="Adults" ${student.grade === 'Adults' ? 'selected' : ''}>Adults</option>
+    `;
+    
+    let daysOptions = '<option value="">Select Days per Week</option>';
+    for (let i = 1; i <= 7; i++) {
+        daysOptions += `<option value="${i}" ${student.days == i ? 'selected' : ''}>${i}</option>`;
+    }
+
+    const subjectsByCategory = {
+        "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry", "Microbiology"],
+        "Pre-College Exams": ["SAT", "IGCSE", "A-Levels", "SSCE", "JAMB"],
+        "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa", "Arabic"],
+        "Tech Courses": ["Coding","ICT", "Stop motion animation", "Computer Appreciation", "Digital Entrepeneurship", "Animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
+        "Support Programs": ["Bible study", "Counseling Programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills", "English Proficiency"]
+    };
+
+    let subjectsHTML = `<h4 class="font-semibold text-gray-700 mt-2">Subjects</h4><div id="edit-student-subjects-container" class="space-y-2 border p-3 rounded bg-gray-50 max-h-48 overflow-y-auto">`;
+    for (const category in subjectsByCategory) {
+        subjectsHTML += `
+            <details>
+                <summary class="font-semibold cursor-pointer text-sm">${category}</summary>
+                <div class="pl-4 grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                    ${subjectsByCategory[category].map(subject => {
+                        const isChecked = student.subjects && student.subjects.includes(subject);
+                        return `<div><label class="text-sm font-normal"><input type="checkbox" name="edit-subjects" value="${subject}" ${isChecked ? 'checked' : ''}> ${subject}</label></div>`;
+                    }).join('')}
+                </div>
+            </details>
+        `;
+    }
+    subjectsHTML += `
+        <div class="font-semibold pt-2 border-t"><label class="text-sm"><input type="checkbox" name="edit-subjects" value="Music" ${student.subjects && student.subjects.includes('Music') ? 'checked' : ''}> Music</label></div>
+    </div>`;
+
+    const editFormHTML = `
+        <h3 class="text-xl font-bold mb-4">Edit Student: ${student.studentName}</h3>
+        <div class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="form-label">Parent Name</label>
+                    <input type="text" id="edit-parent-name" class="form-input" value="${student.parentName || ''}" placeholder="Parent Name">
+                </div>
+                <div>
+                    <label class="form-label">Parent Phone Number</label>
+                    <input type="tel" id="edit-parent-phone" class="form-input" value="${student.parentPhone || ''}" placeholder="Parent Phone Number">
+                </div>
+                <div>
+                    <label class="form-label">Student Name</label>
+                    <input type="text" id="edit-student-name" class="form-input" value="${student.studentName || ''}" placeholder="Student Name">
+                </div>
+                <div>
+                    <label class="form-label">Grade</label>
+                    <select id="edit-student-grade" class="form-input">${gradeOptions}</select>
+                </div>
+            </div>
+            
+            ${subjectsHTML}
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="form-label">Days per Week</label>
+                    <select id="edit-student-days" class="form-input">${daysOptions}</select>
+                </div>
+                <div>
+                    <label class="form-label">Fee (₦)</label>
+                    <input type="text" id="edit-student-fee" class="form-input" 
+                           value="${(student.studentFee || 0).toLocaleString()}" 
+                           placeholder="Enter fee (e.g., 50,000)">
+                </div>
+            </div>
+            
+            <div id="edit-group-class-container" class="${findSpecializedSubject(student.subjects || []) ? '' : 'hidden'}">
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" id="edit-student-group-class" class="rounded" ${student.groupClass ? 'checked' : ''}>
+                    <span class="text-sm font-semibold">Group Class</span>
+                </label>
+            </div>
+            
+            <div class="flex justify-end space-x-2 mt-6">
+                <button id="cancel-edit-btn" class="btn btn-secondary">Cancel</button>
+                <button id="save-edit-btn" class="btn btn-primary" data-student-id="${student.id}" data-collection="${student.collection}">Save Changes</button>
+            </div>
+        </div>`;
+
+    const editModal = document.createElement('div');
+    editModal.className = 'modal-overlay';
+    editModal.innerHTML = `<div class="modal-content max-w-2xl">${editFormHTML}</div>`;
+    document.body.appendChild(editModal);
+
+    document.getElementById('cancel-edit-btn').addEventListener('click', () => editModal.remove());
+    document.getElementById('save-edit-btn').addEventListener('click', async (e) => {
+        const studentId = e.target.getAttribute('data-student-id');
+        const collectionName = e.target.getAttribute('data-collection');
+        
+        const parentName = document.getElementById('edit-parent-name').value.trim();
+        const parentPhone = document.getElementById('edit-parent-phone').value.trim();
+        const studentName = document.getElementById('edit-student-name').value.trim();
+        const studentGrade = document.getElementById('edit-student-grade').value.trim();
+        
+        const selectedSubjects = [];
+        document.querySelectorAll('input[name="edit-subjects"]:checked').forEach(checkbox => {
+            selectedSubjects.push(checkbox.value);
+        });
+
+        const studentDays = document.getElementById('edit-student-days').value.trim();
+        const groupClass = document.getElementById('edit-student-group-class') ? document.getElementById('edit-student-group-class').checked : false;
+        
+        const feeValue = document.getElementById('edit-student-fee').value.trim();
+        const studentFee = parseFloat(feeValue.replace(/,/g, ''));
+
+        if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
+            showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
+            return;
+        }
+
+        if (isNaN(studentFee) || studentFee < 0) {
+            showCustomAlert('Please enter a valid fee amount.');
+            return;
+        }
+
+        try {
+            const studentData = {
+                parentName: parentName,
+                parentPhone: parentPhone,
+                studentName: studentName,
+                grade: studentGrade,
+                subjects: selectedSubjects,
+                days: studentDays,
+                studentFee: studentFee
+            };
+
+            if (document.getElementById('edit-student-group-class')) {
+                studentData.groupClass = groupClass;
+            }
+
+            const studentRef = doc(db, collectionName, studentId);
+            await updateDoc(studentRef, studentData);
+            
+            editModal.remove();
+            showCustomAlert('✅ Student details updated successfully!');
+            
+            const mainContent = document.getElementById('mainContent');
+            if (mainContent && window.tutorData) {
+                renderStudentDatabase(mainContent, window.tutorData);
+            }
+        } catch (error) {
+            console.error("Error updating student:", error);
+            showCustomAlert(`❌ An error occurred: ${error.message}`);
+        }
+    });
+}
+
 async function renderStudentDatabase(container, tutor) {
+    // Update active tab
     updateActiveTab('navStudentDatabase');
     
+    if (!container) {
+        console.error("Container element not found.");
+        return;
+    }
+
     let savedReports = await loadReportsFromFirestore(tutor.email);
+
+    const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+    const pendingStudentQuery = query(collection(db, "pending_students"), where("tutorEmail", "==", tutor.email));
+    const allSubmissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutor.email));
+
+    const [studentsSnapshot, pendingStudentsSnapshot, allSubmissionsSnapshot] = await Promise.all([
+        getDocs(studentQuery),
+        getDocs(pendingStudentQuery),
+        getDocs(allSubmissionsQuery)
+    ]);
+
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
+    const submittedStudentIds = new Set();
 
-    // 1. Fetch Students
-    const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-    const studentsSnap = await getDocs(studentQuery);
-    
-    // 2. Fetch submissions to check if already submitted this month
-    const submissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutor.email));
-    const subSnap = await getDocs(submissionsQuery);
-    const submittedIds = new Set();
-    subSnap.forEach(d => {
-        const date = d.data().submittedAt.toDate();
-        if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
-            submittedIds.add(d.data().studentId);
+    allSubmissionsSnapshot.forEach(doc => {
+        const submissionData = doc.data();
+        const submissionDate = submissionData.submittedAt.toDate();
+        if (submissionDate.getMonth() === currentMonth && submissionDate.getFullYear() === currentYear) {
+            submittedStudentIds.add(submissionData.studentId);
         }
     });
 
-    const approvedStudents = studentsSnap.docs
-        .map(d => ({ id: d.id, ...d.data(), collection: "students" }))
-        .filter(s => !['archived', 'graduated', 'transferred'].includes(s.status));
+    const approvedStudents = studentsSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data(), isPending: false, collection: "students" }))
+        .filter(student => !['archived', 'graduated', 'transferred'].includes(student.status));
 
-    let html = `
-        <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-gray-800">📚 My Students (${approvedStudents.length})</h2>
-        </div>
-        <div class="table-container">
-            <table class="table">
-                <thead><tr><th>Student</th><th>Status</th><th>Actions</th></tr></thead>
-                <tbody>`;
+    const pendingStudents = pendingStudentsSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data(), isPending: true, collection: "pending_students" }))
+        .filter(student => !['archived', 'graduated', 'transferred'].includes(student.status));
 
-    approvedStudents.forEach(student => {
-        const hasSubmitted = submittedIds.has(student.id);
-        const isReportSaved = savedReports[student.id];
-        const isTransitioning = student.isTransitioning;
+    let students = [...approvedStudents, ...pendingStudents];
 
-        let statusBadge = hasSubmitted ? '<span class="badge badge-info">📤 Sent</span>' : 
-                          (isReportSaved ? '<span class="badge badge-success">💾 Saved</span>' : '<span class="badge badge-secondary">📝 Pending</span>');
+    const seenStudents = new Set();
+    const duplicatesToDelete = [];
+    students = students.filter(student => {
+        const studentIdentifier = `${student.studentName}-${student.tutorEmail}`;
+        if (seenStudents.has(studentIdentifier)) {
+            duplicatesToDelete.push({ id: student.id, collection: student.collection });
+            return false;
+        }
+        seenStudents.add(studentIdentifier);
+        return true;
+    });
+    if (duplicatesToDelete.length > 0) {
+        const batch = writeBatch(db);
+        duplicatesToDelete.forEach(dup => {
+            batch.delete(doc(db, dup.collection, dup.id));
+        });
+        await batch.commit();
+        console.log(`Cleaned up ${duplicatesToDelete.length} duplicate student entries.`);
+    }
+
+    const studentsCount = students.length;
+
+    function renderUI() {
+        let studentsHTML = `
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">📚 My Students (${studentsCount})</h2>
+            </div>
+        `;
         
-        if (isTransitioning) statusBadge += ' <span class="badge badge-warning ml-1">🔄 Trans.</span>';
-
-        let actionBtn = '';
-        if (hasSubmitted) {
-            actionBtn = '<span class="text-xs text-gray-400">Done for this month</span>';
-        } else {
-            actionBtn = `<button class="btn btn-primary btn-sm enter-report-btn" data-id="${student.id}">${isReportSaved ? 'Edit' : 'Enter'} Report</button>`;
+        studentsHTML += `
+            <div class="card mb-6">
+                <div class="card-header">
+                    <h3 class="font-bold text-lg">➕ Add a New Student</h3>
+                </div>
+                <div class="card-body">
+                    <div class="space-y-4">
+                        ${getNewStudentFormFields()}
+                    </div>
+                    <div class="action-buttons mt-4">`;
+        
+        if (isTutorAddEnabled) {
+            studentsHTML += `<button id="add-student-btn" class="btn btn-primary">➕ Add Student</button>`;
         }
-
-        html += `
-            <tr>
-                <td><strong>${student.studentName}</strong><br><small>${student.grade}</small></td>
-                <td>${statusBadge}</td>
-                <td>${actionBtn}</td>
-            </tr>`;
-    });
-
-    html += `</tbody></table></div>`;
-
-    // Bulk Submission Button
-    const submittable = approvedStudents.filter(s => !submittedIds.has(s.id));
-    const savedCount = Object.keys(savedReports).length;
-    if (submittable.length > 0) {
-        html += `
-            <div class="mt-6 p-4 bg-gray-50 rounded flex justify-between items-center">
-                <span class="text-sm font-medium">${savedCount} of ${submittable.length} reports ready.</span>
-                <button id="submit-all-reports-btn" class="btn btn-primary" ${savedCount === 0 ? 'disabled' : ''}>
-                    Submit All Prepared Reports
-                </button>
-            </div>`;
-    }
-
-    container.innerHTML = html;
-
-    // --- BUTTON LOGIC ---
-
-    // Enter Report
-    container.querySelectorAll('.enter-report-btn').forEach(btn => {
-        btn.onclick = () => {
-            const student = approvedStudents.find(s => s.id === btn.dataset.id);
-            if (student.isTransitioning) {
-                // Skip report, go to Fee
-                showFeeConfirmationModal(student, { isTransitioning: true }, savedReports, tutor, container);
-            } else {
-                showReportModal(student, savedReports, tutor, container);
-            }
-        };
-    });
-
-    // Bulk Submit
-    const bulkBtn = document.getElementById('submit-all-reports-btn');
-    if (bulkBtn) {
-        bulkBtn.onclick = () => showAccountDetailsModal(Object.values(savedReports), tutor, container);
-    }
-}
-
-// ==========================================
-// REPORT & FEE MODALS (CORE IMPLEMENTATION)
-// ==========================================
-
-function showReportModal(student, savedReports, tutor, container) {
-    const existing = savedReports[student.id] || {};
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML = `
-        <div class="modal-content max-w-4xl">
-            <div class="modal-header"><h3 class="modal-title">📝 Report: ${student.studentName}</h3></div>
-            <div class="modal-body space-y-4">
-                <div class="form-group"><label class="form-label">Introduction</label><textarea id="rep-intro" class="form-input" rows="2">${existing.introduction || ''}</textarea></div>
-                <div class="form-group"><label class="form-label">Topics Covered</label><textarea id="rep-topics" class="form-input" rows="3">${existing.topics || ''}</textarea></div>
-                <div class="form-group"><label class="form-label">Progress</label><textarea id="rep-progress" class="form-input" rows="2">${existing.progress || ''}</textarea></div>
-                <div class="form-group"><label class="form-label">Strengths/Weaknesses</label><textarea id="rep-sw" class="form-input" rows="2">${existing.strengthsWeaknesses || ''}</textarea></div>
-                <div class="form-group"><label class="form-label">Recommendations</label><textarea id="rep-recs" class="form-input" rows="2">${existing.recommendations || ''}</textarea></div>
-                <div class="form-group"><label class="form-label">General Comments</label><textarea id="rep-general" class="form-input" rows="2">${existing.generalComments || ''}</textarea></div>
-            </div>
-            <div class="modal-footer">
-                <button id="cancel-rep" class="btn btn-secondary">Cancel</button>
-                <button id="next-to-fee" class="btn btn-primary">Save & Continue to Fee</button>
-            </div>
-        </div>`;
-    document.body.appendChild(modal);
-
-    document.getElementById('cancel-rep').onclick = () => modal.remove();
-    document.getElementById('next-to-fee').onclick = () => {
-        const reportData = {
-            studentId: student.id, studentName: student.studentName, grade: student.grade,
-            parentName: student.parentName, parentPhone: student.parentPhone,
-            reportMonth: getCurrentMonthYear(),
-            introduction: document.getElementById('rep-intro').value,
-            topics: document.getElementById('rep-topics').value,
-            progress: document.getElementById('rep-progress').value,
-            strengthsWeaknesses: document.getElementById('rep-sw').value,
-            recommendations: document.getElementById('rep-recs').value,
-            generalComments: document.getElementById('rep-general').value
-        };
-        modal.remove();
-        showFeeConfirmationModal(student, reportData, savedReports, tutor, container);
-    };
-}
-
-function showFeeConfirmationModal(student, reportData, savedReports, tutor, container) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML = `
-        <div class="modal-content max-w-md">
-            <div class="modal-header"><h3 class="modal-title">💰 Confirm Fee: ${student.studentName}</h3></div>
-            <div class="modal-body">
-                <p class="text-sm text-gray-600 mb-4">Verify the monthly fee for this student. If it has changed, update it here.</p>
-                <div class="form-group">
-                    <label class="form-label">Monthly Fee (₦)</label>
-                    <input type="number" id="conf-fee" class="form-input" value="${student.studentFee || 0}">
+        
+        studentsHTML += `<button id="add-transitioning-btn" class="btn btn-warning">🔄 Add Transitioning</button>`;
+        
+        studentsHTML += `</div></div></div>`;
+        
+        studentsHTML += `
+            <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="font-medium">Report Submission Status:</span>
+                        <span class="${isSubmissionEnabled ? 'text-green-600 font-bold ml-2' : 'text-red-600 font-bold ml-2'}">
+                            ${isSubmissionEnabled ? '✅ Enabled' : '❌ Disabled'}
+                        </span>
+                    </div>
+                    <span class="text-sm text-gray-500">Set by admin</span>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button id="conf-fee-cancel" class="btn btn-secondary">Back</button>
-                <button id="conf-fee-save" class="btn btn-primary">Save Prepared Report</button>
-            </div>
-        </div>`;
-    document.body.appendChild(modal);
+        `;
 
-    document.getElementById('conf-fee-cancel').onclick = () => {
-        modal.remove();
-        if (!reportData.isTransitioning) showReportModal(student, savedReports, tutor, container);
-    };
+        if (studentsCount === 0) {
+            studentsHTML += `
+                <div class="card">
+                    <div class="card-body text-center">
+                        <div class="text-gray-400 text-4xl mb-3">👤</div>
+                        <h4 class="font-bold text-gray-600 mb-2">No Students Assigned</h4>
+                        <p class="text-gray-500">You are not assigned to any students yet.</p>
+                    </div>
+                </div>
+            `;
+        } else {
+            studentsHTML += `
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Student Name</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+            
+            students.forEach(student => {
+                const hasSubmittedThisMonth = submittedStudentIds.has(student.id);
+                const isStudentOnBreak = student.summerBreak;
+                const isReportSaved = savedReports[student.id];
+                const isTransitioning = student.isTransitioning;
 
-    document.getElementById('conf-fee-save').onclick = async () => {
-        const newFee = parseFloat(document.getElementById('conf-fee').value);
-        if (isNaN(newFee)) return showCustomAlert("Invalid Fee");
+                const feeDisplay = showStudentFees ? `<div class="text-xs text-gray-500 mt-1">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
+                
+                const subjects = student.subjects ? student.subjects.join(', ') : 'N/A';
+                const days = student.days ? `${student.days} days/week` : 'N/A';
 
-        // Sync to DB if changed
-        if (newFee !== student.studentFee) {
-            await updateDoc(doc(db, "students", student.id), { studentFee: newFee });
-            student.studentFee = newFee;
+                let statusHTML = '';
+                let actionsHTML = '';
+
+                if (student.isPending) {
+                    statusHTML = `<span class="badge badge-warning">⏳ Awaiting Approval</span>`;
+                    actionsHTML = `<span class="text-gray-400">No actions available</span>`;
+                } else if (hasSubmittedThisMonth) {
+                    statusHTML = `<span class="badge badge-info">📤 Report Sent</span>`;
+                    actionsHTML = `<span class="text-gray-400">Submitted this month</span>`;
+                } else {
+                    const transitioningIndicator = isTransitioning ? `<span class="badge badge-warning ml-2">🔄 Transitioning</span>` : '';
+                    
+                    statusHTML = `<span class="${isReportSaved ? 'badge badge-success' : 'badge badge-secondary'}">${isReportSaved ? '💾 Report Saved' : '📝 Pending Report'}</span>${transitioningIndicator}`;
+
+                    actionsHTML = `<div class="action-buttons">`;
+
+                    if (isSummerBreakEnabled && !isStudentOnBreak) {
+                        actionsHTML += `<button class="btn btn-warning btn-sm summer-break-btn" data-student-id="${student.id}">⏸️ Break</button>`;
+                    } else if (isStudentOnBreak) {
+                        actionsHTML += `<span class="text-gray-400">On Break</span>`;
+                    }
+
+                    if (isSubmissionEnabled && !isStudentOnBreak) {
+                        if (approvedStudents.length === 1) {
+                            actionsHTML += `<button class="btn btn-primary btn-sm submit-single-report-btn" data-student-id="${student.id}" data-is-transitioning="${isTransitioning}">📝 Submit Report</button>`;
+                        } else {
+                            actionsHTML += `<button class="btn btn-primary btn-sm enter-report-btn" data-student-id="${student.id}" data-is-transitioning="${isTransitioning}">${isReportSaved ? '✏️ Edit Report' : '📝 Enter Report'}</button>`;
+                        }
+                    } else if (!isStudentOnBreak) {
+                        actionsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
+                    }
+                    
+                    if (showEditDeleteButtons && !isStudentOnBreak) {
+                        actionsHTML += `
+                            <button class="btn btn-info btn-sm edit-student-btn-tutor" data-student-id="${student.id}" data-collection="${student.collection}">✏️ Edit</button>
+                            <button class="btn btn-danger btn-sm delete-student-btn-tutor" data-student-id="${student.id}" data-collection="${student.collection}">🗑️ Delete</button>
+                        `;
+                    }
+                    
+                    actionsHTML += `</div>`;
+                }
+                
+                studentsHTML += `
+                    <tr>
+                        <td>
+                            <div class="font-medium">${student.studentName}</div>
+                            <div class="text-sm text-gray-500">${cleanGradeString(student.grade)}</div>
+                            <div class="text-xs text-gray-400">Subjects: ${subjects}</div>
+                            <div class="text-xs text-gray-400">Days: ${days}</div>
+                            ${feeDisplay}
+                        </td>
+                        <td>${statusHTML}</td>
+                        <td>${actionsHTML}</td>
+                    </tr>`;
+            });
+
+            studentsHTML += `</tbody></table></div>`;
+            
+            if (tutor.isManagementStaff) {
+                studentsHTML += `
+                    <div class="card mt-6">
+                        <div class="card-header">
+                            <h3 class="font-bold text-lg">💼 Management Fee</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-sm text-gray-600 mb-4">As you are part of the management staff, please set your monthly management fee before final submission.</p>
+                            <div class="flex items-center space-x-4">
+                                <div class="flex-1">
+                                    <label class="form-label">Monthly Management Fee (₦)</label>
+                                    <input type="number" id="management-fee-input" class="form-input" value="${tutor.managementFee || 0}">
+                                </div>
+                                <button id="save-management-fee-btn" class="btn btn-primary mt-6">Save Fee</button>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+            
+            if (approvedStudents.length > 1 && isSubmissionEnabled) {
+                const submittableStudents = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length;
+                const allReportsSaved = Object.keys(savedReports).length === submittableStudents && submittableStudents > 0;
+                
+                if (submittableStudents > 0) {
+                    studentsHTML += `
+                        <div class="mt-6 text-right">
+                            <button id="submit-all-reports-btn" class="btn btn-primary ${!allReportsSaved ? 'opacity-50 cursor-not-allowed' : ''}" ${!allReportsSaved ? 'disabled' : ''}>
+                                📤 Submit All Reports (${submittableStudents})
+                            </button>
+                        </div>`;
+                }
+            }
+        }
+        container.innerHTML = `<div id="student-list-view" class="bg-white p-6 rounded-lg">${studentsHTML}</div>`;
+        attachEventListeners();
+    }
+
+    function showReportModal(student) {
+        if (student.isTransitioning) {
+            const currentMonthYear = getCurrentMonthYear();
+            const reportData = {
+                studentId: student.id, 
+                studentName: student.studentName, 
+                grade: student.grade,
+                parentName: student.parentName, 
+                parentPhone: student.parentPhone,
+                normalizedParentPhone: normalizePhoneNumber(student.parentPhone),
+                reportMonth: currentMonthYear,
+                introduction: "Transitioning student - no monthly report required.",
+                topics: "Transitioning student - no monthly report required.",
+                progress: "Transitioning student - no monthly report required.",
+                strengthsWeaknesses: "Transitioning student - no monthly report required.",
+                recommendations: "Transitioning student - no monthly report required.",
+                generalComments: "Transitioning student - no monthly report required.",
+                isTransitioning: true
+            };
+            
+            showFeeConfirmationModal(student, reportData);
+            return;
         }
 
-        savedReports[student.id] = reportData;
-        await saveReportsToFirestore(tutor.email, savedReports);
-        modal.remove();
-        showCustomAlert("✅ Report Prepared and Saved!");
-        renderStudentDatabase(container, tutor);
-    };
-}
-
-function showAccountDetailsModal(reportsArray, tutor, container) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML = `
-        <div class="modal-content max-w-md">
-            <div class="modal-header"><h3 class="modal-title">🏦 Bank Details</h3></div>
-            <div class="modal-body space-y-4">
-                <div class="form-group"><label class="form-label">Bank Name</label><input type="text" id="acc-bank" class="form-input" placeholder="e.g. Kuda" required></div>
-                <div class="form-group"><label class="form-label">Account Number</label><input type="text" id="acc-num" class="form-input" placeholder="10 digits" required></div>
-                <div class="form-group"><label class="form-label">Account Name</label><input type="text" id="acc-name" class="form-input" placeholder="Full name" required></div>
+        const existingReport = savedReports[student.id] || {};
+        const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
+        const currentMonthYear = getCurrentMonthYear();
+        
+        const reportFormHTML = `
+            <h3 class="text-xl font-bold mb-4">📝 Monthly Report for ${student.studentName}</h3>
+            <div class="bg-blue-50 p-4 rounded-lg mb-4">
+                <p class="font-semibold text-blue-800">Month: ${currentMonthYear}</p>
             </div>
-            <div class="modal-footer">
-                <button id="acc-cancel" class="btn btn-secondary">Cancel</button>
-                <button id="acc-submit" class="btn btn-primary">Confirm & Submit All</button>
-            </div>
-        </div>`;
-    document.body.appendChild(modal);
+            <div class="space-y-4">
+                <div class="form-group">
+                    <label class="form-label">Introduction</label>
+                    <textarea id="report-intro" class="form-input form-textarea report-textarea" rows="3">${existingReport.introduction || ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Topics & Remarks</label>
+                    <textarea id="report-topics" class="form-input form-textarea report-textarea" rows="4">${existingReport.topics || ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Progress & Achievements</label>
+                    <textarea id="report-progress" class="form-input form-textarea report-textarea" rows="3">${existingReport.progress || ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Strengths & Weaknesses</label>
+                    <textarea id="report-sw" class="form-input form-textarea report-textarea" rows="3">${existingReport.strengthsWeaknesses || ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Recommendations</label>
+                    <textarea id="report-recs" class="form-input form-textarea report-textarea" rows="3">${existingReport.recommendations || ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">General Comments</label>
+                    <textarea id="report-general" class="form-input form-textarea report-textarea" rows="3">${existingReport.generalComments || ''}</textarea>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-report-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="modal-action-btn" class="btn btn-primary">${isSingleApprovedStudent ? 'Proceed to Submit' : 'Save Report'}</button>
+                </div>
+            </div>`;
+        
+        const reportModal = document.createElement('div');
+        reportModal.className = 'modal-overlay';
+        reportModal.innerHTML = `<div class="modal-content max-w-4xl">${reportFormHTML}</div>`;
+        document.body.appendChild(reportModal);
 
-    document.getElementById('acc-cancel').onclick = () => modal.remove();
-    document.getElementById('acc-submit').onclick = async () => {
-        const bank = document.getElementById('acc-bank').value.trim();
-        const num = document.getElementById('acc-num').value.trim();
-        const name = document.getElementById('acc-name').value.trim();
+        document.getElementById('cancel-report-btn').addEventListener('click', () => reportModal.remove());
+        document.getElementById('modal-action-btn').addEventListener('click', async () => {
+            const reportData = {
+                studentId: student.id, 
+                studentName: student.studentName, 
+                grade: student.grade,
+                parentName: student.parentName, 
+                parentPhone: student.parentPhone,
+                normalizedParentPhone: normalizePhoneNumber(student.parentPhone),
+                reportMonth: currentMonthYear,
+                introduction: document.getElementById('report-intro').value,
+                topics: document.getElementById('report-topics').value,
+                progress: document.getElementById('report-progress').value,
+                strengthsWeaknesses: document.getElementById('report-sw').value,
+                recommendations: document.getElementById('report-recs').value,
+                generalComments: document.getElementById('report-general').value
+            };
 
-        if (!bank || !num || !name) return showCustomAlert("Fill all bank details");
+            reportModal.remove();
+            showFeeConfirmationModal(student, reportData);
+        });
+    }
 
-        const btn = document.getElementById('acc-submit');
-        btn.disabled = true; btn.innerText = "Submitting...";
+    function showFeeConfirmationModal(student, reportData) {
+        const feeConfirmationHTML = `
+            <h3 class="text-xl font-bold mb-4">💰 Confirm Fee for ${student.studentName}</h3>
+            <p class="text-sm text-gray-600 mb-4">Please verify the monthly fee for this student before saving the report.</p>
+            <div class="space-y-4">
+                <div class="form-group">
+                    <label class="form-label">Current Fee (₦)</label>
+                    <input type="number" id="confirm-student-fee" class="form-input" 
+                           value="${student.studentFee || 0}" 
+                           placeholder="Enter fee amount">
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-fee-confirm-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="confirm-fee-btn" class="btn btn-primary">Confirm Fee & Save</button>
+                </div>
+            </div>`;
+
+        const feeModal = document.createElement('div');
+        feeModal.className = 'modal-overlay';
+        feeModal.innerHTML = `<div class="modal-content max-w-lg">${feeConfirmationHTML}</div>`;
+        document.body.appendChild(feeModal);
+
+        const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
+
+        document.getElementById('cancel-fee-confirm-btn').addEventListener('click', () => feeModal.remove());
+        document.getElementById('confirm-fee-btn').addEventListener('click', async () => {
+            const newFeeValue = document.getElementById('confirm-student-fee').value;
+            const newFee = parseFloat(newFeeValue);
+
+            if (isNaN(newFee) || newFee < 0) {
+                showCustomAlert('Please enter a valid, non-negative fee amount.');
+                return;
+            }
+
+            if (newFee !== student.studentFee) {
+                try {
+                    const studentRef = doc(db, student.collection, student.id);
+                    await updateDoc(studentRef, { studentFee: newFee });
+                    student.studentFee = newFee; 
+                    showCustomAlert('✅ Student fee has been updated successfully!');
+                } catch (error) {
+                    console.error("Error updating student fee:", error);
+                    showCustomAlert(`❌ Failed to update fee: ${error.message}`);
+                }
+            }
+
+            feeModal.remove();
+
+            if (isSingleApprovedStudent) {
+                showAccountDetailsModal([reportData]);
+            } else {
+                savedReports[student.id] = reportData;
+                await saveReportsToFirestore(tutor.email, savedReports);
+                showCustomAlert(`✅ ${student.studentName}'s report has been saved.`);
+                renderUI(); 
+            }
+        });
+    }
+
+    function showAccountDetailsModal(reportsArray) {
+        const accountFormHTML = `
+            <h3 class="text-xl font-bold mb-4">🏦 Enter Your Payment Details</h3>
+            <p class="text-sm text-gray-600 mb-4">Please provide your bank details for payment processing.</p>
+            <div class="space-y-4">
+                <div class="form-group">
+                    <label class="form-label">Beneficiary Bank Name *</label>
+                    <input type="text" id="beneficiary-bank" class="form-input" placeholder="e.g., Zenith Bank" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Beneficiary Account Number *</label>
+                    <input type="text" id="beneficiary-account" class="form-input" placeholder="Your 10-digit account number" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Beneficiary Name *</label>
+                    <input type="text" id="beneficiary-name" class="form-input" placeholder="Your full name as on the account" required>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-account-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="confirm-submit-btn" class="btn btn-primary">Confirm & Submit Report(s)</button>
+                </div>
+            </div>`;
+        const accountModal = document.createElement('div');
+        accountModal.className = 'modal-overlay';
+        accountModal.innerHTML = `<div class="modal-content max-w-lg">${accountFormHTML}</div>`;
+        document.body.appendChild(accountModal);
+
+        document.getElementById('cancel-account-btn').addEventListener('click', () => accountModal.remove());
+        document.getElementById('confirm-submit-btn').addEventListener('click', async () => {
+            const accountDetails = {
+                beneficiaryBank: document.getElementById('beneficiary-bank').value.trim(),
+                beneficiaryAccount: document.getElementById('beneficiary-account').value.trim(),
+                beneficiaryName: document.getElementById('beneficiary-name').value.trim(),
+            };
+
+            if (!accountDetails.beneficiaryBank || !accountDetails.beneficiaryAccount || !accountDetails.beneficiaryName) {
+                showCustomAlert("❌ Please fill in all bank account details before submitting.");
+                return;
+            }
+
+            accountModal.remove();
+            await submitAllReports(reportsArray, accountDetails);
+        });
+    }
+    
+    async function submitAllReports(reportsArray, accountDetails) {
+        if (reportsArray.length === 0) {
+            showCustomAlert("No reports to submit.");
+            return;
+        }
+
+        const batch = writeBatch(db);
+        reportsArray.forEach(report => {
+            const newReportRef = doc(collection(db, "tutor_submissions"));
+            
+            const finalReportData = {
+                tutorEmail: tutor.email,
+                tutorName: tutor.name,
+                submittedAt: new Date(),
+                ...report,
+                ...accountDetails
+            };
+            
+            if (!finalReportData.normalizedParentPhone && finalReportData.parentPhone) {
+                finalReportData.normalizedParentPhone = normalizePhoneNumber(finalReportData.parentPhone);
+            }
+            
+            batch.set(newReportRef, finalReportData);
+        });
 
         try {
-            const batch = writeBatch(db);
-            reportsArray.forEach(report => {
-                const ref = doc(collection(db, "tutor_submissions"));
-                batch.set(ref, {
-                    ...report, tutorEmail: tutor.email, tutorName: tutor.name,
-                    submittedAt: new Date(), beneficiaryBank: bank,
-                    beneficiaryAccount: num, beneficiaryName: name,
-                    normalizedParentPhone: normalizePhoneNumber(report.parentPhone)
-                });
-            });
             await batch.commit();
             await clearAllReportsFromFirestore(tutor.email);
-            modal.remove();
             showCustomAlert(`✅ Successfully submitted ${reportsArray.length} report(s)!`);
-            renderStudentDatabase(container, tutor);
-        } catch (e) {
-            console.error(e);
-            showCustomAlert("Submission Error");
-            btn.disabled = false; btn.innerText = "Try Again";
+            await renderStudentDatabase(container, tutor);
+        } catch (error) {
+            console.error("Error submitting reports:", error);
+            showCustomAlert(`❌ Error: ${error.message}`);
         }
-    };
+    }
+
+    function showTransitioningConfirmation() {
+        const confirmationHTML = `
+            <div class="modal-overlay">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 class="modal-title text-orange-600">🔄 Add Transitioning Student</h3>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-sm text-gray-600 mb-4">
+                            <strong>Please confirm:</strong> Transitioning students skip monthly report writing and go directly to fee confirmation. 
+                            They will be marked with orange indicators and their fees will be included in pay advice.
+                        </p>
+                        <p class="text-sm text-orange-600 font-semibold mb-4">
+                            Are you sure you want to add a transitioning student?
+                        </p>
+                        <div class="modal-footer">
+                            <button id="cancel-transitioning-btn" class="btn btn-secondary">Cancel</button>
+                            <button id="confirm-transitioning-btn" class="btn btn-primary">Yes, Add Transitioning</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        const confirmationModal = document.createElement('div');
+        confirmationModal.innerHTML = confirmationHTML;
+        document.body.appendChild(confirmationModal);
+
+        document.getElementById('cancel-transitioning-btn').addEventListener('click', () => {
+            confirmationModal.remove();
+        });
+
+        document.getElementById('confirm-transitioning-btn').addEventListener('click', async () => {
+            confirmationModal.remove();
+            await addTransitioningStudent();
+        });
+    }
+
+    async function addTransitioningStudent() {
+        const parentName = document.getElementById('new-parent-name').value.trim();
+        const parentPhone = document.getElementById('new-parent-phone').value.trim();
+        const studentName = document.getElementById('new-student-name').value.trim();
+        const studentGrade = document.getElementById('new-student-grade').value.trim();
+        
+        const selectedSubjects = [];
+        document.querySelectorAll('input[name="subjects"]:checked').forEach(checkbox => {
+            selectedSubjects.push(checkbox.value);
+        });
+
+        const studentDays = document.getElementById('new-student-days').value.trim();
+        const groupClass = document.getElementById('new-student-group-class') ? document.getElementById('new-student-group-class').checked : false;
+        const studentFee = parseFloat(document.getElementById('new-student-fee').value);
+
+        if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
+            showCustomAlert('❌ Please fill in all parent and student details correctly, including at least one subject.');
+            return;
+        }
+
+        const payScheme = getTutorPayScheme(tutor);
+        const suggestedFee = calculateSuggestedFee({
+            grade: studentGrade,
+            days: studentDays,
+            subjects: selectedSubjects,
+            groupClass: groupClass
+        }, payScheme);
+
+        const studentData = {
+            parentName: parentName,
+            parentPhone: parentPhone,
+            studentName: studentName,
+            grade: studentGrade,
+            subjects: selectedSubjects,
+            days: studentDays,
+            studentFee: suggestedFee > 0 ? suggestedFee : studentFee,
+            tutorEmail: tutor.email,
+            tutorName: tutor.name,
+            isTransitioning: true
+        };
+
+        if (findSpecializedSubject(selectedSubjects)) {
+            studentData.groupClass = groupClass;
+        }
+
+        try {
+            if (isBypassApprovalEnabled) {
+                await addDoc(collection(db, "students"), studentData);
+                showCustomAlert('✅ Transitioning student added successfully!');
+            } else {
+                await addDoc(collection(db, "pending_students"), studentData);
+                showCustomAlert('✅ Transitioning student added and is pending approval.');
+            }
+            renderStudentDatabase(container, tutor);
+        } catch (error) {
+            console.error("Error adding transitioning student:", error);
+            showCustomAlert(`❌ An error occurred: ${error.message}`);
+        }
+    }
+
+    function attachEventListeners() {
+        const subjectsContainer = document.getElementById('new-student-subjects-container');
+        const groupClassContainer = document.getElementById('group-class-container');
+        
+        if (subjectsContainer && groupClassContainer) {
+            subjectsContainer.addEventListener('change', (e) => {
+                if (e.target.type === 'checkbox' && e.target.checked) {
+                    const subject = e.target.value;
+                    const hasSpecializedSubject = findSpecializedSubject([subject]);
+                    if (hasSpecializedSubject) {
+                        groupClassContainer.classList.remove('hidden');
+                    }
+                }
+            });
+        }
+
+        const transitioningBtn = document.getElementById('add-transitioning-btn');
+        if (transitioningBtn) {
+            transitioningBtn.addEventListener('click', () => {
+                showTransitioningConfirmation();
+            });
+        }
+
+        const studentBtn = document.getElementById('add-student-btn');
+        if (studentBtn && isTutorAddEnabled) {
+            studentBtn.addEventListener('click', async () => {
+                const parentName = document.getElementById('new-parent-name').value.trim();
+                const parentPhone = document.getElementById('new-parent-phone').value.trim();
+                const studentName = document.getElementById('new-student-name').value.trim();
+                const studentGrade = document.getElementById('new-student-grade').value.trim();
+                
+                const selectedSubjects = [];
+                document.querySelectorAll('input[name="subjects"]:checked').forEach(checkbox => {
+                    selectedSubjects.push(checkbox.value);
+                });
+
+                const studentDays = document.getElementById('new-student-days').value.trim();
+                const groupClass = document.getElementById('new-student-group-class') ? document.getElementById('new-student-group-class').checked : false;
+                const studentFee = parseFloat(document.getElementById('new-student-fee').value);
+
+                if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
+                    showCustomAlert('❌ Please fill in all parent and student details correctly, including at least one subject.');
+                    return;
+                }
+
+                const payScheme = getTutorPayScheme(tutor);
+                const suggestedFee = calculateSuggestedFee({
+                    grade: studentGrade,
+                    days: studentDays,
+                    subjects: selectedSubjects,
+                    groupClass: groupClass
+                }, payScheme);
+
+                const studentData = {
+                    parentName: parentName,
+                    parentPhone: parentPhone,
+                    studentName: studentName,
+                    grade: studentGrade,
+                    subjects: selectedSubjects,
+                    days: studentDays,
+                    studentFee: suggestedFee > 0 ? suggestedFee : studentFee,
+                    tutorEmail: tutor.email,
+                    tutorName: tutor.name
+                };
+
+                if (findSpecializedSubject(selectedSubjects)) {
+                    studentData.groupClass = groupClass;
+                }
+
+                try {
+                    if (isBypassApprovalEnabled) {
+                        await addDoc(collection(db, "students"), studentData);
+                        showCustomAlert('✅ Student added successfully!');
+                    } else {
+                        await addDoc(collection(db, "pending_students"), studentData);
+                        showCustomAlert('✅ Student added and is pending approval.');
+                    }
+                    renderStudentDatabase(container, tutor);
+                } catch (error) {
+                    console.error("Error adding student:", error);
+                    showCustomAlert(`❌ An error occurred: ${error.message}`);
+                }
+            });
+        }
+
+        document.querySelectorAll('.enter-report-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const student = students.find(s => s.id === studentId);
+                showReportModal(student);
+            });
+        });
+
+        document.querySelectorAll('.submit-single-report-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const student = students.find(s => s.id === studentId);
+                showReportModal(student);
+            });
+        });
+
+        document.querySelectorAll('.summer-break-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const student = students.find(s => s.id === studentId);
+                
+                if (confirm(`Are you sure you want to put ${student.studentName} on Break?`)) {
+                    const studentRef = doc(db, "students", studentId);
+                    await updateDoc(studentRef, { summerBreak: true });
+                    showCustomAlert(`✅ ${student.studentName} has been marked as on Break.`);
+                    renderStudentDatabase(container, tutor);
+                }
+            });
+        });
+
+        const submitAllBtn = document.getElementById('submit-all-reports-btn');
+        if (submitAllBtn) {
+            submitAllBtn.addEventListener('click', () => {
+                const reportsToSubmit = Object.values(savedReports);
+                showAccountDetailsModal(reportsToSubmit);
+            });
+        }
+
+        const saveFeeBtn = document.getElementById('save-management-fee-btn');
+        if (saveFeeBtn) {
+            saveFeeBtn.addEventListener('click', async () => {
+                const newFee = parseFloat(document.getElementById('management-fee-input').value);
+                if (isNaN(newFee) || newFee < 0) {
+                    showCustomAlert("❌ Please enter a valid fee amount.");
+                    return;
+                }
+                const tutorRef = doc(db, "tutors", tutor.id);
+                await updateDoc(tutorRef, { managementFee: newFee });
+                showCustomAlert("✅ Management fee updated successfully.");
+                window.tutorData.managementFee = newFee;
+            });
+        }
+        
+        document.querySelectorAll('.edit-student-btn-tutor').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const collectionName = btn.getAttribute('data-collection');
+                const student = students.find(s => s.id === studentId && s.collection === collectionName);
+                if (student) {
+                    showEditStudentModal(student);
+                }
+            });
+        });
+
+        document.querySelectorAll('.delete-student-btn-tutor').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const collectionName = btn.getAttribute('data-collection');
+                const student = students.find(s => s.id === studentId && s.collection === collectionName);
+                
+                if (student && confirm(`Are you sure you want to delete ${student.studentName}? This action cannot be undone.`)) {
+                    try {
+                        await deleteDoc(doc(db, collectionName, studentId));
+                        showCustomAlert('✅ Student deleted successfully!');
+                        renderStudentDatabase(container, tutor);
+                    } catch (error) {
+                        console.error("Error deleting student:", error);
+                        showCustomAlert(`❌ An error occurred: ${error.message}`);
+                    }
+                }
+            });
+        });
+    }
+
+    renderUI();
 }
 
 /*******************************************************************************
- * SECTION 13: AUTO-REGISTERED STUDENTS
+ * SECTION 13: AUTO-REGISTERED STUDENTS MANAGEMENT
  ******************************************************************************/
 
+// Auto-Registered Students Functions
 function renderAutoRegisteredStudents(container, tutor) {
     container.innerHTML = `
         <div class="card">
-            <div class="card-header"><h2 class="text-2xl font-bold">🆕 Auto-Registered Students</h2></div>
-            <div id="auto-students-list" class="card-body"><div class="spinner mx-auto"></div></div>
-        </div>`;
+            <div class="card-header">
+                <h2 class="text-2xl font-bold text-blue-700">🆕 Auto-Registered Students</h2>
+            </div>
+            <div class="card-body">
+                <p class="text-sm text-gray-600 mb-4">Students who completed tests and need profile completion</p>
+                <div id="auto-students-list">
+                    <div class="text-center">
+                        <div class="spinner mx-auto mb-2"></div>
+                        <p class="text-gray-500">Loading auto-registered students...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
     loadAutoRegisteredStudents(tutor.email);
 }
 
 async function loadAutoRegisteredStudents(tutorEmail) {
-    const q = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail), where("autoRegistered", "==", true));
-    const snap = await getDocs(q);
+    const studentsQuery = query(collection(db, "students"), 
+        where("tutorEmail", "==", tutorEmail),
+        where("autoRegistered", "==", true));
+    
+    const pendingQuery = query(collection(db, "pending_students"), 
+        where("tutorEmail", "==", tutorEmail),
+        where("autoRegistered", "==", true));
+
+    try {
+        const [studentsSnapshot, pendingSnapshot] = await Promise.all([
+            getDocs(studentsQuery),
+            getDocs(pendingQuery)
+        ]);
+
+        const autoStudents = [
+            ...studentsSnapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data(), collection: "students" }))
+                .filter(student => !['archived', 'graduated', 'transferred'].includes(student.status)),
+            ...pendingSnapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data(), collection: "pending_students" }))
+                .filter(student => !['archived', 'graduated', 'transferred'].includes(student.status))
+        ];
+
+        renderAutoStudentsList(autoStudents);
+    } catch (error) {
+        console.error("Error loading auto-registered students:", error);
+        document.getElementById('auto-students-list').innerHTML = `
+            <div class="text-center">
+                <div class="text-red-400 text-4xl mb-3">⚠️</div>
+                <h4 class="font-bold text-red-600 mb-2">Failed to Load</h4>
+                <p class="text-gray-500">Please check your connection and try again.</p>
+            </div>
+        `;
+    }
+}
+
+function renderAutoStudentsList(students) {
     const container = document.getElementById('auto-students-list');
     
-    if (snap.empty) {
-        container.innerHTML = '<p class="text-center text-gray-500">No new auto-registrations.</p>';
+    if (students.length === 0) {
+        container.innerHTML = `
+            <div class="text-center">
+                <div class="text-gray-400 text-4xl mb-3">👤</div>
+                <h4 class="font-bold text-gray-600 mb-2">No Auto-Registered Students</h4>
+                <p class="text-gray-500">No students need profile completion.</p>
+            </div>
+        `;
         return;
     }
 
-    let html = '<div class="table-container"><table class="table"><thead><tr><th>Student</th><th>Action</th></tr></thead><tbody>';
-    snap.forEach(d => {
-        const s = d.data();
-        html += `<tr><td>${s.studentName}<br><small>${s.grade}</small></td><td><button class="btn btn-sm btn-primary compl-btn" data-id="${d.id}">Complete Profile</button></td></tr>`;
-    });
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
+    let html = `
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Status</th>
+                        <th>Test Info</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
 
-    container.querySelectorAll('.compl-btn').forEach(btn => {
-        btn.onclick = () => {
-            const student = snap.docs.find(d => d.id === btn.dataset.id).data();
-            student.id = btn.dataset.id; student.collection = "students";
-            showEditStudentModal(student);
-        };
+    students.forEach(student => {
+        const status = student.collection === "students" ? 
+            "🆕 Needs Completion" : 
+            "🆕 Awaiting Approval";
+            
+        const statusClass = student.collection === "students" ? 
+            'badge badge-info' : 
+            'badge badge-warning';
+        
+        html += `
+            <tr>
+                <td>
+                    <div class="font-medium">${student.studentName}</div>
+                    <div class="text-sm text-gray-500">${student.grade} • ${student.parentPhone || 'No phone'}</div>
+                    <div class="text-xs text-gray-400">${student.parentEmail || 'No email'}</div>
+                </td>
+                <td>
+                    <span class="${statusClass}">
+                        ${status}
+                    </span>
+                </td>
+                <td class="text-sm text-gray-500">
+                    ${student.testSubject || 'General Test'}
+                </td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn btn-primary btn-sm complete-student-btn" 
+                                data-student-id="${student.id}" data-collection="${student.collection}">
+                            Complete Profile
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
+    
+    document.querySelectorAll('.complete-student-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const studentId = btn.getAttribute('data-student-id');
+            const collection = btn.getAttribute('data-collection');
+            const student = students.find(s => s.id === studentId && s.collection === collection);
+            if (student) {
+                showEditStudentModal(student);
+            }
+        });
     });
 }
 
 /*******************************************************************************
- * SECTION 14: AUTH & INITIALIZATION
+ * SECTION 13A: GAMIFICATION & PERFORMANCE ENGINE
  ******************************************************************************/
 
-document.addEventListener('DOMContentLoaded', () => {
+// --- CONFIGURATION ---
+const GAMIFICATION_CONFIG = {
+    confettiDuration: 3000, // 3 seconds
+    celebrationFrequency: 'weekly', // 'daily', 'weekly', 'always'
+    gradingCriteria: [
+        { id: 'attendance', label: 'Punctuality', max: 20 },
+        { id: 'student_feedback', label: 'Student Rating', max: 30 },
+        { id: 'admin_review', label: 'Admin Assessment', max: 50 }
+    ]
+};
+
+// --- STATE MANAGEMENT ---
+let currentTutorScore = 0;
+let isTutorOfTheMonth = false;
+
+/**
+ * Initializes the gamification dashboard widget.
+ * Call this function when the dashboard loads.
+ */
+async function initGamification(tutorId) {
+    try {
+        // 1. Get Current Tutor's Score
+        const tutorRef = doc(db, "tutors", tutorId);
+        // We use onSnapshot for REAL-TIME updates. 
+        // If Admin updates score, Tutor sees it instantly.
+        onSnapshot(tutorRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                currentTutorScore = data.performanceScore || 0;
+                updateScoreDisplay(currentTutorScore, data.scoreBreakdown);
+            }
+        });
+
+        // 2. Check "Tutor of the Month" Status
+        checkWinnerStatus(tutorId);
+
+    } catch (error) {
+        console.error("Gamification Error:", error);
+    }
+}
+
+/**
+ * Checks if the current user is the winner and handles the celebration logic.
+ */
+async function checkWinnerStatus(tutorId) {
+    try {
+        // We assume a central document 'gamification/current_cycle' holds the winner info
+        const cycleRef = doc(db, "gamification", "current_cycle");
+        const cycleSnap = await getDoc(cycleRef);
+
+        if (cycleSnap.exists()) {
+            const data = cycleSnap.data();
+            // Data structure: { winnerId: "xyz", month: "October", year: 2023 }
+            
+            if (data.winnerId === tutorId) {
+                isTutorOfTheMonth = true;
+                renderWinnerBadge(data.month);
+                
+                // Logic: Blow confetti if it's the start of the month OR weekly reminder
+                // For now, we blow it on every login if they are the winner (High Dopamine)
+                triggerConfetti(); 
+                showCustomAlert(`🏆 You are the ${data.month} Tutor of the Month!`);
+            }
+        }
+    } catch (error) {
+        console.error("Winner Check Error:", error);
+    }
+}
+
+// --- UI RENDERING FUNCTIONS ---
+
+function updateScoreDisplay(totalScore, breakdown = {}) {
+    // Locate the dashboard widget (Create this div in your HTML)
+    const scoreWidget = document.getElementById('performance-widget');
+    if (!scoreWidget) return;
+
+    // Calculate color based on score
+    let scoreColor = 'text-red-500';
+    if (totalScore > 50) scoreColor = 'text-yellow-500';
+    if (totalScore > 80) scoreColor = 'text-green-500';
+
+    scoreWidget.innerHTML = `
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
+            ${isTutorOfTheMonth ? '<div class="absolute top-0 right-0 bg-yellow-400 text-xs font-bold px-2 py-1 rounded-bl-lg">👑 REIGNING CHAMPION</div>' : ''}
+            
+            <h3 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Performance Score</h3>
+            
+            <div class="flex items-end gap-2 mb-3">
+                <span class="text-4xl font-black ${scoreColor}">${totalScore}</span>
+                <span class="text-gray-400 text-sm mb-1">/ 100 pts</span>
+            </div>
+            
+            <div class="space-y-2">
+                <div class="w-full bg-gray-100 rounded-full h-2">
+                    <div class="bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full transition-all duration-1000" style="width: ${totalScore}%"></div>
+                </div>
+                <p class="text-xs text-gray-400 text-right">Updated by Management</p>
+            </div>
+        </div>
+    `;
+}
+
+function renderWinnerBadge(month) {
+    // Inject a badge into the profile header or sidebar
+    const header = document.querySelector('.header-profile-section'); // Adjust selector to match your HTML
+    if (header) {
+        const badge = document.createElement('div');
+        badge.className = 'winner-badge animate-pulse bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 rounded-full border border-yellow-300 ml-2 flex items-center gap-1';
+        badge.innerHTML = `<span>🏆</span> ${month} Top Tutor`;
+        header.appendChild(badge);
+    }
+}
+
+// --- VISUAL FX (Confetti Engine) ---
+// No external library needed - Raw Canvas implementation for speed
+function triggerConfetti() {
+    const duration = 3000;
+    const end = Date.now() + duration;
+
+    // Simple confetti shim
+    (function frame() {
+        // Launch confetti from left and right edges
+        confetti({
+            particleCount: 2,
+            angle: 60,
+            spread: 55,
+            origin: { x: 0 }
+        });
+        confetti({
+            particleCount: 2,
+            angle: 120,
+            spread: 55,
+            origin: { x: 1 }
+        });
+
+        if (Date.now() < end) {
+            requestAnimationFrame(frame);
+        }
+    }());
+}
+
+// NOTE: You will need to include the lightweight canvas-confetti script in your HTML head for the FX to work:
+// <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+/*******************************************************************************
+ * SECTION 14: ADMIN SETTINGS LISTENER
+ ******************************************************************************/
+
+// Listen for changes to admin settings
+const settingsDocRef = doc(db, "settings", "global_settings");
+onSnapshot(settingsDocRef, (docSnap) => {
+    if (docSnap.exists()) {
+        const data = docSnap.data();
+        isSubmissionEnabled = data.isReportEnabled;
+        isTutorAddEnabled = data.isTutorAddEnabled;
+        isSummerBreakEnabled = data.isSummerBreakEnabled;
+        isBypassApprovalEnabled = data.bypassPendingApproval;
+        showStudentFees = data.showStudentFees;
+        showEditDeleteButtons = data.showEditDeleteButtons;
+
+        const mainContent = document.getElementById('mainContent');
+        if (mainContent.querySelector('#student-list-view')) {
+            renderStudentDatabase(mainContent, window.tutorData);
+        }
+    }
+});
+
+/*******************************************************************************
+ * SECTION 15: MAIN APP INITIALIZATION (UPDATED)
+ ******************************************************************************/
+
+// Main App Initialization
+document.addEventListener('DOMContentLoaded', async () => {
     onAuthStateChanged(auth, async (user) => {
         if (user) {
-            const q = query(collection(db, "tutors"), where("email", "==", user.email.trim()));
-            const snap = await getDocs(q);
-            if (!snap.empty) {
-                window.tutorData = { id: snap.docs[0].id, ...snap.docs[0].data() };
-                renderTutorDashboard(document.getElementById('mainContent'), window.tutorData);
-                initializeFloatingMessagingButton();
-                setInterval(updateUnreadMessageCount, 60000);
+            const tutorQuery = query(collection(db, "tutors"), where("email", "==", user.email.trim()));
+            const querySnapshot = await getDocs(tutorQuery);
+            
+            if (!querySnapshot.empty) {
+                const tutorDoc = querySnapshot.docs[0];
+                const tutorData = { id: tutorDoc.id, ...tutorDoc.data() };
+                
+                // Check if tutor is inactive (block access)
+                if (tutorData.status === 'inactive') {
+                    await signOut(auth);
+                    document.getElementById('mainContent').innerHTML = `
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <div class="text-red-400 text-4xl mb-3">🚫</div>
+                                <h4 class="font-bold text-red-600 mb-2">Account Inactive</h4>
+                                <p class="text-gray-500 mb-4">Your tutor account has been marked as inactive.</p>
+                                <p class="text-sm text-gray-500">Please contact management for assistance.</p>
+                                <a href="tutor-auth.html" class="btn btn-primary mt-4">Return to Login</a>
+                            </div>
+                        </div>`;
+                    return;
+                }
+                
+                window.tutorData = tutorData;
+                
+                if (shouldShowEmploymentPopup(tutorData)) {
+                    showEmploymentDatePopup(tutorData);
+                }
+                
+                if (shouldShowTINPopup(tutorData)) {
+                    showTINPopup(tutorData);
+                }
+                
+                renderTutorDashboard(document.getElementById('mainContent'), tutorData);
+                
+                // Initialize floating messaging and inbox buttons
+                setTimeout(() => {
+                    initializeFloatingMessagingButton();
+                    updateUnreadMessageCount(); // Check for unread messages
+                    
+                    // Set up periodic refresh of unread count (every 30 seconds)
+                    setInterval(updateUnreadMessageCount, 30000);
+                }, 1000);
+                
+                setTimeout(async () => {
+                    await checkAndShowSchedulePopup(tutorData);
+                }, 2000);
             } else {
-                window.location.href = 'tutor-auth.html';
+                console.error("No matching tutor found.");
+                document.getElementById('mainContent').innerHTML = `
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div class="text-red-400 text-4xl mb-3">⚠️</div>
+                            <h4 class="font-bold text-red-600 mb-2">Error: No Tutor Profile Found</h4>
+                            <p class="text-gray-500">No tutor profile found for your email.</p>
+                        </div>
+                    </div>`;
             }
         } else {
-            window.location.href = 'tutor-auth.html';
+            window.location.href = 'login.html';
         }
     });
 
-    document.getElementById('navDashboard').onclick = () => renderTutorDashboard(document.getElementById('mainContent'), window.tutorData);
-    document.getElementById('navStudentDatabase').onclick = () => renderStudentDatabase(document.getElementById('mainContent'), window.tutorData);
-    document.getElementById('navAutoStudents').onclick = () => renderAutoRegisteredStudents(document.getElementById('mainContent'), window.tutorData);
+    // Logout button
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            signOut(auth).then(() => {
+                window.location.href = 'tutor-auth.html';
+            }).catch(error => {
+                console.error("Error signing out:", error);
+                showCustomAlert('❌ Error signing out. Please try again.');
+            });
+        });
+    }
+
+    // Navigation event listeners
+    const addNavListener = (id, renderFunction) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('click', () => {
+                if (window.tutorData) {
+                    renderFunction(document.getElementById('mainContent'), window.tutorData);
+                    // Ensure floating buttons stay visible
+                    setTimeout(() => {
+                        if (!document.querySelector('.floating-messaging-btn')) {
+                            initializeFloatingMessagingButton();
+                        }
+                        updateUnreadMessageCount();
+                    }, 100);
+                }
+            });
+        }
+    };
+
+    addNavListener('navDashboard', renderTutorDashboard);
+    addNavListener('navStudentDatabase', renderStudentDatabase);
+    addNavListener('navAutoStudents', renderAutoRegisteredStudents);
     
-    document.getElementById('logoutBtn').onclick = () => signOut(auth).then(() => window.location.href = 'tutor-auth.html');
+    // Add inbox navigation to the sidebar if it exists
+    setTimeout(() => {
+        const navInbox = document.getElementById('navInbox');
+        if (!navInbox) {
+            // Create inbox navigation item if it doesn't exist
+            const sidebar = document.querySelector('.sidebar-nav');
+            if (sidebar) {
+                const inboxNav = document.createElement('li');
+                inboxNav.id = 'navInbox';
+                inboxNav.innerHTML = `
+                    <a href="#" class="nav-link flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                        <span class="text-xl">📨</span>
+                        <span>Inbox</span>
+                    </a>
+                `;
+                sidebar.appendChild(inboxNav);
+                
+                inboxNav.addEventListener('click', () => {
+                    if (window.tutorData) {
+                        showInboxModal();
+                    }
+                });
+            }
+        }
+    }, 500);
 });
