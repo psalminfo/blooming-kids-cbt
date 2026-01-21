@@ -1,4 +1,4 @@
-# Redirect portal routes
+# Portal routes
 /management*        /management.html    200
 /admin*            /admin.html          200
 /enrollment*       /enrollment.html     200
@@ -6,21 +6,19 @@
 /parent*           /parent.html         200
 /tutor*            /tutor.html          200
 
-# Portal protection files
-/portal-protector.js  /portal-protector.js  200
-/portal-injector.js   /portal-injector.js   200
-
-# AUTH PAGES - MUST COME BEFORE CATCH-ALL
+# Auth pages
 /tutor-auth*       /tutor-auth.html     200
 /parent-auth*      /parent-auth.html    200
 /management-auth*  /management-auth.html 200
 /admin-auth*       /admin-auth.html     200
 /enrollment-auth*  /enrollment-auth.html 200
-/student-login*    /student-login.html  200  # If you have this
 
-# Root ONLY
+# Protection files
+/portal-protector.js  /portal-protector.js  200
+/portal-injector.js   /portal-injector.js   200
+
+# Root
 /                  /index.html          200
 
-# Catch-all for everything else EXCEPT specific files
-/*.html            /index.html          200  # Only HTML files
-/*                 /index.html          404  # Everything else 404
+# Catch-all (LAST!)
+/*                 /index.html          200
