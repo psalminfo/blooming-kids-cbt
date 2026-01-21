@@ -15,12 +15,9 @@
             <form id="signup-form">
                 <div id="signup-container">
                     <h2 class="text-xl font-semibold mb-4">Create Account</h2>
-                    <input type="text" id="signup-name" name="name" placeholder="Full Name" 
-                           class="w-full p-2 mb-4 border rounded" required autocomplete="name">
-                    <input type="email" id="signup-email" name="email" placeholder="Email Address" 
-                           class="w-full p-2 mb-4 border rounded" required autocomplete="email">
-                    <input type="password" id="signup-password" name="new-password" placeholder="Password" 
-                           class="w-full p-2 mb-4 border rounded" required autocomplete="new-password">
+                    <input type="text" id="signup-name" placeholder="Full Name" class="w-full p-2 mb-4 border rounded" required>
+                    <input type="email" id="signup-email" placeholder="Email Address" class="w-full p-2 mb-4 border rounded" required>
+                    <input type="password" id="signup-password" placeholder="Password" class="w-full p-2 mb-4 border rounded" required>
                     <button type="submit" id="signup-btn" class="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700">Sign Up</button>
                     <p class="text-center mt-4 text-sm">Already have an account? <a href="#" id="show-signin" class="text-blue-600 hover:underline">Sign In</a></p>
                 </div>
@@ -30,10 +27,8 @@
             <form id="signin-form">
                 <div id="signin-container" style="display: none;">
                     <h2 class="text-xl font-semibold mb-4">Sign In</h2>
-                    <input type="email" id="signin-email" name="email" placeholder="Email Address" 
-                           class="w-full p-2 mb-4 border rounded" required autocomplete="email">
-                    <input type="password" id="signin-password" name="current-password" placeholder="Password" 
-                           class="w-full p-2 mb-4 border rounded" required autocomplete="current-password">
+                    <input type="email" id="signin-email" placeholder="Email Address" class="w-full p-2 mb-4 border rounded" required>
+                    <input type="password" id="signin-password" placeholder="Password" class="w-full p-2 mb-4 border rounded" required>
                     <div class="text-right mb-4">
                         <a href="#" id="forgot-password-link" class="text-sm text-blue-600 hover:underline">Forgot Password?</a>
                     </div>
