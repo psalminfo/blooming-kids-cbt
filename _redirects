@@ -1,11 +1,15 @@
-# Redirect portal routes
+# Main portals redirect
 /management*        /management.html    200
 /admin*            /admin.html          200
 /enrollment*       /enrollment.html     200
-/enrollment-portal /enrollment.html     200  # This redirects enrollment-portal to enrollment.html
+/enrollment-portal /enrollment.html     200
 /parent*           /parent.html         200
 /tutor*            /tutor.html          200
 
-# Root and everything else
+# Portal protection files
+/portal-protector.js  /portal-protector.js  200
+/portal-injector.js   /portal-injector.js   200
+
+# Root and catch-all
 /                  /index.html          200
 /*                 /index.html          200
