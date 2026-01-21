@@ -11,25 +11,32 @@
         <div class="bg-white shadow-md rounded-lg p-8">
             <h1 class="text-2xl font-bold text-green-700 text-center mb-6">Management Portal Access</h1>
             
-            <div id="signup-container">
-                <h2 class="text-xl font-semibold mb-4">Create Account</h2>
-                <input type="text" id="signup-name" placeholder="Full Name" class="w-full p-2 mb-4 border rounded">
-                <input type="email" id="signup-email" placeholder="Email Address" class="w-full p-2 mb-4 border rounded">
-                <input type="password" id="signup-password" placeholder="Password" class="w-full p-2 mb-4 border rounded">
-                <button id="signup-btn" class="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700">Sign Up</button>
-                <p class="text-center mt-4 text-sm">Already have an account? <a href="#" id="show-signin" class="text-blue-600 hover:underline">Sign In</a></p>
-            </div>
-
-            <div id="signin-container" style="display: none;">
-                <h2 class="text-xl font-semibold mb-4">Sign In</h2>
-                <input type="email" id="signin-email" placeholder="Email Address" class="w-full p-2 mb-4 border rounded">
-                <input type="password" id="signin-password" placeholder="Password" class="w-full p-2 mb-4 border rounded">
-                <div class="text-right mb-4">
-                    <a href="#" id="forgot-password-link" class="text-sm text-blue-600 hover:underline">Forgot Password?</a>
+            <!-- Sign Up Form -->
+            <form id="signup-form">
+                <div id="signup-container">
+                    <h2 class="text-xl font-semibold mb-4">Create Account</h2>
+                    <input type="text" id="signup-name" placeholder="Full Name" class="w-full p-2 mb-4 border rounded" required>
+                    <input type="email" id="signup-email" placeholder="Email Address" class="w-full p-2 mb-4 border rounded" required>
+                    <input type="password" id="signup-password" placeholder="Password" class="w-full p-2 mb-4 border rounded" required>
+                    <button type="submit" id="signup-btn" class="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700">Sign Up</button>
+                    <p class="text-center mt-4 text-sm">Already have an account? <a href="#" id="show-signin" class="text-blue-600 hover:underline">Sign In</a></p>
                 </div>
-                <button id="signin-btn" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Sign In</button>
-                <p class="text-center mt-4 text-sm">Don't have an account? <a href="#" id="show-signup" class="text-blue-600 hover:underline">Sign Up</a></p>
-            </div>
+            </form>
+
+            <!-- Sign In Form -->
+            <form id="signin-form">
+                <div id="signin-container" style="display: none;">
+                    <h2 class="text-xl font-semibold mb-4">Sign In</h2>
+                    <input type="email" id="signin-email" placeholder="Email Address" class="w-full p-2 mb-4 border rounded" required>
+                    <input type="password" id="signin-password" placeholder="Password" class="w-full p-2 mb-4 border rounded" required>
+                    <div class="text-right mb-4">
+                        <a href="#" id="forgot-password-link" class="text-sm text-blue-600 hover:underline">Forgot Password?</a>
+                    </div>
+                    <button type="submit" id="signin-btn" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Sign In</button>
+                    <p class="text-center mt-4 text-sm">Don't have an account? <a href="#" id="show-signup" class="text-blue-600 hover:underline">Sign Up</a></p>
+                </div>
+            </form>
+            
             <p id="error-message" class="text-center mt-4"></p>
         </div>
     </div>
