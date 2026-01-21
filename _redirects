@@ -1,24 +1,19 @@
-# Portal routes
-/management*        /management.html    200
-/admin*            /admin.html          200
-/enrollment*       /enrollment.html     200
-/enrollment-portal /enrollment.html     200
-/parent*           /parent.html         200
-/tutor*            /tutor.html          200
-
-# Auth pages
+# AUTH PAGES FIRST
 /tutor-auth*       /tutor-auth.html     200
 /parent-auth*      /parent-auth.html    200
 /management-auth*  /management-auth.html 200
 /admin-auth*       /admin-auth.html     200
 /enrollment-auth*  /enrollment-auth.html 200
 
-# Protection files
-/portal-protector.js  /portal-protector.js  200
-/portal-injector.js   /portal-injector.js   200
+# Portals next
+/tutor*            /tutor.html          200
+/parent*           /parent.html         200
+/management*       /management.html     200
+/admin*            /admin.html          200
+/enrollment*       /enrollment.html     200
 
 # Root
 /                  /index.html          200
 
-# Catch-all (LAST!)
+# Catch-all LAST
 /*                 /index.html          200
