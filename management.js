@@ -7012,6 +7012,292 @@ function renderBreakStudentsFromCache(searchTerm = '', filterValue = 'all') {
     });
 }
 
+async function fetchRecallRequests(forceRefresh = false) {
+    console.log("🔄 fetchRecallRequests called");
+    
+    try {
+        // Check if Firestore is properly initialized
+        if (!db) {
+            console.error("❌ Firestore db not initialized");
+            return;
+        }
+        
+        const listContainer = document.getElementById('recall-requests-list');
+        if (listContainer && !listContainer.innerHTML.includes("spinner")) {
+            listContainer.innerHTML = `<div class="text-center py-10">
+                <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+                <p class="text-purple-600 font-semibold mt-4">Loading recall requests...</p>
+            </div>`;
+        }
+        
+        // Query the recall_requests collection
+        const recallQuery = query(collection(db, "recall_requests"), where("status", "==", "pending"));
+        console.log("📋 Querying recall_requests collection...");
+        
+        const snapshot = await getDocs(recallQuery);
+        console.log("✅ Query complete, found", snapshot.size, "documents");
+        
+        const requests = snapshot.docs.map(doc => {
+            const data = doc.data();
+            let requestDate;
+            
+            // Handle Firestore timestamp conversion
+            if (data.requestDate && data.requestDate.toDate) {
+                requestDate = data.requestDate.toDate();
+            } else if (data.requestDate && data.requestDate.seconds) {
+                requestDate = new Date(data.requestDate.seconds * 1000);
+            } else if (data.requestDate) {
+                requestDate = new Date(data.requestDate);
+            } else {
+                requestDate = new Date();
+            }
+            
+            return { 
+                id: doc.id, 
+                ...data,
+                requestDate: requestDate,
+                studentName: data.studentName || 'Unknown Student',
+                tutorName: data.tutorName || 'Unknown Tutor',
+                tutorEmail: data.tutorEmail || 'No email'
+            };
+        });
+        
+        console.log("📊 Processed requests:", requests);
+        
+        // Sort by most recent
+        requests.sort((a, b) => b.requestDate - a.requestDate);
+        
+        window.sessionCache.recallRequests = requests;
+        
+        // Update count
+        const countElement = document.getElementById('recall-requests-count');
+        if (countElement) {
+            countElement.textContent = requests.length;
+            console.log("📈 Updated recall count to:", requests.length);
+        }
+        
+        // Check if recall tab is active
+        const recallView = document.getElementById('recall-requests-view');
+        const isRecallTabActive = recallView && !recallView.classList.contains('hidden');
+        
+        console.log("🎯 Recall tab active?", isRecallTabActive);
+        
+        if (isRecallTabActive) {
+            console.log("🎨 Rendering recall requests...");
+            renderRecallRequests(requests);
+        }
+        
+    } catch (error) {
+        console.error("❌ Error fetching recall requests:", error);
+        console.error("Error details:", error.message, error.stack);
+        
+        const container = document.getElementById('recall-requests-list');
+        if (container) {
+            container.innerHTML = `
+                <div class="text-center py-10 text-red-600">
+                    <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
+                    <p class="font-semibold">Failed to load recall requests</p>
+                    <p class="text-sm mt-2">Error: ${error.message}</p>
+                    <div class="mt-4 space-y-2">
+                        <button onclick="fetchRecallRequests(true)" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                            Try Again
+                        </button>
+                        <button onclick="console.log('Current cache:', window.sessionCache)" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">
+                            Debug Cache
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+}
+
+function renderRecallRequests(requests) {
+    console.log("🎨 renderRecallRequests called with", requests?.length, "requests");
+    
+    const container = document.getElementById('recall-requests-list');
+    if (!container) {
+        console.error("❌ Recall requests container not found!");
+        return;
+    }
+    
+    if (!requests || requests.length === 0) {
+        console.log("📭 No recall requests to display");
+        container.innerHTML = `
+            <div class="text-center py-10">
+                <i class="fas fa-inbox text-purple-400 text-4xl mb-4"></i>
+                <p class="text-gray-600">No pending recall requests</p>
+                <p class="text-sm text-gray-400 mt-2">All requests have been processed</p>
+                <button onclick="fetchRecallRequests(true)" class="mt-4 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
+                    <i class="fas fa-sync-alt mr-2"></i> Refresh
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    console.log("🎯 Rendering", requests.length, "recall requests");
+    
+    let html = '';
+    
+    requests.forEach((request, index) => {
+        const requestDate = request.requestDate ? request.requestDate.toLocaleString() : 'Unknown date';
+        
+        html += `
+            <div class="border-l-4 border-l-purple-500 bg-gray-50 p-6 rounded-r-lg hover:bg-gray-100 transition-colors mb-4">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="bg-purple-100 p-2 rounded-lg">
+                                <i class="fas fa-undo-alt text-purple-600"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-lg text-gray-800">${request.studentName}</h3>
+                                <p class="text-sm text-gray-600">Requested by: ${request.tutorName} (${request.tutorEmail})</p>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div class="bg-white p-3 rounded border">
+                                <p class="text-sm font-medium text-gray-500">Request Details</p>
+                                <p class="mt-1"><i class="fas fa-calendar-alt mr-2 text-gray-400"></i>Requested: ${requestDate}</p>
+                                <p><i class="fas fa-user mr-2 text-gray-400"></i>Student ID: ${request.studentId}</p>
+                            </div>
+                            <div class="bg-white p-3 rounded border">
+                                <p class="text-sm font-medium text-gray-500">Tutor Information</p>
+                                <p class="mt-1"><i class="fas fa-chalkboard-teacher mr-2 text-gray-400"></i>Tutor: ${request.tutorName}</p>
+                                <p><i class="fas fa-envelope mr-2 text-gray-400"></i>Email: ${request.tutorEmail}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-col gap-2 ml-4">
+                        <button class="approve-recall-btn bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center whitespace-nowrap font-medium"
+                                data-request-id="${request.id}"
+                                data-student-id="${request.studentId}"
+                                data-student-name="${request.studentName}"
+                                data-tutor-email="${request.tutorEmail}">
+                            <i class="fas fa-check mr-2"></i> Approve
+                        </button>
+                        <button class="reject-recall-btn bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center whitespace-nowrap font-medium"
+                                data-request-id="${request.id}"
+                                data-student-name="${request.studentName}">
+                            <i class="fas fa-times mr-2"></i> Reject
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="flex justify-between items-center text-sm text-gray-500">
+                    <span><i class="fas fa-info-circle mr-1"></i> Action will take the student off break immediately</span>
+                    <span>Request #${index + 1}</span>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+    console.log("✅ HTML rendered successfully");
+    
+    // Add event listeners
+    const approveBtns = document.querySelectorAll('.approve-recall-btn');
+    const rejectBtns = document.querySelectorAll('.reject-recall-btn');
+    
+    console.log("🔗 Found", approveBtns.length, "approve buttons and", rejectBtns.length, "reject buttons");
+    
+    approveBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            console.log("✅ Approve button clicked for request:", e.currentTarget.dataset.requestId);
+            handleRecallRequest(e.currentTarget, 'approve');
+        });
+    });
+    
+    rejectBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            console.log("❌ Reject button clicked for request:", e.currentTarget.dataset.requestId);
+            handleRecallRequest(e.currentTarget, 'reject');
+        });
+    });
+}
+
+// Also update the switchTab function to ensure it loads data when switching tabs
+function switchTab(tab) {
+    console.log("🔄 Switching to tab:", tab);
+    
+    const breakTab = document.getElementById('break-tab');
+    const recallTab = document.getElementById('recall-tab');
+    const breakView = document.getElementById('break-students-view');
+    const recallView = document.getElementById('recall-requests-view');
+    
+    if (tab === 'break') {
+        breakTab.classList.add('active', 'border-b-2', 'border-green-600', 'text-green-600');
+        breakTab.classList.remove('text-gray-500');
+        recallTab.classList.remove('active', 'border-b-2', 'border-purple-600', 'text-purple-600');
+        recallTab.classList.add('text-gray-500');
+        breakView.classList.remove('hidden');
+        recallView.classList.add('hidden');
+        console.log("✅ Switched to Break tab");
+    } else {
+        recallTab.classList.add('active', 'border-b-2', 'border-purple-600', 'text-purple-600');
+        recallTab.classList.remove('text-gray-500');
+        breakTab.classList.remove('active', 'border-b-2', 'border-green-600', 'text-green-600');
+        breakTab.classList.add('text-gray-500');
+        recallView.classList.remove('hidden');
+        breakView.classList.add('hidden');
+        console.log("✅ Switched to Recall tab");
+        
+        // Force refresh of recall requests when switching to recall tab
+        setTimeout(() => {
+            if (!window.sessionCache.recallRequests || window.sessionCache.recallRequests.length === 0) {
+                console.log("📥 No cached recall requests, fetching fresh data...");
+                fetchRecallRequests(true);
+            } else {
+                console.log("📊 Using cached recall requests:", window.sessionCache.recallRequests.length);
+                renderRecallRequests(window.sessionCache.recallRequests);
+            }
+        }, 100);
+    }
+}
+
+// Add this debug button to your HTML temporarily:
+// <button onclick="testRecallRequests()" class="bg-red-500 text-white px-4 py-2 rounded">Test Recall Requests</button>
+
+// And add this test function:
+async function testRecallRequests() {
+    console.log("🧪 Testing recall requests...");
+    
+    try {
+        // Test 1: Check Firestore connection
+        console.log("🔍 Testing Firestore connection...");
+        console.log("Firestore db:", db);
+        
+        // Test 2: Check if collection exists by trying to get count
+        const testQuery = query(collection(db, "recall_requests"));
+        const testSnapshot = await getDocs(testQuery);
+        console.log("📊 Total recall_requests documents:", testSnapshot.size);
+        
+        // Test 3: Show all documents
+        testSnapshot.forEach(doc => {
+            console.log("📄 Document ID:", doc.id, "Data:", doc.data());
+        });
+        
+        // Test 4: Try the actual query
+        console.log("🔍 Running actual query...");
+        const pendingQuery = query(collection(db, "recall_requests"), where("status", "==", "pending"));
+        const pendingSnapshot = await getDocs(pendingQuery);
+        console.log("✅ Pending recall requests:", pendingSnapshot.size);
+        
+        if (pendingSnapshot.size === 0) {
+            console.log("📭 No pending recall requests found. Check if:");
+            console.log("1. The collection exists");
+            console.log("2. Documents have 'status' field set to 'pending'");
+            console.log("3. The tutor actually submitted a recall request");
+        }
+        
+    } catch (error) {
+        console.error("❌ Test failed:", error);
+    }
+}
+
 // ======================================================
 // SECTION 6: COMMUNICATION PANELS
 // ======================================================
@@ -8608,6 +8894,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
