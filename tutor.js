@@ -4065,7 +4065,7 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
 }
 
 /*******************************************************************************
- * SECTION 12: STUDENT DATABASE MANAGEMENT (FINAL FIXED VERSION)
+ * SECTION 12: STUDENT DATABASE MANAGEMENT (FINAL FIXED VERSION WITH NEW FEATURES)
  ******************************************************************************/
 
 // --- Form Helper (Specific to this section) ---
@@ -4230,13 +4230,28 @@ function showEditStudentModal(student) {
     });
 }
 
-
 // --- Main Render Function ---
 async function renderStudentDatabase(container, tutor) {
     if (!container) return;
 
     // Load Reports
     let savedReports = await loadReportsFromFirestore(tutor.email);
+    
+    // NEW: Add toggle state for showing total fees
+    const showFeesToggleKey = `showFeesToggle_${tutor.email}`;
+    const showFeesToggle = localStorage.getItem(showFeesToggleKey) === 'true';
+    
+    // Helper function to calculate total fees (excluding break students)
+    function calculateTotalFees() {
+        let total = 0;
+        approvedStudents.forEach(student => {
+            // Only add fees for students NOT on break
+            if (!student.summerBreak) {
+                total += student.studentFee || 0;
+            }
+        });
+        return total;
+    }
     
     // Queries
     const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
@@ -4284,9 +4299,23 @@ async function renderStudentDatabase(container, tutor) {
 
     const studentsCount = students.length;
 
-    // --- RENDER UI (Exact Old Design) ---
+    // --- RENDER UI (Updated with new features) ---
     function renderUI() {
-        let studentsHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">My Students (${studentsCount})</h2>`;
+        let studentsHTML = `
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-green-700">My Students (${studentsCount})</h2>
+                <div class="flex items-center space-x-4">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="toggle-fees-display" class="hidden peer" ${showFeesToggle ? 'checked' : ''}>
+                        <div class="relative w-12 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-colors">
+                            <div class="absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-6"></div>
+                        </div>
+                        <span class="text-sm font-medium">Show Total Fees</span>
+                    </label>
+                    ${showFeesToggle ? `<div class="bg-green-100 text-green-800 px-3 py-1 rounded-lg font-bold" id="total-fees-display">Total: ₦${calculateTotalFees().toLocaleString()}</div>` : ''}
+                </div>
+            </div>`;
+        
         studentsHTML += `
             <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
                 <h3 class="font-bold text-lg mb-2">Add a New Student</h3>
@@ -4322,10 +4351,15 @@ async function renderStudentDatabase(container, tutor) {
                     const transIndicator = student.isTransitioning ? `<span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full ml-2">Transitioning</span>` : '';
                     statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>${transIndicator}`;
                     
-                    if (isSummerBreakEnabled && !student.summerBreak) {
-                        actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Break</button>`;
-                    } else if (student.summerBreak) {
-                        actionsHTML += `<span class="text-gray-400">On Break</span>`;
+                    // NEW BREAK/RECALL LOGIC
+                    if (isSummerBreakEnabled) {
+                        if (student.summerBreak) {
+                            // Student is on break - show Recall button
+                            actionsHTML += `<button class="recall-from-break-btn bg-purple-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Recall</button>`;
+                        } else {
+                            // Student is active - show Break button
+                            actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Break</button>`;
+                        }
                     }
 
                     if (isSubmissionEnabled && !student.summerBreak) {
@@ -4507,7 +4541,7 @@ async function renderStudentDatabase(container, tutor) {
     }
 
     function attachEventListeners() {
-        // ... (Listeners for subjects/group class/edit/delete same as before) ...
+        // Subject checkbox listener for group class
         const subjectsContainer = document.getElementById('new-student-subjects-container');
         const groupClassContainer = document.getElementById('group-class-container');
         if (subjectsContainer && groupClassContainer) {
@@ -4520,15 +4554,25 @@ async function renderStudentDatabase(container, tutor) {
             });
         }
         
+        // Toggle for showing total fees
+        const toggleFees = document.getElementById('toggle-fees-display');
+        if (toggleFees) {
+            toggleFees.addEventListener('change', (e) => {
+                localStorage.setItem(showFeesToggleKey, e.target.checked);
+                renderStudentDatabase(container, tutor);
+            });
+        }
+        
+        // Add transitioning student
         const transitionBtn = document.getElementById('add-transitioning-btn');
         if(transitionBtn) transitionBtn.addEventListener('click', () => {
             if(confirm("Add Transitioning Student?")) addTransitioningStudent();
         });
 
+        // Add regular student
         const studentBtn = document.getElementById('add-student-btn');
         if (studentBtn && isTutorAddEnabled) {
              studentBtn.addEventListener('click', async () => {
-                // Add student logic (simplified for brevity, identical to legacy)
                 const parentName = document.getElementById('new-parent-name').value.trim();
                 const parentPhone = document.getElementById('new-parent-phone').value.trim();
                 const studentName = document.getElementById('new-student-name').value.trim();
@@ -4543,26 +4587,34 @@ async function renderStudentDatabase(container, tutor) {
                     showCustomAlert('Please fill in all parent and student details.');
                     return;
                 }
+                
                 const payScheme = getTutorPayScheme(tutor);
                 const suggestedFee = calculateSuggestedFee({ grade: studentGrade, days: studentDays, subjects: selectedSubjects, groupClass: groupClass }, payScheme);
                 const studentData = { parentName, parentPhone, studentName, grade: studentGrade, subjects: selectedSubjects, days: studentDays, studentFee: suggestedFee > 0 ? suggestedFee : studentFee, tutorEmail: tutor.email, tutorName: tutor.name };
-                if (document.getElementById('group-class-container') && !document.getElementById('group-class-container').classList.contains('hidden')) studentData.groupClass = groupClass;
                 
-                if (isBypassApprovalEnabled) { await addDoc(collection(db, "students"), studentData); } 
-                else { await addDoc(collection(db, "pending_students"), studentData); }
+                if (document.getElementById('group-class-container') && !document.getElementById('group-class-container').classList.contains('hidden')) {
+                    studentData.groupClass = groupClass;
+                }
+                
+                if (isBypassApprovalEnabled) {
+                    await addDoc(collection(db, "students"), studentData);
+                } else {
+                    await addDoc(collection(db, "pending_students"), studentData);
+                }
                 showCustomAlert('Student Added!');
                 renderStudentDatabase(container, tutor);
             });
         }
 
+        // Enter report buttons
         document.querySelectorAll('.enter-report-btn, .submit-single-report-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const s = students.find(s => s.id === btn.getAttribute('data-student-id'));
-                showReportModal(s); // CALLS THE LOCAL FUNCTION DIRECTLY
+                showReportModal(s);
             });
         });
 
-        // ... Other listeners (Summer break, submit all, edit, delete) ...
+        // Summer break button
         document.querySelectorAll('.summer-break-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const s = students.find(s => s.id === btn.getAttribute('data-student-id'));
@@ -4573,15 +4625,52 @@ async function renderStudentDatabase(container, tutor) {
             });
         });
         
+        // NEW: Recall from break button
+        document.querySelectorAll('.recall-from-break-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const student = students.find(s => s.id === studentId);
+                
+                if (confirm(`Recall ${student.studentName} from break? This requires management approval.`)) {
+                    try {
+                        const recallRequest = {
+                            studentId: student.id,
+                            studentName: student.studentName,
+                            tutorId: tutor.id,
+                            tutorName: tutor.name,
+                            tutorEmail: tutor.email,
+                            requestDate: new Date(),
+                            status: 'pending',
+                            type: 'recall_from_break'
+                        };
+                        
+                        await addDoc(collection(db, "recall_requests"), recallRequest);
+                        showCustomAlert('✅ Recall request sent to management for approval.');
+                        renderStudentDatabase(container, tutor);
+                    } catch (error) {
+                        console.error("Error sending recall request:", error);
+                        showCustomAlert('❌ Error sending recall request. Please try again.');
+                    }
+                }
+            });
+        });
+        
+        // Submit all reports
         const subAll = document.getElementById('submit-all-reports-btn');
         if(subAll) subAll.addEventListener('click', () => showAccountDetailsModal(Object.values(savedReports)));
         
+        // Save management fee
         const saveFee = document.getElementById('save-management-fee-btn');
         if(saveFee) saveFee.addEventListener('click', async () => {
              const f = parseFloat(document.getElementById('management-fee-input').value);
-             if(f>=0) { await updateDoc(doc(db, "tutors", tutor.id), { managementFee: f }); tutor.managementFee = f; showCustomAlert("Fee Saved"); }
+             if(f>=0) { 
+                 await updateDoc(doc(db, "tutors", tutor.id), { managementFee: f }); 
+                 tutor.managementFee = f; 
+                 showCustomAlert("Fee Saved"); 
+             }
         });
 
+        // Edit student
         document.querySelectorAll('.edit-student-btn-tutor').forEach(btn => {
             btn.addEventListener('click', () => {
                 const s = students.find(s => s.id === btn.getAttribute('data-student-id'));
@@ -4589,6 +4678,7 @@ async function renderStudentDatabase(container, tutor) {
             });
         });
 
+        // Delete student
         document.querySelectorAll('.delete-student-btn-tutor').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const s = students.find(s => s.id === btn.getAttribute('data-student-id'));
@@ -4600,40 +4690,38 @@ async function renderStudentDatabase(container, tutor) {
         });
 
         async function addTransitioningStudent() {
-            // Simplified logic reusing main add logic but setting isTransitioning: true
-             // (Logic for adding student is complex, reusing addTransitioningStudent as template) ...
-                const parentName = document.getElementById('new-parent-name').value.trim();
-                const parentPhone = document.getElementById('new-parent-phone').value.trim();
-                const studentName = document.getElementById('new-student-name').value.trim();
-                const studentGrade = document.getElementById('new-student-grade').value.trim();
-                const selectedSubjects = [];
-                document.querySelectorAll('input[name="subjects"]:checked').forEach(checkbox => { selectedSubjects.push(checkbox.value); });
-                const studentDays = document.getElementById('new-student-days').value.trim();
-                const groupClass = document.getElementById('new-student-group-class') ? document.getElementById('new-student-group-class').checked : false;
-                const studentFee = parseFloat(document.getElementById('new-student-fee').value);
-                
-                if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
-                    showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
-                    return;
-                }
+            const parentName = document.getElementById('new-parent-name').value.trim();
+            const parentPhone = document.getElementById('new-parent-phone').value.trim();
+            const studentName = document.getElementById('new-student-name').value.trim();
+            const studentGrade = document.getElementById('new-student-grade').value.trim();
+            const selectedSubjects = [];
+            document.querySelectorAll('input[name="subjects"]:checked').forEach(checkbox => { selectedSubjects.push(checkbox.value); });
+            const studentDays = document.getElementById('new-student-days').value.trim();
+            const groupClass = document.getElementById('new-student-group-class') ? document.getElementById('new-student-group-class').checked : false;
+            const studentFee = parseFloat(document.getElementById('new-student-fee').value);
+            
+            if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
+                showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
+                return;
+            }
 
-                const payScheme = getTutorPayScheme(tutor);
-                const suggestedFee = calculateSuggestedFee({ grade: studentGrade, days: studentDays, subjects: selectedSubjects, groupClass: groupClass }, payScheme);
-                const studentData = {
-                    parentName: parentName, parentPhone: parentPhone, studentName: studentName, grade: studentGrade,
-                    subjects: selectedSubjects, days: studentDays, studentFee: suggestedFee > 0 ? suggestedFee : studentFee,
-                    tutorEmail: tutor.email, tutorName: tutor.name,
-                    isTransitioning: true
-                };
-                if (document.getElementById('group-class-container') && !document.getElementById('group-class-container').classList.contains('hidden')) {
-                    studentData.groupClass = groupClass;
-                }
+            const payScheme = getTutorPayScheme(tutor);
+            const suggestedFee = calculateSuggestedFee({ grade: studentGrade, days: studentDays, subjects: selectedSubjects, groupClass: groupClass }, payScheme);
+            const studentData = {
+                parentName: parentName, parentPhone: parentPhone, studentName: studentName, grade: studentGrade,
+                subjects: selectedSubjects, days: studentDays, studentFee: suggestedFee > 0 ? suggestedFee : studentFee,
+                tutorEmail: tutor.email, tutorName: tutor.name,
+                isTransitioning: true
+            };
+            if (document.getElementById('group-class-container') && !document.getElementById('group-class-container').classList.contains('hidden')) {
+                studentData.groupClass = groupClass;
+            }
 
-                try {
-                    if (isBypassApprovalEnabled) { await addDoc(collection(db, "students"), studentData); showCustomAlert('Student added successfully!'); } 
-                    else { await addDoc(collection(db, "pending_students"), studentData); showCustomAlert('Student added and is pending approval.'); }
-                    renderStudentDatabase(container, tutor);
-                } catch (error) { console.error("Error adding student:", error); showCustomAlert(`An error occurred: ${error.message}`); }
+            try {
+                if (isBypassApprovalEnabled) { await addDoc(collection(db, "students"), studentData); showCustomAlert('Student added successfully!'); } 
+                else { await addDoc(collection(db, "pending_students"), studentData); showCustomAlert('Student added and is pending approval.'); }
+                renderStudentDatabase(container, tutor);
+            } catch (error) { console.error("Error adding student:", error); showCustomAlert(`An error occurred: ${error.message}`); }
         }
     }
 
@@ -5086,6 +5174,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
