@@ -1957,17 +1957,39 @@ function initScheduleManager(tutor) {
     const firebaseDeps = {
         db: db,
         methods: { 
-            getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc
-            // Removed deleteField from here since we're not using it
+            getDocs, query, collection, where, doc, updateDoc, 
+            setDoc, deleteDoc, getDoc  // Make sure getDoc is included
         }
     };
     
     window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
-    window.scheduleManager.checkAndShowPopup();
     
+    // Auto-check for unscheduled students
+    setTimeout(() => {
+        window.scheduleManager.checkAndShowPopup();
+    }, 1000);
+    
+    // Helper to bind the "Manage Schedules" button in your navbar
     const manageBtn = document.getElementById('manage-schedules-nav-btn');
     if (manageBtn) {
-        manageBtn.onclick = () => window.scheduleManager.openManualManager();
+        manageBtn.onclick = () => {
+            if (window.scheduleManager) {
+                window.scheduleManager.openManualManager();
+            } else {
+                showCustomAlert('Schedule manager not initialized. Please refresh the page.');
+            }
+        };
+    }
+    
+    // Also bind to any existing "setup-all-schedules-btn" in the dashboard
+    const setupBtn = document.getElementById('setup-all-schedules-btn');
+    if (setupBtn && !setupBtn.hasAttribute('data-bound')) {
+        setupBtn.setAttribute('data-bound', 'true');
+        setupBtn.addEventListener('click', () => {
+            if (window.scheduleManager) {
+                window.scheduleManager.openManualManager();
+            }
+        });
     }
 }
 
@@ -3583,16 +3605,35 @@ function renderTutorDashboard(container, tutor) {
 
     // Add event listeners for new buttons
     const viewCalendarBtn = document.getElementById('view-full-calendar-btn');
-    if (viewCalendarBtn) {
-        viewCalendarBtn.addEventListener('click', showScheduleCalendarModal);
-    }
+if (viewCalendarBtn) {
+    viewCalendarBtn.addEventListener('click', showScheduleCalendarModal);
+}
     
     const setupSchedulesBtn = document.getElementById('setup-all-schedules-btn');
-    if (setupSchedulesBtn) {
-        setupSchedulesBtn.addEventListener('click', () => {
-            initScheduleManager(tutor);
-        });
-    }
+if (setupSchedulesBtn) {
+    setupSchedulesBtn.addEventListener('click', async () => {
+        try {
+            // Check if scheduleManager already exists
+            if (window.scheduleManager) {
+                await window.scheduleManager.openManualManager();
+            } else {
+                // Create a new instance if it doesn't exist
+                const firebaseDeps = {
+                    db: db,
+                    methods: { 
+                        getDocs, query, collection, where, doc, updateDoc, 
+                        setDoc, deleteDoc, getDoc  // Added getDoc here
+                    }
+                };
+                window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
+                await window.scheduleManager.openManualManager();
+            }
+        } catch (error) {
+            console.error("Error opening schedule manager:", error);
+            showCustomAlert('Error opening schedule manager. Please try again.');
+        }
+    });
+}
     
     const addTopicBtn = document.getElementById('add-topic-btn');
     if (addTopicBtn) {
@@ -5045,6 +5086,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
