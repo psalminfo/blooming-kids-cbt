@@ -1,1 +1,21 @@
-/*    /index.html    200
+# Main entry points
+/                   /index.html      200
+/tutor/*            /tutor.html      200
+/tutor              /tutor.html      200
+/parent/*           /parent.html     200
+/parent             /parent.html     200
+/management/*       /management.html 200
+/management         /management.html 200
+/enrollment/*       /enrollment.html 200
+/enrollment         /enrollment.html 200
+/enrollment-portal/*       /enrollment-portal.html 200
+/enrollment-portal         /enrollment-portal.html 200
+
+# API and assets - don't redirect
+/assets/*           /assets/*        200
+/*.js               /*.js            200
+/*.css              /*.css           200
+/*.png              /*.png           200
+
+# Catch-all for everything else (fallback to index.html)
+/*                  /index.html      200
