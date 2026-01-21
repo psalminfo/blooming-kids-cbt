@@ -7106,45 +7106,6 @@ function renderBreakStudentsFromCache(searchTerm = '', filterValue = 'all') {
     });
 }
 
-// Also update the switchTab function to ensure it loads data when switching tabs
-function switchTab(tab) {
-    console.log("🔄 Switching to tab:", tab);
-    
-    const breakTab = document.getElementById('break-tab');
-    const recallTab = document.getElementById('recall-tab');
-    const breakView = document.getElementById('break-students-view');
-    const recallView = document.getElementById('recall-requests-view');
-    
-    if (tab === 'break') {
-        breakTab.classList.add('active', 'border-b-2', 'border-green-600', 'text-green-600');
-        breakTab.classList.remove('text-gray-500');
-        recallTab.classList.remove('active', 'border-b-2', 'border-purple-600', 'text-purple-600');
-        recallTab.classList.add('text-gray-500');
-        breakView.classList.remove('hidden');
-        recallView.classList.add('hidden');
-        console.log("✅ Switched to Break tab");
-    } else {
-        recallTab.classList.add('active', 'border-b-2', 'border-purple-600', 'text-purple-600');
-        recallTab.classList.remove('text-gray-500');
-        breakTab.classList.remove('active', 'border-b-2', 'border-green-600', 'text-green-600');
-        breakTab.classList.add('text-gray-500');
-        recallView.classList.remove('hidden');
-        breakView.classList.add('hidden');
-        console.log("✅ Switched to Recall tab");
-        
-        // Force refresh of recall requests when switching to recall tab
-        setTimeout(() => {
-            if (!window.sessionCache.recallRequests || window.sessionCache.recallRequests.length === 0) {
-                console.log("📥 No cached recall requests, fetching fresh data...");
-                fetchRecallRequests(true);
-            } else {
-                console.log("📊 Using cached recall requests:", window.sessionCache.recallRequests.length);
-                renderRecallRequests(window.sessionCache.recallRequests);
-            }
-        }, 100);
-    }
-}
-
 // Add this debug button to your HTML temporarily:
 // <button onclick="testRecallRequests()" class="bg-red-500 text-white px-4 py-2 rounded">Test Recall Requests</button>
 
@@ -8781,6 +8742,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
