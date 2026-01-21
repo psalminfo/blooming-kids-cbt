@@ -3,7 +3,7 @@
  ******************************************************************************/
 
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc, deleteField } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -1833,69 +1833,73 @@ class ScheduleManager {
     }
 
     async save(moveToNext) {
-        const rows = this.popup.querySelectorAll('.time-slot-row');
-        const schedule = [];
-        let isValid = true;
+    const rows = this.popup.querySelectorAll('.time-slot-row');
+    const schedule = [];
+    let isValid = true;
 
-        rows.forEach(row => {
-            const day = row.querySelector('.day-select').value;
-            const start = row.querySelector('.start-select').value;
-            const end = row.querySelector('.end-select').value;
+    rows.forEach(row => {
+        const day = row.querySelector('.day-select').value;
+        const start = row.querySelector('.start-select').value;
+        const end = row.querySelector('.end-select').value;
 
-            if (start === end) {
-                this.showAlert('Start and End time cannot be the same', 'error');
-                isValid = false;
-            }
-            schedule.push({ day, start, end });
+        if (start === end) {
+            this.showAlert('Start and End time cannot be the same', 'error');
+            isValid = false;
+        }
+        schedule.push({ day, start, end });
+    });
+
+    if (!isValid) return;
+
+    try {
+        const { updateDoc, doc, setDoc } = this.methods;
+        
+        // 1. Update Student Record
+        const studentRef = doc(this.db, "students", this.activeStudent.id);
+        await updateDoc(studentRef, { schedule });
+
+        // 2. Update/Create Schedule Document
+        const scheduleRef = doc(this.db, "schedules", `sched_${this.activeStudent.id}`);
+        await setDoc(scheduleRef, {
+            studentId: this.activeStudent.id,
+            studentName: this.activeStudent.studentName,
+            tutorEmail: this.tutor.email,
+            schedule,
+            updatedAt: new Date()
+        }, { merge: true });
+
+        this.showAlert('✅ Schedule Saved!', 'success');
+        
+        if (moveToNext) this.next(true);
+        else this.closeModal();
+
+    } catch (error) {
+        console.error(error);
+        this.showAlert('Save failed. Check console.', 'error');
+    }
+}
+
+   async deleteSchedule() {
+    if (!confirm(`Delete schedule for ${this.activeStudent.studentName}?`)) return;
+
+    try {
+        const { updateDoc, doc, deleteDoc } = this.methods;
+        
+        // Remove schedule field from student
+        await updateDoc(doc(this.db, "students", this.activeStudent.id), { 
+            schedule: []  // Set to empty array instead of deleting field
         });
+        
+        // Delete the schedule document
+        await deleteDoc(doc(this.db, "schedules", `sched_${this.activeStudent.id}`));
 
-        if (!isValid) return;
-
-        try {
-            const { updateDoc, doc, setDoc, deleteField } = this.methods;
-            
-            // 1. Update Student Record
-            const studentRef = doc(this.db, "students", this.activeStudent.id);
-            await updateDoc(studentRef, { schedule });
-
-            // 2. Update/Create Schedule Document
-            const scheduleRef = doc(this.db, "schedules", `sched_${this.activeStudent.id}`);
-            await setDoc(scheduleRef, {
-                studentId: this.activeStudent.id,
-                studentName: this.activeStudent.studentName,
-                tutorEmail: this.tutor.email,
-                schedule,
-                updatedAt: new Date()
-            }, { merge: true });
-
-            this.showAlert('✅ Schedule Saved!', 'success');
-            
-            if (moveToNext) this.next(true);
-            else this.closeModal();
-
-        } catch (error) {
-            console.error(error);
-            this.showAlert('Save failed. Check console.', 'error');
-        }
+        this.showAlert('Schedule Deleted', 'success');
+        this.next(false); // Move next but don't mark as "scheduled"
+    } catch (error) {
+        console.error("Delete error:", error);
+        this.showAlert('Delete failed', 'error');
     }
-
-    async deleteSchedule() {
-        if (!confirm(`Delete schedule for ${this.activeStudent.studentName}?`)) return;
-
-        try {
-            const { updateDoc, doc, deleteDoc, deleteField } = this.methods;
-            
-            await updateDoc(doc(this.db, "students", this.activeStudent.id), { 
-                schedule: deleteField() 
-            });
-            await deleteDoc(doc(this.db, "schedules", `sched_${this.activeStudent.id}`));
-
-            this.showAlert('Schedule Deleted', 'success');
-            this.next(false); // Move next but don't mark as "scheduled"
-        } catch (error) {
-            this.showAlert('Delete failed', 'error');
-        }
-    }
+}
 
     // --- UTILITIES ---
 
@@ -1950,21 +1954,17 @@ class ScheduleManager {
 // We pass the Firebase methods explicitly to avoid "magic global" errors.
 
 function initScheduleManager(tutor) {
-    // Ensure these globals exist in your environment, or import them if using modules
     const firebaseDeps = {
-        db: db, // Your global db instance
+        db: db,
         methods: { 
-            getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc, deleteField 
+            getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc
+            // Removed deleteField from here since we're not using it
         }
     };
     
-    // Create the instance and attach to window for debugging/access
     window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
-    
-    // Auto-check for unscheduled students
     window.scheduleManager.checkAndShowPopup();
     
-    // Helper to bind the "Manage Schedules" button in your navbar
     const manageBtn = document.getElementById('manage-schedules-nav-btn');
     if (manageBtn) {
         manageBtn.onclick = () => window.scheduleManager.openManualManager();
@@ -5045,6 +5045,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
