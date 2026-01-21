@@ -1,19 +1,21 @@
-# AUTH PAGES FIRST
+# Enrollment routes
+/enrollment*       /enrollment.html     200
+/enrollment-portal /enrollment.html     200
+
+# Other auth pages
 /tutor-auth*       /tutor-auth.html     200
 /parent-auth*      /parent-auth.html    200
 /management-auth*  /management-auth.html 200
 /admin-auth*       /admin-auth.html     200
-/enrollment-auth*  /enrollment-auth.html 200
 
-# Portals next
+# Portal main pages
 /tutor*            /tutor.html          200
 /parent*           /parent.html         200
 /management*       /management.html     200
 /admin*            /admin.html          200
-/enrollment*       /enrollment.html     200
 
 # Root
 /                  /index.html          200
 
-# Catch-all LAST
+# Catch-all
 /*                 /index.html          200
