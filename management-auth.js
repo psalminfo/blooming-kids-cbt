@@ -2,22 +2,27 @@ import { auth, db } from './firebaseConfig.js';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
-const signupBtn = document.getElementById('signup-btn');
-const signinBtn = document.getElementById('signin-btn');
 const errorMessage = document.getElementById('error-message');
 
 // Toggle between Sign Up and Sign In forms
-document.getElementById('show-signin').addEventListener('click', () => {
+document.getElementById('show-signin').addEventListener('click', (e) => {
+    e.preventDefault();
     document.getElementById('signup-container').style.display = 'none';
     document.getElementById('signin-container').style.display = 'block';
-});
-document.getElementById('show-signup').addEventListener('click', () => {
-    document.getElementById('signin-container').style.display = 'none';
-    document.getElementById('signup-container').style.display = 'block';
+    errorMessage.textContent = '';
 });
 
-// Sign-Up Handler
-signupBtn.addEventListener('click', async () => {
+document.getElementById('show-signup').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('signin-container').style.display = 'none';
+    document.getElementById('signup-container').style.display = 'block';
+    errorMessage.textContent = '';
+});
+
+// Sign-Up Form Handler
+document.getElementById('signup-form').addEventListener('submit', async (e) => {
+    e.preventDefault(); // Prevent page reload
+    
     const name = document.getElementById('signup-name').value;
     const email = document.getElementById('signup-email').value;
     const password = document.getElementById('signup-password').value;
@@ -49,8 +54,10 @@ signupBtn.addEventListener('click', async () => {
     }
 });
 
-// Sign-In Handler
-signinBtn.addEventListener('click', async () => {
+// Sign-In Form Handler
+document.getElementById('signin-form').addEventListener('submit', async (e) => {
+    e.preventDefault(); // Prevent page reload
+    
     const email = document.getElementById('signin-email').value;
     const password = document.getElementById('signin-password').value;
     errorMessage.textContent = '';
@@ -76,6 +83,11 @@ const forgotPasswordLink = document.getElementById('forgot-password-link');
 
 forgotPasswordLink.addEventListener('click', async (e) => {
     e.preventDefault(); // Prevent the link from navigating
+    
+    // First make sure we're showing the signin form
+    document.getElementById('signup-container').style.display = 'none';
+    document.getElementById('signin-container').style.display = 'block';
+    
     const email = document.getElementById('signin-email').value;
 
     if (!email) {
