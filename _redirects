@@ -14,6 +14,7 @@
 
 # ========== STATIC FILES ==========
 /portal-sessions-minimal.js  /portal-sessions-minimal.js  200
+/portal-universe.js    /portal-universe.js    200
 /*.js                 /*.js                 200
 /*.css                /*.css                200
 /*.png                /*.png                200
