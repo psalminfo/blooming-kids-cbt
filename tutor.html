@@ -15,8 +15,10 @@
         gtag('config', 'G-NBTVEGH1SL');
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="fonts/material-design-iconic-font/css/material-design-iconic-font.min.css">
-    <link rel="stylesheet" href="css/style.css">
+    <!-- REMOVED BROKEN FONT LINK -->
+    <!-- <link rel="stylesheet" href="fonts/material-design-iconic-font/css/material-design-iconic-font.min.css"> -->
+    <!-- REMOVED BROKEN CSS LINK -->
+    <!-- <link rel="stylesheet" href="css/style.css"> -->
     
     <style>
         /* Custom Styles for Nav Buttons */
@@ -38,9 +40,14 @@
             justify-content: center;
             align-items: flex-start;
             min-height: 100vh;
-             background-image: url('https://res.cloudinary.com/dy2hxcyaf/image/upload/v1767511634/0eba85cdd30407bc616950834aa7f4d1_black_homeschool-1000-c-90_yyy1il.jpg') !important; }
+            /* FIXED: Subtle background image with transparency */
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.85)),
+                url('https://res.cloudinary.com/dy2hxcyaf/image/upload/v1767511634/0eba85cdd30407bc616950834aa7f4d1_black_homeschool-1000-c-90_yyy1il.jpg') !important;
             background-size: cover;
-            background-position: center;
+            background-position: center top; /* Show only top part */
+            background-attachment: fixed;
+            background-blend-mode: overlay;
             transition: background-color 0.3s;
         }
         .inner {
@@ -200,7 +207,10 @@
         /* --- DARK MODE STYLES --- */
         .dark .wrapper {
             background-color: #111827 !important;
-            background-image: linear-gradient(rgba(17, 24, 39, 0.9), rgba(17, 24, 39, 0.9)), url('images/bg-registration-form-2.jpg') !important;
+            /* Same background image but with dark overlay for dark mode */
+            background-image: 
+                linear-gradient(rgba(17, 24, 39, 0.85), rgba(17, 24, 39, 0.85)),
+                url('https://res.cloudinary.com/dy2hxcyaf/image/upload/v1767511634/0eba85cdd30407bc616950834aa7f4d1_black_homeschool-1000-c-90_yyy1il.jpg') !important;
             background-blend-mode: overlay;
         }
         
@@ -524,4 +534,3 @@
     </script>
 </body>
 </html>
-
