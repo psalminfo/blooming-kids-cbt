@@ -4978,7 +4978,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>`;
             }
         } else {
-            window.location.href = 'login.html';
+            window.location.href ='/tutor-auth.html';
         }
     });
 
@@ -5044,6 +5044,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
