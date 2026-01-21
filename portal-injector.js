@@ -1,57 +1,54 @@
 /*******************************************************************************
- * SECURE PORTAL INJECTOR - Tamper-Resistant Loader
- * Skips auth pages to prevent redirect issues
+ * PORTAL INJECTOR - FIXED VERSION
+ * Skips ALL auth/login pages including enrollment.html
  ******************************************************************************/
 
 (function() {
     'use strict';
     
-    // === SECURITY CONFIG ===
-    const SECURITY = {
-        ALLOWED_DOMAINS: ['bkh.netlify.app', 'localhost'],
-        INTEGRITY_HASH: 'sha256-ABC123DEF456',
-        NONCE: 'portal-injector-' + Date.now() + '-' + Math.random().toString(36).substring(2),
-        MAX_INJECTION_ATTEMPTS: 2,
-        INJECTION_TIMEOUT: 5000
-    };
-    
-    // === AUTH PAGES TO SKIP ===
-    const SKIP_PAGES = [
+    // === PAGES THAT SHOULD NOT GET PORTAL PROTECTION ===
+    const NO_PROTECTION_PAGES = [
+        // Auth pages
         'tutor-auth', 'parent-auth', 'management-auth',
         'admin-auth', 'enrollment-auth', 'student-login',
+        
+        // Enrollment portal (it's an auth/login page)
+        'enrollment', 'enrollment-portal',
+        
+        // File extensions
         'tutor-auth.html', 'parent-auth.html', 'management-auth.html',
-        'admin-auth.html', 'enrollment-auth.html', 'student-login.html'
+        'admin-auth.html', 'enrollment-auth.html', 'student-login.html',
+        'enrollment.html'
     ];
     
-    // === VALIDATION FUNCTIONS ===
-    function isValidEnvironment() {
-        // Check domain
-        const hostname = window.location.hostname;
-        const isAllowedDomain = SECURITY.ALLOWED_DOMAINS.some(domain => 
-            hostname.includes(domain)
-        );
-        
-        if (!isAllowedDomain) {
-            console.warn('🚨 Injection blocked: Invalid domain');
-            return false;
-        }
-        
-        // Check for tampering
-        if (window.self !== window.top) {
-            console.warn('⚠️ Running in iframe - limited functionality');
-        }
-        
-        return true;
-    }
-    
-    // Check if we should skip injection (auth pages)
-    function shouldSkipInjection() {
+    // === CHECK IF CURRENT PAGE SHOULD BE PROTECTED ===
+    function shouldProtectThisPage() {
         const path = window.location.pathname.toLowerCase();
         
-        // Skip auth/login pages
-        for (const page of SKIP_PAGES) {
+        // Check if this is an auth/login page
+        for (const page of NO_PROTECTION_PAGES) {
             if (path.includes(page.toLowerCase())) {
-                console.log(`⏭️ Skipping injection on auth page: ${page}`);
+                console.log(`⏭️ Skipping portal protection on: ${page}`);
+                return false;
+            }
+        }
+        
+        // Check if this is a portal page that needs protection
+        const portalPages = [
+            'tutor.html', 'parent.html', 'management.html',
+            'admin.html', 'index.html', '/'
+        ];
+        
+        for (const page of portalPages) {
+            if (path.includes(page.toLowerCase())) {
+                return true;
+            }
+        }
+        
+        // Check for portal routes without .html
+        const portalRoutes = ['/tutor', '/parent', '/management', '/admin'];
+        for (const route of portalRoutes) {
+            if (path.startsWith(route) && path !== route + '-auth') {
                 return true;
             }
         }
@@ -59,157 +56,52 @@
         return false;
     }
     
-    function shouldInjectProtector() {
-        if (shouldSkipInjection()) {
-            return false;
-        }
-        
-        const path = window.location.pathname.toLowerCase();
-        const protectedPatterns = [
-            '/tutor', '/parent', '/management', '/admin', '/enrollment',
-            'tutor.html', 'parent.html', 'management.html', 'admin.html', 'enrollment.html',
-            'index.html', '/'
-        ];
-        
-        return protectedPatterns.some(pattern => 
-            path.includes(pattern.toLowerCase())
-        );
-    }
-    
-    // === SECURE INJECTION ===
-    function injectSecureScript() {
-        if (!isValidEnvironment()) return;
-        
-        // Check if already injected
-        if (document.querySelector('script[data-portal-protector="secured"]')) {
-            console.log('✅ Portal protector already loaded');
+    // === INJECT PORTAL PROTECTOR ===
+    function injectPortalProtector() {
+        // Already injected?
+        if (document.querySelector('script[data-portal-protector]')) {
             return;
         }
         
-        // Create script element with security attributes
         const script = document.createElement('script');
         script.src = '/portal-protector.js';
         script.async = true;
-        script.defer = true;
-        script.setAttribute('data-portal-protector', 'secured');
-        script.setAttribute('nonce', SECURITY.NONCE);
-        script.setAttribute('data-injected-at', Date.now());
+        script.setAttribute('data-portal-protector', 'true');
         
-        // Add integrity check (in production, use real hash)
-        // script.integrity = SECURITY.INTEGRITY_HASH;
-        // script.crossOrigin = 'anonymous';
-        
-        // Error handling
-        script.onerror = function() {
-            console.error('❌ Failed to load portal protector');
-            this.remove();
+        script.onerror = () => {
+            console.error('Failed to load portal protector');
+            script.remove();
         };
         
-        script.onload = function() {
-            console.log('✅ Portal protector loaded successfully');
-            
-            // Verify injection
-            if (typeof window.SecurePortal !== 'undefined') {
-                console.log('🛡️  Secure Portal API initialized');
-            }
+        script.onload = () => {
+            console.log('✅ Portal protector loaded');
         };
         
-        // Insert in secure location
+        // Inject at the beginning of head
         if (document.head) {
-            // Insert before any other scripts
-            const firstScript = document.head.querySelector('script');
-            if (firstScript) {
-                document.head.insertBefore(script, firstScript);
-            } else {
-                document.head.appendChild(script);
-            }
-            
-            console.log('🔒 Secure portal protection injected');
+            document.head.insertBefore(script, document.head.firstChild);
+            console.log('🔒 Portal protection injected');
         } else {
-            // Wait for head
-            document.addEventListener('DOMContentLoaded', function() {
-                document.head.appendChild(script);
+            document.addEventListener('DOMContentLoaded', () => {
+                document.head.insertBefore(script, document.head.firstChild);
             });
         }
     }
     
-    // === TAMPER DETECTION ===
-    function setupTamperDetection() {
-        // Monitor script element
-        const observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
-                if (mutation.type === 'childList') {
-                    mutation.removedNodes.forEach(function(node) {
-                        if (node.nodeName === 'SCRIPT' && 
-                            node.getAttribute('data-portal-protector') === 'secured') {
-                            console.warn('🚨 Portal protector script removed! Re-injecting...');
-                            injectSecureScript();
-                        }
-                    });
-                }
-            });
-        });
-        
-        // Start observing
-        if (document.head) {
-            observer.observe(document.head, { 
-                childList: true, 
-                subtree: true 
-            });
-        }
-        
-        return observer;
-    }
-    
-    // === MAIN EXECUTION ===
+    // === MAIN ===
     function main() {
-        // Skip auth pages completely
-        if (shouldSkipInjection()) {
-            console.log('🔐 Auth page detected - skipping portal injection');
-            return;
-        }
-        
-        // Validate and inject
-        if (shouldInjectProtector()) {
-            // Add CSP meta tag dynamically (if not present)
-            const existingCSP = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
-            if (!existingCSP) {
-                const cspMeta = document.createElement('meta');
-                cspMeta.httpEquiv = "Content-Security-Policy";
-                cspMeta.content = "default-src 'self' https://*.firebaseio.com https://*.googleapis.com; script-src 'self' 'unsafe-inline' https://*.firebaseio.com; style-src 'self' 'unsafe-inline';";
-                document.head.appendChild(cspMeta);
-            }
-            
-            // Inject after a short delay to avoid race conditions
-            setTimeout(injectSecureScript, 100);
-            
-            // Setup tamper detection
-            setTimeout(setupTamperDetection, 500);
-            
-            console.log('🔐 Secure Portal Injector v2.1 initialized');
+        if (shouldProtectThisPage()) {
+            console.log('🛡️ This page needs portal protection');
+            setTimeout(injectPortalProtector, 100);
         } else {
-            console.log('ℹ️  Portal protector not needed for this page');
+            console.log('🔐 Auth/login page - no portal protection needed');
         }
     }
     
-    // === SAFE EXECUTION ===
-    try {
-        // Wait for document to be ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', main);
-        } else {
-            main();
-        }
-    } catch (error) {
-        console.error('Injector error:', error);
-        // Only inject on non-auth pages even if error
-        if (!shouldSkipInjection()) {
-            setTimeout(injectSecureScript, 1000);
-        }
+    // Start
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', main);
+    } else {
+        main();
     }
-    
-    // === GLOBAL CONFIG CHECK ===
-    // Ensure auth pages don't get portal features
-    window.isAuthPage = shouldSkipInjection();
-    
 })();
