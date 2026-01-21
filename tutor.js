@@ -6,6 +6,7 @@ import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc, deleteField } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 /*******************************************************************************
  * SECTION 2: STYLES & CSS
@@ -1951,11 +1952,11 @@ class ScheduleManager {
 function initScheduleManager(tutor) {
     // Ensure these globals exist in your environment, or import them if using modules
     const firebaseDeps = {
-        db: db, // Your global db instance
-        methods: { 
-            getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc, deleteField 
-        }
-    };
+    db: db,
+    methods: { 
+        getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc, deleteField 
+    }
+};
     
     // Create the instance and attach to window for debugging/access
     window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
@@ -3589,7 +3590,7 @@ function renderTutorDashboard(container, tutor) {
     const setupSchedulesBtn = document.getElementById('setup-all-schedules-btn');
     if (setupSchedulesBtn) {
         setupSchedulesBtn.addEventListener('click', () => {
-            checkAndShowSchedulePopup(tutor);
+            initScheduleManager(tutor);
         });
     }
     
@@ -5044,6 +5045,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
