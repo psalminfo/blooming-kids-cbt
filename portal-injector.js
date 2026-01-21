@@ -1,6 +1,6 @@
 /*******************************************************************************
  * SECURE PORTAL INJECTOR - Tamper-Resistant Loader
- * Uses nonce, integrity checks, and mutation observers
+ * Skips auth pages to prevent redirect issues
  ******************************************************************************/
 
 (function() {
@@ -9,11 +9,19 @@
     // === SECURITY CONFIG ===
     const SECURITY = {
         ALLOWED_DOMAINS: ['bkh.netlify.app', 'localhost'],
-        INTEGRITY_HASH: 'sha256-ABC123DEF456', // Generate real hash in production
+        INTEGRITY_HASH: 'sha256-ABC123DEF456',
         NONCE: 'portal-injector-' + Date.now() + '-' + Math.random().toString(36).substring(2),
         MAX_INJECTION_ATTEMPTS: 2,
         INJECTION_TIMEOUT: 5000
     };
+    
+    // === AUTH PAGES TO SKIP ===
+    const SKIP_PAGES = [
+        'tutor-auth', 'parent-auth', 'management-auth',
+        'admin-auth', 'enrollment-auth', 'student-login',
+        'tutor-auth.html', 'parent-auth.html', 'management-auth.html',
+        'admin-auth.html', 'enrollment-auth.html', 'student-login.html'
+    ];
     
     // === VALIDATION FUNCTIONS ===
     function isValidEnvironment() {
@@ -36,17 +44,36 @@
         return true;
     }
     
+    // Check if we should skip injection (auth pages)
+    function shouldSkipInjection() {
+        const path = window.location.pathname.toLowerCase();
+        
+        // Skip auth/login pages
+        for (const page of SKIP_PAGES) {
+            if (path.includes(page.toLowerCase())) {
+                console.log(`⏭️ Skipping injection on auth page: ${page}`);
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
     function shouldInjectProtector() {
+        if (shouldSkipInjection()) {
+            return false;
+        }
+        
         const path = window.location.pathname.toLowerCase();
         const protectedPatterns = [
             '/tutor', '/parent', '/management', '/admin', '/enrollment',
             'tutor.html', 'parent.html', 'management.html', 'admin.html', 'enrollment.html',
-            'tutor-auth.html', 'parent-auth.html', 'management-auth.html', 'admin-auth.html', 'enrollment-auth.html'
+            'index.html', '/'
         ];
         
         return protectedPatterns.some(pattern => 
             path.includes(pattern.toLowerCase())
-        ) || path === '/' || path === '/index.html';
+        );
     }
     
     // === SECURE INJECTION ===
@@ -136,6 +163,12 @@
     
     // === MAIN EXECUTION ===
     function main() {
+        // Skip auth pages completely
+        if (shouldSkipInjection()) {
+            console.log('🔐 Auth page detected - skipping portal injection');
+            return;
+        }
+        
         // Validate and inject
         if (shouldInjectProtector()) {
             // Add CSP meta tag dynamically (if not present)
@@ -153,8 +186,7 @@
             // Setup tamper detection
             setTimeout(setupTamperDetection, 500);
             
-            // Self-check
-            console.log('🔐 Secure Portal Injector v2.0 initialized');
+            console.log('🔐 Secure Portal Injector v2.1 initialized');
         } else {
             console.log('ℹ️  Portal protector not needed for this page');
         }
@@ -170,7 +202,14 @@
         }
     } catch (error) {
         console.error('Injector error:', error);
-        // Fail safely - inject anyway
-        setTimeout(injectSecureScript, 1000);
+        // Only inject on non-auth pages even if error
+        if (!shouldSkipInjection()) {
+            setTimeout(injectSecureScript, 1000);
+        }
     }
+    
+    // === GLOBAL CONFIG CHECK ===
+    // Ensure auth pages don't get portal features
+    window.isAuthPage = shouldSkipInjection();
+    
 })();
