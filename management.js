@@ -194,7 +194,7 @@ async function renderDashboardPanel(container) {
                         <i class="fas fa-user-plus mr-2"></i> Assign New Student
                     </button>
                     <button id="quick-action-archive" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-3 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-archive mr-2"></i> Archive Student
+                        <i class="fas fa-archive mr-2"></i> 
                     </button>
                     <button id="quick-action-inactive" class="bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg flex items-center justify-center">
                         <i class="fas fa-user-slash mr-2"></i> Mark Tutor Inactive
@@ -418,7 +418,7 @@ window.showArchiveStudentModal = async function() {
             <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl">
                     <div class="flex justify-between items-center p-6 border-b">
-                        <h3 class="text-xl font-bold text-yellow-700">Archive Student</h3>
+                        <h3 class="text-xl font-bold text-yellow-700"></h3>
                         <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
                             <i class="fas fa-times text-xl"></i>
                         </button>
@@ -478,7 +478,7 @@ window.showArchiveStudentModal = async function() {
                             Cancel
                         </button>
                         <button onclick="submitArchiveStudent()" class="px-5 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">
-                            <i class="fas fa-archive mr-2"></i> Archive Student
+                            <i class="fas fa-archive mr-2"></i> 
                         </button>
                     </div>
                 </div>
@@ -492,7 +492,7 @@ window.showArchiveStudentModal = async function() {
         document.body.appendChild(modalContainer);
         
     } catch (error) {
-        console.error('Error showing archive student modal:', error);
+        console.error('Error showing  modal:', error);
         alert('Failed to load student data. Please try again.');
     }
 };
@@ -751,7 +751,7 @@ async function submitArchiveStudent() {
         
     } catch (error) {
         console.error('Error archiving student:', error);
-        alert('Failed to archive student. Please try again.');
+        alert('Failed to . Please try again.');
         
         // Reset button
         const submitBtn = document.querySelector('#archive-student-modal button[onclick="submitArchiveStudent()"]');
@@ -2575,6 +2575,27 @@ async function showTutorHistory(tutorId) {
 // SUBSECTION 3.3: Archived Students Panel
 // ======================================================
 
+// Add debounce function for search
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Modal management functions
+function closeManagementModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.remove();
+    }
+}
+
 async function renderArchivedStudentsPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -2584,6 +2605,7 @@ async function renderArchivedStudentsPanel(container) {
                     <input type="search" id="archived-search" placeholder="Search archived students..." class="p-2 border rounded-md w-64">
                     <button id="refresh-archived-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
                     <button id="archive-student-btn" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Archive Student</button>
+                    <button id="bulk-archive-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">Bulk Archive</button>
                 </div>
             </div>
             
@@ -2612,64 +2634,145 @@ async function renderArchivedStudentsPanel(container) {
         </div>
     `;
     
+    // Clear any existing listeners
+    const refreshBtn = document.getElementById('refresh-archived-btn');
+    const searchInput = document.getElementById('archived-search');
+    const archiveBtn = document.getElementById('archive-student-btn');
+    const bulkArchiveBtn = document.getElementById('bulk-archive-btn');
+    
+    refreshBtn.replaceWith(refreshBtn.cloneNode(true));
+    searchInput.replaceWith(searchInput.cloneNode(true));
+    archiveBtn.replaceWith(archiveBtn.cloneNode(true));
+    bulkArchiveBtn.replaceWith(bulkArchiveBtn.cloneNode(true));
+    
+    // Add new event listeners
     document.getElementById('refresh-archived-btn').addEventListener('click', () => fetchAndRenderArchivedStudents(true));
-    document.getElementById('archived-search').addEventListener('input', (e) => renderArchivedStudentsFromCache(e.target.value));
-    document.getElementById('archive-student-btn').addEventListener('click', showArchiveStudentModal);
+    document.getElementById('archived-search').addEventListener('input', debounce((e) => renderArchivedStudentsFromCache(e.target.value), 300));
+    document.getElementById('archive-student-btn').addEventListener('click', () => showArchiveStudentModal('single'));
+    document.getElementById('bulk-archive-btn').addEventListener('click', () => showArchiveStudentModal('bulk'));
     
     fetchAndRenderArchivedStudents();
 }
 
 async function fetchAndRenderArchivedStudents(forceRefresh = false) {
-    if (forceRefresh) invalidateCache('archivedStudents');
+    if (forceRefresh && typeof invalidateCache === 'function') {
+        invalidateCache('archivedStudents');
+    }
     
     const listContainer = document.getElementById('archived-students-list');
     if (!listContainer) return;
     
     try {
-        if (!sessionCache.archivedStudents) {
-            listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching student data...</p>`;
-            
-            const studentsSnapshot = await getDocs(collection(db, "students"));
-            const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            
-            const archivedStudents = allStudents.filter(student => student.status === 'archived' || student.status === 'graduated' || student.status === 'transferred');
-            const activeStudents = allStudents.filter(student => !student.status || student.status === 'active' || student.status === 'approved');
-            
-            saveToLocalStorage('archivedStudents', archivedStudents);
-            
-            const archivedCount = archivedStudents.filter(s => s.status === 'archived').length;
-            const graduatedCount = archivedStudents.filter(s => s.status === 'graduated').length;
-            const transferredCount = archivedStudents.filter(s => s.status === 'transferred').length;
-            
-            document.getElementById('archived-count-badge').textContent = archivedCount;
-            document.getElementById('active-students-badge').textContent = activeStudents.length;
-            document.getElementById('graduated-count-badge').textContent = graduatedCount;
-            document.getElementById('transferred-count-badge').textContent = transferredCount;
+        listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching student data...</p>`;
+        
+        const studentsSnapshot = await getDocs(collection(db, "students"));
+        const allStudents = studentsSnapshot.docs.map(doc => ({ 
+            id: doc.id, 
+            ...doc.data(),
+            tutorName: doc.data().tutorName || 'Unknown',
+            parentName: doc.data().parentName || 'N/A',
+            grade: doc.data().grade || 'N/A',
+            studentFee: doc.data().studentFee || 0
+        }));
+        
+        // Cache the full student list
+        if (typeof sessionCache !== 'undefined') {
+            sessionCache.allStudents = allStudents;
         }
+        
+        const archivedStudents = allStudents.filter(student => 
+            student.status === 'archived' || 
+            student.status === 'graduated' || 
+            student.status === 'transferred'
+        );
+        
+        const activeStudents = allStudents.filter(student => 
+            !student.status || 
+            student.status === 'active' || 
+            student.status === 'approved'
+        );
+        
+        // Cache archived students
+        if (typeof saveToLocalStorage === 'function') {
+            saveToLocalStorage('archivedStudents', archivedStudents);
+        }
+        if (typeof sessionCache !== 'undefined') {
+            sessionCache.archivedStudents = archivedStudents;
+        }
+        
+        // Update badges
+        const archivedCount = archivedStudents.filter(s => s.status === 'archived').length;
+        const graduatedCount = archivedStudents.filter(s => s.status === 'graduated').length;
+        const transferredCount = archivedStudents.filter(s => s.status === 'transferred').length;
+        
+        document.getElementById('archived-count-badge').textContent = archivedCount;
+        document.getElementById('active-students-badge').textContent = activeStudents.length;
+        document.getElementById('graduated-count-badge').textContent = graduatedCount;
+        document.getElementById('transferred-count-badge').textContent = transferredCount;
         
         renderArchivedStudentsFromCache();
     } catch (error) {
         console.error("Error fetching archived students:", error);
-        listContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load data.</p>`;
+        listContainer.innerHTML = `
+            <div class="text-center py-10">
+                <p class="text-red-500">Failed to load data.</p>
+                <button onclick="fetchAndRenderArchivedStudents(true)" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    Retry
+                </button>
+            </div>
+        `;
     }
 }
 
 function renderArchivedStudentsFromCache(searchTerm = '') {
-    const archivedStudents = sessionCache.archivedStudents || [];
+    const archivedStudents = (typeof sessionCache !== 'undefined' && sessionCache.archivedStudents) || [];
     const listContainer = document.getElementById('archived-students-list');
     if (!listContainer) return;
     
-    const lowerCaseSearchTerm = searchTerm.toLowerCase();
-    const filteredStudents = archivedStudents.filter(student => 
-        student.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
-        student.parentName?.toLowerCase().includes(lowerCaseSearchTerm) ||
-        student.tutorEmail?.toLowerCase().includes(lowerCaseSearchTerm)
-    );
-    
-    if (filteredStudents.length === 0) {
-        listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">${searchTerm ? 'No matching archived students found.' : 'No archived students found.'}</p>`;
+    if (archivedStudents.length === 0) {
+        listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">No archived students found.</p>`;
         return;
     }
+    
+    const lowerCaseSearchTerm = searchTerm.toLowerCase().trim();
+    let filteredStudents = archivedStudents;
+    
+    if (lowerCaseSearchTerm) {
+        filteredStudents = archivedStudents.filter(student => {
+            const searchFields = [
+                student.studentName || '',
+                student.parentName || '',
+                student.tutorEmail || '',
+                student.tutorName || '',
+                student.grade || '',
+                student.status || ''
+            ];
+            
+            return searchFields.some(field => 
+                field.toLowerCase().includes(lowerCaseSearchTerm)
+            );
+        });
+    }
+    
+    if (filteredStudents.length === 0) {
+        listContainer.innerHTML = `
+            <div class="text-center py-10">
+                <p class="text-gray-500">No matching archived students found for "${searchTerm}"</p>
+                <button onclick="document.getElementById('archived-search').value = ''; renderArchivedStudentsFromCache();" 
+                        class="mt-2 text-blue-600 hover:text-blue-800">
+                    Clear search
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    // Sort by archived date (most recent first)
+    filteredStudents.sort((a, b) => {
+        const dateA = a.archivedDate?.seconds || 0;
+        const dateB = b.archivedDate?.seconds || 0;
+        return dateB - dateA;
+    });
     
     listContainer.innerHTML = filteredStudents.map(student => {
         let statusBadge = '';
@@ -2693,77 +2796,165 @@ function renderArchivedStudentsFromCache(searchTerm = '') {
                 statusColor = 'bg-gray-100 text-gray-800';
         }
         
-        const archivedDate = student.archivedDate ? new Date(student.archivedDate.seconds * 1000).toLocaleDateString() : 'Unknown';
-        const lastTutor = student.tutorHistory?.[student.tutorHistory.length - 1]?.tutorName || student.tutorName || 'Unknown';
+        let archivedDate = 'Unknown';
+        if (student.archivedDate) {
+            if (student.archivedDate.toDate) {
+                archivedDate = student.archivedDate.toDate().toLocaleDateString();
+            } else if (student.archivedDate.seconds) {
+                archivedDate = new Date(student.archivedDate.seconds * 1000).toLocaleDateString();
+            }
+        }
+        
+        const lastTutor = student.tutorHistory && student.tutorHistory.length > 0 
+            ? student.tutorHistory[student.tutorHistory.length - 1]?.tutorName 
+            : student.tutorName || 'Unknown';
         
         return `
-            <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
+            <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition-colors">
                 <div class="flex-1">
-                    <h3 class="font-bold text-lg text-gray-800">${student.studentName}</h3>
-                    <div class="grid grid-cols-3 gap-4 mt-2 text-sm">
+                    <div class="flex items-center gap-3 mb-2">
+                        <h3 class="font-bold text-lg text-gray-800">${student.studentName || 'Unnamed Student'}</h3>
+                        <span class="px-2 py-1 text-xs rounded-full ${statusColor}">${statusBadge}</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                         <div>
-                            <p class="text-gray-600">Parent: ${student.parentName || 'N/A'}</p>
-                            <p class="text-gray-600">Last Tutor: ${lastTutor}</p>
+                            <p class="text-gray-600"><span class="font-medium">Parent:</span> ${student.parentName}</p>
+                            <p class="text-gray-600"><span class="font-medium">Last Tutor:</span> ${lastTutor}</p>
                         </div>
                         <div>
-                            <p class="text-gray-600">Grade: ${student.grade || 'N/A'}</p>
-                            <p class="text-gray-600">Fee: ₦${(student.studentFee || 0).toLocaleString()}</p>
+                            <p class="text-gray-600"><span class="font-medium">Grade:</span> ${student.grade}</p>
+                            <p class="text-gray-600"><span class="font-medium">Fee:</span> ₦${(student.studentFee || 0).toLocaleString()}</p>
                         </div>
                         <div>
-                            <p class="text-gray-600">Archived: ${archivedDate}</p>
-                            <p><span class="px-2 py-1 text-xs rounded-full ${statusColor}">${statusBadge}</span></p>
+                            <p class="text-gray-600"><span class="font-medium">Archived:</span> ${archivedDate}</p>
+                            <p class="text-gray-600"><span class="font-medium">By:</span> ${student.archivedBy || 'Unknown'}</p>
                         </div>
                     </div>
-                    ${student.archivedReason ? `<p class="text-sm text-gray-500 mt-2">Reason: ${student.archivedReason}</p>` : ''}
+                    ${student.archivedReason ? `
+                        <div class="mt-2 p-2 bg-gray-200 rounded">
+                            <p class="text-sm text-gray-700"><span class="font-medium">Reason:</span> ${student.archivedReason}</p>
+                        </div>
+                    ` : ''}
                 </div>
-                <div class="flex items-center space-x-2">
-                    <button class="restore-student-btn bg-green-500 text-white px-3 py-2 rounded text-sm hover:bg-green-600" data-student-id="${student.id}">Restore</button>
-                    <button class="view-student-history-btn bg-blue-500 text-white px-3 py-2 rounded text-sm hover:bg-blue-600" data-student-id="${student.id}">View History</button>
+                <div class="flex flex-col items-center space-y-2 ml-4">
+                    <button class="restore-student-btn bg-green-500 text-white px-4 py-2 rounded text-sm hover:bg-green-600 transition-colors w-32" 
+                            data-student-id="${student.id}">
+                        Restore
+                    </button>
+                    <button class="view-student-history-btn bg-blue-500 text-white px-4 py-2 rounded text-sm hover:bg-blue-600 transition-colors w-32" 
+                            data-student-id="${student.id}">
+                        View History
+                    </button>
                 </div>
             </div>
         `;
     }).join('');
     
+    // Add event listeners
     document.querySelectorAll('.restore-student-btn').forEach(button => {
-        button.addEventListener('click', (e) => handleRestoreStudent(e.target.dataset.studentId));
+        button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleRestoreStudent(e.target.dataset.studentId);
+        });
     });
     
     document.querySelectorAll('.view-student-history-btn').forEach(button => {
-        button.addEventListener('click', (e) => window.viewStudentTutorHistory(e.target.dataset.studentId));
+        button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof window.viewStudentTutorHistory === 'function') {
+                window.viewStudentTutorHistory(e.target.dataset.studentId);
+            }
+        });
     });
 }
 
-function showArchiveStudentModal() {
-    const allStudents = sessionCache.students || [];
-    const archivedStudents = sessionCache.archivedStudents || [];
+function showArchiveStudentModal(mode = 'single') {
+    // Remove existing modal if any
+    const existingModal = document.getElementById('archive-student-modal');
+    if (existingModal) existingModal.remove();
     
-    const activeStudentsFiltered = allStudents.filter(student => 
-        !student.status || student.status === 'active' || student.status === 'approved'
+    const allStudents = (typeof sessionCache !== 'undefined' && sessionCache.allStudents) || [];
+    const activeStudents = allStudents.filter(student => 
+        !student.status || 
+        student.status === 'active' || 
+        student.status === 'approved'
     );
     
-    if (activeStudentsFiltered.length === 0) {
+    if (activeStudents.length === 0) {
         alert("No active students available to archive.");
         return;
     }
     
-    const studentOptions = activeStudentsFiltered
-        .sort((a, b) => a.studentName.localeCompare(b.studentName))
-        .map(student => `<option value="${student.id}">${student.studentName} (${student.grade || 'No grade'}) - Tutor: ${student.tutorName || student.tutorEmail}</option>`)
-        .join('');
+    const isBulkMode = mode === 'bulk';
+    const modalTitle = isBulkMode ? 'Bulk Archive Students' : 'Archive Student';
+    const submitButtonText = isBulkMode ? 'Archive Selected Students' : 'Archive Student';
+    
+    const studentOptions = activeStudents
+        .sort((a, b) => (a.studentName || '').localeCompare(b.studentName || ''))
+        .map(student => {
+            const tutorInfo = student.tutorName || student.tutorEmail || 'No tutor';
+            return `
+                <div class="flex items-center p-2 hover:bg-gray-50 rounded">
+                    ${isBulkMode ? `
+                        <input type="checkbox" 
+                               id="student-${student.id}" 
+                               value="${student.id}" 
+                               class="mr-3 h-4 w-4 text-blue-600">
+                    ` : `
+                        <input type="radio" 
+                               id="student-${student.id}" 
+                               name="student" 
+                               value="${student.id}" 
+                               class="mr-3 h-4 w-4 text-blue-600">
+                    `}
+                    <label for="student-${student.id}" class="flex-1 cursor-pointer">
+                        <div class="font-medium">${student.studentName || 'Unnamed Student'}</div>
+                        <div class="text-sm text-gray-600">
+                            Grade: ${student.grade || 'N/A'} | 
+                            Parent: ${student.parentName || 'N/A'} | 
+                            Tutor: ${tutorInfo}
+                        </div>
+                    </label>
+                </div>
+            `;
+        }).join('');
+    
+    const searchAndSelectSection = isBulkMode ? `
+        <div class="mb-4">
+            <input type="text" 
+                   id="student-search" 
+                   placeholder="Search students by name..." 
+                   class="w-full p-2 border rounded-md mb-2"
+                   onkeyup="filterStudentList(this.value)">
+            <div class="max-h-60 overflow-y-auto border rounded-md">
+                ${studentOptions}
+            </div>
+            <div class="mt-2 flex justify-between">
+                <button type="button" onclick="selectAllStudents()" class="text-sm text-blue-600 hover:text-blue-800">
+                    Select All
+                </button>
+                <button type="button" onclick="deselectAllStudents()" class="text-sm text-gray-600 hover:text-gray-800">
+                    Deselect All
+                </button>
+            </div>
+        </div>
+    ` : `
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-2">Select Student</label>
+            <div class="max-h-60 overflow-y-auto border rounded-md">
+                ${studentOptions}
+            </div>
+        </div>
+    `;
     
     const modalHtml = `
         <div id="archive-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
-                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('archive-student-modal')">&times;</button>
-                <h3 class="text-xl font-bold mb-4">Archive Student</h3>
+            <div class="relative p-8 bg-white w-full max-w-2xl rounded-lg shadow-xl">
+                <button class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('archive-student-modal')">&times;</button>
+                <h3 class="text-xl font-bold mb-4">${modalTitle}</h3>
                 <form id="archive-student-form">
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium mb-2">Select Student</label>
-                        <select id="archive-student-select" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-                            <option value="" disabled selected>Select a student...</option>
-                            ${studentOptions}
-                        </select>
-                    </div>
+                    ${searchAndSelectSection}
+                    
                     <div class="mb-4">
                         <label class="block text-sm font-medium mb-2">Archive Status</label>
                         <select id="archive-status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
@@ -2772,17 +2963,36 @@ function showArchiveStudentModal() {
                             <option value="transferred">Transferred (moved to another tutor/company)</option>
                         </select>
                     </div>
+                    
                     <div class="mb-4">
                         <label class="block text-sm font-medium mb-2">Reason (optional)</label>
                         <textarea id="archive-reason" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" placeholder="Reason for archiving..."></textarea>
                     </div>
+                    
                     <div class="mb-4">
                         <label class="block text-sm font-medium mb-2">Effective Date</label>
                         <input type="date" id="archive-date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" value="${new Date().toISOString().split('T')[0]}">
                     </div>
-                    <div class="flex justify-end mt-4">
-                        <button type="button" onclick="closeManagementModal('archive-student-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Archive Student</button>
+                    
+                    <div class="mb-4 flex items-center">
+                        <input type="checkbox" id="send-notification" class="mr-2">
+                        <label for="send-notification" class="text-sm">Send notification to tutor/parent</label>
+                    </div>
+                    
+                    <div id="archive-progress" class="hidden mb-4">
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                        </div>
+                        <p id="progress-text" class="text-sm text-gray-600 mt-1">Processing...</p>
+                    </div>
+                    
+                    <div class="flex justify-end mt-6">
+                        <button type="button" onclick="closeManagementModal('archive-student-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
+                            Cancel
+                        </button>
+                        <button type="submit" id="submit-archive-btn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center">
+                            ${submitButtonText}
+                        </button>
                     </div>
                 </form>
             </div>
@@ -2791,56 +3001,174 @@ function showArchiveStudentModal() {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
+    // Add form submit handler
     document.getElementById('archive-student-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        
         const form = e.target;
-        const studentId = form.elements['archive-student-select'].value;
+        const submitBtn = document.getElementById('submit-archive-btn');
+        const progressDiv = document.getElementById('archive-progress');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        
+        // Get selected student IDs
+        let studentIds = [];
+        if (isBulkMode) {
+            const checkboxes = form.querySelectorAll('input[type="checkbox"]:checked');
+            studentIds = Array.from(checkboxes).map(cb => cb.value);
+        } else {
+            const selectedRadio = form.querySelector('input[type="radio"]:checked');
+            if (!selectedRadio) {
+                alert("Please select a student.");
+                return;
+            }
+            studentIds = [selectedRadio.value];
+        }
+        
+        if (studentIds.length === 0) {
+            alert("Please select at least one student.");
+            return;
+        }
+        
         const status = form.elements['archive-status'].value;
         const reason = form.elements['archive-reason'].value;
         const date = form.elements['archive-date'].value;
+        const sendNotification = document.getElementById('send-notification').checked;
+        
+        // Disable submit button and show progress
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<span class="animate-spin mr-2">⟳</span> Archiving...`;
+        progressDiv.classList.remove('hidden');
         
         try {
-            await updateDoc(doc(db, "students", studentId), {
-                status: status,
-                archivedReason: reason || '',
-                archivedDate: Timestamp.fromDate(new Date(date)),
-                archivedBy: window.userData?.email || 'management',
-                lastUpdated: Timestamp.now()
-            });
+            const batch = writeBatch(db);
+            const updates = [];
             
-            alert("Student archived successfully!");
-            closeManagementModal('archive-student-modal');
-            invalidateCache('archivedStudents');
-            invalidateCache('students');
-            invalidateCache('tutorAssignments');
-            fetchAndRenderArchivedStudents(true);
+            for (let i = 0; i < studentIds.length; i++) {
+                const studentId = studentIds[i];
+                const studentRef = doc(db, "students", studentId);
+                
+                batch.update(studentRef, {
+                    status: status,
+                    archivedReason: reason || '',
+                    archivedDate: Timestamp.fromDate(new Date(date)),
+                    archivedBy: window.userData?.email || 'management',
+                    lastUpdated: Timestamp.now()
+                });
+                
+                updates.push(studentId);
+                
+                // Update progress
+                const progress = ((i + 1) / studentIds.length) * 100;
+                progressBar.style.width = `${progress}%`;
+                progressText.textContent = `Archiving student ${i + 1} of ${studentIds.length}...`;
+            }
+            
+            await batch.commit();
+            
+            // Update progress to complete
+            progressBar.style.width = '100%';
+            progressBar.classList.remove('bg-blue-600');
+            progressBar.classList.add('bg-green-600');
+            progressText.textContent = `Successfully archived ${studentIds.length} student(s)!`;
+            
+            // Show success message
+            setTimeout(() => {
+                alert(`${studentIds.length} student(s) archived successfully!`);
+                closeManagementModal('archive-student-modal');
+                
+                // Invalidate caches if functions exist
+                if (typeof invalidateCache === 'function') {
+                    invalidateCache('archivedStudents');
+                    invalidateCache('students');
+                    invalidateCache('tutorAssignments');
+                }
+                
+                // Refresh the archived students list
+                fetchAndRenderArchivedStudents(true);
+            }, 1000);
             
         } catch (error) {
-            console.error("Error archiving student:", error);
-            alert("Failed to archive student. Please try again.");
+            console.error("Error archiving student(s):", error);
+            progressBar.classList.remove('bg-blue-600');
+            progressBar.classList.add('bg-red-600');
+            progressText.textContent = 'Error archiving student(s). Please try again.';
+            submitBtn.disabled = false;
+            submitBtn.textContent = submitButtonText;
+            
+            setTimeout(() => {
+                alert("Failed to archive student(s). Please try again.");
+            }, 500);
         }
     });
 }
 
+// Helper functions for bulk archive modal
+function filterStudentList(searchTerm) {
+    const studentList = document.querySelectorAll('#archive-student-modal [id^="student-"]');
+    const searchLower = searchTerm.toLowerCase();
+    
+    studentList.forEach(student => {
+        const label = student.nextElementSibling;
+        const studentName = label.querySelector('.font-medium').textContent.toLowerCase();
+        const studentInfo = label.querySelector('.text-sm').textContent.toLowerCase();
+        
+        if (studentName.includes(searchLower) || studentInfo.includes(searchLower)) {
+            student.parentElement.style.display = 'flex';
+        } else {
+            student.parentElement.style.display = 'none';
+        }
+    });
+}
+
+function selectAllStudents() {
+    const checkboxes = document.querySelectorAll('#archive-student-modal input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = true);
+}
+
+function deselectAllStudents() {
+    const checkboxes = document.querySelectorAll('#archive-student-modal input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = false);
+}
+
 async function handleRestoreStudent(studentId) {
-    if (confirm("Are you sure you want to restore this student to active status?")) {
-        try {
-            await updateDoc(doc(db, "students", studentId), {
-                status: 'active',
-                restoredDate: Timestamp.now(),
-                restoredBy: window.userData?.email || 'management',
-                lastUpdated: Timestamp.now()
-            });
-            
-            alert("Student restored successfully!");
+    if (!confirm("Are you sure you want to restore this student to active status?")) {
+        return;
+    }
+    
+    const restoreBtn = document.querySelector(`[data-student-id="${studentId}"].restore-student-btn`);
+    if (restoreBtn) {
+        restoreBtn.disabled = true;
+        restoreBtn.textContent = 'Restoring...';
+    }
+    
+    try {
+        await updateDoc(doc(db, "students", studentId), {
+            status: 'active',
+            restoredDate: Timestamp.now(),
+            restoredBy: window.userData?.email || 'management',
+            lastUpdated: Timestamp.now()
+        });
+        
+        alert("Student restored successfully!");
+        
+        // Invalidate caches if functions exist
+        if (typeof invalidateCache === 'function') {
             invalidateCache('archivedStudents');
             invalidateCache('students');
             invalidateCache('tutorAssignments');
-            fetchAndRenderArchivedStudents(true);
-            
-        } catch (error) {
-            console.error("Error restoring student:", error);
-            alert("Failed to restore student. Please try again.");
+        }
+        
+        // Refresh the archived students list
+        fetchAndRenderArchivedStudents(true);
+        
+    } catch (error) {
+        console.error("Error restoring student:", error);
+        alert("Failed to restore student. Please try again.");
+        
+        if (restoreBtn) {
+            restoreBtn.disabled = false;
+            restoreBtn.textContent = 'Restore';
         }
     }
 }
@@ -8742,6 +9070,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
