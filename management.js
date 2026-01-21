@@ -2956,9 +2956,7 @@ if (typeof window.showEnhancedReassignStudentModal === 'undefined') {
     window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
     window.closeReassignModal = closeReassignModal;
 }
-if (typeof window.showAssignStudentModal === 'undefined') {
-    window.showAssignStudentModal = showAssignStudentModal;
-}
+
 
 // ======================================================
 // SUBSECTION 3.2: Inactive Tutors Panel
@@ -9947,6 +9945,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
