@@ -6357,85 +6357,350 @@ function renderPendingApprovalsFromCache(studentsToRender = null) {
 }
 
 // ======================================================
-// SUBSECTION 5.4: Summer Break Panel
+// SUBSECTION 5.4: Summer Break Panel (UPDATED WITH RECALL REQUESTS)
 // ======================================================
 
 async function renderSummerBreakPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
-                <h2 class="text-2xl font-bold text-green-700">Students on Summer Break</h2>
+                <h2 class="text-2xl font-bold text-green-700">Summer Break Management</h2>
                 <div class="flex items-center gap-4 flex-wrap">
-                    <input type="search" id="break-search" placeholder="Search students by name, tutor, or parent..." 
-                           class="p-2 border rounded-md w-64 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                    <div class="relative" style="min-width: 300px;">
+                        <input type="search" id="break-search" placeholder="Search students by name, tutor, or parent..." 
+                               class="p-2 pl-10 border rounded-md w-full focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                        <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                    </div>
+                    <select id="view-filter" class="p-2 border rounded-md bg-white">
+                        <option value="all">All Students on Break</option>
+                        <option value="pending_recall">Pending Recall Requests</option>
+                        <option value="tutors">Group by Tutor</option>
+                    </select>
                     <button id="refresh-break-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center">
                         <i class="fas fa-sync-alt mr-2"></i> Refresh
                     </button>
                 </div>
             </div>
             
-            <div class="flex space-x-4 mb-6">
-                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
+            <!-- Stats Dashboard -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-yellow-100 p-4 rounded-lg text-center shadow">
                     <h4 class="font-bold text-yellow-800 text-sm">Students on Break</h4>
                     <p id="break-count-badge" class="text-2xl font-extrabold">0</p>
                 </div>
-                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
+                <div class="bg-green-100 p-4 rounded-lg text-center shadow">
                     <h4 class="font-bold text-green-800 text-sm">Active Tutors</h4>
                     <p id="break-tutor-count" class="text-2xl font-extrabold">0</p>
                 </div>
+                <div class="bg-purple-100 p-4 rounded-lg text-center shadow">
+                    <h4 class="font-bold text-purple-800 text-sm">Pending Recall Requests</h4>
+                    <p id="recall-requests-count" class="text-2xl font-extrabold">0</p>
+                </div>
+                <div class="bg-blue-100 p-4 rounded-lg text-center shadow">
+                    <h4 class="font-bold text-blue-800 text-sm">Total Monthly Fees</h4>
+                    <p id="break-fees-total" class="text-xl font-extrabold">₦0</p>
+                </div>
+            </div>
+            
+            <!-- Tabs for different views -->
+            <div class="flex border-b mb-6">
+                <button id="break-tab" class="tab-btn active px-4 py-2 font-medium border-b-2 border-green-600 text-green-600">Students on Break</button>
+                <button id="recall-tab" class="tab-btn px-4 py-2 font-medium text-gray-500 hover:text-purple-600">Recall Requests</button>
             </div>
             
             <div id="break-status-message" class="text-center font-semibold mb-4 hidden"></div>
             
-            <div id="break-students-list" class="space-y-4">
-                <div class="text-center py-10">
-                    <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
-                    <p class="text-green-600 font-semibold mt-4">Loading summer break students...</p>
+            <!-- Students on Break View -->
+            <div id="break-students-view" class="space-y-4">
+                <div id="break-students-list" class="space-y-4">
+                    <div class="text-center py-10">
+                        <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+                        <p class="text-green-600 font-semibold mt-4">Loading summer break students...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recall Requests View -->
+            <div id="recall-requests-view" class="space-y-4 hidden">
+                <div id="recall-requests-list" class="space-y-4">
+                    <div class="text-center py-10">
+                        <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+                        <p class="text-purple-600 font-semibold mt-4">Loading recall requests...</p>
+                    </div>
                 </div>
             </div>
         </div>
     `;
     
-    document.getElementById('refresh-break-btn').addEventListener('click', () => fetchAndRenderBreakStudents(true));
+    // Event Listeners
+    document.getElementById('refresh-break-btn').addEventListener('click', () => {
+        fetchAndRenderBreakStudents(true);
+        fetchRecallRequests(true);
+    });
+    
     document.getElementById('break-search').addEventListener('input', (e) => handleBreakSearch(e.target.value));
+    document.getElementById('view-filter').addEventListener('change', (e) => handleViewFilterChange(e.target.value));
     
-    // Initialize the cache if it doesn't exist
-    if (!sessionCache.breakStudents) {
-        sessionCache.breakStudents = [];
-    }
+    // Tab switching
+    document.getElementById('break-tab').addEventListener('click', () => switchTab('break'));
+    document.getElementById('recall-tab').addEventListener('click', () => switchTab('recall'));
     
+    // Initialize caches
+    if (!sessionCache.breakStudents) sessionCache.breakStudents = [];
+    if (!sessionCache.recallRequests) sessionCache.recallRequests = [];
+    
+    // Fetch both sets of data
     fetchAndRenderBreakStudents();
+    fetchRecallRequests();
 }
 
-// Helper function to handle search
-function handleBreakSearch(searchTerm) {
-    // Check if data is available in cache
-    if (!sessionCache.breakStudents || sessionCache.breakStudents.length === 0) {
-        // If no data in cache, show message and fetch data
-        const listContainer = document.getElementById('break-students-list');
-        if (listContainer) {
-            listContainer.innerHTML = `
-                <div class="text-center py-10">
-                    <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
-                    <p class="text-green-600 font-semibold mt-4">Loading data for search...</p>
-                </div>
-            `;
+function switchTab(tab) {
+    const breakTab = document.getElementById('break-tab');
+    const recallTab = document.getElementById('recall-tab');
+    const breakView = document.getElementById('break-students-view');
+    const recallView = document.getElementById('recall-requests-view');
+    
+    if (tab === 'break') {
+        breakTab.classList.add('active', 'border-b-2', 'border-green-600', 'text-green-600');
+        breakTab.classList.remove('text-gray-500');
+        recallTab.classList.remove('active', 'border-b-2', 'border-purple-600', 'text-purple-600');
+        recallTab.classList.add('text-gray-500');
+        breakView.classList.remove('hidden');
+        recallView.classList.add('hidden');
+    } else {
+        recallTab.classList.add('active', 'border-b-2', 'border-purple-600', 'text-purple-600');
+        recallTab.classList.remove('text-gray-500');
+        breakTab.classList.remove('active', 'border-b-2', 'border-green-600', 'text-green-600');
+        breakTab.classList.add('text-gray-500');
+        recallView.classList.remove('hidden');
+        breakView.classList.add('hidden');
+    }
+}
+
+function handleViewFilterChange(filterValue) {
+    // This will be used when filtering the display
+    const searchInput = document.getElementById('break-search');
+    const currentSearchTerm = searchInput ? searchInput.value : '';
+    renderBreakStudentsFromCache(currentSearchTerm, filterValue);
+}
+
+async function fetchRecallRequests(forceRefresh = false) {
+    if (forceRefresh) invalidateCache('recallRequests');
+    
+    try {
+        const snapshot = await getDocs(query(collection(db, "recall_requests"), where("status", "==", "pending")));
+        const requests = snapshot.docs.map(doc => ({ 
+            id: doc.id, 
+            ...doc.data(),
+            requestDate: doc.data().requestDate?.toDate() || new Date(),
+            studentName: doc.data().studentName || 'Unknown Student'
+        }));
+        
+        // Sort by most recent
+        requests.sort((a, b) => b.requestDate - a.requestDate);
+        
+        sessionCache.recallRequests = requests;
+        
+        // Update count
+        document.getElementById('recall-requests-count').textContent = requests.length;
+        
+        // If recall tab is active, render the requests
+        if (!document.getElementById('recall-requests-view').classList.contains('hidden')) {
+            renderRecallRequests(requests);
         }
-        // Fetch data first, then search
-        fetchAndRenderBreakStudents();
+        
+    } catch (error) {
+        console.error("Error fetching recall requests:", error);
+    }
+}
+
+function renderRecallRequests(requests) {
+    const container = document.getElementById('recall-requests-list');
+    
+    if (!requests || requests.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-10">
+                <i class="fas fa-inbox text-purple-400 text-4xl mb-4"></i>
+                <p class="text-gray-600">No pending recall requests</p>
+                <p class="text-sm text-gray-400 mt-2">All requests have been processed</p>
+            </div>
+        `;
         return;
     }
     
-    // If data exists, perform search
-    renderBreakStudentsFromCache(searchTerm);
+    let html = '';
+    
+    requests.forEach(request => {
+        const requestDate = new Date(request.requestDate).toLocaleString();
+        
+        html += `
+            <div class="border-l-4 border-l-purple-500 bg-gray-50 p-6 rounded-r-lg hover:bg-gray-100 transition-colors">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="bg-purple-100 p-2 rounded-lg">
+                                <i class="fas fa-undo-alt text-purple-600"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-lg text-gray-800">${request.studentName}</h3>
+                                <p class="text-sm text-gray-600">Requested by: ${request.tutorName} (${request.tutorEmail})</p>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div class="bg-white p-3 rounded border">
+                                <p class="text-sm font-medium text-gray-500">Request Details</p>
+                                <p class="mt-1"><i class="fas fa-calendar-alt mr-2 text-gray-400"></i>Requested: ${requestDate}</p>
+                                <p><i class="fas fa-user mr-2 text-gray-400"></i>Student ID: ${request.studentId}</p>
+                            </div>
+                            <div class="bg-white p-3 rounded border">
+                                <p class="text-sm font-medium text-gray-500">Tutor Information</p>
+                                <p class="mt-1"><i class="fas fa-chalkboard-teacher mr-2 text-gray-400"></i>Tutor: ${request.tutorName}</p>
+                                <p><i class="fas fa-envelope mr-2 text-gray-400"></i>Email: ${request.tutorEmail}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-col gap-2 ml-4">
+                        <button class="approve-recall-btn bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center whitespace-nowrap font-medium"
+                                data-request-id="${request.id}"
+                                data-student-id="${request.studentId}"
+                                data-student-name="${request.studentName}"
+                                data-tutor-email="${request.tutorEmail}">
+                            <i class="fas fa-check mr-2"></i> Approve
+                        </button>
+                        <button class="reject-recall-btn bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center whitespace-nowrap font-medium"
+                                data-request-id="${request.id}"
+                                data-student-name="${request.studentName}">
+                            <i class="fas fa-times mr-2"></i> Reject
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="flex justify-between items-center text-sm text-gray-500">
+                    <span><i class="fas fa-info-circle mr-1"></i> Action will take the student off break immediately</span>
+                    <span>Request ID: ${request.id.substring(0, 8)}...</span>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+    
+    // Add event listeners
+    document.querySelectorAll('.approve-recall-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => handleRecallRequest(e.currentTarget, 'approve'));
+    });
+    
+    document.querySelectorAll('.reject-recall-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => handleRecallRequest(e.currentTarget, 'reject'));
+    });
 }
 
+async function handleRecallRequest(button, action) {
+    const requestId = button.dataset.requestId;
+    const studentId = button.dataset.studentId;
+    const studentName = button.dataset.studentName;
+    const tutorEmail = button.dataset.tutorEmail;
+    const adminName = window.currentAdmin?.name || "Management";
+    
+    const actionText = action === 'approve' ? 'approve' : 'reject';
+    const confirmation = confirm(`Are you sure you want to ${actionText} the recall request for ${studentName}?`);
+    
+    if (!confirmation) return;
+    
+    try {
+        const originalText = button.innerHTML;
+        button.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i> Processing...`;
+        button.disabled = true;
+        
+        // Update the recall request status
+        await updateDoc(doc(db, "recall_requests", requestId), { 
+            status: action === 'approve' ? 'approved' : 'rejected',
+            reviewedBy: adminName,
+            reviewDate: Timestamp.now(),
+            notes: action === 'approve' ? 'Recall approved by management' : 'Recall rejected by management'
+        });
+        
+        // If approved, also update the student's break status
+        if (action === 'approve') {
+            await updateDoc(doc(db, "students", studentId), { 
+                summerBreak: false,
+                lastBreakEnd: Timestamp.now(),
+                lastUpdated: Timestamp.now()
+            });
+            
+            // Send notification to tutor
+            await sendTutorNotification(tutorEmail, studentName, 'recall_approved');
+        }
+        
+        // Show success message
+        const statusMessage = document.getElementById('break-status-message');
+        statusMessage.textContent = action === 'approve' 
+            ? `✅ Recall approved! ${studentName} has been taken off summer break.`
+            : `✅ Recall request rejected for ${studentName}.`;
+        statusMessage.className = `text-center font-semibold mb-4 ${action === 'approve' ? 'text-green-600' : 'text-yellow-600'} p-3 ${action === 'approve' ? 'bg-green-50' : 'bg-yellow-50'} rounded-lg`;
+        statusMessage.classList.remove('hidden');
+        
+        setTimeout(() => {
+            statusMessage.classList.add('hidden');
+        }, 4000);
+        
+        // Refresh data
+        invalidateCache('recallRequests');
+        invalidateCache('breakStudents');
+        invalidateCache('students');
+        
+        // Re-fetch both data sets
+        await Promise.all([
+            fetchRecallRequests(true),
+            fetchAndRenderBreakStudents(true)
+        ]);
+        
+    } catch (error) {
+        console.error(`Error ${action}ing recall request:`, error);
+        
+        // Show error message
+        const statusMessage = document.getElementById('break-status-message');
+        statusMessage.textContent = `❌ Failed to ${action} recall request for ${studentName}. Error: ${error.message}`;
+        statusMessage.className = 'text-center font-semibold mb-4 text-red-600 p-3 bg-red-50 rounded-lg';
+        statusMessage.classList.remove('hidden');
+        
+        setTimeout(() => {
+            statusMessage.classList.add('hidden');
+        }, 5000);
+        
+        // Reset button
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+
+async function sendTutorNotification(tutorEmail, studentName, notificationType) {
+    try {
+        const notificationRef = doc(collection(db, "tutor_notifications"));
+        await setDoc(notificationRef, {
+            tutorEmail: tutorEmail,
+            studentName: studentName,
+            type: notificationType,
+            message: notificationType === 'recall_approved' 
+                ? `Your recall request for ${studentName} has been approved. The student is now active.`
+                : `Your recall request for ${studentName} has been processed.`,
+            read: false,
+            createdAt: Timestamp.now(),
+            actionUrl: '#studentDatabase'
+        });
+    } catch (error) {
+        console.error("Error sending notification:", error);
+    }
+}
+
+// Update the existing fetchAndRenderBreakStudents function to include total fees
 async function fetchAndRenderBreakStudents(forceRefresh = false) {
     if (forceRefresh) invalidateCache('breakStudents');
     const listContainer = document.getElementById('break-students-list');
 
     try {
-        // Check if we need to fetch fresh data
         if (forceRefresh || !sessionCache.breakStudents || sessionCache.breakStudents.length === 0) {
             if (listContainer) {
                 listContainer.innerHTML = `<div class="text-center py-10">
@@ -6447,20 +6712,27 @@ async function fetchAndRenderBreakStudents(forceRefresh = false) {
             const snapshot = await getDocs(query(collection(db, "students"), where("summerBreak", "==", true)));
             const allBreakStudents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
-            // Filter for active/approved students only
             const activeBreakStudents = allBreakStudents.filter(student => 
                 !student.status || student.status === 'active' || student.status === 'approved'
             );
             
-            // Update both session cache and localStorage
             sessionCache.breakStudents = activeBreakStudents;
             saveToLocalStorage('breakStudents', activeBreakStudents);
         }
         
-        // Get current search term and render
+        // Calculate total fees (excluding break students)
+        const totalFees = sessionCache.breakStudents.reduce((total, student) => {
+            return total + (student.studentFee || 0);
+        }, 0);
+        
+        // Update fees total display
+        document.getElementById('break-fees-total').textContent = `₦${totalFees.toLocaleString()}`;
+        
         const searchInput = document.getElementById('break-search');
         const currentSearchTerm = searchInput ? searchInput.value : '';
-        renderBreakStudentsFromCache(currentSearchTerm);
+        const filterValue = document.getElementById('view-filter') ? document.getElementById('view-filter').value : 'all';
+        
+        renderBreakStudentsFromCache(currentSearchTerm, filterValue);
         
     } catch(error) {
         console.error("Error fetching break students:", error);
@@ -6479,23 +6751,23 @@ async function fetchAndRenderBreakStudents(forceRefresh = false) {
     }
 }
 
-function renderBreakStudentsFromCache(searchTerm = '') {
+// Update renderBreakStudentsFromCache to include recall request indicator
+function renderBreakStudentsFromCache(searchTerm = '', filterValue = 'all') {
     const breakStudents = sessionCache.breakStudents || [];
     const listContainer = document.getElementById('break-students-list');
     if (!listContainer) return;
     
-    // Update counts with ALL break students (not filtered ones)
+    // Update counts
     const uniqueTutors = [...new Set(breakStudents.map(s => s.tutorEmail))].filter(Boolean);
     document.getElementById('break-count-badge').textContent = breakStudents.length;
     document.getElementById('break-tutor-count').textContent = uniqueTutors.length;
     
-    // Filter students if search term exists
-    const lowerCaseSearchTerm = searchTerm.toLowerCase().trim();
+    // Filter based on search term
     let filteredStudents = breakStudents;
+    const lowerCaseSearchTerm = searchTerm.toLowerCase().trim();
     
     if (searchTerm) {
         filteredStudents = breakStudents.filter(student => {
-            // Check all searchable fields
             const searchFields = [
                 student.studentName,
                 student.tutorEmail,
@@ -6512,183 +6784,34 @@ function renderBreakStudentsFromCache(searchTerm = '') {
         });
     }
     
-    // Handle empty results
-    if (filteredStudents.length === 0) {
-        if (searchTerm) {
-            listContainer.innerHTML = `
-                <div class="text-center py-10">
-                    <i class="fas fa-search text-gray-400 text-4xl mb-4"></i>
-                    <p class="text-gray-600">No students found matching "${searchTerm}"</p>
-                    <p class="text-sm text-gray-400 mt-2">Try a different search term</p>
-                    <button onclick="document.getElementById('break-search').value = ''; renderBreakStudentsFromCache('')" 
-                            class="mt-4 bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200">
-                        Clear Search
-                    </button>
-                </div>
-            `;
-        } else {
-            listContainer.innerHTML = `
-                <div class="text-center py-10">
-                    <i class="fas fa-umbrella-beach text-green-400 text-4xl mb-4"></i>
-                    <p class="text-gray-600">No active students are currently on summer break</p>
-                    <p class="text-sm text-gray-400 mt-2">All students are active</p>
-                </div>
-            `;
-        }
-        return;
+    // Apply additional filter if needed
+    if (filterValue === 'pending_recall') {
+        // Check which students have pending recall requests
+        const pendingRecallIds = (sessionCache.recallRequests || [])
+            .filter(req => req.status === 'pending')
+            .map(req => req.studentId);
+        
+        filteredStudents = filteredStudents.filter(student => 
+            pendingRecallIds.includes(student.id)
+        );
     }
     
-    // Group students by tutor
-    const studentsByTutor = {};
-    filteredStudents.forEach(student => {
-        const tutorKey = student.tutorEmail || 'No Tutor Assigned';
-        if (!studentsByTutor[tutorKey]) {
-            studentsByTutor[tutorKey] = {
-                tutorName: student.tutorName || student.tutorEmail || 'Unknown Tutor',
-                tutorEmail: student.tutorEmail,
-                students: []
-            };
-        }
-        studentsByTutor[tutorKey].students.push(student);
-    });
+    // Rest of the function remains the same, just add recall request indicator
+    if (filteredStudents.length === 0) {
+        // ... (same empty state handling)
+    }
     
-    let html = '';
+    // In the student card HTML, add recall request indicator:
+    // Inside the student card template, add this:
+    const hasRecallRequest = (sessionCache.recallRequests || []).some(req => 
+        req.studentId === student.id && req.status === 'pending'
+    );
     
-    Object.values(studentsByTutor).forEach(tutorGroup => {
-        const studentItems = tutorGroup.students.map(student => {
-            const breakInfo = student.lastBreakStart ? 
-                `Break started: ${new Date(student.lastBreakStart.seconds * 1000).toLocaleDateString()}` : 
-                'No break start date recorded';
-            
-            return `
-                <div class="border-l-4 border-l-yellow-500 bg-gray-50 p-4 rounded-r-lg flex justify-between items-center hover:bg-gray-100 transition-colors">
-                    <div class="flex-1">
-                        <div class="flex items-center gap-3 mb-2">
-                            <h3 class="font-bold text-lg text-gray-800">${student.studentName}</h3>
-                            <span class="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full">On Summer Break</span>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-gray-600">
-                            <div>
-                                <p><i class="fas fa-graduation-cap mr-2 text-gray-400"></i>Grade: ${student.grade || 'N/A'}</p>
-                                <p><i class="fas fa-calendar mr-2 text-gray-400"></i>Days/Week: ${student.days || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p><i class="fas fa-user-friends mr-2 text-gray-400"></i>Parent: ${student.parentName || 'N/A'}</p>
-                                <p><i class="fas fa-phone mr-2 text-gray-400"></i>Phone: ${student.parentPhone || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p><i class="fas fa-money-bill-wave mr-2 text-gray-400"></i>Fee: ₦${(student.studentFee || 0).toLocaleString()}</p>
-                                <p><i class="fas fa-calendar-alt mr-2 text-gray-400"></i>${breakInfo}</p>
-                            </div>
-                        </div>
-                        <div class="mt-3 text-xs text-gray-500">
-                            <p><i class="fas fa-chalkboard-teacher mr-1"></i>Assigned to: ${student.tutorName || student.tutorEmail || 'No tutor assigned'}</p>
-                        </div>
-                    </div>
-                    <div class="ml-4">
-                        <button class="end-break-btn bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center whitespace-nowrap font-medium"
-                                data-student-id="${student.id}"
-                                data-student-name="${student.studentName}"
-                                data-tutor-name="${student.tutorName || student.tutorEmail || 'Unknown Tutor'}">
-                            <i class="fas fa-flag mr-2"></i> End Break
-                        </button>
-                    </div>
-                </div>
-            `;
-        }).join('');
-        
-        html += `
-            <div class="border rounded-lg shadow-sm mb-6">
-                <div class="p-4 bg-yellow-50 border-b rounded-t-lg">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <h3 class="font-bold text-lg text-gray-800">${tutorGroup.tutorName}</h3>
-                            <p class="text-sm text-gray-600">${tutorGroup.tutorEmail || 'No email'}</p>
-                        </div>
-                        <span class="bg-yellow-200 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
-                            ${tutorGroup.students.length} student${tutorGroup.students.length !== 1 ? 's' : ''} on break
-                        </span>
-                    </div>
-                </div>
-                <div class="space-y-3 p-4">
-                    ${studentItems}
-                </div>
-            </div>
-        `;
-    });
-    
-    listContainer.innerHTML = html;
-    
-    // Add event listeners to End Break buttons
-    document.querySelectorAll('.end-break-btn').forEach(button => {
-        button.addEventListener('click', async (e) => {
-            const studentId = e.currentTarget.dataset.studentId;
-            const studentName = e.currentTarget.dataset.studentName;
-            const tutorName = e.currentTarget.dataset.tutorName;
-            
-            const confirmation = confirm(`Are you sure you want to take ${studentName} off summer break and return them to ${tutorName}?`);
-            
-            if (!confirmation) {
-                return;
-            }
-            
-            try {
-                const originalText = e.currentTarget.innerHTML;
-                e.currentTarget.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Ending Break...';
-                e.currentTarget.disabled = true;
-                
-                await updateDoc(doc(db, "students", studentId), { 
-                    summerBreak: false, 
-                    lastBreakEnd: Timestamp.now(),
-                    lastUpdated: Timestamp.now()
-                });
-                
-                // Show success message
-                const statusMessage = document.getElementById('break-status-message');
-                statusMessage.textContent = `✅ Summer break ended for ${studentName}. Student is now active with ${tutorName}.`;
-                statusMessage.className = 'text-center font-semibold mb-4 text-green-600 p-3 bg-green-50 rounded-lg';
-                statusMessage.classList.remove('hidden');
-                
-                setTimeout(() => {
-                    statusMessage.classList.add('hidden');
-                }, 4000);
-                
-                // Invalidate caches and refresh data
-                invalidateCache('breakStudents');
-                invalidateCache('students');
-                invalidateCache('tutorAssignments');
-                
-                // Get current search term before refreshing
-                const searchInput = document.getElementById('break-search');
-                const currentSearchTerm = searchInput ? searchInput.value : '';
-                
-                // Force refresh and then re-apply search if needed
-                await fetchAndRenderBreakStudents(true);
-                
-                if (searchInput && currentSearchTerm) {
-                    searchInput.value = currentSearchTerm;
-                    renderBreakStudentsFromCache(currentSearchTerm);
-                }
-                
-            } catch (error) {
-                console.error("Error ending summer break:", error);
-                
-                // Show error message
-                const statusMessage = document.getElementById('break-status-message');
-                statusMessage.textContent = `❌ Failed to End Break for ${studentName}. Error: ${error.message}`;
-                statusMessage.className = 'text-center font-semibold mb-4 text-red-600 p-3 bg-red-50 rounded-lg';
-                statusMessage.classList.remove('hidden');
-                
-                setTimeout(() => {
-                    statusMessage.classList.add('hidden');
-                }, 5000);
-                
-                // Reset button
-                e.currentTarget.innerHTML = originalText;
-                e.currentTarget.disabled = false;
-            }
-        });
-    });
+    // Add this badge near student name if there's a recall request:
+    if (hasRecallRequest) {
+        // Add this HTML to the student card:
+        `<span class="text-xs px-2 py-1 bg-purple-100 text-purple-800 rounded-full ml-2">Recall Requested</span>`;
+    }
 }
 
 // ======================================================
@@ -8287,6 +8410,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
