@@ -1,7 +1,23 @@
 /*******************************************************************************
  * PORTAL PROTECTOR - FIXED VERSION (No Auth Page Interference)
  ******************************************************************************/
+// === SKIP AUTH PAGES ===
+function isAuthPage() {
+    const path = window.location.pathname.toLowerCase();
+    const authPages = [
+        'tutor-auth', 'parent-auth', 'management-auth',
+        'admin-auth', 'enrollment-auth', 'student-login',
+        'enrollment', 'enrollment-portal'
+    ];
+    
+    return authPages.some(page => path.includes(page));
+}
 
+// Exit immediately if auth page
+if (isAuthPage()) {
+    console.log('🔐 Auth page - portal protector disabled');
+    return;
+}
 (function() {
     'use strict';
     
