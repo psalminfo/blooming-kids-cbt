@@ -4964,7 +4964,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }, 1000);
                 
                 setTimeout(async () => {
-                    await checkAndShowSchedulePopup(tutorData);
+                    await initScheduleManager(tutorData);
                 }, 2000);
             } else {
                 console.error("No matching tutor found.");
@@ -5044,6 +5044,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
