@@ -1952,11 +1952,11 @@ class ScheduleManager {
 function initScheduleManager(tutor) {
     // Ensure these globals exist in your environment, or import them if using modules
     const firebaseDeps = {
-    db: db,
-    methods: { 
-        getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc, deleteField 
-    }
-};
+        db: db, // Your global db instance
+        methods: { 
+            getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc, deleteField 
+        }
+    };
     
     // Create the instance and attach to window for debugging/access
     window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
@@ -5045,6 +5045,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
