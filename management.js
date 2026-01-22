@@ -897,13 +897,11 @@ window.refreshAllDashboardData = async function() {
 // SUBSECTION 3.1: Tutor Directory Panel - UPDATED VERSION
 // ======================================================
 
-// Cache management configuration
-const CACHE_CONFIG = {
-    TUTORS: 'tutors',
-    STUDENTS: 'students',
-    TUTOR_ASSIGNMENTS: 'tutorAssignments',
-    MAX_AGE: 5 * 60 * 1000, // 5 minutes
-    VERSION: '1.2'
+// Cache management system
+const directoryCache = {
+    lastUpdated: 0,
+    CACHE_TTL: 5 * 60 * 1000, // 5 minutes
+    data: {}
 };
 
 // Helper function for safe string operations
@@ -924,35 +922,6 @@ function safeSearch(text, searchTerm) {
     if (!searchTerm || safeToString(searchTerm).trim() === '') return true;
     if (!text) return false;
     return safeToString(text).toLowerCase().includes(safeToString(searchTerm).toLowerCase());
-}
-
-// Enhanced cache management
-function initializeSessionCache() {
-    if (!sessionCache) {
-        sessionCache = {
-            tutors: [],
-            students: [],
-            tutorAssignments: {},
-            _metadata: {
-                version: CACHE_CONFIG.VERSION,
-                lastUpdate: 0,
-                checksum: ''
-            }
-        };
-    }
-    
-    // Clear old cache if version mismatch
-    if (sessionCache._metadata?.version !== CACHE_CONFIG.VERSION) {
-        console.log('Cache version mismatch, clearing cache...');
-        sessionCache.tutors = [];
-        sessionCache.students = [];
-        sessionCache.tutorAssignments = {};
-        sessionCache._metadata = {
-            version: CACHE_CONFIG.VERSION,
-            lastUpdate: 0,
-            checksum: ''
-        };
-    }
 }
 
 // Function to search student comprehensively
@@ -1007,205 +976,40 @@ function searchStudentFromFirebase(student, searchTerm, tutors = []) {
     return false;
 }
 
-// Smart duplicate detection for students
-function detectStudentDuplicates(students) {
-    const duplicates = [];
-    const seenNames = new Map();
-    const seenPhones = new Map();
-    const seenEmails = new Map();
+// Function to remove duplicate students
+function removeDuplicateStudents(students) {
+    const seenPhones = new Set();
+    const seenEmails = new Set();
+    const seenNames = new Set();
+    const uniqueStudents = [];
     
-    students.forEach((student, index) => {
-        if (!student) return;
+    for (const student of students) {
+        if (!student) continue;
         
-        const studentName = (student.studentName || '').toLowerCase().trim();
-        const parentPhone = (student.parentPhone || '').replace(/\D/g, '');
-        const parentEmail = (student.parentEmail || '').toLowerCase().trim();
+        const phone = student.parentPhone ? student.parentPhone.trim().toLowerCase() : '';
+        const email = student.parentEmail ? student.parentEmail.trim().toLowerCase() : '';
+        const name = student.studentName ? student.studentName.trim().toLowerCase() : '';
         
-        let duplicateFound = false;
-        const duplicateReasons = [];
+        // Check for duplicates by phone, email, or name
+        const isDuplicate = (phone && seenPhones.has(phone)) || 
+                           (email && seenEmails.has(email)) || 
+                           (name && seenNames.has(name));
         
-        // Check name duplicates (allow same name but different phone/email)
-        if (studentName && seenNames.has(studentName)) {
-            const existingStudent = students[seenNames.get(studentName)];
-            const existingPhone = (existingStudent.parentPhone || '').replace(/\D/g, '');
-            const existingEmail = (existingStudent.parentEmail || '').toLowerCase().trim();
-            
-            // Only flag as duplicate if phone OR email matches
-            if ((parentPhone && parentPhone === existingPhone) || 
-                (parentEmail && parentEmail === existingEmail)) {
-                duplicateFound = true;
-                duplicateReasons.push('Same name with matching contact');
-            }
-        }
-        
-        // Check phone duplicates
-        if (parentPhone && seenPhones.has(parentPhone)) {
-            duplicateFound = true;
-            duplicateReasons.push('Same phone number');
-        }
-        
-        // Check email duplicates
-        if (parentEmail && seenEmails.has(parentEmail)) {
-            duplicateFound = true;
-            duplicateReasons.push('Same email address');
-        }
-        
-        if (duplicateFound) {
-            duplicates.push({
-                student,
-                index,
-                reasons: duplicateReasons
+        if (!isDuplicate) {
+            uniqueStudents.push(student);
+            if (phone) seenPhones.add(phone);
+            if (email) seenEmails.add(email);
+            if (name) seenNames.add(name);
+        } else {
+            console.warn('Duplicate student detected and removed:', {
+                name: student.studentName,
+                phone: student.parentPhone,
+                email: student.parentEmail
             });
         }
-        
-        // Update tracking maps
-        if (studentName && !seenNames.has(studentName)) {
-            seenNames.set(studentName, index);
-        }
-        if (parentPhone) {
-            seenPhones.set(parentPhone, index);
-        }
-        if (parentEmail) {
-            seenEmails.set(parentEmail, index);
-        }
-    });
+    }
     
-    return duplicates;
-}
-
-// Merge duplicate students
-function mergeDuplicateStudents(students) {
-    const mergedStudents = [];
-    const processedIndices = new Set();
-    
-    // Group by phone number (most reliable identifier)
-    const phoneGroups = new Map();
-    
-    students.forEach((student, index) => {
-        if (!student) return;
-        
-        const phone = (student.parentPhone || '').replace(/\D/g, '');
-        const key = phone || (student.parentEmail || '').toLowerCase().trim() || 
-                   (student.studentName || '').toLowerCase().trim();
-        
-        if (!key) {
-            if (!processedIndices.has(index)) {
-                mergedStudents.push(student);
-                processedIndices.add(index);
-            }
-            return;
-        }
-        
-        if (!phoneGroups.has(key)) {
-            phoneGroups.set(key, []);
-        }
-        phoneGroups.get(key).push({ student, index });
-    });
-    
-    // Merge groups
-    phoneGroups.forEach(group => {
-        if (group.length === 1) {
-            mergedStudents.push(group[0].student);
-            processedIndices.add(group[0].index);
-            return;
-        }
-        
-        // Sort by creation date (newest first)
-        group.sort((a, b) => {
-            const dateA = new Date(a.student.createdAt || 0);
-            const dateB = new Date(b.student.createdAt || 0);
-            return dateB - dateA;
-        });
-        
-        // Merge data from all duplicates
-        const primaryStudent = { ...group[0].student };
-        
-        for (let i = 1; i < group.length; i++) {
-            const duplicate = group[i].student;
-            
-            // Merge fields (prefer non-empty values from duplicates)
-            Object.keys(duplicate).forEach(key => {
-                if (duplicate[key] && !primaryStudent[key]) {
-                    primaryStudent[key] = duplicate[key];
-                }
-            });
-        }
-        
-        // Add notes about merge
-        if (!primaryStudent.notes) primaryStudent.notes = '';
-        primaryStudent.notes += `\n[MERGED: Found ${group.length} duplicates merged on ${new Date().toLocaleDateString()}]`;
-        
-        mergedStudents.push(primaryStudent);
-        group.forEach(item => processedIndices.add(item.index));
-    });
-    
-    return mergedStudents;
-}
-
-// Function to display duplicate warnings
-function showDuplicateWarning(duplicates) {
-    if (duplicates.length === 0) return;
-    
-    const warningHtml = `
-        <div class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded-lg shadow-lg z-50 max-w-2xl animate-pulse">
-            <div class="flex items-start">
-                <svg class="w-6 h-6 mr-2 text-yellow-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                </svg>
-                <div>
-                    <strong class="font-bold">Duplicate Students Detected!</strong>
-                    <p class="text-sm mt-1">Found ${duplicates.length} potential duplicate student(s).</p>
-                    <button id="view-duplicates-btn" class="mt-2 text-sm bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded">
-                        View Details
-                    </button>
-                </div>
-                <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-lg font-bold">&times;</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', warningHtml);
-    
-    document.getElementById('view-duplicates-btn')?.addEventListener('click', () => {
-        showDuplicateDetailsModal(duplicates);
-    });
-}
-
-function showDuplicateDetailsModal(duplicates) {
-    const detailsHtml = duplicates.map((dup, idx) => `
-        <div class="mb-4 p-3 bg-red-50 rounded border border-red-200">
-            <h4 class="font-bold text-red-700">Duplicate #${idx + 1}</h4>
-            <p><strong>Student:</strong> ${dup.student.studentName || 'Unnamed'}</p>
-            <p><strong>Parent:</strong> ${dup.student.parentName || 'N/A'}</p>
-            <p><strong>Phone:</strong> ${dup.student.parentPhone || 'N/A'}</p>
-            <p><strong>Email:</strong> ${dup.student.parentEmail || 'N/A'}</p>
-            <p class="text-sm text-red-600"><strong>Reason:</strong> ${dup.reasons.join(', ')}</p>
-        </div>
-    `).join('');
-    
-    const modalHtml = `
-        <div id="duplicate-details-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-            <div class="relative bg-white w-full max-w-3xl rounded-lg shadow-xl">
-                <div class="p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-bold text-red-700">Duplicate Students Found</h3>
-                        <button onclick="closeManagementModal('duplicate-details-modal')" class="text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
-                    </div>
-                    <div class="max-h-96 overflow-y-auto">
-                        ${detailsHtml}
-                    </div>
-                    <p class="text-sm text-gray-600 mt-4">Note: Duplicates will be automatically merged. The system will keep the most recent record and merge information from duplicates.</p>
-                    <div class="flex justify-end mt-6">
-                        <button onclick="closeManagementModal('duplicate-details-modal')" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">
-                            Close
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    return uniqueStudents;
 }
 
 async function renderManagementTutorView(container) {
@@ -1217,16 +1021,16 @@ async function renderManagementTutorView(container) {
                     <input type="search" id="directory-search" placeholder="Search Tutors, Students, Parents, Subjects, Grades..." class="p-2 border rounded-md w-64">
                     <button id="assign-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Assign New Student</button>
                     <button id="reassign-student-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Reassign Student</button>
-                    <button id="view-tutor-history-directory-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">View Student History</button>
+                    <button id="view-all-history-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">View All History</button>
                     <button id="refresh-directory-btn" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Refresh</button>
                 </div>
             </div>
             <div class="flex space-x-4 mb-4">
-                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full cursor-pointer hover:bg-green-200 transition-colors" id="tutor-count-card">
+                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full cursor-pointer hover:bg-green-200 transition-colors" id="active-tutors-card">
                     <h4 class="font-bold text-green-800 text-sm">Active Tutors</h4>
                     <p id="tutor-count-badge" class="text-2xl font-extrabold">0</p>
                 </div>
-                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full cursor-pointer hover:bg-yellow-200 transition-colors" id="student-count-card">
+                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full cursor-pointer hover:bg-yellow-200 transition-colors" id="active-students-card">
                     <h4 class="font-bold text-yellow-800 text-sm">Active Students</h4>
                     <p id="student-count-badge" class="text-2xl font-extrabold">0</p>
                 </div>
@@ -1241,29 +1045,34 @@ async function renderManagementTutorView(container) {
         </div>
     `;
     
-    // Initialize cache
-    initializeSessionCache();
-    
-    // Add event listeners - wrapped in try-catch to prevent crash if elements missing
+    // Add event listeners
     try {
-        document.getElementById('assign-student-btn').addEventListener('click', showAssignStudentModal);
+        document.getElementById('assign-student-btn').addEventListener('click', showEnhancedAssignStudentModal);
         document.getElementById('reassign-student-btn').addEventListener('click', showEnhancedReassignStudentModal);
         document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
         document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
+        document.getElementById('view-all-history-btn').addEventListener('click', showAllStudentHistory);
         
-        // Make counter cards clickable
-        document.getElementById('history-count-card').addEventListener('click', showAllStudentsWithHistory);
-        document.getElementById('tutor-count-card').addEventListener('click', () => {
-            document.getElementById('directory-search').value = '';
-            renderDirectoryFromCache();
-        });
-        document.getElementById('student-count-card').addEventListener('click', () => {
-            document.getElementById('directory-search').value = '';
+        // Add click events for counter cards
+        document.getElementById('active-tutors-card').addEventListener('click', () => {
+            const searchInput = document.getElementById('directory-search');
+            searchInput.value = '';
+            searchInput.focus();
             renderDirectoryFromCache();
         });
         
-        document.getElementById('view-tutor-history-directory-btn').addEventListener('click', async () => {
-            showAllStudentsWithHistory();
+        document.getElementById('active-students-card').addEventListener('click', () => {
+            const searchInput = document.getElementById('directory-search');
+            searchInput.value = 'student';
+            renderDirectoryFromCache('student');
+        });
+        
+        document.getElementById('history-count-card').addEventListener('click', () => {
+            showAllStudentHistory();
+        });
+        
+        document.getElementById('view-tutor-history-directory-btn')?.addEventListener('click', async () => {
+            showAllStudentHistory();
         });
         
     } catch (e) {
@@ -1273,18 +1082,18 @@ async function renderManagementTutorView(container) {
     fetchAndRenderDirectory();
 }
 
-function showAllStudentsWithHistory() {
+// Function to show all student history
+async function showAllStudentHistory() {
     if (!sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
-        alert("No student history available. Please refresh the directory first.");
-        return;
+        await fetchAndRenderDirectory(true);
     }
     
     const students = sessionCache.students || [];
-    const tutorAssignments = sessionCache.tutorAssignments;
+    const tutorAssignments = sessionCache.tutorAssignments || {};
     
-    // Get students with history
+    // Get all students with history
     const studentsWithHistory = students.filter(student => 
-        student && tutorAssignments[student.id]
+        student && tutorAssignments[student.id] && tutorAssignments[student.id].length > 0
     );
     
     if (studentsWithHistory.length === 0) {
@@ -1292,46 +1101,64 @@ function showAllStudentsWithHistory() {
         return;
     }
     
-    const studentOptions = studentsWithHistory.map(student => {
-        const historyCount = tutorAssignments[student.id]?.length || 0;
-        return `<option value="${student.id}">
-            ${student.studentName || 'Unnamed'} (${student.grade || 'No grade'}) - ${historyCount} assignment(s)
-        </option>`;
-    }).join('');
-    
     const modalHtml = `
-        <div id="select-student-history-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div class="relative p-8 bg-white w-full max-w-2xl rounded-lg shadow-xl">
-                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('select-student-history-modal')">&times;</button>
-                <h3 class="text-xl font-bold mb-4 text-purple-700">Select Student to View History</h3>
-                
-                <div class="mb-4">
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                            </svg>
+        <div id="all-history-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+            <div class="relative bg-white w-full max-w-4xl rounded-lg shadow-xl animate-fadeIn max-h-[90vh] flex flex-col">
+                <div class="flex items-center justify-between p-6 border-b">
+                    <div>
+                        <h3 class="text-xl font-bold text-purple-700">All Students with History</h3>
+                        <p class="text-sm text-gray-600 mt-1">${studentsWithHistory.length} students with tutor assignment history</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="relative">
+                            <input type="search" id="history-search" placeholder="Search students..." class="pl-10 p-2 border rounded-md w-64">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                </svg>
+                            </div>
                         </div>
-                        <input type="search" id="history-student-search" placeholder="Search students by name, grade, parent..." 
-                               class="pl-10 w-full p-3 border border-gray-300 rounded-lg mb-4">
+                        <button onclick="closeManagementModal('all-history-modal')" 
+                                class="text-gray-500 hover:text-gray-800 text-2xl font-bold transition-colors">
+                            &times;
+                        </button>
                     </div>
                 </div>
                 
-                <form id="select-student-history-form">
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium mb-2">Select Student</label>
-                        <select id="select-student-history" size="10" required 
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 h-64 overflow-y-auto">
-                            <option value="" disabled selected>Select a student...</option>
-                            ${studentOptions}
-                        </select>
-                        <p class="text-sm text-gray-500 mt-2">${studentsWithHistory.length} students with history found</p>
+                <div class="flex-1 overflow-auto p-6">
+                    <div class="space-y-4" id="history-student-list">
+                        ${studentsWithHistory.map(student => {
+                            const history = tutorAssignments[student.id] || [];
+                            const historyCount = history.length;
+                            const latestAssignment = history[0];
+                            const currentTutor = latestAssignment ? `${latestAssignment.newTutorName || latestAssignment.tutorName || 'Unknown'}` : 'No tutor';
+                            
+                            return `
+                                <div class="border rounded-lg p-4 hover:shadow-md transition-shadow" data-search-text="${student.studentName?.toLowerCase()} ${student.parentName?.toLowerCase()} ${student.grade?.toLowerCase()}">
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <h4 class="font-bold text-lg">${student.studentName || 'Unnamed Student'}</h4>
+                                            <div class="text-sm text-gray-600 mt-1">
+                                                <span>Grade: ${student.grade || 'N/A'}</span> • 
+                                                <span>Parent: ${student.parentName || 'N/A'}</span> • 
+                                                <span>Current Tutor: ${currentTutor}</span>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm">
+                                                ${historyCount} assignment${historyCount !== 1 ? 's' : ''}
+                                            </span>
+                                            <button class="view-student-history-btn bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition-colors"
+                                                    data-student-id="${student.id}">
+                                                View History
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
-                    <div class="flex justify-end mt-4">
-                        <button type="button" onclick="closeManagementModal('select-student-history-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">View History</button>
-                    </div>
-                </form>
+                </div>
             </div>
         </div>
     `;
@@ -1339,65 +1166,58 @@ function showAllStudentsWithHistory() {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
     // Add search functionality
-    const searchInput = document.getElementById('history-student-search');
-    const selectElement = document.getElementById('select-student-history');
-    const originalOptions = Array.from(selectElement.options);
-    
-    searchInput.addEventListener('input', function() {
-        const searchTerm = this.value.toLowerCase();
-        
-        originalOptions.forEach(option => {
-            if (option.value === '') return;
+    const searchInput = document.getElementById('history-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const studentCards = document.querySelectorAll('#history-student-list > div');
             
-            const optionText = option.textContent.toLowerCase();
-            option.style.display = optionText.includes(searchTerm) ? 'block' : 'none';
-        });
-    });
-    
-    const form = document.getElementById('select-student-history-form');
-    if(form) {
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const selectEl = document.getElementById('select-student-history');
-            if (selectEl) {
-                const studentId = selectEl.value;
-                closeManagementModal('select-student-history-modal');
-                if (typeof window.viewStudentTutorHistory === 'function') {
-                    window.viewStudentTutorHistory(studentId);
+            studentCards.forEach(card => {
+                const searchText = card.getAttribute('data-search-text') || '';
+                if (searchText.includes(searchTerm) || !searchTerm) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
                 }
-            }
+            });
         });
     }
+    
+    // Add click events for view history buttons
+    document.querySelectorAll('.view-student-history-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            closeManagementModal('all-history-modal');
+            if (typeof window.viewStudentTutorHistory === 'function') {
+                window.viewStudentTutorHistory(button.dataset.studentId);
+            }
+        });
+    });
 }
 
 async function fetchAndRenderDirectory(forceRefresh = false) {
-    const directoryList = document.getElementById('directory-list');
-    if (!directoryList) return;
+    // Check cache validity
+    const cacheValid = !forceRefresh && 
+                     directoryCache.lastUpdated && 
+                     (Date.now() - directoryCache.lastUpdated < directoryCache.CACHE_TTL) &&
+                     directoryCache.data.tutors &&
+                     directoryCache.data.students;
     
-    if (forceRefresh) {
-        invalidateCache('tutors');
-        invalidateCache('students');
-        invalidateCache('tutorAssignments');
-        sessionCache._metadata.lastUpdate = 0;
-    }
-    
-    // Check if cache is still valid
-    const cacheAge = Date.now() - (sessionCache._metadata?.lastUpdate || 0);
-    const isCacheValid = !forceRefresh && 
-                        sessionCache.tutors?.length > 0 && 
-                        sessionCache.students?.length > 0 &&
-                        cacheAge < CACHE_CONFIG.MAX_AGE;
-    
-    if (isCacheValid) {
-        console.log('Using cached directory data');
+    if (cacheValid) {
+        console.log("Using cached directory data");
+        sessionCache.tutors = directoryCache.data.tutors;
+        sessionCache.students = directoryCache.data.students;
+        sessionCache.tutorAssignments = directoryCache.data.tutorAssignments;
         renderDirectoryFromCache();
         return;
     }
     
     try {
-        directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data from server...</p>`;
+        const directoryList = document.getElementById('directory-list');
+        if (directoryList) {
+            directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data from server...</p>`;
+        }
         
-        // Fetch all data in parallel
+        // Use Promise.all for parallel fetching
         const [tutorsSnapshot, studentsSnapshot, tutorAssignmentsSnapshot] = await Promise.all([
             getDocs(query(collection(db, "tutors"), orderBy("name"))),
             getDocs(query(collection(db, "students"), orderBy("studentName"))),
@@ -1427,7 +1247,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
         );
         
         // Process students with safe data handling
-        const rawStudents = studentsSnapshot.docs.map(doc => {
+        let allStudents = studentsSnapshot.docs.map(doc => {
             const data = doc.data();
             return {
                 id: doc.id,
@@ -1439,8 +1259,8 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
                 days: data.days || '',
                 subjects: Array.isArray(data.subjects) ? data.subjects : (data.subjects ? [data.subjects] : []),
                 parentName: data.parentName || '',
-                parentPhone: data.parentPhone || '',
-                parentEmail: data.parentEmail || '',
+                parentPhone: data.parentPhone ? String(data.parentPhone).trim() : '',
+                parentEmail: data.parentEmail ? String(data.parentEmail).trim() : '',
                 address: data.address || '',
                 status: data.status || 'active',
                 createdAt: data.createdAt || new Date().toISOString(),
@@ -1448,24 +1268,11 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             };
         });
         
-        // Check for and handle duplicates
-        const duplicates = detectStudentDuplicates(rawStudents);
-        if (duplicates.length > 0) {
-            console.warn(`Found ${duplicates.length} duplicate students`);
-            showDuplicateWarning(duplicates);
-            
-            // Merge duplicates
-            const mergedStudents = mergeDuplicateStudents(rawStudents);
-            console.log(`Merged ${rawStudents.length} students down to ${mergedStudents.length}`);
-            
-            // Update Firebase with merged data (in background)
-            processMergedStudents(rawStudents, mergedStudents);
-            
-            rawStudents.length = 0;
-            rawStudents.push(...mergedStudents);
-        }
+        // Remove duplicate students based on phone, email, or name
+        allStudents = removeDuplicateStudents(allStudents);
+        console.log(`After deduplication: ${allStudents.length} unique students`);
         
-        const activeStudents = rawStudents.filter(student => 
+        const activeStudents = allStudents.filter(student => 
             student && (!student.status || student.status === 'active' || student.status === 'approved')
         );
         
@@ -1503,53 +1310,31 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             );
         });
         
-        // Save to cache with metadata
+        // Save to cache
+        directoryCache.data = {
+            tutors: activeTutors,
+            students: activeStudents,
+            tutorAssignments: tutorAssignments
+        };
+        directoryCache.lastUpdated = Date.now();
+        
         sessionCache.tutors = activeTutors;
         sessionCache.students = activeStudents;
         sessionCache.tutorAssignments = tutorAssignments;
-        sessionCache._metadata = {
-            version: CACHE_CONFIG.VERSION,
-            lastUpdate: Date.now(),
-            checksum: generateChecksum(activeTutors, activeStudents)
-        };
+        sessionCache._lastUpdate = Date.now();
         
-        // Save to localStorage for persistence
-        saveToLocalStorage('tutors', activeTutors);
-        saveToLocalStorage('students', activeStudents);
-        saveToLocalStorage('tutorAssignments', tutorAssignments);
-        saveToLocalStorage('cache_metadata', sessionCache._metadata);
-        
-        console.log("Cache updated:", {
+        console.log("Cache updated with:", {
             tutors: activeTutors.length,
             students: activeStudents.length,
-            assignments: Object.keys(tutorAssignments).length,
-            age: 'fresh'
+            assignments: Object.keys(tutorAssignments).length
         });
         
         renderDirectoryFromCache();
         
     } catch (error) {
         console.error("Error fetching directory data:", error);
-        
-        // Try to load from localStorage if network fails
-        const cachedTutors = loadFromLocalStorage('tutors') || [];
-        const cachedStudents = loadFromLocalStorage('students') || [];
-        const cachedAssignments = loadFromLocalStorage('tutorAssignments') || {};
-        
-        if (cachedTutors.length > 0 || cachedStudents.length > 0) {
-            console.log("Loading from localStorage cache");
-            sessionCache.tutors = cachedTutors;
-            sessionCache.students = cachedStudents;
-            sessionCache.tutorAssignments = cachedAssignments;
-            renderDirectoryFromCache();
-            
-            directoryList.insertAdjacentHTML('beforeend', `
-                <div class="bg-yellow-50 border border-yellow-200 rounded p-4 mt-4">
-                    <p class="text-yellow-700 text-sm">Showing cached data. Some information may be outdated. 
-                    <button onclick="fetchAndRenderDirectory(true)" class="text-yellow-800 font-semibold hover:underline">Refresh</button></p>
-                </div>
-            `);
-        } else {
+        const directoryList = document.getElementById('directory-list');
+        if (directoryList) {
             directoryList.innerHTML = `
                 <div class="text-center py-10">
                     <p class="text-red-500 mb-4">Failed to load data: ${error.message}</p>
@@ -1559,50 +1344,6 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
                 </div>
             `;
         }
-    }
-}
-
-// Helper function to generate checksum
-function generateChecksum(tutors, students) {
-    const dataString = JSON.stringify({
-        tutors: tutors.length,
-        students: students.length,
-        tutorCount: tutors.reduce((sum, t) => sum + (t.email || '').length, 0),
-        studentCount: students.reduce((sum, s) => sum + (s.studentName || '').length, 0)
-    });
-    
-    let hash = 0;
-    for (let i = 0; i < dataString.length; i++) {
-        const char = dataString.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-    }
-    return hash.toString(36);
-}
-
-// Process merged students in background
-async function processMergedStudents(originalStudents, mergedStudents) {
-    try {
-        // Identify duplicates to clean up
-        const mergedIds = new Set(mergedStudents.map(s => s.id));
-        const duplicatesToRemove = originalStudents.filter(s => !mergedIds.has(s.id));
-        
-        if (duplicatesToRemove.length === 0) return;
-        
-        console.log(`Cleaning up ${duplicatesToRemove.length} duplicate students from Firebase...`);
-        
-        // In production, you might want to:
-        // 1. Mark duplicates as inactive instead of deleting
-        // 2. Create a merge log
-        // 3. Notify admins
-        
-        // For now, just log
-        duplicatesToRemove.forEach(student => {
-            console.log(`Duplicate to handle: ${student.studentName} (${student.parentPhone})`);
-        });
-        
-    } catch (error) {
-        console.error("Error processing merged students:", error);
     }
 }
 
@@ -1626,7 +1367,6 @@ function renderDirectoryFromCache(searchTerm = '') {
         return;
     }
 
-    // Safe search term handling
     const searchTermLower = safeToString(searchTerm).toLowerCase();
     
     // Group students by tutor email
@@ -1686,16 +1426,9 @@ function renderDirectoryFromCache(searchTerm = '') {
     
     if (tutorCountBadge) tutorCountBadge.textContent = tutors.length;
     if (studentCountBadge) studentCountBadge.textContent = students.length;
-    if (historyCountBadge) {
-        const historyCount = Object.keys(tutorAssignments).length;
-        historyCountBadge.textContent = historyCount;
-        
-        // Add tooltip
-        const historyCard = document.getElementById('history-count-card');
-        if (historyCard) {
-            historyCard.title = `Click to view all ${historyCount} students with history`;
-        }
-    }
+    
+    const studentsWithHistory = Object.keys(tutorAssignments).length;
+    if (historyCountBadge) historyCountBadge.textContent = studentsWithHistory;
 
     // Check permissions
     const canEditStudents = window.userData?.permissions?.actions?.canEditStudents === true;
@@ -1750,7 +1483,6 @@ function renderDirectoryFromCache(searchTerm = '') {
                         <div>
                             <span class="text-green-700">${tutor.name || 'Unnamed Tutor'}</span>
                             <span class="ml-2 text-sm font-normal text-gray-500">${tutor.email || ''}</span>
-                            ${tutor.phone ? `<span class="ml-2 text-sm font-normal text-gray-500">${tutor.phone}</span>` : ''}
                         </div>
                         <div class="flex items-center">
                             <span class="ml-2 text-sm font-normal px-2 py-1 bg-green-100 text-green-800 rounded-full">
@@ -1821,69 +1553,33 @@ function renderDirectoryFromCache(searchTerm = '') {
 // ENHANCED ASSIGN STUDENT MODAL WITH SEARCH
 // ======================================================
 
-async function showAssignStudentModal() {
+async function showEnhancedAssignStudentModal() {
     try {
-        // Ensure cache is fresh
-        if (!isCacheValid(['tutors', 'students'])) {
+        // Ensure fresh data
+        if (!isCacheValid(['students', 'tutors'])) {
             await fetchAndRenderDirectory(true);
         }
         
-        const tutors = getCleanTutors();
         const students = getCleanStudents();
-        
-        if (tutors.length === 0) {
-            alert("No active tutors found. Please add tutors first.");
-            return;
-        }
+        const tutors = getCleanTutors();
         
         // Get unassigned students
         const unassignedStudents = students.filter(student => 
             !student.tutorEmail || student.tutorEmail.trim() === ''
         );
         
-        const tutorOptions = tutors.map(tutor => {
-            const searchText = [
-                tutor.name || '',
-                tutor.email || '',
-                tutor.phone || '',
-                Array.isArray(tutor.subjects) ? tutor.subjects.join(' ') : (tutor.subjects || '')
-            ].join(' ').toLowerCase();
-            
-            return `
-                <option value="${tutor.email}" 
-                        data-tutor-name="${tutor.name || ''}"
-                        data-search-text="${searchText}">
-                    ${tutor.name} (${tutor.email}) - ${tutor.phone || 'No phone'}
-                </option>
-            `;
-        }).join('');
-        
-        const studentOptions = unassignedStudents.map(student => {
-            const searchText = [
-                student.studentName || '',
-                student.grade || '',
-                student.parentName || '',
-                student.parentPhone || '',
-                student.parentEmail || '',
-                Array.isArray(student.subjects) ? student.subjects.join(' ') : (student.subjects || '')
-            ].join(' ').toLowerCase();
-            
-            return `
-                <option value="${student.id}" 
-                        data-student-name="${student.studentName || ''}"
-                        data-search-text="${searchText}">
-                    ${student.studentName} - Grade ${student.grade || 'N/A'} (${student.parentName || 'No parent'})
-                </option>
-            `;
-        }).join('');
+        if (unassignedStudents.length === 0) {
+            showReassignAlert("No unassigned students found. All students are already assigned to tutors.", 'info');
+            return;
+        }
         
         const modalHtml = `
             <div id="assign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
                 <div class="relative bg-white w-full max-w-4xl rounded-lg shadow-xl animate-fadeIn">
                     <div class="flex items-center justify-between p-6 border-b">
                         <div>
-                            <h3 class="text-xl font-bold text-green-700">Assign Student to Tutor</h3>
-                            <p class="text-sm text-gray-600 mt-1">Assign unassigned students to tutors</p>
+                            <h3 class="text-xl font-bold text-green-700">Assign New Student to Tutor</h3>
+                            <p class="text-sm text-gray-600 mt-1">Select a student and assign them to a tutor</p>
                         </div>
                         <button onclick="closeManagementModal('assign-student-modal')" 
                                 class="text-gray-400 hover:text-gray-800 text-2xl font-bold transition-colors">
@@ -1894,9 +1590,10 @@ async function showAssignStudentModal() {
                     <div class="p-6">
                         <form id="assign-student-form">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                <!-- Student Search -->
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">
-                                        Search Students
+                                        Search Unassigned Students
                                     </label>
                                     <div class="relative">
                                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1906,12 +1603,13 @@ async function showAssignStudentModal() {
                                         </div>
                                         <input type="search" 
                                                id="assign-search-students" 
-                                               placeholder="Search students by name, grade, parent..." 
+                                               placeholder="Search by student name, grade, parent..." 
                                                class="pl-10 w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all">
                                     </div>
                                     <p class="text-xs text-gray-500 mt-2">${unassignedStudents.length} unassigned students</p>
                                 </div>
                                 
+                                <!-- Tutor Search -->
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">
                                         Search Tutors
@@ -1924,7 +1622,7 @@ async function showAssignStudentModal() {
                                         </div>
                                         <input type="search" 
                                                id="assign-search-tutors" 
-                                               placeholder="Search tutors by name, email, phone..." 
+                                               placeholder="Search by tutor name, email, subjects..." 
                                                class="pl-10 w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all">
                                     </div>
                                     <p class="text-xs text-gray-500 mt-2">${tutors.length} available tutors</p>
@@ -1932,6 +1630,7 @@ async function showAssignStudentModal() {
                             </div>
                             
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                                <!-- Student Selection -->
                                 <div class="space-y-2">
                                     <label class="block text-sm font-medium text-gray-700">
                                         Select Student to Assign
@@ -1940,14 +1639,36 @@ async function showAssignStudentModal() {
                                     <div class="relative">
                                         <select id="assign-student-id" 
                                                 required 
-                                                class="block w-full rounded-md border-gray-300 shadow-sm p-3 h-48 overflow-y-auto focus:ring-green-500 focus:border-green-500 transition-all"
-                                                size="8">
+                                                class="block w-full rounded-md border-gray-300 shadow-sm p-3 h-64 overflow-y-auto focus:ring-green-500 focus:border-green-500 transition-all"
+                                                size="10">
                                             <option value="" disabled selected class="text-gray-500">Select a student...</option>
-                                            ${studentOptions}
+                                            ${unassignedStudents.map(student => {
+                                                const searchText = [
+                                                    student.studentName || '',
+                                                    student.grade || '',
+                                                    student.parentName || '',
+                                                    student.parentPhone || '',
+                                                    Array.isArray(student.subjects) ? student.subjects.join(' ') : (student.subjects || '')
+                                                ].join(' ').toLowerCase();
+                                                
+                                                return `
+                                                    <option value="${student.id}" 
+                                                            data-search-text="${searchText}">
+                                                        ${student.studentName} | Grade ${student.grade || 'N/A'} | Parent: ${student.parentName || 'N/A'}
+                                                    </option>
+                                                `;
+                                            }).join('')}
                                         </select>
+                                        <div id="assign-student-count" class="absolute bottom-2 right-2 text-xs text-gray-500 bg-white px-2 py-1 rounded">
+                                            ${unassignedStudents.length} unassigned students
+                                        </div>
+                                    </div>
+                                    <div id="assign-student-info" class="mt-3 p-3 bg-blue-50 rounded-md hidden">
+                                        <p class="text-sm font-medium text-blue-800" id="assign-selected-student-text"></p>
                                     </div>
                                 </div>
                                 
+                                <!-- Tutor Selection -->
                                 <div class="space-y-2">
                                     <label class="block text-sm font-medium text-gray-700">
                                         Select Tutor
@@ -1959,23 +1680,47 @@ async function showAssignStudentModal() {
                                                 class="block w-full rounded-md border-gray-300 shadow-sm p-3 h-48 overflow-y-auto focus:ring-green-500 focus:border-green-500 transition-all"
                                                 size="8">
                                             <option value="" disabled selected class="text-gray-500">Select a tutor...</option>
-                                            ${tutorOptions}
+                                            ${tutors.map(tutor => {
+                                                const searchText = [
+                                                    tutor.name || '',
+                                                    tutor.email || '',
+                                                    tutor.phone || '',
+                                                    Array.isArray(tutor.subjects) ? tutor.subjects.join(' ') : (tutor.subjects || '')
+                                                ].join(' ').toLowerCase();
+                                                
+                                                return `
+                                                    <option value="${tutor.email}" 
+                                                            data-tutor-name="${tutor.name || ''}"
+                                                            data-search-text="${searchText}">
+                                                        ${tutor.name} (${tutor.email})
+                                                    </option>
+                                                `;
+                                            }).join('')}
                                         </select>
+                                        <div id="assign-tutor-count" class="absolute bottom-2 right-2 text-xs text-gray-500 bg-white px-2 py-1 rounded">
+                                            ${tutors.length} tutors
+                                        </div>
+                                    </div>
+                                    <div id="assign-tutor-info" class="mt-3 p-3 bg-green-50 rounded-md hidden">
+                                        <p class="text-sm font-medium text-green-800" id="assign-selected-tutor-text"></p>
                                     </div>
                                 </div>
                             </div>
                             
+                            <!-- Reason Section -->
                             <div class="mb-6">
                                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                                    Assignment Notes (Optional)
+                                    Assignment Notes
+                                    <span class="text-gray-500 text-xs font-normal">(Optional)</span>
                                 </label>
                                 <textarea id="assign-notes" 
                                           class="w-full rounded-md border-gray-300 shadow-sm p-3 focus:ring-green-500 focus:border-green-500 transition-all"
-                                          rows="2" 
+                                          rows="3" 
                                           placeholder="Any notes about this assignment..."
-                                          maxlength="250"></textarea>
+                                          maxlength="500"></textarea>
                             </div>
                             
+                            <!-- Action Buttons -->
                             <div class="flex justify-end space-x-3 pt-4 border-t">
                                 <button type="button" 
                                         onclick="closeManagementModal('assign-student-modal')" 
@@ -1983,7 +1728,11 @@ async function showAssignStudentModal() {
                                     Cancel
                                 </button>
                                 <button type="submit" 
-                                        class="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
+                                        id="assign-submit-btn"
+                                        class="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                    </svg>
                                     Assign Student
                                 </button>
                             </div>
@@ -1994,22 +1743,22 @@ async function showAssignStudentModal() {
         `;
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
-        
-        // Initialize search functionality
-        initializeAssignModalSearch(unassignedStudents, tutors);
+        initializeAssignStudentModal(unassignedStudents, tutors);
         
     } catch (error) {
-        console.error("Error showing assign student modal:", error);
-        alert(`Error: ${error.message}`);
+        console.error("Error in assign student modal:", error);
+        showReassignAlert(`Error: ${error.message}`, 'error');
     }
 }
 
-function initializeAssignModalSearch(students, tutors) {
+function initializeAssignStudentModal(unassignedStudents, tutors) {
     const studentSearchInput = document.getElementById('assign-search-students');
     const tutorSearchInput = document.getElementById('assign-search-tutors');
     const studentSelect = document.getElementById('assign-student-id');
     const tutorSelect = document.getElementById('assign-tutor-email');
+    const form = document.getElementById('assign-student-form');
     
+    // Store original options
     const originalStudentOptions = Array.from(studentSelect.options);
     const originalTutorOptions = Array.from(tutorSelect.options);
     
@@ -2017,15 +1766,12 @@ function initializeAssignModalSearch(students, tutors) {
     if (studentSearchInput) {
         studentSearchInput.addEventListener('input', function() {
             const searchTerm = this.value.toLowerCase();
+            const visibleOptions = enhancedSearchFilter(originalStudentOptions, searchTerm, 'data-search-text');
             
-            originalStudentOptions.forEach(option => {
-                if (option.value === '') return;
-                
-                const searchText = option.getAttribute('data-search-text') || 
-                                 option.textContent.toLowerCase();
-                
-                option.style.display = searchText.includes(searchTerm) ? 'block' : 'none';
-            });
+            const countElement = document.getElementById('assign-student-count');
+            if (countElement) {
+                countElement.textContent = `${visibleOptions.length} students found`;
+            }
         });
     }
     
@@ -2033,74 +1779,155 @@ function initializeAssignModalSearch(students, tutors) {
     if (tutorSearchInput) {
         tutorSearchInput.addEventListener('input', function() {
             const searchTerm = this.value.toLowerCase();
+            const visibleOptions = enhancedSearchFilter(originalTutorOptions, searchTerm, 'data-search-text');
             
-            originalTutorOptions.forEach(option => {
-                if (option.value === '') return;
-                
-                const searchText = option.getAttribute('data-search-text') || 
-                                 option.textContent.toLowerCase();
-                
-                option.style.display = searchText.includes(searchTerm) ? 'block' : 'none';
-            });
+            const countElement = document.getElementById('assign-tutor-count');
+            if (countElement) {
+                countElement.textContent = `${visibleOptions.length} tutors found`;
+            }
         });
     }
     
-    // Form submission
-    const form = document.getElementById('assign-student-form');
+    // Show selected student info
+    if (studentSelect) {
+        studentSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption && selectedOption.value) {
+                const studentTextElement = document.getElementById('assign-selected-student-text');
+                const studentInfoDiv = document.getElementById('assign-student-info');
+                
+                if (studentTextElement) {
+                    studentTextElement.textContent = `Selected: ${selectedOption.textContent}`;
+                }
+                if (studentInfoDiv) {
+                    studentInfoDiv.classList.remove('hidden');
+                }
+            }
+        });
+    }
+    
+    // Show selected tutor info
+    if (tutorSelect) {
+        tutorSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption && selectedOption.value) {
+                const tutorTextElement = document.getElementById('assign-selected-tutor-text');
+                const tutorInfoDiv = document.getElementById('assign-tutor-info');
+                
+                if (tutorTextElement) {
+                    tutorTextElement.textContent = `Selected: ${selectedOption.textContent}`;
+                }
+                if (tutorInfoDiv) {
+                    tutorInfoDiv.classList.remove('hidden');
+                }
+            }
+        });
+    }
+    
+    // Handle form submission
     if (form) {
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const studentId = studentSelect.value;
             const tutorEmail = tutorSelect.value;
-            const notes = document.getElementById('assign-notes')?.value || '';
+            const notes = document.getElementById('assign-notes')?.value.trim() || '';
             
             if (!studentId || !tutorEmail) {
-                alert("Please select both a student and a tutor.");
+                showReassignAlert("Please select both a student and a tutor.", 'warning');
                 return;
             }
             
-            const student = students.find(s => s.id === studentId);
+            const student = unassignedStudents.find(s => s.id === studentId);
             const tutor = tutors.find(t => t.email === tutorEmail);
             
             if (!student || !tutor) {
-                alert("Selected student or tutor not found.");
+                showReassignAlert("Selected student or tutor not found.", 'error');
                 return;
             }
             
-            const confirmed = confirm(`Assign ${student.studentName} to ${tutor.name}?`);
+            // Confirmation
+            const confirmed = await showReassignConfirmationDialog(
+                `Assign Student`,
+                `Assign <strong>${student.studentName}</strong> to <strong>${tutor.name}</strong>?`,
+                'warning'
+            );
+            
             if (!confirmed) return;
             
-            try {
-                // Update student record
-                await updateDoc(doc(db, "students", studentId), {
-                    tutorEmail: tutorEmail,
-                    tutorName: tutor.name,
-                    updatedAt: new Date().toISOString(),
-                    updatedBy: window.userData?.name || 'Admin'
-                });
-                
-                // Create assignment history
-                await addDoc(collection(db, "tutorAssignments"), {
-                    studentId: studentId,
-                    studentName: student.studentName,
-                    newTutorEmail: tutorEmail,
-                    newTutorName: tutor.name,
-                    reason: 'Initial assignment' + (notes ? `: ${notes}` : ''),
-                    assignedBy: window.userData?.name || 'Admin',
-                    assignedAt: new Date().toISOString(),
-                    timestamp: new Date().toISOString()
-                });
-                
-                alert(`✅ Successfully assigned ${student.studentName} to ${tutor.name}!`);
-                closeManagementModal('assign-student-modal');
-                fetchAndRenderDirectory(true);
-                
-            } catch (error) {
-                console.error("Assignment error:", error);
-                alert(`❌ Failed to assign student: ${error.message}`);
-            }
+            await performAssignment(student, tutor, notes);
         });
+    }
+}
+
+async function performAssignment(student, tutor, notes) {
+    const submitBtn = document.getElementById('assign-submit-btn');
+    const originalBtnContent = submitBtn.innerHTML;
+    
+    try {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `
+            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Processing...
+        `;
+        
+        const currentUser = window.userData?.name || 'Admin';
+        const currentUserEmail = window.userData?.email || 'admin@system';
+        
+        // 1. Create assignment history
+        const assignmentData = {
+            studentId: student.id,
+            studentName: student.studentName,
+            newTutorEmail: tutor.email,
+            newTutorName: tutor.name,
+            reason: notes || 'Initial assignment',
+            assignedBy: currentUser,
+            assignedByEmail: currentUserEmail,
+            assignedAt: new Date().toISOString(),
+            timestamp: new Date().toISOString()
+        };
+        
+        await addDoc(collection(db, "tutorAssignments"), assignmentData);
+        
+        // 2. Update student document
+        const studentUpdateData = {
+            tutorEmail: tutor.email,
+            tutorName: tutor.name,
+            updatedAt: new Date().toISOString(),
+            updatedBy: currentUser,
+            updatedByEmail: currentUserEmail
+        };
+        
+        await updateDoc(doc(db, "students", student.id), studentUpdateData);
+        
+        // 3. Update cache
+        if (sessionCache.students) {
+            const studentIndex = sessionCache.students.findIndex(s => s && s.id === student.id);
+            if (studentIndex !== -1) {
+                sessionCache.students[studentIndex].tutorEmail = tutor.email;
+                sessionCache.students[studentIndex].tutorName = tutor.name;
+                sessionCache._lastUpdate = Date.now();
+            }
+        }
+        
+        // Invalidate cache
+        directoryCache.lastUpdated = 0;
+        
+        showReassignAlert(`✅ Successfully assigned "${student.studentName}" to ${tutor.name}!`, 'success');
+        
+        setTimeout(() => {
+            closeManagementModal('assign-student-modal');
+            fetchAndRenderDirectory(true);
+        }, 1500);
+        
+    } catch (error) {
+        console.error("Assignment error:", error);
+        showReassignAlert(`❌ Failed to assign student: ${error.message}`, 'error');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnContent;
     }
 }
 
@@ -2120,9 +1947,9 @@ function isCacheValid(requiredKeys = []) {
         }
     }
     
-    // Check if cache is too old
-    const cacheTime = sessionCache._metadata?.lastUpdate || 0;
-    return Date.now() - cacheTime < CACHE_CONFIG.MAX_AGE;
+    const cacheTime = sessionCache._lastUpdate || 0;
+    const maxAge = 5 * 60 * 1000;
+    return Date.now() - cacheTime < maxAge;
 }
 
 /**
@@ -2145,7 +1972,6 @@ function getCleanStudents() {
             subjects: Array.isArray(student.subjects) ? student.subjects : 
                      (student.subjects ? [student.subjects] : []),
             status: student.status || 'active',
-            // Include all other properties safely
             ...Object.keys(student).reduce((acc, key) => {
                 if (student[key] !== undefined && student[key] !== null) {
                     acc[key] = student[key];
@@ -2176,7 +2002,6 @@ function getCleanTutors() {
             status: tutor.status || 'active',
             subjects: Array.isArray(tutor.subjects) ? tutor.subjects : 
                      (tutor.subjects ? [tutor.subjects] : []),
-            // Include all other properties safely
             ...Object.keys(tutor).reduce((acc, key) => {
                 if (tutor[key] !== undefined && tutor[key] !== null) {
                     acc[key] = tutor[key];
@@ -2230,7 +2055,7 @@ function createReassignModalHtml(students, tutors) {
                 `Current: ${currentTutorName}`
             ].filter(part => part && part.trim() !== '');
             
-            // Create comprehensive search text that includes all searchable fields
+            // Create comprehensive search text
             const searchText = [
                 student.studentName || '',
                 student.grade || '',
@@ -2252,7 +2077,6 @@ function createReassignModalHtml(students, tutors) {
         }).join('');
     
     const tutorOptions = tutors.map(tutor => {
-        // Create comprehensive search text for tutors
         const searchText = [
             tutor.name || '',
             tutor.email || '',
@@ -2689,16 +2513,17 @@ async function performReassignment(student, newTutor, reason, currentTutor = nul
         await updateDoc(doc(db, "students", student.id), studentUpdateData);
         console.log("Student document updated");
         
-        // 3. Update local cache
+        // 3. Update local cache and invalidate
         if (sessionCache.students) {
             const studentIndex = sessionCache.students.findIndex(s => s && s.id === student.id);
             if (studentIndex !== -1) {
                 sessionCache.students[studentIndex].tutorEmail = newTutor.email;
                 sessionCache.students[studentIndex].tutorName = newTutor.name;
-                sessionCache._metadata.lastUpdate = Date.now();
-                saveToLocalStorage('students', sessionCache.students);
+                sessionCache._lastUpdate = Date.now();
             }
         }
+        
+        directoryCache.lastUpdated = 0;
         
         // 4. Show success message
         showReassignAlert(`✅ Successfully reassigned "${student.studentName}" to ${newTutor.name}!`, 'success');
@@ -2899,12 +2724,6 @@ if (!document.getElementById('reassign-modal-styles')) {
                 background: #555;
             }
             
-            /* Highlight current tutor */
-            option[data-is-current="true"] {
-                background-color: #fef3c7;
-                font-weight: 500;
-            }
-            
             /* Better select styling */
             select option {
                 padding: 8px 12px;
@@ -2913,21 +2732,6 @@ if (!document.getElementById('reassign-modal-styles')) {
             
             select option:hover {
                 background-color: #f3f4f6;
-            }
-            
-            /* Search input clear button */
-            input[type="search"]::-webkit-search-cancel-button {
-                -webkit-appearance: none;
-                height: 1em;
-                width: 1em;
-                background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23999"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>') no-repeat;
-                background-size: contain;
-                opacity: 0.5;
-                cursor: pointer;
-            }
-            
-            input[type="search"]::-webkit-search-cancel-button:hover {
-                opacity: 0.8;
             }
         </style>
     `;
@@ -9945,6 +9749,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
