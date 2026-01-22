@@ -1071,10 +1071,6 @@ async function renderManagementTutorView(container) {
             showAllStudentHistory();
         });
         
-        document.getElementById('view-tutor-history-directory-btn')?.addEventListener('click', async () => {
-            showAllStudentHistory();
-        });
-        
     } catch (e) {
         console.error("Error attaching event listeners:", e);
     }
@@ -9749,6 +9745,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
