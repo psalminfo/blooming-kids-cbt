@@ -917,6 +917,12 @@ function safeToString(value) {
     return String(value);
 }
 
+// Helper function to safely trim and convert to lowercase
+function safeTrimLower(value) {
+    if (value === null || value === undefined) return '';
+    return safeToString(value).trim().toLowerCase();
+}
+
 // Helper function for safe search
 function safeSearch(text, searchTerm) {
     if (!searchTerm || safeToString(searchTerm).trim() === '') return true;
@@ -976,7 +982,7 @@ function searchStudentFromFirebase(student, searchTerm, tutors = []) {
     return false;
 }
 
-// Function to remove duplicate students
+// Function to remove duplicate students with safe data handling
 function removeDuplicateStudents(students) {
     const seenPhones = new Set();
     const seenEmails = new Set();
@@ -986,9 +992,9 @@ function removeDuplicateStudents(students) {
     for (const student of students) {
         if (!student) continue;
         
-        const phone = student.parentPhone ? student.parentPhone.trim().toLowerCase() : '';
-        const email = student.parentEmail ? student.parentEmail.trim().toLowerCase() : '';
-        const name = student.studentName ? student.studentName.trim().toLowerCase() : '';
+        const phone = safeTrimLower(student.parentPhone);
+        const email = safeTrimLower(student.parentEmail);
+        const name = safeTrimLower(student.studentName);
         
         // Check for duplicates by phone, email, or name
         const isDuplicate = (phone && seenPhones.has(phone)) || 
@@ -1056,15 +1062,19 @@ async function renderManagementTutorView(container) {
         // Add click events for counter cards
         document.getElementById('active-tutors-card').addEventListener('click', () => {
             const searchInput = document.getElementById('directory-search');
-            searchInput.value = '';
-            searchInput.focus();
-            renderDirectoryFromCache();
+            if (searchInput) {
+                searchInput.value = '';
+                searchInput.focus();
+                renderDirectoryFromCache();
+            }
         });
         
         document.getElementById('active-students-card').addEventListener('click', () => {
             const searchInput = document.getElementById('directory-search');
-            searchInput.value = 'student';
-            renderDirectoryFromCache('student');
+            if (searchInput) {
+                searchInput.value = 'student';
+                renderDirectoryFromCache('student');
+            }
         });
         
         document.getElementById('history-count-card').addEventListener('click', () => {
@@ -1080,8 +1090,15 @@ async function renderManagementTutorView(container) {
 
 // Function to show all student history
 async function showAllStudentHistory() {
-    if (!sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
-        await fetchAndRenderDirectory(true);
+    // Check if we have data, if not fetch it
+    if (!sessionCache || !sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
+        try {
+            await fetchAndRenderDirectory(true);
+        } catch (error) {
+            console.error("Error fetching data for history:", error);
+            alert("Failed to load student history data. Please try again.");
+            return;
+        }
     }
     
     const students = sessionCache.students || [];
@@ -1130,7 +1147,7 @@ async function showAllStudentHistory() {
                             const currentTutor = latestAssignment ? `${latestAssignment.newTutorName || latestAssignment.tutorName || 'Unknown'}` : 'No tutor';
                             
                             return `
-                                <div class="border rounded-lg p-4 hover:shadow-md transition-shadow" data-search-text="${student.studentName?.toLowerCase()} ${student.parentName?.toLowerCase()} ${student.grade?.toLowerCase()}">
+                                <div class="border rounded-lg p-4 hover:shadow-md transition-shadow" data-search-text="${safeTrimLower(student.studentName)} ${safeTrimLower(student.parentName)} ${safeTrimLower(student.grade)}">
                                     <div class="flex justify-between items-center">
                                         <div>
                                             <h4 class="font-bold text-lg">${student.studentName || 'Unnamed Student'}</h4>
@@ -1255,8 +1272,8 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
                 days: data.days || '',
                 subjects: Array.isArray(data.subjects) ? data.subjects : (data.subjects ? [data.subjects] : []),
                 parentName: data.parentName || '',
-                parentPhone: data.parentPhone ? String(data.parentPhone).trim() : '',
-                parentEmail: data.parentEmail ? String(data.parentEmail).trim() : '',
+                parentPhone: safeToString(data.parentPhone),
+                parentEmail: safeToString(data.parentEmail),
                 address: data.address || '',
                 status: data.status || 'active',
                 createdAt: data.createdAt || new Date().toISOString(),
@@ -1963,8 +1980,8 @@ function getCleanStudents() {
             tutorName: student.tutorName || '',
             grade: student.grade || '',
             parentName: student.parentName || '',
-            parentPhone: student.parentPhone || '',
-            parentEmail: student.parentEmail || '',
+            parentPhone: safeTrimLower(student.parentPhone),
+            parentEmail: safeTrimLower(student.parentEmail),
             subjects: Array.isArray(student.subjects) ? student.subjects : 
                      (student.subjects ? [student.subjects] : []),
             status: student.status || 'active',
@@ -9745,6 +9762,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
