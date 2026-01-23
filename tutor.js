@@ -4379,13 +4379,14 @@ async function renderStudentDatabase(container, tutor) {
                         
                         if (student.summerBreak) {
                             // Student is on break - show appropriate recall button/status
-                            if (recallStatus === 'pending') {
-                                actionsHTML += `<span class="bg-purple-200 text-purple-800 px-3 py-1 rounded text-sm">Recall Requested</span>`;
-                            } else if (recallStatus === 'approved') {
-                                actionsHTML += `<span class="bg-green-200 text-green-800 px-3 py-1 rounded text-sm">Recalled ✓</span>`;
-                            } else {
-                                actionsHTML += `<button class="recall-from-break-btn bg-purple-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Recall</button>`;
-                            }
+                           if (recallStatus === 'pending') {
+    actionsHTML += `<span class="bg-purple-200 text-purple-800 px-3 py-1 rounded text-sm">Recall Requested</span>`;
+} else if (recallStatus === 'approved') {
+    actionsHTML += `<span class="bg-green-200 text-green-800 px-3 py-1 rounded text-sm">Recalled ✓</span>`;
+} else {
+    // Only show Recall button if student is on break AND no recall status exists
+    actionsHTML += `<button class="recall-from-break-btn bg-purple-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Recall</button>`;
+}
                         } else {
                             // Student is active - show Break button
                             actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Break</button>`;
@@ -5247,6 +5248,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
