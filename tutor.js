@@ -4066,7 +4066,31 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
 
 /*******************************************************************************
  * SECTION 12: STUDENT DATABASE MANAGEMENT (FINAL FIXED VERSION WITH NEW FEATURES)
+ * UPDATED: 
+ * 1. Tutors only see approved students (no pending students)
+ * 2. Recall button tracks request status and prevents duplicate requests
  ******************************************************************************/
+
+// --- Helper function to check recall request status ---
+async function checkRecallRequestStatus(studentId) {
+    try {
+        const recallQuery = query(
+            collection(db, "recall_requests"),
+            where("studentId", "==", studentId),
+            where("status", "in", ["pending", "approved"])
+        );
+        const snapshot = await getDocs(recallQuery);
+        
+        if (!snapshot.empty) {
+            const latestRequest = snapshot.docs[0].data();
+            return latestRequest.status; // Returns 'pending' or 'approved'
+        }
+        return null; // No recall request exists
+    } catch (error) {
+        console.error("Error checking recall status:", error);
+        return null;
+    }
+}
 
 // --- Form Helper (Specific to this section) ---
 function getNewStudentFormFields() {
@@ -4253,18 +4277,17 @@ async function renderStudentDatabase(container, tutor) {
         return total;
     }
     
-    // Queries
+    // Queries - REMOVED pendingStudentQuery (Tutors only see approved students)
     const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-    const pendingStudentQuery = query(collection(db, "pending_students"), where("tutorEmail", "==", tutor.email));
     const allSubmissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutor.email));
     
-    const [studentsSnapshot, pendingStudentsSnapshot, allSubmissionsSnapshot] = await Promise.all([
-        getDocs(studentQuery), getDocs(pendingStudentQuery), getDocs(allSubmissionsQuery)
+    const [studentsSnapshot, allSubmissionsSnapshot] = await Promise.all([
+        getDocs(studentQuery), getDocs(allSubmissionsQuery)  // Only approved students and submissions
     ]);
 
-    // Process Students
+    // Process Students - ONLY APPROVED STUDENTS
     let approvedStudents = studentsSnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data(), isPending: false, collection: "students" }))
+        .map(doc => ({ id: doc.id, ...doc.data(), collection: "students" }))
         .filter(student => !student.status || student.status === 'active' || student.status === 'approved' || !['archived', 'graduated', 'transferred'].includes(student.status));
 
     const now = new Date();
@@ -4279,8 +4302,8 @@ async function renderStudentDatabase(container, tutor) {
         }
     });
 
-    const pendingStudents = pendingStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: true, collection: "pending_students" }));
-    let students = [...approvedStudents, ...pendingStudents];
+    // FIX: ONLY approved students - NO pending students
+    let students = [...approvedStudents];  // Tutors only see approved students
 
     // Deduplicate
     const seenStudents = new Set();
@@ -4341,21 +4364,28 @@ async function renderStudentDatabase(container, tutor) {
                 const subjects = student.subjects ? student.subjects.join(', ') : 'N/A';
                 const days = student.days ? `${student.days} days/week` : 'N/A';
 
-                if (student.isPending) {
-                    statusHTML = `<span class="status-indicator text-yellow-600 font-semibold">Awaiting Approval</span>`;
-                    actionsHTML = `<span class="text-gray-400">No actions available</span>`;
-                } else if (hasSubmitted) {
+                // FIXED: No pending student check - tutors only see approved students
+                if (hasSubmitted) {
                     statusHTML = `<span class="status-indicator text-blue-600 font-semibold">Report Sent</span>`;
                     actionsHTML = `<span class="text-gray-400">Submitted this month</span>`;
                 } else {
                     const transIndicator = student.isTransitioning ? `<span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full ml-2">Transitioning</span>` : '';
                     statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>${transIndicator}`;
                     
-                    // NEW BREAK/RECALL LOGIC
+                    // NEW BREAK/RECALL LOGIC with status checking
                     if (isSummerBreakEnabled) {
+                        // Check recall status for each student
+                        const recallStatus = window.recallStatusCache ? window.recallStatusCache[student.id] : null;
+                        
                         if (student.summerBreak) {
-                            // Student is on break - show Recall button
-                            actionsHTML += `<button class="recall-from-break-btn bg-purple-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Recall</button>`;
+                            // Student is on break - show appropriate recall button/status
+                            if (recallStatus === 'pending') {
+                                actionsHTML += `<span class="bg-purple-200 text-purple-800 px-3 py-1 rounded text-sm">Recall Requested</span>`;
+                            } else if (recallStatus === 'approved') {
+                                actionsHTML += `<span class="bg-green-200 text-green-800 px-3 py-1 rounded text-sm">Recalled ✓</span>`;
+                            } else {
+                                actionsHTML += `<button class="recall-from-break-btn bg-purple-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Recall</button>`;
+                            }
                         } else {
                             // Student is active - show Break button
                             actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Break</button>`;
@@ -4540,6 +4570,27 @@ async function renderStudentDatabase(container, tutor) {
         document.body.appendChild(d);
     }
 
+    // Pre-fetch recall status for all students
+    async function prefetchRecallStatuses() {
+        const recallPromises = students
+            .filter(s => s.summerBreak)
+            .map(async student => {
+                const status = await checkRecallRequestStatus(student.id);
+                return { studentId: student.id, status };
+            });
+        
+        const results = await Promise.all(recallPromises);
+        window.recallStatusCache = {};
+        results.forEach(result => {
+            if (result.status) {
+                window.recallStatusCache[result.studentId] = result.status;
+            }
+        });
+    }
+
+    // Pre-fetch recall statuses before rendering UI
+    await prefetchRecallStatuses();
+
     function attachEventListeners() {
         // Subject checkbox listener for group class
         const subjectsContainer = document.getElementById('new-student-subjects-container');
@@ -4625,7 +4676,7 @@ async function renderStudentDatabase(container, tutor) {
             });
         });
         
-        // NEW: Recall from break button
+        // NEW: Recall from break button with state management
         document.querySelectorAll('.recall-from-break-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const studentId = btn.getAttribute('data-student-id');
@@ -4633,6 +4684,12 @@ async function renderStudentDatabase(container, tutor) {
                 
                 if (confirm(`Recall ${student.studentName} from break? This requires management approval.`)) {
                     try {
+                        // Disable button immediately
+                        btn.disabled = true;
+                        btn.innerHTML = "Requesting...";
+                        btn.classList.remove('bg-purple-500');
+                        btn.classList.add('bg-gray-400');
+                        
                         const recallRequest = {
                             studentId: student.id,
                             studentName: student.studentName,
@@ -4645,11 +4702,27 @@ async function renderStudentDatabase(container, tutor) {
                         };
                         
                         await addDoc(collection(db, "recall_requests"), recallRequest);
+                        
+                        // Update button to show requested
+                        btn.innerHTML = "Recall Requested";
+                        btn.classList.remove('bg-gray-400');
+                        btn.classList.add('bg-purple-200', 'text-purple-800');
+                        
+                        // Update the cache
+                        if (window.recallStatusCache) {
+                            window.recallStatusCache[student.id] = 'pending';
+                        }
+                        
                         showCustomAlert('✅ Recall request sent to management for approval.');
-                        renderStudentDatabase(container, tutor);
+                        
                     } catch (error) {
                         console.error("Error sending recall request:", error);
                         showCustomAlert('❌ Error sending recall request. Please try again.');
+                        // Reset button on error
+                        btn.disabled = false;
+                        btn.innerHTML = "Recall";
+                        btn.classList.remove('bg-gray-400', 'bg-purple-200', 'text-purple-800');
+                        btn.classList.add('bg-purple-500', 'text-white');
                     }
                 }
             });
@@ -5174,6 +5247,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
