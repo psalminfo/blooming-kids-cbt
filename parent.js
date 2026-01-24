@@ -3638,6 +3638,354 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize the NEW portal
     initializeParentPortalV2();
+
+    // ============================================================================
+// SECTION 19: SETTINGS & PROFILE MANAGEMENT (PLUG-AND-PLAY ADD-ON)
+// ============================================================================
+
+/**
+ * SETTINGS MANAGER
+ * Handles Parent Profile, Child Data Updates, and Contact Synchronization.
+ * Automatically injects itself into the existing UI.
+ */
+class SettingsManager {
+    constructor() {
+        this.isActive = false;
+        this.injectSettingsUI();
+    }
+
+    // 1. INJECT UI COMPONENTS (Button & Content Area)
+    injectSettingsUI() {
+        // A. Add Settings Button to Navigation
+        const navContainer = document.querySelector('.bg-green-50 .flex.gap-2');
+        if (navContainer && !document.getElementById('settingsBtn')) {
+            const settingsBtn = document.createElement('button');
+            settingsBtn.id = 'settingsBtn';
+            settingsBtn.onclick = () => this.openSettingsTab();
+            settingsBtn.className = 'bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-700 transition-all duration-200 btn-glow flex items-center justify-center';
+            settingsBtn.innerHTML = '<span class="mr-2">⚙️</span> Settings';
+            
+            // Insert before Logout button
+            const logoutBtn = navContainer.querySelector('button[onclick="logout()"]');
+            if (logoutBtn) {
+                navContainer.insertBefore(settingsBtn, logoutBtn);
+            } else {
+                navContainer.appendChild(settingsBtn);
+            }
+        }
+
+        // B. Add Settings Content Area (Hidden by default)
+        const mainContainer = document.getElementById('reportArea');
+        if (mainContainer && !document.getElementById('settingsContentArea')) {
+            const settingsDiv = document.createElement('div');
+            settingsDiv.id = 'settingsContentArea';
+            settingsDiv.className = 'hidden max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 fade-in';
+            settingsDiv.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+                    <div class="bg-gray-800 px-6 py-4 flex justify-between items-center">
+                        <h2 class="text-xl font-bold text-white flex items-center">
+                            <span class="mr-2">⚙️</span> Family Profile & Settings
+                        </h2>
+                        <button onclick="manualRefreshReportsV2()" class="text-gray-300 hover:text-white text-sm">
+                            ← Back to Dashboard
+                        </button>
+                    </div>
+                    <div id="settingsDynamicContent" class="p-6">
+                        <div class="loading-spinner mx-auto"></div>
+                    </div>
+                </div>
+            `;
+            mainContainer.appendChild(settingsDiv);
+        }
+    }
+
+    // 2. OPEN TAB LOGIC
+    openSettingsTab() {
+        // Hide other tabs
+        ['reportContentArea', 'academicsContentArea', 'rewardsContentArea'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('hidden');
+        });
+        
+        // Deactivate main tabs
+        ['reportTab', 'academicsTab', 'rewardsTab'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.classList.remove('tab-active-main');
+                el.classList.add('tab-inactive-main');
+            }
+        });
+
+        // Show Settings
+        const settingsArea = document.getElementById('settingsContentArea');
+        if (settingsArea) {
+            settingsArea.classList.remove('hidden');
+            this.loadSettingsData();
+        }
+    }
+
+    // 3. LOAD DATA
+    async loadSettingsData() {
+        const content = document.getElementById('settingsDynamicContent');
+        const user = auth.currentUser;
+        if (!user) return;
+
+        try {
+            // Fetch fresh data
+            const userDoc = await db.collection('parent_users').doc(user.uid).get();
+            const userData = userDoc.data();
+            
+            // Fetch children using the existing powerful search
+            const childrenResult = await comprehensiveFindChildren(userData.normalizedPhone || userData.phone);
+            const students = childrenResult.allStudentData;
+
+            this.renderSettingsForm(userData, students);
+
+        } catch (error) {
+            console.error("Settings load error:", error);
+            content.innerHTML = `<p class="text-red-500">Error loading settings: ${error.message}</p>`;
+        }
+    }
+
+    // 4. RENDER UI
+    renderSettingsForm(userData, students) {
+        const content = document.getElementById('settingsDynamicContent');
+        
+        let html = `
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="md:col-span-1 space-y-6">
+                    <h3 class="text-lg font-bold text-gray-800 border-b pb-2">Parent Profile</h3>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
+                        <input type="text" id="settingParentName" value="${safeText(userData.parentName || 'Parent')}" 
+                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Primary Phone (Login)</label>
+                        <input type="text" value="${safeText(userData.phone)}" disabled 
+                            class="w-full px-4 py-2 border rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed">
+                        <p class="text-xs text-gray-500 mt-1">To change login phone, please contact support.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                        <input type="email" id="settingParentEmail" value="${safeText(userData.email || '')}" 
+                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+
+                    <button onclick="settingsManager.saveParentProfile()" 
+                        class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                        Update My Profile
+                    </button>
+                </div>
+
+                <div class="md:col-span-2 space-y-6">
+                    <h3 class="text-lg font-bold text-gray-800 border-b pb-2">Children & Linked Contacts</h3>
+                    
+                    ${students.length === 0 ? '<p class="text-gray-500 italic">No students linked yet.</p>' : ''}
+                    
+                    <div class="space-y-6">
+        `;
+
+        students.forEach((student, index) => {
+            const data = student.data;
+            const gender = data.gender || '';
+            const motherPhone = data.motherPhone || '';
+            const fatherPhone = data.fatherPhone || '';
+            const guardianEmail = data.guardianEmail || '';
+
+            html += `
+                <div class="bg-gray-50 border border-gray-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        
+                        <div class="col-span-2 md:col-span-1">
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Student Name</label>
+                            <input type="text" id="studentName_${student.id}" value="${safeText(student.name)}" 
+                                class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-green-500 font-semibold text-gray-800">
+                        </div>
+
+                        <div class="col-span-2 md:col-span-1">
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Gender</label>
+                            <select id="studentGender_${student.id}" class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-green-500 bg-white">
+                                <option value="" ${gender === '' ? 'selected' : ''}>Select Gender...</option>
+                                <option value="Male" ${gender === 'Male' ? 'selected' : ''}>Male</option>
+                                <option value="Female" ${gender === 'Female' ? 'selected' : ''}>Female</option>
+                            </select>
+                        </div>
+
+                        <div class="col-span-2 border-t border-gray-200 pt-3 mt-1">
+                            <p class="text-sm font-semibold text-blue-800 mb-2">📞 Additional Contacts (For Access)</p>
+                            <p class="text-xs text-gray-500 mb-3">Add Father/Mother numbers here. Anyone with these numbers can log in or view reports.</p>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs text-gray-500">Mother's Phone</label>
+                                    <input type="tel" id="motherPhone_${student.id}" value="${safeText(motherPhone)}" placeholder="+1..."
+                                        class="w-full px-3 py-1.5 border rounded text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500">Father's Phone</label>
+                                    <input type="tel" id="fatherPhone_${student.id}" value="${safeText(fatherPhone)}" placeholder="+1..."
+                                        class="w-full px-3 py-1.5 border rounded text-sm">
+                                </div>
+                                <div class="col-span-2">
+                                    <label class="block text-xs text-gray-500">Secondary Email (CC for Reports)</label>
+                                    <input type="email" id="guardianEmail_${student.id}" value="${safeText(guardianEmail)}" 
+                                        class="w-full px-3 py-1.5 border rounded text-sm">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-span-2 mt-2 flex justify-end">
+                            <button onclick="settingsManager.updateStudent('${student.id}', '${student.collection}')" 
+                                class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors shadow-sm flex items-center">
+                                <span>💾 Save ${safeText(student.name)}'s Details</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+
+        content.innerHTML = html;
+    }
+
+    // 5. ACTIONS: SAVE PARENT PROFILE
+    async saveParentProfile() {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const name = document.getElementById('settingParentName').value.trim();
+        const email = document.getElementById('settingParentEmail').value.trim();
+
+        if (!name) return showMessage('Name is required', 'error');
+
+        try {
+            const btn = document.querySelector('button[onclick="settingsManager.saveParentProfile()"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<div class="loading-spinner-small mr-2"></div> Saving...';
+            btn.disabled = true;
+
+            await db.collection('parent_users').doc(user.uid).update({
+                parentName: name,
+                email: email
+            });
+
+            // Update local display immediately
+            const welcomeMsg = document.getElementById('welcomeMessage');
+            if (welcomeMsg) welcomeMsg.textContent = `Welcome, ${name}!`;
+
+            showMessage('Profile updated successfully!', 'success');
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        } catch (error) {
+            console.error(error);
+            showMessage('Failed to update profile.', 'error');
+        }
+    }
+
+    // 6. ACTIONS: UPDATE STUDENT (THE "REFLECT EVERYWHERE" LOGIC)
+    async updateStudent(studentId, collectionName) {
+        try {
+            const nameInput = document.getElementById(`studentName_${studentId}`);
+            const genderInput = document.getElementById(`studentGender_${studentId}`);
+            const motherInput = document.getElementById(`motherPhone_${studentId}`);
+            const fatherInput = document.getElementById(`fatherPhone_${studentId}`);
+            const emailInput = document.getElementById(`guardianEmail_${studentId}`);
+
+            const newName = nameInput.value.trim();
+            const gender = genderInput.value;
+            const motherPhone = motherInput.value.trim();
+            const fatherPhone = fatherInput.value.trim();
+            const email = emailInput.value.trim();
+
+            if (!newName) return showMessage('Student name cannot be empty', 'error');
+
+            // Show loading state
+            const btn = document.querySelector(`button[onclick="settingsManager.updateStudent('${studentId}', '${collectionName}')"]`);
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<div class="loading-spinner-small mr-2"></div> Updating Everywhere...';
+            btn.disabled = true;
+
+            // A. Update Student Profile (Primary)
+            const updateData = {
+                studentName: newName,
+                name: newName, // redundancy for safety
+                gender: gender,
+                motherPhone: motherPhone,
+                fatherPhone: fatherPhone,
+                guardianEmail: email,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            await db.collection(collectionName).doc(studentId).update(updateData);
+
+            // B. "Reflect Everywhere" - Background Batch Update
+            // This ensures reports in other portals show the new name
+            this.propagateStudentNameChange(studentId, newName);
+
+            showMessage(`${newName}'s details updated successfully!`, 'success');
+            
+            // C. Restore Button
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+
+            // D. Refresh Dashboard to show changes
+            if (window.authManager) {
+                setTimeout(() => window.authManager.reloadDashboard(), 1000);
+            }
+
+        } catch (error) {
+            console.error("Update error:", error);
+            showMessage('Error updating student details.', 'error');
+        }
+    }
+
+    // 7. PROPAGATION LOGIC (Updates Tutors/Reports)
+    async propagateStudentNameChange(studentId, newName) {
+        console.log(`🔄 Propagating name change for ${studentId} to: ${newName}`);
+        
+        // We do this silently in the background
+        const collections = ['tutor_submissions', 'student_results'];
+        
+        for (const col of collections) {
+            try {
+                // Find docs linked to this student
+                const snapshot = await db.collection(col)
+                    .where('studentId', '==', studentId)
+                    .limit(50) // Limit to prevent timeouts
+                    .get();
+
+                if (!snapshot.empty) {
+                    const batch = db.batch();
+                    snapshot.forEach(doc => {
+                        const ref = db.collection(col).doc(doc.id);
+                        batch.update(ref, { 
+                            studentName: newName,
+                            student: newName 
+                        });
+                    });
+                    await batch.commit();
+                    console.log(`✅ Updated ${snapshot.size} documents in ${col}`);
+                }
+            } catch (err) {
+                console.warn(`Background update for ${col} failed:`, err);
+                // Non-critical: Profile is already updated, which is what matters most
+            }
+        }
+    }
+}
+
+// INITIALIZE SETTINGS ADD-ON
+const settingsManager = new SettingsManager();
     
     console.log("🎉 Parent Portal V2 initialized");
 });
