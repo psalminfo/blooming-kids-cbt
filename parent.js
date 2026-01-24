@@ -3640,7 +3640,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeParentPortalV2();
 
     // ============================================================================
-// SECTION 19: SETTINGS & PROFILE MANAGEMENT (PLUG-AND-PLAY ADD-ON)
+// SECTION 19: SETTINGS & PROFILE MANAGEMENT (FIXED & GLOBAL)
 // ============================================================================
 
 /**
@@ -3651,13 +3651,20 @@ document.addEventListener('DOMContentLoaded', function() {
 class SettingsManager {
     constructor() {
         this.isActive = false;
-        this.injectSettingsUI();
+        // Wait for DOM to be fully ready before injecting
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => this.injectSettingsUI());
+        } else {
+            this.injectSettingsUI();
+        }
     }
 
     // 1. INJECT UI COMPONENTS (Button & Content Area)
     injectSettingsUI() {
         // A. Add Settings Button to Navigation
         const navContainer = document.querySelector('.bg-green-50 .flex.gap-2');
+        
+        // Safety check: if button already exists, don't add it again
         if (navContainer && !document.getElementById('settingsBtn')) {
             const settingsBtn = document.createElement('button');
             settingsBtn.id = 'settingsBtn';
@@ -3775,7 +3782,7 @@ class SettingsManager {
                             class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
                     </div>
 
-                    <button onclick="settingsManager.saveParentProfile()" 
+                    <button onclick="window.settingsManager.saveParentProfile()" 
                         class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors">
                         Update My Profile
                     </button>
@@ -3839,7 +3846,7 @@ class SettingsManager {
                         </div>
 
                         <div class="col-span-2 mt-2 flex justify-end">
-                            <button onclick="settingsManager.updateStudent('${student.id}', '${student.collection}')" 
+                            <button onclick="window.settingsManager.updateStudent('${student.id}', '${student.collection}')" 
                                 class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors shadow-sm flex items-center">
                                 <span>💾 Save ${safeText(student.name)}'s Details</span>
                             </button>
@@ -3869,10 +3876,13 @@ class SettingsManager {
         if (!name) return showMessage('Name is required', 'error');
 
         try {
-            const btn = document.querySelector('button[onclick="settingsManager.saveParentProfile()"]');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<div class="loading-spinner-small mr-2"></div> Saving...';
-            btn.disabled = true;
+            const btn = document.querySelector('button[onclick="window.settingsManager.saveParentProfile()"]');
+            const originalText = btn ? btn.innerHTML : 'Update My Profile';
+            
+            if (btn) {
+                btn.innerHTML = '<div class="loading-spinner-small mr-2"></div> Saving...';
+                btn.disabled = true;
+            }
 
             await db.collection('parent_users').doc(user.uid).update({
                 parentName: name,
@@ -3884,8 +3894,11 @@ class SettingsManager {
             if (welcomeMsg) welcomeMsg.textContent = `Welcome, ${name}!`;
 
             showMessage('Profile updated successfully!', 'success');
-            btn.innerHTML = originalText;
-            btn.disabled = false;
+            
+            if (btn) {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
         } catch (error) {
             console.error(error);
             showMessage('Failed to update profile.', 'error');
@@ -3910,10 +3923,13 @@ class SettingsManager {
             if (!newName) return showMessage('Student name cannot be empty', 'error');
 
             // Show loading state
-            const btn = document.querySelector(`button[onclick="settingsManager.updateStudent('${studentId}', '${collectionName}')"]`);
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<div class="loading-spinner-small mr-2"></div> Updating Everywhere...';
-            btn.disabled = true;
+            const btn = document.querySelector(`button[onclick="window.settingsManager.updateStudent('${studentId}', '${collectionName}')"]`);
+            const originalText = btn ? btn.innerHTML : 'Save Details';
+            
+            if (btn) {
+                btn.innerHTML = '<div class="loading-spinner-small mr-2"></div> Updating Everywhere...';
+                btn.disabled = true;
+            }
 
             // A. Update Student Profile (Primary)
             const updateData = {
@@ -3935,8 +3951,10 @@ class SettingsManager {
             showMessage(`${newName}'s details updated successfully!`, 'success');
             
             // C. Restore Button
-            btn.innerHTML = originalText;
-            btn.disabled = false;
+            if (btn) {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
 
             // D. Refresh Dashboard to show changes
             if (window.authManager) {
@@ -3984,8 +4002,10 @@ class SettingsManager {
     }
 }
 
-// INITIALIZE SETTINGS ADD-ON
-const settingsManager = new SettingsManager();
+// ----------------------------------------------------------------------------
+// CRITICAL FIX: EXPOSE TO WINDOW SO HTML BUTTONS CAN FIND IT
+// ----------------------------------------------------------------------------
+window.settingsManager = new SettingsManager();
     
     console.log("🎉 Parent Portal V2 initialized");
 });
