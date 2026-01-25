@@ -2090,74 +2090,175 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
 }
 
 // ============================================================================
-// SECTION 13: REAL-TIME MONITORING WITHOUT COMPLEX QUERIES
+// SECTION 13: REAL-TIME MONITORING WITH DIGIT MATCHING
 // ============================================================================
 
+// Clear all real-time listeners
+function cleanupRealTimeListeners() {
+    console.log("🧹 Cleaning up real-time listeners...");
+    
+    realTimeListeners.forEach(unsubscribe => {
+        if (typeof unsubscribe === 'function') {
+            unsubscribe();
+        }
+    });
+    realTimeListeners = [];
+    
+    // Clear intervals
+    if (window.realTimeIntervals) {
+        window.realTimeIntervals.forEach(id => clearInterval(id));
+        window.realTimeIntervals = [];
+    }
+}
+
+// Setup real-time monitoring with digit matching
 function setupRealTimeMonitoring(parentPhone, userId) {
-    // Clear any existing listeners
+    console.log("📡 Setting up real-time monitoring...");
+    
+    // Clean up existing listeners first
     cleanupRealTimeListeners();
     
-    // Get parent's digit-only phone for comparison
+    // Initialize intervals array if not exists
+    if (!window.realTimeIntervals) {
+        window.realTimeIntervals = [];
+    }
+    
+    // Get parent's digits for comparison
     const parentDigits = extractPhoneDigits(parentPhone);
     
     if (!parentDigits) {
         console.warn("⚠️ Cannot setup monitoring - invalid parent phone:", parentPhone);
         return;
     }
+
+    console.log("📡 Monitoring for phone digits:", parentDigits);
     
-    console.log("📡 Setting up real-time monitoring for digits:", parentDigits);
-    
-    // We need to fetch ALL and filter client-side since Firestore can't do digit matching
-    // Set up interval checks instead of direct listeners
-    
-    // Check for new reports every 30 seconds
-    const checkInterval = setInterval(async () => {
+    // Function to check for new reports
+    const checkForNewReports = async () => {
         try {
-            // Check for new monthly reports
-            const monthlySnapshot = await db.collection("tutor_submissions").get();
-            monthlySnapshot.forEach(doc => {
-                const data = doc.data();
-                const docPhone = data.parentPhone || data.parent_phone || data.phone;
-                
-                if (docPhone && comparePhonesByDigits(docPhone, parentPhone)) {
-                    // Check if we've seen this before
-                    const lastChecked = localStorage.getItem(`lastReport_${doc.id}`);
-                    if (!lastChecked) {
-                        console.log("🆕 NEW MONTHLY REPORT DETECTED!");
-                        showNewReportNotification('monthly');
-                        localStorage.setItem(`lastReport_${doc.id}`, Date.now().toString());
-                    }
-                }
-            });
+            // Track if we found new reports
+            let foundNewMonthly = false;
+            let foundNewAssessment = false;
             
-            // Check for new assessment reports
-            const assessmentSnapshot = await db.collection("student_results").get();
-            assessmentSnapshot.forEach(doc => {
-                const data = doc.data();
-                const docPhone = data.parentPhone || data.parent_phone || data.phone;
-                
-                if (docPhone && comparePhonesByDigits(docPhone, parentPhone)) {
-                    const lastChecked = localStorage.getItem(`lastReport_${doc.id}`);
-                    if (!lastChecked) {
-                        console.log("🆕 NEW ASSESSMENT REPORT DETECTED!");
-                        showNewReportNotification('assessment');
-                        localStorage.setItem(`lastReport_${doc.id}`, Date.now().toString());
+            // Get last check time
+            const lastCheckKey = `lastReportCheck_${userId}`;
+            const lastCheckTime = parseInt(localStorage.getItem(lastCheckKey) || '0');
+            const now = Date.now();
+            
+            // Check monthly reports
+            try {
+                const monthlySnapshot = await db.collection("tutor_submissions").get();
+                monthlySnapshot.forEach(doc => {
+                    const data = doc.data();
+                    const docPhone = data.parentPhone || data.parent_phone || data.phone;
+                    
+                    if (docPhone && comparePhonesByDigits(docPhone, parentPhone)) {
+                        // Check if this is new (added after last check)
+                        const docTime = data.timestamp?.toDate?.()?.getTime() || 
+                                      data.createdAt?.toDate?.()?.getTime() || 
+                                      data.submittedAt?.toDate?.()?.getTime() || 0;
+                        
+                        if (docTime > lastCheckTime) {
+                            foundNewMonthly = true;
+                            console.log("🆕 NEW MONTHLY REPORT DETECTED:", doc.id);
+                        }
                     }
-                }
-            });
+                });
+            } catch (error) {
+                console.error("Monthly check error:", error);
+            }
+            
+            // Check assessment reports
+            try {
+                const assessmentSnapshot = await db.collection("student_results").get();
+                assessmentSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    const docPhone = data.parentPhone || data.parent_phone || data.phone;
+                    
+                    if (docPhone && comparePhonesByDigits(docPhone, parentPhone)) {
+                        // Check if this is new (added after last check)
+                        const docTime = data.timestamp?.toDate?.()?.getTime() || 
+                                      data.createdAt?.toDate?.()?.getTime() || 
+                                      data.submittedAt?.toDate?.()?.getTime() || 0;
+                        
+                        if (docTime > lastCheckTime) {
+                            foundNewAssessment = true;
+                            console.log("🆕 NEW ASSESSMENT REPORT DETECTED:", doc.id);
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Assessment check error:", error);
+            }
+            
+            // Show notifications if new reports found
+            if (foundNewMonthly) {
+                showNewReportNotification('monthly');
+            }
+            if (foundNewAssessment) {
+                showNewReportNotification('assessment');
+            }
+            
+            // Update last check time
+            localStorage.setItem(lastCheckKey, now.toString());
+            
         } catch (error) {
             console.error("Real-time check error:", error);
         }
-    }, 30000); // Check every 30 seconds
+    };
     
-    realTimeListeners.push(() => clearInterval(checkInterval));
+    // Check for new reports every 60 seconds
+    const reportInterval = setInterval(checkForNewReports, 60000);
+    window.realTimeIntervals.push(reportInterval);
+    realTimeListeners.push(() => clearInterval(reportInterval));
     
-    // Monitor academics periodically
+    // Run initial check immediately
+    setTimeout(checkForNewReports, 2000);
+    
+    // Check for new academics every 30 seconds
     const academicsInterval = setInterval(() => {
         checkForNewAcademics();
     }, 30000);
-    
+    window.realTimeIntervals.push(academicsInterval);
     realTimeListeners.push(() => clearInterval(academicsInterval));
+    
+    console.log("✅ Real-time monitoring setup complete");
+}
+
+// Show notification for new reports
+function showNewReportNotification(type) {
+    const reportType = type === 'assessment' ? 'Assessment Report' : 
+                      type === 'monthly' ? 'Monthly Report' : 'New Update';
+    
+    showMessage(`New ${reportType} available!`, 'success');
+    
+    // Add a visual indicator in the UI
+    const existingIndicator = document.getElementById('newReportIndicator');
+    if (existingIndicator) {
+        existingIndicator.remove();
+    }
+    
+    const indicator = document.createElement('div');
+    indicator.id = 'newReportIndicator';
+    indicator.className = 'fixed top-20 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-40 animate-pulse fade-in';
+    indicator.innerHTML = `📄 New ${safeText(reportType)} Available!`;
+    document.body.appendChild(indicator);
+    
+    // Remove after 5 seconds
+    setTimeout(() => {
+        indicator.remove();
+    }, 5000);
+    
+    // Update the manual refresh button text
+    const refreshBtn = document.getElementById('manualRefreshBtn');
+    if (refreshBtn) {
+        const originalText = refreshBtn.innerHTML;
+        refreshBtn.innerHTML = '<span class="mr-2">🔄</span> <span class="animate-pulse">Check for New Reports</span>';
+        
+        setTimeout(() => {
+            refreshBtn.innerHTML = originalText;
+        }, 3000);
+    }
 }
 
 // ============================================================================
