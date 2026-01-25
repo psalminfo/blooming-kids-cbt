@@ -419,6 +419,11 @@ let realTimeListeners = [];
 let academicsNotifications = new Map(); // studentName -> {dailyTopics: count, homework: count}
 let charts = new Map(); // Store chart instances
 
+// Initialize intervals array globally
+if (!window.realTimeIntervals) {
+    window.realTimeIntervals = [];
+}
+
 // ============================================================================
 // SECTION 4: UI MESSAGE SYSTEM
 // ============================================================================
