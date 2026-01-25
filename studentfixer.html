@@ -102,6 +102,12 @@
             font-size: 11px;
             font-weight: 600;
         }
+        .progress-bar {
+            height: 6px;
+            background: #10B981;
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -215,6 +221,15 @@
                 <div id="loader" class="hidden text-center py-12">
                     <div class="loading-spinner mx-auto" style="width: 60px; height: 60px;"></div>
                     <p class="text-green-600 font-semibold mt-4 text-lg" id="loadingText">Loading...</p>
+                    <div id="progressBar" class="mt-4 max-w-md mx-auto hidden">
+                        <div class="flex justify-between text-sm text-gray-600 mb-1">
+                            <span>Progress</span>
+                            <span id="progressText">0/0</span>
+                        </div>
+                        <div class="bg-gray-200 rounded-full h-2">
+                            <div id="progressFill" class="progress-bar rounded-full h-2"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -286,6 +301,13 @@
                                 Create normalizedPhone field if missing
                             </label>
                         </div>
+
+                        <div class="flex items-center space-x-2">
+                            <input type="checkbox" id="updateAllCollections" checked>
+                            <label for="updateAllCollections" class="text-sm text-gray-700">
+                                Update phone in all collections (students & pending_students)
+                            </label>
+                        </div>
                     </div>
                 </div>
                 <div class="flex justify-end space-x-3 mt-6">
@@ -294,6 +316,101 @@
                     </button>
                     <button onclick="applyBulkNormalization()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
                         Apply to All Selected
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Phone Modal -->
+    <div id="addPhoneModal" class="modal hidden">
+        <div class="modal-content w-full max-w-lg">
+            <div class="p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">➕ Add Phone Number</h2>
+                <div id="addPhoneContent">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label>
+                            <div id="addPhoneStudentName" class="data-field p-2"></div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                            <input type="text" id="newPhoneNumber" 
+                                   placeholder="e.g., +2348012345678 or 08012345678"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Phone Field Name</label>
+                            <select id="phoneFieldName" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                                <option value="phone">phone</option>
+                                <option value="parentPhone">parentPhone</option>
+                                <option value="parent_phone">parent_phone</option>
+                                <option value="contactPhone">contactPhone</option>
+                            </select>
+                        </div>
+                        <div class="text-sm text-gray-600">
+                            <p>This will add the phone number and automatically create a normalized version.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button onclick="hideAddPhone()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+                        Cancel
+                    </button>
+                    <button onclick="applyAddPhone()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                        Add Phone
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Student Modal -->
+    <div id="editStudentModal" class="modal hidden">
+        <div class="modal-content w-full max-w-2xl">
+            <div class="p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">✏️ Edit Student</h2>
+                <div id="editStudentContent">
+                    <!-- Content will be loaded here -->
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button onclick="hideEditStudent()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+                        Cancel
+                    </button>
+                    <button onclick="applyEditStudent()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phone Analyzer Modal -->
+    <div id="phoneAnalyzerModal" class="modal hidden">
+        <div class="modal-content w-full max-w-4xl">
+            <div class="p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">🔍 Phone Format Analyzer</h2>
+                <div id="phoneAnalyzerContent">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Enter Phone Number to Analyze
+                            </label>
+                            <input type="text" id="analyzePhoneInput" 
+                                   placeholder="Enter any phone number..."
+                                   class="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                   oninput="analyzePhoneNumber()">
+                        </div>
+                        <div id="analysisResults" class="space-y-4">
+                            <div class="text-center text-gray-500">
+                                Enter a phone number to see analysis
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button onclick="hidePhoneAnalyzer()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+                        Close
                     </button>
                 </div>
             </div>
@@ -326,6 +443,8 @@
         let filteredStudents = [];
         let currentStudentDetails = null;
         let currentNormalizationData = null;
+        let currentEditData = null;
+        let currentAddPhoneData = null;
         let selectedStudentsForBulk = new Set();
 
         // Toast notification function
@@ -480,6 +599,55 @@
             });
             
             return normalizationAttempts;
+        }
+
+        // Update phone in all collections for a student
+        async function updatePhoneInAllCollections(studentId, normalizedPhone, updateParentPhone = true) {
+            try {
+                const updates = [];
+                
+                // Check both collections for this student
+                const collections = ['students', 'pending_students'];
+                
+                for (const collection of collections) {
+                    try {
+                        const docRef = db.collection(collection).doc(studentId);
+                        const doc = await docRef.get();
+                        
+                        if (doc.exists) {
+                            const updateData = {};
+                            const data = doc.data();
+                            
+                            // Update phone field if exists
+                            if (data.phone) {
+                                updateData.phone = normalizedPhone;
+                            }
+                            
+                            // Update normalizedPhone field
+                            updateData.normalizedPhone = normalizedPhone;
+                            
+                            // Update parent phone fields if requested
+                            if (updateParentPhone) {
+                                if (data.parentPhone) updateData.parentPhone = normalizedPhone;
+                                if (data.parent_phone) updateData.parent_phone = normalizedPhone;
+                                if (data.contactPhone) updateData.contactPhone = normalizedPhone;
+                            }
+                            
+                            updateData.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+                            
+                            updates.push(docRef.update(updateData));
+                        }
+                    } catch (error) {
+                        console.log(`No document in ${collection} for student ${studentId}`);
+                    }
+                }
+                
+                await Promise.all(updates);
+                return updates.length;
+            } catch (error) {
+                console.error('Error updating all collections:', error);
+                throw error;
+            }
         }
 
         // Load all students
@@ -737,13 +905,13 @@
                                             📱 Normalize Phone
                                         </button>
                                     ` : `
-                                        <button onclick="addPhoneToStudent('${student.id}', '${student.collection}')"
+                                        <button onclick="addPhoneToStudent('${student.id}', '${student.collection}', '${studentName}')"
                                                 class="bg-yellow-600 text-white px-3 py-1 rounded text-sm hover:bg-yellow-700">
                                             ➕ Add Phone
                                         </button>
                                     `}
                                     
-                                    <button onclick="editStudent('${student.id}', '${student.collection}')"
+                                    <button onclick="editStudent('${student.id}', '${student.collection}', '${studentName}')"
                                             class="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700">
                                         ✏️ Edit
                                     </button>
@@ -958,6 +1126,13 @@
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg">
                     </div>
                     
+                    <div class="flex items-center space-x-2 mt-3">
+                        <input type="checkbox" id="updateAllCollectionsCheck" checked>
+                        <label for="updateAllCollectionsCheck" class="text-sm text-gray-700">
+                            Update phone in all collections (students & pending_students)
+                        </label>
+                    </div>
+                    
                     <div class="text-sm text-gray-600">
                         <p>This will update:</p>
                         <ul class="list-disc pl-5 mt-1">
@@ -996,6 +1171,8 @@
         // Apply phone normalization
         async function applyPhoneNormalization() {
             const normalizedPhone = document.getElementById('normalizedPhoneInput').value.trim();
+            const updateAllCollections = document.getElementById('updateAllCollectionsCheck') ? 
+                document.getElementById('updateAllCollectionsCheck').checked : true;
             
             if (!normalizedPhone) {
                 showToast('Please enter a phone number', 'warning');
@@ -1005,31 +1182,34 @@
             const { studentId, collection } = currentNormalizationData;
             
             try {
-                // Get current student data
-                const studentRef = db.collection(collection).doc(studentId);
-                const studentDoc = await studentRef.get();
-                const studentData = studentDoc.data();
-                
-                // Prepare update data
-                const updateData = {
-                    normalizedPhone: normalizedPhone,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                };
-                
-                // Also update phone field if it exists
-                if (studentData.phone) {
-                    updateData.phone = normalizedPhone;
+                if (updateAllCollections) {
+                    // Update in all collections
+                    const updatedCount = await updatePhoneInAllCollections(studentId, normalizedPhone, true);
+                    showToast(`Updated phone in ${updatedCount} collection(s)`, 'success');
+                } else {
+                    // Update only in current collection
+                    const studentRef = db.collection(collection).doc(studentId);
+                    const studentDoc = await studentRef.get();
+                    const studentData = studentDoc.data();
+                    
+                    const updateData = {
+                        normalizedPhone: normalizedPhone,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+                    
+                    if (studentData.phone) {
+                        updateData.phone = normalizedPhone;
+                    }
+                    
+                    if (studentData.parentPhone) {
+                        updateData.parentPhone = normalizedPhone;
+                    }
+                    
+                    await studentRef.update(updateData);
+                    showToast('Phone normalized successfully!', 'success');
                 }
-                
-                // Update parentPhone if it exists
-                if (studentData.parentPhone) {
-                    updateData.parentPhone = normalizedPhone;
-                }
-                
-                await studentRef.update(updateData);
                 
                 hidePhoneNormalization();
-                showToast('Phone normalized successfully!', 'success');
                 
                 // Refresh the student list
                 loadAllStudents();
@@ -1107,12 +1287,14 @@
             studentsToNormalize.slice(0, 10).forEach(student => {
                 const studentName = student.studentName || student.name || 'Unknown';
                 let phoneInfo = 'No phone';
+                let normalizedValue = null;
                 
                 if (student.phoneAnalysis.phoneFormats.length > 0) {
                     const phone = student.phoneAnalysis.phoneFormats[0].value;
                     const normalized = universalNormalizePhoneNumber(phone);
                     if (normalized.length > 0 && normalized[0].valid) {
                         phoneInfo = `${phone} → ${normalized[0].normalized}`;
+                        normalizedValue = normalized[0].normalized;
                     } else {
                         phoneInfo = `${phone} (invalid)`;
                     }
@@ -1121,7 +1303,9 @@
                 previewHtml += `
                     <div class="text-sm border-b pb-2">
                         <div class="font-medium">${studentName}</div>
-                        <div class="text-gray-600">${phoneInfo}</div>
+                        <div class="text-gray-600 ${normalizedValue ? 'text-green-600' : 'text-red-600'}">
+                            ${phoneInfo}
+                        </div>
                     </div>
                 `;
             });
@@ -1137,51 +1321,68 @@
         async function applyBulkNormalization() {
             const updateParentPhone = document.getElementById('updateParentPhone').checked;
             const createMissingFields = document.getElementById('createMissingFields').checked;
+            const updateAllCollections = document.getElementById('updateAllCollections').checked;
             
             const studentsToNormalize = allStudents.filter(student => 
                 selectedStudentsForBulk.has(student.id)
             );
             
             showLoader(`Normalizing ${studentsToNormalize.length} phones...`);
+            showProgressBar(studentsToNormalize.length);
             
             try {
-                const updates = [];
+                let successCount = 0;
+                let errorCount = 0;
                 
-                for (const student of studentsToNormalize) {
-                    if (student.phoneAnalysis.phoneFormats.length > 0) {
-                        const phone = student.phoneAnalysis.phoneFormats[0].value;
-                        const normalized = universalNormalizePhoneNumber(phone);
-                        
-                        if (normalized.length > 0 && normalized[0].valid) {
-                            const normalizedPhone = normalized[0].normalized;
-                            const updateData = {};
+                for (let i = 0; i < studentsToNormalize.length; i++) {
+                    const student = studentsToNormalize[i];
+                    updateProgressBar(i + 1, studentsToNormalize.length);
+                    
+                    try {
+                        if (student.phoneAnalysis.phoneFormats.length > 0) {
+                            const phone = student.phoneAnalysis.phoneFormats[0].value;
+                            const normalized = universalNormalizePhoneNumber(phone);
                             
-                            if (createMissingFields || student.normalizedPhone) {
-                                updateData.normalizedPhone = normalizedPhone;
+                            if (normalized.length > 0 && normalized[0].valid) {
+                                const normalizedPhone = normalized[0].normalized;
+                                
+                                if (updateAllCollections) {
+                                    await updatePhoneInAllCollections(student.id, normalizedPhone, updateParentPhone);
+                                } else {
+                                    const updateData = {};
+                                    
+                                    if (createMissingFields || student.normalizedPhone) {
+                                        updateData.normalizedPhone = normalizedPhone;
+                                    }
+                                    
+                                    if (student.phone) {
+                                        updateData.phone = normalizedPhone;
+                                    }
+                                    
+                                    if (updateParentPhone && student.parentPhone) {
+                                        updateData.parentPhone = normalizedPhone;
+                                    }
+                                    
+                                    updateData.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+                                    
+                                    await db.collection(student.collection).doc(student.id).update(updateData);
+                                }
+                                successCount++;
+                            } else {
+                                errorCount++;
                             }
-                            
-                            if (student.phone) {
-                                updateData.phone = normalizedPhone;
-                            }
-                            
-                            if (updateParentPhone && student.parentPhone) {
-                                updateData.parentPhone = normalizedPhone;
-                            }
-                            
-                            updateData.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
-                            
-                            updates.push(
-                                db.collection(student.collection).doc(student.id).update(updateData)
-                            );
+                        } else {
+                            errorCount++;
                         }
+                    } catch (error) {
+                        errorCount++;
+                        console.error(`Error normalizing student ${student.id}:`, error);
                     }
                 }
                 
-                await Promise.all(updates);
-                
                 hideLoader();
                 hideBulkNormalize();
-                showToast(`Normalized ${updates.length} phone numbers`, 'success');
+                showToast(`Normalized ${successCount} phone numbers successfully (${errorCount} failed)`, successCount > 0 ? 'success' : 'warning');
                 
                 // Refresh data
                 loadAllStudents();
@@ -1261,6 +1462,23 @@
         function hideLoader() {
             document.getElementById('loader').classList.add('hidden');
             document.getElementById('resultsArea').classList.remove('hidden');
+            hideProgressBar();
+        }
+
+        function showProgressBar(total) {
+            document.getElementById('progressBar').classList.remove('hidden');
+            document.getElementById('progressText').textContent = `0/${total}`;
+            document.getElementById('progressFill').style.width = '0%';
+        }
+
+        function updateProgressBar(current, total) {
+            const percentage = (current / total) * 100;
+            document.getElementById('progressFill').style.width = `${percentage}%`;
+            document.getElementById('progressText').textContent = `${current}/${total}`;
+        }
+
+        function hideProgressBar() {
+            document.getElementById('progressBar').classList.add('hidden');
         }
 
         function hideStudentDetails() {
@@ -1275,6 +1493,16 @@
 
         function hideBulkNormalize() {
             hideModal('bulkNormalizeModal');
+        }
+
+        function hideAddPhone() {
+            hideModal('addPhoneModal');
+            currentAddPhoneData = null;
+        }
+
+        function hideEditStudent() {
+            hideModal('editStudentModal');
+            currentEditData = null;
         }
 
         // Copy student data
@@ -1332,32 +1560,411 @@
             showToast('All student data exported!', 'success');
         }
 
-        // Placeholder functions for other features
-        function addPhoneToStudent(studentId, collection) {
-            showToast('Add phone feature coming soon!', 'info');
+        // Add Phone to Student
+        function addPhoneToStudent(studentId, collection, studentName) {
+            currentAddPhoneData = {
+                studentId: studentId,
+                collection: collection,
+                studentName: studentName
+            };
+            
+            document.getElementById('addPhoneStudentName').textContent = studentName;
+            document.getElementById('newPhoneNumber').value = '';
+            document.getElementById('phoneFieldName').value = 'phone';
+            
+            showModal('addPhoneModal');
         }
 
-        function editStudent(studentId, collection) {
-            showToast('Edit student feature coming soon!', 'info');
-        }
-
-        function deleteStudent(studentId, collection, studentName) {
-            if (confirm(`Are you sure you want to delete ${studentName}?`)) {
-                showToast(`Would delete ${studentName} (feature coming soon)`, 'warning');
+        async function applyAddPhone() {
+            const phoneNumber = document.getElementById('newPhoneNumber').value.trim();
+            const fieldName = document.getElementById('phoneFieldName').value;
+            
+            if (!phoneNumber) {
+                showToast('Please enter a phone number', 'warning');
+                return;
+            }
+            
+            if (!currentAddPhoneData) return;
+            
+            const { studentId, collection } = currentAddPhoneData;
+            
+            try {
+                // Normalize the phone number
+                const normalized = universalNormalizePhoneNumber(phoneNumber);
+                const validVersions = normalized.filter(v => v.valid && v.normalized);
+                
+                if (validVersions.length === 0) {
+                    showToast('Invalid phone number format', 'error');
+                    return;
+                }
+                
+                const normalizedPhone = validVersions[0].normalized;
+                
+                const updateData = {
+                    [fieldName]: phoneNumber,
+                    normalizedPhone: normalizedPhone,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                await db.collection(collection).doc(studentId).update(updateData);
+                
+                hideAddPhone();
+                showToast('Phone added successfully!', 'success');
+                
+                // Refresh data
+                loadAllStudents();
+                
+            } catch (error) {
+                showToast(`Error adding phone: ${error.message}`, 'error');
             }
         }
 
-        function normalizeAllPhonesForStudent() {
+        // Edit Student
+        async function editStudent(studentId, collection, studentName) {
+            showLoader('Loading student data...');
+            
+            try {
+                const doc = await db.collection(collection).doc(studentId).get();
+                
+                if (!doc.exists) {
+                    showToast('Student not found', 'error');
+                    hideLoader();
+                    return;
+                }
+                
+                currentEditData = {
+                    id: studentId,
+                    collection: collection,
+                    data: doc.data()
+                };
+                
+                let html = `
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label>
+                            <input type="text" id="editStudentName" 
+                                   value="${currentEditData.data.studentName || currentEditData.data.name || ''}"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Parent Name</label>
+                            <input type="text" id="editParentName" 
+                                   value="${currentEditData.data.parentName || currentEditData.data.parent || ''}"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                `;
+                
+                // Add phone fields
+                const phoneFields = ['phone', 'parentPhone', 'parent_phone', 'contactPhone'];
+                phoneFields.forEach(field => {
+                    if (currentEditData.data[field]) {
+                        html += `
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">${field}</label>
+                                <input type="text" id="edit${field}" 
+                                       value="${currentEditData.data[field]}"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                            </div>
+                        `;
+                    }
+                });
+                
+                html += `</div>`;
+                document.getElementById('editStudentContent').innerHTML = html;
+                
+                hideLoader();
+                showModal('editStudentModal');
+                
+            } catch (error) {
+                hideLoader();
+                showToast(`Error loading student: ${error.message}`, 'error');
+            }
+        }
+
+        async function applyEditStudent() {
+            if (!currentEditData) return;
+            
+            try {
+                const updateData = {};
+                
+                const studentName = document.getElementById('editStudentName').value.trim();
+                const parentName = document.getElementById('editParentName').value.trim();
+                
+                if (studentName) updateData.studentName = studentName;
+                if (parentName) updateData.parentName = parentName;
+                
+                // Update phone fields
+                const phoneFields = ['phone', 'parentPhone', 'parent_phone', 'contactPhone'];
+                phoneFields.forEach(field => {
+                    const inputId = `edit${field}`;
+                    const inputElement = document.getElementById(inputId);
+                    if (inputElement) {
+                        const value = inputElement.value.trim();
+                        if (value) {
+                            updateData[field] = value;
+                        }
+                    }
+                });
+                
+                updateData.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+                
+                await db.collection(currentEditData.collection).doc(currentEditData.id).update(updateData);
+                
+                hideEditStudent();
+                showToast('Student updated successfully!', 'success');
+                
+                // Refresh data
+                loadAllStudents();
+                
+            } catch (error) {
+                showToast(`Error updating student: ${error.message}`, 'error');
+            }
+        }
+
+        // Delete Student
+        async function deleteStudent(studentId, collection, studentName) {
+            if (!confirm(`Are you sure you want to delete "${studentName}"? This action cannot be undone.`)) {
+                return;
+            }
+            
+            try {
+                // Delete from both collections
+                const collections = ['students', 'pending_students'];
+                let deletedCount = 0;
+                
+                for (const col of collections) {
+                    try {
+                        await db.collection(col).doc(studentId).delete();
+                        deletedCount++;
+                    } catch (error) {
+                        // Document might not exist in this collection
+                    }
+                }
+                
+                if (deletedCount > 0) {
+                    showToast(`Deleted "${studentName}" from ${deletedCount} collection(s)`, 'success');
+                    loadAllStudents();
+                } else {
+                    showToast('Student not found', 'error');
+                }
+                
+            } catch (error) {
+                showToast(`Error deleting student: ${error.message}`, 'error');
+            }
+        }
+
+        // Normalize all phones for current student
+        async function normalizeAllPhonesForStudent() {
             if (!currentStudentDetails) return;
-            showToast('Normalize all phones feature coming soon!', 'info');
+            
+            const { id, collection, data } = currentStudentDetails;
+            
+            try {
+                // Find all phone fields
+                const phoneFields = ['phone', 'parentPhone', 'parent_phone', 'contactPhone'];
+                let normalizedCount = 0;
+                
+                for (const field of phoneFields) {
+                    if (data[field]) {
+                        const normalized = universalNormalizePhoneNumber(data[field]);
+                        const validVersions = normalized.filter(v => v.valid && v.normalized);
+                        
+                        if (validVersions.length > 0) {
+                            const updateData = {
+                                [`normalized${field.charAt(0).toUpperCase() + field.slice(1)}`]: validVersions[0].normalized,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            };
+                            
+                            await db.collection(collection).doc(id).update(updateData);
+                            normalizedCount++;
+                        }
+                    }
+                }
+                
+                showToast(`Normalized ${normalizedCount} phone fields for this student`, 'success');
+                
+                // Refresh details
+                viewStudentDetails(id, collection);
+                
+            } catch (error) {
+                showToast(`Error normalizing phones: ${error.message}`, 'error');
+            }
         }
 
+        // Phone Analyzer
         function showPhoneAnalyzer() {
-            showToast('Phone analyzer feature coming soon!', 'info');
+            document.getElementById('analyzePhoneInput').value = '';
+            document.getElementById('analysisResults').innerHTML = `
+                <div class="text-center text-gray-500">
+                    Enter a phone number to see analysis
+                </div>
+            `;
+            showModal('phoneAnalyzerModal');
         }
 
-        function fixMissingPhoneFields() {
-            showToast('Fix missing fields feature coming soon!', 'info');
+        function analyzePhoneNumber() {
+            const phoneNumber = document.getElementById('analyzePhoneInput').value.trim();
+            
+            if (!phoneNumber) {
+                document.getElementById('analysisResults').innerHTML = `
+                    <div class="text-center text-gray-500">
+                        Enter a phone number to see analysis
+                    </div>
+                `;
+                return;
+            }
+            
+            const normalized = universalNormalizePhoneNumber(phoneNumber);
+            const validVersions = normalized.filter(v => v.valid && v.normalized);
+            
+            let html = `
+                <div class="space-y-4">
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <div class="text-sm font-medium text-gray-700">Original Phone:</div>
+                        <div class="font-mono text-lg">${phoneNumber}</div>
+                    </div>
+            `;
+            
+            if (validVersions.length > 0) {
+                const bestVersion = validVersions[0];
+                
+                html += `
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div class="text-sm font-medium text-green-800">Normalized Result:</div>
+                        <div class="font-mono text-xl font-bold">${bestVersion.normalized}</div>
+                        <div class="mt-2 space-y-1">
+                            <div class="text-sm"><span class="font-medium">Format:</span> ${bestVersion.attempt}</div>
+                            <div class="text-sm"><span class="font-medium">Country:</span> ${bestVersion.country || 'Unknown'}</div>
+                            <div class="text-sm"><span class="font-medium">Valid:</span> ✅ Yes</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div class="text-red-700 font-medium">Invalid Phone Number</div>
+                        <div class="text-sm text-red-600 mt-1">
+                            Could not normalize this phone number. Please check the format.
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Show all normalization attempts
+            html += `
+                <div>
+                    <div class="font-medium text-gray-700 mb-2">All Normalization Attempts:</div>
+                    <div class="space-y-2">
+            `;
+            
+            normalized.forEach((attempt, index) => {
+                html += `
+                    <div class="border rounded-lg p-3 ${attempt.valid ? 'bg-green-50' : 'bg-red-50'}">
+                        <div class="flex justify-between">
+                            <span class="font-medium">Attempt ${index + 1}:</span>
+                            <span class="text-sm ${attempt.valid ? 'text-green-600' : 'text-red-600'}">
+                                ${attempt.valid ? '✓ Valid' : '✗ Invalid'}
+                            </span>
+                        </div>
+                        <div class="font-mono text-sm mt-1">${attempt.normalized || attempt.error}</div>
+                        <div class="text-xs text-gray-500 mt-1">Method: ${attempt.attempt}</div>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+            </div>
+            `;
+            
+            document.getElementById('analysisResults').innerHTML = html;
+        }
+
+        function hidePhoneAnalyzer() {
+            hideModal('phoneAnalyzerModal');
+        }
+
+        // Fix Missing Phone Fields
+        async function fixMissingPhoneFields() {
+            showLoader('Finding students with missing phone fields...');
+            
+            try {
+                const studentsWithIssues = allStudents.filter(student => 
+                    !student.phoneAnalysis.hasPhone || 
+                    !student.phoneAnalysis.hasNormalizedPhone
+                );
+                
+                showToast(`Found ${studentsWithIssues.length} students with phone field issues`, 'info');
+                
+                // Create a detailed report
+                let report = `Phone Field Issues Report\n`;
+                report += `Generated: ${new Date().toISOString()}\n`;
+                report += `Total Students with Issues: ${studentsWithIssues.length}\n\n`;
+                
+                let fixedCount = 0;
+                const operations = [];
+                
+                for (const student of studentsWithIssues) {
+                    const studentName = student.studentName || student.name || 'Unknown';
+                    report += `Student: ${studentName}\n`;
+                    report += `ID: ${student.id}\n`;
+                    report += `Collection: ${student.collection}\n`;
+                    
+                    // Try to create normalized phone from existing fields
+                    if (student.phoneAnalysis.phoneFormats.length > 0 && !student.phoneAnalysis.hasNormalizedPhone) {
+                        const phone = student.phoneAnalysis.phoneFormats[0].value;
+                        const normalized = universalNormalizePhoneNumber(phone);
+                        
+                        if (normalized.length > 0 && normalized[0].valid) {
+                            const normalizedPhone = normalized[0].normalized;
+                            
+                            operations.push(
+                                db.collection(student.collection).doc(student.id).update({
+                                    normalizedPhone: normalizedPhone,
+                                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                })
+                            );
+                            
+                            report += `✓ Added normalizedPhone: ${normalizedPhone}\n`;
+                            fixedCount++;
+                        } else {
+                            report += `✗ Could not normalize existing phone\n`;
+                        }
+                    } else if (!student.phoneAnalysis.hasPhone) {
+                        report += `✗ No phone field found\n`;
+                    }
+                    
+                    report += `---\n`;
+                }
+                
+                // Execute all updates
+                if (operations.length > 0) {
+                    await Promise.all(operations);
+                    showToast(`Fixed ${fixedCount} phone field issues`, 'success');
+                } else {
+                    showToast('No phone field issues to fix', 'info');
+                }
+                
+                // Download the report
+                const blob = new Blob([report], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `phone-fields-report-${new Date().toISOString().split('T')[0]}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                // Refresh data
+                loadAllStudents();
+                
+            } catch (error) {
+                showToast(`Error fixing phone fields: ${error.message}`, 'error');
+                hideLoader();
+            }
         }
 
         // Initialize on load
