@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Manager - All Students with Details</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/libphonenumber-js@1.10.14/bundle/libphonenumber-js.min.js"></script>
+    <style>
+        .loading-spinner {
+            border: 6px solid #f3f3f3;
+            border-top: 6px solid #10B981;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .student-card {
+            border-left: 4px solid #3B82F6;
+            background-color: #EFF6FF;
+        }
+        .phone-badge {
+            display: inline-block;
+            background: #E0E7FF;
+            color: #3730A3;
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin: 2px;
+            font-family: monospace;
+        }
+        .format-correct {
+            background-color: #D1FAE5;
+            border: 1px solid #10B981;
+        }
+        .format-warning {
+            background-color: #FEF3C7;
+            border: 1px solid #F59E0B;
+        }
+        .format-error {
+            background-color: #FEE2E2;
+            border: 1px solid #DC2626;
+        }
+        .data-field {
+            font-family: monospace;
+            background-color: #F9FAFB;
+            padding: 2px 4px;
+            border-radius: 4px;
+            border: 1px solid #E5E7EB;
+        }
+        .raw-data {
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 10001;
+            animation: slideIn 0.3s ease-out;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+        }
+        .filter-highlight {
+            background-color: #FEF3C7;
+            border: 2px solid #F59E0B;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app">
+        <div class="min-h-screen bg-gray-50 py-8">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <!-- Header -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h1 class="text-3xl font-bold text-gray-900">Student Manager</h1>
+                            <p class="text-gray-600 mt-2">View all students with complete details and normalize phone numbers</p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">Admin Mode</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search and Filters -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Search Student Name
+                            </label>
+                            <input 
+                                type="text" 
+                                id="searchStudentName" 
+                                placeholder="Type to search students..."
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                onkeyup="filterStudents()"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Filter by Status
+                            </label>
+                            <select id="statusFilter" onchange="filterStudents()" 
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="all">All Students</option>
+                                <option value="active">Active Only</option>
+                                <option value="pending">Pending Only</option>
+                                <option value="phone-issues">Phone Issues</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button onclick="loadAllStudents()" 
+                                    class="w-full bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors">
+                                🔄 Refresh Data
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Bulk Actions -->
+                    <div class="mt-6 border-t pt-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Bulk Actions</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <button onclick="normalizeAllPhoneNumbers()" 
+                                    class="bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+                                📱 Normalize All Phones
+                            </button>
+                            <button onclick="exportAllStudentData()" 
+                                    class="bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 transition-colors">
+                                📤 Export All Data
+                            </button>
+                            <button onclick="showPhoneAnalyzer()" 
+                                    class="bg-yellow-600 text-white px-4 py-3 rounded-lg hover:bg-yellow-700 transition-colors">
+                                🔍 Phone Format Analyzer
+                            </button>
+                            <button onclick="fixMissingPhoneFields()" 
+                                    class="bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 transition-colors">
+                                ⚡ Fix Missing Fields
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div id="statsSection" class="hidden mb-8">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-white rounded-lg shadow p-4">
+                            <div class="text-2xl font-bold text-blue-600" id="totalStudents">0</div>
+                            <div class="text-sm text-gray-600">Total Students</div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-4">
+                            <div class="text-2xl font-bold text-green-600" id="activeStudents">0</div>
+                            <div class="text-sm text-gray-600">Active Students</div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-4">
+                            <div class="text-2xl font-bold text-yellow-600" id="pendingStudents">0</div>
+                            <div class="text-sm text-gray-600">Pending Students</div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-4">
+                            <div class="text-2xl font-bold text-red-600" id="phoneIssues">0</div>
+                            <div class="text-sm text-gray-600">Phone Issues</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Area -->
+                <div id="resultsArea">
+                    <div class="text-center py-12">
+                        <div class="loading-spinner mx-auto" style="width: 60px; height: 60px;"></div>
+                        <p class="text-green-600 font-semibold mt-4 text-lg">Loading all students...</p>
+                        <p class="text-gray-500 text-sm mt-2">Fetching data from Firebase...</p>
+                    </div>
+                </div>
+
+                <!-- Loading State -->
+                <div id="loader" class="hidden text-center py-12">
+                    <div class="loading-spinner mx-auto" style="width: 60px; height: 60px;"></div>
+                    <p class="text-green-600 font-semibold mt-4 text-lg" id="loadingText">Loading...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Details Modal -->
+    <div id="studentDetailsModal" class="modal hidden">
+        <div class="modal-content w-full max-w-4xl">
+            <div class="p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4" id="modalStudentName">Student Details</h2>
+                <div id="studentDetailsContent" class="space-y-6">
+                    <!-- Content will be loaded here -->
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button onclick="hideStudentDetails()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phone Normalization Modal -->
+    <div id="phoneNormalizationModal" class="modal hidden">
+        <div class="modal-content w-full max-w-lg">
+            <div class="p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">📱 Normalize Phone Number</h2>
+                <div id="phoneNormalizationContent">
+                    <!-- Content will be loaded here -->
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button onclick="hidePhoneNormalization()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+                        Cancel
+                    </button>
+                    <button onclick="applyPhoneNormalization()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                        Apply Normalization
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Normalize Modal -->
+    <div id="bulkNormalizeModal" class="modal hidden">
+        <div class="modal-content w-full max-w-2xl">
+            <div class="p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">📱 Bulk Phone Normalization</h2>
+                <div id="bulkNormalizeContent">
+                    <div class="space-y-4">
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <p class="text-blue-700">This will normalize phone numbers for <span id="bulkStudentCount">0</span> students.</p>
+                            <p class="text-sm text-blue-600 mt-2">It will update both 'phone' and 'normalizedPhone' fields.</p>
+                        </div>
+                        
+                        <div id="bulkPreview" class="max-h-60 overflow-y-auto space-y-2">
+                            <!-- Preview items will be added here -->
+                        </div>
+                        
+                        <div class="flex items-center space-x-2">
+                            <input type="checkbox" id="updateParentPhone" checked>
+                            <label for="updateParentPhone" class="text-sm text-gray-700">
+                                Also update parentPhone field if it exists
+                            </label>
+                        </div>
+                        
+                        <div class="flex items-center space-x-2">
+                            <input type="checkbox" id="createMissingFields" checked>
+                            <label for="createMissingFields" class="text-sm text-gray-700">
+                                Create normalizedPhone field if missing
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button onclick="hideBulkNormalize()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+                        Cancel
+                    </button>
+                    <button onclick="applyBulkNormalization()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                        Apply to All Selected
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
+            authDomain: "bloomingkidsassessment.firebaseapp.com",
+            projectId: "bloomingkidsassessment",
+            storageBucket: "bloomingkidsassessment.appspot.com",
+            messagingSenderId: "238975054977",
+            appId: "1:238975054977:web:87c70b4db044998a204980"
+        };
+
+        // Initialize Firebase
+        let db;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            console.log('✅ Firebase initialized successfully');
+        } catch (error) {
+            console.error('Firebase initialization error:', error);
+        }
+
+        // Global variables
+        let allStudents = [];
+        let filteredStudents = [];
+        let currentStudentDetails = null;
+        let currentNormalizationData = null;
+        let selectedStudentsForBulk = new Set();
+
+        // Toast notification function
+        function showToast(message, type = 'info') {
+            const colors = {
+                success: 'bg-green-600',
+                error: 'bg-red-600',
+                warning: 'bg-yellow-600',
+                info: 'bg-blue-600'
+            };
+            
+            const toast = document.createElement('div');
+            toast.className = `toast ${colors[type] || colors.info}`;
+            toast.innerHTML = `
+                <div class="flex items-center">
+                    <span class="mr-2">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideIn 0.3s ease-out reverse';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Modal functions
+        function showModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+        }
+
+        function hideModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        // Universal Phone Normalization
+        function universalNormalizePhoneNumber(phone) {
+            if (!phone || typeof phone !== 'string') {
+                return [{ normalized: null, original: phone, valid: false, error: 'Invalid input' }];
+            }
+
+            const originalPhone = phone.trim();
+            const normalizationAttempts = [];
+            
+            const cleaned = originalPhone.replace(/[^\d+]/g, '');
+            
+            const strategies = [
+                () => {
+                    try {
+                        const parsed = libphonenumber.parsePhoneNumberFromString(originalPhone);
+                        if (parsed && parsed.isValid()) {
+                            return {
+                                normalized: parsed.format('E.164'),
+                                original: originalPhone,
+                                valid: true,
+                                attempt: 'standard_parse',
+                                country: parsed.country
+                            };
+                        }
+                    } catch (e) {}
+                    return null;
+                },
+                
+                () => {
+                    if (cleaned.match(/^0[7-9][0-9]/) && cleaned.length === 11) {
+                        const ngNumber = '+234' + cleaned.substring(1);
+                        try {
+                            const parsed = libphonenumber.parsePhoneNumberFromString(ngNumber);
+                            if (parsed && parsed.isValid()) {
+                                return {
+                                    normalized: parsed.format('E.164'),
+                                    original: originalPhone,
+                                    valid: true,
+                                    attempt: 'nigeria_leading_zero',
+                                    country: 'NG'
+                                };
+                            }
+                        } catch (e) {}
+                    }
+                    return null;
+                },
+                
+                () => {
+                    if (cleaned.match(/^[7-9][0-9]{9}$/) && cleaned.length === 10) {
+                        const ngNumber = '+234' + cleaned;
+                        try {
+                            const parsed = libphonenumber.parsePhoneNumberFromString(ngNumber);
+                            if (parsed && parsed.isValid()) {
+                                return {
+                                    normalized: parsed.format('E.164'),
+                                    original: originalPhone,
+                                    valid: true,
+                                    attempt: 'nigeria_10_digits',
+                                    country: 'NG'
+                                };
+                            }
+                        } catch (e) {}
+                    }
+                    return null;
+                },
+                
+                () => {
+                    if (cleaned.match(/^234[7-9][0-9]{9}$/) && cleaned.length === 13) {
+                        const ngNumber = '+' + cleaned;
+                        try {
+                            const parsed = libphonenumber.parsePhoneNumberFromString(ngNumber);
+                            if (parsed && parsed.isValid()) {
+                                return {
+                                    normalized: parsed.format('E.164'),
+                                    original: originalPhone,
+                                    valid: true,
+                                    attempt: 'nigeria_234_prefix',
+                                    country: 'NG'
+                                };
+                            }
+                        } catch (e) {}
+                    }
+                    return null;
+                },
+                
+                () => {
+                    const digitsOnly = cleaned.replace(/\D/g, '');
+                    if (digitsOnly.length >= 8 && digitsOnly.length <= 15) {
+                        return {
+                            normalized: digitsOnly,
+                            original: originalPhone,
+                            valid: true,
+                            attempt: 'digits_only',
+                            country: null
+                        };
+                    }
+                    return null;
+                }
+            ];
+            
+            for (const strategy of strategies) {
+                const result = strategy();
+                if (result) {
+                    normalizationAttempts.push(result);
+                    return normalizationAttempts;
+                }
+            }
+            
+            normalizationAttempts.push({
+                normalized: null,
+                original: originalPhone,
+                valid: false,
+                error: 'No valid normalization found',
+                attempt: 'all_failed'
+            });
+            
+            return normalizationAttempts;
+        }
+
+        // Load all students
+        async function loadAllStudents() {
+            showLoader('Loading all students...');
+            
+            try {
+                // Load from both collections
+                const [activeSnapshot, pendingSnapshot] = await Promise.all([
+                    db.collection('students').get(),
+                    db.collection('pending_students').get()
+                ]);
+                
+                allStudents = [];
+                
+                // Process active students
+                activeSnapshot.forEach(doc => {
+                    const student = {
+                        id: doc.id,
+                        collection: 'students',
+                        type: 'active',
+                        ...doc.data()
+                    };
+                    
+                    // Analyze phone
+                    student.phoneAnalysis = analyzeStudentPhone(student);
+                    allStudents.push(student);
+                });
+                
+                // Process pending students
+                pendingSnapshot.forEach(doc => {
+                    const student = {
+                        id: doc.id,
+                        collection: 'pending_students',
+                        type: 'pending',
+                        ...doc.data()
+                    };
+                    
+                    // Analyze phone
+                    student.phoneAnalysis = analyzeStudentPhone(student);
+                    allStudents.push(student);
+                });
+                
+                // Update stats
+                updateStatistics();
+                
+                // Display students
+                displayStudents(allStudents);
+                
+                hideLoader();
+                showToast(`Loaded ${allStudents.length} students`, 'success');
+                
+            } catch (error) {
+                hideLoader();
+                showToast(`Error loading students: ${error.message}`, 'error');
+                document.getElementById('resultsArea').innerHTML = `
+                    <div class="text-center py-12 text-red-600">
+                        Error loading students: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Analyze student phone
+        function analyzeStudentPhone(student) {
+            const analysis = {
+                hasPhone: false,
+                hasNormalizedPhone: false,
+                phoneFormats: [],
+                issues: [],
+                suggestions: []
+            };
+            
+            // Check phone fields
+            const phoneFields = ['phone', 'parentPhone', 'parent_phone', 'contactPhone'];
+            let foundPhone = null;
+            
+            for (const field of phoneFields) {
+                if (student[field] && typeof student[field] === 'string' && student[field].trim()) {
+                    foundPhone = student[field].trim();
+                    analysis.phoneFormats.push({
+                        field: field,
+                        value: foundPhone
+                    });
+                }
+            }
+            
+            analysis.hasPhone = foundPhone !== null;
+            
+            // Check normalized phone
+            if (student.normalizedPhone || student.normalizedParentPhone) {
+                analysis.hasNormalizedPhone = true;
+            }
+            
+            // Analyze phone if found
+            if (foundPhone) {
+                const normalized = universalNormalizePhoneNumber(foundPhone);
+                const validVersions = normalized.filter(v => v.valid && v.normalized);
+                
+                if (validVersions.length > 0) {
+                    analysis.normalized = validVersions[0].normalized;
+                    analysis.isValid = true;
+                    
+                    if (!analysis.hasNormalizedPhone) {
+                        analysis.issues.push('Missing normalized phone field');
+                        analysis.suggestions.push(`Add normalizedPhone: ${analysis.normalized}`);
+                    }
+                } else {
+                    analysis.isValid = false;
+                    analysis.issues.push('Invalid phone format');
+                    analysis.suggestions.push('Needs manual correction');
+                }
+            } else {
+                analysis.issues.push('No phone number found');
+            }
+            
+            return analysis;
+        }
+
+        // Display students
+        function displayStudents(students) {
+            filteredStudents = students;
+            const resultsArea = document.getElementById('resultsArea');
+            
+            if (students.length === 0) {
+                resultsArea.innerHTML = `
+                    <div class="text-center py-12">
+                        <div class="text-4xl mb-4">📭</div>
+                        <h3 class="text-xl font-bold text-gray-700 mb-2">No Students Found</h3>
+                        <p class="text-gray-500">No students match your search criteria.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = `
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="text-sm text-gray-600">
+                            Showing ${students.length} students
+                        </div>
+                        <div>
+                            <button onclick="selectAllForBulk()" class="text-sm bg-blue-100 text-blue-800 px-3 py-1 rounded mr-2">
+                                Select All
+                            </button>
+                            <button onclick="clearBulkSelection()" class="text-sm bg-gray-100 text-gray-800 px-3 py-1 rounded">
+                                Clear Selection
+                            </button>
+                        </div>
+                    </div>
+            `;
+            
+            students.forEach((student, index) => {
+                const studentName = student.studentName || student.name || student.childName || `Student ${index + 1}`;
+                const parentName = student.parentName || student.parent || 'Unknown';
+                
+                // Get primary phone
+                let primaryPhone = '';
+                if (student.phoneAnalysis.phoneFormats.length > 0) {
+                    primaryPhone = student.phoneAnalysis.phoneFormats[0].value;
+                }
+                
+                // Determine status badge
+                let statusBadge = '';
+                if (student.type === 'active') {
+                    statusBadge = '<span class="badge bg-green-100 text-green-800">Active</span>';
+                } else {
+                    statusBadge = '<span class="badge bg-yellow-100 text-yellow-800">Pending</span>';
+                }
+                
+                // Phone status badge
+                let phoneBadge = '';
+                if (!student.phoneAnalysis.hasPhone) {
+                    phoneBadge = '<span class="badge bg-red-100 text-red-800">No Phone</span>';
+                } else if (!student.phoneAnalysis.isValid) {
+                    phoneBadge = '<span class="badge bg-red-100 text-red-800">Invalid Phone</span>';
+                } else if (!student.phoneAnalysis.hasNormalizedPhone) {
+                    phoneBadge = '<span class="badge bg-yellow-100 text-yellow-800">Unnormalized</span>';
+                } else {
+                    phoneBadge = '<span class="badge bg-green-100 text-green-800">Normalized</span>';
+                }
+                
+                const isSelected = selectedStudentsForBulk.has(student.id);
+                
+                html += `
+                    <div class="student-card rounded-lg p-4 ${isSelected ? 'filter-highlight' : ''}">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <div class="flex items-center space-x-2 mb-2">
+                                    <input type="checkbox" 
+                                           id="select-${student.id}" 
+                                           ${isSelected ? 'checked' : ''}
+                                           onchange="toggleStudentSelection('${student.id}', this.checked)"
+                                           class="rounded">
+                                    <h3 class="text-lg font-semibold text-gray-800">${studentName}</h3>
+                                    ${statusBadge}
+                                    ${phoneBadge}
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                                    <div class="text-sm">
+                                        <div class="font-medium text-gray-700">Parent:</div>
+                                        <div class="text-gray-600">${parentName}</div>
+                                    </div>
+                                    <div class="text-sm">
+                                        <div class="font-medium text-gray-700">Collection:</div>
+                                        <div class="data-field">${student.collection}</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Phone Information -->
+                                ${student.phoneAnalysis.phoneFormats.length > 0 ? `
+                                    <div class="mb-3">
+                                        <div class="font-medium text-gray-700 text-sm mb-1">Phone Numbers:</div>
+                                        <div class="flex flex-wrap gap-1">
+                                ` : ''}
+                                
+                                ${student.phoneAnalysis.phoneFormats.map(format => {
+                                    const normalized = universalNormalizePhoneNumber(format.value);
+                                    const isValid = normalized.length > 0 && normalized[0].valid;
+                                    
+                                    return `
+                                        <span class="phone-badge ${isValid ? 'format-correct' : 'format-error'}">
+                                            ${format.field}: ${format.value}
+                                            ${isValid ? '✓' : '✗'}
+                                        </span>
+                                    `;
+                                }).join('')}
+                                
+                                ${student.phoneAnalysis.phoneFormats.length > 0 ? `
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                
+                                <!-- Issues -->
+                                ${student.phoneAnalysis.issues.length > 0 ? `
+                                    <div class="mb-3">
+                                        <div class="font-medium text-red-700 text-sm mb-1">Issues:</div>
+                                        <div class="text-sm text-red-600">
+                                            ${student.phoneAnalysis.issues.join(', ')}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                
+                                <!-- Actions -->
+                                <div class="flex flex-wrap gap-2">
+                                    <button onclick="viewStudentDetails('${student.id}', '${student.collection}')"
+                                            class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
+                                        👁️ View Details
+                                    </button>
+                                    
+                                    ${student.phoneAnalysis.hasPhone ? `
+                                        <button onclick="normalizePhoneForStudent('${student.id}', '${student.collection}', '${primaryPhone}')"
+                                                class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">
+                                            📱 Normalize Phone
+                                        </button>
+                                    ` : `
+                                        <button onclick="addPhoneToStudent('${student.id}', '${student.collection}')"
+                                                class="bg-yellow-600 text-white px-3 py-1 rounded text-sm hover:bg-yellow-700">
+                                            ➕ Add Phone
+                                        </button>
+                                    `}
+                                    
+                                    <button onclick="editStudent('${student.id}', '${student.collection}')"
+                                            class="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700">
+                                        ✏️ Edit
+                                    </button>
+                                    
+                                    <button onclick="deleteStudent('${student.id}', '${student.collection}', '${studentName}')"
+                                            class="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700">
+                                        🗑️ Delete
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="text-right">
+                                <div class="text-xs text-gray-500">
+                                    ID: ${student.id.substring(0, 8)}...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += `</div>`;
+            resultsArea.innerHTML = html;
+            
+            // Show stats section
+            document.getElementById('statsSection').classList.remove('hidden');
+        }
+
+        // View student details
+        async function viewStudentDetails(studentId, collection) {
+            showLoader('Loading student details...');
+            
+            try {
+                const doc = await db.collection(collection).doc(studentId).get();
+                
+                if (!doc.exists) {
+                    showToast('Student not found', 'error');
+                    hideLoader();
+                    return;
+                }
+                
+                currentStudentDetails = {
+                    id: studentId,
+                    collection: collection,
+                    data: doc.data()
+                };
+                
+                displayStudentDetails();
+                
+            } catch (error) {
+                showToast(`Error loading details: ${error.message}`, 'error');
+                hideLoader();
+            }
+        }
+
+        function displayStudentDetails() {
+            const student = currentStudentDetails;
+            const data = student.data;
+            const studentName = data.studentName || data.name || data.childName || 'Unknown Student';
+            
+            document.getElementById('modalStudentName').textContent = `${studentName} Details`;
+            
+            let html = `
+                <div class="space-y-6">
+                    <!-- Basic Info -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <div class="text-sm font-medium text-gray-700">Student ID:</div>
+                                <div class="data-field">${student.id}</div>
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-gray-700">Collection:</div>
+                                <div class="data-field">${student.collection}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- All Fields -->
+                    <div>
+                        <h4 class="font-semibold text-gray-800 mb-3">All Fields</h4>
+                        <div class="raw-data bg-gray-50 p-4 rounded-lg">
+            `;
+            
+            // Display all fields
+            Object.entries(data).sort().forEach(([key, value]) => {
+                html += `<div class="mb-2"><span class="font-medium text-blue-700">${key}:</span> `;
+                
+                if (value === null) {
+                    html += `<span class="text-gray-500">null</span>`;
+                } else if (typeof value === 'object') {
+                    if (value.toDate) {
+                        // Firebase timestamp
+                        html += `<span class="text-green-600">${value.toDate().toLocaleString()}</span>`;
+                    } else {
+                        html += `<span class="text-purple-600">${JSON.stringify(value, null, 2)}</span>`;
+                    }
+                } else if (typeof value === 'boolean') {
+                    html += `<span class="text-orange-600">${value}</span>`;
+                } else if (typeof value === 'number') {
+                    html += `<span class="text-indigo-600">${value}</span>`;
+                } else {
+                    html += `<span class="text-gray-800">${value}</span>`;
+                }
+                
+                html += `</div>`;
+            });
+            
+            html += `
+                        </div>
+                    </div>
+                    
+                    <!-- Phone Analysis -->
+                    <div>
+                        <h4 class="font-semibold text-gray-800 mb-3">Phone Analysis</h4>
+                        <div class="space-y-3">
+            `;
+            
+            // Find phone fields
+            const phoneFields = ['phone', 'parentPhone', 'parent_phone', 'contactPhone', 'normalizedPhone', 'normalizedParentPhone'];
+            let foundPhones = false;
+            
+            phoneFields.forEach(field => {
+                if (data[field]) {
+                    foundPhones = true;
+                    const normalized = universalNormalizePhoneNumber(data[field]);
+                    const isValid = normalized.length > 0 && normalized[0].valid;
+                    const normalizedValue = isValid ? normalized[0].normalized : 'Invalid';
+                    
+                    html += `
+                        <div class="border rounded-lg p-3 ${isValid ? 'bg-green-50' : 'bg-red-50'}">
+                            <div class="font-medium">${field}:</div>
+                            <div class="font-mono text-sm">${data[field]}</div>
+                            <div class="text-xs ${isValid ? 'text-green-600' : 'text-red-600'} mt-1">
+                                Status: ${isValid ? 'Valid' : 'Invalid'} | 
+                                Normalized: ${normalizedValue}
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+            
+            if (!foundPhones) {
+                html += `<div class="text-yellow-600">No phone fields found</div>`;
+            }
+            
+            html += `
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Actions -->
+                    <div class="flex space-x-3">
+                        <button onclick="copyStudentData()" 
+                                class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                            📋 Copy JSON
+                        </button>
+                        <button onclick="downloadStudentData()" 
+                                class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                            💾 Download Data
+                        </button>
+                        <button onclick="normalizeAllPhonesForStudent()" 
+                                class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
+                            📱 Normalize All Phones
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('studentDetailsContent').innerHTML = html;
+            hideLoader();
+            showModal('studentDetailsModal');
+        }
+
+        // Normalize phone for student
+        function normalizePhoneForStudent(studentId, collection, currentPhone) {
+            currentNormalizationData = {
+                studentId: studentId,
+                collection: collection,
+                currentPhone: currentPhone
+            };
+            
+            const normalized = universalNormalizePhoneNumber(currentPhone);
+            const validVersions = normalized.filter(v => v.valid && v.normalized);
+            
+            let html = `
+                <div class="space-y-4">
+                    <div>
+                        <div class="text-sm font-medium text-gray-700 mb-1">Current Phone:</div>
+                        <div class="data-field">${currentPhone}</div>
+                    </div>
+            `;
+            
+            if (validVersions.length > 0) {
+                const bestVersion = validVersions[0];
+                
+                html += `
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div class="text-sm font-medium text-green-800 mb-1">Recommended Normalization:</div>
+                        <div class="font-mono text-lg">${bestVersion.normalized}</div>
+                        <div class="text-xs text-green-600 mt-1">
+                            Format: ${bestVersion.attempt} | Country: ${bestVersion.country || 'Unknown'}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Normalized Phone Number
+                        </label>
+                        <input type="text" 
+                               id="normalizedPhoneInput" 
+                               value="${bestVersion.normalized}"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                    
+                    <div class="text-sm text-gray-600">
+                        <p>This will update:</p>
+                        <ul class="list-disc pl-5 mt-1">
+                            <li>phone field (if exists)</li>
+                            <li>normalizedPhone field</li>
+                            <li>parentPhone field (if exists)</li>
+                        </ul>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div class="text-red-700">Cannot normalize this phone number</div>
+                        <div class="text-sm text-red-600 mt-1">
+                            Please enter a valid Nigerian phone number format
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Enter Correct Phone Number
+                        </label>
+                        <input type="text" 
+                               id="normalizedPhoneInput" 
+                               placeholder="e.g., +2348012345678"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                `;
+            }
+            
+            html += `</div>`;
+            document.getElementById('phoneNormalizationContent').innerHTML = html;
+            showModal('phoneNormalizationModal');
+        }
+
+        // Apply phone normalization
+        async function applyPhoneNormalization() {
+            const normalizedPhone = document.getElementById('normalizedPhoneInput').value.trim();
+            
+            if (!normalizedPhone) {
+                showToast('Please enter a phone number', 'warning');
+                return;
+            }
+            
+            const { studentId, collection } = currentNormalizationData;
+            
+            try {
+                // Get current student data
+                const studentRef = db.collection(collection).doc(studentId);
+                const studentDoc = await studentRef.get();
+                const studentData = studentDoc.data();
+                
+                // Prepare update data
+                const updateData = {
+                    normalizedPhone: normalizedPhone,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                // Also update phone field if it exists
+                if (studentData.phone) {
+                    updateData.phone = normalizedPhone;
+                }
+                
+                // Update parentPhone if it exists
+                if (studentData.parentPhone) {
+                    updateData.parentPhone = normalizedPhone;
+                }
+                
+                await studentRef.update(updateData);
+                
+                hidePhoneNormalization();
+                showToast('Phone normalized successfully!', 'success');
+                
+                // Refresh the student list
+                loadAllStudents();
+                
+                // Refresh details if modal is open
+                if (currentStudentDetails && currentStudentDetails.id === studentId) {
+                    viewStudentDetails(studentId, collection);
+                }
+                
+            } catch (error) {
+                showToast(`Error normalizing phone: ${error.message}`, 'error');
+            }
+        }
+
+        // Bulk actions
+        function toggleStudentSelection(studentId, isSelected) {
+            if (isSelected) {
+                selectedStudentsForBulk.add(studentId);
+            } else {
+                selectedStudentsForBulk.delete(studentId);
+            }
+            
+            // Update UI
+            const card = document.querySelector(`[id="select-${studentId}"]`).closest('.student-card');
+            if (card) {
+                if (isSelected) {
+                    card.classList.add('filter-highlight');
+                } else {
+                    card.classList.remove('filter-highlight');
+                }
+            }
+        }
+
+        function selectAllForBulk() {
+            filteredStudents.forEach(student => {
+                selectedStudentsForBulk.add(student.id);
+                const checkbox = document.getElementById(`select-${student.id}`);
+                if (checkbox) checkbox.checked = true;
+            });
+            
+            // Update UI
+            document.querySelectorAll('.student-card').forEach(card => {
+                card.classList.add('filter-highlight');
+            });
+            
+            showToast(`Selected ${filteredStudents.length} students for bulk action`, 'info');
+        }
+
+        function clearBulkSelection() {
+            selectedStudentsForBulk.clear();
+            document.querySelectorAll('.student-card').forEach(card => {
+                card.classList.remove('filter-highlight');
+            });
+            
+            document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+        }
+
+        // Normalize all phone numbers
+        async function normalizeAllPhoneNumbers() {
+            if (selectedStudentsForBulk.size === 0) {
+                showToast('Please select students first', 'warning');
+                return;
+            }
+            
+            const studentsToNormalize = allStudents.filter(student => 
+                selectedStudentsForBulk.has(student.id)
+            );
+            
+            // Preview
+            document.getElementById('bulkStudentCount').textContent = studentsToNormalize.length;
+            
+            let previewHtml = '';
+            studentsToNormalize.slice(0, 10).forEach(student => {
+                const studentName = student.studentName || student.name || 'Unknown';
+                let phoneInfo = 'No phone';
+                
+                if (student.phoneAnalysis.phoneFormats.length > 0) {
+                    const phone = student.phoneAnalysis.phoneFormats[0].value;
+                    const normalized = universalNormalizePhoneNumber(phone);
+                    if (normalized.length > 0 && normalized[0].valid) {
+                        phoneInfo = `${phone} → ${normalized[0].normalized}`;
+                    } else {
+                        phoneInfo = `${phone} (invalid)`;
+                    }
+                }
+                
+                previewHtml += `
+                    <div class="text-sm border-b pb-2">
+                        <div class="font-medium">${studentName}</div>
+                        <div class="text-gray-600">${phoneInfo}</div>
+                    </div>
+                `;
+            });
+            
+            if (studentsToNormalize.length > 10) {
+                previewHtml += `<div class="text-sm text-gray-500">+ ${studentsToNormalize.length - 10} more students</div>`;
+            }
+            
+            document.getElementById('bulkPreview').innerHTML = previewHtml;
+            showModal('bulkNormalizeModal');
+        }
+
+        async function applyBulkNormalization() {
+            const updateParentPhone = document.getElementById('updateParentPhone').checked;
+            const createMissingFields = document.getElementById('createMissingFields').checked;
+            
+            const studentsToNormalize = allStudents.filter(student => 
+                selectedStudentsForBulk.has(student.id)
+            );
+            
+            showLoader(`Normalizing ${studentsToNormalize.length} phones...`);
+            
+            try {
+                const updates = [];
+                
+                for (const student of studentsToNormalize) {
+                    if (student.phoneAnalysis.phoneFormats.length > 0) {
+                        const phone = student.phoneAnalysis.phoneFormats[0].value;
+                        const normalized = universalNormalizePhoneNumber(phone);
+                        
+                        if (normalized.length > 0 && normalized[0].valid) {
+                            const normalizedPhone = normalized[0].normalized;
+                            const updateData = {};
+                            
+                            if (createMissingFields || student.normalizedPhone) {
+                                updateData.normalizedPhone = normalizedPhone;
+                            }
+                            
+                            if (student.phone) {
+                                updateData.phone = normalizedPhone;
+                            }
+                            
+                            if (updateParentPhone && student.parentPhone) {
+                                updateData.parentPhone = normalizedPhone;
+                            }
+                            
+                            updateData.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+                            
+                            updates.push(
+                                db.collection(student.collection).doc(student.id).update(updateData)
+                            );
+                        }
+                    }
+                }
+                
+                await Promise.all(updates);
+                
+                hideLoader();
+                hideBulkNormalize();
+                showToast(`Normalized ${updates.length} phone numbers`, 'success');
+                
+                // Refresh data
+                loadAllStudents();
+                
+            } catch (error) {
+                hideLoader();
+                showToast(`Error during bulk normalization: ${error.message}`, 'error');
+            }
+        }
+
+        // Filter students
+        function filterStudents() {
+            const searchTerm = document.getElementById('searchStudentName').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            
+            let filtered = allStudents;
+            
+            // Apply search filter
+            if (searchTerm) {
+                filtered = filtered.filter(student => {
+                    const studentName = (student.studentName || student.name || student.childName || '').toLowerCase();
+                    const parentName = (student.parentName || student.parent || '').toLowerCase();
+                    
+                    return studentName.includes(searchTerm) || 
+                           parentName.includes(searchTerm) ||
+                           (student.phone && student.phone.includes(searchTerm));
+                });
+            }
+            
+            // Apply status filter
+            if (statusFilter !== 'all') {
+                if (statusFilter === 'active') {
+                    filtered = filtered.filter(s => s.type === 'active');
+                } else if (statusFilter === 'pending') {
+                    filtered = filtered.filter(s => s.type === 'pending');
+                } else if (statusFilter === 'phone-issues') {
+                    filtered = filtered.filter(s => 
+                        !s.phoneAnalysis.hasPhone || 
+                        !s.phoneAnalysis.isValid || 
+                        !s.phoneAnalysis.hasNormalizedPhone
+                    );
+                }
+            }
+            
+            // Clear bulk selection when filtering
+            if (searchTerm || statusFilter !== 'all') {
+                clearBulkSelection();
+            }
+            
+            displayStudents(filtered);
+        }
+
+        // Update statistics
+        function updateStatistics() {
+            const total = allStudents.length;
+            const active = allStudents.filter(s => s.type === 'active').length;
+            const pending = allStudents.filter(s => s.type === 'pending').length;
+            const phoneIssues = allStudents.filter(s => 
+                !s.phoneAnalysis.hasPhone || 
+                !s.phoneAnalysis.isValid || 
+                !s.phoneAnalysis.hasNormalizedPhone
+            ).length;
+            
+            document.getElementById('totalStudents').textContent = total;
+            document.getElementById('activeStudents').textContent = active;
+            document.getElementById('pendingStudents').textContent = pending;
+            document.getElementById('phoneIssues').textContent = phoneIssues;
+        }
+
+        // Helper functions
+        function showLoader(text = 'Loading...') {
+            document.getElementById('loader').classList.remove('hidden');
+            document.getElementById('resultsArea').classList.add('hidden');
+            document.getElementById('loadingText').textContent = text;
+        }
+
+        function hideLoader() {
+            document.getElementById('loader').classList.add('hidden');
+            document.getElementById('resultsArea').classList.remove('hidden');
+        }
+
+        function hideStudentDetails() {
+            hideModal('studentDetailsModal');
+            currentStudentDetails = null;
+        }
+
+        function hidePhoneNormalization() {
+            hideModal('phoneNormalizationModal');
+            currentNormalizationData = null;
+        }
+
+        function hideBulkNormalize() {
+            hideModal('bulkNormalizeModal');
+        }
+
+        // Copy student data
+        function copyStudentData() {
+            if (!currentStudentDetails) return;
+            
+            const jsonString = JSON.stringify(currentStudentDetails.data, null, 2);
+            navigator.clipboard.writeText(jsonString).then(() => {
+                showToast('Student data copied to clipboard!', 'success');
+            });
+        }
+
+        // Download student data
+        function downloadStudentData() {
+            if (!currentStudentDetails) return;
+            
+            const jsonString = JSON.stringify(currentStudentDetails.data, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `student-${currentStudentDetails.id}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showToast('Student data downloaded!', 'success');
+        }
+
+        // Export all data
+        function exportAllStudentData() {
+            const data = {
+                exportedAt: new Date().toISOString(),
+                totalStudents: allStudents.length,
+                students: allStudents.map(student => ({
+                    id: student.id,
+                    collection: student.collection,
+                    type: student.type,
+                    ...student
+                }))
+            };
+            
+            const jsonString = JSON.stringify(data, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `all-students-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showToast('All student data exported!', 'success');
+        }
+
+        // Placeholder functions for other features
+        function addPhoneToStudent(studentId, collection) {
+            showToast('Add phone feature coming soon!', 'info');
+        }
+
+        function editStudent(studentId, collection) {
+            showToast('Edit student feature coming soon!', 'info');
+        }
+
+        function deleteStudent(studentId, collection, studentName) {
+            if (confirm(`Are you sure you want to delete ${studentName}?`)) {
+                showToast(`Would delete ${studentName} (feature coming soon)`, 'warning');
+            }
+        }
+
+        function normalizeAllPhonesForStudent() {
+            if (!currentStudentDetails) return;
+            showToast('Normalize all phones feature coming soon!', 'info');
+        }
+
+        function showPhoneAnalyzer() {
+            showToast('Phone analyzer feature coming soon!', 'info');
+        }
+
+        function fixMissingPhoneFields() {
+            showToast('Fix missing fields feature coming soon!', 'info');
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Student Manager loaded');
+            loadAllStudents();
+            
+            // Add admin badge
+            const badge = document.createElement('div');
+            badge.className = 'admin-badge';
+            badge.textContent = 'STUDENT MANAGER';
+            badge.style.cssText = `
+                position: fixed;
+                top: 10px;
+                left: 10px;
+                background: #3B82F6;
+                color: white;
+                padding: 8px 12px;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: bold;
+                z-index: 10000;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            `;
+            document.body.appendChild(badge);
+        });
+    </script>
+</body>
+</html>
