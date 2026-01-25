@@ -42,8 +42,7 @@ function sanitizeInput(input) {
 
 // Safe text content helper (doesn't escape HTML for rendering)
 function safeText(text) {
-    if (!text) return '';
-    if (typeof text !== 'string') return String(text);
+    if (typeof text !== 'string') return text;
     return text.trim();
 }
 
@@ -52,6 +51,39 @@ function capitalize(str) {
     if (!str || typeof str !== 'string') return "";
     const cleaned = safeText(str);
     return cleaned.replace(/\b\w/g, l => l.toUpperCase());
+}
+
+// ========== NEW FUNCTION ==========
+// Compare phone numbers by digits only (ignoring formatting) - GLOBAL SUPPORT
+function comparePhonesByDigits(phone1, phone2) {
+    if (!phone1 || !phone2) return false;
+    
+    try {
+        // Convert to strings and extract only digits
+        const digits1 = phone1.toString().replace(/\D/g, '');
+        const digits2 = phone2.toString().replace(/\D/g, '');
+        
+        if (!digits1 || !digits2) return false;
+        
+        // Remove leading zeros for international comparison
+        const clean1 = digits1.replace(/^0+/, '');
+        const clean2 = digits2.replace(/^0+/, '');
+        
+        // Compare both versions (with and without leading zeros)
+        return digits1 === digits2 || 
+               clean1 === clean2 || 
+               digits1 === clean2 || 
+               clean1 === digits2;
+    } catch (error) {
+        console.warn("Phone comparison error:", error);
+        return false;
+    }
+}
+
+// Extract only digits from phone (for searching)
+function extractPhoneDigits(phone) {
+    if (!phone) return '';
+    return phone.toString().replace(/\D/g, '').replace(/^0+/, '');
 }
 
 // ============================================================================
@@ -1868,87 +1900,67 @@ function setupRealTimeMonitoring(parentPhone, userId) {
     // Clear any existing listeners
     cleanupRealTimeListeners();
     
-    // Normalize phone
-    const normalizedPhone = normalizePhoneNumber(parentPhone);
-    if (!normalizedPhone.valid) {
+    // Get parent's digit-only phone for comparison
+    const parentDigits = extractPhoneDigits(parentPhone);
+    
+    if (!parentDigits) {
+        console.warn("⚠️ Cannot setup monitoring - invalid parent phone:", parentPhone);
         return;
     }
     
-    // Monitor monthly reports
-    const monthlyListener = db.collection("tutor_submissions")
-        .where("parentPhone", "==", normalizedPhone.normalized)
-        .onSnapshot((snapshot) => {
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === "added") {
-                    console.log("🆕 NEW MONTHLY REPORT DETECTED!");
-                    showNewReportNotification('monthly');
-                }
-            });
-        }, (error) => {
-            console.error("Monthly reports listener error:", error);
-        });
-    realTimeListeners.push(monthlyListener);
+    console.log("📡 Setting up real-time monitoring for digits:", parentDigits);
     
-    // Monitor assessment reports
-    const assessmentListener = db.collection("student_results")
-        .where("parentPhone", "==", normalizedPhone.normalized)
-        .onSnapshot((snapshot) => {
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === "added") {
-                    console.log("🆕 NEW ASSESSMENT REPORT DETECTED!");
-                    showNewReportNotification('assessment');
+    // We need to fetch ALL and filter client-side since Firestore can't do digit matching
+    // Set up interval checks instead of direct listeners
+    
+    // Check for new reports every 30 seconds
+    const checkInterval = setInterval(async () => {
+        try {
+            // Check for new monthly reports
+            const monthlySnapshot = await db.collection("tutor_submissions").get();
+            monthlySnapshot.forEach(doc => {
+                const data = doc.data();
+                const docPhone = data.parentPhone || data.parent_phone || data.phone;
+                
+                if (docPhone && comparePhonesByDigits(docPhone, parentPhone)) {
+                    // Check if we've seen this before
+                    const lastChecked = localStorage.getItem(`lastReport_${doc.id}`);
+                    if (!lastChecked) {
+                        console.log("🆕 NEW MONTHLY REPORT DETECTED!");
+                        showNewReportNotification('monthly');
+                        localStorage.setItem(`lastReport_${doc.id}`, Date.now().toString());
+                    }
                 }
             });
-        }, (error) => {
-            console.error("Assessment reports listener error:", error);
-        });
-    realTimeListeners.push(assessmentListener);
+            
+            // Check for new assessment reports
+            const assessmentSnapshot = await db.collection("student_results").get();
+            assessmentSnapshot.forEach(doc => {
+                const data = doc.data();
+                const docPhone = data.parentPhone || data.parent_phone || data.phone;
+                
+                if (docPhone && comparePhonesByDigits(docPhone, parentPhone)) {
+                    const lastChecked = localStorage.getItem(`lastReport_${doc.id}`);
+                    if (!lastChecked) {
+                        console.log("🆕 NEW ASSESSMENT REPORT DETECTED!");
+                        showNewReportNotification('assessment');
+                        localStorage.setItem(`lastReport_${doc.id}`, Date.now().toString());
+                    }
+                }
+            });
+        } catch (error) {
+            console.error("Real-time check error:", error);
+        }
+    }, 30000); // Check every 30 seconds
+    
+    realTimeListeners.push(() => clearInterval(checkInterval));
     
     // Monitor academics periodically
-    setInterval(() => {
+    const academicsInterval = setInterval(() => {
         checkForNewAcademics();
-    }, 60000); // Reduced from 30 to 60 seconds
-}
-
-function cleanupRealTimeListeners() {
-    realTimeListeners.forEach(unsubscribe => {
-        if (typeof unsubscribe === 'function') {
-            unsubscribe();
-        }
-    });
-    realTimeListeners = [];
+    }, 30000);
     
-    // Clean up charts
-    charts.forEach(chart => {
-        if (chart && typeof chart.destroy === 'function') {
-            chart.destroy();
-        }
-    });
-    charts.clear();
-}
-
-function showNewReportNotification(type) {
-    const reportType = type === 'assessment' ? 'Assessment Report' : 
-                      type === 'monthly' ? 'Monthly Report' : 'New Update';
-    
-    showMessage(`New ${reportType} available!`, 'success');
-    
-    // Add a visual indicator in the UI
-    const existingIndicator = document.getElementById('newReportIndicator');
-    if (existingIndicator) {
-        existingIndicator.remove();
-    }
-    
-    const indicator = document.createElement('div');
-    indicator.id = 'newReportIndicator';
-    indicator.className = 'fixed top-20 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-40 animate-pulse fade-in';
-    indicator.innerHTML = `📄 New ${safeText(reportType)} Available!`;
-    document.body.appendChild(indicator);
-    
-    // Remove after 5 seconds
-    setTimeout(() => {
-        indicator.remove();
-    }, 5000);
+    realTimeListeners.push(() => clearInterval(academicsInterval));
 }
 
 // ============================================================================
@@ -3202,93 +3214,183 @@ const authManager = new UnifiedAuthManager();
  * This searches EVERY possible phone variation across multiple collections
  */
 async function comprehensiveFindChildren(parentPhone) {
-    console.log("🔍 COMPREHENSIVE SEARCH for children with phone:", parentPhone);
+    console.log("🔍 COMPREHENSIVE DIGIT SEARCH for children with phone:", parentPhone);
 
-    const allChildren = new Map(); // studentId -> studentData
-    const studentNameIdMap = new Map(); // studentName -> studentId
+    const allChildren = new Map();
+    const studentNameIdMap = new Map();
+    
+    // Get parent's phone digits for comparison
+    const parentDigits = extractPhoneDigits(parentPhone);
+    
+    if (!parentDigits) {
+        console.warn("⚠️ No valid digits in parent phone:", parentPhone);
+        return {
+            studentIds: [],
+            studentNameIdMap: new Map(),
+            allStudentData: [],
+            studentNames: []
+        };
+    }
 
     try {
-        // 1. Generate phone variations
-        const normalizedPhone = normalizePhoneNumber(parentPhone);
-        if (!normalizedPhone.valid) {
-            return {
-                studentIds: [],
-                studentNameIdMap: new Map(),
-                allStudentData: [],
-                studentNames: []
-            };
-        }
-
-        // 2. Search in students collection first
-        try {
-            const snapshot = await db.collection('students')
-                .where('parentPhone', '==', normalizedPhone.normalized)
-                .get();
-
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                const studentId = doc.id;
-                const studentName = safeText(data.studentName || data.name || 'Unknown');
-
-                if (studentName !== 'Unknown' && !allChildren.has(studentId)) {
-                    allChildren.set(studentId, {
-                        id: studentId,
-                        name: studentName,
-                        data: data,
-                        isPending: false,
-                        collection: 'students'
-                    });
-                    
-                    // Handle duplicate names
-                    if (studentNameIdMap.has(studentName)) {
-                        const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
-                        studentNameIdMap.set(uniqueName, studentId);
-                    } else {
-                        studentNameIdMap.set(studentName, studentId);
-                    }
+        // 1. Search in students collection (FETCH ALL THEN FILTER)
+        console.log("📋 Fetching ALL students for digit matching...");
+        const allStudentsSnapshot = await db.collection('students').get();
+        
+        allStudentsSnapshot.forEach(doc => {
+            const data = doc.data();
+            const studentId = doc.id;
+            const studentName = safeText(data.studentName || data.name || 'Unknown');
+            
+            if (studentName === 'Unknown') return;
+            
+            // Check ALL phone fields in student data
+            const phoneFields = [
+                data.parentPhone,
+                data.guardianPhone,
+                data.motherPhone,
+                data.fatherPhone,
+                data.contactPhone,
+                data.phone,
+                data.parentPhone1,
+                data.parentPhone2,
+                data.emergencyPhone
+            ];
+            
+            let isMatch = false;
+            let matchedField = '';
+            
+            // Compare each phone field by digits only
+            for (const fieldPhone of phoneFields) {
+                if (fieldPhone && comparePhonesByDigits(fieldPhone, parentPhone)) {
+                    isMatch = true;
+                    matchedField = fieldPhone;
+                    break;
                 }
-            });
-        } catch (error) {
-            // Silently continue
-        }
-
-        // 3. Search in pending_students collection
-        try {
-            const snapshot = await db.collection('pending_students')
-                .where('parentPhone', '==', normalizedPhone.normalized)
-                .get();
-
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                const studentId = doc.id;
-                const studentName = safeText(data.studentName || data.name || 'Unknown');
-
-                if (studentName !== 'Unknown' && !allChildren.has(studentId)) {
-                    allChildren.set(studentId, {
-                        id: studentId,
-                        name: studentName,
-                        data: data,
-                        isPending: true,
-                        collection: 'pending_students'
-                    });
-                    
-                    // Handle duplicate names
-                    if (studentNameIdMap.has(studentName)) {
-                        const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
-                        studentNameIdMap.set(uniqueName, studentId);
-                    } else {
-                        studentNameIdMap.set(studentName, studentId);
-                    }
+            }
+            
+            if (isMatch && !allChildren.has(studentId)) {
+                console.log(`✅ DIGIT MATCH: Parent ${parentDigits} = ${matchedField} → Student ${studentName}`);
+                
+                allChildren.set(studentId, {
+                    id: studentId,
+                    name: studentName,
+                    data: data,
+                    isPending: false,
+                    collection: 'students'
+                });
+                
+                // Handle duplicate names
+                if (studentNameIdMap.has(studentName)) {
+                    const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
+                    studentNameIdMap.set(uniqueName, studentId);
+                } else {
+                    studentNameIdMap.set(studentName, studentId);
                 }
-            });
-        } catch (error) {
-            // Silently continue
+            }
+        });
+        
+        // 2. Search in pending_students collection
+        console.log("📋 Fetching ALL pending students for digit matching...");
+        const allPendingSnapshot = await db.collection('pending_students').get();
+        
+        allPendingSnapshot.forEach(doc => {
+            const data = doc.data();
+            const studentId = doc.id;
+            const studentName = safeText(data.studentName || data.name || 'Unknown');
+            
+            if (studentName === 'Unknown') return;
+            
+            // Check phone fields
+            const phoneFields = [
+                data.parentPhone,
+                data.guardianPhone,
+                data.motherPhone,
+                data.fatherPhone,
+                data.contactPhone,
+                data.phone
+            ];
+            
+            let isMatch = false;
+            let matchedField = '';
+            
+            for (const fieldPhone of phoneFields) {
+                if (fieldPhone && comparePhonesByDigits(fieldPhone, parentPhone)) {
+                    isMatch = true;
+                    matchedField = fieldPhone;
+                    break;
+                }
+            }
+            
+            if (isMatch && !allChildren.has(studentId)) {
+                console.log(`✅ PENDING DIGIT MATCH: Parent ${parentDigits} = ${matchedField} → Student ${studentName}`);
+                
+                allChildren.set(studentId, {
+                    id: studentId,
+                    name: studentName,
+                    data: data,
+                    isPending: true,
+                    collection: 'pending_students'
+                });
+                
+                if (studentNameIdMap.has(studentName)) {
+                    const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
+                    studentNameIdMap.set(uniqueName, studentId);
+                } else {
+                    studentNameIdMap.set(studentName, studentId);
+                }
+            }
+        });
+
+        // 3. EMAIL MATCHING (backup)
+        console.log("📧 Checking for email matches...");
+        const userDoc = await db.collection('parent_users')
+            .where('normalizedPhone', '==', parentPhone)
+            .limit(1)
+            .get();
+
+        if (!userDoc.empty) {
+            const userData = userDoc.docs[0].data();
+            if (userData.email) {
+                try {
+                    const emailSnapshot = await db.collection('students')
+                        .where('parentEmail', '==', userData.email)
+                        .get();
+
+                    emailSnapshot.forEach(doc => {
+                        const data = doc.data();
+                        const studentId = doc.id;
+                        const studentName = safeText(data.studentName || data.name || 'Unknown');
+
+                        if (studentName !== 'Unknown' && !allChildren.has(studentId)) {
+                            console.log(`✅ EMAIL MATCH: ${userData.email} → Student ${studentName}`);
+                            
+                            allChildren.set(studentId, {
+                                id: studentId,
+                                name: studentName,
+                                data: data,
+                                isPending: false,
+                                collection: 'students'
+                            });
+                            
+                            if (!studentNameIdMap.has(studentName)) {
+                                studentNameIdMap.set(studentName, studentId);
+                            }
+                        }
+                    });
+                } catch (error) {
+                    console.warn("Email search error:", error.message);
+                }
+            }
         }
 
-        // 5. Return results
+        // 4. Return results
         const studentNames = Array.from(studentNameIdMap.keys());
         const studentIds = Array.from(allChildren.keys());
         const allStudentData = Array.from(allChildren.values());
+
+        console.log(`🎯 DIGIT SEARCH RESULTS: ${studentNames.length} students found`);
+        console.log("📊 Students:", studentNames);
 
         return {
             studentIds,
@@ -3298,7 +3400,7 @@ async function comprehensiveFindChildren(parentPhone) {
         };
 
     } catch (error) {
-        console.error("❌ Comprehensive search error:", error);
+        console.error("❌ Comprehensive digit search error:", error);
         return {
             studentIds: [],
             studentNameIdMap: new Map(),
