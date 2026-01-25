@@ -1719,27 +1719,34 @@ function addLogoutButton() {
 }
 
 // ============================================================================
-// SECTION 12: SIMPLE REPORT SEARCH - NO CHILD MATCHING NEEDED
+// SECTION 12: SIMPLE REPORT SEARCH WITH DIGIT MATCHING FOR GLOBAL PHONES
 // ============================================================================
 
 async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUid = '') {
-    console.log("🔍 SIMPLE Search for:", { parentPhone, parentEmail, parentUid });
+    console.log("🔍 DIGIT-MATCHING Search for:", { parentPhone, parentEmail, parentUid });
     
     let assessmentResults = [];
     let monthlyResults = [];
     
     try {
-        // Generate phone variations for search
-        const normalizedPhone = normalizePhoneNumber(parentPhone);
-        if (!normalizedPhone.valid) {
+        // Get parent's digits for comparison
+        const parentDigits = extractPhoneDigits(parentPhone);
+        
+        if (!parentDigits) {
+            console.warn("⚠️ No valid digits in parent phone");
             return { assessmentResults: [], monthlyResults: [] };
         }
 
-        const searchPhone = normalizedPhone.normalized;
-        
-        console.log(`🎯 Searching with: ${searchPhone}`);
+        console.log(`🎯 Searching with digits: ${parentDigits}`);
 
+        // --- PHONE VARIATIONS FOR EXACT MATCHING ---
+        const normalizedPhone = normalizePhoneNumber(parentPhone);
+        const searchPhone = normalizedPhone.valid ? normalizedPhone.normalized : parentPhone;
+        
         // --- ASSESSMENT REPORTS SEARCH ---
+        console.log("📊 Searching assessment reports...");
+        
+        // METHOD 1: Try exact matches first
         try {
             const assessmentSnapshot = await db.collection("student_results")
                 .where("parentPhone", "==", searchPhone)
@@ -1747,12 +1754,13 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
                 .get();
             
             if (!assessmentSnapshot.empty) {
-                console.log(`✅ Found ${assessmentSnapshot.size} assessment reports`);
+                console.log(`✅ Found ${assessmentSnapshot.size} assessment reports (exact match)`);
                 assessmentSnapshot.forEach(doc => {
                     const data = doc.data();
                     assessmentResults.push({ 
                         id: doc.id,
                         collection: 'student_results',
+                        matchType: 'exact',
                         ...data,
                         timestamp: data.submittedAt?.seconds || 
                                   data.createdAt?.seconds || 
@@ -1763,24 +1771,26 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
                 });
             }
         } catch (error) {
-            console.error("Assessment search error:", error);
+            console.log("ℹ️ Exact assessment search skipped:", error.message);
         }
 
-        // Try normalized phone field if no results
-        if (assessmentResults.length === 0) {
-            try {
-                const assessmentSnapshot2 = await db.collection("student_results")
-                    .where("normalizedParentPhone", "==", searchPhone)
-                    .limit(100)
-                    .get();
-                
-                if (!assessmentSnapshot2.empty) {
-                    console.log(`✅ Found ${assessmentSnapshot2.size} assessment reports (normalized)`);
-                    assessmentSnapshot2.forEach(doc => {
-                        const data = doc.data();
+        // METHOD 2: Try normalized phone field
+        try {
+            const assessmentSnapshot2 = await db.collection("student_results")
+                .where("normalizedParentPhone", "==", searchPhone)
+                .limit(100)
+                .get();
+            
+            if (!assessmentSnapshot2.empty) {
+                console.log(`✅ Found ${assessmentSnapshot2.size} assessment reports (normalized)`);
+                assessmentSnapshot2.forEach(doc => {
+                    const data = doc.data();
+                    const existing = assessmentResults.find(r => r.id === doc.id);
+                    if (!existing) {
                         assessmentResults.push({ 
                             id: doc.id,
                             collection: 'student_results',
+                            matchType: 'normalized',
                             ...data,
                             timestamp: data.submittedAt?.seconds || 
                                       data.createdAt?.seconds || 
@@ -1788,14 +1798,69 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
                                       Date.now() / 1000,
                             type: 'assessment'
                         });
-                    });
+                    }
+                });
+            }
+        } catch (error) {
+            console.log("ℹ️ Normalized assessment search skipped:", error.message);
+        }
+
+        // METHOD 3: DIGIT MATCHING - Fetch ALL and filter client-side
+        if (assessmentResults.length === 0) {
+            console.log("🔄 Trying DIGIT MATCHING for assessment reports...");
+            try {
+                const allAssessments = await db.collection("student_results").limit(500).get();
+                let digitMatches = 0;
+                
+                allAssessments.forEach(doc => {
+                    const data = doc.data();
+                    const existing = assessmentResults.find(r => r.id === doc.id);
+                    if (existing) return;
+                    
+                    // Check ALL possible phone fields
+                    const phoneFields = [
+                        data.parentPhone,
+                        data.parent_phone,
+                        data.guardianPhone,
+                        data.motherPhone,
+                        data.fatherPhone,
+                        data.phone,
+                        data.contactPhone,
+                        data.normalizedParentPhone
+                    ];
+                    
+                    for (const fieldPhone of phoneFields) {
+                        if (fieldPhone && comparePhonesByDigits(fieldPhone, parentPhone)) {
+                            digitMatches++;
+                            assessmentResults.push({ 
+                                id: doc.id,
+                                collection: 'student_results',
+                                matchType: 'digit-match',
+                                matchedField: fieldPhone,
+                                ...data,
+                                timestamp: data.submittedAt?.seconds || 
+                                          data.createdAt?.seconds || 
+                                          data.timestamp?.seconds || 
+                                          Date.now() / 1000,
+                                type: 'assessment'
+                            });
+                            break;
+                        }
+                    }
+                });
+                
+                if (digitMatches > 0) {
+                    console.log(`✅ Found ${digitMatches} assessment reports (DIGIT MATCH)`);
                 }
             } catch (error) {
-                console.error("Normalized assessment search error:", error);
+                console.error("Digit matching error:", error);
             }
         }
 
         // --- MONTHLY REPORTS SEARCH ---
+        console.log("📈 Searching monthly reports...");
+        
+        // METHOD 1: Try exact matches first
         try {
             const monthlySnapshot = await db.collection("tutor_submissions")
                 .where("parentPhone", "==", searchPhone)
@@ -1803,12 +1868,13 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
                 .get();
             
             if (!monthlySnapshot.empty) {
-                console.log(`✅ Found ${monthlySnapshot.size} monthly reports`);
+                console.log(`✅ Found ${monthlySnapshot.size} monthly reports (exact match)`);
                 monthlySnapshot.forEach(doc => {
                     const data = doc.data();
                     monthlyResults.push({ 
                         id: doc.id,
                         collection: 'tutor_submissions',
+                        matchType: 'exact',
                         ...data,
                         timestamp: data.submittedAt?.seconds || 
                                   data.createdAt?.seconds || 
@@ -1819,24 +1885,26 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
                 });
             }
         } catch (error) {
-            console.error("Monthly search error:", error);
+            console.log("ℹ️ Exact monthly search skipped:", error.message);
         }
 
-        // Try normalized phone field if no results
-        if (monthlyResults.length === 0) {
-            try {
-                const monthlySnapshot2 = await db.collection("tutor_submissions")
-                    .where("normalizedParentPhone", "==", searchPhone)
-                    .limit(100)
-                    .get();
-                
-                if (!monthlySnapshot2.empty) {
-                    console.log(`✅ Found ${monthlySnapshot2.size} monthly reports (normalized)`);
-                    monthlySnapshot2.forEach(doc => {
-                        const data = doc.data();
+        // METHOD 2: Try normalized phone field
+        try {
+            const monthlySnapshot2 = await db.collection("tutor_submissions")
+                .where("normalizedParentPhone", "==", searchPhone)
+                .limit(100)
+                .get();
+            
+            if (!monthlySnapshot2.empty) {
+                console.log(`✅ Found ${monthlySnapshot2.size} monthly reports (normalized)`);
+                monthlySnapshot2.forEach(doc => {
+                    const data = doc.data();
+                    const existing = monthlyResults.find(r => r.id === doc.id);
+                    if (!existing) {
                         monthlyResults.push({ 
                             id: doc.id,
                             collection: 'tutor_submissions',
+                            matchType: 'normalized',
                             ...data,
                             timestamp: data.submittedAt?.seconds || 
                                       data.createdAt?.seconds || 
@@ -1844,15 +1912,68 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
                                       Date.now() / 1000,
                             type: 'monthly'
                         });
-                    });
+                    }
+                });
+            }
+        } catch (error) {
+            console.log("ℹ️ Normalized monthly search skipped:", error.message);
+        }
+
+        // METHOD 3: DIGIT MATCHING - Fetch ALL and filter client-side
+        if (monthlyResults.length === 0) {
+            console.log("🔄 Trying DIGIT MATCHING for monthly reports...");
+            try {
+                const allMonthly = await db.collection("tutor_submissions").limit(500).get();
+                let digitMatches = 0;
+                
+                allMonthly.forEach(doc => {
+                    const data = doc.data();
+                    const existing = monthlyResults.find(r => r.id === doc.id);
+                    if (existing) return;
+                    
+                    // Check ALL possible phone fields
+                    const phoneFields = [
+                        data.parentPhone,
+                        data.parent_phone,
+                        data.guardianPhone,
+                        data.motherPhone,
+                        data.fatherPhone,
+                        data.phone,
+                        data.contactPhone,
+                        data.normalizedParentPhone
+                    ];
+                    
+                    for (const fieldPhone of phoneFields) {
+                        if (fieldPhone && comparePhonesByDigits(fieldPhone, parentPhone)) {
+                            digitMatches++;
+                            monthlyResults.push({ 
+                                id: doc.id,
+                                collection: 'tutor_submissions',
+                                matchType: 'digit-match',
+                                matchedField: fieldPhone,
+                                ...data,
+                                timestamp: data.submittedAt?.seconds || 
+                                          data.createdAt?.seconds || 
+                                          data.timestamp?.seconds || 
+                                          Date.now() / 1000,
+                                type: 'monthly'
+                            });
+                            break;
+                        }
+                    }
+                });
+                
+                if (digitMatches > 0) {
+                    console.log(`✅ Found ${digitMatches} monthly reports (DIGIT MATCH)`);
                 }
             } catch (error) {
-                console.error("Normalized monthly search error:", error);
+                console.error("Digit matching error:", error);
             }
         }
 
-        // Email search (optional)
+        // --- EMAIL SEARCH (backup) ---
         if (parentEmail && (assessmentResults.length === 0 || monthlyResults.length === 0)) {
+            console.log("📧 Trying email search as backup...");
             try {
                 const emailSnapshot = await db.collection("student_results")
                     .where("parentEmail", "==", parentEmail)
@@ -1868,6 +1989,7 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
                             assessmentResults.push({ 
                                 id: doc.id,
                                 collection: 'student_results',
+                                matchType: 'email',
                                 ...data,
                                 timestamp: data.submittedAt?.seconds || 
                                           data.createdAt?.seconds || 
@@ -1879,14 +2001,89 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
                     });
                 }
             } catch (error) {
-                console.error("Email search error:", error);
+                console.log("ℹ️ Email search skipped:", error.message);
             }
         }
 
-        console.log("🎯 SEARCH SUMMARY - Assessments:", assessmentResults.length, "Monthly:", monthlyResults.length);
+        // --- SEARCH OTHER COLLECTIONS WITH DIGIT MATCHING ---
+        if (assessmentResults.length === 0 && monthlyResults.length === 0) {
+            console.log("🔍 Searching in additional collections...");
+            
+            const otherCollections = [
+                'monthly_reports',
+                'assessment_reports',
+                'progress_reports',
+                'reports',
+                'student_reports'
+            ];
+            
+            for (const collectionName of otherCollections) {
+                try {
+                    const snapshot = await db.collection(collectionName).limit(200).get();
+                    let found = 0;
+                    
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        
+                        // Check phone fields
+                        const phoneFields = Object.keys(data).filter(key => 
+                            key.toLowerCase().includes('phone') || 
+                            key.toLowerCase().includes('contact')
+                        );
+                        
+                        for (const field of phoneFields) {
+                            if (data[field] && comparePhonesByDigits(data[field], parentPhone)) {
+                                const reportType = collectionName.includes('monthly') ? 'monthly' : 'assessment';
+                                if (reportType === 'assessment') {
+                                    assessmentResults.push({
+                                        id: doc.id,
+                                        collection: collectionName,
+                                        matchType: 'digit-other',
+                                        matchedField: field,
+                                        ...data,
+                                        timestamp: data.submittedAt?.seconds || 
+                                                  data.createdAt?.seconds || 
+                                                  data.timestamp?.seconds || 
+                                                  Date.now() / 1000,
+                                        type: reportType
+                                    });
+                                } else {
+                                    monthlyResults.push({
+                                        id: doc.id,
+                                        collection: collectionName,
+                                        matchType: 'digit-other',
+                                        matchedField: field,
+                                        ...data,
+                                        timestamp: data.submittedAt?.seconds || 
+                                                  data.createdAt?.seconds || 
+                                                  data.timestamp?.seconds || 
+                                                  Date.now() / 1000,
+                                        type: reportType
+                                    });
+                                }
+                                found++;
+                                break;
+                            }
+                        }
+                    });
+                    
+                    if (found > 0) {
+                        console.log(`✅ Found ${found} reports in ${collectionName}`);
+                    }
+                } catch (error) {
+                    // Collection might not exist
+                }
+            }
+        }
+
+        console.log("🎯 SEARCH SUMMARY:", {
+            assessments: assessmentResults.length,
+            monthly: monthlyResults.length,
+            parentDigits: parentDigits
+        });
         
     } catch (error) {
-        console.error("❌ Simple search error:", error);
+        console.error("❌ Digit-matching search error:", error);
     }
     
     return { assessmentResults, monthlyResults };
