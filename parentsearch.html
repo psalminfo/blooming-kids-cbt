@@ -229,16 +229,16 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Parent Phone Number (ANY FORMAT)
+                                Search Phone, Email, or Student Name
                             </label>
                             <input 
                                 type="text" 
                                 id="adminParentPhone" 
-                                placeholder="Enter ANY phone format: 08012345678, 2348012345678, +2348012345678, 8012345678"
+                                placeholder="Enter phone (any format), email, or student name"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                             >
                             <p class="text-sm text-gray-500 mt-2">
-                                Accepts ANY format: With/without country code, with/without leading 0, with/without +
+                                Universal search: Phone (any format), Email, or Student Name
                             </p>
                         </div>
                         <div class="flex items-end space-x-4">
@@ -614,1307 +614,9 @@
         let currentStudentConnectionData = null;
         let currentPhoneFormatData = null;
 
-        // ==================== NEW: STUDENT CONNECTION FIXER ====================
-        
-        async function searchStudentConnections() {
-            const studentName = document.getElementById('connectionFixStudentName').value.trim();
-            if (!studentName) {
-                showToast('Please enter a student name', 'warning');
-                return;
-            }
+        // ==================== EXISTING FUNCTIONS FROM YOUR ORIGINAL CODE ====================
 
-            showModal('studentConnectionFixerModal');
-            const contentDiv = document.getElementById('studentConnectionFixerContent');
-            contentDiv.innerHTML = `
-                <div class="text-center py-8">
-                    <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
-                    <p class="text-green-600 font-semibold mt-4">Searching for student: ${studentName}</p>
-                    <p class="text-gray-500 text-sm mt-2">Checking all collections for connection issues...</p>
-                </div>
-            `;
-
-            try {
-                // Step 1: Find the student and get parent info
-                const studentResults = await findStudentAndParent(studentName);
-                
-                if (!studentResults.student) {
-                    contentDiv.innerHTML = `
-                        <div class="text-center py-8">
-                            <div class="text-4xl mb-4">❌</div>
-                            <h3 class="text-xl font-bold text-red-700 mb-2">Student Not Found</h3>
-                            <p class="text-gray-500">No student found with name: "${studentName}"</p>
-                            <button onclick="searchSimilarStudents('${studentName}')" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg">
-                                Search Similar Names
-                            </button>
-                        </div>
-                    `;
-                    return;
-                }
-
-                // Step 2: Get all submissions for this student across collections
-                const allSubmissions = await getAllStudentSubmissions(studentName);
-                
-                // Step 3: Analyze phone mismatches
-                const analysis = analyzePhoneMismatches(
-                    studentResults.student, 
-                    studentResults.parent, 
-                    allSubmissions
-                );
-
-                // Step 4: Display results
-                displayConnectionAnalysis(analysis, studentResults, allSubmissions);
-
-                // Store for bulk operations
-                currentStudentConnectionData = {
-                    student: studentResults.student,
-                    parent: studentResults.parent,
-                    submissions: allSubmissions,
-                    analysis: analysis
-                };
-
-            } catch (error) {
-                contentDiv.innerHTML = `
-                    <div class="text-center py-8 text-red-600">
-                        <p>Error analyzing student connections: ${error.message}</p>
-                    </div>
-                `;
-            }
-        }
-
-        async function findStudentAndParent(studentName) {
-            const result = { student: null, parent: null };
-            
-            // Search in active students
-            let query = await db.collection('students')
-                .where('studentName', '==', studentName)
-                .limit(1)
-                .get();
-            
-            if (!query.empty) {
-                const doc = query.docs[0];
-                result.student = { id: doc.id, collection: 'students', ...doc.data() };
-                
-                // Try to find parent
-                if (result.student.parentPhone) {
-                    const parentQuery = await db.collection('parent_users')
-                        .where('normalizedPhone', '==', result.student.normalizedParentPhone || result.student.parentPhone)
-                        .limit(1)
-                        .get();
-                    
-                    if (!parentQuery.empty) {
-                        const parentDoc = parentQuery.docs[0];
-                        result.parent = { id: parentDoc.id, ...parentDoc.data() };
-                    }
-                }
-                
-                return result;
-            }
-            
-            // Search in pending students
-            query = await db.collection('pending_students')
-                .where('studentName', '==', studentName)
-                .limit(1)
-                .get();
-            
-            if (!query.empty) {
-                const doc = query.docs[0];
-                result.student = { id: doc.id, collection: 'pending_students', ...doc.data() };
-                
-                if (result.student.parentPhone) {
-                    const parentQuery = await db.collection('parent_users')
-                        .where('normalizedPhone', '==', result.student.normalizedParentPhone || result.student.parentPhone)
-                        .limit(1)
-                        .get();
-                    
-                    if (!parentQuery.empty) {
-                        const parentDoc = parentQuery.docs[0];
-                        result.parent = { id: parentDoc.id, ...parentDoc.data() };
-                    }
-                }
-            }
-            
-            return result;
-        }
-
-        async function getAllStudentSubmissions(studentName) {
-            const collections = [
-                'daily_topics',
-                'homework_assignments',
-                'student_results',
-                'tutor_submissions',
-                'monthly_reports',
-                'assessment_reports'
-            ];
-            
-            const allSubmissions = [];
-            
-            for (const collection of collections) {
-                try {
-                    let query;
-                    
-                    // Try different field names
-                    const fieldNames = ['studentName', 'student', 'name', 'childName'];
-                    
-                    for (const fieldName of fieldNames) {
-                        query = await db.collection(collection)
-                            .where(fieldName, '==', studentName)
-                            .get();
-                        
-                        if (!query.empty) break;
-                    }
-                    
-                    if (query && !query.empty) {
-                        query.forEach(doc => {
-                            allSubmissions.push({
-                                id: doc.id,
-                                collection: collection,
-                                ...doc.data()
-                            });
-                        });
-                    }
-                } catch (error) {
-                    console.log(`No submissions in ${collection}:`, error.message);
-                }
-            }
-            
-            return allSubmissions;
-        }
-
-        function analyzePhoneMismatches(student, parent, submissions) {
-            const parentPhone = parent?.phone || student.parentPhone;
-            const parentNormalized = parent?.normalizedPhone || student.normalizedParentPhone;
-            
-            let normalizedParentPhone = parentNormalized;
-            if (!normalizedParentPhone && parentPhone) {
-                const normalized = universalNormalizePhoneNumber(parentPhone);
-                if (normalized.length > 0 && normalized[0].valid) {
-                    normalizedParentPhone = normalized[0].normalized;
-                }
-            }
-            
-            const analysis = {
-                student: student.studentName || student.name,
-                parentPhone: parentPhone,
-                parentNormalized: normalizedParentPhone,
-                totalSubmissions: submissions.length,
-                byCollection: {},
-                issues: {
-                    formatMismatches: [],
-                    missingPhones: [],
-                    correctMatches: []
-                },
-                stats: {
-                    correct: 0,
-                    formatIssues: 0,
-                    missing: 0
-                }
-            };
-            
-            // Group by collection
-            submissions.forEach(sub => {
-                const collection = sub.collection;
-                if (!analysis.byCollection[collection]) {
-                    analysis.byCollection[collection] = [];
-                }
-                analysis.byCollection[collection].push(sub);
-            });
-            
-            // Analyze each submission
-            submissions.forEach(sub => {
-                const subPhone = sub.parentPhone || sub.phone;
-                const subNormalized = sub.normalizedParentPhone || sub.normalizedPhone;
-                
-                if (!subPhone) {
-                    analysis.stats.missing++;
-                    analysis.issues.missingPhones.push({
-                        id: sub.id,
-                        collection: sub.collection,
-                        type: sub.type || 'Submission',
-                        date: sub.date || sub.submittedAt || sub.createdAt,
-                        current: 'MISSING',
-                        suggested: normalizedParentPhone
-                    });
-                } else if (normalizedParentPhone && (subNormalized === normalizedParentPhone || 
-                         comparePhonesAsSame(subPhone, parentPhone))) {
-                    analysis.stats.correct++;
-                    analysis.issues.correctMatches.push({
-                        id: sub.id,
-                        collection: sub.collection,
-                        type: sub.type || 'Submission',
-                        date: sub.date || sub.submittedAt || sub.createdAt,
-                        phone: subPhone,
-                        status: 'CORRECT'
-                    });
-                } else {
-                    analysis.stats.formatIssues++;
-                    analysis.issues.formatMismatches.push({
-                        id: sub.id,
-                        collection: sub.collection,
-                        type: sub.type || 'Submission',
-                        date: sub.date || sub.submittedAt || sub.createdAt,
-                        current: subPhone,
-                        suggested: normalizedParentPhone || parentPhone
-                    });
-                }
-            });
-            
-            return analysis;
-        }
-
-        function comparePhonesAsSame(phone1, phone2) {
-            if (!phone1 || !phone2) return false;
-            
-            const normalize = (phone) => {
-                // Remove all non-digit characters except +
-                let cleaned = phone.replace(/[^\d+]/g, '');
-                
-                // Convert 0xxx to +234xxx
-                if (cleaned.startsWith('0') && cleaned.length === 11) {
-                    cleaned = '+234' + cleaned.substring(1);
-                }
-                
-                // Convert 234xxx to +234xxx
-                if (cleaned.startsWith('234') && cleaned.length === 13) {
-                    cleaned = '+' + cleaned;
-                }
-                
-                // Convert xxxxxxxxxx to +234xxxxxxxxxx
-                if (cleaned.length === 10 && !cleaned.startsWith('0')) {
-                    cleaned = '+234' + cleaned;
-                }
-                
-                return cleaned;
-            };
-            
-            return normalize(phone1) === normalize(phone2);
-        }
-
-        function displayConnectionAnalysis(analysis, studentData, submissions) {
-            const contentDiv = document.getElementById('studentConnectionFixerContent');
-            
-            let html = `
-                <div class="space-y-6">
-                    <!-- Header -->
-                    <div class="bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-blue-600 p-6 rounded-lg">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <h3 class="text-xl font-bold text-gray-800">${analysis.student}</h3>
-                                <div class="mt-2 space-y-2">
-                                    ${studentData.parent ? `
-                                        <p class="text-gray-700">
-                                            <span class="font-medium">Parent:</span> ${studentData.parent.parentName}
-                                        </p>
-                                        <p class="text-gray-700">
-                                            <span class="font-medium">Parent Phone:</span> 
-                                            <span class="phone-format-badge">${analysis.parentPhone}</span>
-                                            ${analysis.parentNormalized ? `<span class="phone-format-badge">${analysis.parentNormalized}</span>` : ''}
-                                        </p>
-                                    ` : `
-                                        <p class="text-yellow-700">
-                                            <span class="font-medium">⚠️ No parent account found</span>
-                                        </p>
-                                        <p class="text-gray-700">
-                                            <span class="font-medium">Student Phone:</span> 
-                                            ${studentData.student.parentPhone ? `<span class="phone-format-badge">${studentData.student.parentPhone}</span>` : 'None'}
-                                        </p>
-                                    `}
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <div class="text-2xl font-bold text-blue-600">${analysis.totalSubmissions}</div>
-                                <div class="text-sm text-gray-600">Total Submissions</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Summary Stats -->
-                    <div class="grid grid-cols-3 gap-4">
-                        <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                            <div class="text-2xl font-bold text-green-600">${analysis.stats.correct}</div>
-                            <div class="text-sm text-green-800">Correctly Linked</div>
-                        </div>
-                        <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-                            <div class="text-2xl font-bold text-red-600">${analysis.stats.formatIssues}</div>
-                            <div class="text-sm text-red-800">Format Mismatches</div>
-                        </div>
-                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-                            <div class="text-2xl font-bold text-yellow-600">${analysis.stats.missing}</div>
-                            <div class="text-sm text-yellow-800">Missing Phones</div>
-                        </div>
-                    </div>
-
-                    <!-- Bulk Actions -->
-                    ${analysis.stats.formatIssues > 0 || analysis.stats.missing > 0 ? `
-                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                            <h4 class="font-semibold text-purple-800 mb-3">🔧 Bulk Fix Actions</h4>
-                            <div class="flex flex-wrap gap-3">
-                                ${analysis.stats.formatIssues > 0 ? `
-                                    <button onclick="fixAllFormatMismatches()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
-                                        🔄 Fix ${analysis.stats.formatIssues} Format Issues
-                                    </button>
-                                ` : ''}
-                                ${analysis.stats.missing > 0 ? `
-                                    <button onclick="addAllMissingPhones()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-                                        📱 Add ${analysis.stats.missing} Missing Phones
-                                    </button>
-                                ` : ''}
-                                ${analysis.totalSubmissions > 0 ? `
-                                    <button onclick="fixAllSubmissionsForStudent()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-                                        ⚡ Fix All ${analysis.totalSubmissions} Submissions
-                                    </button>
-                                ` : ''}
-                            </div>
-                            <p class="text-xs text-purple-600 mt-2">
-                                These actions will update ALL submissions for ${analysis.student} to use: ${analysis.parentNormalized || analysis.parentPhone}
-                            </p>
-                        </div>
-                    ` : ''}
-
-                    <!-- Submissions by Collection -->
-                    <div>
-                        <h4 class="font-semibold text-gray-800 mb-3">📂 Submissions by Collection</h4>
-                        <div class="space-y-4">
-            `;
-            
-            // Display submissions grouped by collection
-            for (const [collection, items] of Object.entries(analysis.byCollection)) {
-                const collectionIssues = items.filter(item => {
-                    const phone = item.parentPhone || item.phone;
-                    return !phone || !comparePhonesAsSame(phone, analysis.parentPhone);
-                }).length;
-                
-                html += `
-                    <div class="border rounded-lg overflow-hidden">
-                        <div class="bg-gray-50 px-4 py-2 border-b flex justify-between items-center">
-                            <span class="font-medium">${collection.replace('_', ' ')}</span>
-                            <span class="text-sm ${collectionIssues > 0 ? 'text-red-600' : 'text-green-600'}">
-                                ${items.length} items • ${collectionIssues} issues
-                            </span>
-                        </div>
-                        <div class="p-4">
-                            <div class="space-y-2">
-                `;
-                
-                // Display first 3 items as examples
-                items.slice(0, 3).forEach(item => {
-                    const phone = item.parentPhone || item.phone;
-                    const normalized = item.normalizedParentPhone || item.normalizedPhone;
-                    const hasIssue = !phone || !comparePhonesAsSame(phone, analysis.parentPhone);
-                    
-                    html += `
-                        <div class="text-sm ${hasIssue ? 'text-red-700' : 'text-green-700'}">
-                            ${item.type || 'Submission'}: 
-                            ${phone ? `<span class="font-mono">${phone}</span>` : '<span class="text-yellow-600">[MISSING]</span>'}
-                            ${hasIssue ? '❌' : '✅'}
-                        </div>
-                    `;
-                });
-                
-                if (items.length > 3) {
-                    html += `<div class="text-xs text-gray-500">+ ${items.length - 3} more...</div>`;
-                }
-                
-                html += `
-                            </div>
-                            ${collectionIssues > 0 ? `
-                                <button onclick="fixCollectionSubmissions('${collection}', '${analysis.student}')" 
-                                        class="mt-3 text-sm bg-red-100 text-red-800 px-3 py-1 rounded hover:bg-red-200">
-                                    Fix ${collectionIssues} issues in this collection
-                                </button>
-                            ` : ''}
-                        </div>
-                    </div>
-                `;
-            }
-            
-            html += `
-                        </div>
-                    </div>
-
-                    <!-- Phone Format Details -->
-                    <div class="bg-gray-50 border rounded-lg p-4">
-                        <h4 class="font-semibold text-gray-800 mb-3">📱 Phone Format Analysis</h4>
-                        <div class="space-y-3">
-                            <div>
-                                <p class="text-sm font-medium text-gray-700">Parent Phone:</p>
-                                <div class="mt-1 flex flex-wrap gap-2">
-                                    <span class="phone-format-badge format-match">${analysis.parentPhone}</span>
-                                    ${analysis.parentNormalized ? `<span class="phone-format-badge format-match">${analysis.parentNormalized}</span>` : ''}
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <p class="text-sm font-medium text-gray-700">Found Phone Formats in Submissions:</p>
-                                <div class="mt-1 flex flex-wrap gap-2">
-            `;
-            
-            // Collect all unique phone formats from submissions
-            const phoneFormats = new Set();
-            submissions.forEach(sub => {
-                const phone = sub.parentPhone || sub.phone;
-                if (phone) {
-                    phoneFormats.add(phone);
-                }
-            });
-            
-            phoneFormats.forEach(format => {
-                const isMatch = comparePhonesAsSame(format, analysis.parentPhone);
-                html += `<span class="phone-format-badge ${isMatch ? 'format-match' : 'format-mismatch'}">${format}</span>`;
-            });
-            
-            if (phoneFormats.size === 0) {
-                html += `<span class="phone-format-badge format-missing">No phones found in submissions</span>`;
-            }
-            
-            html += `
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            contentDiv.innerHTML = html;
-        }
-
-        async function fixAllFormatMismatches() {
-            if (!currentStudentConnectionData) return;
-            
-            const { analysis } = currentStudentConnectionData;
-            const updates = [];
-            
-            for (const issue of analysis.issues.formatMismatches) {
-                const updateData = {
-                    parentPhone: analysis.parentPhone,
-                    normalizedParentPhone: analysis.parentNormalized,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                };
-                
-                updates.push(
-                    db.collection(issue.collection).doc(issue.id).update(updateData)
-                );
-            }
-            
-            try {
-                await Promise.all(updates);
-                showToast(`Fixed ${updates.length} format mismatches for ${analysis.student}`, 'success');
-                // Refresh the analysis
-                searchStudentConnections();
-            } catch (error) {
-                showToast(`Error fixing format mismatches: ${error.message}`, 'error');
-            }
-        }
-
-        async function addAllMissingPhones() {
-            if (!currentStudentConnectionData) return;
-            
-            const { analysis } = currentStudentConnectionData;
-            const updates = [];
-            
-            for (const issue of analysis.issues.missingPhones) {
-                const updateData = {
-                    parentPhone: analysis.parentPhone,
-                    normalizedParentPhone: analysis.parentNormalized,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                };
-                
-                updates.push(
-                    db.collection(issue.collection).doc(issue.id).update(updateData)
-                );
-            }
-            
-            try {
-                await Promise.all(updates);
-                showToast(`Added ${updates.length} missing phones for ${analysis.student}`, 'success');
-                // Refresh the analysis
-                searchStudentConnections();
-            } catch (error) {
-                showToast(`Error adding missing phones: ${error.message}`, 'error');
-            }
-        }
-
-        async function fixAllSubmissionsForStudent() {
-            if (!currentStudentConnectionData) return;
-            
-            const { analysis, submissions } = currentStudentConnectionData;
-            const updates = [];
-            
-            for (const submission of submissions) {
-                const updateData = {
-                    parentPhone: analysis.parentPhone,
-                    normalizedParentPhone: analysis.parentNormalized,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                };
-                
-                updates.push(
-                    db.collection(submission.collection).doc(submission.id).update(updateData)
-                );
-            }
-            
-            try {
-                await Promise.all(updates);
-                showToast(`Updated ALL ${updates.length} submissions for ${analysis.student}`, 'success');
-                // Refresh the analysis
-                searchStudentConnections();
-            } catch (error) {
-                showToast(`Error updating submissions: ${error.message}`, 'error');
-            }
-        }
-
-        async function fixCollectionSubmissions(collection, studentName) {
-            try {
-                const analysis = currentStudentConnectionData.analysis;
-                const submissions = currentStudentConnectionData.submissions
-                    .filter(sub => sub.collection === collection);
-                
-                const updates = submissions.map(sub => {
-                    const updateData = {
-                        parentPhone: analysis.parentPhone,
-                        normalizedParentPhone: analysis.parentNormalized,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    };
-                    
-                    return db.collection(collection).doc(sub.id).update(updateData);
-                });
-                
-                await Promise.all(updates);
-                showToast(`Fixed ${updates.length} submissions in ${collection}`, 'success');
-                searchStudentConnections();
-            } catch (error) {
-                showToast(`Error fixing collection: ${error.message}`, 'error');
-            }
-        }
-
-        function hideStudentConnectionFixer() {
-            hideModal('studentConnectionFixerModal');
-            currentStudentConnectionData = null;
-        }
-
-        // ==================== NEW: PHONE FORMAT ANALYZER ====================
-        
-        async function showPhoneFormatAnalyzer() {
-            showModal('phoneFormatAnalyzerModal');
-            const contentDiv = document.getElementById('phoneFormatAnalyzerContent');
-            
-            contentDiv.innerHTML = `
-                <div class="text-center py-8">
-                    <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
-                    <p class="text-green-600 font-semibold mt-4">Analyzing phone formats across all collections...</p>
-                </div>
-            `;
-
-            try {
-                // Get all phone formats from all collections
-                const phoneFormats = await analyzeAllPhoneFormats();
-                displayPhoneFormatAnalysis(phoneFormats);
-                
-                // Store for later use
-                currentPhoneFormatData = phoneFormats;
-                
-            } catch (error) {
-                contentDiv.innerHTML = `
-                    <div class="text-center py-8 text-red-600">
-                        <p>Error analyzing phone formats: ${error.message}</p>
-                    </div>
-                `;
-            }
-        }
-
-        async function analyzeAllPhoneFormats() {
-            const collections = [
-                'parent_users',
-                'students',
-                'pending_students',
-                'daily_topics',
-                'homework_assignments',
-                'student_results',
-                'tutor_submissions'
-            ];
-            
-            const phoneMap = new Map(); // phone -> { formats: Set, collections: Set, count: number }
-            
-            for (const collection of collections) {
-                try {
-                    const snapshot = await db.collection(collection).limit(100).get();
-                    
-                    snapshot.forEach(doc => {
-                        const data = doc.data();
-                        const phoneFields = [
-                            'phone', 'parentPhone', 'normalizedPhone', 'normalizedParentPhone'
-                        ];
-                        
-                        phoneFields.forEach(field => {
-                            if (data[field] && typeof data[field] === 'string') {
-                                const phone = data[field].trim();
-                                if (phone) {
-                                    if (!phoneMap.has(phone)) {
-                                        phoneMap.set(phone, {
-                                            formats: new Set(),
-                                            collections: new Set(),
-                                            count: 0
-                                        });
-                                    }
-                                    
-                                    const entry = phoneMap.get(phone);
-                                    entry.formats.add(field);
-                                    entry.collections.add(collection);
-                                    entry.count++;
-                                }
-                            }
-                        });
-                    });
-                } catch (error) {
-                    console.log(`Error analyzing ${collection}:`, error.message);
-                }
-            }
-            
-            // Convert to array and sort by count
-            return Array.from(phoneMap.entries())
-                .map(([phone, data]) => ({
-                    phone,
-                    formats: Array.from(data.formats),
-                    collections: Array.from(data.collections),
-                    count: data.count,
-                    normalized: universalNormalizePhoneNumber(phone)[0]?.normalized || phone
-                }))
-                .sort((a, b) => b.count - a.count);
-        }
-
-        function displayPhoneFormatAnalysis(phoneFormats) {
-            const contentDiv = document.getElementById('phoneFormatAnalyzerContent');
-            
-            let html = `
-                <div class="space-y-6">
-                    <!-- Header -->
-                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-600 p-6 rounded-lg">
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <h3 class="text-xl font-bold text-gray-800">Phone Format Analyzer</h3>
-                                <p class="text-gray-600 mt-1">Found ${phoneFormats.length} unique phone formats across all collections</p>
-                            </div>
-                            <div class="text-right">
-                                <div class="text-2xl font-bold text-blue-600">${phoneFormats.reduce((sum, p) => sum + p.count, 0)}</div>
-                                <div class="text-sm text-gray-600">Total References</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Bulk Actions -->
-                    <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                        <h4 class="font-semibold text-purple-800 mb-3">⚡ Bulk Phone Format Actions</h4>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <button onclick="normalizeAllPhoneFormats()" class="bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700">
-                                🔄 Normalize All Phone Formats
-                            </button>
-                            <button onclick="syncParentPhonesEverywhere()" class="bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700">
-                                📱 Sync Parent Phones Everywhere
-                            </button>
-                        </div>
-                        <p class="text-xs text-purple-600 mt-2">
-                            These actions will standardize phone formats across ALL collections
-                        </p>
-                    </div>
-
-                    <!-- Phone Format Table -->
-                    <div>
-                        <h4 class="font-semibold text-gray-800 mb-3">📋 All Phone Formats</h4>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Phone Number</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Normalized</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Found In</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Collections</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-            `;
-            
-            phoneFormats.forEach((format, index) => {
-                const isNormalized = format.phone === format.normalized;
-                
-                html += `
-                    <tr class="${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}">
-                        <td class="px-4 py-3">
-                            <span class="font-mono text-sm ${isNormalized ? 'text-green-700' : 'text-red-700'}">
-                                ${format.phone}
-                            </span>
-                            ${!isNormalized ? '<span class="text-xs text-red-600 ml-2">❌</span>' : ''}
-                        </td>
-                        <td class="px-4 py-3">
-                            <span class="font-mono text-sm text-blue-700">
-                                ${format.normalized}
-                            </span>
-                        </td>
-                        <td class="px-4 py-3 text-sm">
-                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                                ${format.count} places
-                            </span>
-                        </td>
-                        <td class="px-4 py-3">
-                            <div class="flex flex-wrap gap-1">
-                                ${format.collections.slice(0, 3).map(col => 
-                                    `<span class="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded">${col}</span>`
-                                ).join('')}
-                                ${format.collections.length > 3 ? 
-                                    `<span class="text-xs text-gray-500">+${format.collections.length - 3}</span>` : ''}
-                            </div>
-                        </td>
-                        <td class="px-4 py-3">
-                            <div class="flex space-x-2">
-                                <button onclick="updateSinglePhoneFormat('${format.phone}', '${format.normalized}')"
-                                        class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200">
-                                    Update
-                                </button>
-                                <button onclick="showPhoneUsage('${format.phone}')"
-                                        class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200">
-                                    View Usage
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
-            
-            html += `
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            contentDiv.innerHTML = html;
-        }
-
-        async function normalizeAllPhoneFormats() {
-            if (!confirm('This will normalize ALL phone formats across ALL collections. Continue?')) return;
-            
-            showToast('Starting phone format normalization...', 'info');
-            
-            try {
-                let totalUpdated = 0;
-                const collections = [
-                    'parent_users',
-                    'students',
-                    'pending_students',
-                    'daily_topics',
-                    'homework_assignments',
-                    'student_results',
-                    'tutor_submissions'
-                ];
-                
-                for (const collection of collections) {
-                    try {
-                        const snapshot = await db.collection(collection).get();
-                        const updates = [];
-                        
-                        snapshot.forEach(doc => {
-                            const data = doc.data();
-                            const updateData = {};
-                            
-                            // Check and normalize phone fields
-                            if (data.phone && typeof data.phone === 'string') {
-                                const normalized = universalNormalizePhoneNumber(data.phone);
-                                if (normalized.length > 0 && normalized[0].valid) {
-                                    updateData.phone = normalized[0].normalized;
-                                    updateData.normalizedPhone = normalized[0].normalized;
-                                }
-                            }
-                            
-                            if (data.parentPhone && typeof data.parentPhone === 'string') {
-                                const normalized = universalNormalizePhoneNumber(data.parentPhone);
-                                if (normalized.length > 0 && normalized[0].valid) {
-                                    updateData.parentPhone = normalized[0].normalized;
-                                    updateData.normalizedParentPhone = normalized[0].normalized;
-                                }
-                            }
-                            
-                            if (Object.keys(updateData).length > 0) {
-                                updateData.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
-                                updates.push(db.collection(collection).doc(doc.id).update(updateData));
-                                totalUpdated++;
-                            }
-                        });
-                        
-                        await Promise.all(updates);
-                        console.log(`Updated ${updates.length} documents in ${collection}`);
-                        
-                    } catch (error) {
-                        console.error(`Error updating ${collection}:`, error);
-                    }
-                }
-                
-                showToast(`Successfully normalized ${totalUpdated} phone formats across all collections!`, 'success');
-                // Refresh the analysis
-                showPhoneFormatAnalyzer();
-                
-            } catch (error) {
-                showToast(`Error normalizing phone formats: ${error.message}`, 'error');
-            }
-        }
-
-        async function syncParentPhonesEverywhere() {
-            if (!confirm('This will sync parent phone numbers across ALL collections. This may take a while. Continue?')) return;
-            
-            showToast('Starting parent phone sync across all collections...', 'info');
-            
-            try {
-                // Get all parents
-                const parentsSnapshot = await db.collection('parent_users').get();
-                let totalUpdated = 0;
-                
-                for (const parentDoc of parentsSnapshot.docs) {
-                    const parent = parentDoc.data();
-                    const parentId = parentDoc.id;
-                    const parentPhone = parent.phone;
-                    const parentNormalized = parent.normalizedPhone;
-                    
-                    if (!parentPhone) continue;
-                    
-                    // Define target phone (prefer normalized)
-                    const targetPhone = parentNormalized || parentPhone;
-                    
-                    // Collections to update
-                    const collections = [
-                        'students',
-                        'pending_students',
-                        'daily_topics',
-                        'homework_assignments',
-                        'student_results',
-                        'tutor_submissions'
-                    ];
-                    
-                    for (const collection of collections) {
-                        try {
-                            // Update by parent phone
-                            const phoneQuery = await db.collection(collection)
-                                .where('parentPhone', '==', parentPhone)
-                                .get();
-                            
-                            const updates = [];
-                            phoneQuery.forEach(doc => {
-                                updates.push(
-                                    db.collection(collection).doc(doc.id).update({
-                                        parentPhone: targetPhone,
-                                        normalizedParentPhone: parentNormalized || targetPhone,
-                                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                                    })
-                                );
-                            });
-                            
-                            await Promise.all(updates);
-                            totalUpdated += updates.length;
-                            
-                        } catch (error) {
-                            console.log(`Error updating ${collection} for parent ${parentId}:`, error.message);
-                        }
-                    }
-                }
-                
-                showToast(`Successfully synced ${totalUpdated} records across all collections!`, 'success');
-                // Refresh the analysis
-                showPhoneFormatAnalyzer();
-                
-            } catch (error) {
-                showToast(`Error syncing parent phones: ${error.message}`, 'error');
-            }
-        }
-
-        function updateSinglePhoneFormat(oldPhone, newPhone) {
-            document.getElementById('phoneFormatUpdateContent').innerHTML = `
-                <div class="space-y-4">
-                    <div>
-                        <p class="text-sm text-gray-700">Updating phone format:</p>
-                        <div class="mt-2 space-y-2">
-                            <div class="bg-red-50 p-3 rounded border">
-                                <p class="text-sm font-medium text-red-800">Old Format:</p>
-                                <p class="font-mono">${oldPhone}</p>
-                            </div>
-                            <div class="bg-green-50 p-3 rounded border">
-                                <p class="text-sm font-medium text-green-800">New Format:</p>
-                                <p class="font-mono">${newPhone}</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div>
-                        <label class="flex items-center">
-                            <input type="checkbox" id="updateAllCollections" class="mr-2" checked>
-                            <span class="text-sm text-gray-700">Update across ALL collections</span>
-                        </label>
-                    </div>
-                    <div id="phoneUpdatePreview" class="text-sm text-gray-600">
-                        Preparing preview...
-                    </div>
-                </div>
-            `;
-            
-            // Show preview
-            setTimeout(() => {
-                previewPhoneUpdate(oldPhone, newPhone);
-            }, 100);
-            
-            showModal('phoneFormatUpdateModal');
-            currentPhoneFormatData = { oldPhone, newPhone };
-        }
-
-        async function previewPhoneUpdate(oldPhone, newPhone) {
-            const previewDiv = document.getElementById('phoneUpdatePreview');
-            
-            try {
-                const collections = [
-                    'parent_users',
-                    'students',
-                    'pending_students',
-                    'daily_topics',
-                    'homework_assignments',
-                    'student_results',
-                    'tutor_submissions'
-                ];
-                
-                let previewHTML = '<p class="font-medium">Affected collections:</p><div class="mt-2 space-y-1">';
-                
-                for (const collection of collections) {
-                    try {
-                        // Count documents with this phone
-                        const phoneQuery = await db.collection(collection)
-                            .where('phone', '==', oldPhone)
-                            .get();
-                        
-                        const parentPhoneQuery = await db.collection(collection)
-                            .where('parentPhone', '==', oldPhone)
-                            .get();
-                        
-                        const total = phoneQuery.size + parentPhoneQuery.size;
-                        
-                        if (total > 0) {
-                            previewHTML += `<p class="text-xs">• ${collection}: ${total} documents</p>`;
-                        }
-                    } catch (error) {
-                        // Collection might not have the field
-                    }
-                }
-                
-                previewHTML += '</div>';
-                previewDiv.innerHTML = previewHTML;
-                
-            } catch (error) {
-                previewDiv.innerHTML = `<p class="text-red-600">Error generating preview: ${error.message}</p>`;
-            }
-        }
-
-        async function applyPhoneFormatUpdate() {
-            const updateAll = document.getElementById('updateAllCollections')?.checked || false;
-            const { oldPhone, newPhone } = currentPhoneFormatData || {};
-            
-            if (!oldPhone || !newPhone) return;
-            
-            showToast('Updating phone format...', 'info');
-            
-            try {
-                const collections = updateAll ? [
-                    'parent_users',
-                    'students',
-                    'pending_students',
-                    'daily_topics',
-                    'homework_assignments',
-                    'student_results',
-                    'tutor_submissions'
-                ] : ['parent_users'];
-                
-                let totalUpdated = 0;
-                
-                for (const collection of collections) {
-                    try {
-                        // Update phone field
-                        const phoneQuery = await db.collection(collection)
-                            .where('phone', '==', oldPhone)
-                            .get();
-                        
-                        const phoneUpdates = phoneQuery.docs.map(doc => 
-                            db.collection(collection).doc(doc.id).update({
-                                phone: newPhone,
-                                normalizedPhone: newPhone,
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            })
-                        );
-                        
-                        // Update parentPhone field
-                        const parentPhoneQuery = await db.collection(collection)
-                            .where('parentPhone', '==', oldPhone)
-                            .get();
-                        
-                        const parentPhoneUpdates = parentPhoneQuery.docs.map(doc => 
-                            db.collection(collection).doc(doc.id).update({
-                                parentPhone: newPhone,
-                                normalizedParentPhone: newPhone,
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            })
-                        );
-                        
-                        await Promise.all([...phoneUpdates, ...parentPhoneUpdates]);
-                        totalUpdated += phoneQuery.size + parentPhoneQuery.size;
-                        
-                    } catch (error) {
-                        console.log(`Error updating ${collection}:`, error.message);
-                    }
-                }
-                
-                showToast(`Updated ${totalUpdated} documents with new phone format!`, 'success');
-                hidePhoneFormatUpdateModal();
-                
-                // Refresh analysis
-                if (updateAll) {
-                    showPhoneFormatAnalyzer();
-                }
-                
-            } catch (error) {
-                showToast(`Error updating phone format: ${error.message}`, 'error');
-            }
-        }
-
-        function hidePhoneFormatAnalyzer() {
-            hideModal('phoneFormatAnalyzerModal');
-            currentPhoneFormatData = null;
-        }
-
-        function hidePhoneFormatUpdateModal() {
-            hideModal('phoneFormatUpdateModal');
-            currentPhoneFormatData = null;
-        }
-
-        // ==================== FIXED EXISTING FUNCTIONS ====================
-
-        // Fix the broken Admin Tools functions
-        async function loadAllParentsSummary() {
-            showModal('allParentsSummaryModal');
-            const contentDiv = document.getElementById('allParentsSummaryContent');
-            
-            contentDiv.innerHTML = `
-                <div class="text-center py-8">
-                    <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
-                    <p class="text-green-600 font-semibold mt-4">Loading all parent portals...</p>
-                </div>
-            `;
-
-            try {
-                const parentsSnapshot = await db.collection('parent_users').limit(50).get();
-                
-                if (parentsSnapshot.empty) {
-                    contentDiv.innerHTML = `
-                        <div class="text-center py-8">
-                            <p class="text-gray-500">No parent accounts found.</p>
-                        </div>
-                    `;
-                    return;
-                }
-
-                let html = '<div class="space-y-6">';
-                
-                parentsSnapshot.forEach(doc => {
-                    const parent = doc.data();
-                    html += `
-                        <div class="border rounded-lg p-6 bg-white">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <h3 class="font-bold text-gray-800">${parent.parentName || 'Unknown Parent'}</h3>
-                                    <div class="mt-2 space-y-1">
-                                        <p class="text-sm text-gray-600">📞 ${parent.phone}</p>
-                                        <p class="text-sm text-gray-600">📧 ${parent.email || 'No email'}</p>
-                                        <p class="text-xs text-gray-500">ID: ${doc.id}</p>
-                                    </div>
-                                </div>
-                                <div class="flex flex-col space-y-2">
-                                    <button onclick="viewParentPortalById('${doc.id}')" 
-                                            class="bg-blue-100 text-blue-800 px-3 py-1 rounded text-sm hover:bg-blue-200">
-                                        View Portal
-                                    </button>
-                                    <button onclick="editParentEmailPrompt('${doc.id}', '${parent.parentName || 'Unknown'}', '${parent.email}')" 
-                                            class="bg-green-100 text-green-800 px-3 py-1 rounded text-sm hover:bg-green-200">
-                                        Edit Email
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-                
-                html += '</div>';
-                contentDiv.innerHTML = html;
-                
-            } catch (error) {
-                contentDiv.innerHTML = `
-                    <div class="text-center py-8 text-red-600">
-                        <p>Error loading parent summary: ${error.message}</p>
-                    </div>
-                `;
-            }
-        }
-
-        async function loadStudentsManagement() {
-            showModal('studentsManagementModal');
-            const contentDiv = document.getElementById('studentsManagementContent');
-            
-            contentDiv.innerHTML = `
-                <div class="text-center py-8">
-                    <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
-                    <p class="text-green-600 font-semibold mt-4">Loading student management...</p>
-                </div>
-            `;
-
-            try {
-                const [activeSnapshot, pendingSnapshot] = await Promise.all([
-                    db.collection('students').limit(50).get(),
-                    db.collection('pending_students').limit(50).get()
-                ]);
-
-                let html = `
-                    <div class="space-y-6">
-                        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                            <div class="flex justify-between items-center">
-                                <h3 class="font-semibold text-green-800">Active Students (${activeSnapshot.size})</h3>
-                                <button onclick="exportStudentsData()" class="text-sm bg-green-100 text-green-800 px-3 py-1 rounded">
-                                    Export
-                                </button>
-                            </div>
-                        </div>
-                `;
-
-                if (!activeSnapshot.empty) {
-                    activeSnapshot.forEach(doc => {
-                        const student = doc.data();
-                        html += `
-                            <div class="border rounded-lg p-4 bg-white">
-                                <div class="flex justify-between items-start">
-                                    <div>
-                                        <h4 class="font-medium text-gray-800">${student.studentName || student.name || 'Unknown'}</h4>
-                                        <div class="mt-1 space-y-1">
-                                            ${student.parentPhone ? `<p class="text-sm text-gray-600">📞 ${student.parentPhone}</p>` : ''}
-                                            ${student.parentEmail ? `<p class="text-sm text-gray-600">📧 ${student.parentEmail}</p>` : ''}
-                                            <p class="text-xs text-gray-500">ID: ${doc.id}</p>
-                                        </div>
-                                    </div>
-                                    <div class="flex space-x-2">
-                                        <button onclick="fixStudentPhone('${doc.id}', '${student.studentName || student.name}', '${student.parentPhone}')"
-                                                class="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                                            Fix Phone
-                                        </button>
-                                        <button onclick="viewStudentSubmissions('${student.studentName || student.name}')"
-                                                class="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">
-                                            View Submissions
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    });
-                } else {
-                    html += `<p class="text-gray-500 text-center py-4">No active students found.</p>`;
-                }
-
-                html += `
-                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-6">
-                            <h3 class="font-semibold text-yellow-800">Pending Students (${pendingSnapshot.size})</h3>
-                        </div>
-                `;
-
-                if (!pendingSnapshot.empty) {
-                    pendingSnapshot.forEach(doc => {
-                        const student = doc.data();
-                        html += `
-                            <div class="border rounded-lg p-4 bg-white">
-                                <div class="flex justify-between items-start">
-                                    <div>
-                                        <h4 class="font-medium text-gray-800">${student.studentName || student.name || 'Unknown'}</h4>
-                                        <div class="mt-1 space-y-1">
-                                            ${student.parentPhone ? `<p class="text-sm text-gray-600">📞 ${student.parentPhone}</p>` : ''}
-                                            <p class="text-xs text-gray-500">ID: ${doc.id}</p>
-                                        </div>
-                                    </div>
-                                    <button onclick="approvePendingStudent('${doc.id}')"
-                                            class="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">
-                                        Approve
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                    });
-                } else {
-                    html += `<p class="text-gray-500 text-center py-4">No pending students.</p>`;
-                }
-
-                html += '</div>';
-                contentDiv.innerHTML = html;
-
-            } catch (error) {
-                contentDiv.innerHTML = `
-                    <div class="text-center py-8 text-red-600">
-                        <p>Error loading students: ${error.message}</p>
-                    </div>
-                `;
-            }
-        }
-
-        // Fix for viewStudentSubmissions
-        async function viewStudentSubmissions(studentName) {
-            hideStudentsManagement();
-            document.getElementById('connectionFixStudentName').value = studentName;
-            searchStudentConnections();
-        }
-
-        // Fix for showDuplicateAccounts
-        async function showDuplicateAccounts() {
-            try {
-                document.getElementById('loadingDetails').textContent = 'Finding duplicate accounts...';
-                document.getElementById('adminLoader').classList.remove('hidden');
-                
-                const parentsSnapshot = await db.collection('parent_users').get();
-                const phoneMap = new Map();
-                
-                parentsSnapshot.forEach(doc => {
-                    const parent = doc.data();
-                    if (parent.phone) {
-                        // Normalize phone for comparison
-                        const normalized = universalNormalizePhoneNumber(parent.phone);
-                        const normalizedPhone = normalized.length > 0 && normalized[0].valid ? 
-                            normalized[0].normalized : parent.phone;
-                        
-                        if (!phoneMap.has(normalizedPhone)) {
-                            phoneMap.set(normalizedPhone, []);
-                        }
-                        phoneMap.get(normalizedPhone).push({
-                            id: doc.id,
-                            ...parent
-                        });
-                    }
-                });
-                
-                let duplicateParents = [];
-                phoneMap.forEach((parents, phone) => {
-                    if (parents.length > 1) {
-                        duplicateParents = duplicateParents.concat(parents.map(p => ({
-                            ...p,
-                            duplicateCount: parents.length,
-                            duplicatePhone: phone
-                        })));
-                    }
-                });
-                
-                if (duplicateParents.length === 0) {
-                    showError('No Duplicates', 'No duplicate accounts found!');
-                    return;
-                }
-                
-                displayParentList(duplicateParents, 'Duplicate Accounts', true);
-                
-            } catch (error) {
-                showError('Search Failed', 'Error finding duplicate accounts: ' + error.message);
-            }
-        }
-
-        // ==================== TOAST NOTIFICATION FUNCTION ====================
+        // Toast notification function
         function showToast(message, type = 'info') {
             const colors = {
                 success: 'bg-green-600',
@@ -1940,10 +642,6 @@
             }, 3000);
         }
 
-        // ==================== KEEP ALL YOUR EXISTING FUNCTIONS ====================
-        // I've kept ALL your existing functions below - they remain unchanged
-        // Only added the new features and fixed the broken ones
-        
         // Modal functions
         function showModal(modalId) {
             document.getElementById(modalId).classList.remove('hidden');
@@ -2101,13 +799,2422 @@
             return normalizationAttempts;
         }
 
-        // ==================== ALL YOUR EXISTING FUNCTIONS CONTINUE BELOW ====================
-        // (I've kept them all exactly as you had them)
-        // The rest of your existing code continues here...
+        // ==================== UNIVERSAL PHONE SEARCH FUNCTION ====================
+        async function searchPhoneInAllCollections(phone) {
+            const normalizedVersions = universalNormalizePhoneNumber(phone);
+            const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
+            
+            if (validVersions.length === 0) {
+                throw new Error(`Cannot normalize phone: ${phone}. Try formats like: 08012345678, 2348012345678, +2348012345678`);
+            }
+            
+            const searchResults = {
+                parent: null,
+                parentId: null,
+                foundInCollections: new Set(),
+                searchAttempts: validVersions,
+                matchedVersion: null
+            };
+            
+            // Define all collections to search
+            const collectionsToSearch = [
+                'parent_users',
+                'students',
+                'pending_students',
+                'student_results',
+                'tutor_submissions',
+                'daily_topics',
+                'homework_assignments',
+                'referral_transactions'
+            ];
+            
+            // Try each normalized version
+            for (const version of validVersions) {
+                const normalizedPhone = version.normalized;
+                
+                // 1. Search in parent_users (most important)
+                try {
+                    // Search by normalized phone
+                    let query = await db.collection('parent_users')
+                        .where('normalizedPhone', '==', normalizedPhone)
+                        .limit(1)
+                        .get();
+                    
+                    // If not found, search by phone field with various formats
+                    if (query.empty) {
+                        const phoneVariations = [
+                            phone,
+                            normalizedPhone,
+                            phone.replace('+', ''),
+                            phone.startsWith('0') ? '234' + phone.substring(1) : null,
+                            phone.startsWith('234') ? '0' + phone.substring(3) : null
+                        ].filter(Boolean);
+                        
+                        for (const variation of phoneVariations) {
+                            query = await db.collection('parent_users')
+                                .where('phone', '==', variation)
+                                .limit(1)
+                                .get();
+                            
+                            if (!query.empty) break;
+                        }
+                    }
+                    
+                    if (!query.empty) {
+                        searchResults.parent = query.docs[0].data();
+                        searchResults.parentId = query.docs[0].id;
+                        searchResults.matchedVersion = version;
+                        searchResults.foundInCollections.add('parent_users');
+                        break; // Found parent, stop searching
+                    }
+                } catch (error) {
+                    console.log(`Error searching parent_users for ${normalizedPhone}:`, error.message);
+                }
+            }
+            
+            // If parent not found, search in other collections for any records
+            if (!searchResults.parent) {
+                for (const collection of collectionsToSearch) {
+                    if (collection === 'parent_users') continue;
+                    
+                    for (const version of validVersions) {
+                        try {
+                            // Try normalized phone field
+                            let query = await db.collection(collection)
+                                .where('normalizedParentPhone', '==', version.normalized)
+                                .limit(1)
+                                .get();
+                            
+                            // Try parentPhone field
+                            if (query.empty) {
+                                query = await db.collection(collection)
+                                    .where('parentPhone', '==', phone)
+                                    .limit(1)
+                                    .get();
+                            }
+                            
+                            // Try other phone variations
+                            if (query.empty) {
+                                const phoneVariations = [
+                                    phone,
+                                    version.normalized,
+                                    phone.replace('+', ''),
+                                    phone.startsWith('0') ? '234' + phone.substring(1) : null,
+                                    phone.startsWith('234') ? '0' + phone.substring(3) : null
+                                ].filter(Boolean);
+                                
+                                for (const variation of phoneVariations) {
+                                    query = await db.collection(collection)
+                                        .where('parentPhone', '==', variation)
+                                        .limit(1)
+                                        .get();
+                                    
+                                    if (!query.empty) break;
+                                }
+                            }
+                            
+                            if (!query.empty) {
+                                searchResults.foundInCollections.add(collection);
+                                // Extract parent info from found document
+                                const docData = query.docs[0].data();
+                                if (docData.parentEmail || docData.parentName) {
+                                    searchResults.parent = {
+                                        phone: phone,
+                                        email: docData.parentEmail || 'unknown@example.com',
+                                        parentName: docData.parentName || 'Unknown Parent'
+                                    };
+                                    searchResults.matchedVersion = version;
+                                }
+                                break;
+                            }
+                        } catch (error) {
+                            console.log(`Error searching ${collection}:`, error.message);
+                        }
+                    }
+                }
+            }
+            
+            return searchResults;
+        }
 
-        // ... [All your existing functions continue here - they remain unchanged]
+        // ==================== MISSING FUNCTION - ADD THIS ====================
+        async function searchByPhone(phone) {
+            return await searchPhoneInAllCollections(phone);
+        }
 
-        // Initialize
+        // ==================== ENHANCED UNIVERSAL SEARCH ====================
+        async function universalSearch(query) {
+            const trimmedQuery = query.trim();
+            
+            if (!trimmedQuery) {
+                showToast('Please enter a search query', 'warning');
+                return null;
+            }
+            
+            // Determine search type
+            let searchType = 'phone';
+            let searchValue = trimmedQuery;
+            
+            // Check if it's an email
+            if (trimmedQuery.includes('@')) {
+                searchType = 'email';
+            }
+            // Check if it's a student name (contains letters and possibly numbers)
+            else if (/[a-zA-Z]/.test(trimmedQuery)) {
+                searchType = 'studentName';
+            }
+            // Otherwise assume it's a phone number
+            else {
+                searchType = 'phone';
+            }
+            
+            try {
+                switch (searchType) {
+                    case 'phone':
+                        return await searchByPhone(trimmedQuery);
+                        
+                    case 'email':
+                        return await searchByEmail(trimmedQuery);
+                        
+                    case 'studentName':
+                        return await searchByStudentNameUniversal(trimmedQuery);
+                        
+                    default:
+                        return await searchByPhone(trimmedQuery);
+                }
+            } catch (error) {
+                console.error('Universal search error:', error);
+                return null;
+            }
+        }
+
+        async function searchByEmail(email) {
+            try {
+                // Search in parent_users first
+                let query = await db.collection('parent_users')
+                    .where('email', '==', email)
+                    .limit(1)
+                    .get();
+                
+                if (!query.empty) {
+                    const doc = query.docs[0];
+                    return {
+                        parent: doc.data(),
+                        parentId: doc.id,
+                        searchType: 'email',
+                        foundIn: 'parent_users'
+                    };
+                }
+                
+                // Search in students for parentEmail
+                query = await db.collection('students')
+                    .where('parentEmail', '==', email)
+                    .limit(1)
+                    .get();
+                
+                if (!query.empty) {
+                    const student = query.docs[0].data();
+                    // Now find parent by phone
+                    if (student.parentPhone) {
+                        return await searchByPhone(student.parentPhone);
+                    }
+                }
+                
+                // Search in other collections
+                const collections = ['tutor_submissions', 'student_results', 'daily_topics'];
+                for (const collection of collections) {
+                    try {
+                        query = await db.collection(collection)
+                            .where('parentEmail', '==', email)
+                            .limit(1)
+                            .get();
+                        
+                        if (!query.empty) {
+                            const doc = query.docs[0].data();
+                            if (doc.parentPhone) {
+                                return await searchByPhone(doc.parentPhone);
+                            }
+                        }
+                    } catch (error) {
+                        // Collection might not have parentEmail field
+                    }
+                }
+                
+                return null;
+            } catch (error) {
+                throw new Error(`Email search failed: ${error.message}`);
+            }
+        }
+
+        async function searchByStudentNameUniversal(studentName) {
+            try {
+                // First, try to find student in students collection
+                let query = await db.collection('students')
+                    .where('studentName', '==', studentName)
+                    .limit(1)
+                    .get();
+                
+                let student = null;
+                let collection = 'students';
+                
+                if (query.empty) {
+                    // Try pending_students
+                    query = await db.collection('pending_students')
+                        .where('studentName', '==', studentName)
+                        .limit(1)
+                        .get();
+                    
+                    if (!query.empty) {
+                        collection = 'pending_students';
+                    }
+                }
+                
+                if (!query.empty) {
+                    const doc = query.docs[0];
+                    student = {
+                        id: doc.id,
+                        collection: collection,
+                        ...doc.data()
+                    };
+                    
+                    // Find parent by student's parentPhone
+                    if (student.parentPhone) {
+                        const parentSearch = await searchByPhone(student.parentPhone);
+                        if (parentSearch && parentSearch.parent) {
+                            return {
+                                ...parentSearch,
+                                foundStudent: student,
+                                searchType: 'studentName'
+                            };
+                        }
+                    }
+                }
+                
+                // If student not found or no parent, search in submissions
+                const collections = ['student_results', 'tutor_submissions'];
+                for (const coll of collections) {
+                    try {
+                        query = await db.collection(coll)
+                            .where('studentName', '==', studentName)
+                            .limit(1)
+                            .get();
+                        
+                        if (!query.empty) {
+                            const submission = query.docs[0].data();
+                            if (submission.parentPhone) {
+                                const parentSearch = await searchByPhone(submission.parentPhone);
+                                if (parentSearch && parentSearch.parent) {
+                                    return {
+                                        ...parentSearch,
+                                        foundSubmission: submission,
+                                        searchType: 'studentName'
+                                    };
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        // Continue to next collection
+                    }
+                }
+                
+                // If we get here, we found student records but no parent
+                if (student) {
+                    return {
+                        foundStudent: student,
+                        parent: null,
+                        searchType: 'studentName',
+                        message: `Found student "${studentName}" but no parent account linked`
+                    };
+                }
+                
+                return null;
+            } catch (error) {
+                throw new Error(`Student name search failed: ${error.message}`);
+            }
+        }
+
+        // ==================== ENHANCED PHONE MIGRATION - NUCLEAR UPDATE ====================
+        function getAllPhoneVariations(phone) {
+            if (!phone) return [];
+            
+            const variations = new Set();
+            
+            // Add original
+            variations.add(phone);
+            
+            // Normalize to get variations
+            const normalizedVersions = universalNormalizePhoneNumber(phone);
+            normalizedVersions.forEach(v => {
+                if (v.valid && v.normalized) {
+                    variations.add(v.normalized);
+                }
+            });
+            
+            // Common variations for Nigerian numbers
+            if (phone.startsWith('0') && phone.length === 11) {
+                variations.add('+234' + phone.substring(1));  // +2348012345678
+                variations.add('234' + phone.substring(1));   // 2348012345678
+                variations.add(phone.substring(1));           // 8012345678
+            }
+            
+            if (phone.startsWith('+234') && phone.length === 14) {
+                variations.add('0' + phone.substring(4));     // 08012345678
+                variations.add(phone.substring(1));           // 2348012345678
+                variations.add(phone.substring(4));           // 8012345678
+            }
+            
+            if (phone.startsWith('234') && phone.length === 13) {
+                variations.add('+234' + phone.substring(3));  // +2348012345678
+                variations.add('0' + phone.substring(3));     // 08012345678
+                variations.add(phone.substring(3));           // 8012345678
+            }
+            
+            if (phone.length === 10 && !phone.startsWith('0')) {
+                variations.add('+234' + phone);               // +2348012345678
+                variations.add('0' + phone);                  // 08012345678
+                variations.add('234' + phone);                // 2348012345678
+            }
+            
+            // Also add cleaned versions (remove spaces, dashes, etc.)
+            const cleaned = phone.replace(/[^\d+]/g, '');
+            if (cleaned !== phone) {
+                variations.add(cleaned);
+            }
+            
+            return Array.from(variations);
+        }
+
+        async function updateParentPhone() {
+            const newPhone = document.getElementById('newPhone').value.trim();
+            const validationElement = document.getElementById('phoneValidation');
+            
+            if (!newPhone) {
+                validationElement.innerHTML = '<p class="text-red-600">Please enter a phone number</p>';
+                validationElement.classList.remove('hidden');
+                return;
+            }
+            
+            const normalized = universalNormalizePhoneNumber(newPhone);
+            const validVersions = normalized.filter(v => v.valid && v.normalized);
+            
+            if (validVersions.length === 0) {
+                validationElement.innerHTML = '<p class="text-red-600">Invalid phone number format</p>';
+                validationElement.classList.remove('hidden');
+                return;
+            }
+            
+            const normalizedPhone = validVersions[0].normalized;
+            const oldPhone = document.getElementById('currentPhone').value;
+            
+            try {
+                validationElement.innerHTML = '<p class="text-blue-600"><div class="loading-spinner-small inline-block mr-2"></div> Starting nuclear phone migration...</p>';
+                validationElement.classList.remove('hidden');
+                
+                // Step 1: Update parent_users collection
+                await db.collection('parent_users').doc(currentEditingUserId).update({
+                    phone: newPhone,
+                    normalizedPhone: normalizedPhone,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                // Step 2: Get ALL possible variations of the old phone
+                const oldVariations = getAllPhoneVariations(oldPhone);
+                const newVariations = getAllPhoneVariations(newPhone);
+                
+                // Step 3: Scan and update ALL 8 database collections
+                const collectionsToUpdate = [
+                    'students',
+                    'student_results',
+                    'tutor_submissions',
+                    'daily_topics',
+                    'homework_assignments',
+                    'pending_students',
+                    'referral_transactions',
+                    'monthly_reports',
+                    'assessment_reports',
+                    'progress_reports'
+                ];
+                
+                let totalUpdated = 0;
+                const updatePromises = [];
+                
+                for (const collection of collectionsToUpdate) {
+                    try {
+                        // Search for ALL variations of the old phone
+                        for (const oldVariant of oldVariations) {
+                            // Try multiple field names
+                            const fields = ['parentPhone', 'phone', 'contactPhone', 'guardianPhone'];
+                            
+                            for (const field of fields) {
+                                try {
+                                    const query = await db.collection(collection)
+                                        .where(field, '==', oldVariant)
+                                        .get();
+                                    
+                                    query.forEach(doc => {
+                                        const updateData = {
+                                            [field]: newPhone,
+                                            normalizedParentPhone: normalizedPhone,
+                                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                        };
+                                        
+                                        updatePromises.push(
+                                            db.collection(collection).doc(doc.id).update(updateData)
+                                        );
+                                        totalUpdated++;
+                                    });
+                                } catch (error) {
+                                    // Field might not exist in this collection
+                                }
+                            }
+                            
+                            // Also check normalizedParentPhone field
+                            try {
+                                const query = await db.collection(collection)
+                                    .where('normalizedParentPhone', '==', oldVariant)
+                                    .get();
+                                
+                                query.forEach(doc => {
+                                    updatePromises.push(
+                                        db.collection(collection).doc(doc.id).update({
+                                            normalizedParentPhone: normalizedPhone,
+                                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                        })
+                                    );
+                                    totalUpdated++;
+                                });
+                            } catch (error) {
+                                // Field might not exist
+                            }
+                        }
+                    } catch (error) {
+                        console.log(`Collection ${collection} update error:`, error.message);
+                    }
+                }
+                
+                // Execute all updates
+                if (updatePromises.length > 0) {
+                    await Promise.all(updatePromises);
+                }
+                
+                validationElement.innerHTML = `
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                        <p class="text-green-800 font-semibold">✅ Nuclear Migration Complete!</p>
+                        <p class="text-green-700 text-sm mt-1">
+                            Updated parent phone and migrated ${totalUpdated} records across ${collectionsToUpdate.length} collections
+                        </p>
+                        <p class="text-green-600 text-xs mt-2">
+                            Old phone variations: ${oldVariations.slice(0, 3).join(', ')}${oldVariations.length > 3 ? '...' : ''}
+                        </p>
+                        <p class="text-green-600 text-xs">
+                            New phone: ${newPhone} → ${normalizedPhone}
+                        </p>
+                    </div>
+                `;
+                
+                setTimeout(() => {
+                    hideEditPhoneModal();
+                    showToast(`Nuclear migration complete! Updated ${totalUpdated} records`, 'success');
+                    // Refresh current view if parent portal is open
+                    if (currentParentData) {
+                        document.getElementById('adminParentPhone').value = newPhone;
+                        loadParentPortal();
+                    }
+                }, 3000);
+                
+            } catch (error) {
+                validationElement.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p class="text-red-800 font-semibold">❌ Migration Error</p>
+                    <p class="text-red-700 text-sm">${error.message}</p>
+                </div>`;
+                validationElement.classList.remove('hidden');
+            }
+        }
+
+        function hideEditPhoneModal() {
+            hideModal('editPhoneModal');
+            currentEditingUserId = null;
+        }
+
+        // ==================== EDIT EMAIL - COMPLETE IMPLEMENTATION ====================
+        async function editParentEmailPrompt(userId, parentName, currentEmail) {
+            const newEmail = prompt(`Edit email for ${parentName}\nCurrent: ${currentEmail}\n\nEnter new email address:`, currentEmail);
+            
+            if (!newEmail || newEmail === currentEmail) {
+                return;
+            }
+            
+            // Basic email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(newEmail)) {
+                showToast('Please enter a valid email address', 'error');
+                return;
+            }
+            
+            try {
+                await updateParentEmail(userId, newEmail);
+            } catch (error) {
+                showToast(`Error updating email: ${error.message}`, 'error');
+            }
+        }
+
+        async function updateParentEmail(userId, newEmail) {
+            try {
+                await db.collection('parent_users').doc(userId).update({
+                    email: newEmail,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                showToast(`Email updated successfully to: ${newEmail}`, 'success');
+                
+                // Also update email in student records
+                await updateEmailInRelatedCollections(userId, newEmail);
+                
+            } catch (error) {
+                throw new Error(`Failed to update email: ${error.message}`);
+            }
+        }
+
+        async function updateEmailInRelatedCollections(parentId, newEmail) {
+            try {
+                // Get parent phone first
+                const parentDoc = await db.collection('parent_users').doc(parentId).get();
+                if (!parentDoc.exists) return;
+                
+                const parentData = parentDoc.data();
+                const parentPhone = parentData.phone;
+                if (!parentPhone) return;
+                
+                // Collections to update
+                const collections = ['students', 'pending_students', 'student_results', 'tutor_submissions'];
+                let totalUpdated = 0;
+                
+                for (const collection of collections) {
+                    try {
+                        // Find documents with this parent phone
+                        const query = await db.collection(collection)
+                            .where('parentPhone', '==', parentPhone)
+                            .get();
+                        
+                        const updatePromises = [];
+                        query.forEach(doc => {
+                            updatePromises.push(
+                                db.collection(collection).doc(doc.id).update({
+                                    parentEmail: newEmail,
+                                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                })
+                            );
+                        });
+                        
+                        if (updatePromises.length > 0) {
+                            await Promise.all(updatePromises);
+                            totalUpdated += updatePromises.length;
+                        }
+                    } catch (error) {
+                        // Collection might not have parentPhone field
+                    }
+                }
+                
+                if (totalUpdated > 0) {
+                    console.log(`Updated email in ${totalUpdated} related records`);
+                }
+            } catch (error) {
+                console.log('Error updating related collections:', error.message);
+            }
+        }
+
+        // ==================== COMPLETE PARENT PORTAL FUNCTIONS ====================
+        async function loadCompleteParentPortal(parentUserId, parentPhone, parentUserData) {
+            const resultsArea = document.getElementById('adminResultsArea');
+            
+            try {
+                document.getElementById('loadingDetails').textContent = `Loading complete portal for ${parentUserData.parentName || 'Parent'}...`;
+
+                resultsArea.innerHTML = `
+                    <div class="bg-white rounded-lg shadow-lg">
+                        <div class="bg-red-50 border-b border-red-200 p-4">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <h2 class="text-xl font-bold text-red-800">Viewing Complete Portal for: ${parentUserData.parentName || 'Parent'}</h2>
+                                    <p class="text-red-600">Phone: ${parentUserData.phone} | Email: ${parentUserData.email}</p>
+                                    <p class="text-red-600 text-sm">User ID: ${parentUserId}</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-sm text-red-700">Account Created: ${parentUserData.createdAt?.toDate().toLocaleDateString() || 'Unknown'}</p>
+                                    <p class="text-sm text-red-700">Referral Code: ${parentUserData.referralCode || 'None'}</p>
+                                    <div class="flex space-x-2 mt-2">
+                                        <button onclick="editParentPhone('${parentUserId}', '${parentUserData.phone}')" 
+                                                class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
+                                            ✏️ Edit Phone
+                                        </button>
+                                        <button onclick="editParentEmailPrompt('${parentUserId}', '${parentUserData.parentName || 'Unknown'}', '${parentUserData.email}')" 
+                                                class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">
+                                            ✏️ Edit Email
+                                        </button>
+                                        <button onclick="deleteParentAccountPrompt('${parentUserId}', '${parentUserData.parentName || 'Unknown'}', '${parentUserData.phone}', '${parentUserData.email}')" 
+                                                class="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700">
+                                            🗑️ Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="adminParentPortalContent" class="p-6">
+                            <div class="text-center py-8">
+                                <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+                                <p class="text-green-600 font-semibold mt-4">Loading complete parent portal...</p>
+                                <p class="text-gray-500 text-sm mt-2">Fetching data from all collections...</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // Get COMPLETE data including daily academics
+                const completeData = await getCompleteParentPortalData(parentPhone);
+
+                currentParentData = {
+                    user: parentUserData,
+                    userId: parentUserId,
+                    ...completeData
+                };
+
+                // Display the complete portal
+                displayCompleteParentPortal(completeData, parentUserData);
+
+                document.getElementById('adminLoader').classList.add('hidden');
+                resultsArea.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Error loading parent portal:', error);
+                resultsArea.innerHTML = `
+                    <div class="bg-white rounded-lg shadow-lg p-8 text-center">
+                        <div class="text-6xl mb-4">❌</div>
+                        <h3 class="text-xl font-bold text-red-700 mb-2">Error Loading Parent Portal</h3>
+                        <p class="text-gray-500">${error.message}</p>
+                    </div>
+                `;
+                document.getElementById('adminLoader').classList.add('hidden');
+                resultsArea.classList.remove('hidden');
+            }
+        }
+
+        async function getCompleteParentPortalData(parentPhone) {
+            const normalizedVersions = universalNormalizePhoneNumber(parentPhone);
+            const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
+            
+            let allData = {
+                assessmentResults: [],
+                monthlyResults: [],
+                dailyTopics: [],
+                homeworkAssignments: [],
+                students: [],
+                pendingStudents: [],
+                referralTransactions: [],
+                
+                // Backup/legacy collections
+                backupReports: {
+                    monthly_reports: [],
+                    assessment_reports: [],
+                    progress_reports: [],
+                    reports: [],
+                    student_reports: [],
+                    parent_reports: [],
+                    academic_reports: [],
+                    session_reports: [],
+                    performance_reports: []
+                },
+                
+                // Statistics
+                stats: {
+                    totalAssessments: 0,
+                    totalMonthlyReports: 0,
+                    totalDailyTopics: 0,
+                    totalHomework: 0,
+                    totalStudents: 0,
+                    totalReferrals: 0
+                }
+            };
+            
+            // Helper function to query collections
+            async function queryCollection(collectionName, fieldName, value) {
+                try {
+                    const snapshot = await db.collection(collectionName)
+                        .where(fieldName, '==', value)
+                        .get();
+                    
+                    const results = [];
+                    snapshot.forEach(doc => {
+                        results.push({
+                            id: doc.id,
+                            ...doc.data(),
+                            collection: collectionName
+                        });
+                    });
+                    return results;
+                } catch (error) {
+                    console.log(`No data in ${collectionName}:`, error.message);
+                    return [];
+                }
+            }
+            
+            // Query with multiple phone formats
+            for (const version of validVersions) {
+                // Primary collections with normalized phone
+                if (!allData.assessmentResults.length) {
+                    allData.assessmentResults = await queryCollection('student_results', 'normalizedParentPhone', version.normalized);
+                }
+                
+                if (!allData.monthlyResults.length) {
+                    allData.monthlyResults = await queryCollection('tutor_submissions', 'normalizedParentPhone', version.normalized);
+                }
+                
+                // Daily academics
+                if (!allData.dailyTopics.length) {
+                    allData.dailyTopics = await queryCollection('daily_topics', 'parentPhone', parentPhone);
+                }
+                
+                if (!allData.homeworkAssignments.length) {
+                    allData.homeworkAssignments = await queryCollection('homework_assignments', 'parentPhone', parentPhone);
+                }
+                
+                // Student records
+                if (!allData.students.length) {
+                    allData.students = await queryCollection('students', 'parentPhone', parentPhone);
+                }
+                
+                if (!allData.pendingStudents.length) {
+                    allData.pendingStudents = await queryCollection('pending_students', 'parentPhone', parentPhone);
+                }
+                
+                // Referrals
+                if (!allData.referralTransactions.length) {
+                    allData.referralTransactions = await queryCollection('referral_transactions', 'parentPhone', parentPhone);
+                }
+                
+                // Backup collections (try with regular phone)
+                const backupCollections = [
+                    'monthly_reports', 'assessment_reports', 'progress_reports', 'reports',
+                    'student_reports', 'parent_reports', 'academic_reports', 'session_reports', 'performance_reports'
+                ];
+                
+                for (const collection of backupCollections) {
+                    if (allData.backupReports[collection].length === 0) {
+                        const results = await queryCollection(collection, 'parentPhone', parentPhone);
+                        allData.backupReports[collection] = results;
+                    }
+                }
+            }
+            
+            // Calculate statistics
+            allData.stats = {
+                totalAssessments: allData.assessmentResults.length,
+                totalMonthlyReports: allData.monthlyResults.length,
+                totalDailyTopics: allData.dailyTopics.length,
+                totalHomework: allData.homeworkAssignments.length,
+                totalStudents: allData.students.length + allData.pendingStudents.length,
+                totalReferrals: allData.referralTransactions.length,
+                backupReportsCount: Object.values(allData.backupReports).flat().length
+            };
+            
+            return allData;
+        }
+
+        function displayCompleteParentPortal(data, parentUserData) {
+            const portalContent = document.getElementById('adminParentPortalContent');
+            
+            let contentHTML = `
+                <div class="space-y-8">
+                    <!-- Parent Information Header -->
+                    <div class="bg-gradient-to-r from-blue-50 to-green-50 border-l-4 border-blue-600 p-6 rounded-lg">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+                            <div>
+                                <h1 class="text-2xl font-bold text-gray-800">${parentUserData.parentName || 'Parent'}'s Complete Portal</h1>
+                                <div class="flex flex-wrap gap-4 mt-2">
+                                    <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+                                        📞 ${parentUserData.phone}
+                                    </span>
+                                    <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
+                                        📧 ${parentUserData.email}
+                                    </span>
+                                    <span class="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm">
+                                        👨‍👧‍👦 ${data.stats.totalStudents} Student(s)
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="mt-4 md:mt-0">
+                                <div class="text-right">
+                                    <p class="text-sm text-gray-600">Member since: ${parentUserData.createdAt?.toDate().toLocaleDateString() || 'Unknown'}</p>
+                                    <p class="text-sm text-gray-600">Referral Code: ${parentUserData.referralCode || 'None'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Stats Overview -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-white border rounded-lg p-4 text-center shadow-sm">
+                            <div class="text-2xl font-bold text-blue-600">${data.stats.totalAssessments}</div>
+                            <div class="text-sm text-gray-600">Assessment Reports</div>
+                        </div>
+                        <div class="bg-white border rounded-lg p-4 text-center shadow-sm">
+                            <div class="text-2xl font-bold text-green-600">${data.stats.totalMonthlyReports}</div>
+                            <div class="text-sm text-gray-600">Monthly Reports</div>
+                        </div>
+                        <div class="bg-white border rounded-lg p-4 text-center shadow-sm">
+                            <div class="text-2xl font-bold text-purple-600">${data.stats.totalDailyTopics}</div>
+                            <div class="text-sm text-gray-600">Daily Topics</div>
+                        </div>
+                        <div class="bg-white border rounded-lg p-4 text-center shadow-sm">
+                            <div class="text-2xl font-bold text-yellow-600">${data.stats.totalHomework}</div>
+                            <div class="text-sm text-gray-600">Homework Assignments</div>
+                        </div>
+                    </div>
+            `;
+            
+            // Students Section
+            if (data.students.length > 0 || data.pendingStudents.length > 0) {
+                contentHTML += `
+                    <div class="bg-white border rounded-lg p-6 shadow-sm">
+                        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                            <span class="mr-2">👨‍🎓</span> Students (${data.stats.totalStudents})
+                        </h2>
+                        <div class="space-y-4">
+                `;
+                
+                // Active Students
+                if (data.students.length > 0) {
+                    contentHTML += `
+                        <div>
+                            <h3 class="font-semibold text-green-700 mb-2">Active Students (${data.students.length})</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    `;
+                    
+                    data.students.forEach(student => {
+                        contentHTML += `
+                            <div class="border rounded-lg p-3 bg-green-50">
+                                <div class="font-medium">${capitalize(student.studentName || student.name || 'Unknown')}</div>
+                                <div class="text-sm text-gray-600 mt-1">
+                                    Grade: ${student.grade || 'N/A'} | Age: ${student.age || 'N/A'}
+                                </div>
+                                ${student.registrationDate ? `
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        Registered: ${new Date(student.registrationDate?.seconds * 1000).toLocaleDateString()}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    });
+                    
+                    contentHTML += `</div></div>`;
+                }
+                
+                // Pending Students
+                if (data.pendingStudents.length > 0) {
+                    contentHTML += `
+                        <div>
+                            <h3 class="font-semibold text-yellow-700 mb-2">Pending Registration (${data.pendingStudents.length})</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    `;
+                    
+                    data.pendingStudents.forEach(student => {
+                        contentHTML += `
+                            <div class="border rounded-lg p-3 bg-yellow-50">
+                                <div class="font-medium">${capitalize(student.studentName || student.name || 'Unknown')}</div>
+                                <div class="text-sm text-gray-600 mt-1">
+                                    Status: ${student.status || 'Pending'}
+                                </div>
+                                ${student.createdAt ? `
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        Submitted: ${new Date(student.createdAt?.seconds * 1000).toLocaleDateString()}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    });
+                    
+                    contentHTML += `</div></div>`;
+                }
+                
+                contentHTML += `</div></div>`;
+            }
+            
+            // Daily Academics Section
+            if (data.dailyTopics.length > 0 || data.homeworkAssignments.length > 0) {
+                contentHTML += `
+                    <div class="bg-white border rounded-lg p-6 shadow-sm">
+                        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                            <span class="mr-2">📚</span> Daily Academics
+                        </h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                `;
+                
+                // Daily Topics
+                if (data.dailyTopics.length > 0) {
+                    const tutors = {};
+                    const dates = new Set();
+                    
+                    data.dailyTopics.forEach(topic => {
+                        const tutor = topic.tutorName || topic.tutorEmail || 'Unknown Tutor';
+                        if (!tutors[tutor]) {
+                            tutors[tutor] = { count: 0, dates: new Set() };
+                        }
+                        tutors[tutor].count++;
+                        
+                        if (topic.date) {
+                            const date = new Date(topic.date?.seconds * 1000).toLocaleDateString();
+                            dates.add(date);
+                            tutors[tutor].dates.add(date);
+                        }
+                    });
+                    
+                    contentHTML += `
+                        <div class="border rounded-lg p-4 bg-blue-50">
+                            <h3 class="font-semibold text-blue-800 mb-3">Daily Topics (${data.dailyTopics.length})</h3>
+                            <div class="space-y-3">
+                    `;
+                    
+                    for (const [tutor, info] of Object.entries(tutors)) {
+                        contentHTML += `
+                            <div class="bg-white p-3 rounded border">
+                                <div class="font-medium">${tutor}</div>
+                                <div class="text-sm text-gray-600 mt-1">
+                                    Sessions: ${info.count}
+                                    ${info.dates.size > 0 ? `| Dates: ${info.dates.size} day(s)` : ''}
+                                </div>
+                                ${info.dates.size > 0 ? `
+                                    <div class="text-xs text-gray-500 mt-2">
+                                        Recent: ${Array.from(info.dates).slice(0, 3).join(', ')}
+                                        ${info.dates.size > 3 ? '...' : ''}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    }
+                    
+                    contentHTML += `</div></div>`;
+                } else {
+                    contentHTML += `
+                        <div class="border rounded-lg p-4 bg-blue-50">
+                            <h3 class="font-semibold text-blue-800 mb-2">Daily Topics</h3>
+                            <p class="text-gray-600">No daily topics found</p>
+                        </div>
+                    `;
+                }
+                
+                // Homework Assignments
+                if (data.homeworkAssignments.length > 0) {
+                    const tutors = {};
+                    const statusCount = { pending: 0, completed: 0, overdue: 0 };
+                    
+                    data.homeworkAssignments.forEach(hw => {
+                        const tutor = hw.tutorName || hw.tutorEmail || 'Unknown Tutor';
+                        if (!tutors[tutor]) {
+                            tutors[tutor] = { count: 0, subjects: new Set() };
+                        }
+                        tutors[tutor].count++;
+                        
+                        if (hw.subject) tutors[tutor].subjects.add(hw.subject);
+                        
+                        // Count status
+                        if (hw.status === 'completed') statusCount.completed++;
+                        else if (hw.status === 'overdue') statusCount.overdue++;
+                        else statusCount.pending++;
+                    });
+                    
+                    contentHTML += `
+                        <div class="border rounded-lg p-4 bg-green-50">
+                            <h3 class="font-semibold text-green-800 mb-3">Homework Assignments (${data.homeworkAssignments.length})</h3>
+                            <div class="mb-4">
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>Completed: ${statusCount.completed}</span>
+                                    <span>Pending: ${statusCount.pending}</span>
+                                    <span>Overdue: ${statusCount.overdue}</span>
+                                </div>
+                            </div>
+                            <div class="space-y-3">
+                    `;
+                    
+                    for (const [tutor, info] of Object.entries(tutors)) {
+                        contentHTML += `
+                            <div class="bg-white p-3 rounded border">
+                                <div class="font-medium">${tutor}</div>
+                                <div class="text-sm text-gray-600 mt-1">
+                                    Assignments: ${info.count}
+                                    ${info.subjects.size > 0 ? `| Subjects: ${info.subjects.size}` : ''}
+                                </div>
+                                ${info.subjects.size > 0 ? `
+                                    <div class="text-xs text-gray-500 mt-2">
+                                        Subjects: ${Array.from(info.subjects).slice(0, 3).join(', ')}
+                                        ${info.subjects.size > 3 ? '...' : ''}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    }
+                    
+                    contentHTML += `</div></div>`;
+                } else {
+                    contentHTML += `
+                        <div class="border rounded-lg p-4 bg-green-50">
+                            <h3 class="font-semibold text-green-800 mb-2">Homework Assignments</h3>
+                            <p class="text-gray-600">No homework assignments found</p>
+                        </div>
+                    `;
+                }
+                
+                contentHTML += `</div></div>`;
+            }
+            
+            // Assessment Reports
+            if (data.assessmentResults.length > 0) {
+                const studentsMap = new Map();
+                
+                data.assessmentResults.forEach(result => {
+                    const studentName = result.studentName;
+                    if (!studentsMap.has(studentName)) {
+                        studentsMap.set(studentName, []);
+                    }
+                    studentsMap.get(studentName).push(result);
+                });
+                
+                contentHTML += `
+                    <div class="bg-white border rounded-lg p-6 shadow-sm">
+                        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                            <span class="mr-2">📊</span> Assessment Reports (${data.assessmentResults.length})
+                        </h2>
+                        <div class="space-y-6">
+                `;
+                
+                studentsMap.forEach((assessments, studentName) => {
+                    const tutors = new Set();
+                    const subjects = new Set();
+                    const dates = new Set();
+                    
+                    assessments.forEach(assessment => {
+                        if (assessment.tutorName || assessment.tutorEmail) {
+                            tutors.add(assessment.tutorName || assessment.tutorEmail);
+                        }
+                        if (assessment.subject) subjects.add(assessment.subject);
+                        if (assessment.submittedAt) {
+                            const date = new Date(assessment.submittedAt.seconds * 1000).toLocaleDateString();
+                            dates.add(date);
+                        }
+                    });
+                    
+                    contentHTML += `
+                        <div class="border-l-4 border-blue-500 pl-4">
+                            <h3 class="font-semibold text-blue-800">${capitalize(studentName)}</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                                <div class="text-sm">
+                                    <div class="font-medium">Assessments: ${assessments.length}</div>
+                                    <div class="text-gray-600">Subjects: ${subjects.size}</div>
+                                </div>
+                                <div class="text-sm">
+                                    <div class="font-medium">Tutors: ${tutors.size}</div>
+                                    <div class="text-gray-600">${Array.from(tutors).slice(0, 2).join(', ')}${tutors.size > 2 ? '...' : ''}</div>
+                                </div>
+                                <div class="text-sm">
+                                    <div class="font-medium">Dates: ${dates.size}</div>
+                                    <div class="text-gray-600">${Array.from(dates).slice(0, 2).join(', ')}${dates.size > 2 ? '...' : ''}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                contentHTML += `</div></div>`;
+            }
+            
+            // Monthly Reports
+            if (data.monthlyResults.length > 0) {
+                const studentsMap = new Map();
+                
+                data.monthlyResults.forEach(report => {
+                    const studentName = report.studentName;
+                    if (!studentsMap.has(studentName)) {
+                        studentsMap.set(studentName, []);
+                    }
+                    studentsMap.get(studentName).push(report);
+                });
+                
+                contentHTML += `
+                    <div class="bg-white border rounded-lg p-6 shadow-sm">
+                        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                            <span class="mr-2">📈</span> Monthly Reports (${data.monthlyResults.length})
+                        </h2>
+                        <div class="space-y-4">
+                `;
+                
+                studentsMap.forEach((reports, studentName) => {
+                    const tutors = new Set();
+                    const months = new Set();
+                    
+                    reports.forEach(report => {
+                        if (report.tutorName) tutors.add(report.tutorName);
+                        if (report.submittedAt) {
+                            const date = new Date(report.submittedAt.seconds * 1000);
+                            months.add(`${date.getMonth() + 1}/${date.getFullYear()}`);
+                        }
+                    });
+                    
+                    contentHTML += `
+                        <div class="border rounded-lg p-4 bg-green-50">
+                            <h3 class="font-semibold text-green-800">${capitalize(studentName)}</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                                <div class="text-sm">
+                                    <div class="font-medium">Reports: ${reports.length}</div>
+                                    <div class="text-gray-600">Tutors: ${tutors.size}</div>
+                                </div>
+                                <div class="text-sm">
+                                    <div class="font-medium">Months Covered:</div>
+                                    <div class="text-gray-600">${Array.from(months).join(', ')}</div>
+                                </div>
+                                <div class="text-sm">
+                                    <div class="font-medium">Tutors:</div>
+                                    <div class="text-gray-600">${Array.from(tutors).join(', ')}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                contentHTML += `</div></div>`;
+            }
+            
+            // Referral Transactions
+            if (data.referralTransactions.length > 0) {
+                contentHTML += `
+                    <div class="bg-white border rounded-lg p-6 shadow-sm">
+                        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                            <span class="mr-2">💰</span> Referral Transactions (${data.referralTransactions.length})
+                        </h2>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Date</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Type</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Amount</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Status</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Referred To</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                `;
+                
+                data.referralTransactions.forEach(transaction => {
+                    const date = transaction.timestamp ? 
+                        new Date(transaction.timestamp.seconds * 1000).toLocaleDateString() : 'N/A';
+                    
+                    contentHTML += `
+                        <tr>
+                            <td class="px-4 py-2 text-sm">${date}</td>
+                            <td class="px-4 py-2 text-sm">${transaction.type || 'N/A'}</td>
+                            <td class="px-4 py-2 text-sm">${transaction.amount || '0'}</td>
+                            <td class="px-4 py-2 text-sm">
+                                <span class="px-2 py-1 rounded-full text-xs ${transaction.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                                    ${transaction.status || 'pending'}
+                                </span>
+                            </td>
+                            <td class="px-4 py-2 text-sm">${transaction.referredTo || 'N/A'}</td>
+                        </tr>
+                    `;
+                });
+                
+                contentHTML += `</tbody></table></div></div>`;
+            }
+            
+            // Backup Reports Summary
+            const totalBackupReports = data.stats.backupReportsCount;
+            if (totalBackupReports > 0) {
+                contentHTML += `
+                    <div class="bg-white border rounded-lg p-6 shadow-sm">
+                        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                            <span class="mr-2">📂</span> Backup/Legacy Reports (${totalBackupReports})
+                        </h2>
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                `;
+                
+                for (const [collection, reports] of Object.entries(data.backupReports)) {
+                    if (reports.length > 0) {
+                        contentHTML += `
+                            <div class="border rounded-lg p-3 bg-gray-50">
+                                <div class="font-medium">${collection.replace('_', ' ')}</div>
+                                <div class="text-sm text-gray-600 mt-1">${reports.length} report(s)</div>
+                                <div class="text-xs text-gray-500 mt-2">
+                                    ${reports[0].studentName ? `Students: ${new Set(reports.map(r => r.studentName)).size}` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+                
+                contentHTML += `</div></div>`;
+            }
+            
+            // Collection Summary
+            contentHTML += `
+                <div class="bg-gray-50 border rounded-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">📋 Data Collection Summary</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span>Parent Users:</span>
+                            <span class="font-medium">1 <span class="collection-badge">parent_users</span></span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span>Students:</span>
+                            <span class="font-medium">${data.stats.totalStudents} <span class="collection-badge">students/pending_students</span></span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span>Daily Topics:</span>
+                            <span class="font-medium">${data.stats.totalDailyTopics} <span class="collection-badge">daily_topics</span></span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span>Homework:</span>
+                            <span class="font-medium">${data.stats.totalHomework} <span class="collection-badge">homework_assignments</span></span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span>Assessment Reports:</span>
+                            <span class="font-medium">${data.stats.totalAssessments} <span class="collection-badge">student_results</span></span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span>Monthly Reports:</span>
+                            <span class="font-medium">${data.stats.totalMonthlyReports} <span class="collection-badge">tutor_submissions</span></span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span>Referrals:</span>
+                            <span class="font-medium">${data.stats.totalReferrals} <span class="collection-badge">referral_transactions</span></span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span>Backup Reports:</span>
+                            <span class="font-medium">${totalBackupReports} <span class="collection-badge">9 collections</span></span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            contentHTML += `</div>`;
+            portalContent.innerHTML = contentHTML;
+        }
+
+        // ==================== MANAGE STUDENTS - COMPLETE IMPLEMENTATION ====================
+        async function loadStudentsManagement() {
+            hideAdminTools();
+            showModal('studentsManagementModal');
+            
+            try {
+                document.getElementById('studentsManagementContent').innerHTML = `
+                    <div class="text-center py-8">
+                        <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+                        <p class="text-green-600 font-semibold mt-4">Loading all students...</p>
+                    </div>
+                `;
+                
+                // Get all students from both collections
+                const [activeStudents, pendingStudents] = await Promise.all([
+                    db.collection('students').get(),
+                    db.collection('pending_students').get()
+                ]);
+                
+                const allStudents = [];
+                
+                activeStudents.forEach(doc => {
+                    const student = doc.data();
+                    allStudents.push({
+                        id: doc.id,
+                        collection: 'students',
+                        status: 'Active',
+                        ...student
+                    });
+                });
+                
+                pendingStudents.forEach(doc => {
+                    const student = doc.data();
+                    allStudents.push({
+                        id: doc.id,
+                        collection: 'pending_students',
+                        status: 'Pending',
+                        ...student
+                    });
+                });
+                
+                // Sort by student name
+                allStudents.sort((a, b) => {
+                    const nameA = a.studentName || a.name || '';
+                    const nameB = b.studentName || b.name || '';
+                    return nameA.localeCompare(nameB);
+                });
+                
+                displayStudentsTable(allStudents);
+                
+            } catch (error) {
+                document.getElementById('studentsManagementContent').innerHTML = `
+                    <div class="text-center py-8 text-red-600">
+                        <p>Error loading students: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function displayStudentsTable(students) {
+            let html = `
+                <div class="mb-6">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-700">Total Students: ${students.length}</h3>
+                            <p class="text-sm text-gray-600">Active: ${students.filter(s => s.status === 'Active').length} | 
+                            Pending: ${students.filter(s => s.status === 'Pending').length}</p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="exportStudentsToCSV()" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm">
+                                📤 Export CSV
+                            </button>
+                            <button onclick="findUnlinkedStudents()" class="bg-red-600 text-white px-4 py-2 rounded-lg text-sm">
+                                🔍 Find Unlinked
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto border rounded-lg">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grade/Age</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Parent Phone</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Linked Parent</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+            `;
+            
+            if (students.length === 0) {
+                html += `
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                            No students found in the system
+                        </td>
+                    </tr>
+                `;
+            } else {
+                students.forEach((student, index) => {
+                    const studentName = student.studentName || student.name || 'Unknown';
+                    const parentPhone = student.parentPhone || 'Unlinked';
+                    const parentEmail = student.parentEmail || '';
+                    const grade = student.grade || student.class || 'N/A';
+                    const age = student.age || 'N/A';
+                    
+                    // Check if parent exists
+                    const isLinked = parentPhone !== 'Unlinked';
+                    let linkedParentInfo = 'Not Found';
+                    let linkedStatus = 'text-red-600';
+                    
+                    if (isLinked) {
+                        linkedParentInfo = parentPhone;
+                        linkedStatus = 'text-green-600';
+                        if (parentEmail) {
+                            linkedParentInfo += `<br><span class="text-xs text-gray-500">${parentEmail}</span>`;
+                        }
+                    }
+                    
+                    html += `
+                        <tr class="${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} hover:bg-blue-50">
+                            <td class="px-4 py-3 text-sm">
+                                <div class="font-medium text-gray-900">${capitalize(studentName)}</div>
+                                <div class="text-xs text-gray-500">ID: ${student.id.substring(0, 8)}...</div>
+                            </td>
+                            <td class="px-4 py-3 text-sm">
+                                <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">${grade}</span>
+                                <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs ml-1">Age: ${age}</span>
+                            </td>
+                            <td class="px-4 py-3 text-sm">
+                                <span class="font-mono ${isLinked ? 'text-green-700' : 'text-red-700'}">
+                                    ${parentPhone}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-sm">
+                                <span class="px-2 py-1 rounded-full text-xs ${student.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                                    ${student.status}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-sm ${linkedStatus}">
+                                <div class="text-xs">${linkedParentInfo}</div>
+                            </td>
+                            <td class="px-4 py-3 text-sm">
+                                <div class="flex space-x-1">
+                                    <button onclick="viewStudentPortal('${student.id}', '${student.collection}')" 
+                                            class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs hover:bg-blue-200">
+                                        👁️ View
+                                    </button>
+                                    ${isLinked ? `
+                                        <button onclick="viewParentByStudentPhone('${parentPhone}')" 
+                                                class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs hover:bg-green-200">
+                                            👨‍👦 Parent
+                                        </button>
+                                    ` : `
+                                        <button onclick="linkStudentToParent('${student.id}', '${student.collection}')" 
+                                                class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs hover:bg-red-200">
+                                            🔗 Link
+                                        </button>
+                                    `}
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mt-4 text-sm text-gray-600">
+                    <p>📊 Summary: ${students.filter(s => s.parentPhone).length} linked to parents | 
+                    ${students.filter(s => !s.parentPhone).length} unlinked</p>
+                </div>
+            `;
+            
+            document.getElementById('studentsManagementContent').innerHTML = html;
+        }
+
+        async function viewStudentPortal(studentId, collection) {
+            try {
+                const studentDoc = await db.collection(collection).doc(studentId).get();
+                if (studentDoc.exists) {
+                    const student = studentDoc.data();
+                    const studentName = student.studentName || student.name || 'Student';
+                    
+                    let portalHTML = `
+                        <div class="bg-white rounded-lg shadow-lg p-6">
+                            <div class="flex justify-between items-start mb-6">
+                                <div>
+                                    <h2 class="text-xl font-bold text-gray-800">${studentName} Portal</h2>
+                                    <div class="mt-2 space-y-1">
+                                        <p class="text-sm text-gray-600">ID: ${studentId}</p>
+                                        <p class="text-sm text-gray-600">Collection: ${collection}</p>
+                                        <p class="text-sm text-gray-600">Status: ${student.status || 'Active'}</p>
+                                    </div>
+                                </div>
+                                <button onclick="hideModal('studentsManagementModal')" 
+                                        class="bg-gray-600 text-white px-4 py-2 rounded-lg text-sm">
+                                    Close
+                                </button>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="border rounded-lg p-4">
+                                    <h3 class="font-semibold text-gray-700 mb-3">Student Details</h3>
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Name:</span>
+                                            <span class="font-medium">${studentName}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Grade:</span>
+                                            <span>${student.grade || student.class || 'N/A'}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Age:</span>
+                                            <span>${student.age || 'N/A'}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Gender:</span>
+                                            <span>${student.gender || 'N/A'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="border rounded-lg p-4">
+                                    <h3 class="font-semibold text-gray-700 mb-3">Parent Connection</h3>
+                                    <div class="space-y-2">
+                    `;
+                    
+                    if (student.parentPhone) {
+                        portalHTML += `
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Phone:</span>
+                                <span class="font-mono text-green-700">${student.parentPhone}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Email:</span>
+                                <span>${student.parentEmail || 'N/A'}</span>
+                            </div>
+                            <div class="mt-4">
+                                <button onclick="viewParentByStudentPhone('${student.parentPhone}')" 
+                                        class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
+                                    👨‍👦 Go to Parent Portal
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        portalHTML += `
+                            <div class="text-center py-4">
+                                <p class="text-red-600 font-semibold">⚠️ No Parent Linked</p>
+                                <button onclick="linkStudentToParent('${studentId}', '${collection}')" 
+                                        class="mt-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
+                                    🔗 Link to Parent
+                                </button>
+                            </div>
+                        `;
+                    }
+                    
+                    portalHTML += `
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Student Submissions -->
+                    <div class="mt-6">
+                        <h3 class="font-semibold text-gray-700 mb-3">Recent Submissions</h3>
+                        <div id="studentSubmissionsContent" class="text-center py-4">
+                            <div class="loading-spinner-small mx-auto"></div>
+                            <p class="text-gray-600 text-sm mt-2">Loading submissions...</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+                    
+                    // Create a modal for student portal
+                    const studentModal = document.createElement('div');
+                    studentModal.className = 'modal';
+                    studentModal.id = 'studentPortalModal';
+                    studentModal.innerHTML = `
+                        <div class="modal-content w-full max-w-4xl">
+                            <div class="p-6">
+                                ${portalHTML}
+                            </div>
+                        </div>
+                    `;
+                    
+                    document.body.appendChild(studentModal);
+                    showModal('studentPortalModal');
+                    
+                    // Load student submissions
+                    loadStudentSubmissions(studentName);
+                }
+            } catch (error) {
+                showToast(`Error loading student: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadStudentSubmissions(studentName) {
+            try {
+                const contentDiv = document.getElementById('studentSubmissionsContent');
+                if (!contentDiv) return;
+                
+                const collections = ['student_results', 'tutor_submissions', 'daily_topics', 'homework_assignments'];
+                let totalSubmissions = 0;
+                
+                for (const collection of collections) {
+                    try {
+                        const query = await db.collection(collection)
+                            .where('studentName', '==', studentName)
+                            .limit(5)
+                            .get();
+                        
+                        if (!query.empty) {
+                            totalSubmissions += query.size;
+                        }
+                    } catch (error) {
+                        // Collection might not exist or have studentName field
+                    }
+                }
+                
+                contentDiv.innerHTML = `
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="text-blue-800 font-semibold">Found ${totalSubmissions} submissions</p>
+                                <p class="text-blue-600 text-sm">Across ${collections.length} collections</p>
+                            </div>
+                            <button onclick="searchStudentNameGlobal('${studentName}')" 
+                                    class="bg-blue-600 text-white px-3 py-1 rounded text-sm">
+                                🔍 Search All Records
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.log('Error loading submissions:', error.message);
+            }
+        }
+
+        async function viewParentByStudentPhone(phone) {
+            if (!phone) {
+                showToast('No parent phone found for this student', 'warning');
+                return;
+            }
+            
+            document.getElementById('adminParentPhone').value = phone;
+            loadParentPortal();
+            hideModal('studentPortalModal');
+            hideModal('studentsManagementModal');
+        }
+
+        async function findUnlinkedStudents() {
+            try {
+                const allStudents = await getAllStudents();
+                const unlinkedStudents = allStudents.filter(student => !student.parentPhone);
+                
+                if (unlinkedStudents.length === 0) {
+                    showToast('All students are linked to parents!', 'success');
+                    return;
+                }
+                
+                // Create a modal to show unlinked students
+                let modalHTML = `
+                    <div class="modal-content w-full max-w-4xl">
+                        <div class="p-6">
+                            <h2 class="text-xl font-bold text-gray-800 mb-4">🔍 Unlinked Students (${unlinkedStudents.length})</h2>
+                            <div class="overflow-x-auto border rounded-lg">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-red-50">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-red-700 uppercase">Student</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-red-700 uppercase">Collection</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-red-700 uppercase">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                `;
+                
+                unlinkedStudents.forEach(student => {
+                    const studentName = student.studentName || student.name || 'Unknown';
+                    modalHTML += `
+                        <tr class="border-b hover:bg-red-50">
+                            <td class="px-4 py-3 text-sm">
+                                <div class="font-medium">${capitalize(studentName)}</div>
+                                <div class="text-xs text-gray-500">ID: ${student.id.substring(0, 8)}...</div>
+                            </td>
+                            <td class="px-4 py-3 text-sm">
+                                <span class="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs">${student.collection}</span>
+                            </td>
+                            <td class="px-4 py-3 text-sm">
+                                <button onclick="linkStudentToParent('${student.id}', '${student.collection}')" 
+                                        class="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700">
+                                    🔗 Link Now
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                modalHTML += `
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-4">
+                                <button onclick="bulkLinkUnlinkedStudents()" 
+                                        class="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">
+                                    ⚡ Bulk Link All Unlinked Students
+                                </button>
+                            </div>
+                            <div class="flex justify-end mt-6">
+                                <button onclick="hideModal('unlinkedStudentsModal')" 
+                                        class="bg-gray-600 text-white px-4 py-2 rounded-lg">
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                const modal = document.createElement('div');
+                modal.className = 'modal';
+                modal.id = 'unlinkedStudentsModal';
+                modal.innerHTML = modalHTML;
+                
+                document.body.appendChild(modal);
+                showModal('unlinkedStudentsModal');
+                
+            } catch (error) {
+                showToast(`Error finding unlinked students: ${error.message}`, 'error');
+            }
+        }
+
+        async function getAllStudents() {
+            const [activeStudents, pendingStudents] = await Promise.all([
+                db.collection('students').get(),
+                db.collection('pending_students').get()
+            ]);
+            
+            const allStudents = [];
+            
+            activeStudents.forEach(doc => {
+                allStudents.push({
+                    id: doc.id,
+                    collection: 'students',
+                    status: 'Active',
+                    ...doc.data()
+                });
+            });
+            
+            pendingStudents.forEach(doc => {
+                allStudents.push({
+                    id: doc.id,
+                    collection: 'pending_students',
+                    status: 'Pending',
+                    ...doc.data()
+                });
+            });
+            
+            return allStudents;
+        }
+
+        // ==================== PHONE FORMAT ANALYZER - COMPLETE IMPLEMENTATION ====================
+        async function showPhoneFormatAnalyzer() {
+            showModal('phoneFormatAnalyzerModal');
+            
+            const contentDiv = document.getElementById('phoneFormatAnalyzerContent');
+            contentDiv.innerHTML = `
+                <div class="text-center py-8">
+                    <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+                    <p class="text-green-600 font-semibold mt-4">Analyzing phone formats across all collections...</p>
+                </div>
+            `;
+            
+            setTimeout(() => {
+                analyzePhoneFormats();
+            }, 100);
+        }
+
+        async function analyzePhoneFormats() {
+            try {
+                const contentDiv = document.getElementById('phoneFormatAnalyzerContent');
+                
+                // Get all parent users
+                const parentsSnapshot = await db.collection('parent_users').get();
+                
+                let formatStats = {
+                    total: 0,
+                    goodFormats: 0,      // +234 format
+                    riskyFormats: 0,     // 0xxx format
+                    otherFormats: 0,     // 234xxx, etc.
+                    invalidFormats: 0,
+                    formatDetails: {
+                        '+234': 0,
+                        '0xxx': 0,
+                        '234xxx': 0,
+                        'xxxxxx': 0,
+                        'invalid': 0
+                    },
+                    examples: {
+                        good: [],
+                        risky: [],
+                        invalid: []
+                    }
+                };
+                
+                parentsSnapshot.forEach(doc => {
+                    const parent = doc.data();
+                    const phone = parent.phone || '';
+                    const normalized = parent.normalizedPhone || '';
+                    
+                    formatStats.total++;
+                    
+                    // Analyze format
+                    if (phone.startsWith('+234')) {
+                        formatStats.goodFormats++;
+                        formatStats.formatDetails['+234']++;
+                        if (formatStats.examples.good.length < 3) {
+                            formatStats.examples.good.push({
+                                phone: phone,
+                                name: parent.parentName || 'Unknown',
+                                id: doc.id
+                            });
+                        }
+                    } else if (phone.startsWith('0') && phone.length === 11) {
+                        formatStats.riskyFormats++;
+                        formatStats.formatDetails['0xxx']++;
+                        if (formatStats.examples.risky.length < 3) {
+                            formatStats.examples.risky.push({
+                                phone: phone,
+                                name: parent.parentName || 'Unknown',
+                                id: doc.id
+                            });
+                        }
+                    } else if (phone.startsWith('234') && phone.length === 13) {
+                        formatStats.otherFormats++;
+                        formatStats.formatDetails['234xxx']++;
+                    } else if (phone.length >= 8 && phone.length <= 15 && /^\d+$/.test(phone)) {
+                        formatStats.otherFormats++;
+                        formatStats.formatDetails['xxxxxx']++;
+                    } else {
+                        formatStats.invalidFormats++;
+                        formatStats.formatDetails['invalid']++;
+                        if (formatStats.examples.invalid.length < 3 && phone) {
+                            formatStats.examples.invalid.push({
+                                phone: phone,
+                                name: parent.parentName || 'Unknown',
+                                id: doc.id
+                            });
+                        }
+                    }
+                });
+                
+                // Also check student records
+                const studentsSnapshot = await db.collection('students').get();
+                let studentPhoneStats = {
+                    total: 0,
+                    hasPhone: 0,
+                    missingPhone: 0,
+                    formatIssues: 0
+                };
+                
+                studentsSnapshot.forEach(doc => {
+                    const student = doc.data();
+                    studentPhoneStats.total++;
+                    
+                    if (student.parentPhone) {
+                        studentPhoneStats.hasPhone++;
+                        const normalized = universalNormalizePhoneNumber(student.parentPhone);
+                        if (normalized.length === 0 || !normalized[0].valid) {
+                            studentPhoneStats.formatIssues++;
+                        }
+                    } else {
+                        studentPhoneStats.missingPhone++;
+                    }
+                });
+                
+                // Display results
+                let html = `
+                    <div class="space-y-6">
+                        <!-- Summary Stats -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <div class="text-2xl font-bold text-green-600">${formatStats.goodFormats}</div>
+                                <div class="text-sm text-green-800">Good Formats (+234)</div>
+                                <div class="text-xs text-green-600 mt-1">${((formatStats.goodFormats/formatStats.total)*100).toFixed(1)}% of total</div>
+                            </div>
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                <div class="text-2xl font-bold text-yellow-600">${formatStats.riskyFormats}</div>
+                                <div class="text-sm text-yellow-800">Risky Formats (0xxx)</div>
+                                <div class="text-xs text-yellow-600 mt-1">${((formatStats.riskyFormats/formatStats.total)*100).toFixed(1)}% of total</div>
+                            </div>
+                            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                                <div class="text-2xl font-bold text-red-600">${formatStats.invalidFormats}</div>
+                                <div class="text-sm text-red-800">Invalid Formats</div>
+                                <div class="text-xs text-red-600 mt-1">${((formatStats.invalidFormats/formatStats.total)*100).toFixed(1)}% of total</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Student Phone Stats -->
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h3 class="font-semibold text-blue-800 mb-3">👨‍🎓 Student Phone Analysis</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <div class="text-lg font-bold text-blue-700">${studentPhoneStats.hasPhone}</div>
+                                    <div class="text-sm text-blue-600">Students with Phone</div>
+                                </div>
+                                <div>
+                                    <div class="text-lg font-bold text-red-700">${studentPhoneStats.missingPhone}</div>
+                                    <div class="text-sm text-red-600">Missing Phone</div>
+                                </div>
+                                <div>
+                                    <div class="text-lg font-bold text-yellow-700">${studentPhoneStats.formatIssues}</div>
+                                    <div class="text-sm text-yellow-600">Format Issues</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Format Details -->
+                        <div>
+                            <h3 class="font-semibold text-gray-800 mb-3">📊 Format Breakdown</h3>
+                            <div class="space-y-4">
+                `;
+                
+                // Format breakdown
+                for (const [format, count] of Object.entries(formatStats.formatDetails)) {
+                    if (count > 0) {
+                        const percentage = ((count/formatStats.total)*100).toFixed(1);
+                        let color = 'gray';
+                        let bgColor = 'gray-100';
+                        let textColor = 'gray-800';
+                        
+                        if (format === '+234') {
+                            color = 'green';
+                            bgColor = 'green-100';
+                            textColor = 'green-800';
+                        } else if (format === '0xxx') {
+                            color = 'yellow';
+                            bgColor = 'yellow-100';
+                            textColor = 'yellow-800';
+                        } else if (format === 'invalid') {
+                            color = 'red';
+                            bgColor = 'red-100';
+                            textColor = 'red-800';
+                        }
+                        
+                        html += `
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <span class="font-medium">${format === '+234' ? '+234xxxxxxxxx' : 
+                                                              format === '0xxx' ? '0xxxxxxxxxx' : 
+                                                              format === '234xxx' ? '234xxxxxxxxx' : 
+                                                              format === 'xxxxxx' ? 'xxxxxxxxxx' : 'Invalid'}</span>
+                                    <span class="text-xs text-gray-500 ml-2">(${format})</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <div class="w-48 bg-${bgColor} rounded-full h-2.5 mr-3">
+                                        <div class="bg-${color}-600 h-2.5 rounded-full" style="width: ${percentage}%"></div>
+                                    </div>
+                                    <span class="text-${textColor} font-medium">${count} (${percentage}%)</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+                
+                html += `
+                            </div>
+                        </div>
+                        
+                        <!-- Examples -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="border border-green-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-green-800 mb-2">✅ Good Format Examples</h4>
+                                <div class="space-y-2">
+                `;
+                
+                if (formatStats.examples.good.length > 0) {
+                    formatStats.examples.good.forEach(example => {
+                        html += `
+                            <div class="bg-green-50 p-2 rounded">
+                                <div class="font-mono text-green-700">${example.phone}</div>
+                                <div class="text-xs text-green-600">${example.name}</div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    html += `<p class="text-green-600 text-sm">No examples found</p>`;
+                }
+                
+                html += `
+                                </div>
+                            </div>
+                            
+                            <div class="border border-yellow-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-yellow-800 mb-2">⚠️ Risky Format Examples</h4>
+                                <div class="space-y-2">
+                `;
+                
+                if (formatStats.examples.risky.length > 0) {
+                    formatStats.examples.risky.forEach(example => {
+                        const normalized = universalNormalizePhoneNumber(example.phone);
+                        const suggested = normalized.length > 0 && normalized[0].valid ? 
+                            normalized[0].normalized : 'Cannot normalize';
+                        
+                        html += `
+                            <div class="bg-yellow-50 p-2 rounded">
+                                <div class="font-mono text-yellow-700">${example.phone}</div>
+                                <div class="text-xs text-yellow-600">${example.name}</div>
+                                <div class="text-xs text-green-600 mt-1">Suggested: ${suggested}</div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    html += `<p class="text-yellow-600 text-sm">No risky formats found</p>`;
+                }
+                
+                html += `
+                                </div>
+                            </div>
+                            
+                            <div class="border border-red-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-red-800 mb-2">❌ Invalid Format Examples</h4>
+                                <div class="space-y-2">
+                `;
+                
+                if (formatStats.examples.invalid.length > 0) {
+                    formatStats.examples.invalid.forEach(example => {
+                        html += `
+                            <div class="bg-red-50 p-2 rounded">
+                                <div class="font-mono text-red-700">${example.phone || 'Empty'}</div>
+                                <div class="text-xs text-red-600">${example.name}</div>
+                                <button onclick="editParentPhone('${example.id}', '${example.phone || ''}')" 
+                                        class="mt-1 text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700">
+                                    Fix
+                                </button>
+                            </div>
+                        `;
+                    });
+                } else {
+                    html += `<p class="text-red-600 text-sm">No invalid formats found</p>`;
+                }
+                
+                html += `
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Actions -->
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-purple-800 mb-3">🚀 Bulk Actions</h4>
+                            <div class="flex flex-wrap gap-3">
+                                <button onclick="fixAllRiskyFormats()" class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700">
+                                    🔄 Fix All Risky Formats (${formatStats.riskyFormats})
+                                </button>
+                                <button onclick="normalizeAllPhones()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                                    ⚡ Normalize All Phones (${formatStats.total})
+                                </button>
+                                <button onclick="generatePhoneReport()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                                    📊 Generate Report
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                contentDiv.innerHTML = html;
+                
+            } catch (error) {
+                contentDiv.innerHTML = `
+                    <div class="text-center py-8 text-red-600">
+                        <p>Error analyzing phone formats: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function hidePhoneFormatAnalyzer() {
+            hideModal('phoneFormatAnalyzerModal');
+        }
+
+        // ==================== MAIN PARENT PORTAL LOADER ====================
+        async function loadParentPortal() {
+            const searchInput = document.getElementById('adminParentPhone');
+            const query = searchInput.value.trim();
+            const searchBtn = document.getElementById('searchBtn');
+            
+            if (!query) {
+                showError('Input Required', 'Please enter a phone number, email, or student name');
+                return;
+            }
+
+            searchBtn.disabled = true;
+            searchBtn.innerHTML = '<div class="loading-spinner-small mr-2"></div> Searching...';
+            document.getElementById('adminLoader').classList.remove('hidden');
+            document.getElementById('adminError').classList.add('hidden');
+            document.getElementById('adminResultsArea').classList.add('hidden');
+            document.getElementById('loadingDetails').textContent = `Searching for: ${query}`;
+
+            try {
+                // Use universal search
+                const searchResult = await universalSearch(query);
+                
+                if (!searchResult || !searchResult.parent) {
+                    // Check if we found student but no parent
+                    if (searchResult && searchResult.foundStudent) {
+                        throw new Error(`Found student "${searchResult.foundStudent.studentName}" but no parent account is linked. You may need to link a parent first.`);
+                    }
+                    
+                    if (searchResult && searchResult.message) {
+                        throw new Error(searchResult.message);
+                    }
+                    
+                    throw new Error('No account found with that phone, email, or student name.');
+                }
+
+                // Load the parent portal
+                await loadCompleteParentPortal(searchResult.parentId, searchResult.parent.phone || query, searchResult.parent);
+
+            } catch (error) {
+                console.error('Admin portal error:', error);
+                showError('Search Failed', error.message);
+            } finally {
+                searchBtn.disabled = false;
+                searchBtn.innerHTML = '<span class="mr-2">🔍</span> View Parent Portal';
+            }
+        }
+
+        // ==================== EXISTING ADMIN TOOLS FUNCTIONS ====================
+        function showAdminTools() {
+            loadSystemStats();
+            showModal('adminToolsModal');
+        }
+
+        function hideAdminTools() {
+            hideModal('adminToolsModal');
+        }
+
+        // Quick test function
+        function testWithSampleData() {
+            const sampleNumbers = [
+                '08012345678',
+                '2348012345678',
+                '+2348012345678',
+                '8012345678',
+                '07012345678',
+                '2347012345678'
+            ];
+            
+            const randomNumber = sampleNumbers[Math.floor(Math.random() * sampleNumbers.length)];
+            document.getElementById('adminParentPhone').value = randomNumber;
+            
+            showToast(`Testing with: ${randomNumber}`, 'info');
+            loadParentPortal();
+        }
+
+        // Quick search functions
+        async function searchRecentParents() {
+            try {
+                document.getElementById('loadingDetails').textContent = 'Loading recent parents...';
+                document.getElementById('adminLoader').classList.remove('hidden');
+                
+                const recentParents = await db.collection('parent_users')
+                    .orderBy('createdAt', 'desc')
+                    .limit(20)
+                    .get();
+
+                if (recentParents.empty) {
+                    showError('No Parents Found', 'No parent accounts found in the system.');
+                    return;
+                }
+
+                let parentsArray = [];
+                recentParents.forEach(doc => {
+                    parentsArray.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+
+                displayParentList(parentsArray, 'Recent Parents', true);
+                
+            } catch (error) {
+                showError('Search Failed', 'Error loading recent parents: ' + error.message);
+            }
+        }
+
+        async function showAllParents() {
+            try {
+                document.getElementById('loadingDetails').textContent = 'Loading all parents...';
+                document.getElementById('adminLoader').classList.remove('hidden');
+
+                const allParents = await db.collection('parent_users').limit(50).get();
+
+                if (allParents.empty) {
+                    showError('No Parents', 'No parent accounts found in the system.');
+                    return;
+                }
+
+                let parentsArray = [];
+                allParents.forEach(doc => {
+                    parentsArray.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+
+                displayParentList(parentsArray, 'All Parents', true);
+
+            } catch (error) {
+                showError('Search Failed', 'Error loading all parents: ' + error.message);
+            }
+        }
+
+        function displayParentList(parents, title, showActions = false) {
+            let optionsHTML = `
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold mb-4">${title} (${parents.length})</h3>
+                    <div class="space-y-3 max-h-96 overflow-y-auto">
+            `;
+            
+            parents.forEach(parent => {
+                const isDefective = parent.issues && parent.issues.length > 0;
+                const isDuplicate = parent.duplicateCount > 1;
+                
+                let badgeHTML = '';
+                if (isDefective) {
+                    badgeHTML = `<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full ml-2">Defective</span>`;
+                }
+                if (isDuplicate) {
+                    badgeHTML += `<span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full ml-2">Duplicate (${parent.duplicateCount})</span>`;
+                }
+                
+                optionsHTML += `
+                    <div class="border rounded-lg p-4 ${isDefective ? 'defective-account' : isDuplicate ? 'duplicate-account' : ''}">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <strong class="text-gray-800">${parent.parentName || 'Unknown Name'}</strong>
+                                ${badgeHTML}
+                                <div class="text-sm text-gray-600 mt-1">
+                                    📞 ${parent.phone}<br>
+                                    📧 ${parent.email}
+                                </div>
+                                ${parent.issues ? `
+                                    <div class="text-xs text-red-600 mt-2">
+                                        <strong>Issues:</strong> ${parent.issues.join(', ')}
+                                    </div>
+                                ` : ''}
+                            </div>
+                            ${showActions ? `
+                                <div class="flex flex-col space-y-2 ml-4">
+                                    <button onclick="editParentEmailPrompt('${parent.id}', '${parent.parentName || 'Unknown'}', '${parent.email}')" 
+                                            class="bg-green-100 text-green-800 px-3 py-1 rounded text-sm hover:bg-green-200">
+                                        ✏️ Edit Email
+                                    </button>
+                                    <button onclick="viewParentPortalById('${parent.id}')" 
+                                            class="bg-blue-100 text-blue-800 px-3 py-1 rounded text-sm hover:bg-blue-200">
+                                        👁️ View Portal
+                                    </button>
+                                    <button onclick="deleteParentAccountPrompt('${parent.id}', '${parent.parentName || 'Unknown'}', '${parent.phone}', '${parent.email}')" 
+                                            class="bg-red-100 text-red-800 px-3 py-1 rounded text-sm hover:bg-red-200">
+                                        🗑️ Delete
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            optionsHTML += '</div></div>';
+            
+            document.getElementById('adminLoader').classList.add('hidden');
+            document.getElementById('adminResultsArea').innerHTML = optionsHTML;
+            document.getElementById('adminResultsArea').classList.remove('hidden');
+        }
+
+        async function viewParentPortalById(userId) {
+            try {
+                const userDoc = await db.collection('parent_users').doc(userId).get();
+                if (userDoc.exists) {
+                    const parentUser = userDoc.data();
+                    document.getElementById('adminParentPhone').value = parentUser.phone;
+                    loadParentPortal();
+                    hideModal('adminToolsModal');
+                }
+            } catch (error) {
+                showToast('Error loading parent: ' + error.message, 'error');
+            }
+        }
+
+        async function searchByStudentName() {
+            const studentName = prompt('Enter student name to search:');
+            if (!studentName) return;
+
+            try {
+                document.getElementById('loadingDetails').textContent = `Searching for student: ${studentName}`;
+                document.getElementById('adminLoader').classList.remove('hidden');
+
+                const assessmentSnapshot = await db.collection('student_results')
+                    .where('studentName', '>=', studentName)
+                    .where('studentName', '<=', studentName + '\uf8ff')
+                    .limit(10)
+                    .get();
+
+                let parentPhones = new Set();
+                
+                assessmentSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.parentPhone) {
+                        parentPhones.add(data.parentPhone);
+                    }
+                });
+
+                const monthlySnapshot = await db.collection('tutor_submissions')
+                    .where('studentName', '>=', studentName)
+                    .where('studentName', '<=', studentName + '\uf8ff')
+                    .limit(10)
+                    .get();
+
+                monthlySnapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.parentPhone) {
+                        parentPhones.add(data.parentPhone);
+                    }
+                });
+
+                if (parentPhones.size === 0) {
+                    showError('No Results', `No parents found for student: ${studentName}`);
+                    return;
+                }
+
+                let parentsArray = [];
+                for (let phone of parentPhones) {
+                    const parentQuery = await db.collection('parent_users')
+                        .where('phone', '==', phone)
+                        .limit(1)
+                        .get();
+                    
+                    if (!parentQuery.empty) {
+                        parentsArray.push({
+                            id: parentQuery.docs[0].id,
+                            ...parentQuery.docs[0].data()
+                        });
+                    }
+                }
+
+                displayParentList(parentsArray, `Parents for Student: ${studentName}`, true);
+
+            } catch (error) {
+                showError('Search Failed', 'Error searching by student name: ' + error.message);
+            }
+        }
+
+        function sendTestNotification() {
+            showToast('Test notification sent successfully!', 'success');
+        }
+
+        // Load system stats
+        async function loadSystemStats() {
+            try {
+                const parentsSnapshot = await db.collection('parent_users').get();
+                const studentsSnapshot = await db.collection('students').get();
+                const totalParents = parentsSnapshot.size;
+                const totalStudents = studentsSnapshot.size;
+                
+                let defectiveCount = 0;
+                let duplicateCount = 0;
+                
+                parentsSnapshot.forEach(doc => {
+                    const parent = doc.data();
+                    if (!parent.normalizedPhone || !parent.phone || parent.phone.length < 8) {
+                        defectiveCount++;
+                    }
+                });
+                
+                document.getElementById('systemStats').innerHTML = `
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-white p-3 rounded-lg border">
+                            <div class="text-2xl font-bold text-blue-600">${totalParents}</div>
+                            <div class="text-sm text-gray-600">Total Parents</div>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg border">
+                            <div class="text-2xl font-bold text-green-600">${totalStudents}</div>
+                            <div class="text-sm text-gray-600">Total Students</div>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg border">
+                            <div class="text-2xl font-bold text-red-600">${defectiveCount}</div>
+                            <div class="text-sm text-gray-600">Defective Accounts</div>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg border">
+                            <div class="text-2xl font-bold text-purple-600">${totalParents - defectiveCount}</div>
+                            <div class="text-sm text-gray-600">Healthy Accounts</div>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('systemStats').innerHTML = `<p class="text-red-600">Error loading statistics: ${error.message}</p>`;
+            }
+        }
+
+        // ==================== EDIT PHONE FUNCTIONS ====================
+        function editParentPhone(userId, currentPhone) {
+            currentEditingUserId = userId;
+            document.getElementById('currentPhone').value = currentPhone;
+            document.getElementById('newPhone').value = '';
+            document.getElementById('phoneValidation').classList.add('hidden');
+            showModal('editPhoneModal');
+        }
+
+        // ==================== INITIALIZATION ====================
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Admin Parent Viewer with Universal Search & Fix Tools');
             
@@ -2117,18 +3224,6 @@
                     loadParentPortal();
                 }
             });
-            
-            // Initialize delete confirmation
-            const confirmDelete = document.getElementById('confirmDelete');
-            if (confirmDelete) {
-                confirmDelete.addEventListener('change', function() {
-                    const deleteBtn = document.getElementById('confirmDeleteBtn');
-                    if (deleteBtn) {
-                        deleteBtn.disabled = !this.checked;
-                        deleteBtn.classList.toggle('opacity-50', !this.checked);
-                    }
-                });
-            }
             
             // Show welcome message
             setTimeout(() => {
