@@ -1,6 +1,6 @@
 /*******************************************************************************
  * SECTION 1: IMPORTS & INITIAL SETUP
- ******************************************************************************/
+ ******************************************************************************/https://github.com/psalminfo/blooming-kids-cbt/blob/main/tutor.js
 
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc, deleteField } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
@@ -5415,7 +5415,6 @@ function renderSmartReportForm(student, existingReport, monthsWithStatus) {
                 </option>`;
     }).join('');
     
-    const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
     const displayMonth = formatMonthValue(defaultMonthValue);
     
     const reportFormHTML = `
@@ -5496,7 +5495,7 @@ function renderSmartReportForm(student, existingReport, monthsWithStatus) {
                 Cancel
             </button>
             <button id="modal-action-btn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
-                ${isSingleApprovedStudent ? 'Proceed to Submit' : 'Save Report'}
+                Save Report
             </button>
         </div>
     `;
@@ -5615,9 +5614,9 @@ function renderSmartReportForm(student, existingReport, monthsWithStatus) {
 
 /**
  * Enhanced function to check submissions by month
- * Replace the original submission check logic
+ * Use this instead of the old submission check
  */
-async function checkStudentSubmissions(tutorEmail) {
+async function checkStudentSubmissionsByMonth(tutorEmail) {
     try {
         const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
         
@@ -5628,7 +5627,7 @@ async function checkStudentSubmissions(tutorEmail) {
         );
         
         const snapshot = await getDocs(allSubmissionsQuery);
-        const submittedStudentIds = new Set();
+        const submittedStudentIdsSet = new Set(); // Changed variable name to avoid conflict
         const submittedMonthsByStudent = {}; // Track which months each student has reports for
         
         snapshot.forEach(doc => {
@@ -5664,12 +5663,12 @@ async function checkStudentSubmissions(tutorEmail) {
             });
             
             if (hasCurrentMonth) {
-                submittedStudentIds.add(studentId);
+                submittedStudentIdsSet.add(studentId);
             }
         });
         
         return {
-            submittedStudentIds,
+            submittedStudentIds: submittedStudentIdsSet, // Return the set with different name
             submittedMonthsByStudent,
             hasSubmissionForMonth: (studentId, month) => {
                 return submittedMonthsByStudent[studentId] && 
@@ -5688,238 +5687,97 @@ async function checkStudentSubmissions(tutorEmail) {
 // ============================================
 
 /**
- * Update the renderStudentDatabase function to use new system
- * Replace the original status checking logic
+ * Updated version of renderStudentDatabase with month tracking
+ * This should replace the problematic section in your code
  */
-async function renderStudentDatabaseWithSmartReports(container, tutor) {
+async function renderStudentDatabaseWithMonthTracking(container, tutor) {
     // ... existing code until submission check ...
     
-    // REPLACE THIS SECTION:
+    // FIXED: Use new function that doesn't conflict with variable names
+    const submissionInfo = await checkStudentSubmissionsByMonth(tutor.email);
+    const submittedStudentIds = submissionInfo.submittedStudentIds; // This won't conflict now
+    
+    // ... rest of your function ...
+}
+
+// ============================================
+// 5. PATCH FOR EXISTING RENDERSTUDENTDATABASE
+// ============================================
+
+/**
+ * Patch to fix the duplicate variable declaration in renderStudentDatabase
+ * Add this to the beginning of your renderStudentDatabase function
+ */
+function applyMonthTrackingPatch() {
+    // Find the problematic section in renderStudentDatabase
+    // Look for this code:
+    /*
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     const submittedStudentIds = new Set();
+    */
     
-    allSubmissionsSnapshot.forEach(doc => {
-        const subData = doc.data();
-        const subDate = subData.submittedAt.toDate();
-        if (subDate.getMonth() === currentMonth && subDate.getFullYear() === currentYear) {
-            submittedStudentIds.add(subData.studentId); // OLD LOGIC
-        }
-    });
+    // Replace it with:
+    /*
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const currentMonthYear = now.toLocaleString('default', { month: 'long', year: 'numeric' });
     
-    // WITH THIS:
-    const submissionInfo = await checkStudentSubmissions(tutor.email);
+    // Use new month-aware submission checking
+    const submissionInfo = await checkStudentSubmissionsByMonth(tutor.email);
     const submittedStudentIds = submissionInfo.submittedStudentIds;
     const submittedMonthsByStudent = submissionInfo.submittedMonthsByStudent;
-    
-    // Then in your student loop, display month-specific status:
-    students.forEach(student => {
-        const studentMonths = submittedMonthsByStudent[student.id] || new Set();
-        const hasCurrentMonthReport = Array.from(studentMonths).some(month => {
-            return month.includes(currentMonthYear);
-        });
-        
-        // Display appropriate status
-        if (hasCurrentMonthReport) {
-            statusHTML = `<span class="status-indicator text-blue-600 font-semibold">
-                            Report Sent (${currentMonthYear})
-                         </span>`;
-        } else if (studentMonths.size > 0) {
-            // Has reports for other months
-            const lastMonth = Array.from(studentMonths).pop();
-            statusHTML = `<span class="status-indicator text-yellow-600">
-                            Last report: ${lastMonth}
-                         </span>`;
-        }
-        // ... rest of student rendering ...
-    });
-    
-    // ... rest of function ...
+    */
 }
 
 // ============================================
-// 5. MIGRATION HELPER FOR EXISTING DATA
+// 6. INTEGRATION HELPER FUNCTIONS
 // ============================================
 
 /**
- * Helper to migrate existing reports to new system
- * Run this once to update all existing reports
- */
-async function migrateExistingReports() {
-    try {
-        console.log("Starting report migration...");
-        
-        const allReportsQuery = query(collection(db, "tutor_submissions"));
-        const snapshot = await getDocs(allReportsQuery);
-        
-        let migratedCount = 0;
-        const updatePromises = [];
-        
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            
-            // Skip if already migrated
-            if (data.reportMonth) {
-                return;
-            }
-            
-            // Determine month from submission date
-            const subDate = data.submittedAt.toDate();
-            const monthValue = `${subDate.getFullYear()}-${String(subDate.getMonth() + 1).padStart(2, '0')}`;
-            const monthDisplay = subDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-            
-            // Prepare update
-            updatePromises.push(
-                updateDoc(doc.ref, {
-                    reportMonth: monthValue,
-                    reportMonthDisplay: monthDisplay,
-                    submittedForMonth: monthDisplay // For backward compatibility
-                })
-            );
-            
-            migratedCount++;
-        });
-        
-        // Execute all updates
-        await Promise.all(updatePromises);
-        console.log(`✅ Successfully migrated ${migratedCount} reports`);
-        showCustomAlert(`✅ Migrated ${migratedCount} existing reports to new system`);
-        
-    } catch (error) {
-        console.error("Migration failed:", error);
-        showCustomAlert("❌ Report migration failed. Please contact admin.");
-    }
-}
-
-// ============================================
-// 6. INTEGRATION WITH EXISTING CODE
-// ============================================
-
-/**
- * Replace the original showReportModal calls with smart version
- * Add this to your main initialization or event listeners
+ * Replace old report modal with smart one
  */
 function integrateSmartReporting() {
-    // Replace event listeners for report buttons
-    document.addEventListener('click', function(e) {
-        // Handle enter report buttons
-        if (e.target.classList.contains('enter-report-btn') || 
-            e.target.classList.contains('submit-single-report-btn')) {
-            e.preventDefault();
-            const studentId = e.target.getAttribute('data-student-id');
-            const student = students.find(s => s.id === studentId);
-            if (student) {
-                showSmartReportModal(student); // Use new smart modal
-            }
-        }
-    });
+    // Store reference to old function if needed
+    window.originalShowReportModal = window.showReportModal;
     
-    // Update dashboard buttons if needed
-    const addTopicBtn = document.getElementById('add-topic-btn');
-    if (addTopicBtn) {
-        addTopicBtn.addEventListener('click', () => {
-            const studentId = document.getElementById('select-student-topic').value;
-            const student = getStudentFromCache(studentId);
-            if (student) {
-                showSmartReportModal(student); // Use new smart modal
-            }
-        });
-    }
+    // Override with new function
+    window.showReportModal = function(student) {
+        showSmartReportModal(student);
+    };
+    
+    console.log("✅ Smart reporting system integrated");
 }
-
-// ============================================
-// 7. ADMIN REPORT VIEW ENHANCEMENT
-// ============================================
-
-/**
- * Enhanced admin view to show reports by month
- */
-async function loadTutorReportsByMonth(tutorEmail) {
-    try {
-        const reportsQuery = query(
-            collection(db, "tutor_submissions"),
-            where("tutorEmail", "==", tutorEmail)
-        );
-        
-        const snapshot = await getDocs(reportsQuery);
-        const reportsByMonth = {};
-        
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const monthKey = data.reportMonth || 
-                           data.submittedForMonth || 
-                           data.submittedAt.toDate().toLocaleString('default', { month: 'long', year: 'numeric' });
-            
-            if (!reportsByMonth[monthKey]) {
-                reportsByMonth[monthKey] = [];
-            }
-            
-            reportsByMonth[monthKey].push({
-                id: doc.id,
-                ...data,
-                month: monthKey
-            });
-        });
-        
-        // Sort months chronologically
-        const sortedMonths = Object.keys(reportsByMonth).sort((a, b) => {
-            // Convert to dates for sorting
-            const dateA = parseMonthToDate(a);
-            const dateB = parseMonthToDate(b);
-            return dateB - dateA; // Newest first
-        });
-        
-        return { reportsByMonth, sortedMonths };
-        
-    } catch (error) {
-        console.error("Error loading reports by month:", error);
-        return { reportsByMonth: {}, sortedMonths: [] };
-    }
-}
-
-// Helper to parse month string to Date
-function parseMonthToDate(monthStr) {
-    if (monthStr.match(/^\d{4}-\d{2}$/)) {
-        // YYYY-MM format
-        const [year, month] = monthStr.split('-').map(Number);
-        return new Date(year, month - 1);
-    } else {
-        // Try to parse "Month Year" format
-        const [monthName, year] = monthStr.split(' ');
-        const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
-        return new Date(year, monthIndex);
-    }
-}
-
-// ============================================
-// 8. INITIALIZATION
-// ============================================
 
 /**
  * Initialize the smart reporting system
- * Call this when tutor logs in
  */
 async function initSmartReporting(tutor) {
-    console.log("Initializing Smart Reporting System...");
+    console.log("🔄 Initializing Smart Reporting System...");
     
-    // 1. Integrate with existing UI
-    integrateSmartReporting();
-    
-    // 2. Optional: Run migration once
-    const migrationDone = localStorage.getItem('report_migration_done');
-    if (!migrationDone && tutor.isManagementStaff) {
-        const shouldMigrate = confirm("Update existing reports to new month-tracking system?");
-        if (shouldMigrate) {
-            await migrateExistingReports();
-            localStorage.setItem('report_migration_done', 'true');
+    try {
+        // 1. Integrate with existing UI
+        integrateSmartReporting();
+        
+        // 2. Add CSS styles
+        addSmartReportingStyles();
+        
+        // 3. Optional: Show welcome message for first time
+        const hasSeenMessage = localStorage.getItem('smart_reporting_welcome');
+        if (!hasSeenMessage) {
+            setTimeout(() => {
+                showCustomAlert("📅 Smart Reporting Enabled!\n\nNow you can:\n• Submit reports for any month\n• Submit both late and current month reports\n• Never get blocked by late submissions");
+                localStorage.setItem('smart_reporting_welcome', 'true');
+            }, 2000);
         }
+        
+        console.log("✅ Smart Reporting System Ready");
+        
+    } catch (error) {
+        console.error("❌ Smart reporting initialization failed:", error);
     }
-    
-    // 3. Add CSS for new components
-    addSmartReportingStyles();
-    
-    console.log("✅ Smart Reporting System Ready");
 }
 
 /**
@@ -5990,30 +5848,72 @@ function addSmartReportingStyles() {
 }
 
 // ============================================
-// 9. USAGE INSTRUCTIONS
+// 7. QUICK FIX FOR IMMEDIATE USE
 // ============================================
 
-/*
-HOW TO USE THIS SYSTEM:
+/**
+ * Quick patch to fix the immediate issue
+ * Add this to your existing renderStudentDatabase function where the error occurs
+ */
+function applyQuickFixToRenderStudentDatabase() {
+    // In your renderStudentDatabase function, find this code around line 5713:
+    /*
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const submittedStudentIds = new Set();
+    
+    allSubmissionsSnapshot.forEach(doc => {
+        const subData = doc.data();
+        const subDate = subData.submittedAt.toDate();
+        if (subDate.getMonth() === currentMonth && subDate.getFullYear() === currentYear) {
+            submittedStudentIds.add(subData.studentId);
+        }
+    });
+    */
+    
+    // Replace it with:
+    /*
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const currentMonthYear = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+    
+    // Use temporary variable to avoid conflict
+    const tempSubmittedIds = new Set();
+    
+    allSubmissionsSnapshot.forEach(doc => {
+        const subData = doc.data();
+        const subDate = subData.submittedAt.toDate();
+        
+        // Check if report is for current month (not just submission date)
+        const reportMonth = subData.reportMonth || 
+                           subData.submittedForMonth ||
+                           subDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+        
+        // Only block if it's a report for current month
+        if (reportMonth === currentMonthYear) {
+            tempSubmittedIds.add(subData.studentId);
+        }
+    });
+    
+    const submittedStudentIds = tempSubmittedIds; // Assign to original variable
+    */
+}
 
-1. Add this entire SECTION 15A to your tutor.js file
-2. In your main initialization, call:
-   initSmartReporting(window.tutorData);
-   
-3. Replace the original report button event listeners to use:
-   showSmartReportModal() instead of showReportModal()
+// ============================================
+// 8. INITIALIZE ON PAGE LOAD
+// ============================================
 
-4. Optional: Run migration once to update existing reports
-
-FEATURES:
-✅ Explicit month selection for every report
-✅ Prevents accidental duplicate submissions for same month
-✅ Allows late submissions without blocking current month
-✅ Clear visual indicators for which months have reports
-✅ Backward compatible with existing data
-✅ Migration tool for existing reports
-✅ Admin view organized by month
-*/
+// Add this to your main initialization
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait for tutor data to be available
+    setTimeout(() => {
+        if (window.tutorData) {
+            initSmartReporting(window.tutorData);
+        }
+    }, 1000);
+});
 
 /*******************************************************************************
  * END OF SECTION 15A: SMART MONTHLY REPORT SUBMISSION SYSTEM
@@ -6233,6 +6133,7 @@ inboxObserver.observe(document.body, { childList: true, subtree: true });
 // EXPOSE FUNCTIONS TO WINDOW (REQUIRED FOR HTML ONCLICK)
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
+
 
 
 
