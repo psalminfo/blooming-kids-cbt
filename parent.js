@@ -4419,3 +4419,242 @@ window.settingsManager = new SettingsManager();
 window.authManager = authManager;
 window.comprehensiveFindChildren = comprehensiveFindChildren;
 window.manualRefreshReportsV2 = manualRefreshReportsV2;
+
+// ============================================================================
+// SECTION 20: GOOGLE CLASSROOM STYLE HOMEWORK (COMPLETE PARENT VERSION)
+// ============================================================================
+
+// CONFIG
+const CLOUDINARY_CONFIG = {
+    cloudName: 'dwjq7j5zp', 
+    uploadPreset: 'tutor_homework'
+};
+
+// 1. INJECT DEPENDENCIES
+(function loadDeps() {
+    if (!document.getElementById('cloudinary-script')) {
+        const s = document.createElement('script');
+        s.id = 'cloudinary-script';
+        s.src = 'https://upload-widget.cloudinary.com/global/all.js';
+        document.head.appendChild(s);
+    }
+    const style = document.createElement('style');
+    style.textContent = `
+        .gc-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(4px); animation: fadeIn 0.2s; }
+        .gc-modal-container { background: #fff; width: 90%; max-width: 1000px; height: 90vh; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.2); }
+        .gc-header { padding: 16px 24px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; }
+        .gc-body { display: flex; flex: 1; overflow-y: auto; background: #fff; }
+        .gc-main { flex: 1; padding: 24px; border-right: 1px solid #f0f0f0; }
+        .gc-sidebar { width: 350px; padding: 24px; background: #fff; }
+        .gc-title { font-size: 2rem; color: #1967d2; margin-bottom: 8px; }
+        .gc-card { background: #fff; border: 1px solid #dadce0; border-radius: 8px; padding: 16px; box-shadow: 0 1px 2px rgba(60,64,67,0.3); margin-bottom: 16px; }
+        .gc-btn-add { display: flex; align-items: center; justify-content: center; width: 100%; padding: 10px; margin-bottom: 10px; background: #fff; border: 1px solid #dadce0; border-radius: 4px; color: #1967d2; font-weight: 500; cursor: pointer; transition: 0.2s; }
+        .gc-btn-add:hover { background: #f8f9fa; color: #174ea6; }
+        .gc-btn-primary { width: 100%; padding: 10px; background: #1967d2; border: none; border-radius: 4px; color: #fff; font-weight: 500; cursor: pointer; transition: 0.2s; }
+        .gc-btn-primary:hover { background: #185abc; }
+        .gc-btn-unsubmit { width: 100%; padding: 10px; background: #fff; border: 1px solid #dadce0; border-radius: 4px; color: #3c4043; font-weight: 500; cursor: pointer; margin-top: 10px; }
+        .gc-btn-unsubmit:hover { background: #f1f3f4; }
+        .gc-attachment { display: flex; align-items: center; border: 1px solid #dadce0; border-radius: 4px; padding: 8px; margin-bottom: 12px; cursor: pointer; }
+        .gc-att-icon { width: 36px; height: 36px; background: #f1f3f4; color: #1967d2; display: flex; align-items: center; justify-content: center; margin-right: 12px; border-radius: 4px; }
+        @media (max-width: 768px) { .gc-body { flex-direction: column; } .gc-sidebar { width: 100%; border-top: 1px solid #e0e0e0; } }
+    `;
+    document.head.appendChild(style);
+})();
+
+// 2. OPEN GOOGLE CLASSROOM MODAL (With Real-Time Listener)
+let homeworkUnsub = null; // Store listener to detach later
+
+function openGoogleClassroomModal(initialHwData, studentId) {
+    document.body.style.overflow = 'hidden';
+    
+    // Create base modal structure
+    const modalHTML = `
+        <div class="gc-modal-overlay" id="gcModal">
+            <div class="gc-modal-container">
+                <div class="gc-header">
+                    <div class="flex items-center gap-3"><span class="font-medium text-gray-600">Assignment Details</span></div>
+                    <button onclick="closeGoogleClassroomModal()" class="text-2xl text-gray-500 hover:text-black">×</button>
+                </div>
+                <div class="gc-body" id="gcBodyContent">
+                    <div class="flex justify-center items-center h-full w-full"><div class="loading-spinner"></div></div>
+                </div>
+            </div>
+        </div>`;
+    
+    const div = document.createElement('div');
+    div.innerHTML = modalHTML;
+    document.body.appendChild(div.firstElementChild);
+
+    // Start Real-time Listener on this specific homework ID
+    const hwRef = db.collection('homework_assignments').doc(initialHwData.id);
+    
+    homeworkUnsub = hwRef.onSnapshot((doc) => {
+        if (doc.exists) {
+            const freshData = { id: doc.id, ...doc.data() };
+            // Ensure timestamp is converted if needed (handling both Date and Firestore Timestamp)
+            if (freshData.dueDate && typeof freshData.dueDate.toDate !== 'function') {
+                 // It's likely a string, try to parse or keep as is.
+                 // Ideally consistency in DB is key.
+            }
+            renderGoogleClassroomContent(freshData, studentId);
+        }
+    });
+}
+
+function renderGoogleClassroomContent(homework, studentId) {
+    const container = document.getElementById('gcBodyContent');
+    if (!container) return;
+
+    // --- SMART STATUS LOGIC ---
+    const isGraded = homework.status === 'graded';
+    const isSubmitted = ['submitted', 'completed', 'graded'].includes(homework.status);
+    
+    // Calculate Due Date Logic
+    let dueTime = 0;
+    if (homework.dueDate) dueTime = new Date(homework.dueDate).getTime();
+    else if (homework.dueTimestamp) dueTime = homework.dueTimestamp;
+    
+    const now = Date.now();
+    const isOverdue = !isSubmitted && dueTime > 0 && dueTime < now;
+    
+    // Check for "Done Late"
+    let isDoneLate = false;
+    if (isSubmitted && homework.submittedAt && dueTime > 0) {
+        const subTime = homework.submittedAt.toDate ? homework.submittedAt.toDate().getTime() : new Date(homework.submittedAt).getTime();
+        if (subTime > dueTime) isDoneLate = true;
+    }
+
+    let statusText = 'Assigned';
+    let statusClass = 'text-green-700';
+    let statusSubText = '';
+
+    if (isGraded) {
+        statusText = 'Graded';
+        statusClass = 'text-black font-bold';
+    } else if (isSubmitted) {
+        statusText = 'Handed in';
+        statusClass = 'text-green-700 font-bold';
+        if (isDoneLate) {
+            statusSubText = '<span class="text-red-500 text-xs font-bold block">Done late</span>';
+        }
+    } else if (isOverdue) {
+        statusText = 'Missing';
+        statusClass = 'text-red-600 font-bold';
+    }
+
+    // RENDER UI
+    container.innerHTML = `
+        <div class="gc-main">
+            <h1 class="gc-title">${homework.title || homework.subject}</h1>
+            <div class="text-gray-500 text-sm mb-6 flex gap-3">
+                <span>${homework.tutorName || 'Tutor'}</span> • 
+                <span>Due ${homework.dueDate || 'No Date'}</span> • 
+                <span class="${statusClass}">${statusText}</span>
+            </div>
+            <div class="border-b mb-6"></div>
+            <div class="text-gray-800 leading-relaxed whitespace-pre-wrap">${homework.description || 'No instructions.'}</div>
+            
+            ${homework.fileUrl ? `
+                <div class="mt-8">
+                    <h4 class="text-sm font-medium text-gray-500 mb-2">Reference Materials</h4>
+                    <a href="${homework.fileUrl}" target="_blank" class="gc-attachment hover:bg-gray-50">
+                        <div class="gc-att-icon">📎</div>
+                        <div class="text-sm font-medium text-blue-900 truncate">Attachment</div>
+                    </a>
+                </div>` : ''}
+        </div>
+
+        <div class="gc-sidebar">
+            <div class="gc-card">
+                <div class="flex justify-between items-start mb-4">
+                    <h2 class="text-lg font-medium text-gray-800">Your work</h2>
+                    <div class="text-right">
+                        <div class="text-xs uppercase font-bold ${statusClass}">${statusText}</div>
+                        ${statusSubText}
+                    </div>
+                </div>
+
+                <div id="gc-file-area" class="mb-4">
+                    ${homework.submissionUrl ? `
+                        <div class="gc-attachment">
+                            <div class="gc-att-icon">📄</div>
+                            <div class="flex-1 truncate text-sm">Submitted File</div>
+                            <a href="${homework.submissionUrl}" target="_blank" class="text-blue-600 text-xs font-bold px-2">VIEW</a>
+                        </div>` : ''}
+                </div>
+
+                ${!isSubmitted ? `
+                    <button class="gc-btn-add" onclick="triggerCloudinaryUpload('${homework.id}', '${studentId}')">
+                        <span class="mr-2 text-xl">+</span> Add or create
+                    </button>
+                    <button id="btn-turn-in" class="gc-btn-primary ${!homework.submissionUrl ? 'opacity-50 cursor-not-allowed' : ''}" 
+                        onclick="submitHomeworkToFirebase('${homework.id}')" ${!homework.submissionUrl ? 'disabled' : ''}>
+                        Mark as done
+                    </button>` 
+                : 
+                /* IF SUBMITTED OR GRADED */
+                `
+                    ${isGraded ? `
+                        <div class="text-center py-2 bg-gray-50 rounded mb-2">
+                            <div class="text-3xl font-bold text-gray-800">${homework.score}/100</div>
+                            <div class="text-xs text-gray-500">Overall Grade</div>
+                        </div>
+                    ` : `
+                        <button class="gc-btn-unsubmit" onclick="unsubmitHomework('${homework.id}')">Unsubmit</button>
+                        <p class="text-xs text-gray-500 mt-2 text-center">Unsubmit to add or change attachments.</p>
+                    `}
+                `}
+            </div>
+
+            ${homework.feedback ? `
+                <div class="gc-card mt-4">
+                    <h2 class="text-sm font-medium mb-2">Private comments</h2>
+                    <div class="text-sm text-gray-600 bg-gray-50 p-3 rounded">${homework.feedback}</div>
+                    <div class="text-xs text-gray-400 mt-1 text-right">From Tutor</div>
+                </div>` : ''}
+        </div>
+    `;
+}
+
+function closeGoogleClassroomModal() {
+    if (homeworkUnsub) homeworkUnsub(); // Stop listening to Firebase
+    const modal = document.getElementById('gcModal');
+    if (modal) modal.remove();
+    document.body.style.overflow = 'auto';
+}
+
+// 3. ACTIONS
+function triggerCloudinaryUpload(homeworkId, studentId) {
+    if (!window.cloudinary) return alert("Upload widget loading...");
+    
+    cloudinary.createUploadWidget({
+        cloudName: CLOUDINARY_CONFIG.cloudName,
+        uploadPreset: CLOUDINARY_CONFIG.uploadPreset,
+        sources: ['local', 'camera', 'google_drive'],
+        folder: `homework_submissions/${studentId}`,
+        tags: [homeworkId]
+    }, async (error, result) => {
+        if (!error && result && result.event === "success") {
+            // Save temporarily to DB so UI updates via listener
+            await db.collection('homework_assignments').doc(homeworkId).update({
+                submissionUrl: result.info.secure_url
+            });
+        }
+    }).open();
+}
+
+async function submitHomeworkToFirebase(homeworkId) {
+    if (!confirm("Turn in your work?")) return;
+    await db.collection('homework_assignments').doc(homeworkId).update({
+        status: 'submitted',
+        submittedAt: new Date() // Use client date or serverTimestamp
+    });
+}
+
+async function unsubmitHomework(homeworkId) {
+    if (!confirm("Unsubmit to make changes? Don't forget to resubmit once you're done.")) return;
+    await db.collection('homework_assignments').doc(homeworkId).update({
+        status: 'assigned',
+        submissionUrl: firebase.firestore.FieldValue.delete() // Remove file ref
+    });
+}
