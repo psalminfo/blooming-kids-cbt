@@ -5460,6 +5460,9 @@ const inboxObserver = new MutationObserver(() => {
     }
 });
 inboxObserver.observe(document.body, { childList: true, subtree: true });
+// EXPOSE FUNCTIONS TO WINDOW (REQUIRED FOR HTML ONCLICK)
+window.loadHomeworkInbox = loadHomeworkInbox;
+window.openGradingModal = openGradingModal;
 
 
 
