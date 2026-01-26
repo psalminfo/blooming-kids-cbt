@@ -4421,59 +4421,89 @@ window.comprehensiveFindChildren = comprehensiveFindChildren;
 window.manualRefreshReportsV2 = manualRefreshReportsV2;
 
 // ============================================================================
-// SECTION 20: GOOGLE CLASSROOM STYLE HOMEWORK (COMPLETE PARENT VERSION)
+// SECTION 20: GOOGLE CLASSROOM STYLE HOMEWORK (FULL INTEGRATION)
 // ============================================================================
 
-// CONFIG
+/**
+ * 1. CONFIGURATION
+ * Get these from your Cloudinary Dashboard -> Settings -> Upload
+ */
 const CLOUDINARY_CONFIG = {
-    cloudName: 'dwjq7j5zp', 
-    uploadPreset: 'tutor_homework'
+    cloudName: 'dwjq7j5zp',    // Replace with your Cloud Name
+    uploadPreset: 'tutor_homework' // Replace with your Unsigned Upload Preset
 };
 
-// 1. INJECT DEPENDENCIES
-(function loadDeps() {
+/**
+ * 2. STYLE & DEPENDENCY INJECTION
+ * Loads Cloudinary and the Google Classroom CSS
+ */
+(function injectDependencies() {
+    // Load Cloudinary Widget
     if (!document.getElementById('cloudinary-script')) {
-        const s = document.createElement('script');
-        s.id = 'cloudinary-script';
-        s.src = 'https://upload-widget.cloudinary.com/global/all.js';
-        document.head.appendChild(s);
+        const script = document.createElement('script');
+        script.id = 'cloudinary-script';
+        script.src = 'https://upload-widget.cloudinary.com/global/all.js';
+        document.head.appendChild(script);
     }
+
+    // Inject CSS
     const style = document.createElement('style');
     style.textContent = `
+        /* Overlay & Modal */
         .gc-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(4px); animation: fadeIn 0.2s; }
         .gc-modal-container { background: #fff; width: 90%; max-width: 1000px; height: 90vh; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.2); }
         .gc-header { padding: 16px 24px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Layout */
         .gc-body { display: flex; flex: 1; overflow-y: auto; background: #fff; }
         .gc-main { flex: 1; padding: 24px; border-right: 1px solid #f0f0f0; }
         .gc-sidebar { width: 350px; padding: 24px; background: #fff; }
-        .gc-title { font-size: 2rem; color: #1967d2; margin-bottom: 8px; }
+        
+        /* Elements */
+        .gc-title { font-size: 2rem; color: #1967d2; margin-bottom: 8px; font-weight: 400; }
         .gc-card { background: #fff; border: 1px solid #dadce0; border-radius: 8px; padding: 16px; box-shadow: 0 1px 2px rgba(60,64,67,0.3); margin-bottom: 16px; }
+        
+        /* Buttons */
         .gc-btn-add { display: flex; align-items: center; justify-content: center; width: 100%; padding: 10px; margin-bottom: 10px; background: #fff; border: 1px solid #dadce0; border-radius: 4px; color: #1967d2; font-weight: 500; cursor: pointer; transition: 0.2s; }
         .gc-btn-add:hover { background: #f8f9fa; color: #174ea6; }
+        
         .gc-btn-primary { width: 100%; padding: 10px; background: #1967d2; border: none; border-radius: 4px; color: #fff; font-weight: 500; cursor: pointer; transition: 0.2s; }
         .gc-btn-primary:hover { background: #185abc; }
+        .gc-btn-primary:disabled { background: #e0e0e0; cursor: not-allowed; }
+        
         .gc-btn-unsubmit { width: 100%; padding: 10px; background: #fff; border: 1px solid #dadce0; border-radius: 4px; color: #3c4043; font-weight: 500; cursor: pointer; margin-top: 10px; }
         .gc-btn-unsubmit:hover { background: #f1f3f4; }
+        
+        /* Attachments */
         .gc-attachment { display: flex; align-items: center; border: 1px solid #dadce0; border-radius: 4px; padding: 8px; margin-bottom: 12px; cursor: pointer; }
         .gc-att-icon { width: 36px; height: 36px; background: #f1f3f4; color: #1967d2; display: flex; align-items: center; justify-content: center; margin-right: 12px; border-radius: 4px; }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @media (max-width: 768px) { .gc-body { flex-direction: column; } .gc-sidebar { width: 100%; border-top: 1px solid #e0e0e0; } }
     `;
     document.head.appendChild(style);
 })();
 
-// 2. OPEN GOOGLE CLASSROOM MODAL (With Real-Time Listener)
-let homeworkUnsub = null; // Store listener to detach later
+/**
+ * 3. MODAL LOGIC (OPEN/CLOSE/RENDER)
+ */
+let homeworkListenerUnsub = null;
 
 function openGoogleClassroomModal(initialHwData, studentId) {
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden'; // Lock scroll
     
-    // Create base modal structure
+    // 1. Create Modal Shell
     const modalHTML = `
         <div class="gc-modal-overlay" id="gcModal">
             <div class="gc-modal-container">
                 <div class="gc-header">
-                    <div class="flex items-center gap-3"><span class="font-medium text-gray-600">Assignment Details</span></div>
-                    <button onclick="closeGoogleClassroomModal()" class="text-2xl text-gray-500 hover:text-black">×</button>
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-blue-100 rounded-full text-blue-600">
+                            <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" /></svg>
+                        </div>
+                        <span class="font-medium text-gray-600">Assignment Details</span>
+                    </div>
+                    <button onclick="closeGoogleClassroomModal()" class="text-2xl text-gray-500 hover:text-black transition-colors">×</button>
                 </div>
                 <div class="gc-body" id="gcBodyContent">
                     <div class="flex justify-center items-center h-full w-full"><div class="loading-spinner"></div></div>
@@ -4485,16 +4515,14 @@ function openGoogleClassroomModal(initialHwData, studentId) {
     div.innerHTML = modalHTML;
     document.body.appendChild(div.firstElementChild);
 
-    // Start Real-time Listener on this specific homework ID
+    // 2. Start Real-Time Listener (Updates if tutor grades while open)
     const hwRef = db.collection('homework_assignments').doc(initialHwData.id);
-    
-    homeworkUnsub = hwRef.onSnapshot((doc) => {
+    homeworkListenerUnsub = hwRef.onSnapshot((doc) => {
         if (doc.exists) {
             const freshData = { id: doc.id, ...doc.data() };
-            // Ensure timestamp is converted if needed (handling both Date and Firestore Timestamp)
-            if (freshData.dueDate && typeof freshData.dueDate.toDate !== 'function') {
-                 // It's likely a string, try to parse or keep as is.
-                 // Ideally consistency in DB is key.
+            // Ensure timestamp compatibility
+            if (!freshData.dueTimestamp && freshData.dueDate) {
+                freshData.dueTimestamp = getTimestamp(freshData.dueDate);
             }
             renderGoogleClassroomContent(freshData, studentId);
         }
@@ -4505,61 +4533,40 @@ function renderGoogleClassroomContent(homework, studentId) {
     const container = document.getElementById('gcBodyContent');
     if (!container) return;
 
-    // --- SMART STATUS LOGIC ---
+    // --- Status Logic ---
     const isGraded = homework.status === 'graded';
     const isSubmitted = ['submitted', 'completed', 'graded'].includes(homework.status);
-    
-    // Calculate Due Date Logic
-    let dueTime = 0;
-    if (homework.dueDate) dueTime = new Date(homework.dueDate).getTime();
-    else if (homework.dueTimestamp) dueTime = homework.dueTimestamp;
-    
     const now = Date.now();
-    const isOverdue = !isSubmitted && dueTime > 0 && dueTime < now;
-    
-    // Check for "Done Late"
-    let isDoneLate = false;
-    if (isSubmitted && homework.submittedAt && dueTime > 0) {
-        const subTime = homework.submittedAt.toDate ? homework.submittedAt.toDate().getTime() : new Date(homework.submittedAt).getTime();
-        if (subTime > dueTime) isDoneLate = true;
-    }
+    const isOverdue = !isSubmitted && homework.dueTimestamp && homework.dueTimestamp < now;
 
     let statusText = 'Assigned';
     let statusClass = 'text-green-700';
-    let statusSubText = '';
 
-    if (isGraded) {
-        statusText = 'Graded';
-        statusClass = 'text-black font-bold';
-    } else if (isSubmitted) {
-        statusText = 'Handed in';
-        statusClass = 'text-green-700 font-bold';
-        if (isDoneLate) {
-            statusSubText = '<span class="text-red-500 text-xs font-bold block">Done late</span>';
-        }
-    } else if (isOverdue) {
-        statusText = 'Missing';
-        statusClass = 'text-red-600 font-bold';
-    }
+    if (isGraded) { statusText = 'Graded'; statusClass = 'text-black font-bold'; }
+    else if (isSubmitted) { statusText = 'Handed in'; statusClass = 'text-green-700 font-bold'; }
+    else if (isOverdue) { statusText = 'Missing'; statusClass = 'text-red-600 font-bold'; }
 
-    // RENDER UI
+    // --- Render HTML ---
     container.innerHTML = `
         <div class="gc-main">
-            <h1 class="gc-title">${homework.title || homework.subject}</h1>
+            <h1 class="gc-title">${safeText(homework.title || homework.subject)}</h1>
             <div class="text-gray-500 text-sm mb-6 flex gap-3">
-                <span>${homework.tutorName || 'Tutor'}</span> • 
-                <span>Due ${homework.dueDate || 'No Date'}</span> • 
+                <span>${safeText(homework.tutorName || 'Tutor')}</span> • 
+                <span>Due ${formatDetailedDate(homework.dueTimestamp)}</span> • 
                 <span class="${statusClass}">${statusText}</span>
             </div>
             <div class="border-b mb-6"></div>
-            <div class="text-gray-800 leading-relaxed whitespace-pre-wrap">${homework.description || 'No instructions.'}</div>
+            
+            <div class="text-gray-800 leading-relaxed whitespace-pre-wrap mb-8">
+                ${safeText(homework.description || homework.instructions || 'No instructions provided.')}
+            </div>
             
             ${homework.fileUrl ? `
-                <div class="mt-8">
+                <div class="mt-4">
                     <h4 class="text-sm font-medium text-gray-500 mb-2">Reference Materials</h4>
                     <a href="${homework.fileUrl}" target="_blank" class="gc-attachment hover:bg-gray-50">
                         <div class="gc-att-icon">📎</div>
-                        <div class="text-sm font-medium text-blue-900 truncate">Attachment</div>
+                        <div class="text-sm font-medium text-blue-900 truncate flex-1">Download Assignment File</div>
                     </a>
                 </div>` : ''}
         </div>
@@ -4568,12 +4575,10 @@ function renderGoogleClassroomContent(homework, studentId) {
             <div class="gc-card">
                 <div class="flex justify-between items-start mb-4">
                     <h2 class="text-lg font-medium text-gray-800">Your work</h2>
-                    <div class="text-right">
-                        <div class="text-xs uppercase font-bold ${statusClass}">${statusText}</div>
-                        ${statusSubText}
-                    </div>
+                    <div class="text-xs uppercase font-bold ${statusClass}">${statusText}</div>
                 </div>
 
+                <!-- Attached File Area -->
                 <div id="gc-file-area" class="mb-4">
                     ${homework.submissionUrl ? `
                         <div class="gc-attachment">
@@ -4583,20 +4588,20 @@ function renderGoogleClassroomContent(homework, studentId) {
                         </div>` : ''}
                 </div>
 
+                <!-- Action Buttons -->
                 ${!isSubmitted ? `
                     <button class="gc-btn-add" onclick="triggerCloudinaryUpload('${homework.id}', '${studentId}')">
                         <span class="mr-2 text-xl">+</span> Add or create
                     </button>
-                    <button id="btn-turn-in" class="gc-btn-primary ${!homework.submissionUrl ? 'opacity-50 cursor-not-allowed' : ''}" 
-                        onclick="submitHomeworkToFirebase('${homework.id}')" ${!homework.submissionUrl ? 'disabled' : ''}>
+                    <button id="btn-turn-in" class="gc-btn-primary" 
+                        onclick="submitHomeworkToFirebase('${homework.id}')" ${!homework.submissionUrl ? 'disabled style="opacity:0.5"' : ''}>
                         Mark as done
-                    </button>` 
-                : 
-                /* IF SUBMITTED OR GRADED */
-                `
+                    </button>
+                    <p class="text-xs text-gray-500 mt-2 text-center">Upload a file to enable submission</p>
+                ` : `
                     ${isGraded ? `
-                        <div class="text-center py-2 bg-gray-50 rounded mb-2">
-                            <div class="text-3xl font-bold text-gray-800">${homework.score}/100</div>
+                        <div class="text-center py-4 bg-gray-50 rounded border border-gray-200">
+                            <div class="text-3xl font-bold text-gray-800">${homework.grade || homework.score || '-'}%</div>
                             <div class="text-xs text-gray-500">Overall Grade</div>
                         </div>
                     ` : `
@@ -4609,7 +4614,7 @@ function renderGoogleClassroomContent(homework, studentId) {
             ${homework.feedback ? `
                 <div class="gc-card mt-4">
                     <h2 class="text-sm font-medium mb-2">Private comments</h2>
-                    <div class="text-sm text-gray-600 bg-gray-50 p-3 rounded">${homework.feedback}</div>
+                    <div class="text-sm text-gray-600 bg-gray-50 p-3 rounded border border-gray-100">${safeText(homework.feedback)}</div>
                     <div class="text-xs text-gray-400 mt-1 text-right">From Tutor</div>
                 </div>` : ''}
         </div>
@@ -4617,44 +4622,173 @@ function renderGoogleClassroomContent(homework, studentId) {
 }
 
 function closeGoogleClassroomModal() {
-    if (homeworkUnsub) homeworkUnsub(); // Stop listening to Firebase
+    if (homeworkListenerUnsub) homeworkListenerUnsub(); // Stop listening
     const modal = document.getElementById('gcModal');
     if (modal) modal.remove();
-    document.body.style.overflow = 'auto';
+    document.body.style.overflow = 'auto'; // Restore scroll
 }
 
-// 3. ACTIONS
+/**
+ * 4. UPLOAD & SUBMISSION LOGIC
+ */
 function triggerCloudinaryUpload(homeworkId, studentId) {
-    if (!window.cloudinary) return alert("Upload widget loading...");
+    if (!window.cloudinary) return alert("Upload widget is loading. Please try again in a few seconds.");
     
-    cloudinary.createUploadWidget({
+    const widget = cloudinary.createUploadWidget({
         cloudName: CLOUDINARY_CONFIG.cloudName,
         uploadPreset: CLOUDINARY_CONFIG.uploadPreset,
         sources: ['local', 'camera', 'google_drive'],
         folder: `homework_submissions/${studentId}`,
-        tags: [homeworkId]
+        tags: [homeworkId, 'homework_submission'],
+        multiple: false
     }, async (error, result) => {
         if (!error && result && result.event === "success") {
-            // Save temporarily to DB so UI updates via listener
+            // Optimistic update (User sees it immediately via listener)
             await db.collection('homework_assignments').doc(homeworkId).update({
-                submissionUrl: result.info.secure_url
+                submissionUrl: result.info.secure_url,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
+            showMessage('File uploaded!', 'success');
         }
-    }).open();
+    });
+    widget.open();
 }
 
 async function submitHomeworkToFirebase(homeworkId) {
-    if (!confirm("Turn in your work?")) return;
-    await db.collection('homework_assignments').doc(homeworkId).update({
-        status: 'submitted',
-        submittedAt: new Date() // Use client date or serverTimestamp
-    });
+    if (!confirm("Are you ready to turn in your work?")) return;
+    
+    const btn = document.getElementById('btn-turn-in');
+    if(btn) { btn.disabled = true; btn.textContent = "Turning in..."; }
+
+    try {
+        await db.collection('homework_assignments').doc(homeworkId).update({
+            status: 'submitted',
+            submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            submissionDate: new Date().toISOString()
+        });
+        showMessage('Assignment turned in!', 'success');
+    } catch (e) {
+        console.error(e);
+        showMessage('Error turning in work.', 'error');
+        if(btn) { btn.disabled = false; btn.textContent = "Mark as done"; }
+    }
 }
 
 async function unsubmitHomework(homeworkId) {
-    if (!confirm("Unsubmit to make changes? Don't forget to resubmit once you're done.")) return;
+    if (!confirm("Unsubmit this assignment?")) return;
     await db.collection('homework_assignments').doc(homeworkId).update({
         status: 'assigned',
-        submissionUrl: firebase.firestore.FieldValue.delete() // Remove file ref
+        submissionUrl: firebase.firestore.FieldValue.delete() // Remove file link
     });
 }
+
+/**
+ * 5. ROBUST SCANNER (ENSURES BUTTONS APPEAR)
+ * Scans the DOM every 2 seconds to inject buttons into dynamic content.
+ */
+function scanAndInjectButtons() {
+    // Select all homework cards in the academics content area
+    const cards = document.querySelectorAll('#academicsContent .bg-white.border.rounded-lg');
+
+    cards.forEach(card => {
+        // Skip if already injected
+        if (card.querySelector('.gc-inject-btn')) return;
+
+        // Verify it's a homework card (look for "Due:" text)
+        const textContent = card.textContent || "";
+        if (!textContent.includes('Due:')) return;
+
+        // Create Button
+        const btnContainer = document.createElement('div');
+        btnContainer.className = 'mt-4 pt-3 border-t border-gray-100 flex justify-end gc-inject-btn fade-in';
+        btnContainer.innerHTML = `
+            <button class="flex items-center gap-2 bg-white text-blue-600 border border-blue-200 px-4 py-2 rounded-full text-sm font-medium hover:bg-blue-50 transition-colors shadow-sm group">
+                <span class="group-hover:scale-110 transition-transform">📤</span> 
+                <span>Turn In / View Details</span>
+            </button>
+        `;
+
+        // Add Click Logic
+        const btn = btnContainer.querySelector('button');
+        btn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation(); // Stop accordion from toggling
+            
+            // Find Title to lookup homework
+            const titleEl = card.querySelector('h5');
+            const titleText = titleEl ? titleEl.textContent.trim() : '';
+            if (titleText) findAndOpenHomework(titleText);
+        };
+
+        card.appendChild(btnContainer);
+    });
+}
+
+// Helper to match UI Title -> Database ID
+function findAndOpenHomework(titleText) {
+    // Use the currently selected student, or fallback to the first child
+    const selector = document.getElementById('studentSelector');
+    let studentName = selector ? selector.value : null;
+    if (!studentName && userChildren.length > 0) studentName = userChildren[0];
+    
+    if (!studentName) return showMessage('Please select a student first.', 'error');
+    
+    const studentId = studentIdMap.get(studentName);
+    if (!studentId) return showMessage('Student ID not found.', 'error');
+
+    // Show visual feedback
+    showMessage('Opening classroom...', 'success');
+
+    // Query DB for this assignment
+    db.collection('homework_assignments')
+        .where('studentId', '==', studentId)
+        .where('title', '==', titleText)
+        .limit(1)
+        .get()
+        .then(snapshot => {
+            if (!snapshot.empty) {
+                const doc = snapshot.docs[0];
+                const hwData = { id: doc.id, ...doc.data() };
+                // Ensure timestamp exists
+                if (!hwData.dueTimestamp && hwData.dueDate) hwData.dueTimestamp = getTimestamp(hwData.dueDate);
+                
+                openGoogleClassroomModal(hwData, studentId);
+            } else {
+                // Fallback: Try client-side match (if DB query fails due to exact string mismatch)
+                console.warn("Exact title match failed, trying fuzzy match...");
+                 db.collection('homework_assignments').where('studentId', '==', studentId).get().then(snap => {
+                     const found = snap.docs.find(d => {
+                         const dData = d.data();
+                         return (dData.title || dData.subject) === titleText;
+                     });
+                     if (found) {
+                        const hwData = { id: found.id, ...found.data() };
+                        if (!hwData.dueTimestamp && hwData.dueDate) hwData.dueTimestamp = getTimestamp(hwData.dueDate);
+                        openGoogleClassroomModal(hwData, studentId);
+                     } else {
+                         showMessage('Could not find assignment details.', 'error');
+                     }
+                });
+            }
+        })
+        .catch(err => {
+            console.error("Error finding homework:", err);
+            showMessage('Error loading assignment.', 'error');
+        });
+}
+
+// 6. INITIALIZATION
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Initial Scan
+    scanAndInjectButtons();
+
+    // 2. Observer (Preferred method)
+    const observer = new MutationObserver(() => scanAndInjectButtons());
+    const target = document.getElementById('academicsContent');
+    if (target) observer.observe(target, { childList: true, subtree: true });
+
+    // 3. Fallback Interval (The "Hammer" - Ensures it works even if Observer misses)
+    setInterval(scanAndInjectButtons, 2000);
+    
+    console.log("🚀 Google Classroom Module Loaded");
+});
