@@ -1,6 +1,7 @@
 /*******************************************************************************
  * SECTION 1: IMPORTS & INITIAL SETUP
- ******************************************************************************/https://github.com/psalminfo/blooming-kids-cbt/blob/main/tutor.js
+ * GitHub: https://github.com/psalminfo/blooming-kids-cbt/blob/main/tutor.js
+ ******************************************************************************/
 
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc, deleteField } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
@@ -6133,6 +6134,7 @@ inboxObserver.observe(document.body, { childList: true, subtree: true });
 // EXPOSE FUNCTIONS TO WINDOW (REQUIRED FOR HTML ONCLICK)
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
+
 
 
 
