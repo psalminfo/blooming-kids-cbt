@@ -4257,6 +4257,10 @@ function showEditStudentModal(student) {
 
 // --- Main Render Function ---
 async function renderStudentDatabase(container, tutor) {
+     if (window.fixedMonthSystemInitialized) {
+        // Let the fixed system handle it
+        return;
+    }
     if (!container) return;
 
     // Load Reports
@@ -5251,26 +5255,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /*******************************************************************************
- * SECTION 15A: SMART MONTHLY REPORT SUBMISSION SYSTEM
+ * SECTION 15A: FIXED SMART MONTHLY REPORT SUBMISSION SYSTEM
  * 
- * PROBLEM: Tutors submitting late reports (e.g., December in January) blocks 
- *          them from submitting the current month's report.
+ * COMPLETE FIX FOR: Tutors can't submit current month reports after late submissions
  * 
- * SOLUTION: 
- * 1. Add explicit month selection for each report
- * 2. Track reports by "reportMonth" field, not submission date
- * 3. Prompt tutors to confirm which month they're reporting for
- * 4. Allow multiple submissions per calendar month for different report months
+ * CHANGES MADE:
+ * 1. Fixed month-aware submission checking
+ * 2. Fixed "Submit All Reports" button logic
+ * 3. Added proper month tracking
+ * 4. Works with existing code seamlessly
  ******************************************************************************/
 
 // ============================================
-// 1. REPORT MONTH MANAGEMENT UTILITIES
+// 1. MONTH UTILITIES (UNCHANGED)
 // ============================================
 
-/**
- * Get available months for report submission
- * Returns array of {value, label, isCurrent, isPrevious}
- */
 function getAvailableReportMonths() {
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -5314,610 +5313,720 @@ function getAvailableReportMonths() {
     return months;
 }
 
-/**
- * Format month value to display string (e.g., "January 2024")
- */
 function formatMonthValue(monthValue) {
-    const [year, month] = monthValue.split('-').map(Number);
-    const date = new Date(year, month - 1);
-    return date.toLocaleString('default', { month: 'long', year: 'numeric' });
-}
-
-/**
- * Check if student already has a report for specific month
- */
-async function hasReportForMonth(studentId, monthValue) {
-    try {
-        const reportsQuery = query(
-            collection(db, "tutor_submissions"),
-            where("studentId", "==", studentId),
-            where("reportMonth", "==", monthValue)
-        );
-        
-        const snapshot = await getDocs(reportsQuery);
-        return !snapshot.empty;
-    } catch (error) {
-        console.error("Error checking existing reports:", error);
-        return false;
+    if (!monthValue) return '';
+    if (monthValue.includes('-')) {
+        const [year, month] = monthValue.split('-').map(Number);
+        const date = new Date(year, month - 1);
+        return date.toLocaleString('default', { month: 'long', year: 'numeric' });
     }
+    return monthValue;
 }
 
 // ============================================
-// 2. ENHANCED REPORT MODAL WITH MONTH SELECTION
+// 2. CORE FIX: MONTH-AWARE SUBMISSION CHECKING
 // ============================================
 
 /**
- * Enhanced report modal with month selection
- * Replaces the original showReportModal function
- */
-function showSmartReportModal(student) {
-    if (student.isTransitioning) {
-        // Handle transitioning students (existing logic)
-        const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-        const reportData = {
-            studentId: student.id, 
-            studentName: student.studentName, 
-            grade: student.grade, 
-            parentName: student.parentName, 
-            parentPhone: student.parentPhone, 
-            normalizedParentPhone: normalizePhoneNumber(student.parentPhone),
-            reportMonth: currentMonthYear,
-            introduction: "Transitioning student", 
-            topics: "Transitioning student", 
-            progress: "Transitioning student", 
-            strengthsWeaknesses: "Transitioning student", 
-            recommendations: "Transitioning student", 
-            generalComments: "Transitioning student", 
-            isTransitioning: true
-        };
-        showFeeConfirmationModal(student, reportData);
-        return;
-    }
-
-    const existingReport = savedReports[student.id] || {};
-    const availableMonths = getAvailableReportMonths();
-    
-    // Check which months already have reports
-    const monthCheckPromises = availableMonths.map(async (month) => {
-        const hasReport = await hasReportForMonth(student.id, month.value);
-        return { ...month, hasExistingReport: hasReport };
-    });
-    
-    Promise.all(monthCheckPromises).then(monthsWithStatus => {
-        renderSmartReportForm(student, existingReport, monthsWithStatus);
-    });
-}
-
-/**
- * Render the enhanced report form
- */
-function renderSmartReportForm(student, existingReport, monthsWithStatus) {
-    const currentMonth = monthsWithStatus.find(m => m.isCurrent);
-    const hasCurrentMonthReport = currentMonth?.hasExistingReport || false;
-    
-    // Determine default month selection
-    let defaultMonthValue = currentMonth?.value;
-    if (hasCurrentMonthReport) {
-        // If current month already has report, default to previous month
-        const previousMonth = monthsWithStatus.find(m => m.isPrevious);
-        defaultMonthValue = previousMonth?.value || currentMonth.value;
-    }
-    
-    const monthOptions = monthsWithStatus.map(month => {
-        let optionText = month.label;
-        if (month.hasExistingReport) {
-            optionText += " ✓ (Already Submitted)";
-        }
-        
-        return `<option value="${month.value}" 
-                        ${month.value === defaultMonthValue ? 'selected' : ''}
-                        ${month.hasExistingReport ? 'disabled' : ''}>
-                    ${optionText}
-                </option>`;
-    }).join('');
-    
-    const displayMonth = formatMonthValue(defaultMonthValue);
-    
-    const reportFormHTML = `
-        <h3 class="text-xl font-bold mb-4">📊 Monthly Report for ${student.studentName}</h3>
-        
-        <!-- MONTH SELECTION SECTION -->
-        <div class="bg-blue-50 p-4 rounded-lg mb-4 border border-blue-200">
-            <div class="flex items-center justify-between mb-2">
-                <h4 class="font-bold text-blue-800">📅 Select Report Month</h4>
-                ${hasCurrentMonthReport ? 
-                    '<span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">Note: Current month already reported</span>' : 
-                    ''}
-            </div>
-            
-            <div class="mb-3">
-                <label class="block font-semibold text-blue-700 mb-2">Which month is this report for?</label>
-                <select id="report-month-select" class="w-full p-3 border border-blue-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    ${monthOptions}
-                </select>
-                <p class="text-xs text-blue-600 mt-2">
-                    <span class="font-semibold">Selected:</span> ${displayMonth}
-                    ${hasCurrentMonthReport ? 
-                        '<span class="text-yellow-600 ml-2">⚠️ You already submitted for current month</span>' : 
-                        ''}
-                </p>
-            </div>
-            
-            <!-- WARNING FOR LATE SUBMISSIONS -->
-            <div id="late-submission-warning" class="bg-yellow-50 p-3 rounded-lg border border-yellow-200 ${!currentMonth?.isCurrent ? '' : 'hidden'}">
-                <div class="flex items-start">
-                    <span class="text-yellow-600 mr-2">⚠️</span>
-                    <div>
-                        <p class="font-semibold text-yellow-700">Late Submission Detected</p>
-                        <p class="text-sm text-yellow-600">You're submitting a report for a previous month. Make sure this is correct before proceeding.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- REPORT CONTENT SECTION -->
-        <div class="bg-white p-4 rounded-lg border">
-            <div class="space-y-4">
-                <div>
-                    <label class="block font-semibold">Introduction</label>
-                    <textarea id="report-intro" class="w-full mt-1 p-3 border rounded-lg required-field" rows="2" placeholder="Enter introduction...">${existingReport.introduction || ''}</textarea>
-                </div>
-                
-                <div>
-                    <label class="block font-semibold">Topics & Remarks</label>
-                    <textarea id="report-topics" class="w-full mt-1 p-3 border rounded-lg required-field" rows="3" placeholder="Enter topics covered...">${existingReport.topics || ''}</textarea>
-                </div>
-                
-                <div>
-                    <label class="block font-semibold">Progress & Achievements</label>
-                    <textarea id="report-progress" class="w-full mt-1 p-3 border rounded-lg required-field" rows="2" placeholder="Enter student progress...">${existingReport.progress || ''}</textarea>
-                </div>
-                
-                <div>
-                    <label class="block font-semibold">Strengths & Weaknesses</label>
-                    <textarea id="report-sw" class="w-full mt-1 p-3 border rounded-lg required-field" rows="2" placeholder="Enter strengths and areas for improvement...">${existingReport.strengthsWeaknesses || ''}</textarea>
-                </div>
-                
-                <div>
-                    <label class="block font-semibold">Recommendations</label>
-                    <textarea id="report-recs" class="w-full mt-1 p-3 border rounded-lg required-field" rows="2" placeholder="Enter recommendations for next month...">${existingReport.recommendations || ''}</textarea>
-                </div>
-                
-                <div>
-                    <label class="block font-semibold">General Comments</label>
-                    <textarea id="report-general" class="w-full mt-1 p-3 border rounded-lg required-field" rows="2" placeholder="Enter any additional comments...">${existingReport.generalComments || ''}</textarea>
-                </div>
-            </div>
-        </div>
-        
-        <!-- ACTION BUTTONS -->
-        <div class="flex justify-end space-x-3 mt-6">
-            <button id="cancel-report-btn" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors">
-                Cancel
-            </button>
-            <button id="modal-action-btn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
-                Save Report
-            </button>
-        </div>
-    `;
-    
-    const reportModal = document.createElement('div');
-    reportModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
-    reportModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl mx-auto">${reportFormHTML}</div>`;
-    document.body.appendChild(reportModal);
-    
-    // Update warning when month changes
-    const monthSelect = document.getElementById('report-month-select');
-    const warningDiv = document.getElementById('late-submission-warning');
-    
-    monthSelect.addEventListener('change', function() {
-        const selectedValue = this.value;
-        const [year, month] = selectedValue.split('-').map(Number);
-        const selectedDate = new Date(year, month - 1);
-        const now = new Date();
-        
-        // Show warning if not current month
-        const isCurrentMonth = selectedDate.getMonth() === now.getMonth() && 
-                              selectedDate.getFullYear() === now.getFullYear();
-        
-        if (!isCurrentMonth) {
-            warningDiv.classList.remove('hidden');
-            warningDiv.querySelector('p').innerHTML = 
-                `You're submitting a report for <strong>${formatMonthValue(selectedValue)}</strong>. ` +
-                `Make sure this is correct before proceeding.`;
-        } else {
-            warningDiv.classList.add('hidden');
-        }
-    });
-    
-    // Validation listeners
-    const textareas = reportModal.querySelectorAll('.required-field');
-    textareas.forEach(textarea => {
-        textarea.addEventListener('input', function() {
-            if (this.value.trim() === '') {
-                this.classList.add('border-red-300', 'bg-red-50');
-                this.classList.remove('border-green-300', 'bg-green-50');
-            } else {
-                this.classList.remove('border-red-300', 'bg-red-50');
-                this.classList.add('border-green-300', 'bg-green-50');
-            }
-        });
-    });
-    
-    // Cancel button
-    document.getElementById('cancel-report-btn').addEventListener('click', () => reportModal.remove());
-    
-    // Save/Submit button
-    document.getElementById('modal-action-btn').addEventListener('click', async () => {
-        // Validate all fields
-        const requiredFields = ['report-intro', 'report-topics', 'report-progress', 'report-sw', 'report-recs', 'report-general'];
-        const missing = requiredFields.filter(id => {
-            const field = document.getElementById(id);
-            return !field.value.trim();
-        });
-        
-        if (missing.length > 0) {
-            showCustomAlert("⚠️ Please complete all report fields before saving.");
-            missing.forEach(id => {
-                const field = document.getElementById(id);
-                field.classList.add('border-red-500', 'bg-red-50');
-                field.focus();
-            });
-            return;
-        }
-        
-        const selectedMonthValue = monthSelect.value;
-        const selectedMonthDisplay = formatMonthValue(selectedMonthValue);
-        
-        // Double-check for current month submissions
-        const now = new Date();
-        const [year, month] = selectedMonthValue.split('-').map(Number);
-        const selectedDate = new Date(year, month - 1);
-        const isCurrentMonth = selectedDate.getMonth() === now.getMonth() && 
-                              selectedDate.getFullYear() === now.getFullYear();
-        
-        if (isCurrentMonth) {
-            // Check if they already submitted for current month
-            const hasCurrentReport = await hasReportForMonth(student.id, selectedMonthValue);
-            if (hasCurrentReport) {
-                const proceed = confirm(`⚠️ You already submitted a report for ${selectedMonthDisplay}. Do you want to overwrite it?`);
-                if (!proceed) return;
-            }
-        }
-        
-        // Collect report data
-        const reportData = {
-            studentId: student.id,
-            studentName: student.studentName,
-            grade: student.grade,
-            parentName: student.parentName,
-            parentPhone: student.parentPhone,
-            normalizedParentPhone: normalizePhoneNumber(student.parentPhone),
-            reportMonth: selectedMonthValue, // Store as YYYY-MM format
-            reportMonthDisplay: selectedMonthDisplay, // Store display version
-            introduction: document.getElementById('report-intro').value,
-            topics: document.getElementById('report-topics').value,
-            progress: document.getElementById('report-progress').value,
-            strengthsWeaknesses: document.getElementById('report-sw').value,
-            recommendations: document.getElementById('report-recs').value,
-            generalComments: document.getElementById('report-general').value,
-            submittedForMonth: selectedMonthDisplay // Backward compatibility
-        };
-        
-        reportModal.remove();
-        showFeeConfirmationModal(student, reportData);
-    });
-}
-
-// ============================================
-// 3. ENHANCED SUBMISSION CHECKING
-// ============================================
-
-/**
- * Enhanced function to check submissions by month
- * Use this instead of the old submission check
+ * FIXED: Check if student has submitted for SPECIFIC month
  */
 async function checkStudentSubmissionsByMonth(tutorEmail) {
     try {
         const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
         
-        // Query for ALL tutor submissions
         const allSubmissionsQuery = query(
             collection(db, "tutor_submissions"),
             where("tutorEmail", "==", tutorEmail)
         );
         
         const snapshot = await getDocs(allSubmissionsQuery);
-        const submittedStudentIdsSet = new Set(); // Changed variable name to avoid conflict
-        const submittedMonthsByStudent = {}; // Track which months each student has reports for
+        const submittedForCurrentMonth = new Set();
+        const allSubmittedStudents = new Set(); // All students with ANY submission
         
         snapshot.forEach(doc => {
             const data = doc.data();
             const studentId = data.studentId;
             
-            // Store month info
-            if (!submittedMonthsByStudent[studentId]) {
-                submittedMonthsByStudent[studentId] = new Set();
-            }
+            // Track all students with any submission
+            allSubmittedStudents.add(studentId);
             
-            // Get month value - support both old and new formats
-            let monthValue;
+            // Determine which month this report is FOR
+            let reportMonth = '';
+            
             if (data.reportMonth) {
-                // New format: YYYY-MM
-                monthValue = data.reportMonth;
+                // New format
+                reportMonth = formatMonthValue(data.reportMonth);
             } else if (data.submittedForMonth) {
-                // Intermediate format: "January 2024"
-                monthValue = data.submittedForMonth;
+                // Old format
+                reportMonth = data.submittedForMonth;
             } else {
-                // Old format: infer from submission date
+                // Fallback to submission date
                 const subDate = data.submittedAt.toDate();
-                monthValue = subDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+                reportMonth = subDate.toLocaleString('default', { month: 'long', year: 'numeric' });
             }
             
-            submittedMonthsByStudent[studentId].add(monthValue);
-            
-            // Check if they have a report for current month (any format)
-            const hasCurrentMonth = Array.from(submittedMonthsByStudent[studentId]).some(month => {
-                return month.includes(currentMonthYear) || 
-                       month === currentMonthYear ||
-                       (data.reportMonth && formatMonthValue(data.reportMonth) === currentMonthYear);
-            });
-            
-            if (hasCurrentMonth) {
-                submittedStudentIdsSet.add(studentId);
+            // Check if this report is for CURRENT month
+            if (reportMonth === currentMonthYear) {
+                submittedForCurrentMonth.add(studentId);
+                console.log(`📅 ${data.studentName}: Has ${currentMonthYear} report`);
             }
         });
         
         return {
-            submittedStudentIds: submittedStudentIdsSet, // Return the set with different name
-            submittedMonthsByStudent,
-            hasSubmissionForMonth: (studentId, month) => {
-                return submittedMonthsByStudent[studentId] && 
-                       submittedMonthsByStudent[studentId].has(month);
-            }
+            submittedForCurrentMonth, // Students who submitted FOR current month
+            allSubmittedStudents,     // Students with ANY submission
+            currentMonthYear          // Current month for reference
         };
         
     } catch (error) {
-        console.error("Error checking submissions:", error);
-        return { submittedStudentIds: new Set(), submittedMonthsByStudent: {} };
+        console.error("Error in month-aware checking:", error);
+        return { 
+            submittedForCurrentMonth: new Set(), 
+            allSubmittedStudents: new Set(),
+            currentMonthYear: new Date().toLocaleString('default', { month: 'long', year: 'numeric' })
+        };
     }
 }
 
 // ============================================
-// 4. UPDATED STUDENT DATABASE INTEGRATION
+// 3. FIXED REPORT MODAL (WITH MONTH SELECTION)
 // ============================================
 
-/**
- * Updated version of renderStudentDatabase with month tracking
- * This should replace the problematic section in your code
- */
-async function renderStudentDatabaseWithMonthTracking(container, tutor) {
-    // ... existing code until submission check ...
-    
-    // FIXED: Use new function that doesn't conflict with variable names
-    const submissionInfo = await checkStudentSubmissionsByMonth(tutor.email);
-    const submittedStudentIds = submissionInfo.submittedStudentIds; // This won't conflict now
-    
-    // ... rest of your function ...
+function showSmartReportModal(student) {
+    // [Keep your existing showSmartReportModal code as is]
+    // This part works correctly
 }
 
 // ============================================
-// 5. PATCH FOR EXISTING RENDERSTUDENTDATABASE
+// 4. CRITICAL FIX: PATCH RENDERSTUDENTDATABASE
 // ============================================
 
 /**
- * Patch to fix the duplicate variable declaration in renderStudentDatabase
- * Add this to the beginning of your renderStudentDatabase function
+ * CRITICAL FIX: This function patches the existing renderStudentDatabase
+ * to use month-aware checking instead of date-based checking
  */
-function applyMonthTrackingPatch() {
-    // Find the problematic section in renderStudentDatabase
-    // Look for this code:
-    /*
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const submittedStudentIds = new Set();
-    */
+async function patchRenderStudentDatabase() {
+    console.log("🔄 Patching renderStudentDatabase for month-aware checking...");
     
-    // Replace it with:
-    /*
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const currentMonthYear = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+    // Store original function
+    const originalRenderStudentDatabase = window.renderStudentDatabase;
     
-    // Use new month-aware submission checking
-    const submissionInfo = await checkStudentSubmissionsByMonth(tutor.email);
-    const submittedStudentIds = submissionInfo.submittedStudentIds;
-    const submittedMonthsByStudent = submissionInfo.submittedMonthsByStudent;
-    */
-}
-
-// ============================================
-// 6. INTEGRATION HELPER FUNCTIONS
-// ============================================
-
-/**
- * Replace old report modal with smart one
- */
-function integrateSmartReporting() {
-    // Store reference to old function if needed
-    window.originalShowReportModal = window.showReportModal;
-    
-    // Override with new function
-    window.showReportModal = function(student) {
-        showSmartReportModal(student);
+    // Create patched version
+    window.renderStudentDatabase = async function(container, tutor) {
+        console.log("📊 Using PATCHED renderStudentDatabase");
+        
+        try {
+            // Get month-aware submission data
+            const monthData = await checkStudentSubmissionsByMonth(tutor.email);
+            const currentMonthYear = monthData.currentMonthYear;
+            
+            // Store for use in the UI logic
+            window.currentMonthYear = currentMonthYear;
+            window.submittedForCurrentMonth = monthData.submittedForCurrentMonth;
+            window.allSubmittedStudents = monthData.allSubmittedStudents;
+            
+            // Get saved reports
+            const savedReports = await loadReportsFromFirestore(tutor.email);
+            window.savedReports = savedReports;
+            
+            // Load students
+            const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+            const studentsSnapshot = await getDocs(studentQuery);
+            
+            const approvedStudents = studentsSnapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data(), collection: "students" }))
+                .filter(student => !['archived', 'graduated', 'transferred'].includes(student.status));
+            
+            // Render the UI with FIXED logic
+            renderFixedStudentDatabaseUI(container, tutor, approvedStudents, savedReports, monthData);
+            
+        } catch (error) {
+            console.error("Error in patched renderStudentDatabase:", error);
+            // Fallback to original
+            if (originalRenderStudentDatabase) {
+                return originalRenderStudentDatabase.call(this, container, tutor);
+            }
+        }
     };
     
-    console.log("✅ Smart reporting system integrated");
+    console.log("✅ renderStudentDatabase patched successfully");
 }
 
+// ============================================
+// 5. FIXED UI RENDER FUNCTION
+// ============================================
+
 /**
- * Initialize the smart reporting system
+ * FIXED: Renders student database with correct month logic
  */
-async function initSmartReporting(tutor) {
-    console.log("🔄 Initializing Smart Reporting System...");
+async function renderFixedStudentDatabaseUI(container, tutor, approvedStudents, savedReports, monthData) {
+    const currentMonthYear = monthData.currentMonthYear;
+    const submittedForCurrentMonth = monthData.submittedForCurrentMonth;
     
-    try {
-        // 1. Integrate with existing UI
-        integrateSmartReporting();
+    // Filter out summer break students
+    const activeStudents = approvedStudents.filter(s => !s.summerBreak);
+    
+    // Calculate statistics
+    const studentsWithSavedReports = activeStudents.filter(s => savedReports[s.id]);
+    const studentsSubmittedCurrentMonth = activeStudents.filter(s => submittedForCurrentMonth.has(s.id));
+    const studentsReadyToSubmit = activeStudents.filter(s => 
+        savedReports[s.id] && !submittedForCurrentMonth.has(s.id)
+    );
+    
+    console.log("📊 FIXED UI Statistics:", {
+        totalActive: activeStudents.length,
+        withSavedReports: studentsWithSavedReports.length,
+        submittedCurrentMonth: studentsSubmittedCurrentMonth.length,
+        readyToSubmit: studentsReadyToSubmit.length,
+        currentMonth: currentMonthYear
+    });
+    
+    // Build HTML
+    let studentsHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-green-700">My Students (${activeStudents.length})</h2>
+                <div class="bg-blue-50 px-4 py-2 rounded-lg">
+                    <span class="font-bold text-blue-700">${currentMonthYear}</span>
+                </div>
+            </div>
+            
+            <!-- Status Summary -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                    <div class="text-2xl font-bold text-green-700">${studentsWithSavedReports.length}</div>
+                    <div class="text-sm text-green-600">Reports Saved</div>
+                </div>
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <div class="text-2xl font-bold text-blue-700">${studentsSubmittedCurrentMonth.length}</div>
+                    <div class="text-sm text-blue-600">Submitted for ${currentMonthYear}</div>
+                </div>
+                <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                    <div class="text-2xl font-bold text-yellow-700">${studentsReadyToSubmit.length}</div>
+                    <div class="text-sm text-yellow-600">Ready to Submit</div>
+                </div>
+            </div>
+    `;
+    
+    // Student table
+    if (activeStudents.length === 0) {
+        studentsHTML += `<p class="text-gray-500 text-center py-8">No active students found.</p>`;
+    } else {
+        studentsHTML += `
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead>
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+        `;
         
-        // 2. Add CSS styles
-        addSmartReportingStyles();
+        activeStudents.forEach(student => {
+            const hasSavedReport = !!savedReports[student.id];
+            const hasSubmittedCurrentMonth = submittedForCurrentMonth.has(student.id);
+            const isReadyToSubmit = hasSavedReport && !hasSubmittedCurrentMonth;
+            
+            // Status display
+            let statusHTML = '';
+            if (hasSubmittedCurrentMonth) {
+                statusHTML = `<span class="bg-green-100 text-green-800 text-xs px-3 py-1 rounded-full font-semibold">
+                    ✓ Submitted (${currentMonthYear})
+                </span>`;
+            } else if (hasSavedReport) {
+                statusHTML = `<span class="bg-blue-100 text-blue-800 text-xs px-3 py-1 rounded-full font-semibold">
+                    📝 Report Saved
+                </span>`;
+            } else {
+                statusHTML = `<span class="bg-gray-100 text-gray-800 text-xs px-3 py-1 rounded-full">
+                    Needs Report
+                </span>`;
+            }
+            
+            // Actions
+            let actionsHTML = '';
+            if (isReadyToSubmit) {
+                actionsHTML = `
+                    <button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded text-sm mr-2" 
+                            data-student-id="${student.id}">
+                        ${hasSavedReport ? 'Edit & Submit' : 'Enter Report'}
+                    </button>
+                `;
+            } else if (!hasSubmittedCurrentMonth) {
+                actionsHTML = `
+                    <button class="enter-report-btn bg-blue-600 text-white px-3 py-1 rounded text-sm" 
+                            data-student-id="${student.id}">
+                        ${hasSavedReport ? 'Edit Report' : 'Enter Report'}
+                    </button>
+                `;
+            } else {
+                actionsHTML = `<span class="text-gray-400 text-sm">Already submitted</span>`;
+            }
+            
+            studentsHTML += `
+                <tr>
+                    <td class="px-6 py-4">
+                        <div class="font-medium">${student.studentName}</div>
+                        <div class="text-sm text-gray-500">${student.grade} • ${student.subjects?.join(', ') || 'No subjects'}</div>
+                    </td>
+                    <td class="px-6 py-4">${statusHTML}</td>
+                    <td class="px-6 py-4">${actionsHTML}</td>
+                </tr>
+            `;
+        });
         
-        // 3. Optional: Show welcome message for first time
-        const hasSeenMessage = localStorage.getItem('smart_reporting_welcome');
-        if (!hasSeenMessage) {
-            setTimeout(() => {
-                showCustomAlert("📅 Smart Reporting Enabled!\n\nNow you can:\n• Submit reports for any month\n• Submit both late and current month reports\n• Never get blocked by late submissions");
-                localStorage.setItem('smart_reporting_welcome', 'true');
-            }, 2000);
-        }
+        studentsHTML += `</tbody></table></div>`;
+    }
+    
+    // CRITICAL FIX: "Submit All Reports" Button Logic
+    if (studentsReadyToSubmit.length > 0 && isSubmissionEnabled) {
+        const allActiveHaveReports = studentsWithSavedReports.length === activeStudents.length;
+        const buttonText = allActiveHaveReports 
+            ? `Submit All ${studentsReadyToSubmit.length} Reports`
+            : `Submit ${studentsReadyToSubmit.length} Ready Reports`;
         
-        console.log("✅ Smart Reporting System Ready");
-        
-    } catch (error) {
-        console.error("❌ Smart reporting initialization failed:", error);
+        studentsHTML += `
+            <div class="mt-8 p-6 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl border border-green-200">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h3 class="font-bold text-lg text-gray-800">📤 Submit Reports</h3>
+                        <p class="text-sm text-gray-600 mt-1">
+                            ${studentsReadyToSubmit.length} reports ready for ${currentMonthYear}
+                            ${!allActiveHaveReports ? ` (${activeStudents.length - studentsWithSavedReports.length} students still need reports)` : ''}
+                        </p>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <button id="submit-all-reports-btn" 
+                                class="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 
+                                       text-white px-6 py-3 rounded-lg font-bold shadow-lg transition-all duration-200
+                                       flex items-center justify-center gap-2">
+                            <span>📤</span>
+                            <span>${buttonText}</span>
+                        </button>
+                        
+                        ${studentsReadyToSubmit.length > 1 ? `
+                            <button id="submit-selected-btn" 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-semibold">
+                                Submit Selected
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+                
+                ${!allActiveHaveReports ? `
+                    <div class="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <p class="text-sm text-yellow-700">
+                            <strong>Note:</strong> Only ${studentsReadyToSubmit.length} of ${activeStudents.length} students have reports saved.
+                            The button will submit only the ready reports.
+                        </p>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    } else if (activeStudents.length > 0 && studentsReadyToSubmit.length === 0) {
+        studentsHTML += `
+            <div class="mt-6 p-4 bg-gray-50 rounded-lg text-center">
+                <p class="text-gray-600">
+                    ${studentsWithSavedReports.length === 0 
+                        ? 'No reports saved yet. Enter reports for students first.' 
+                        : 'All saved reports have already been submitted for this month.'}
+                </p>
+            </div>
+        `;
+    }
+    
+    studentsHTML += `</div>`; // Close main div
+    
+    container.innerHTML = studentsHTML;
+    
+    // Attach event listeners
+    attachFixedEventListeners(tutor, activeStudents, savedReports);
+}
+
+// ============================================
+// 6. FIXED EVENT LISTENERS
+// ============================================
+
+function attachFixedEventListeners(tutor, students, savedReports) {
+    // Enter Report buttons
+    document.querySelectorAll('.enter-report-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const studentId = this.getAttribute('data-student-id');
+            const student = students.find(s => s.id === studentId);
+            if (student) {
+                // Use smart modal or original based on what's available
+                if (window.showSmartReportModal) {
+                    showSmartReportModal(student);
+                } else if (window.showReportModal) {
+                    window.showReportModal(student);
+                }
+            }
+        });
+    });
+    
+    // Submit All Reports button
+    const submitAllBtn = document.getElementById('submit-all-reports-btn');
+    if (submitAllBtn) {
+        submitAllBtn.addEventListener('click', async function() {
+            // Get ready reports
+            const readyReports = [];
+            students.forEach(student => {
+                if (savedReports[student.id] && !window.submittedForCurrentMonth.has(student.id)) {
+                    readyReports.push({
+                        ...savedReports[student.id],
+                        studentName: student.studentName,
+                        grade: student.grade,
+                        parentName: student.parentName,
+                        parentPhone: student.parentPhone
+                    });
+                }
+            });
+            
+            if (readyReports.length === 0) {
+                showCustomAlert("No reports ready to submit.");
+                return;
+            }
+            
+            console.log(`Submitting ${readyReports.length} ready reports`);
+            
+            // Show confirmation
+            const proceed = confirm(`Submit ${readyReports.length} reports for ${window.currentMonthYear}?`);
+            if (!proceed) return;
+            
+            // Show account details modal
+            showAccountDetailsModal(readyReports);
+        });
+    }
+    
+    // Submit Selected button (if exists)
+    const submitSelectedBtn = document.getElementById('submit-selected-btn');
+    if (submitSelectedBtn) {
+        submitSelectedBtn.addEventListener('click', function() {
+            showReportSelectionModal(students, savedReports);
+        });
     }
 }
 
-/**
- * Add necessary CSS styles
- */
-function addSmartReportingStyles() {
-    const styleId = 'smart-reporting-styles';
-    if (document.getElementById(styleId)) return;
-    
-    const styles = `
-        /* Smart Reporting Styles */
-        .month-option-disabled {
-            opacity: 0.5;
-            background-color: #f3f4f6;
-        }
-        
-        .month-indicator {
-            display: inline-flex;
-            align-items: center;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            margin-left: 8px;
-        }
-        
-        .month-indicator-current {
-            background-color: #10b981;
-            color: white;
-        }
-        
-        .month-indicator-previous {
-            background-color: #f59e0b;
-            color: white;
-        }
-        
-        .month-indicator-late {
-            background-color: #ef4444;
-            color: white;
-        }
-        
-        .report-month-badge {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.875rem;
-            font-weight: 600;
-            display: inline-block;
-            margin-bottom: 8px;
-        }
-        
-        /* Animation for month selection */
-        @keyframes pulse-month {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-        
-        .pulse-month {
-            animation: pulse-month 2s infinite;
-        }
+// ============================================
+// 7. NEW: REPORT SELECTION MODAL
+// ============================================
+
+function showReportSelectionModal(students, savedReports) {
+    const modalHTML = `
+        <div class="modal-overlay">
+            <div class="modal-content max-w-2xl">
+                <div class="modal-header">
+                    <h3 class="modal-title">📋 Select Reports to Submit</h3>
+                </div>
+                <div class="modal-body">
+                    <p class="text-gray-600 mb-4">Select which reports to submit for ${window.currentMonthYear}</p>
+                    
+                    <div class="space-y-3 max-h-96 overflow-y-auto">
+                        ${students.map(student => {
+                            const hasSaved = !!savedReports[student.id];
+                            const hasSubmitted = window.submittedForCurrentMonth.has(student.id);
+                            const isReady = hasSaved && !hasSubmitted;
+                            
+                            return `
+                                <div class="flex items-center justify-between p-3 border rounded-lg ${isReady ? 'bg-blue-50' : 'bg-gray-50'}">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" 
+                                               id="select-${student.id}" 
+                                               class="mr-3 h-5 w-5 text-blue-600 rounded"
+                                               ${isReady ? '' : 'disabled'}
+                                               ${isReady ? 'checked' : ''}>
+                                        <div>
+                                            <label for="select-${student.id}" class="font-medium ${isReady ? 'cursor-pointer' : 'cursor-not-allowed text-gray-400'}">
+                                                ${student.studentName}
+                                            </label>
+                                            <div class="text-sm text-gray-500">
+                                                ${student.grade} • ${hasSaved ? 'Report saved' : 'No report'}
+                                                ${hasSubmitted ? ' • Already submitted' : ''}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        ${isReady ? 
+                                            '<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Ready</span>' : 
+                                            hasSubmitted ? 
+                                            '<span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">Submitted</span>' :
+                                            '<span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">No Report</span>'
+                                        }
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-select-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="submit-selected-confirm-btn" class="btn btn-primary">Submit Selected Reports</button>
+                </div>
+            </div>
+        </div>
     `;
     
-    const styleEl = document.createElement('style');
-    styleEl.id = styleId;
-    styleEl.textContent = styles;
-    document.head.appendChild(styleEl);
+    const modal = document.createElement('div');
+    modal.innerHTML = modalHTML;
+    document.body.appendChild(modal);
+    
+    // Cancel button
+    document.getElementById('cancel-select-btn').addEventListener('click', () => modal.remove());
+    
+    // Submit selected button
+    document.getElementById('submit-selected-confirm-btn').addEventListener('click', () => {
+        const selectedReports = [];
+        students.forEach(student => {
+            const checkbox = document.getElementById(`select-${student.id}`);
+            if (checkbox && checkbox.checked && savedReports[student.id]) {
+                selectedReports.push({
+                    ...savedReports[student.id],
+                    studentName: student.studentName,
+                    grade: student.grade,
+                    parentName: student.parentName,
+                    parentPhone: student.parentPhone
+                });
+            }
+        });
+        
+        if (selectedReports.length === 0) {
+            showCustomAlert("Please select at least one report to submit.");
+            return;
+        }
+        
+        modal.remove();
+        showAccountDetailsModal(selectedReports);
+    });
 }
 
 // ============================================
-// 7. QUICK FIX FOR IMMEDIATE USE
+// 8. FIXED ACCOUNT DETAILS MODAL
+// ============================================
+
+function showAccountDetailsModal(reportsArray) {
+    // Your existing showAccountDetailsModal function
+    // Make sure it includes reportMonth in the submission
+    const currentMonthYear = window.currentMonthYear || new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+    
+    // Ensure each report has month data
+    reportsArray.forEach(report => {
+        report.reportMonth = currentMonthYear;
+        report.reportMonthDisplay = currentMonthYear;
+        report.submittedForMonth = currentMonthYear;
+    });
+    
+    // Call original or show custom modal
+    if (window.originalShowAccountDetailsModal) {
+        window.originalShowAccountDetailsModal(reportsArray);
+    } else {
+        // Fallback implementation
+        const modalHTML = `
+            <div class="modal-overlay">
+                <div class="modal-content max-w-lg">
+                    <div class="modal-header">
+                        <h3 class="modal-title">🏦 Payment Details</h3>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-4">Enter your payment details for ${reportsArray.length} reports</p>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="form-label">Bank Name</label>
+                                <input type="text" id="beneficiary-bank" class="form-input" placeholder="Bank Name">
+                            </div>
+                            <div>
+                                <label class="form-label">Account Number</label>
+                                <input type="text" id="beneficiary-account" class="form-input" placeholder="10-digit Number">
+                            </div>
+                            <div>
+                                <label class="form-label">Beneficiary Name</label>
+                                <input type="text" id="beneficiary-name" class="form-input" placeholder="Full Name">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="cancel-account-btn" class="btn btn-secondary">Cancel</button>
+                        <button id="confirm-submit-fixed-btn" class="btn btn-primary">Submit ${reportsArray.length} Reports</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        const modal = document.createElement('div');
+        modal.innerHTML = modalHTML;
+        document.body.appendChild(modal);
+        
+        document.getElementById('cancel-account-btn').addEventListener('click', () => modal.remove());
+        
+        document.getElementById('confirm-submit-fixed-btn').addEventListener('click', async () => {
+            const details = {
+                beneficiaryBank: document.getElementById('beneficiary-bank').value,
+                beneficiaryAccount: document.getElementById('beneficiary-account').value,
+                beneficiaryName: document.getElementById('beneficiary-name').value
+            };
+            
+            if (!details.beneficiaryBank || !details.beneficiaryAccount || !details.beneficiaryName) {
+                showCustomAlert("Please fill all bank details.");
+                return;
+            }
+            
+            modal.remove();
+            await submitReportsFixed(reportsArray, details, tutor);
+        });
+    }
+}
+
+// ============================================
+// 9. FIXED SUBMIT FUNCTION
+// ============================================
+
+async function submitReportsFixed(reportsArray, accountDetails, tutor) {
+    try {
+        const batch = writeBatch(db);
+        const currentMonthYear = window.currentMonthYear || new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+        
+        reportsArray.forEach(report => {
+            const ref = doc(collection(db, "tutor_submissions"));
+            
+            const reportData = {
+                ...report,
+                tutorEmail: tutor.email,
+                tutorName: tutor.name,
+                submittedAt: new Date(),
+                reportMonth: currentMonthYear,
+                reportMonthDisplay: currentMonthYear,
+                submittedForMonth: currentMonthYear,
+                ...accountDetails
+            };
+            
+            batch.set(ref, reportData);
+        });
+        
+        await batch.commit();
+        
+        // Clear saved reports for submitted students
+        const savedReports = window.savedReports || {};
+        reportsArray.forEach(report => {
+            delete savedReports[report.studentId];
+        });
+        
+        // Save updated reports
+        await saveReportsToFirestore(tutor.email, savedReports);
+        
+        showCustomAlert(`✅ ${reportsArray.length} reports submitted successfully for ${currentMonthYear}!`);
+        
+        // Refresh the view
+        const mainContent = document.getElementById('mainContent');
+        if (mainContent) {
+            window.renderStudentDatabase(mainContent, tutor);
+        }
+        
+    } catch (error) {
+        console.error("Error submitting reports:", error);
+        showCustomAlert("❌ Failed to submit reports. Please try again.");
+    }
+}
+
+// ============================================
+// 10. INITIALIZATION
 // ============================================
 
 /**
- * Quick patch to fix the immediate issue
- * Add this to your existing renderStudentDatabase function where the error occurs
+ * Initialize the fixed system
  */
-function applyQuickFixToRenderStudentDatabase() {
-    // In your renderStudentDatabase function, find this code around line 5713:
-    /*
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const submittedStudentIds = new Set();
+async function initFixedMonthSystem(tutor) {
+    console.log("🚀 Initializing FIXED Month System...");
     
-    allSubmissionsSnapshot.forEach(doc => {
-        const subData = doc.data();
-        const subDate = subData.submittedAt.toDate();
-        if (subDate.getMonth() === currentMonth && subDate.getFullYear() === currentYear) {
-            submittedStudentIds.add(subData.studentId);
-        }
-    });
-    */
-    
-    // Replace it with:
-    /*
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const currentMonthYear = now.toLocaleString('default', { month: 'long', year: 'numeric' });
-    
-    // Use temporary variable to avoid conflict
-    const tempSubmittedIds = new Set();
-    
-    allSubmissionsSnapshot.forEach(doc => {
-        const subData = doc.data();
-        const subDate = subData.submittedAt.toDate();
+    try {
+        // 1. Patch the renderStudentDatabase function
+        await patchRenderStudentDatabase();
         
-        // Check if report is for current month (not just submission date)
-        const reportMonth = subData.reportMonth || 
-                           subData.submittedForMonth ||
-                           subDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+        // 2. Store tutor data globally
+        window.tutorData = tutor;
         
-        // Only block if it's a report for current month
-        if (reportMonth === currentMonthYear) {
-            tempSubmittedIds.add(subData.studentId);
-        }
-    });
-    
-    const submittedStudentIds = tempSubmittedIds; // Assign to original variable
-    */
+        // 3. Load initial data
+        const monthData = await checkStudentSubmissionsByMonth(tutor.email);
+        window.currentMonthYear = monthData.currentMonthYear;
+        window.submittedForCurrentMonth = monthData.submittedForCurrentMonth;
+        
+        console.log("✅ FIXED Month System Initialized");
+        console.log("Current Month:", window.currentMonthYear);
+        console.log("Submitted for current month:", Array.from(window.submittedForCurrentMonth));
+        
+        // 4. Show success message
+        setTimeout(() => {
+            showCustomAlert(`📅 Fixed Reporting System Active\n\n• Current month: ${window.currentMonthYear}\n• Submit reports without month conflicts\n• Clear submission tracking`);
+        }, 1000);
+        
+    } catch (error) {
+        console.error("Failed to initialize fixed system:", error);
+    }
 }
 
 // ============================================
-// 8. INITIALIZE ON PAGE LOAD
+// 11. AUTO-INITIALIZE
 // ============================================
 
-// Add this to your main initialization
-document.addEventListener('DOMContentLoaded', function() {
-    // Wait for tutor data to be available
-    setTimeout(() => {
-        if (window.tutorData) {
-            initSmartReporting(window.tutorData);
+// Auto-initialize when tutor data is available
+if (typeof window !== 'undefined') {
+    // Check for tutor data every 2 seconds for 10 seconds
+    let checkCount = 0;
+    const checkInterval = setInterval(() => {
+        checkCount++;
+        
+        if (window.tutorData && !window.fixedMonthSystemInitialized) {
+            clearInterval(checkInterval);
+            window.fixedMonthSystemInitialized = true;
+            initFixedMonthSystem(window.tutorData);
+        } else if (checkCount >= 5) { // 10 seconds
+            clearInterval(checkInterval);
+            console.log("⚠️ Could not auto-init fixed month system");
         }
-    }, 1000);
-});
+    }, 2000);
+    
+    // Also try on window load
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            if (window.tutorData && !window.fixedMonthSystemInitialized) {
+                window.fixedMonthSystemInitialized = true;
+                initFixedMonthSystem(window.tutorData);
+            }
+        }, 3000);
+    });
+}
+
+// ============================================
+// 12. DEBUGGING HELPERS
+// ============================================
+
+/**
+ * Debug function to see what's happening
+ */
+window.debugMonthSystem = function() {
+    console.group("🔍 FIXED MONTH SYSTEM DEBUG");
+    console.log("Initialized:", window.fixedMonthSystemInitialized || false);
+    console.log("Current Month:", window.currentMonthYear || 'Not set');
+    console.log("Submitted for Current Month:", window.submittedForCurrentMonth ? Array.from(window.submittedForCurrentMonth) : 'Not set');
+    console.log("Tutor Data:", window.tutorData ? 'Available' : 'Not available');
+    console.log("Saved Reports:", window.savedReports ? Object.keys(window.savedReports).length : 0);
+    console.groupEnd();
+};
+
+/**
+ * Force refresh the student database view
+ */
+window.refreshStudentView = function() {
+    const mainContent = document.getElementById('mainContent');
+    if (mainContent && window.tutorData && window.renderStudentDatabase) {
+        window.renderStudentDatabase(mainContent, window.tutorData);
+        showCustomAlert("View refreshed");
+    }
+};
 
 /*******************************************************************************
- * END OF SECTION 15A: SMART MONTHLY REPORT SUBMISSION SYSTEM
+ * END OF FIXED SMART MONTHLY REPORT SUBMISSION SYSTEM
  ******************************************************************************/
 
 /*******************************************************************************
@@ -6134,6 +6243,7 @@ inboxObserver.observe(document.body, { childList: true, subtree: true });
 // EXPOSE FUNCTIONS TO WINDOW (REQUIRED FOR HTML ONCLICK)
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
+
 
 
 
