@@ -5255,360 +5255,209 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /*******************************************************************************
- * SECTION 15A: FIXED MONTHLY REPORT SUBMISSION SYSTEM
+ * SECTION 15A: TEMPORARY BYPASS FOR MONTH SUBMISSION ISSUE
  * 
- * SOLUTION: Track reports by "reportMonth" not submission date
- * A tutor can submit multiple times in same month for DIFFERENT report months
+ * TEMPORARY FIX: Forces submit button to show regardless of month
+ * Add this now, remove when proper fix is implemented
  ******************************************************************************/
 
+console.log("⚠️ TEMPORARY BYPASS ACTIVE - Remove Section 15A when fixed");
+
 // ============================================
-// 1. MONTH TRACKING UTILITIES (USE EXISTING IF AVAILABLE)
+// 1. OVERRIDE THE SUBMISSION CHECKING
 // ============================================
 
-/**
- * Get current month - check if function already exists
- */
-if (typeof window.getCurrentMonthYear === 'undefined') {
-    window.getCurrentMonthYear = function() {
-        const now = new Date();
-        return now.toLocaleString('default', { month: 'long', year: 'numeric' });
-    };
+// Store the original function
+if (!window.originalRenderStudentDatabaseBypass) {
+    window.originalRenderStudentDatabaseBypass = window.renderStudentDatabase;
 }
 
-/**
- * Format month value - check if function already exists
- */
-if (typeof window.formatMonthValueSmart === 'undefined') {
-    window.formatMonthValueSmart = function(monthValue) {
-        if (!monthValue) return '';
-        if (monthValue.includes('-')) {
-            const [year, month] = monthValue.split('-').map(Number);
-            const date = new Date(year, month - 1);
-            return date.toLocaleString('default', { month: 'long', year: 'numeric' });
-        }
-        return monthValue;
-    };
-}
-
-// ============================================
-// 2. CORE FIX: MONTH-AWARE SUBMISSION CHECKING
-// ============================================
-
-/**
- * FIXED: Check which students have submitted reports FOR the current month
- */
-async function getSubmittedForCurrentMonthFixed(tutorEmail) {
-    try {
-        const currentMonthYear = window.getCurrentMonthYear();
-        const submittedIds = new Set();
-        
-        const allSubmissionsQuery = query(
-            collection(db, "tutor_submissions"),
-            where("tutorEmail", "==", tutorEmail)
-        );
-        
-        const snapshot = await getDocs(allSubmissionsQuery);
-        
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            
-            // Determine which month this report is FOR
-            let reportMonth = '';
-            
-            if (data.reportMonth) {
-                reportMonth = window.formatMonthValueSmart(data.reportMonth);
-            } else if (data.submittedForMonth) {
-                reportMonth = data.submittedForMonth;
-            } else {
-                const subDate = data.submittedAt.toDate();
-                reportMonth = subDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-            }
-            
-            // CRITICAL: Only mark as submitted if report is FOR current month
-            if (reportMonth === currentMonthYear) {
-                submittedIds.add(data.studentId);
-            }
-        });
-        
-        return submittedIds;
-        
-    } catch (error) {
-        console.error("Error checking month-aware submissions:", error);
-        return new Set();
-    }
-}
-
-// ============================================
-// 3. PATCH THE SUBMISSION CHECKING
-// ============================================
-
-/**
- * Patch the renderStudentDatabase function
- */
-function patchSubmissionCheckingFixed() {
-    console.log("🔧 Patching submission checking...");
+// Create bypass version
+window.renderStudentDatabase = async function(container, tutor) {
+    console.log("🚨 USING BYPASS VERSION - Submit button will always show if reports saved");
     
-    // Store original if not already stored
-    if (!window.originalRenderStudentDatabaseFixed) {
-        window.originalRenderStudentDatabaseFixed = window.renderStudentDatabase;
-    }
+    // First, let the original function run
+    const result = await window.originalRenderStudentDatabaseBypass.call(this, container, tutor);
     
-    // Create patched version
-    window.renderStudentDatabase = async function(container, tutor) {
-        console.log("📊 Using month-aware renderStudentDatabase");
-        
-        try {
-            // Get students submitted FOR current month
-            const submittedForCurrentMonth = await getSubmittedForCurrentMonthFixed(tutor.email);
-            
-            // Store for debugging
-            window.monthFixedSubmittedIds = submittedForCurrentMonth;
-            window.monthFixedCurrentMonth = window.getCurrentMonthYear();
-            
-            // Render with fixed logic
-            await renderStudentDatabaseWithMonthFix(container, tutor, submittedForCurrentMonth);
-            
-        } catch (error) {
-            console.error("Error in patched renderStudentDatabase:", error);
-            // Fallback to original
-            if (window.originalRenderStudentDatabaseFixed) {
-                return window.originalRenderStudentDatabaseFixed.call(this, container, tutor);
-            }
-        }
-    };
+    // After it renders, force the submit button to show
+    setTimeout(() => {
+        forceSubmitButtonToShow(tutor.email);
+    }, 500);
     
-    console.log("✅ Submission checking patched");
-}
-
-// ============================================
-// 4. FIXED RENDER FUNCTION
-// ============================================
-
-async function renderStudentDatabaseWithMonthFix(container, tutor, submittedForCurrentMonth) {
-    try {
-        // Load saved reports
-        const savedReports = await loadReportsFromFirestore(tutor.email);
-        
-        // Load students
-        const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-        const studentsSnapshot = await getDocs(studentsQuery);
-        
-        const approvedStudents = studentsSnapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() }))
-            .filter(student => !['archived', 'graduated', 'transferred'].includes(student.status));
-        
-        // Filter active students
-        const activeStudents = approvedStudents.filter(s => !s.summerBreak);
-        
-        // Calculate ready reports
-        const studentsReadyToSubmit = activeStudents.filter(s => 
-            savedReports[s.id] && !submittedForCurrentMonth.has(s.id)
-        );
-        
-        // CRITICAL: Check if we need to render the submit button
-        const shouldShowSubmitButton = studentsReadyToSubmit.length > 0 && isSubmissionEnabled;
-        
-        console.log("Month Fix Debug:", {
-            totalActive: activeStudents.length,
-            savedReports: Object.keys(savedReports).length,
-            submittedCurrentMonth: submittedForCurrentMonth.size,
-            readyToSubmit: studentsReadyToSubmit.length,
-            shouldShowButton: shouldShowSubmitButton
-        });
-        
-        // Now call the ORIGINAL function but we need to ensure it shows the button
-        // We'll temporarily modify the logic
-        
-        if (window.originalRenderStudentDatabaseFixed) {
-            // Store our data for the original function to use
-            window.tempMonthFixData = {
-                submittedForCurrentMonth,
-                studentsReadyToSubmit,
-                shouldShowSubmitButton
-            };
-            
-            // Call original
-            const result = await window.originalRenderStudentDatabaseFixed.call(this, container, tutor);
-            
-            // After original renders, ensure submit button is visible
-            setTimeout(() => ensureSubmitButtonVisible(studentsReadyToSubmit.length), 100);
-            
-            return result;
-        }
-        
-    } catch (error) {
-        console.error("Error in renderStudentDatabaseWithMonthFix:", error);
-        throw error;
-    }
-}
-
-// ============================================
-// 5. ENSURE SUBMIT BUTTON IS VISIBLE
-// ============================================
-
-function ensureSubmitButtonVisible(readyCount) {
-    if (readyCount === 0) return;
-    
-    // Check if submit button exists
-    let submitBtn = document.getElementById('submit-all-reports-btn');
-    
-    if (!submitBtn) {
-        // Button doesn't exist - we need to add it
-        const container = document.querySelector('#student-list-view') || 
-                         document.querySelector('.bg-white.p-6') || 
-                         document.getElementById('mainContent');
-        
-        if (container) {
-            // Add submit button
-            const buttonHTML = `
-                <div class="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <h4 class="font-bold text-green-800">📤 Submit Reports</h4>
-                            <p class="text-sm text-green-600">${readyCount} reports ready to submit</p>
-                        </div>
-                        <button id="submit-all-reports-btn-fixed" 
-                                class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold">
-                            Submit ${readyCount} Reports
-                        </button>
-                    </div>
-                </div>
-            `;
-            
-            // Find a good place to insert it
-            const tables = container.querySelectorAll('table');
-            if (tables.length > 0) {
-                tables[tables.length - 1].insertAdjacentHTML('afterend', buttonHTML);
-            } else {
-                container.insertAdjacentHTML('beforeend', buttonHTML);
-            }
-            
-            // Add event listener to new button
-            setTimeout(() => {
-                const newBtn = document.getElementById('submit-all-reports-btn-fixed');
-                if (newBtn) {
-                    newBtn.addEventListener('click', () => {
-                        showCustomAlert(`Would submit ${readyCount} reports. Please use the normal submit process.`);
-                    });
-                }
-            }, 100);
-        }
-    }
-}
-
-// ============================================
-// 6. QUICK FIX FOR EXISTING CODE
-// ============================================
-
-/**
- * This function can be called to force the button to show
- */
-window.fixSubmitButtonIssue = function() {
-    const container = document.getElementById('mainContent');
-    if (!container || !window.tutorData) return;
-    
-    // Get saved reports
-    loadReportsFromFirestore(window.tutorData.email).then(savedReports => {
-        const savedCount = Object.keys(savedReports).length;
-        
-        if (savedCount > 0) {
-            // Add emergency submit button
-            const emergencyBtn = document.createElement('div');
-            emergencyBtn.innerHTML = `
-                <div style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;">
-                    <button onclick="window.emergencySubmitAll()" 
-                            style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 12px 20px; border-radius: 8px; border: none; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); cursor: pointer;">
-                        🚨 Submit ${savedCount} Reports
-                    </button>
-                </div>
-            `;
-            document.body.appendChild(emergencyBtn);
-            
-            showCustomAlert(`Found ${savedCount} saved reports. Emergency submit button added.`);
-        }
-    });
+    return result;
 };
 
-window.emergencySubmitAll = async function() {
-    if (!window.tutorData) return;
+// ============================================
+// 2. FORCE SUBMIT BUTTON TO SHOW
+// ============================================
+
+async function forceSubmitButtonToShow(tutorEmail) {
+    try {
+        // Load saved reports
+        const savedReports = await loadReportsFromFirestore(tutorEmail);
+        const savedCount = Object.keys(savedReports).length;
+        
+        if (savedCount === 0) {
+            console.log("No saved reports found");
+            return;
+        }
+        
+        console.log(`Found ${savedCount} saved reports - forcing submit button`);
+        
+        // Check if submit button already exists
+        const existingBtn = document.getElementById('submit-all-reports-btn');
+        
+        if (!existingBtn) {
+            // Button doesn't exist - add it
+            addEmergencySubmitButton(savedCount, savedReports);
+        } else if (existingBtn.disabled) {
+            // Button exists but is disabled - enable it
+            existingBtn.disabled = false;
+            existingBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            existingBtn.classList.add('hover:bg-green-800');
+            console.log("✅ Enabled existing submit button");
+        }
+        
+    } catch (error) {
+        console.error("Error forcing submit button:", error);
+    }
+}
+
+// ============================================
+// 3. ADD EMERGENCY SUBMIT BUTTON
+// ============================================
+
+function addEmergencySubmitButton(savedCount, savedReports) {
+    // Find where to add the button
+    const studentListView = document.getElementById('student-list-view');
+    const mainContainer = studentListView || document.getElementById('mainContent');
     
-    const savedReports = await loadReportsFromFirestore(window.tutorData.email);
-    const reportsArray = Object.values(savedReports);
-    
-    if (reportsArray.length === 0) {
-        showCustomAlert("No reports to submit.");
+    if (!mainContainer) {
+        console.error("Could not find container for submit button");
         return;
     }
     
-    const proceed = confirm(`Submit ${reportsArray.length} reports?`);
-    if (proceed) {
+    // Create button HTML
+    const buttonHTML = `
+        <div class="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h4 class="font-bold text-yellow-800">⚠️ TEMPORARY BYPASS ACTIVE</h4>
+                    <p class="text-sm text-yellow-600">
+                        ${savedCount} reports saved | Submit enabled regardless of month
+                    </p>
+                </div>
+                <button id="emergency-submit-all-btn" 
+                        class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-bold">
+                    Submit ${savedCount} Reports
+                </button>
+            </div>
+            <p class="text-xs text-yellow-500 mt-2">
+                This is a temporary fix. Normal month checking is disabled.
+            </p>
+        </div>
+    `;
+    
+    // Add the button
+    mainContainer.insertAdjacentHTML('beforeend', buttonHTML);
+    
+    // Add click handler
+    document.getElementById('emergency-submit-all-btn').addEventListener('click', function() {
+        const reportsArray = Object.values(savedReports);
         showAccountDetailsModal(reportsArray);
+    });
+    
+    console.log(`✅ Added emergency submit button for ${savedCount} reports`);
+}
+
+// ============================================
+// 4. ADD FLOATING BYPASS TOGGLE
+// ============================================
+
+// Add a floating button to toggle bypass
+setTimeout(() => {
+    const toggleBtn = document.createElement('button');
+    toggleBtn.innerHTML = '🚨 BYPASS';
+    toggleBtn.style.cssText = `
+        position: fixed;
+        bottom: 70px;
+        right: 20px;
+        background: #ef4444;
+        color: white;
+        border: none;
+        border-radius: 50px;
+        padding: 8px 16px;
+        font-size: 12px;
+        font-weight: bold;
+        cursor: pointer;
+        z-index: 9999;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    `;
+    toggleBtn.title = 'Click to force submit button';
+    
+    toggleBtn.onclick = function() {
+        if (window.tutorData) {
+            forceSubmitButtonToShow(window.tutorData.email);
+            showCustomAlert("Bypass activated. Checking for saved reports...");
+        }
+    };
+    
+    document.body.appendChild(toggleBtn);
+}, 2000);
+
+// ============================================
+// 5. AUTO-RUN BYPASS
+// ============================================
+
+// Run bypass automatically on page load
+window.addEventListener('load', function() {
+    setTimeout(() => {
+        if (window.tutorData) {
+            console.log("🔄 Auto-running month bypass for tutor:", window.tutorData.email);
+            // Initial check
+            setTimeout(() => forceSubmitButtonToShow(window.tutorData.email), 1000);
+            // Check again after 3 seconds
+            setTimeout(() => forceSubmitButtonToShow(window.tutorData.email), 3000);
+        }
+    }, 1500);
+});
+
+// ============================================
+// 6. DEBUG COMMANDS
+// ============================================
+
+// Add debug command to console
+window.forceSubmitNow = function() {
+    if (window.tutorData) {
+        forceSubmitButtonToShow(window.tutorData.email);
+    } else {
+        console.error("No tutor data found");
     }
 };
 
-// ============================================
-// 7. INITIALIZATION
-// ============================================
-
-function initMonthFixSystem() {
-    console.log("🔧 Initializing month fix system...");
-    
-    // Patch the submission checking
-    patchSubmissionCheckingFixed();
-    
-    // Also add a manual fix button in the UI
-    setTimeout(() => {
-        // Add a hidden debug button
-        const debugBtn = document.createElement('button');
-        debugBtn.textContent = '🔧';
-        debugBtn.style.cssText = 'position: fixed; bottom: 20px; left: 20px; width: 40px; height: 40px; border-radius: 50%; background: #6366f1; color: white; border: none; z-index: 9999; font-size: 18px;';
-        debugBtn.title = 'Fix Submit Button';
-        debugBtn.onclick = window.fixSubmitButtonIssue;
-        document.body.appendChild(debugBtn);
-    }, 2000);
-    
-    console.log("✅ Month fix system ready");
-}
-
-// ============================================
-// 8. AUTO-START
-// ============================================
-
-// Start when page loads
-if (typeof window !== 'undefined') {
-    // Wait a bit then start
-    setTimeout(initMonthFixSystem, 1000);
-    
-    // Also start when tutor data is available
-    const checkTutor = setInterval(() => {
-        if (window.tutorData) {
-            clearInterval(checkTutor);
-            initMonthFixSystem();
-        }
-    }, 500);
-}
-
-// ============================================
-// 9. DEBUGGING
-// ============================================
-
-window.checkMonthFix = function() {
-    console.group("🔍 MONTH FIX DEBUG");
-    console.log("Current Month:", window.getCurrentMonthYear ? window.getCurrentMonthYear() : 'Function not found');
-    console.log("Tutor Data:", window.tutorData ? 'Available' : 'Not available');
-    console.log("Month Fix Data:", window.tempMonthFixData || 'Not set');
-    console.log("Saved Reports:", window.savedReports ? Object.keys(window.savedReports).length : 'Not loaded');
+window.showBypassStatus = function() {
+    console.group("🚨 BYPASS STATUS");
+    console.log("Bypass Active: YES");
+    console.log("Original function saved:", !!window.originalRenderStudentDatabaseBypass);
+    console.log("Tutor data:", window.tutorData ? "Available" : "Not available");
+    console.log("Saved reports:", window.savedReports ? Object.keys(window.savedReports).length : "Not loaded");
     console.groupEnd();
 };
 
+console.log("✅ Temporary bypass loaded. Type 'showBypassStatus()' in console for info.");
+console.log("✅ Type 'forceSubmitNow()' to manually force submit button.");
+
 /*******************************************************************************
- * END OF SECTION 15A
+ * END OF TEMPORARY BYPASS
  * 
- * This version:
- * 1. Avoids duplicate function declarations
- * 2. Fixes month tracking
- * 3. Ensures submit button shows
- * 4. Adds emergency button if needed
+ * TO REMOVE LATER:
+ * 1. Delete this entire SECTION 15A
+ * 2. Everything will return to normal
+ * 
+ * CURRENT BEHAVIOR:
+ * - Submit button will ALWAYS show if there are saved reports
+ * - Month checking is bypassed
+ * - Red floating button appears for manual control
  ******************************************************************************/
 
 /*******************************************************************************
@@ -5825,6 +5674,7 @@ inboxObserver.observe(document.body, { childList: true, subtree: true });
 // EXPOSE FUNCTIONS TO WINDOW (REQUIRED FOR HTML ONCLICK)
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
+
 
 
 
