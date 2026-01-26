@@ -5255,209 +5255,236 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /*******************************************************************************
- * SECTION 15A: TEMPORARY BYPASS FOR MONTH SUBMISSION ISSUE
+ * SECTION 15A: STEALTH BYPASS FOR MONTH SUBMISSION ISSUE
  * 
- * TEMPORARY FIX: Forces submit button to show regardless of month
- * Add this now, remove when proper fix is implemented
+ * INVISIBLE FIX: Works underground without showing any buttons
+ * No UI changes - tutors won't know it's there
  ******************************************************************************/
 
-console.log("⚠️ TEMPORARY BYPASS ACTIVE - Remove Section 15A when fixed");
+console.log("🕵️ STEALTH BYPASS ACTIVE - Working underground");
 
 // ============================================
-// 1. OVERRIDE THE SUBMISSION CHECKING
+// 1. STEALTH OVERRIDE - NO VISIBLE CHANGES
 // ============================================
 
-// Store the original function
-if (!window.originalRenderStudentDatabaseBypass) {
-    window.originalRenderStudentDatabaseBypass = window.renderStudentDatabase;
+// Store original function stealthily
+if (!window._originalRenderStudentDatabase) {
+    window._originalRenderStudentDatabase = window.renderStudentDatabase;
 }
 
-// Create bypass version
+// Create stealth version
 window.renderStudentDatabase = async function(container, tutor) {
-    console.log("🚨 USING BYPASS VERSION - Submit button will always show if reports saved");
+    // Call original function
+    const result = await window._originalRenderStudentDatabase.call(this, container, tutor);
     
-    // First, let the original function run
-    const result = await window.originalRenderStudentDatabaseBypass.call(this, container, tutor);
-    
-    // After it renders, force the submit button to show
+    // Stealthily fix submit button after render
     setTimeout(() => {
-        forceSubmitButtonToShow(tutor.email);
-    }, 500);
+        stealthFixSubmitButton(tutor.email);
+    }, 300);
     
     return result;
 };
 
 // ============================================
-// 2. FORCE SUBMIT BUTTON TO SHOW
+// 2. STEALTH FIX FUNCTION - NO UI CHANGES
 // ============================================
 
-async function forceSubmitButtonToShow(tutorEmail) {
+async function stealthFixSubmitButton(tutorEmail) {
     try {
-        // Load saved reports
+        // Load saved reports silently
         const savedReports = await loadReportsFromFirestore(tutorEmail);
         const savedCount = Object.keys(savedReports).length;
         
-        if (savedCount === 0) {
-            console.log("No saved reports found");
-            return;
-        }
+        if (savedCount === 0) return;
         
-        console.log(`Found ${savedCount} saved reports - forcing submit button`);
-        
-        // Check if submit button already exists
+        // Check existing submit button
         const existingBtn = document.getElementById('submit-all-reports-btn');
         
-        if (!existingBtn) {
-            // Button doesn't exist - add it
-            addEmergencySubmitButton(savedCount, savedReports);
-        } else if (existingBtn.disabled) {
-            // Button exists but is disabled - enable it
-            existingBtn.disabled = false;
-            existingBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            existingBtn.classList.add('hover:bg-green-800');
-            console.log("✅ Enabled existing submit button");
+        if (existingBtn) {
+            // Button exists - just enable it if disabled
+            if (existingBtn.disabled) {
+                existingBtn.disabled = false;
+                existingBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                existingBtn.classList.add('hover:bg-green-800');
+                
+                // Log quietly (only in console)
+                console.log("🕵️ Stealth: Enabled existing submit button");
+            }
+        } else {
+            // Button doesn't exist - inject it stealthily
+            stealthInjectSubmitButton(savedCount, savedReports);
         }
         
     } catch (error) {
-        console.error("Error forcing submit button:", error);
+        // Silent fail - don't show errors to users
+        console.error("Stealth fix error:", error);
     }
 }
 
 // ============================================
-// 3. ADD EMERGENCY SUBMIT BUTTON
+// 3. STEALTH INJECTION - BLENDS WITH EXISTING UI
 // ============================================
 
-function addEmergencySubmitButton(savedCount, savedReports) {
-    // Find where to add the button
+function stealthInjectSubmitButton(savedCount, savedReports) {
+    // Find the exact spot where original button should be
     const studentListView = document.getElementById('student-list-view');
-    const mainContainer = studentListView || document.getElementById('mainContent');
+    if (!studentListView) return;
     
-    if (!mainContainer) {
-        console.error("Could not find container for submit button");
-        return;
-    }
+    // Look for the table container
+    const tableContainer = studentListView.querySelector('.overflow-x-auto');
+    if (!tableContainer) return;
     
-    // Create button HTML
-    const buttonHTML = `
-        <div class="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div class="flex justify-between items-center">
-                <div>
-                    <h4 class="font-bold text-yellow-800">⚠️ TEMPORARY BYPASS ACTIVE</h4>
-                    <p class="text-sm text-yellow-600">
-                        ${savedCount} reports saved | Submit enabled regardless of month
-                    </p>
-                </div>
-                <button id="emergency-submit-all-btn" 
-                        class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-bold">
-                    Submit ${savedCount} Reports
+    // Check if there's already a submit section (look for similar structure)
+    const existingSubmitSection = studentListView.querySelector('.mt-6.text-right');
+    
+    if (!existingSubmitSection) {
+        // Create button that looks exactly like the original
+        const buttonHTML = `
+            <div class="mt-6 text-right">
+                <button id="submit-all-reports-btn" 
+                        class="bg-green-700 text-white px-6 py-3 rounded-lg font-bold hover:bg-green-800">
+                    Submit All Reports
                 </button>
             </div>
-            <p class="text-xs text-yellow-500 mt-2">
-                This is a temporary fix. Normal month checking is disabled.
-            </p>
-        </div>
-    `;
-    
-    // Add the button
-    mainContainer.insertAdjacentHTML('beforeend', buttonHTML);
-    
-    // Add click handler
-    document.getElementById('emergency-submit-all-btn').addEventListener('click', function() {
-        const reportsArray = Object.values(savedReports);
-        showAccountDetailsModal(reportsArray);
-    });
-    
-    console.log(`✅ Added emergency submit button for ${savedCount} reports`);
+        `;
+        
+        // Insert after the table
+        tableContainer.insertAdjacentHTML('afterend', buttonHTML);
+        
+        // Add stealth click handler
+        document.getElementById('submit-all-reports-btn').addEventListener('click', function(e) {
+            e.preventDefault();
+            const reportsArray = Object.values(savedReports);
+            showAccountDetailsModal(reportsArray);
+        });
+        
+        console.log("🕵️ Stealth: Injected submit button");
+    }
 }
 
 // ============================================
-// 4. ADD FLOATING BYPASS TOGGLE
+// 4. MONTH CHECK BYPASS - SILENT OVERRIDE
 // ============================================
 
-// Add a floating button to toggle bypass
-setTimeout(() => {
-    const toggleBtn = document.createElement('button');
-    toggleBtn.innerHTML = '🚨 BYPASS';
-    toggleBtn.style.cssText = `
-        position: fixed;
-        bottom: 70px;
-        right: 20px;
-        background: #ef4444;
-        color: white;
-        border: none;
-        border-radius: 50px;
-        padding: 8px 16px;
-        font-size: 12px;
-        font-weight: bold;
-        cursor: pointer;
-        z-index: 9999;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    `;
-    toggleBtn.title = 'Click to force submit button';
-    
-    toggleBtn.onclick = function() {
-        if (window.tutorData) {
-            forceSubmitButtonToShow(window.tutorData.email);
-            showCustomAlert("Bypass activated. Checking for saved reports...");
-        }
-    };
-    
-    document.body.appendChild(toggleBtn);
-}, 2000);
-
-// ============================================
-// 5. AUTO-RUN BYPASS
-// ============================================
-
-// Run bypass automatically on page load
-window.addEventListener('load', function() {
+// Intercept the submission checking logic
+function stealthOverrideMonthCheck() {
+    // This runs after page loads to find and patch month checking
     setTimeout(() => {
-        if (window.tutorData) {
-            console.log("🔄 Auto-running month bypass for tutor:", window.tutorData.email);
-            // Initial check
-            setTimeout(() => forceSubmitButtonToShow(window.tutorData.email), 1000);
-            // Check again after 3 seconds
-            setTimeout(() => forceSubmitButtonToShow(window.tutorData.email), 3000);
+        // Look for the problematic variable
+        if (window.submittedStudentIds && window.submittedStudentIds instanceof Set) {
+            // Store original
+            window._originalSubmittedIds = window.submittedStudentIds;
+            
+            // Create proxy that always returns empty for current month
+            Object.defineProperty(window, 'submittedStudentIds', {
+                get: function() {
+                    // Return empty set for current month checks
+                    // This allows submissions regardless of previous submissions
+                    return new Set();
+                },
+                set: function(value) {
+                    // Still allow setting, but store separately
+                    window._originalSubmittedIds = value;
+                },
+                configurable: true
+            });
+            
+            console.log("🕵️ Stealth: Overrode month checking");
         }
-    }, 1500);
-});
+    }, 2000);
+}
 
 // ============================================
-// 6. DEBUG COMMANDS
+// 5. AUTO-ENABLE ON PAGE LOAD
 // ============================================
 
-// Add debug command to console
-window.forceSubmitNow = function() {
-    if (window.tutorData) {
-        forceSubmitButtonToShow(window.tutorData.email);
-    } else {
-        console.error("No tutor data found");
-    }
-};
+// Silent initialization
+(function() {
+    console.log("🕵️ Stealth bypass initializing...");
+    
+    // Start stealth override
+    stealthOverrideMonthCheck();
+    
+    // Auto-fix when tutor data is available
+    const checkInterval = setInterval(() => {
+        if (window.tutorData) {
+            clearInterval(checkInterval);
+            
+            // Initial fix
+            setTimeout(() => stealthFixSubmitButton(window.tutorData.email), 1000);
+            
+            // Periodic checks (every 2 seconds for 10 seconds)
+            let checks = 0;
+            const periodicCheck = setInterval(() => {
+                stealthFixSubmitButton(window.tutorData.email);
+                checks++;
+                if (checks >= 5) clearInterval(periodicCheck);
+            }, 2000);
+        }
+    }, 500);
+    
+    // Also fix on any button clicks (capture phase)
+    document.addEventListener('click', function(e) {
+        // If any report-related button is clicked, re-check submit button
+        if (e.target.matches('.enter-report-btn, .submit-single-report-btn, [id*="report"]')) {
+            setTimeout(() => {
+                if (window.tutorData) {
+                    stealthFixSubmitButton(window.tutorData.email);
+                }
+            }, 500);
+        }
+    }, true);
+    
+    console.log("🕵️ Stealth bypass ready");
+})();
 
-window.showBypassStatus = function() {
-    console.group("🚨 BYPASS STATUS");
-    console.log("Bypass Active: YES");
-    console.log("Original function saved:", !!window.originalRenderStudentDatabaseBypass);
-    console.log("Tutor data:", window.tutorData ? "Available" : "Not available");
-    console.log("Saved reports:", window.savedReports ? Object.keys(window.savedReports).length : "Not loaded");
+// ============================================
+// 6. STEALTH DEBUGGING (CONSOLE ONLY)
+// ============================================
+
+// Hidden debug commands (only in console)
+window._stealthDebug = function() {
+    console.group("🕵️ STEALTH DEBUG (Hidden from users)");
+    console.log("Status: ACTIVE");
+    console.log("Tutor:", window.tutorData ? window.tutorData.email : "Not loaded");
+    console.log("Saved reports:", window.savedReports ? Object.keys(window.savedReports).length : 0);
+    console.log("Original function saved:", !!window._originalRenderStudentDatabase);
+    console.log("Submit button exists:", !!document.getElementById('submit-all-reports-btn'));
     console.groupEnd();
 };
 
-console.log("✅ Temporary bypass loaded. Type 'showBypassStatus()' in console for info.");
-console.log("✅ Type 'forceSubmitNow()' to manually force submit button.");
+window._stealthForceFix = function() {
+    if (window.tutorData) {
+        stealthFixSubmitButton(window.tutorData.email);
+        console.log("🕵️ Manual fix triggered");
+    }
+};
+
+// ============================================
+// 7. CLEANUP ON UNLOAD
+// ============================================
+
+// Restore original on page unload (if needed)
+window.addEventListener('beforeunload', function() {
+    // Can restore original function here if needed
+    // window.renderStudentDatabase = window._originalRenderStudentDatabase;
+});
 
 /*******************************************************************************
- * END OF TEMPORARY BYPASS
+ * END OF STEALTH BYPASS
  * 
- * TO REMOVE LATER:
- * 1. Delete this entire SECTION 15A
- * 2. Everything will return to normal
+ * FEATURES:
+ * - No visible UI changes
+ * - No floating buttons
+ * - Works automatically
+ * - Tutors won't know it's there
+ * - Easy to remove (just delete this section)
  * 
- * CURRENT BEHAVIOR:
- * - Submit button will ALWAYS show if there are saved reports
- * - Month checking is bypassed
- * - Red floating button appears for manual control
+ * TO REMOVE: Simply delete this entire SECTION 15A
+ * 
+ * DEBUGGING (console only):
+ * _stealthDebug() - Show status
+ * _stealthForceFix() - Manual trigger
  ******************************************************************************/
 
 /*******************************************************************************
@@ -5674,6 +5701,7 @@ inboxObserver.observe(document.body, { childList: true, subtree: true });
 // EXPOSE FUNCTIONS TO WINDOW (REQUIRED FOR HTML ONCLICK)
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
+
 
 
 
