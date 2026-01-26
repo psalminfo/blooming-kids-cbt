@@ -5250,6 +5250,776 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /*******************************************************************************
+ * SECTION 15A: SMART MONTHLY REPORT SUBMISSION SYSTEM
+ * 
+ * PROBLEM: Tutors submitting late reports (e.g., December in January) blocks 
+ *          them from submitting the current month's report.
+ * 
+ * SOLUTION: 
+ * 1. Add explicit month selection for each report
+ * 2. Track reports by "reportMonth" field, not submission date
+ * 3. Prompt tutors to confirm which month they're reporting for
+ * 4. Allow multiple submissions per calendar month for different report months
+ ******************************************************************************/
+
+// ============================================
+// 1. REPORT MONTH MANAGEMENT UTILITIES
+// ============================================
+
+/**
+ * Get available months for report submission
+ * Returns array of {value, label, isCurrent, isPrevious}
+ */
+function getAvailableReportMonths() {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    const months = [];
+    
+    // Current month
+    const currentMonthName = now.toLocaleString('default', { month: 'long' });
+    months.push({
+        value: `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`,
+        label: `${currentMonthName} ${currentYear} (Current Month)`,
+        isCurrent: true,
+        isPrevious: false
+    });
+    
+    // Previous month (for late submissions)
+    const prevDate = new Date(now);
+    prevDate.setMonth(currentMonth - 1);
+    const prevMonthName = prevDate.toLocaleString('default', { month: 'long' });
+    months.push({
+        value: `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`,
+        label: `${prevMonthName} ${prevDate.getFullYear()} (Previous Month)`,
+        isCurrent: false,
+        isPrevious: true
+    });
+    
+    // Allow up to 3 months back for very late submissions
+    for (let i = 2; i <= 3; i++) {
+        const lateDate = new Date(now);
+        lateDate.setMonth(currentMonth - i);
+        const lateMonthName = lateDate.toLocaleString('default', { month: 'long' });
+        months.push({
+            value: `${lateDate.getFullYear()}-${String(lateDate.getMonth() + 1).padStart(2, '0')}`,
+            label: `${lateMonthName} ${lateDate.getFullYear()} (Late Submission)`,
+            isCurrent: false,
+            isPrevious: false
+        });
+    }
+    
+    return months;
+}
+
+/**
+ * Format month value to display string (e.g., "January 2024")
+ */
+function formatMonthValue(monthValue) {
+    const [year, month] = monthValue.split('-').map(Number);
+    const date = new Date(year, month - 1);
+    return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+}
+
+/**
+ * Check if student already has a report for specific month
+ */
+async function hasReportForMonth(studentId, monthValue) {
+    try {
+        const reportsQuery = query(
+            collection(db, "tutor_submissions"),
+            where("studentId", "==", studentId),
+            where("reportMonth", "==", monthValue)
+        );
+        
+        const snapshot = await getDocs(reportsQuery);
+        return !snapshot.empty;
+    } catch (error) {
+        console.error("Error checking existing reports:", error);
+        return false;
+    }
+}
+
+// ============================================
+// 2. ENHANCED REPORT MODAL WITH MONTH SELECTION
+// ============================================
+
+/**
+ * Enhanced report modal with month selection
+ * Replaces the original showReportModal function
+ */
+function showSmartReportModal(student) {
+    if (student.isTransitioning) {
+        // Handle transitioning students (existing logic)
+        const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+        const reportData = {
+            studentId: student.id, 
+            studentName: student.studentName, 
+            grade: student.grade, 
+            parentName: student.parentName, 
+            parentPhone: student.parentPhone, 
+            normalizedParentPhone: normalizePhoneNumber(student.parentPhone),
+            reportMonth: currentMonthYear,
+            introduction: "Transitioning student", 
+            topics: "Transitioning student", 
+            progress: "Transitioning student", 
+            strengthsWeaknesses: "Transitioning student", 
+            recommendations: "Transitioning student", 
+            generalComments: "Transitioning student", 
+            isTransitioning: true
+        };
+        showFeeConfirmationModal(student, reportData);
+        return;
+    }
+
+    const existingReport = savedReports[student.id] || {};
+    const availableMonths = getAvailableReportMonths();
+    
+    // Check which months already have reports
+    const monthCheckPromises = availableMonths.map(async (month) => {
+        const hasReport = await hasReportForMonth(student.id, month.value);
+        return { ...month, hasExistingReport: hasReport };
+    });
+    
+    Promise.all(monthCheckPromises).then(monthsWithStatus => {
+        renderSmartReportForm(student, existingReport, monthsWithStatus);
+    });
+}
+
+/**
+ * Render the enhanced report form
+ */
+function renderSmartReportForm(student, existingReport, monthsWithStatus) {
+    const currentMonth = monthsWithStatus.find(m => m.isCurrent);
+    const hasCurrentMonthReport = currentMonth?.hasExistingReport || false;
+    
+    // Determine default month selection
+    let defaultMonthValue = currentMonth?.value;
+    if (hasCurrentMonthReport) {
+        // If current month already has report, default to previous month
+        const previousMonth = monthsWithStatus.find(m => m.isPrevious);
+        defaultMonthValue = previousMonth?.value || currentMonth.value;
+    }
+    
+    const monthOptions = monthsWithStatus.map(month => {
+        let optionText = month.label;
+        if (month.hasExistingReport) {
+            optionText += " ✓ (Already Submitted)";
+        }
+        
+        return `<option value="${month.value}" 
+                        ${month.value === defaultMonthValue ? 'selected' : ''}
+                        ${month.hasExistingReport ? 'disabled' : ''}>
+                    ${optionText}
+                </option>`;
+    }).join('');
+    
+    const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
+    const displayMonth = formatMonthValue(defaultMonthValue);
+    
+    const reportFormHTML = `
+        <h3 class="text-xl font-bold mb-4">📊 Monthly Report for ${student.studentName}</h3>
+        
+        <!-- MONTH SELECTION SECTION -->
+        <div class="bg-blue-50 p-4 rounded-lg mb-4 border border-blue-200">
+            <div class="flex items-center justify-between mb-2">
+                <h4 class="font-bold text-blue-800">📅 Select Report Month</h4>
+                ${hasCurrentMonthReport ? 
+                    '<span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">Note: Current month already reported</span>' : 
+                    ''}
+            </div>
+            
+            <div class="mb-3">
+                <label class="block font-semibold text-blue-700 mb-2">Which month is this report for?</label>
+                <select id="report-month-select" class="w-full p-3 border border-blue-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    ${monthOptions}
+                </select>
+                <p class="text-xs text-blue-600 mt-2">
+                    <span class="font-semibold">Selected:</span> ${displayMonth}
+                    ${hasCurrentMonthReport ? 
+                        '<span class="text-yellow-600 ml-2">⚠️ You already submitted for current month</span>' : 
+                        ''}
+                </p>
+            </div>
+            
+            <!-- WARNING FOR LATE SUBMISSIONS -->
+            <div id="late-submission-warning" class="bg-yellow-50 p-3 rounded-lg border border-yellow-200 ${!currentMonth?.isCurrent ? '' : 'hidden'}">
+                <div class="flex items-start">
+                    <span class="text-yellow-600 mr-2">⚠️</span>
+                    <div>
+                        <p class="font-semibold text-yellow-700">Late Submission Detected</p>
+                        <p class="text-sm text-yellow-600">You're submitting a report for a previous month. Make sure this is correct before proceeding.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- REPORT CONTENT SECTION -->
+        <div class="bg-white p-4 rounded-lg border">
+            <div class="space-y-4">
+                <div>
+                    <label class="block font-semibold">Introduction</label>
+                    <textarea id="report-intro" class="w-full mt-1 p-3 border rounded-lg required-field" rows="2" placeholder="Enter introduction...">${existingReport.introduction || ''}</textarea>
+                </div>
+                
+                <div>
+                    <label class="block font-semibold">Topics & Remarks</label>
+                    <textarea id="report-topics" class="w-full mt-1 p-3 border rounded-lg required-field" rows="3" placeholder="Enter topics covered...">${existingReport.topics || ''}</textarea>
+                </div>
+                
+                <div>
+                    <label class="block font-semibold">Progress & Achievements</label>
+                    <textarea id="report-progress" class="w-full mt-1 p-3 border rounded-lg required-field" rows="2" placeholder="Enter student progress...">${existingReport.progress || ''}</textarea>
+                </div>
+                
+                <div>
+                    <label class="block font-semibold">Strengths & Weaknesses</label>
+                    <textarea id="report-sw" class="w-full mt-1 p-3 border rounded-lg required-field" rows="2" placeholder="Enter strengths and areas for improvement...">${existingReport.strengthsWeaknesses || ''}</textarea>
+                </div>
+                
+                <div>
+                    <label class="block font-semibold">Recommendations</label>
+                    <textarea id="report-recs" class="w-full mt-1 p-3 border rounded-lg required-field" rows="2" placeholder="Enter recommendations for next month...">${existingReport.recommendations || ''}</textarea>
+                </div>
+                
+                <div>
+                    <label class="block font-semibold">General Comments</label>
+                    <textarea id="report-general" class="w-full mt-1 p-3 border rounded-lg required-field" rows="2" placeholder="Enter any additional comments...">${existingReport.generalComments || ''}</textarea>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ACTION BUTTONS -->
+        <div class="flex justify-end space-x-3 mt-6">
+            <button id="cancel-report-btn" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors">
+                Cancel
+            </button>
+            <button id="modal-action-btn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
+                ${isSingleApprovedStudent ? 'Proceed to Submit' : 'Save Report'}
+            </button>
+        </div>
+    `;
+    
+    const reportModal = document.createElement('div');
+    reportModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+    reportModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl mx-auto">${reportFormHTML}</div>`;
+    document.body.appendChild(reportModal);
+    
+    // Update warning when month changes
+    const monthSelect = document.getElementById('report-month-select');
+    const warningDiv = document.getElementById('late-submission-warning');
+    
+    monthSelect.addEventListener('change', function() {
+        const selectedValue = this.value;
+        const [year, month] = selectedValue.split('-').map(Number);
+        const selectedDate = new Date(year, month - 1);
+        const now = new Date();
+        
+        // Show warning if not current month
+        const isCurrentMonth = selectedDate.getMonth() === now.getMonth() && 
+                              selectedDate.getFullYear() === now.getFullYear();
+        
+        if (!isCurrentMonth) {
+            warningDiv.classList.remove('hidden');
+            warningDiv.querySelector('p').innerHTML = 
+                `You're submitting a report for <strong>${formatMonthValue(selectedValue)}</strong>. ` +
+                `Make sure this is correct before proceeding.`;
+        } else {
+            warningDiv.classList.add('hidden');
+        }
+    });
+    
+    // Validation listeners
+    const textareas = reportModal.querySelectorAll('.required-field');
+    textareas.forEach(textarea => {
+        textarea.addEventListener('input', function() {
+            if (this.value.trim() === '') {
+                this.classList.add('border-red-300', 'bg-red-50');
+                this.classList.remove('border-green-300', 'bg-green-50');
+            } else {
+                this.classList.remove('border-red-300', 'bg-red-50');
+                this.classList.add('border-green-300', 'bg-green-50');
+            }
+        });
+    });
+    
+    // Cancel button
+    document.getElementById('cancel-report-btn').addEventListener('click', () => reportModal.remove());
+    
+    // Save/Submit button
+    document.getElementById('modal-action-btn').addEventListener('click', async () => {
+        // Validate all fields
+        const requiredFields = ['report-intro', 'report-topics', 'report-progress', 'report-sw', 'report-recs', 'report-general'];
+        const missing = requiredFields.filter(id => {
+            const field = document.getElementById(id);
+            return !field.value.trim();
+        });
+        
+        if (missing.length > 0) {
+            showCustomAlert("⚠️ Please complete all report fields before saving.");
+            missing.forEach(id => {
+                const field = document.getElementById(id);
+                field.classList.add('border-red-500', 'bg-red-50');
+                field.focus();
+            });
+            return;
+        }
+        
+        const selectedMonthValue = monthSelect.value;
+        const selectedMonthDisplay = formatMonthValue(selectedMonthValue);
+        
+        // Double-check for current month submissions
+        const now = new Date();
+        const [year, month] = selectedMonthValue.split('-').map(Number);
+        const selectedDate = new Date(year, month - 1);
+        const isCurrentMonth = selectedDate.getMonth() === now.getMonth() && 
+                              selectedDate.getFullYear() === now.getFullYear();
+        
+        if (isCurrentMonth) {
+            // Check if they already submitted for current month
+            const hasCurrentReport = await hasReportForMonth(student.id, selectedMonthValue);
+            if (hasCurrentReport) {
+                const proceed = confirm(`⚠️ You already submitted a report for ${selectedMonthDisplay}. Do you want to overwrite it?`);
+                if (!proceed) return;
+            }
+        }
+        
+        // Collect report data
+        const reportData = {
+            studentId: student.id,
+            studentName: student.studentName,
+            grade: student.grade,
+            parentName: student.parentName,
+            parentPhone: student.parentPhone,
+            normalizedParentPhone: normalizePhoneNumber(student.parentPhone),
+            reportMonth: selectedMonthValue, // Store as YYYY-MM format
+            reportMonthDisplay: selectedMonthDisplay, // Store display version
+            introduction: document.getElementById('report-intro').value,
+            topics: document.getElementById('report-topics').value,
+            progress: document.getElementById('report-progress').value,
+            strengthsWeaknesses: document.getElementById('report-sw').value,
+            recommendations: document.getElementById('report-recs').value,
+            generalComments: document.getElementById('report-general').value,
+            submittedForMonth: selectedMonthDisplay // Backward compatibility
+        };
+        
+        reportModal.remove();
+        showFeeConfirmationModal(student, reportData);
+    });
+}
+
+// ============================================
+// 3. ENHANCED SUBMISSION CHECKING
+// ============================================
+
+/**
+ * Enhanced function to check submissions by month
+ * Replace the original submission check logic
+ */
+async function checkStudentSubmissions(tutorEmail) {
+    try {
+        const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+        
+        // Query for ALL tutor submissions
+        const allSubmissionsQuery = query(
+            collection(db, "tutor_submissions"),
+            where("tutorEmail", "==", tutorEmail)
+        );
+        
+        const snapshot = await getDocs(allSubmissionsQuery);
+        const submittedStudentIds = new Set();
+        const submittedMonthsByStudent = {}; // Track which months each student has reports for
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const studentId = data.studentId;
+            
+            // Store month info
+            if (!submittedMonthsByStudent[studentId]) {
+                submittedMonthsByStudent[studentId] = new Set();
+            }
+            
+            // Get month value - support both old and new formats
+            let monthValue;
+            if (data.reportMonth) {
+                // New format: YYYY-MM
+                monthValue = data.reportMonth;
+            } else if (data.submittedForMonth) {
+                // Intermediate format: "January 2024"
+                monthValue = data.submittedForMonth;
+            } else {
+                // Old format: infer from submission date
+                const subDate = data.submittedAt.toDate();
+                monthValue = subDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+            }
+            
+            submittedMonthsByStudent[studentId].add(monthValue);
+            
+            // Check if they have a report for current month (any format)
+            const hasCurrentMonth = Array.from(submittedMonthsByStudent[studentId]).some(month => {
+                return month.includes(currentMonthYear) || 
+                       month === currentMonthYear ||
+                       (data.reportMonth && formatMonthValue(data.reportMonth) === currentMonthYear);
+            });
+            
+            if (hasCurrentMonth) {
+                submittedStudentIds.add(studentId);
+            }
+        });
+        
+        return {
+            submittedStudentIds,
+            submittedMonthsByStudent,
+            hasSubmissionForMonth: (studentId, month) => {
+                return submittedMonthsByStudent[studentId] && 
+                       submittedMonthsByStudent[studentId].has(month);
+            }
+        };
+        
+    } catch (error) {
+        console.error("Error checking submissions:", error);
+        return { submittedStudentIds: new Set(), submittedMonthsByStudent: {} };
+    }
+}
+
+// ============================================
+// 4. UPDATED STUDENT DATABASE INTEGRATION
+// ============================================
+
+/**
+ * Update the renderStudentDatabase function to use new system
+ * Replace the original status checking logic
+ */
+async function renderStudentDatabaseWithSmartReports(container, tutor) {
+    // ... existing code until submission check ...
+    
+    // REPLACE THIS SECTION:
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const submittedStudentIds = new Set();
+    
+    allSubmissionsSnapshot.forEach(doc => {
+        const subData = doc.data();
+        const subDate = subData.submittedAt.toDate();
+        if (subDate.getMonth() === currentMonth && subDate.getFullYear() === currentYear) {
+            submittedStudentIds.add(subData.studentId); // OLD LOGIC
+        }
+    });
+    
+    // WITH THIS:
+    const submissionInfo = await checkStudentSubmissions(tutor.email);
+    const submittedStudentIds = submissionInfo.submittedStudentIds;
+    const submittedMonthsByStudent = submissionInfo.submittedMonthsByStudent;
+    
+    // Then in your student loop, display month-specific status:
+    students.forEach(student => {
+        const studentMonths = submittedMonthsByStudent[student.id] || new Set();
+        const hasCurrentMonthReport = Array.from(studentMonths).some(month => {
+            return month.includes(currentMonthYear);
+        });
+        
+        // Display appropriate status
+        if (hasCurrentMonthReport) {
+            statusHTML = `<span class="status-indicator text-blue-600 font-semibold">
+                            Report Sent (${currentMonthYear})
+                         </span>`;
+        } else if (studentMonths.size > 0) {
+            // Has reports for other months
+            const lastMonth = Array.from(studentMonths).pop();
+            statusHTML = `<span class="status-indicator text-yellow-600">
+                            Last report: ${lastMonth}
+                         </span>`;
+        }
+        // ... rest of student rendering ...
+    });
+    
+    // ... rest of function ...
+}
+
+// ============================================
+// 5. MIGRATION HELPER FOR EXISTING DATA
+// ============================================
+
+/**
+ * Helper to migrate existing reports to new system
+ * Run this once to update all existing reports
+ */
+async function migrateExistingReports() {
+    try {
+        console.log("Starting report migration...");
+        
+        const allReportsQuery = query(collection(db, "tutor_submissions"));
+        const snapshot = await getDocs(allReportsQuery);
+        
+        let migratedCount = 0;
+        const updatePromises = [];
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            
+            // Skip if already migrated
+            if (data.reportMonth) {
+                return;
+            }
+            
+            // Determine month from submission date
+            const subDate = data.submittedAt.toDate();
+            const monthValue = `${subDate.getFullYear()}-${String(subDate.getMonth() + 1).padStart(2, '0')}`;
+            const monthDisplay = subDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+            
+            // Prepare update
+            updatePromises.push(
+                updateDoc(doc.ref, {
+                    reportMonth: monthValue,
+                    reportMonthDisplay: monthDisplay,
+                    submittedForMonth: monthDisplay // For backward compatibility
+                })
+            );
+            
+            migratedCount++;
+        });
+        
+        // Execute all updates
+        await Promise.all(updatePromises);
+        console.log(`✅ Successfully migrated ${migratedCount} reports`);
+        showCustomAlert(`✅ Migrated ${migratedCount} existing reports to new system`);
+        
+    } catch (error) {
+        console.error("Migration failed:", error);
+        showCustomAlert("❌ Report migration failed. Please contact admin.");
+    }
+}
+
+// ============================================
+// 6. INTEGRATION WITH EXISTING CODE
+// ============================================
+
+/**
+ * Replace the original showReportModal calls with smart version
+ * Add this to your main initialization or event listeners
+ */
+function integrateSmartReporting() {
+    // Replace event listeners for report buttons
+    document.addEventListener('click', function(e) {
+        // Handle enter report buttons
+        if (e.target.classList.contains('enter-report-btn') || 
+            e.target.classList.contains('submit-single-report-btn')) {
+            e.preventDefault();
+            const studentId = e.target.getAttribute('data-student-id');
+            const student = students.find(s => s.id === studentId);
+            if (student) {
+                showSmartReportModal(student); // Use new smart modal
+            }
+        }
+    });
+    
+    // Update dashboard buttons if needed
+    const addTopicBtn = document.getElementById('add-topic-btn');
+    if (addTopicBtn) {
+        addTopicBtn.addEventListener('click', () => {
+            const studentId = document.getElementById('select-student-topic').value;
+            const student = getStudentFromCache(studentId);
+            if (student) {
+                showSmartReportModal(student); // Use new smart modal
+            }
+        });
+    }
+}
+
+// ============================================
+// 7. ADMIN REPORT VIEW ENHANCEMENT
+// ============================================
+
+/**
+ * Enhanced admin view to show reports by month
+ */
+async function loadTutorReportsByMonth(tutorEmail) {
+    try {
+        const reportsQuery = query(
+            collection(db, "tutor_submissions"),
+            where("tutorEmail", "==", tutorEmail)
+        );
+        
+        const snapshot = await getDocs(reportsQuery);
+        const reportsByMonth = {};
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const monthKey = data.reportMonth || 
+                           data.submittedForMonth || 
+                           data.submittedAt.toDate().toLocaleString('default', { month: 'long', year: 'numeric' });
+            
+            if (!reportsByMonth[monthKey]) {
+                reportsByMonth[monthKey] = [];
+            }
+            
+            reportsByMonth[monthKey].push({
+                id: doc.id,
+                ...data,
+                month: monthKey
+            });
+        });
+        
+        // Sort months chronologically
+        const sortedMonths = Object.keys(reportsByMonth).sort((a, b) => {
+            // Convert to dates for sorting
+            const dateA = parseMonthToDate(a);
+            const dateB = parseMonthToDate(b);
+            return dateB - dateA; // Newest first
+        });
+        
+        return { reportsByMonth, sortedMonths };
+        
+    } catch (error) {
+        console.error("Error loading reports by month:", error);
+        return { reportsByMonth: {}, sortedMonths: [] };
+    }
+}
+
+// Helper to parse month string to Date
+function parseMonthToDate(monthStr) {
+    if (monthStr.match(/^\d{4}-\d{2}$/)) {
+        // YYYY-MM format
+        const [year, month] = monthStr.split('-').map(Number);
+        return new Date(year, month - 1);
+    } else {
+        // Try to parse "Month Year" format
+        const [monthName, year] = monthStr.split(' ');
+        const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
+        return new Date(year, monthIndex);
+    }
+}
+
+// ============================================
+// 8. INITIALIZATION
+// ============================================
+
+/**
+ * Initialize the smart reporting system
+ * Call this when tutor logs in
+ */
+async function initSmartReporting(tutor) {
+    console.log("Initializing Smart Reporting System...");
+    
+    // 1. Integrate with existing UI
+    integrateSmartReporting();
+    
+    // 2. Optional: Run migration once
+    const migrationDone = localStorage.getItem('report_migration_done');
+    if (!migrationDone && tutor.isManagementStaff) {
+        const shouldMigrate = confirm("Update existing reports to new month-tracking system?");
+        if (shouldMigrate) {
+            await migrateExistingReports();
+            localStorage.setItem('report_migration_done', 'true');
+        }
+    }
+    
+    // 3. Add CSS for new components
+    addSmartReportingStyles();
+    
+    console.log("✅ Smart Reporting System Ready");
+}
+
+/**
+ * Add necessary CSS styles
+ */
+function addSmartReportingStyles() {
+    const styleId = 'smart-reporting-styles';
+    if (document.getElementById(styleId)) return;
+    
+    const styles = `
+        /* Smart Reporting Styles */
+        .month-option-disabled {
+            opacity: 0.5;
+            background-color: #f3f4f6;
+        }
+        
+        .month-indicator {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+        
+        .month-indicator-current {
+            background-color: #10b981;
+            color: white;
+        }
+        
+        .month-indicator-previous {
+            background-color: #f59e0b;
+            color: white;
+        }
+        
+        .month-indicator-late {
+            background-color: #ef4444;
+            color: white;
+        }
+        
+        .report-month-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: 8px;
+        }
+        
+        /* Animation for month selection */
+        @keyframes pulse-month {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .pulse-month {
+            animation: pulse-month 2s infinite;
+        }
+    `;
+    
+    const styleEl = document.createElement('style');
+    styleEl.id = styleId;
+    styleEl.textContent = styles;
+    document.head.appendChild(styleEl);
+}
+
+// ============================================
+// 9. USAGE INSTRUCTIONS
+// ============================================
+
+/*
+HOW TO USE THIS SYSTEM:
+
+1. Add this entire SECTION 15A to your tutor.js file
+2. In your main initialization, call:
+   initSmartReporting(window.tutorData);
+   
+3. Replace the original report button event listeners to use:
+   showSmartReportModal() instead of showReportModal()
+
+4. Optional: Run migration once to update existing reports
+
+FEATURES:
+✅ Explicit month selection for every report
+✅ Prevents accidental duplicate submissions for same month
+✅ Allows late submissions without blocking current month
+✅ Clear visual indicators for which months have reports
+✅ Backward compatible with existing data
+✅ Migration tool for existing reports
+✅ Admin view organized by month
+*/
+
+/*******************************************************************************
+ * END OF SECTION 15A: SMART MONTHLY REPORT SUBMISSION SYSTEM
+ ******************************************************************************/
+
+/*******************************************************************************
  * SECTION 16: GOOGLE CLASSROOM GRADING INTERFACE (FINAL)
  ******************************************************************************/
 
@@ -5463,6 +6233,7 @@ inboxObserver.observe(document.body, { childList: true, subtree: true });
 // EXPOSE FUNCTIONS TO WINDOW (REQUIRED FOR HTML ONCLICK)
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
+
 
 
 
