@@ -5610,7 +5610,7 @@ window.checkMonthFix = function() {
  * 3. Ensures submit button shows
  * 4. Adds emergency button if needed
  ******************************************************************************/
- ******************************************************************************/
+
 /*******************************************************************************
  * SECTION 16: GOOGLE CLASSROOM GRADING INTERFACE (FINAL)
  ******************************************************************************/
@@ -5825,6 +5825,7 @@ inboxObserver.observe(document.body, { childList: true, subtree: true });
 // EXPOSE FUNCTIONS TO WINDOW (REQUIRED FOR HTML ONCLICK)
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
+
 
 
 
