@@ -1,3 +1,6 @@
+// ============================================================================
+// FIREBASE CONFIGURATION
+// ============================================================================
 
 // Firebase config for the 'bloomingkidsassessment' project
 firebase.initializeApp({
@@ -13,27 +16,20 @@ const db = firebase.firestore();
 const auth = firebase.auth();
 
 // ============================================================================
-// SECTION 1: CYBER SECURITY & UTILITY FUNCTIONS
+// SECTION 1: CORE UTILITIES & SECURITY (OPTIMIZED)
 // ============================================================================
 
-// XSS Protection - Escape HTML to prevent injection attacks
+// XSS Protection
 function escapeHtml(text) {
     if (typeof text !== 'string') return text;
-    
     const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;',
-        '`': '&#x60;',
-        '/': '&#x2F;',
-        '=': '&#x3D;'
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+        "'": '&#039;', '`': '&#x60;', '/': '&#x2F;', '=': '&#x3D;'
     };
-    return text.replace(/[&<>"'`/=]/g, function(m) { return map[m]; });
+    return text.replace(/[&<>"'`/=]/g, m => map[m]);
 }
 
-// Sanitize user input for safe rendering
+// Sanitize input
 function sanitizeInput(input) {
     if (typeof input === 'string') {
         return escapeHtml(input.trim());
@@ -41,21 +37,20 @@ function sanitizeInput(input) {
     return input;
 }
 
-// Safe text content helper (doesn't escape HTML for rendering)
+// Safe text (no HTML escaping for display)
 function safeText(text) {
     if (typeof text !== 'string') return text;
     return text.trim();
 }
 
-// Capitalize names safely
+// Capitalize names
 function capitalize(str) {
     if (!str || typeof str !== 'string') return "";
     const cleaned = safeText(str);
     return cleaned.replace(/\b\w/g, l => l.toUpperCase());
 }
 
-// ========== NEW FUNCTION ==========
-// Compare phone numbers by digits only (ignoring formatting) - GLOBAL SUPPORT
+// ========== UNIVERSAL PHONE MATCHING (FIXED - SUFFIX BASED) ==========
 function comparePhonesByDigits(phone1, phone2) {
     if (!phone1 || !phone2) return false;
     
@@ -66,35 +61,336 @@ function comparePhonesByDigits(phone1, phone2) {
         
         if (!digits1 || !digits2) return false;
         
-        // Remove leading zeros for international comparison
-        const clean1 = digits1.replace(/^0+/, '');
-        const clean2 = digits2.replace(/^0+/, '');
+        // SUFFIX MATCHING: Compare only last 10 digits
+        const suffix1 = digits1.slice(-10);
+        const suffix2 = digits2.slice(-10);
         
-        // Compare both versions (with and without leading zeros)
-        return digits1 === digits2 || 
-               clean1 === clean2 || 
-               digits1 === clean2 || 
-               clean1 === digits2;
+        // Also check full match for completeness
+        return suffix1 === suffix2 || digits1 === digits2;
     } catch (error) {
         console.warn("Phone comparison error:", error);
         return false;
     }
 }
 
-// Extract only digits from phone (for searching)
+// Extract suffix (last 10 digits) for searching
+function extractPhoneSuffix(phone) {
+    if (!phone) return '';
+    const digits = phone.toString().replace(/\D/g, '');
+    return digits.slice(-10); // Last 10 digits only
+}
+
+// Extract all digits
 function extractPhoneDigits(phone) {
     if (!phone) return '';
-    return phone.toString().replace(/\D/g, '').replace(/^0+/, '');
+    return phone.toString().replace(/\D/g, '');
 }
 
 // ============================================================================
-// SECTION 2: APP CONFIGURATION & INITIALIZATION
+// SECTION 2: GLOBAL STATE MANAGEMENT
 // ============================================================================
 
-// Inject custom CSS for smooth animations and transitions
+let currentUserData = null;
+let userChildren = [];
+let studentIdMap = new Map();
+let allStudentData = [];
+let realTimeListeners = [];
+let charts = new Map();
+let pendingRequests = new Set();
+
+// Initialize intervals array globally
+if (!window.realTimeIntervals) {
+    window.realTimeIntervals = [];
+}
+
+// ============================================================================
+// SECTION 3: UI MESSAGE SYSTEM
+// ============================================================================
+
+function showMessage(message, type = 'info') {
+    // Remove any existing message
+    const existingMessage = document.querySelector('.message-toast');
+    if (existingMessage) {
+        existingMessage.remove();
+    }
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message-toast fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm fade-in slide-down ${
+        type === 'error' ? 'bg-red-500 text-white' : 
+        type === 'success' ? 'bg-green-500 text-white' : 
+        'bg-blue-500 text-white'
+    }`;
+    messageDiv.textContent = `BKH says: ${safeText(message)}`;
+    
+    document.body.appendChild(messageDiv);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        if (messageDiv.parentNode) {
+            messageDiv.remove();
+        }
+    }, 5000);
+}
+
+// Show skeleton loader
+function showSkeletonLoader(elementId, type = 'default') {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    let skeletonHtml = '';
+    
+    switch(type) {
+        case 'dashboard':
+            skeletonHtml = `
+                <div class="space-y-6">
+                    <div class="skeleton skeleton-title"></div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="skeleton skeleton-card"></div>
+                        <div class="skeleton skeleton-card"></div>
+                        <div class="skeleton skeleton-card"></div>
+                    </div>
+                    <div class="skeleton skeleton-card h-64"></div>
+                </div>
+            `;
+            break;
+        case 'reports':
+            skeletonHtml = `
+                <div class="space-y-4">
+                    <div class="skeleton skeleton-title w-1/2"></div>
+                    ${Array.from({length: 3}, (_, i) => `
+                        <div class="border rounded-lg p-4">
+                            <div class="skeleton skeleton-text w-3/4"></div>
+                            <div class="skeleton skeleton-text w-1/2 mt-2"></div>
+                            <div class="skeleton skeleton-text w-full mt-4 h-20"></div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            break;
+        default:
+            skeletonHtml = `
+                <div class="text-center py-8">
+                    <div class="loading-spinner mx-auto"></div>
+                    <p class="text-green-600 font-semibold mt-4">Loading...</p>
+                </div>
+            `;
+    }
+    
+    element.innerHTML = skeletonHtml;
+}
+
+// ============================================================================
+// SECTION 4: DATE & TIME UTILITIES
+// ============================================================================
+
+function formatDetailedDate(date, showTimezone = false) {
+    let dateObj;
+    
+    if (date?.toDate) {
+        dateObj = date.toDate();
+    } else if (date instanceof Date) {
+        dateObj = date;
+    } else if (typeof date === 'string') {
+        dateObj = new Date(date);
+    } else if (typeof date === 'number') {
+        if (date < 10000000000) {
+            dateObj = new Date(date * 1000);
+        } else {
+            dateObj = new Date(date);
+        }
+    } else {
+        return 'Unknown date';
+    }
+    
+    if (isNaN(dateObj.getTime())) {
+        return 'Invalid date';
+    }
+    
+    const options = {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    };
+    
+    if (showTimezone) {
+        options.timeZoneName = 'short';
+    }
+    
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    let formatted = dateObj.toLocaleDateString('en-US', options);
+    
+    if (showTimezone) {
+        formatted += ` (${timezone})`;
+    }
+    
+    return formatted;
+}
+
+function getYearMonthFromDate(date) {
+    let dateObj;
+    
+    if (date?.toDate) {
+        dateObj = date.toDate();
+    } else if (date instanceof Date) {
+        dateObj = date;
+    } else if (typeof date === 'string') {
+        dateObj = new Date(date);
+    } else if (typeof date === 'number') {
+        if (date < 10000000000) {
+            dateObj = new Date(date * 1000);
+        } else {
+            dateObj = new Date(date);
+        }
+    } else {
+        return { year: 0, month: 0 };
+    }
+    
+    if (isNaN(dateObj.getTime())) {
+        return { year: 0, month: 0 };
+    }
+    
+    return {
+        year: dateObj.getFullYear(),
+        month: dateObj.getMonth()
+    };
+}
+
+function getTimestamp(dateInput) {
+    if (!dateInput) return 0;
+    
+    if (dateInput?.toDate) {
+        return dateInput.toDate().getTime();
+    } else if (dateInput instanceof Date) {
+        return dateInput.getTime();
+    } else if (typeof dateInput === 'string') {
+        return new Date(dateInput).getTime();
+    } else if (typeof dateInput === 'number') {
+        if (dateInput < 10000000000) {
+            return dateInput * 1000;
+        }
+        return dateInput;
+    }
+    
+    return 0;
+}
+
+function getTimestampFromData(data) {
+    if (!data) return 0;
+    
+    const timestampFields = [
+        'timestamp',
+        'createdAt',
+        'submittedAt',
+        'date',
+        'updatedAt',
+        'assignedDate',
+        'dueDate'
+    ];
+    
+    for (const field of timestampFields) {
+        if (data[field]) {
+            const timestamp = getTimestamp(data[field]);
+            if (timestamp > 0) {
+                return Math.floor(timestamp / 1000);
+            }
+        }
+    }
+    
+    return Math.floor(Date.now() / 1000);
+}
+
+// ============================================================================
+// SECTION 5: MONTH DISPLAY LOGIC
+// ============================================================================
+
+function getMonthDisplayLogic() {
+    const today = new Date();
+    const currentDay = today.getDate();
+    
+    if (currentDay === 1 || currentDay === 2) {
+        return {
+            showCurrentMonth: true,
+            showPreviousMonth: true
+        };
+    } else {
+        return {
+            showCurrentMonth: true,
+            showPreviousMonth: false
+        };
+    }
+}
+
+function getCurrentMonthYear() {
+    const now = new Date();
+    const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    return {
+        month: now.getMonth(),
+        year: now.getFullYear(),
+        monthName: monthNames[now.getMonth()]
+    };
+}
+
+function getPreviousMonthYear() {
+    const now = new Date();
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    return {
+        month: lastMonth.getMonth(),
+        year: lastMonth.getFullYear(),
+        monthName: monthNames[lastMonth.getMonth()]
+    };
+}
+
+// ============================================================================
+// SECTION 6: APP CONFIGURATION & INITIALIZATION
+// ============================================================================
+
+// Inject optimized CSS with skeleton loaders
 function injectCustomCSS() {
     const style = document.createElement('style');
     style.textContent = `
+        /* Skeleton Loaders */
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: 4px;
+        }
+        
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        .skeleton-text {
+            height: 1em;
+            margin-bottom: 0.5em;
+        }
+        
+        .skeleton-title {
+            height: 1.8em;
+            margin-bottom: 1em;
+            width: 70%;
+        }
+        
+        .skeleton-card {
+            height: 150px;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        
         /* Smooth transitions */
         .accordion-content {
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -240,26 +536,90 @@ function injectCustomCSS() {
             color: #EF4444;
             background-color: #FEE2E2;
         }
+        
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .mobile-stack {
+                flex-direction: column !important;
+            }
+            
+            .mobile-full-width {
+                width: 100% !important;
+            }
+            
+            .mobile-padding {
+                padding: 1rem !important;
+            }
+        }
     `;
     document.head.appendChild(style);
 }
 
-// Create country code dropdown with full list
+// Phone normalization (optimized)
+function normalizePhoneNumber(phone) {
+    if (!phone || typeof phone !== 'string') {
+        return { normalized: null, valid: false, error: 'Invalid input' };
+    }
+
+    try {
+        // Clean the phone number - remove all non-digit characters except +
+        let cleaned = phone.replace(/[^\d+]/g, '');
+        
+        // If empty after cleaning, return error
+        if (!cleaned) {
+            return { normalized: null, valid: false, error: 'Empty phone number' };
+        }
+        
+        // Check if it already has a country code
+        if (cleaned.startsWith('+')) {
+            // Already has country code
+            cleaned = '+' + cleaned.substring(1).replace(/\+/g, '');
+            
+            return {
+                normalized: cleaned,
+                valid: true,
+                error: null
+            };
+        } else {
+            // No country code, add +1 as default
+            cleaned = cleaned.replace(/^0+/, '');
+            
+            // Add default country code
+            cleaned = '+1' + cleaned;
+            
+            return {
+                normalized: cleaned,
+                valid: true,
+                error: null
+            };
+        }
+        
+    } catch (error) {
+        console.error("❌ Phone normalization error:", error);
+        return { 
+            normalized: null, 
+            valid: false, 
+            error: safeText(error.message)
+        };
+    }
+}
+
+// Create country code dropdown
 function createCountryCodeDropdown() {
     const phoneInputContainer = document.getElementById('signupPhone')?.parentNode;
     if (!phoneInputContainer) return;
     
     // Create container for country code and phone number
     const container = document.createElement('div');
-    container.className = 'flex gap-2';
+    container.className = 'flex gap-2 mobile-stack';
     
     // Create country code dropdown
     const countryCodeSelect = document.createElement('select');
     countryCodeSelect.id = 'countryCode';
-    countryCodeSelect.className = 'w-32 px-3 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200';
+    countryCodeSelect.className = 'w-32 px-3 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200 mobile-full-width';
     countryCodeSelect.required = true;
     
-    // FULL COUNTRY CODES LIST (50+ countries) - MAINTAINED GLOBAL
+    // FULL COUNTRY CODES LIST
     const countries = [
         { code: '+1', name: 'USA/Canada (+1)' },
         { code: '+234', name: 'Nigeria (+234)' },
@@ -328,7 +688,7 @@ function createCountryCodeDropdown() {
     const phoneInput = document.getElementById('signupPhone');
     if (phoneInput) {
         phoneInput.placeholder = 'Enter phone number without country code';
-        phoneInput.className = 'flex-1 px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200';
+        phoneInput.className = 'flex-1 px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200 mobile-full-width';
         
         // Replace the original input with new structure
         container.appendChild(countryCodeSelect);
@@ -337,130 +697,140 @@ function createCountryCodeDropdown() {
     }
 }
 
-// ENHANCED PHONE NORMALIZATION FUNCTION - BETTER GLOBAL SUPPORT
-function normalizePhoneNumber(phone) {
-    if (!phone || typeof phone !== 'string') {
-        return { normalized: null, valid: false, error: 'Invalid input' };
-    }
+// ============================================================================
+// SECTION 7: AUTHENTICATION FUNCTIONS
+// ============================================================================
 
-    console.log("🔧 Normalizing phone:", phone);
+async function handleSignInFull(identifier, password, signInBtn, authLoader) {
+    const requestId = `signin_${Date.now()}`;
+    pendingRequests.add(requestId);
     
     try {
-        // Clean the phone number - remove all non-digit characters except +
-        let cleaned = phone.replace(/[^\d+]/g, '');
+        await auth.signInWithEmailAndPassword(identifier, password);
+        console.log("✅ Sign in successful");
+        // Auth listener will handle the rest
+    } catch (error) {
+        if (!pendingRequests.has(requestId)) return;
         
-        // If empty after cleaning, return error
-        if (!cleaned) {
-            return { normalized: null, valid: false, error: 'Empty phone number' };
+        let errorMessage = "Failed to sign in. Please check your credentials.";
+        
+        if (error.code === 'auth/user-not-found') {
+            errorMessage = "No account found with this email.";
+        } else if (error.code === 'auth/wrong-password') {
+            errorMessage = "Incorrect password.";
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = "Invalid email address format.";
+        } else if (error.code === 'auth/too-many-requests') {
+            errorMessage = "Too many failed attempts. Please try again later.";
         }
         
-        // Check if it already has a country code
-        if (cleaned.startsWith('+')) {
-            // Already has country code, validate format
-            // Remove any extra plus signs
-            cleaned = '+' + cleaned.substring(1).replace(/\+/g, '');
-            
-            return {
-                normalized: cleaned,
-                valid: true,
-                error: null
-            };
-        } else {
-            // No country code, add +1 as default for global compatibility
-            // Remove leading zeros if present
-            cleaned = cleaned.replace(/^0+/, '');
-            
-            // Check if it looks like a local number that might need a country code
-            if (cleaned.length <= 10) {
-                // Local number, add +1 (USA/Canada default)
-                cleaned = '+1' + cleaned;
-            } else if (cleaned.length > 10) {
-                // Might already have country code without +
-                // Check if it starts with a known country code pattern
-                const knownCodes = ['234', '44', '91', '86', '33', '49', '81', '61', '55', '7'];
-                const possibleCode = cleaned.substring(0, 3);
-                
-                if (knownCodes.includes(possibleCode)) {
-                    cleaned = '+' + cleaned;
-                } else {
-                    // Default to +1 for unknown long numbers
-                    cleaned = '+1' + cleaned;
-                }
-            }
-            
-            // Ensure format is correct
-            return {
-                normalized: cleaned,
-                valid: true,
-                error: null
-            };
+        showMessage(errorMessage, 'error');
+        
+        if (signInBtn) signInBtn.disabled = false;
+        
+        const signInText = document.getElementById('signInText');
+        const signInSpinner = document.getElementById('signInSpinner');
+        
+        if (signInText) signInText.textContent = 'Sign In';
+        if (signInSpinner) signInSpinner.classList.add('hidden');
+        if (authLoader) authLoader.classList.add('hidden');
+    } finally {
+        pendingRequests.delete(requestId);
+    }
+}
+
+async function handleSignUpFull(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader) {
+    const requestId = `signup_${Date.now()}`;
+    pendingRequests.add(requestId);
+    
+    try {
+        let fullPhoneInput = localPhone;
+        if (!localPhone.startsWith('+')) {
+            fullPhoneInput = countryCode + localPhone;
         }
+        
+        const normalizedResult = normalizePhoneNumber(fullPhoneInput);
+        
+        if (!normalizedResult.valid) {
+            throw new Error(`Invalid phone number: ${normalizedResult.error}`);
+        }
+        
+        const finalPhone = normalizedResult.normalized;
+        console.log("📱 Processing signup with normalized phone:", finalPhone);
+
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+
+        const referralCode = await generateReferralCode();
+
+        await db.collection('parent_users').doc(user.uid).set({
+            email: email,
+            phone: finalPhone,
+            normalizedPhone: finalPhone,
+            parentName: 'Parent',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            referralCode: referralCode,
+            referralEarnings: 0,
+            uid: user.uid
+        });
+
+        console.log("✅ Account created and profile saved");
+        showMessage('Account created successfully!', 'success');
         
     } catch (error) {
-        console.error("❌ Phone normalization error:", error);
-        return { 
-            normalized: null, 
-            valid: false, 
-            error: safeText(error.message)
-        };
-    }
-}
-
-// ============================================================================
-// SECTION 3: GLOBAL VARIABLES & STATE MANAGEMENT
-// ============================================================================
-
-let currentUserData = null;
-let userChildren = [];
-let studentIdMap = new Map();
-let allStudentData = [];
-let unreadMessagesCount = 0;
-let unreadAcademicsCount = 0;
-let realTimeListeners = [];
-let academicsNotifications = new Map(); // studentName -> {dailyTopics: count, homework: count}
-let charts = new Map(); // Store chart instances
-
-// Initialize intervals array globally
-if (!window.realTimeIntervals) {
-    window.realTimeIntervals = [];
-}
-
-// ============================================================================
-// SECTION 4: UI MESSAGE SYSTEM
-// ============================================================================
-
-function showMessage(message, type) {
-    // Remove any existing message
-    const existingMessage = document.querySelector('.message-toast');
-    if (existingMessage) {
-        existingMessage.remove();
-    }
-
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message-toast fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm fade-in slide-down ${
-        type === 'error' ? 'bg-red-500 text-white' : 
-        type === 'success' ? 'bg-green-500 text-white' : 
-        'bg-blue-500 text-white'
-    }`;
-    messageDiv.textContent = `BKH says: ${safeText(message)}`;
-    
-    document.body.appendChild(messageDiv);
-    
-    // Auto remove after 5 seconds
-    setTimeout(() => {
-        if (messageDiv.parentNode) {
-            messageDiv.remove();
+        if (!pendingRequests.has(requestId)) return;
+        
+        let errorMessage = "Failed to create account.";
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = "This email is already registered. Please sign in instead.";
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = "Password should be at least 6 characters.";
+        } else if (error.message) {
+            errorMessage = error.message;
         }
-    }, 5000);
+
+        showMessage(errorMessage, 'error');
+
+        if (signUpBtn) signUpBtn.disabled = false;
+        
+        const signUpText = document.getElementById('signUpText');
+        const signUpSpinner = document.getElementById('signUpSpinner');
+        
+        if (signUpText) signUpText.textContent = 'Create Account';
+        if (signUpSpinner) signUpSpinner.classList.add('hidden');
+        if (authLoader) authLoader.classList.add('hidden');
+    } finally {
+        pendingRequests.delete(requestId);
+    }
+}
+
+async function handlePasswordResetFull(email, sendResetBtn, resetLoader) {
+    const requestId = `reset_${Date.now()}`;
+    pendingRequests.add(requestId);
+    
+    try {
+        await auth.sendPasswordResetEmail(email);
+        showMessage('Password reset link sent to your email!', 'success');
+        hidePasswordResetModal();
+    } catch (error) {
+        if (!pendingRequests.has(requestId)) return;
+        
+        let errorMessage = "Failed to send reset email.";
+        if (error.code === 'auth/user-not-found') {
+            errorMessage = "No account found with this email address.";
+        }
+        showMessage(errorMessage, 'error');
+    } finally {
+        pendingRequests.delete(requestId);
+        if (sendResetBtn) sendResetBtn.disabled = false;
+        if (resetLoader) resetLoader.classList.add('hidden');
+    }
 }
 
 // ============================================================================
-// SECTION 5: REFERRAL SYSTEM FUNCTIONS
+// SECTION 8: REFERRAL SYSTEM
 // ============================================================================
 
-/**
- * Generates a unique, alphanumeric referral code prefixed with 'BKH'.
- */
 async function generateReferralCode() {
     const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const prefix = 'BKH';
@@ -474,7 +844,6 @@ async function generateReferralCode() {
         }
         code = prefix + suffix;
 
-        // Check uniqueness in Firestore
         const snapshot = await db.collection('parent_users').where('referralCode', '==', code).limit(1).get();
         if (snapshot.empty) {
             isUnique = true;
@@ -483,27 +852,23 @@ async function generateReferralCode() {
     return safeText(code);
 }
 
-/**
- * Loads the parent's referral data for the Rewards Dashboard.
- */
 async function loadReferralRewards(parentUid) {
     const rewardsContent = document.getElementById('rewardsContent');
     if (!rewardsContent) return;
     
-    rewardsContent.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading rewards data...</p></div>';
+    showSkeletonLoader('rewardsContent', 'reports');
 
     try {
-        // Get the parent's referral code and current earnings
         const userDoc = await db.collection('parent_users').doc(parentUid).get();
         if (!userDoc.exists) {
-            rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">User data not found. Please sign in again.</p>';
+            rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">User data not found.</p>';
             return;
         }
+        
         const userData = userDoc.data();
         const referralCode = safeText(userData.referralCode || 'N/A');
         const totalEarnings = userData.referralEarnings || 0;
         
-        // Query referral transactions
         const transactionsSnapshot = await db.collection('referral_transactions')
             .where('ownerUid', '==', parentUid)
             .get();
@@ -520,7 +885,6 @@ async function loadReferralRewards(parentUid) {
         } else {
             const transactions = transactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
-            // Sort manually by timestamp descending
             transactions.sort((a, b) => {
                 const aTime = a.timestamp?.toDate?.() || new Date(0);
                 const bTime = b.timestamp?.toDate?.() || new Date(0);
@@ -556,7 +920,6 @@ async function loadReferralRewards(parentUid) {
             });
         }
         
-        // Display the dashboard
         rewardsContent.innerHTML = `
             <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-8 shadow-md slide-down">
                 <h2 class="text-2xl font-bold text-blue-800 mb-1">Your Referral Code</h2>
@@ -599,373 +962,362 @@ async function loadReferralRewards(parentUid) {
         
     } catch (error) {
         console.error('Error loading referral rewards:', error);
-        rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">An error occurred while loading your rewards data. Please try again later.</p>';
+        rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">Error loading rewards.</p>';
     }
 }
 
 // ============================================================================
-// SECTION 6: AUTHENTICATION & USER MANAGEMENT (CORE IMPLEMENTATION)
+// SECTION 9: COMPREHENSIVE CHILDREN FINDER (WITH SUFFIX MATCHING)
 // ============================================================================
 
-/**
- * FULL SIGN IN LOGIC
- * Handles the actual Firebase authentication and UI updates.
- */
-async function handleSignInFull(identifier, password, signInBtn, authLoader) {
-    try {
-        // 1. Attempt Sign In
-        await auth.signInWithEmailAndPassword(identifier, password);
-        
-        console.log("✅ Sign in successful for:", identifier);
-        // Success is handled by the UnifiedAuthManager
+async function comprehensiveFindChildren(parentPhone) {
+    console.log("🔍 COMPREHENSIVE SUFFIX SEARCH for children with phone:", parentPhone);
 
-    } catch (error) {
-        console.error("Sign In Error:", error);
-        
-        // 3. Handle Errors
-        let errorMessage = "Failed to sign in. Please check your credentials.";
-        
-        if (error.code === 'auth/user-not-found') {
-            errorMessage = "No account found with this email.";
-        } else if (error.code === 'auth/wrong-password') {
-            errorMessage = "Incorrect password.";
-        } else if (error.code === 'auth/invalid-email') {
-            errorMessage = "Invalid email address format.";
-        } else if (error.code === 'auth/too-many-requests') {
-            errorMessage = "Too many failed attempts. Please try again later.";
-        }
-        
-        showMessage(errorMessage, 'error');
-        
-        // 4. Reset UI
-        if (signInBtn) signInBtn.disabled = false;
-        
-        const signInText = document.getElementById('signInText');
-        const signInSpinner = document.getElementById('signInSpinner');
-        
-        if (signInText) signInText.textContent = 'Sign In';
-        if (signInSpinner) signInSpinner.classList.add('hidden');
-        if (authLoader) authLoader.classList.add('hidden');
+    const allChildren = new Map();
+    const studentNameIdMap = new Map();
+    
+    const parentSuffix = extractPhoneSuffix(parentPhone);
+    
+    if (!parentSuffix) {
+        console.warn("⚠️ No valid suffix in parent phone:", parentPhone);
+        return {
+            studentIds: [],
+            studentNameIdMap: new Map(),
+            allStudentData: [],
+            studentNames: []
+        };
     }
-}
 
-/**
- * FULL SIGN UP LOGIC
- * Handles creating the user, normalizing phone, and saving to Firestore.
- */
-async function handleSignUpFull(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader) {
     try {
-        // 1. Normalize Phone Number
-        let fullPhoneInput = localPhone;
-        if (!localPhone.startsWith('+')) {
-            fullPhoneInput = countryCode + localPhone;
-        }
+        // Search in students and pending_students collections in parallel
+        const [studentsSnapshot, pendingSnapshot] = await Promise.all([
+            db.collection('students').get().catch(() => ({ forEach: () => {} })),
+            db.collection('pending_students').get().catch(() => ({ forEach: () => {} }))
+        ]);
         
-        const normalizedResult = normalizePhoneNumber(fullPhoneInput);
+        // Process students
+        studentsSnapshot.forEach(doc => {
+            const data = doc.data();
+            const studentId = doc.id;
+            const studentName = safeText(data.studentName || data.name || 'Unknown');
+            
+            if (studentName === 'Unknown') return;
+            
+            const phoneFields = [
+                data.parentPhone,
+                data.guardianPhone,
+                data.motherPhone,
+                data.fatherPhone,
+                data.contactPhone,
+                data.phone,
+                data.parentPhone1,
+                data.parentPhone2,
+                data.emergencyPhone
+            ];
+            
+            let isMatch = false;
+            let matchedField = '';
+            
+            for (const fieldPhone of phoneFields) {
+                if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
+                    isMatch = true;
+                    matchedField = fieldPhone;
+                    break;
+                }
+            }
+            
+            if (isMatch && !allChildren.has(studentId)) {
+                console.log(`✅ SUFFIX MATCH: Parent ${parentSuffix} = ${matchedField} → Student ${studentName}`);
+                
+                allChildren.set(studentId, {
+                    id: studentId,
+                    name: studentName,
+                    data: data,
+                    isPending: false,
+                    collection: 'students'
+                });
+                
+                if (studentNameIdMap.has(studentName)) {
+                    const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
+                    studentNameIdMap.set(uniqueName, studentId);
+                } else {
+                    studentNameIdMap.set(studentName, studentId);
+                }
+            }
+        });
         
-        if (!normalizedResult.valid) {
-            throw new Error(`Invalid phone number: ${normalizedResult.error}`);
-        }
-        
-        const finalPhone = normalizedResult.normalized;
-        console.log("📱 Processing signup with normalized phone:", finalPhone);
-
-        // 2. Create Authentication User
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        const user = userCredential.user;
-
-        // 3. Generate Referral Code
-        const referralCode = await generateReferralCode();
-
-        // 4. Save User Data to Firestore
-        await db.collection('parent_users').doc(user.uid).set({
-            email: email,
-            phone: finalPhone, // Normalized +CountryCode format
-            normalizedPhone: finalPhone, // Explicit field for searching
-            parentName: 'Parent', // Default name
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            referralCode: referralCode,
-            referralEarnings: 0,
-            uid: user.uid
+        // Process pending students
+        pendingSnapshot.forEach(doc => {
+            const data = doc.data();
+            const studentId = doc.id;
+            const studentName = safeText(data.studentName || data.name || 'Unknown');
+            
+            if (studentName === 'Unknown') return;
+            
+            const phoneFields = [
+                data.parentPhone,
+                data.guardianPhone,
+                data.motherPhone,
+                data.fatherPhone,
+                data.contactPhone,
+                data.phone
+            ];
+            
+            let isMatch = false;
+            let matchedField = '';
+            
+            for (const fieldPhone of phoneFields) {
+                if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
+                    isMatch = true;
+                    matchedField = fieldPhone;
+                    break;
+                }
+            }
+            
+            if (isMatch && !allChildren.has(studentId)) {
+                console.log(`✅ PENDING SUFFIX MATCH: Parent ${parentSuffix} = ${matchedField} → Student ${studentName}`);
+                
+                allChildren.set(studentId, {
+                    id: studentId,
+                    name: studentName,
+                    data: data,
+                    isPending: true,
+                    collection: 'pending_students'
+                });
+                
+                if (studentNameIdMap.has(studentName)) {
+                    const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
+                    studentNameIdMap.set(uniqueName, studentId);
+                } else {
+                    studentNameIdMap.set(studentName, studentId);
+                }
+            }
         });
 
-        console.log("✅ Account created and profile saved for:", user.uid);
-        showMessage('Account created successfully!', 'success');
-        
-        // Success is handled by UnifiedAuthManager
+        // Email matching (backup)
+        const userDoc = await db.collection('parent_users')
+            .where('normalizedPhone', '==', parentPhone)
+            .limit(1)
+            .get();
 
-    } catch (error) {
-        console.error("Sign Up Error:", error);
-        
-        let errorMessage = "Failed to create account.";
-        if (error.code === 'auth/email-already-in-use') {
-            errorMessage = "This email is already registered. Please sign in instead.";
-        } else if (error.code === 'auth/weak-password') {
-            errorMessage = "Password should be at least 6 characters.";
-        } else if (error.message) {
-            errorMessage = error.message;
-        }
+        if (!userDoc.empty) {
+            const userData = userDoc.docs[0].data();
+            if (userData.email) {
+                try {
+                    const emailSnapshot = await db.collection('students')
+                        .where('parentEmail', '==', userData.email)
+                        .get();
 
-        showMessage(errorMessage, 'error');
+                    emailSnapshot.forEach(doc => {
+                        const data = doc.data();
+                        const studentId = doc.id;
+                        const studentName = safeText(data.studentName || data.name || 'Unknown');
 
-        // Reset UI
-        if (signUpBtn) signUpBtn.disabled = false;
-        
-        const signUpText = document.getElementById('signUpText');
-        const signUpSpinner = document.getElementById('signUpSpinner');
-        
-        if (signUpText) signUpText.textContent = 'Create Account';
-        if (signUpSpinner) signUpSpinner.classList.add('hidden');
-        if (authLoader) authLoader.classList.add('hidden');
-    }
-}
-
-/**
- * FULL PASSWORD RESET LOGIC
- */
-async function handlePasswordResetFull(email, sendResetBtn, resetLoader) {
-    try {
-        await auth.sendPasswordResetEmail(email);
-        showMessage('Password reset link sent to your email!', 'success');
-        hidePasswordResetModal();
-    } catch (error) {
-        console.error("Reset Error:", error);
-        let errorMessage = "Failed to send reset email.";
-        if (error.code === 'auth/user-not-found') {
-            errorMessage = "No account found with this email address.";
-        }
-        showMessage(errorMessage, 'error');
-    } finally {
-        if (sendResetBtn) sendResetBtn.disabled = false;
-        if (resetLoader) resetLoader.classList.add('hidden');
-    }
-}
-
-// ============================================================================
-// SECTION 7: MESSAGING - DISABLED (REMOVED FOR NOW)
-// ============================================================================
-
-// All messaging functions removed as requested
-
-// ============================================================================
-// SECTION 8: PROACTIVE ACADEMICS TAB WITHOUT COMPLEX QUERIES
-// ============================================================================
-
-/**
- * Determines which months to show based on the 2nd Day Rule
- * @returns {Object} { showCurrentMonth: boolean, showPreviousMonth: boolean }
- */
-function getMonthDisplayLogic() {
-    const today = new Date();
-    const currentDay = today.getDate();
-    
-    // 2nd Day Rule: Show previous month only on 1st or 2nd of current month
-    if (currentDay === 1 || currentDay === 2) {
-        return {
-            showCurrentMonth: true,
-            showPreviousMonth: true
-        };
-    } else {
-        return {
-            showCurrentMonth: true,
-            showPreviousMonth: false
-        };
-    }
-}
-
-/**
- * Gets the current month and year
- * @returns {Object} { month: number, year: number, monthName: string }
- */
-function getCurrentMonthYear() {
-    const now = new Date();
-    const monthNames = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    
-    return {
-        month: now.getMonth(),
-        year: now.getFullYear(),
-        monthName: monthNames[now.getMonth()]
-    };
-}
-
-/**
- * Gets the previous month and year
- * @returns {Object} { month: number, year: number, monthName: string }
- */
-function getPreviousMonthYear() {
-    const now = new Date();
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const monthNames = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    
-    return {
-        month: lastMonth.getMonth(),
-        year: lastMonth.getFullYear(),
-        monthName: monthNames[lastMonth.getMonth()]
-    };
-}
-
-/**
- * Formats date with detailed format including time - ENHANCED FOR PARENT TIMEZONES
- * @param {Date|FirebaseTimestamp} date 
- * @param {boolean} showTimezone - Whether to show timezone info
- * @returns {string} Formatted date
- */
-function formatDetailedDate(date, showTimezone = false) {
-    let dateObj;
-    
-    // Handle Firebase Timestamp
-    if (date?.toDate) {
-        dateObj = date.toDate();
-    } else if (date instanceof Date) {
-        dateObj = date;
-    } else if (typeof date === 'string') {
-        dateObj = new Date(date);
-    } else if (typeof date === 'number') {
-        // Handle seconds timestamp
-        if (date < 10000000000) {
-            dateObj = new Date(date * 1000);
-        } else {
-            dateObj = new Date(date);
-        }
-    } else {
-        return 'Unknown date';
-    }
-    
-    if (isNaN(dateObj.getTime())) {
-        return 'Invalid date';
-    }
-    
-    const options = {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-    };
-    
-    // Add timezone info if requested
-    if (showTimezone) {
-        options.timeZoneName = 'short';
-    }
-    
-    // Get parent's local timezone
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    
-    let formatted = dateObj.toLocaleDateString('en-US', options);
-    
-    if (showTimezone) {
-        formatted += ` (${timezone})`;
-    }
-    
-    return formatted;
-}
-
-/**
- * Formats date for month filtering
- * @param {Date|FirebaseTimestamp} date 
- * @returns {Object} { year: number, month: number }
- */
-function getYearMonthFromDate(date) {
-    let dateObj;
-    
-    if (date?.toDate) {
-        dateObj = date.toDate();
-    } else if (date instanceof Date) {
-        dateObj = date;
-    } else if (typeof date === 'string') {
-        dateObj = new Date(date);
-    } else if (typeof date === 'number') {
-        if (date < 10000000000) {
-            dateObj = new Date(date * 1000);
-        } else {
-            dateObj = new Date(date);
-        }
-    } else {
-        return { year: 0, month: 0 };
-    }
-    
-    if (isNaN(dateObj.getTime())) {
-        return { year: 0, month: 0 };
-    }
-    
-    return {
-        year: dateObj.getFullYear(),
-        month: dateObj.getMonth()
-    };
-}
-
-/**
- * Gets timestamp in milliseconds from various date formats
- * @param {any} dateInput 
- * @returns {number} Timestamp in milliseconds
- */
-function getTimestamp(dateInput) {
-    if (!dateInput) return 0;
-    
-    if (dateInput?.toDate) {
-        return dateInput.toDate().getTime();
-    } else if (dateInput instanceof Date) {
-        return dateInput.getTime();
-    } else if (typeof dateInput === 'string') {
-        return new Date(dateInput).getTime();
-    } else if (typeof dateInput === 'number') {
-        // Handle seconds timestamp
-        if (dateInput < 10000000000) {
-            return dateInput * 1000; // Convert seconds to milliseconds
-        }
-        return dateInput; // Assume milliseconds
-    }
-    
-    return 0;
-}
-
-/**
- * Gets timestamp in seconds from various date formats
- * @param {any} data - Data object containing timestamp fields
- * @returns {number} Timestamp in seconds
- */
-function getTimestampFromData(data) {
-    if (!data) return 0;
-    
-    // Try different timestamp fields
-    const timestampFields = [
-        'timestamp',
-        'createdAt',
-        'submittedAt',
-        'date',
-        'updatedAt',
-        'assignedDate',
-        'dueDate'
-    ];
-    
-    for (const field of timestampFields) {
-        if (data[field]) {
-            const timestamp = getTimestamp(data[field]);
-            if (timestamp > 0) {
-                return Math.floor(timestamp / 1000); // Convert to seconds
+                        if (studentName !== 'Unknown' && !allChildren.has(studentId)) {
+                            console.log(`✅ EMAIL MATCH: ${userData.email} → Student ${studentName}`);
+                            
+                            allChildren.set(studentId, {
+                                id: studentId,
+                                name: studentName,
+                                data: data,
+                                isPending: false,
+                                collection: 'students'
+                            });
+                            
+                            if (!studentNameIdMap.has(studentName)) {
+                                studentNameIdMap.set(studentName, studentId);
+                            }
+                        }
+                    });
+                } catch (error) {
+                    console.warn("Email search error:", error.message);
+                }
             }
         }
+
+        const studentNames = Array.from(studentNameIdMap.keys());
+        const studentIds = Array.from(allChildren.keys());
+        const allStudentData = Array.from(allChildren.values());
+
+        console.log(`🎯 SUFFIX SEARCH RESULTS: ${studentNames.length} students found`);
+
+        return {
+            studentIds,
+            studentNameIdMap,
+            allStudentData,
+            studentNames
+        };
+
+    } catch (error) {
+        console.error("❌ Comprehensive suffix search error:", error);
+        return {
+            studentIds: [],
+            studentNameIdMap: new Map(),
+            allStudentData: [],
+            studentNames: []
+        };
     }
-    
-    // Fallback to current time
-    return Math.floor(Date.now() / 1000);
 }
 
-/**
- * Loads academic data for ALL children (including those with no data)
- */
+// ============================================================================
+// SECTION 10: UNIVERSAL REPORT SEARCH WITH SUFFIX MATCHING
+// ============================================================================
+
+async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUid = '') {
+    console.log("🔍 SUFFIX-MATCHING Search for:", { parentPhone });
+    
+    let assessmentResults = [];
+    let monthlyResults = [];
+    
+    try {
+        // Get parent's phone suffix for comparison
+        const parentSuffix = extractPhoneSuffix(parentPhone);
+        
+        if (!parentSuffix) {
+            console.warn("⚠️ No valid suffix in parent phone");
+            return { assessmentResults: [], monthlyResults: [] };
+        }
+
+        console.log(`🎯 Searching with suffix: ${parentSuffix}`);
+
+        // --- PARALLEL SEARCHES ---
+        const searchPromises = [];
+        
+        // 1. Search assessment reports
+        searchPromises.push(
+            db.collection("student_results").limit(500).get().then(snapshot => {
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    
+                    // Check ALL phone fields with suffix matching
+                    const phoneFields = [
+                        data.parentPhone,
+                        data.parent_phone,
+                        data.guardianPhone,
+                        data.motherPhone,
+                        data.fatherPhone,
+                        data.phone,
+                        data.contactPhone,
+                        data.normalizedParentPhone
+                    ];
+                    
+                    for (const fieldPhone of phoneFields) {
+                        if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
+                            assessmentResults.push({ 
+                                id: doc.id,
+                                collection: 'student_results',
+                                matchType: 'suffix-match',
+                                matchedField: fieldPhone,
+                                ...data,
+                                timestamp: getTimestampFromData(data),
+                                type: 'assessment'
+                            });
+                            break;
+                        }
+                    }
+                });
+                console.log(`✅ Found ${assessmentResults.length} assessment reports (suffix match)`);
+            }).catch(error => {
+                console.log("ℹ️ Assessment search error:", error.message);
+            })
+        );
+        
+        // 2. Search monthly reports
+        searchPromises.push(
+            db.collection("tutor_submissions").limit(500).get().then(snapshot => {
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    
+                    const phoneFields = [
+                        data.parentPhone,
+                        data.parent_phone,
+                        data.guardianPhone,
+                        data.motherPhone,
+                        data.fatherPhone,
+                        data.phone,
+                        data.contactPhone,
+                        data.normalizedParentPhone
+                    ];
+                    
+                    for (const fieldPhone of phoneFields) {
+                        if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
+                            monthlyResults.push({ 
+                                id: doc.id,
+                                collection: 'tutor_submissions',
+                                matchType: 'suffix-match',
+                                matchedField: fieldPhone,
+                                ...data,
+                                timestamp: getTimestampFromData(data),
+                                type: 'monthly'
+                            });
+                            break;
+                        }
+                    }
+                });
+                console.log(`✅ Found ${monthlyResults.length} monthly reports (suffix match)`);
+            }).catch(error => {
+                console.log("ℹ️ Monthly search error:", error.message);
+            })
+        );
+        
+        // 3. Email search (backup)
+        if (parentEmail) {
+            searchPromises.push(
+                db.collection("student_results")
+                    .where("parentEmail", "==", parentEmail)
+                    .limit(100)
+                    .get()
+                    .then(snapshot => {
+                        if (!snapshot.empty) {
+                            snapshot.forEach(doc => {
+                                const data = doc.data();
+                                const existing = assessmentResults.find(r => r.id === doc.id);
+                                if (!existing) {
+                                    assessmentResults.push({ 
+                                        id: doc.id,
+                                        collection: 'student_results',
+                                        matchType: 'email',
+                                        ...data,
+                                        timestamp: getTimestampFromData(data),
+                                        type: 'assessment'
+                                    });
+                                }
+                            });
+                            console.log(`✅ Found ${snapshot.size} reports by email`);
+                        }
+                    }).catch(() => {})
+            );
+        }
+        
+        // Wait for all searches to complete
+        await Promise.all(searchPromises);
+        
+        // Remove duplicates
+        assessmentResults = [...new Map(assessmentResults.map(item => [item.id, item])).values()];
+        monthlyResults = [...new Map(monthlyResults.map(item => [item.id, item])).values()];
+        
+        console.log("🎯 SEARCH SUMMARY:", {
+            assessments: assessmentResults.length,
+            monthly: monthlyResults.length,
+            parentSuffix: parentSuffix
+        });
+        
+    } catch (error) {
+        console.error("❌ Suffix-matching search error:", error);
+    }
+    
+    return { assessmentResults, monthlyResults };
+}
+
+// ============================================================================
+// SECTION 11: PROACTIVE ACADEMICS TAB
+// ============================================================================
+
 async function loadAcademicsData(selectedStudent = null) {
     const academicsContent = document.getElementById('academicsContent');
     if (!academicsContent) return;
     
-    academicsContent.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading academic data...</p></div>';
+    showSkeletonLoader('academicsContent', 'reports');
 
     try {
         const user = auth.currentUser;
@@ -973,14 +1325,14 @@ async function loadAcademicsData(selectedStudent = null) {
             throw new Error('Please sign in to view academic data');
         }
 
-        // Use comprehensive find children to get ALL children
+        // Get user data
         const userDoc = await db.collection('parent_users').doc(user.uid).get();
         const userData = userDoc.data();
         const parentPhone = userData.normalizedPhone || userData.phone;
 
+        // Load children data
         const childrenResult = await comprehensiveFindChildren(parentPhone);
         
-        // Update global variables
         userChildren = childrenResult.studentNames;
         studentIdMap = childrenResult.studentNameIdMap;
         allStudentData = childrenResult.allStudentData;
@@ -996,18 +1348,16 @@ async function loadAcademicsData(selectedStudent = null) {
             return;
         }
 
-        // Determine which student to show - ALL children visible always
         let studentsToShow = [];
         if (selectedStudent && studentIdMap.has(selectedStudent)) {
             studentsToShow = [selectedStudent];
         } else {
-            // Show ALL children
             studentsToShow = userChildren;
         }
 
         let academicsHtml = '';
 
-        // Create student selector if multiple students
+        // Student selector
         if (studentIdMap.size > 1) {
             academicsHtml += `
                 <div class="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm slide-down">
@@ -1030,12 +1380,333 @@ async function loadAcademicsData(selectedStudent = null) {
             `;
         }
 
-        // Load data for each student (ALL children, even with no data)
-        for (const studentName of studentsToShow) {
+        // Load data for each student in parallel
+        const studentPromises = studentsToShow.map(async (studentName) => {
             const studentId = studentIdMap.get(studentName);
             const studentInfo = allStudentData.find(s => s.name === studentName);
             
-            const studentHeader = `
+            let sessionTopicsHtml = '';
+            let homeworkHtml = '';
+            
+            // Load session topics and homework in parallel
+            if (studentId) {
+                const [sessionTopicsSnapshot, homeworkSnapshot] = await Promise.all([
+                    db.collection('daily_topics').where('studentId', '==', studentId).get().catch(() => ({ empty: true })),
+                    db.collection('homework_assignments').where('studentId', '==', studentId).get().catch(() => ({ empty: true }))
+                ]);
+                
+                // Process session topics
+                if (sessionTopicsSnapshot.empty) {
+                    sessionTopicsHtml = `
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                            <p class="text-gray-500">No session topics recorded yet. Check back after your child's sessions!</p>
+                        </div>
+                    `;
+                } else {
+                    const topics = [];
+                    sessionTopicsSnapshot.forEach(doc => {
+                        const topicData = doc.data();
+                        topics.push({ 
+                            id: doc.id, 
+                            ...topicData,
+                            timestamp: getTimestamp(topicData.date || topicData.createdAt || topicData.timestamp)
+                        });
+                    });
+                    
+                    topics.sort((a, b) => a.timestamp - b.timestamp);
+                    
+                    const monthLogic = getMonthDisplayLogic();
+                    const currentMonth = getCurrentMonthYear();
+                    const previousMonth = getPreviousMonthYear();
+                    
+                    const filteredTopics = topics.filter(topic => {
+                        const topicDate = new Date(topic.timestamp);
+                        const { year, month } = getYearMonthFromDate(topicDate);
+                        
+                        if (year === currentMonth.year && month === currentMonth.month) {
+                            return true;
+                        }
+                        
+                        if (monthLogic.showPreviousMonth && 
+                            year === previousMonth.year && 
+                            month === previousMonth.month) {
+                            return true;
+                        }
+                        
+                        return false;
+                    });
+                    
+                    if (filteredTopics.length === 0) {
+                        sessionTopicsHtml = `
+                            <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                                <p class="text-gray-500">No session topics for the selected time period.</p>
+                            </div>
+                        `;
+                    } else {
+                        const topicsByMonth = {};
+                        filteredTopics.forEach(topic => {
+                            const topicDate = new Date(topic.timestamp);
+                            const { year, month } = getYearMonthFromDate(topicDate);
+                            const monthKey = `${year}-${month}`;
+                            
+                            if (!topicsByMonth[monthKey]) {
+                                topicsByMonth[monthKey] = [];
+                            }
+                            topicsByMonth[monthKey].push(topic);
+                        });
+                        
+                        for (const [monthKey, monthTopics] of Object.entries(topicsByMonth)) {
+                            const [year, month] = monthKey.split('-').map(num => parseInt(num));
+                            const monthNames = [
+                                'January', 'February', 'March', 'April', 'May', 'June',
+                                'July', 'August', 'September', 'October', 'November', 'December'
+                            ];
+                            const monthName = monthNames[month];
+                            
+                            sessionTopicsHtml += `
+                                <div class="mb-6">
+                                    <h4 class="font-semibold text-gray-700 mb-4 p-3 bg-gray-100 rounded-lg">${monthName} ${year}</h4>
+                                    <div class="space-y-4">
+                            `;
+                            
+                            monthTopics.forEach(topicData => {
+                                const formattedDate = formatDetailedDate(new Date(topicData.timestamp), true);
+                                const safeTopics = safeText(topicData.topics || topicData.sessionTopics || 'No topics recorded for this session.');
+                                const tutorName = safeText(topicData.tutorName || topicData.updatedBy || 'Tutor');
+                                
+                                sessionTopicsHtml += `
+                                    <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+                                        <div class="flex justify-between items-start mb-3">
+                                            <div>
+                                                <span class="font-medium text-gray-800 text-sm">${safeText(formattedDate)}</span>
+                                                <div class="mt-1 flex items-center">
+                                                    <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full mr-2">Session</span>
+                                                    <span class="text-xs text-gray-600">By: ${tutorName}</span>
+                                                </div>
+                                            </div>
+                                            ${topicData.updatedAt ? 
+                                                `<span class="text-xs text-gray-500">Updated: ${formatDetailedDate(topicData.updatedAt, true)}</span>` : 
+                                                ''}
+                                        </div>
+                                        <div class="text-gray-700 bg-gray-50 p-3 rounded-md">
+                                            <p class="whitespace-pre-wrap">${safeTopics}</p>
+                                        </div>
+                                        ${topicData.notes ? `
+                                        <div class="mt-3 text-sm">
+                                            <span class="font-medium text-gray-700">Additional Notes:</span>
+                                            <p class="text-gray-600 mt-1 bg-yellow-50 p-2 rounded">${safeText(topicData.notes)}</p>
+                                        </div>
+                                        ` : ''}
+                                    </div>
+                                `;
+                            });
+                            
+                            sessionTopicsHtml += `
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    }
+                }
+                
+                // Process homework
+                if (homeworkSnapshot.empty) {
+                    homeworkHtml = `
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                            <p class="text-gray-500">No homework assignments yet.</p>
+                        </div>
+                    `;
+                } else {
+                    const homeworkList = [];
+                    homeworkSnapshot.forEach(doc => {
+                        const homework = doc.data();
+                        homeworkList.push({ 
+                            id: doc.id, 
+                            ...homework,
+                            assignedTimestamp: getTimestamp(homework.assignedDate || homework.createdAt || homework.timestamp),
+                            dueTimestamp: getTimestamp(homework.dueDate)
+                        });
+                    });
+                    
+                    const now = new Date().getTime();
+                    homeworkList.sort((a, b) => a.dueTimestamp - b.dueTimestamp);
+                    
+                    const monthLogic = getMonthDisplayLogic();
+                    const currentMonth = getCurrentMonthYear();
+                    const previousMonth = getPreviousMonthYear();
+                    
+                    const filteredHomework = homeworkList.filter(homework => {
+                        const dueDate = new Date(homework.dueTimestamp);
+                        const { year, month } = getYearMonthFromDate(dueDate);
+                        
+                        if (year === currentMonth.year && month === currentMonth.month) {
+                            return true;
+                        }
+                        
+                        if (monthLogic.showPreviousMonth && 
+                            year === previousMonth.year && 
+                            month === previousMonth.month) {
+                            return true;
+                        }
+                        
+                        if (homework.dueTimestamp < now) {
+                            return true;
+                        }
+                        
+                        const nextMonth = new Date(currentMonth.year, currentMonth.month + 1, 1);
+                        if (dueDate <= nextMonth) {
+                            return true;
+                        }
+                        
+                        return false;
+                    });
+                    
+                    if (filteredHomework.length === 0) {
+                        homeworkHtml = `
+                            <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                                <p class="text-gray-500">No homework for the selected time period.</p>
+                            </div>
+                        `;
+                    } else {
+                        const homeworkByMonth = {};
+                        filteredHomework.forEach(homework => {
+                            const dueDate = new Date(homework.dueTimestamp);
+                            const { year, month } = getYearMonthFromDate(dueDate);
+                            const monthKey = `${year}-${month}`;
+                            
+                            if (!homeworkByMonth[monthKey]) {
+                                homeworkByMonth[monthKey] = [];
+                            }
+                            homeworkByMonth[monthKey].push(homework);
+                        });
+                        
+                        const sortedMonthKeys = Object.keys(homeworkByMonth).sort((a, b) => {
+                            const [aYear, aMonth] = a.split('-').map(Number);
+                            const [bYear, bMonth] = b.split('-').map(Number);
+                            return aYear - bYear || aMonth - bMonth;
+                        });
+                        
+                        for (const monthKey of sortedMonthKeys) {
+                            const [year, month] = monthKey.split('-').map(num => parseInt(num));
+                            const monthNames = [
+                                'January', 'February', 'March', 'April', 'May', 'June',
+                                'July', 'August', 'September', 'October', 'November', 'December'
+                            ];
+                            const monthName = monthNames[month];
+                            const monthHomework = homeworkByMonth[monthKey];
+                            
+                            homeworkHtml += `
+                                <div class="mb-6">
+                                    <h4 class="font-semibold text-gray-700 mb-4 p-3 bg-gray-100 rounded-lg">${monthName} ${year}</h4>
+                                    <div class="space-y-4">
+                            `;
+                            
+                            monthHomework.forEach(homework => {
+                                const dueDate = new Date(homework.dueTimestamp);
+                                const assignedDate = new Date(homework.assignedTimestamp);
+                                const formattedDueDate = formatDetailedDate(dueDate, true);
+                                const formattedAssignedDate = formatDetailedDate(assignedDate, true);
+                                const isOverdue = homework.dueTimestamp < now;
+                                const isSubmitted = homework.status === 'submitted' || homework.status === 'completed';
+                                const statusColor = isOverdue ? 'bg-red-100 text-red-800' : 
+                                                  isSubmitted ? 'bg-green-100 text-green-800' : 
+                                                  'bg-blue-100 text-blue-800';
+                                const statusText = isOverdue ? 'Overdue' : 
+                                                 isSubmitted ? 'Submitted' : 
+                                                 'Pending';
+                                const safeTitle = safeText(homework.title || homework.subject || 'Untitled Assignment');
+                                const safeDescription = safeText(homework.description || homework.instructions || 'No description provided.');
+                                const tutorName = safeText(homework.tutorName || homework.assignedBy || 'Tutor');
+                                
+                                homeworkHtml += `
+                                    <div class="bg-white border ${isOverdue ? 'border-red-200' : 'border-gray-200'} rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+                                        <div class="flex justify-between items-start mb-3">
+                                            <div>
+                                                <h5 class="font-medium text-gray-800 text-lg">${safeTitle}</h5>
+                                                <div class="mt-1 flex flex-wrap items-center gap-2">
+                                                    <span class="text-xs ${statusColor} px-2 py-1 rounded-full">${statusText}</span>
+                                                    <span class="text-xs text-gray-600">Assigned by: ${tutorName}</span>
+                                                    ${homework.subject ? `<span class="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded-full">${safeText(homework.subject)}</span>` : ''}
+                                                </div>
+                                            </div>
+                                            <div class="text-right">
+                                                <span class="text-sm font-medium text-gray-700">Due: ${safeText(formattedDueDate)}</span>
+                                                <div class="text-xs text-gray-500 mt-1">Assigned: ${safeText(formattedAssignedDate)}</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="text-gray-700 mb-4">
+                                            <p class="whitespace-pre-wrap bg-gray-50 p-3 rounded-md">${safeDescription}</p>
+                                        </div>
+                                        
+                                        <div class="flex justify-between items-center pt-3 border-t border-gray-100">
+                                            <div class="flex items-center space-x-3">
+                                                ${homework.fileUrl ? `
+                                                    <a href="${safeText(homework.fileUrl)}" target="_blank" class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm">
+                                                        <span class="mr-1">📎</span> Download Attachment
+                                                    </a>
+                                                ` : ''}
+                                                
+                                                ${homework.submissionUrl ? `
+                                                    <a href="${safeText(homework.submissionUrl)}" target="_blank" class="text-blue-600 hover:text-blue-800 font-medium flex items-center text-sm">
+                                                        <span class="mr-1">📤</span> View Submission
+                                                    </a>
+                                                ` : ''}
+                                            </div>
+                                            
+                                            ${homework.grade ? `
+                                                <div class="text-sm">
+                                                    <span class="font-medium text-gray-700">Grade:</span>
+                                                    <span class="ml-1 font-bold ${homework.grade >= 70 ? 'text-green-600' : homework.grade >= 50 ? 'text-yellow-600' : 'text-red-600'}">
+                                                        ${homework.grade}%
+                                                    </span>
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                        
+                                        ${homework.feedback ? `
+                                        <div class="mt-4 pt-3 border-t border-gray-100">
+                                            <span class="font-medium text-gray-700 text-sm">Tutor Feedback:</span>
+                                            <p class="text-gray-600 text-sm mt-1 bg-blue-50 p-2 rounded">${safeText(homework.feedback)}</p>
+                                        </div>
+                                        ` : ''}
+                                    </div>
+                                `;
+                            });
+                            
+                            homeworkHtml += `
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    }
+                }
+            } else {
+                sessionTopicsHtml = `
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                        <p class="text-gray-500">Student ID not found. Session topics cannot be loaded.</p>
+                    </div>
+                `;
+                homeworkHtml = `
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                        <p class="text-gray-500">Student ID not found. Homework cannot be loaded.</p>
+                    </div>
+                `;
+            }
+            
+            return {
+                studentName,
+                studentInfo,
+                sessionTopicsHtml,
+                homeworkHtml
+            };
+        });
+        
+        const studentResults = await Promise.all(studentPromises);
+        
+        // Build final HTML
+        studentResults.forEach(({ studentName, studentInfo, sessionTopicsHtml, homeworkHtml }) => {
+            academicsHtml += `
                 <div class="bg-gradient-to-r from-green-100 to-green-50 border-l-4 border-green-600 p-4 rounded-lg mb-6 slide-down" id="academics-student-${safeText(studentName)}">
                     <div class="flex justify-between items-center">
                         <div>
@@ -1046,9 +1717,7 @@ async function loadAcademicsData(selectedStudent = null) {
                 </div>
             `;
 
-            academicsHtml += studentHeader;
-
-            // Student Information Section (always shown)
+            // Student Information
             academicsHtml += `
                 <div class="mb-8 fade-in">
                     <div class="flex items-center mb-4">
@@ -1087,152 +1756,7 @@ async function loadAcademicsData(selectedStudent = null) {
                         </div>
                     </button>
                     <div id="session-topics-${safeText(studentName)}-content" class="accordion-content hidden">
-            `;
-
-            try {
-                if (studentId) {
-                    // Get all session topics from daily_topics collection
-                    const sessionTopicsSnapshot = await db.collection('daily_topics')
-                        .where('studentId', '==', studentId)
-                        .get();
-
-                    if (sessionTopicsSnapshot.empty) {
-                        academicsHtml += `
-                            <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                                <p class="text-gray-500">No session topics recorded yet. Check back after your child's sessions!</p>
-                            </div>
-                        `;
-                    } else {
-                        const topics = [];
-                        
-                        // Process each document
-                        sessionTopicsSnapshot.forEach(doc => {
-                            const topicData = doc.data();
-                            topics.push({ 
-                                id: doc.id, 
-                                ...topicData,
-                                timestamp: getTimestamp(topicData.date || topicData.createdAt || topicData.timestamp)
-                            });
-                        });
-                        
-                        // Sort manually by date ASCENDING
-                        topics.sort((a, b) => a.timestamp - b.timestamp);
-                        
-                        // Filter topics based on month display logic
-                        const monthLogic = getMonthDisplayLogic();
-                        const currentMonth = getCurrentMonthYear();
-                        const previousMonth = getPreviousMonthYear();
-                        
-                        const filteredTopics = topics.filter(topic => {
-                            const topicDate = new Date(topic.timestamp);
-                            const { year, month } = getYearMonthFromDate(topicDate);
-                            
-                            // Always show topics from current month
-                            if (year === currentMonth.year && month === currentMonth.month) {
-                                return true;
-                            }
-                            
-                            // Show previous month only if allowed by 2nd Day Rule
-                            if (monthLogic.showPreviousMonth && 
-                                year === previousMonth.year && 
-                                month === previousMonth.month) {
-                                return true;
-                            }
-                            
-                            return false;
-                        });
-                        
-                        if (filteredTopics.length === 0) {
-                            academicsHtml += `
-                                <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                                    <p class="text-gray-500">No session topics for the selected time period.</p>
-                                </div>
-                            `;
-                        } else {
-                            // Group by month
-                            const topicsByMonth = {};
-                            filteredTopics.forEach(topic => {
-                                const topicDate = new Date(topic.timestamp);
-                                const { year, month } = getYearMonthFromDate(topicDate);
-                                const monthKey = `${year}-${month}`;
-                                
-                                if (!topicsByMonth[monthKey]) {
-                                    topicsByMonth[monthKey] = [];
-                                }
-                                topicsByMonth[monthKey].push(topic);
-                            });
-                            
-                            // Display topics grouped by month
-                            for (const [monthKey, monthTopics] of Object.entries(topicsByMonth)) {
-                                const [year, month] = monthKey.split('-').map(num => parseInt(num));
-                                const monthNames = [
-                                    'January', 'February', 'March', 'April', 'May', 'June',
-                                    'July', 'August', 'September', 'October', 'November', 'December'
-                                ];
-                                const monthName = monthNames[month];
-                                
-                                academicsHtml += `
-                                    <div class="mb-6">
-                                        <h4 class="font-semibold text-gray-700 mb-4 p-3 bg-gray-100 rounded-lg">${monthName} ${year}</h4>
-                                        <div class="space-y-4">
-                                `;
-                                
-                                monthTopics.forEach(topicData => {
-                                    const formattedDate = formatDetailedDate(new Date(topicData.timestamp), true);
-                                    const safeTopics = safeText(topicData.topics || topicData.sessionTopics || 'No topics recorded for this session.');
-                                    const tutorName = safeText(topicData.tutorName || topicData.updatedBy || 'Tutor');
-                                    
-                                    academicsHtml += `
-                                        <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                                            <div class="flex justify-between items-start mb-3">
-                                                <div>
-                                                    <span class="font-medium text-gray-800 text-sm">${safeText(formattedDate)}</span>
-                                                    <div class="mt-1 flex items-center">
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full mr-2">Session</span>
-                                                        <span class="text-xs text-gray-600">By: ${tutorName}</span>
-                                                    </div>
-                                                </div>
-                                                ${topicData.updatedAt ? 
-                                                    `<span class="text-xs text-gray-500">Updated: ${formatDetailedDate(topicData.updatedAt, true)}</span>` : 
-                                                    ''}
-                                            </div>
-                                            <div class="text-gray-700 bg-gray-50 p-3 rounded-md">
-                                                <p class="whitespace-pre-wrap">${safeTopics}</p>
-                                            </div>
-                                            ${topicData.notes ? `
-                                            <div class="mt-3 text-sm">
-                                                <span class="font-medium text-gray-700">Additional Notes:</span>
-                                                <p class="text-gray-600 mt-1 bg-yellow-50 p-2 rounded">${safeText(topicData.notes)}</p>
-                                            </div>
-                                            ` : ''}
-                                        </div>
-                                    `;
-                                });
-                                
-                                academicsHtml += `
-                                        </div>
-                                    </div>
-                                `;
-                            }
-                        }
-                    }
-                } else {
-                    academicsHtml += `
-                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                            <p class="text-gray-500">Student ID not found. Session topics cannot be loaded.</p>
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                console.error('Error loading session topics:', error);
-                academicsHtml += `
-                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                        <p class="text-yellow-700">Unable to load session topics at this time. Please try again later.</p>
-                    </div>
-                `;
-            }
-
-            academicsHtml += `
+                        ${sessionTopicsHtml}
                     </div>
                 </div>
             `;
@@ -1252,222 +1776,16 @@ async function loadAcademicsData(selectedStudent = null) {
                         <span id="homework-${safeText(studentName)}-arrow" class="accordion-arrow text-purple-600 text-xl">▼</span>
                     </button>
                     <div id="homework-${safeText(studentName)}-content" class="accordion-content hidden">
-            `;
-
-            try {
-                if (studentId) {
-                    // Get all homework from homework_assignments collection
-                    const homeworkSnapshot = await db.collection('homework_assignments')
-                        .where('studentId', '==', studentId)
-                        .get();
-
-                    if (homeworkSnapshot.empty) {
-                        academicsHtml += `
-                            <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                                <p class="text-gray-500">No homework assignments yet.</p>
-                            </div>
-                        `;
-                    } else {
-                        const homeworkList = [];
-                        
-                        // Process each document
-                        homeworkSnapshot.forEach(doc => {
-                            const homework = doc.data();
-                            homeworkList.push({ 
-                                id: doc.id, 
-                                ...homework,
-                                assignedTimestamp: getTimestamp(homework.assignedDate || homework.createdAt || homework.timestamp),
-                                dueTimestamp: getTimestamp(homework.dueDate)
-                            });
-                        });
-                        
-                        const now = new Date().getTime();
-                        
-                        // Sort manually by due date ASCENDING
-                        homeworkList.sort((a, b) => a.dueTimestamp - b.dueTimestamp);
-                        
-                        // Filter homework based on month display logic
-                        const monthLogic = getMonthDisplayLogic();
-                        const currentMonth = getCurrentMonthYear();
-                        const previousMonth = getPreviousMonthYear();
-                        
-                        const filteredHomework = homeworkList.filter(homework => {
-                            const dueDate = new Date(homework.dueTimestamp);
-                            const { year, month } = getYearMonthFromDate(dueDate);
-                            
-                            // Always show current month homework
-                            if (year === currentMonth.year && month === currentMonth.month) {
-                                return true;
-                            }
-                            
-                            // Show previous month homework if allowed by 2nd Day Rule
-                            if (monthLogic.showPreviousMonth && 
-                                year === previousMonth.year && 
-                                month === previousMonth.month) {
-                                return true;
-                            }
-                            
-                            // Always show overdue assignments regardless of month
-                            if (homework.dueTimestamp < now) {
-                                return true;
-                            }
-                            
-                            // Show upcoming assignments (next month)
-                            const nextMonth = new Date(currentMonth.year, currentMonth.month + 1, 1);
-                            if (dueDate <= nextMonth) {
-                                return true;
-                            }
-                            
-                            return false;
-                        });
-                        
-                        if (filteredHomework.length === 0) {
-                            academicsHtml += `
-                                <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                                    <p class="text-gray-500">No homework for the selected time period.</p>
-                                </div>
-                            `;
-                        } else {
-                            // Group by month
-                            const homeworkByMonth = {};
-                            filteredHomework.forEach(homework => {
-                                const dueDate = new Date(homework.dueTimestamp);
-                                const { year, month } = getYearMonthFromDate(dueDate);
-                                const monthKey = `${year}-${month}`;
-                                
-                                if (!homeworkByMonth[monthKey]) {
-                                    homeworkByMonth[monthKey] = [];
-                                }
-                                homeworkByMonth[monthKey].push(homework);
-                            });
-                            
-                            // Sort months in chronological order
-                            const sortedMonthKeys = Object.keys(homeworkByMonth).sort((a, b) => {
-                                const [aYear, aMonth] = a.split('-').map(Number);
-                                const [bYear, bMonth] = b.split('-').map(Number);
-                                return aYear - bYear || aMonth - bMonth;
-                            });
-                            
-                            // Display homework grouped by month
-                            for (const monthKey of sortedMonthKeys) {
-                                const [year, month] = monthKey.split('-').map(num => parseInt(num));
-                                const monthNames = [
-                                    'January', 'February', 'March', 'April', 'May', 'June',
-                                    'July', 'August', 'September', 'October', 'November', 'December'
-                                ];
-                                const monthName = monthNames[month];
-                                const monthHomework = homeworkByMonth[monthKey];
-                                
-                                academicsHtml += `
-                                    <div class="mb-6">
-                                        <h4 class="font-semibold text-gray-700 mb-4 p-3 bg-gray-100 rounded-lg">${monthName} ${year}</h4>
-                                        <div class="space-y-4">
-                                `;
-                                
-                                monthHomework.forEach(homework => {
-                                    const dueDate = new Date(homework.dueTimestamp);
-                                    const assignedDate = new Date(homework.assignedTimestamp);
-                                    const formattedDueDate = formatDetailedDate(dueDate, true);
-                                    const formattedAssignedDate = formatDetailedDate(assignedDate, true);
-                                    const isOverdue = homework.dueTimestamp < now;
-                                    const isSubmitted = homework.status === 'submitted' || homework.status === 'completed';
-                                    const statusColor = isOverdue ? 'bg-red-100 text-red-800' : 
-                                                      isSubmitted ? 'bg-green-100 text-green-800' : 
-                                                      'bg-blue-100 text-blue-800';
-                                    const statusText = isOverdue ? 'Overdue' : 
-                                                     isSubmitted ? 'Submitted' : 
-                                                     'Pending';
-                                    const safeTitle = safeText(homework.title || homework.subject || 'Untitled Assignment');
-                                    const safeDescription = safeText(homework.description || homework.instructions || 'No description provided.');
-                                    const tutorName = safeText(homework.tutorName || homework.assignedBy || 'Tutor');
-                                    
-                                    academicsHtml += `
-                                        <div class="bg-white border ${isOverdue ? 'border-red-200' : 'border-gray-200'} rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                                            <div class="flex justify-between items-start mb-3">
-                                                <div>
-                                                    <h5 class="font-medium text-gray-800 text-lg">${safeTitle}</h5>
-                                                    <div class="mt-1 flex flex-wrap items-center gap-2">
-                                                        <span class="text-xs ${statusColor} px-2 py-1 rounded-full">${statusText}</span>
-                                                        <span class="text-xs text-gray-600">Assigned by: ${tutorName}</span>
-                                                        ${homework.subject ? `<span class="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded-full">${safeText(homework.subject)}</span>` : ''}
-                                                    </div>
-                                                </div>
-                                                <div class="text-right">
-                                                    <span class="text-sm font-medium text-gray-700">Due: ${safeText(formattedDueDate)}</span>
-                                                    <div class="text-xs text-gray-500 mt-1">Assigned: ${safeText(formattedAssignedDate)}</div>
-                                                </div>
-                                            </div>
-                                            
-                                            <div class="text-gray-700 mb-4">
-                                                <p class="whitespace-pre-wrap bg-gray-50 p-3 rounded-md">${safeDescription}</p>
-                                            </div>
-                                            
-                                            <div class="flex justify-between items-center pt-3 border-t border-gray-100">
-                                                <div class="flex items-center space-x-3">
-                                                    ${homework.fileUrl ? `
-                                                        <a href="${safeText(homework.fileUrl)}" target="_blank" class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm">
-                                                            <span class="mr-1">📎</span> Download Attachment
-                                                        </a>
-                                                    ` : ''}
-                                                    
-                                                    ${homework.submissionUrl ? `
-                                                        <a href="${safeText(homework.submissionUrl)}" target="_blank" class="text-blue-600 hover:text-blue-800 font-medium flex items-center text-sm">
-                                                            <span class="mr-1">📤</span> View Submission
-                                                        </a>
-                                                    ` : ''}
-                                                </div>
-                                                
-                                                ${homework.grade ? `
-                                                    <div class="text-sm">
-                                                        <span class="font-medium text-gray-700">Grade:</span>
-                                                        <span class="ml-1 font-bold ${homework.grade >= 70 ? 'text-green-600' : homework.grade >= 50 ? 'text-yellow-600' : 'text-red-600'}">
-                                                            ${homework.grade}%
-                                                        </span>
-                                                    </div>
-                                                ` : ''}
-                                            </div>
-                                            
-                                            ${homework.feedback ? `
-                                            <div class="mt-4 pt-3 border-t border-gray-100">
-                                                <span class="font-medium text-gray-700 text-sm">Tutor Feedback:</span>
-                                                <p class="text-gray-600 text-sm mt-1 bg-blue-50 p-2 rounded">${safeText(homework.feedback)}</p>
-                                            </div>
-                                            ` : ''}
-                                        </div>
-                                    `;
-                                });
-                                
-                                academicsHtml += `
-                                        </div>
-                                    </div>
-                                `;
-                            }
-                        }
-                    }
-                } else {
-                    academicsHtml += `
-                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                            <p class="text-gray-500">Student ID not found. Homework cannot be loaded.</p>
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                console.error('Error loading homework:', error);
-                academicsHtml += `
-                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                        <p class="text-yellow-700">Unable to load homework assignments at this time. Please try again later.</p>
-                    </div>
-                `;
-            }
-
-            academicsHtml += `
+                        ${homeworkHtml}
                     </div>
                 </div>
             `;
-        }
+        });
 
-        // Update academics content
         academicsContent.innerHTML = academicsHtml;
+        
+        // Initialize Google Classroom buttons
+        setTimeout(scanAndInjectButtons, 100);
 
     } catch (error) {
         console.error('Error loading academics data:', error);
@@ -1502,604 +1820,14 @@ function toggleAcademicsAccordion(sectionId) {
     }
 }
 
-function updateAcademicsTabBadge(count) {
-    const academicsTab = document.getElementById('academicsTab');
-    if (!academicsTab) return;
-    
-    // Remove existing badge
-    const existingBadge = academicsTab.querySelector('.academics-badge');
-    if (existingBadge) {
-        existingBadge.remove();
-    }
-    
-    // Add new badge if there are unread items
-    if (count > 0) {
-        const badge = document.createElement('span');
-        badge.className = 'academics-badge absolute -top-1 -right-1 bg-red-500 text-white rounded-full text-xs min-w-5 h-5 flex items-center justify-center font-bold animate-pulse px-1';
-        badge.textContent = count > 9 ? '9+' : count;
-        badge.style.lineHeight = '1rem';
-        badge.style.fontSize = '0.7rem';
-        badge.style.padding = '0 4px';
-        academicsTab.style.position = 'relative';
-        academicsTab.appendChild(badge);
-    }
-}
-
 function onStudentSelected(studentName) {
     loadAcademicsData(studentName || null);
 }
 
-// Update the checkForNewAcademics function to match
-async function checkForNewAcademics() {
-    try {
-        const user = auth.currentUser;
-        if (!user) return;
-
-        // Get user data to find phone
-        const userDoc = await db.collection('parent_users').doc(user.uid).get();
-        const userData = userDoc.data();
-        const parentPhone = userData.normalizedPhone || userData.phone;
-
-        // Use comprehensive find children
-        const childrenResult = await comprehensiveFindChildren(parentPhone);
-        const studentNameIdMap = childrenResult.studentNameIdMap;
-        
-        // Reset notifications
-        academicsNotifications.clear();
-        let totalUnread = 0;
-
-        // Check for new session topics and homework for each student
-        for (const [studentName, studentId] of studentNameIdMap) {
-            let studentUnread = { sessionTopics: 0, homework: 0 };
-            
-            try {
-                // Get session topics from last 7 days
-                const oneWeekAgo = new Date();
-                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-                
-                const sessionTopicsSnapshot = await db.collection('daily_topics')
-                    .where('studentId', '==', studentId)
-                    .get();
-                
-                // Filter client-side for recent topics (last 7 days)
-                sessionTopicsSnapshot.forEach(doc => {
-                    const topic = doc.data();
-                    const topicDate = topic.date?.toDate?.() || topic.createdAt?.toDate?.() || new Date(0);
-                    if (topicDate >= oneWeekAgo) {
-                        studentUnread.sessionTopics++;
-                    }
-                });
-                
-                // Get homework from last 7 days
-                const homeworkSnapshot = await db.collection('homework_assignments')
-                    .where('studentId', '==', studentId)
-                    .get();
-                
-                // Filter client-side for recent homework (last 7 days)
-                homeworkSnapshot.forEach(doc => {
-                    const homework = doc.data();
-                    const assignedDate = homework.assignedDate?.toDate?.() || homework.createdAt?.toDate?.() || new Date(0);
-                    if (assignedDate >= oneWeekAgo) {
-                        studentUnread.homework++;
-                    }
-                });
-                
-            } catch (error) {
-                console.error(`Error checking academics for ${studentName}:`, error);
-                // Continue with other students
-            }
-            
-            // Store student notifications
-            academicsNotifications.set(studentName, studentUnread);
-            
-            // Add to total
-            totalUnread += studentUnread.sessionTopics + studentUnread.homework;
-        }
-        
-        // Update academics tab badge
-        updateAcademicsTabBadge(totalUnread);
-
-    } catch (error) {
-        console.error('Error checking for new academics:', error);
-    }
-}
-
 // ============================================================================
-// SECTION 9: MESSAGING - DISABLED (REMOVED FOR NOW)
+// SECTION 12: OPTIMIZED REAL-TIME MONITORING
 // ============================================================================
 
-// All messaging functions removed as requested
-
-// ============================================================================
-// SECTION 10: NOTIFICATION SYSTEM WITHOUT COMPLEX QUERIES
-// ============================================================================
-
-async function checkForNewMessages() {
-    // Function kept but not used since messaging is disabled
-    return;
-}
-
-function updateNotificationBadge(count) {
-    // Function kept but not used since messaging is disabled
-    return;
-}
-
-function resetNotificationCount() {
-    // Function kept but not used since messaging is disabled
-    return;
-}
-
-// ============================================================================
-// SECTION 11: NAVIGATION BUTTONS & DYNAMIC UI
-// ============================================================================
-
-// Add Messages button removed as requested
-
-// MANUAL REFRESH FUNCTION
-async function manualRefreshReportsV2() {
-    const user = auth.currentUser;
-    if (!user) return;
-    
-    const refreshBtn = document.getElementById('manualRefreshBtn');
-    if (!refreshBtn) return;
-    
-    const originalText = refreshBtn.innerHTML;
-    
-    // Show loading state
-    refreshBtn.innerHTML = '<div class="loading-spinner-small mr-2"></div> Checking...';
-    refreshBtn.disabled = true;
-    
-    try {
-        // Get user data
-        const userDoc = await db.collection('parent_users').doc(user.uid).get();
-        if (userDoc.exists) {
-            const userData = userDoc.data();
-            const userPhone = userData.normalizedPhone || userData.phone;
-            
-            // Force reload reports using auth manager
-            if (window.authManager && typeof window.authManager.reloadDashboard === 'function') {
-                await window.authManager.reloadDashboard();
-            } else {
-                // Fallback to old method
-                await loadAllReportsForParent(userPhone, user.uid, true);
-            }
-            
-            // Also check for new academics
-            await checkForNewAcademics();
-            
-            showMessage('Reports refreshed successfully!', 'success');
-        }
-    } catch (error) {
-        console.error('Manual refresh error:', error);
-        showMessage('Refresh failed. Please try again.', 'error');
-    } finally {
-        // Restore button state
-        refreshBtn.innerHTML = originalText;
-        refreshBtn.disabled = false;
-    }
-}
-
-// ADD MANUAL REFRESH BUTTON TO WELCOME SECTION
-function addManualRefreshButton() {
-    const welcomeSection = document.querySelector('.bg-green-50');
-    if (!welcomeSection) return;
-    
-    const buttonContainer = welcomeSection.querySelector('.flex.gap-2');
-    if (!buttonContainer) return;
-    
-    // Check if button already exists
-    if (document.getElementById('manualRefreshBtn')) return;
-    
-    const refreshBtn = document.createElement('button');
-    refreshBtn.id = 'manualRefreshBtn';
-    refreshBtn.onclick = manualRefreshReportsV2;
-    refreshBtn.className = 'bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 btn-glow flex items-center justify-center';
-    refreshBtn.innerHTML = '<span class="mr-2">🔄</span> Check for New Reports';
-    
-    // Insert before the logout button
-    const logoutBtn = buttonContainer.querySelector('button[onclick="logout()"]');
-    if (logoutBtn) {
-        buttonContainer.insertBefore(refreshBtn, logoutBtn);
-    } else {
-        buttonContainer.appendChild(refreshBtn);
-    }
-}
-
-// ADD LOGOUT BUTTON (with duplicate prevention)
-function addLogoutButton() {
-    const welcomeSection = document.querySelector('.bg-green-50');
-    if (!welcomeSection) return;
-    
-    const buttonContainer = welcomeSection.querySelector('.flex.gap-2');
-    if (!buttonContainer) return;
-    
-    // Check if logout button already exists
-    if (buttonContainer.querySelector('button[onclick="logout()"]')) return;
-    
-    const logoutBtn = document.createElement('button');
-    logoutBtn.onclick = logout;
-    logoutBtn.className = 'bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition-all duration-200 btn-glow flex items-center justify-center';
-    logoutBtn.innerHTML = '<span class="mr-2">🚪</span> Logout';
-    
-    buttonContainer.appendChild(logoutBtn);
-}
-
-// ============================================================================
-// SECTION 12: SIMPLE REPORT SEARCH WITH DIGIT MATCHING FOR GLOBAL PHONES
-// ============================================================================
-
-async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUid = '') {
-    console.log("🔍 DIGIT-MATCHING Search for:", { parentPhone, parentEmail, parentUid });
-    
-    let assessmentResults = [];
-    let monthlyResults = [];
-    
-    try {
-        // Get parent's digits for comparison
-        const parentDigits = extractPhoneDigits(parentPhone);
-        
-        if (!parentDigits) {
-            console.warn("⚠️ No valid digits in parent phone");
-            return { assessmentResults: [], monthlyResults: [] };
-        }
-
-        console.log(`🎯 Searching with digits: ${parentDigits}`);
-
-        // --- PHONE VARIATIONS FOR EXACT MATCHING ---
-        const normalizedPhone = normalizePhoneNumber(parentPhone);
-        const searchPhone = normalizedPhone.valid ? normalizedPhone.normalized : parentPhone;
-        
-        // --- ASSESSMENT REPORTS SEARCH ---
-        console.log("📊 Searching assessment reports...");
-        
-        // METHOD 1: Try exact matches first
-        try {
-            const assessmentSnapshot = await db.collection("student_results")
-                .where("parentPhone", "==", searchPhone)
-                .limit(100)
-                .get();
-            
-            if (!assessmentSnapshot.empty) {
-                console.log(`✅ Found ${assessmentSnapshot.size} assessment reports (exact match)`);
-                assessmentSnapshot.forEach(doc => {
-                    const data = doc.data();
-                    assessmentResults.push({ 
-                        id: doc.id,
-                        collection: 'student_results',
-                        matchType: 'exact',
-                        ...data,
-                        timestamp: data.submittedAt?.seconds || 
-                                  data.createdAt?.seconds || 
-                                  data.timestamp?.seconds || 
-                                  Date.now() / 1000,
-                        type: 'assessment'
-                    });
-                });
-            }
-        } catch (error) {
-            console.log("ℹ️ Exact assessment search skipped:", error.message);
-        }
-
-        // METHOD 2: Try normalized phone field
-        try {
-            const assessmentSnapshot2 = await db.collection("student_results")
-                .where("normalizedParentPhone", "==", searchPhone)
-                .limit(100)
-                .get();
-            
-            if (!assessmentSnapshot2.empty) {
-                console.log(`✅ Found ${assessmentSnapshot2.size} assessment reports (normalized)`);
-                assessmentSnapshot2.forEach(doc => {
-                    const data = doc.data();
-                    const existing = assessmentResults.find(r => r.id === doc.id);
-                    if (!existing) {
-                        assessmentResults.push({ 
-                            id: doc.id,
-                            collection: 'student_results',
-                            matchType: 'normalized',
-                            ...data,
-                            timestamp: data.submittedAt?.seconds || 
-                                      data.createdAt?.seconds || 
-                                      data.timestamp?.seconds || 
-                                      Date.now() / 1000,
-                            type: 'assessment'
-                        });
-                    }
-                });
-            }
-        } catch (error) {
-            console.log("ℹ️ Normalized assessment search skipped:", error.message);
-        }
-
-        // METHOD 3: DIGIT MATCHING - Fetch ALL and filter client-side
-        if (assessmentResults.length === 0) {
-            console.log("🔄 Trying DIGIT MATCHING for assessment reports...");
-            try {
-                const allAssessments = await db.collection("student_results").limit(500).get();
-                let digitMatches = 0;
-                
-                allAssessments.forEach(doc => {
-                    const data = doc.data();
-                    const existing = assessmentResults.find(r => r.id === doc.id);
-                    if (existing) return;
-                    
-                    // Check ALL possible phone fields
-                    const phoneFields = [
-                        data.parentPhone,
-                        data.parent_phone,
-                        data.guardianPhone,
-                        data.motherPhone,
-                        data.fatherPhone,
-                        data.phone,
-                        data.contactPhone,
-                        data.normalizedParentPhone
-                    ];
-                    
-                    for (const fieldPhone of phoneFields) {
-                        if (fieldPhone && comparePhonesByDigits(fieldPhone, parentPhone)) {
-                            digitMatches++;
-                            assessmentResults.push({ 
-                                id: doc.id,
-                                collection: 'student_results',
-                                matchType: 'digit-match',
-                                matchedField: fieldPhone,
-                                ...data,
-                                timestamp: data.submittedAt?.seconds || 
-                                          data.createdAt?.seconds || 
-                                          data.timestamp?.seconds || 
-                                          Date.now() / 1000,
-                                type: 'assessment'
-                            });
-                            break;
-                        }
-                    }
-                });
-                
-                if (digitMatches > 0) {
-                    console.log(`✅ Found ${digitMatches} assessment reports (DIGIT MATCH)`);
-                }
-            } catch (error) {
-                console.error("Digit matching error:", error);
-            }
-        }
-
-        // --- MONTHLY REPORTS SEARCH ---
-        console.log("📈 Searching monthly reports...");
-        
-        // METHOD 1: Try exact matches first
-        try {
-            const monthlySnapshot = await db.collection("tutor_submissions")
-                .where("parentPhone", "==", searchPhone)
-                .limit(100)
-                .get();
-            
-            if (!monthlySnapshot.empty) {
-                console.log(`✅ Found ${monthlySnapshot.size} monthly reports (exact match)`);
-                monthlySnapshot.forEach(doc => {
-                    const data = doc.data();
-                    monthlyResults.push({ 
-                        id: doc.id,
-                        collection: 'tutor_submissions',
-                        matchType: 'exact',
-                        ...data,
-                        timestamp: data.submittedAt?.seconds || 
-                                  data.createdAt?.seconds || 
-                                  data.timestamp?.seconds || 
-                                  Date.now() / 1000,
-                        type: 'monthly'
-                    });
-                });
-            }
-        } catch (error) {
-            console.log("ℹ️ Exact monthly search skipped:", error.message);
-        }
-
-        // METHOD 2: Try normalized phone field
-        try {
-            const monthlySnapshot2 = await db.collection("tutor_submissions")
-                .where("normalizedParentPhone", "==", searchPhone)
-                .limit(100)
-                .get();
-            
-            if (!monthlySnapshot2.empty) {
-                console.log(`✅ Found ${monthlySnapshot2.size} monthly reports (normalized)`);
-                monthlySnapshot2.forEach(doc => {
-                    const data = doc.data();
-                    const existing = monthlyResults.find(r => r.id === doc.id);
-                    if (!existing) {
-                        monthlyResults.push({ 
-                            id: doc.id,
-                            collection: 'tutor_submissions',
-                            matchType: 'normalized',
-                            ...data,
-                            timestamp: data.submittedAt?.seconds || 
-                                      data.createdAt?.seconds || 
-                                      data.timestamp?.seconds || 
-                                      Date.now() / 1000,
-                            type: 'monthly'
-                        });
-                    }
-                });
-            }
-        } catch (error) {
-            console.log("ℹ️ Normalized monthly search skipped:", error.message);
-        }
-
-        // METHOD 3: DIGIT MATCHING - Fetch ALL and filter client-side
-        if (monthlyResults.length === 0) {
-            console.log("🔄 Trying DIGIT MATCHING for monthly reports...");
-            try {
-                const allMonthly = await db.collection("tutor_submissions").limit(500).get();
-                let digitMatches = 0;
-                
-                allMonthly.forEach(doc => {
-                    const data = doc.data();
-                    const existing = monthlyResults.find(r => r.id === doc.id);
-                    if (existing) return;
-                    
-                    // Check ALL possible phone fields
-                    const phoneFields = [
-                        data.parentPhone,
-                        data.parent_phone,
-                        data.guardianPhone,
-                        data.motherPhone,
-                        data.fatherPhone,
-                        data.phone,
-                        data.contactPhone,
-                        data.normalizedParentPhone
-                    ];
-                    
-                    for (const fieldPhone of phoneFields) {
-                        if (fieldPhone && comparePhonesByDigits(fieldPhone, parentPhone)) {
-                            digitMatches++;
-                            monthlyResults.push({ 
-                                id: doc.id,
-                                collection: 'tutor_submissions',
-                                matchType: 'digit-match',
-                                matchedField: fieldPhone,
-                                ...data,
-                                timestamp: data.submittedAt?.seconds || 
-                                          data.createdAt?.seconds || 
-                                          data.timestamp?.seconds || 
-                                          Date.now() / 1000,
-                                type: 'monthly'
-                            });
-                            break;
-                        }
-                    }
-                });
-                
-                if (digitMatches > 0) {
-                    console.log(`✅ Found ${digitMatches} monthly reports (DIGIT MATCH)`);
-                }
-            } catch (error) {
-                console.error("Digit matching error:", error);
-            }
-        }
-
-        // --- EMAIL SEARCH (backup) ---
-        if (parentEmail && (assessmentResults.length === 0 || monthlyResults.length === 0)) {
-            console.log("📧 Trying email search as backup...");
-            try {
-                const emailSnapshot = await db.collection("student_results")
-                    .where("parentEmail", "==", parentEmail)
-                    .limit(100)
-                    .get();
-                
-                if (!emailSnapshot.empty) {
-                    console.log(`✅ Found ${emailSnapshot.size} reports by email`);
-                    emailSnapshot.forEach(doc => {
-                        const data = doc.data();
-                        const existing = assessmentResults.find(r => r.id === doc.id);
-                        if (!existing) {
-                            assessmentResults.push({ 
-                                id: doc.id,
-                                collection: 'student_results',
-                                matchType: 'email',
-                                ...data,
-                                timestamp: data.submittedAt?.seconds || 
-                                          data.createdAt?.seconds || 
-                                          data.timestamp?.seconds || 
-                                          Date.now() / 1000,
-                                type: 'assessment'
-                            });
-                        }
-                    });
-                }
-            } catch (error) {
-                console.log("ℹ️ Email search skipped:", error.message);
-            }
-        }
-
-        // --- SEARCH OTHER COLLECTIONS WITH DIGIT MATCHING ---
-        if (assessmentResults.length === 0 && monthlyResults.length === 0) {
-            console.log("🔍 Searching in additional collections...");
-            
-            const otherCollections = [
-                'monthly_reports',
-                'assessment_reports',
-                'progress_reports',
-                'reports',
-                'student_reports'
-            ];
-            
-            for (const collectionName of otherCollections) {
-                try {
-                    const snapshot = await db.collection(collectionName).limit(200).get();
-                    let found = 0;
-                    
-                    snapshot.forEach(doc => {
-                        const data = doc.data();
-                        
-                        // Check phone fields
-                        const phoneFields = Object.keys(data).filter(key => 
-                            key.toLowerCase().includes('phone') || 
-                            key.toLowerCase().includes('contact')
-                        );
-                        
-                        for (const field of phoneFields) {
-                            if (data[field] && comparePhonesByDigits(data[field], parentPhone)) {
-                                const reportType = collectionName.includes('monthly') ? 'monthly' : 'assessment';
-                                if (reportType === 'assessment') {
-                                    assessmentResults.push({
-                                        id: doc.id,
-                                        collection: collectionName,
-                                        matchType: 'digit-other',
-                                        matchedField: field,
-                                        ...data,
-                                        timestamp: data.submittedAt?.seconds || 
-                                                  data.createdAt?.seconds || 
-                                                  data.timestamp?.seconds || 
-                                                  Date.now() / 1000,
-                                        type: reportType
-                                    });
-                                } else {
-                                    monthlyResults.push({
-                                        id: doc.id,
-                                        collection: collectionName,
-                                        matchType: 'digit-other',
-                                        matchedField: field,
-                                        ...data,
-                                        timestamp: data.submittedAt?.seconds || 
-                                                  data.createdAt?.seconds || 
-                                                  data.timestamp?.seconds || 
-                                                  Date.now() / 1000,
-                                        type: reportType
-                                    });
-                                }
-                                found++;
-                                break;
-                            }
-                        }
-                    });
-                    
-                    if (found > 0) {
-                        console.log(`✅ Found ${found} reports in ${collectionName}`);
-                    }
-                } catch (error) {
-                    // Collection might not exist
-                }
-            }
-        }
-
-        console.log("🎯 SEARCH SUMMARY:", {
-            assessments: assessmentResults.length,
-            monthly: monthlyResults.length,
-            parentDigits: parentDigits
-        });
-        
-    } catch (error) {
-        console.error("❌ Digit-matching search error:", error);
-    }
-    
-    return { assessmentResults, monthlyResults };
-}
-
-// ============================================================================
-// SECTION 13: REAL-TIME MONITORING WITH DIGIT MATCHING
-// ============================================================================
-
-// Clear all real-time listeners
 function cleanupRealTimeListeners() {
     console.log("🧹 Cleaning up real-time listeners...");
     
@@ -2110,102 +1838,74 @@ function cleanupRealTimeListeners() {
     });
     realTimeListeners = [];
     
-    // Clear intervals
     if (window.realTimeIntervals) {
         window.realTimeIntervals.forEach(id => clearInterval(id));
         window.realTimeIntervals = [];
     }
+    
+    // Clean up charts
+    charts.forEach(chart => {
+        if (chart && typeof chart.destroy === 'function') {
+            chart.destroy();
+        }
+    });
+    charts.clear();
 }
 
-// Setup real-time monitoring with digit matching
 function setupRealTimeMonitoring(parentPhone, userId) {
-    console.log("📡 Setting up real-time monitoring...");
+    console.log("📡 Setting up OPTIMIZED real-time monitoring...");
     
-    // Clean up existing listeners first
     cleanupRealTimeListeners();
     
-    // Initialize intervals array if not exists
     if (!window.realTimeIntervals) {
         window.realTimeIntervals = [];
     }
     
-    // Get parent's digits for comparison
-    const parentDigits = extractPhoneDigits(parentPhone);
-    
-    if (!parentDigits) {
+    const parentSuffix = extractPhoneSuffix(parentPhone);
+    if (!parentSuffix) {
         console.warn("⚠️ Cannot setup monitoring - invalid parent phone:", parentPhone);
         return;
     }
 
-    console.log("📡 Monitoring for phone digits:", parentDigits);
+    console.log("📡 Monitoring for phone suffix:", parentSuffix);
     
     // Function to check for new reports
     const checkForNewReports = async () => {
         try {
-            // Track if we found new reports
-            let foundNewMonthly = false;
-            let foundNewAssessment = false;
-            
-            // Get last check time
             const lastCheckKey = `lastReportCheck_${userId}`;
             const lastCheckTime = parseInt(localStorage.getItem(lastCheckKey) || '0');
             const now = Date.now();
             
-            // Check monthly reports
-            try {
-                const monthlySnapshot = await db.collection("tutor_submissions").get();
-                monthlySnapshot.forEach(doc => {
-                    const data = doc.data();
-                    const docPhone = data.parentPhone || data.parent_phone || data.phone;
-                    
-                    if (docPhone && comparePhonesByDigits(docPhone, parentPhone)) {
-                        // Check if this is new (added after last check)
-                        const docTime = data.timestamp?.toDate?.()?.getTime() || 
-                                      data.createdAt?.toDate?.()?.getTime() || 
-                                      data.submittedAt?.toDate?.()?.getTime() || 0;
+            let foundNew = false;
+            
+            // Check all collections in parallel
+            const collections = ['tutor_submissions', 'student_results'];
+            
+            await Promise.all(collections.map(async (collection) => {
+                try {
+                    const snapshot = await db.collection(collection).limit(200).get();
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        const docPhone = data.parentPhone || data.parent_phone || data.phone;
                         
-                        if (docTime > lastCheckTime) {
-                            foundNewMonthly = true;
-                            console.log("🆕 NEW MONTHLY REPORT DETECTED:", doc.id);
+                        if (docPhone && extractPhoneSuffix(docPhone) === parentSuffix) {
+                            const docTime = getTimestamp(data.timestamp || data.createdAt || data.submittedAt);
+                            
+                            if (docTime > lastCheckTime) {
+                                foundNew = true;
+                                console.log(`🆕 NEW ${collection} DETECTED:`, doc.id);
+                            }
                         }
-                    }
-                });
-            } catch (error) {
-                console.error("Monthly check error:", error);
+                    });
+                } catch (error) {
+                    console.error(`${collection} check error:`, error);
+                }
+            }));
+            
+            if (foundNew) {
+                showNewReportNotification();
             }
             
-            // Check assessment reports
-            try {
-                const assessmentSnapshot = await db.collection("student_results").get();
-                assessmentSnapshot.forEach(doc => {
-                    const data = doc.data();
-                    const docPhone = data.parentPhone || data.parent_phone || data.phone;
-                    
-                    if (docPhone && comparePhonesByDigits(docPhone, parentPhone)) {
-                        // Check if this is new (added after last check)
-                        const docTime = data.timestamp?.toDate?.()?.getTime() || 
-                                      data.createdAt?.toDate?.()?.getTime() || 
-                                      data.submittedAt?.toDate?.()?.getTime() || 0;
-                        
-                        if (docTime > lastCheckTime) {
-                            foundNewAssessment = true;
-                            console.log("🆕 NEW ASSESSMENT REPORT DETECTED:", doc.id);
-                        }
-                    }
-                });
-            } catch (error) {
-                console.error("Assessment check error:", error);
-            }
-            
-            // Show notifications if new reports found
-            if (foundNewMonthly) {
-                showNewReportNotification('monthly');
-            }
-            if (foundNewAssessment) {
-                showNewReportNotification('assessment');
-            }
-            
-            // Update last check time
             localStorage.setItem(lastCheckKey, now.toString());
             
         } catch (error) {
@@ -2218,27 +1918,15 @@ function setupRealTimeMonitoring(parentPhone, userId) {
     window.realTimeIntervals.push(reportInterval);
     realTimeListeners.push(() => clearInterval(reportInterval));
     
-    // Run initial check immediately
+    // Run initial check after 2 seconds
     setTimeout(checkForNewReports, 2000);
-    
-    // Check for new academics every 30 seconds
-    const academicsInterval = setInterval(() => {
-        checkForNewAcademics();
-    }, 30000);
-    window.realTimeIntervals.push(academicsInterval);
-    realTimeListeners.push(() => clearInterval(academicsInterval));
     
     console.log("✅ Real-time monitoring setup complete");
 }
 
-// Show notification for new reports
-function showNewReportNotification(type) {
-    const reportType = type === 'assessment' ? 'Assessment Report' : 
-                      type === 'monthly' ? 'Monthly Report' : 'New Update';
+function showNewReportNotification() {
+    showMessage('New reports available! Refresh to view.', 'success');
     
-    showMessage(`New ${reportType} available!`, 'success');
-    
-    // Add a visual indicator in the UI
     const existingIndicator = document.getElementById('newReportIndicator');
     if (existingIndicator) {
         existingIndicator.remove();
@@ -2247,15 +1935,13 @@ function showNewReportNotification(type) {
     const indicator = document.createElement('div');
     indicator.id = 'newReportIndicator';
     indicator.className = 'fixed top-20 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-40 animate-pulse fade-in';
-    indicator.innerHTML = `📄 New ${safeText(reportType)} Available!`;
+    indicator.innerHTML = '📄 New Reports Available!';
     document.body.appendChild(indicator);
     
-    // Remove after 5 seconds
     setTimeout(() => {
         indicator.remove();
     }, 5000);
     
-    // Update the manual refresh button text
     const refreshBtn = document.getElementById('manualRefreshBtn');
     if (refreshBtn) {
         const originalText = refreshBtn.innerHTML;
@@ -2268,17 +1954,9 @@ function showNewReportNotification(type) {
 }
 
 // ============================================================================
-// SECTION 14: YEARLY ARCHIVES REPORTS SYSTEM WITH ACCORDIONS & CHARTS
+// SECTION 13: YEARLY ARCHIVES REPORTS SYSTEM
 // ============================================================================
 
-/**
- * Generates a unique, personalized recommendation using a smart template.
- * It summarizes performance instead of just listing topics.
- * @param {string} studentName The name of the student.
- * @param {string} tutorName The name of the tutor.
- * @param {Array} results The student's test results.
- * @returns {string} A personalized recommendation string.
- */
 function generateTemplatedRecommendation(studentName, tutorName, results) {
     const strengths = [];
     const weaknesses = [];
@@ -2318,16 +1996,10 @@ function generateTemplatedRecommendation(studentName, tutorName, results) {
     return praiseClause + improvementClause + closingStatement;
 }
 
-/**
- * Creates a hierarchical accordion view for reports
- * Student Name → Year → Month → Report Type (Assessments/Monthly)
- * EXACTLY matches old tutor.js wording and logic
- */
 function createYearlyArchiveReportView(reportsByStudent) {
     let html = '';
     let studentIndex = 0;
     
-    // Sort students alphabetically
     const sortedStudents = Array.from(reportsByStudent.entries())
         .sort((a, b) => a[0].localeCompare(b[0]));
     
@@ -2335,12 +2007,10 @@ function createYearlyArchiveReportView(reportsByStudent) {
         const fullName = capitalize(studentName);
         const studentData = reports.studentData;
         
-        // Count reports for this student
         const assessmentCount = Array.from(reports.assessments.values()).flat().length;
         const monthlyCount = Array.from(reports.monthly.values()).flat().length;
         const totalCount = assessmentCount + monthlyCount;
         
-        // Create student accordion header with beautiful design
         html += `
             <div class="accordion-item mb-6 fade-in">
                 <button onclick="toggleAccordion('student-${studentIndex}')" 
@@ -2369,7 +2039,6 @@ function createYearlyArchiveReportView(reportsByStudent) {
                 <div id="student-${studentIndex}-content" class="accordion-content hidden mt-4">
         `;
         
-        // If no reports, show beautiful empty state
         if (totalCount === 0) {
             html += `
                 <div class="p-8 bg-gradient-to-br from-gray-50 to-blue-50 border border-gray-200 rounded-xl text-center shadow-sm">
@@ -2388,10 +2057,8 @@ function createYearlyArchiveReportView(reportsByStudent) {
                 </div>
             `;
         } else {
-            // Group reports by year
             const reportsByYear = new Map();
             
-            // Process assessment reports by year
             for (const [sessionKey, sessionReports] of reports.assessments) {
                 sessionReports.forEach(report => {
                     const year = new Date(report.timestamp * 1000).getFullYear();
@@ -2406,7 +2073,6 @@ function createYearlyArchiveReportView(reportsByStudent) {
                 });
             }
             
-            // Process monthly reports by year
             for (const [sessionKey, sessionReports] of reports.monthly) {
                 sessionReports.forEach(report => {
                     const year = new Date(report.timestamp * 1000).getFullYear();
@@ -2421,10 +2087,8 @@ function createYearlyArchiveReportView(reportsByStudent) {
                 });
             }
             
-            // Sort years in descending order (newest first)
             const sortedYears = Array.from(reportsByYear.keys()).sort((a, b) => b - a);
             
-            // Create year accordions
             let yearIndex = 0;
             for (const year of sortedYears) {
                 const yearData = reportsByYear.get(year);
@@ -2455,7 +2119,6 @@ function createYearlyArchiveReportView(reportsByStudent) {
                         <div id="year-${studentIndex}-${yearIndex}-content" class="progress-accordion-content hidden ml-6 mt-3">
                 `;
                 
-                // Assessment Reports for this year - EXACTLY as in old tutor.js
                 if (yearAssessmentCount > 0) {
                     html += `
                         <div class="mb-6">
@@ -2471,7 +2134,6 @@ function createYearlyArchiveReportView(reportsByStudent) {
                             </div>
                     `;
                     
-                    // Group assessments by month
                     const assessmentsByMonth = new Map();
                     yearData.assessments.forEach(({ sessionKey, reports: sessionReports, date }) => {
                         const month = date.getMonth();
@@ -2481,7 +2143,6 @@ function createYearlyArchiveReportView(reportsByStudent) {
                         assessmentsByMonth.get(month).push({ sessionKey, reports: sessionReports, date });
                     });
                     
-                    // Sort months in descending order (newest first)
                     const sortedMonths = Array.from(assessmentsByMonth.keys()).sort((a, b) => b - a);
                     
                     sortedMonths.forEach(month => {
@@ -2514,7 +2175,6 @@ function createYearlyArchiveReportView(reportsByStudent) {
                     html += `</div>`;
                 }
                 
-                // Monthly Reports for this year - EXACTLY as in old tutor.js
                 if (yearMonthlyCount > 0) {
                     html += `
                         <div class="mb-6">
@@ -2530,7 +2190,6 @@ function createYearlyArchiveReportView(reportsByStudent) {
                             </div>
                     `;
                     
-                    // Group monthly reports by month
                     const monthlyByMonth = new Map();
                     yearData.monthly.forEach(({ sessionKey, reports: sessionReports, date }) => {
                         const month = date.getMonth();
@@ -2540,7 +2199,6 @@ function createYearlyArchiveReportView(reportsByStudent) {
                         monthlyByMonth.get(month).push({ sessionKey, reports: sessionReports, date });
                     });
                     
-                    // Sort months in descending order (newest first)
                     const sortedMonths = Array.from(monthlyByMonth.keys()).sort((a, b) => b - a);
                     
                     sortedMonths.forEach(month => {
@@ -2593,26 +2251,12 @@ function createYearlyArchiveReportView(reportsByStudent) {
     return html;
 }
 
-// Create assessment report with EXACT wording and logic from old tutor.js
 function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, fullName, date) {
     const firstReport = sessionReports[0];
     const formattedDate = formatDetailedDate(date || new Date(firstReport.timestamp * 1000), true);
     
-    // Get tutor name
     let tutorName = 'N/A';
     const tutorEmail = firstReport.tutorEmail;
-    if (tutorEmail && tutorEmail !== 'N/A') {
-        // Try to fetch tutor name from tutors collection
-        try {
-            // Note: This might need to be async in production
-            const tutorDoc = db.collection("tutors").doc(tutorEmail).get();
-            if (tutorDoc.exists) {
-                tutorName = tutorDoc.data().name;
-            }
-        } catch (error) {
-            console.log("Could not fetch tutor name:", error);
-        }
-    }
     
     const results = sessionReports.map(testResult => {
         const topics = [...new Set(testResult.answers?.map(a => safeText(a.topic)).filter(t => t))] || [];
@@ -2624,7 +2268,6 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
         };
     });
 
-    // Generate tutor recommendation EXACTLY as in old tutor.js
     const recommendation = generateTemplatedRecommendation(fullName, tutorName, results);
 
     const tableRows = results.map(res => `
@@ -2641,11 +2284,9 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
         </tr>
     `).join("");
 
-    // Check for creative writing answer
     const creativeWritingAnswer = firstReport.answers?.find(a => a.type === 'creative-writing');
     const tutorReport = creativeWritingAnswer?.tutorReport || 'Pending review.';
 
-    // Prepare chart data EXACTLY as in old tutor.js
     const chartId = `chart-${studentIndex}-${sessionId}`;
     const chartConfig = {
         type: 'bar',
@@ -2681,7 +2322,6 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
 
     return `
         <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="assessment-block-${studentIndex}-${sessionId}">
-            <!-- EXACT SAME HEADER AS OLD TUTOR.JS -->
             <div class="text-center mb-6 border-b pb-4">
                 <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
                      alt="Blooming Kids House Logo" 
@@ -2690,7 +2330,6 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
                 <p class="text-gray-600">Date: ${formattedDate}</p>
             </div>
 
-            <!-- EXACT SAME INFO GRID AS OLD TUTOR.JS -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
                 <div>
                     <p><strong>Student's Name:</strong> ${fullName}</p>
@@ -2703,42 +2342,35 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
                 </div>
             </div>
             
-            <!-- EXACT SAME PERFORMANCE SUMMARY AS OLD TUTOR.JS -->
             <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Performance Summary</h3>
             <table class="w-full text-sm mb-4 border border-collapse">
                 <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr></thead>
                 <tbody>${tableRows}</tbody>
             </table>
             
-            <!-- EXACT SAME KNOWLEDGE & SKILL ANALYSIS AS OLD TUTOR.JS -->
             <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Knowledge & Skill Analysis</h3>
             <table class="w-full text-sm mb-4 border border-collapse">
                 <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-left">Topics Covered</th></tr></thead>
                 <tbody>${topicsTableRows}</tbody>
             </table>
             
-            <!-- EXACT SAME TUTOR'S RECOMMENDATION AS OLD TUTOR.JS -->
             <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Tutor's Recommendation</h3>
             <p class="mb-2 text-gray-700 leading-relaxed">${recommendation}</p>
 
             ${creativeWritingAnswer ? `
-            <!-- EXACT SAME CREATIVE WRITING FEEDBACK AS OLD TUTOR.JS -->
             <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Creative Writing Feedback</h3>
             <p class="mb-2 text-gray-700"><strong>Tutor's Report:</strong> ${tutorReport}</p>
             ` : ''}
 
             ${results.length > 0 ? `
-            <!-- EXACT SAME CHART AS OLD TUTOR.JS -->
             <canvas id="${chartId}" class="w-full h-48 mb-4"></canvas>
             ` : ''}
             
-            <!-- EXACT SAME DIRECTOR'S MESSAGE AS OLD TUTOR.JS -->
             <div class="bg-yellow-50 p-4 rounded-lg mt-6">
                 <h3 class="text-lg font-semibold mb-1 text-green-700">Director's Message</h3>
                 <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
             </div>
             
-            <!-- EXACT SAME DOWNLOAD BUTTON AS OLD TUTOR.JS -->
             <div class="mt-6 text-center">
                 <button onclick="downloadSessionReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}', 'assessment')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
                     Download Assessment PDF
@@ -2746,7 +2378,6 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
             </div>
         </div>
         <script>
-            // Defer chart creation until after DOM is ready
             setTimeout(() => {
                 const ctx = document.getElementById('${chartId}');
                 if (ctx) {
@@ -2758,14 +2389,12 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
     `;
 }
 
-// Create monthly report with EXACT wording and logic from old tutor.js
 function createMonthlyReportHTML(sessionReports, studentIndex, sessionId, fullName, date) {
     const firstReport = sessionReports[0];
     const formattedDate = formatDetailedDate(date || new Date(firstReport.timestamp * 1000), true);
     
     return `
         <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="monthly-block-${studentIndex}-${sessionId}">
-            <!-- EXACT SAME HEADER AS OLD TUTOR.JS -->
             <div class="text-center mb-6 border-b pb-4">
                 <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
                      alt="Blooming Kids House Logo" 
@@ -2774,7 +2403,6 @@ function createMonthlyReportHTML(sessionReports, studentIndex, sessionId, fullNa
                 <p class="text-gray-600">Date: ${formattedDate}</p>
             </div>
             
-            <!-- EXACT SAME INFO GRID AS OLD TUTOR.JS -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
                 <div>
                     <p><strong>Student's Name:</strong> ${firstReport.studentName || 'N/A'}</p>
@@ -2788,7 +2416,6 @@ function createMonthlyReportHTML(sessionReports, studentIndex, sessionId, fullNa
             </div>
 
             ${firstReport.introduction ? `
-            <!-- EXACT SAME INTRODUCTION AS OLD TUTOR.JS -->
             <div class="mb-6">
                 <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">INTRODUCTION</h3>
                 <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.introduction)}</p>
@@ -2796,7 +2423,6 @@ function createMonthlyReportHTML(sessionReports, studentIndex, sessionId, fullNa
             ` : ''}
 
             ${firstReport.topics ? `
-            <!-- EXACT SAME TOPICS & REMARKS AS OLD TUTOR.JS -->
             <div class="mb-6">
                 <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">TOPICS & REMARKS</h3>
                 <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.topics)}</p>
@@ -2804,7 +2430,6 @@ function createMonthlyReportHTML(sessionReports, studentIndex, sessionId, fullNa
             ` : ''}
 
             ${firstReport.progress ? `
-            <!-- EXACT SAME PROGRESS & ACHIEVEMENTS AS OLD TUTOR.JS -->
             <div class="mb-6">
                 <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">PROGRESS & ACHIEVEMENTS</h3>
                 <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.progress)}</p>
@@ -2812,7 +2437,6 @@ function createMonthlyReportHTML(sessionReports, studentIndex, sessionId, fullNa
             ` : ''}
 
             ${firstReport.strengthsWeaknesses ? `
-            <!-- EXACT SAME STRENGTHS AND WEAKNESSES AS OLD TUTOR.JS -->
             <div class="mb-6">
                 <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">STRENGTHS AND WEAKNESSES</h3>
                 <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.strengthsWeaknesses)}</p>
@@ -2820,7 +2444,6 @@ function createMonthlyReportHTML(sessionReports, studentIndex, sessionId, fullNa
             ` : ''}
 
             ${firstReport.recommendations ? `
-            <!-- EXACT SAME RECOMMENDATIONS AS OLD TUTOR.JS -->
             <div class="mb-6">
                 <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">RECOMMENDATIONS</h3>
                 <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.recommendations)}</p>
@@ -2828,20 +2451,17 @@ function createMonthlyReportHTML(sessionReports, studentIndex, sessionId, fullNa
             ` : ''}
 
             ${firstReport.generalComments ? `
-            <!-- EXACT SAME GENERAL TUTOR'S COMMENTS AS OLD TUTOR.JS -->
             <div class="mb-6">
                 <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">GENERAL TUTOR'S COMMENTS</h3>
                 <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.generalComments)}</p>
             </div>
             ` : ''}
 
-            <!-- EXACT SAME SIGNATURE AS OLD TUTOR.JS -->
             <div class="text-right mt-8 pt-4 border-t">
                 <p class="text-gray-600">Best regards,</p>
                 <p class="font-semibold text-green-800">${firstReport.tutorName || 'N/A'}</p>
             </div>
 
-            <!-- EXACT SAME DOWNLOAD BUTTON AS OLD TUTOR.JS -->
             <div class="mt-6 text-center">
                 <button onclick="downloadMonthlyReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
                     Download Monthly Report PDF
@@ -2885,7 +2505,6 @@ function downloadMonthlyReport(studentIndex, sessionId, studentName) {
     downloadSessionReport(studentIndex, sessionId, studentName, 'monthly');
 }
 
-// FIXED: Accordion toggle function
 function toggleAccordion(elementId) {
     const content = document.getElementById(`${elementId}-content`);
     const arrow = document.getElementById(`${elementId}-arrow`);
@@ -2905,7 +2524,7 @@ function toggleAccordion(elementId) {
 }
 
 // ============================================================================
-// SECTION 15: SIMPLE REPORT LOADING FUNCTION (NO CHILD MATCHING)
+// SECTION 14: PARALLEL REPORT LOADING
 // ============================================================================
 
 async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false) {
@@ -2915,7 +2534,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
     const authLoader = document.getElementById("authLoader");
     const welcomeMessage = document.getElementById("welcomeMessage");
 
-    // 1. UI STATE MANAGEMENT
     if (auth.currentUser && authArea && reportArea) {
         authArea.classList.add("hidden");
         reportArea.classList.remove("hidden");
@@ -2926,38 +2544,38 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
     }
 
     if (authLoader) authLoader.classList.remove("hidden");
+    
+    // Show skeleton loader immediately
+    showSkeletonLoader('reportContent', 'dashboard');
 
     try {
-        // 2. GET USER DATA
-        const userDoc = await db.collection('parent_users').doc(userId).get();
-        const userData = userDoc.data();
+        // PARALLEL DATA LOADING
+        const [userDoc, searchResults] = await Promise.all([
+            db.collection('parent_users').doc(userId).get(),
+            searchAllReportsForParent(parentPhone, '', userId)
+        ]);
         
-        // Parent Name
-        let parentName = userData?.parentName || 'Parent';
-        
-        // Update welcome message
-        if (welcomeMessage) {
-            welcomeMessage.textContent = `Welcome, ${parentName}!`;
+        if (!userDoc.exists) {
+            throw new Error("User profile not found");
         }
         
-        // Store user data globally
+        const userData = userDoc.data();
+        
+        // Update UI immediately
         currentUserData = {
-            parentName: parentName,
+            parentName: userData.parentName || 'Parent',
             parentPhone: parentPhone,
-            email: userData?.email || ''
+            email: userData.email || ''
         };
 
-        // 3. SIMPLE REPORT SEARCH (NO CHILD MATCHING)
-        console.log("🔍 SIMPLE: Searching reports...");
-        const { assessmentResults, monthlyResults } = await searchAllReportsForParent(
-            parentPhone, 
-            currentUserData.email, 
-            userId
-        );
+        if (welcomeMessage) {
+            welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
+        }
 
-        console.log("📊 SIMPLE: Found", assessmentResults.length, "assessments and", monthlyResults.length, "monthly reports");
+        const { assessmentResults, monthlyResults } = searchResults;
 
-        // 4. IF NO REPORTS FOUND
+        console.log("📊 PARALLEL LOAD: Found", assessmentResults.length, "assessments and", monthlyResults.length, "monthly reports");
+
         if (assessmentResults.length === 0 && monthlyResults.length === 0) {
             reportContent.innerHTML = `
                 <div class="text-center py-16">
@@ -2988,21 +2606,18 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                 </div>
             `;
             
-            // Setup monitoring for future reports
-            setupRealTimeMonitoring(parentPhone, userId);
-            loadReferralRewards(userId);
-            loadAcademicsData();
-            addManualRefreshButton();
-            addLogoutButton();
+            // Setup monitoring in background
+            setTimeout(() => {
+                setupRealTimeMonitoring(parentPhone, userId);
+            }, 1000);
             
             return;
         }
 
-        // 5. REPORTS FOUND - DISPLAY THEM
+        // Process reports
         let reportsHtml = '';
         const studentReportsMap = new Map();
 
-        // Group reports by student name (from the reports themselves)
         [...assessmentResults, ...monthlyResults].forEach(report => {
             const studentName = report.studentName;
             if (!studentName) return;
@@ -3021,15 +2636,11 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             }
         });
 
-        // Update userChildren from the reports found
         userChildren = Array.from(studentReportsMap.keys());
         
-        // Create reports HTML using your existing createYearlyArchiveReportView function
-        // But we need to adapt the data format slightly
         const formattedReportsByStudent = new Map();
         
         for (const [studentName, reports] of studentReportsMap) {
-            // Group assessments by session
             const assessmentsBySession = new Map();
             reports.assessments.forEach(report => {
                 const sessionKey = Math.floor(report.timestamp / 86400);
@@ -3039,7 +2650,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                 assessmentsBySession.get(sessionKey).push(report);
             });
             
-            // Group monthly by session
             const monthlyBySession = new Map();
             reports.monthly.forEach(report => {
                 const sessionKey = Math.floor(report.timestamp / 86400);
@@ -3056,24 +2666,23 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             });
         }
 
-        // Generate HTML using your existing function
         reportsHtml = createYearlyArchiveReportView(formattedReportsByStudent);
         reportContent.innerHTML = reportsHtml;
 
-        // 6. SETUP OTHER FEATURES
-        if (authArea && reportArea) {
-            authArea.classList.add("hidden");
-            reportArea.classList.remove("hidden");
-        }
-        
-        setupRealTimeMonitoring(parentPhone, userId);
-        addManualRefreshButton();
-        addLogoutButton();
-        loadReferralRewards(userId);
-        loadAcademicsData();
+        // Setup other features in background
+        setTimeout(() => {
+            if (authArea && reportArea) {
+                authArea.classList.add("hidden");
+                reportArea.classList.remove("hidden");
+            }
+            
+            setupRealTimeMonitoring(parentPhone, userId);
+            addManualRefreshButton();
+            addLogoutButton();
+        }, 100);
 
     } catch (error) {
-        console.error("❌ SIMPLE: Error loading reports:", error);
+        console.error("❌ PARALLEL LOAD Error:", error);
         if (reportContent) {
             reportContent.innerHTML = `
                 <div class="bg-gradient-to-r from-red-50 to-orange-50 border-l-4 border-red-500 p-6 rounded-xl shadow-md">
@@ -3103,148 +2712,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
 }
 
 // ============================================================================
-// SECTION 16: ADMIN DIAGNOSTICS FUNCTIONS
-// ============================================================================
-
-async function showDiagnostics() {
-    const user = auth.currentUser;
-    if (!user) return;
-    
-    const userDoc = await db.collection('parent_users').doc(user.uid).get();
-    const userData = userDoc.data();
-    
-    let diagnosticsHtml = `
-        <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-6 mt-4">
-            <h3 class="text-lg font-bold text-yellow-800 mb-4">📊 Diagnostics</h3>
-            <div class="space-y-3">
-                <p><strong>Parent Phone:</strong> ${userData?.phone || 'Not set'}</p>
-                <p><strong>Normalized Phone:</strong> ${userData?.normalizedPhone || 'Not set'}</p>
-                <p><strong>Parent Email:</strong> ${userData?.email || 'Not set'}</p>
-                <p><strong>Parent UID:</strong> ${user.uid}</p>
-    `;
-    
-    // Check what students are linked
-    const childrenResult = await comprehensiveFindChildren(userData?.normalizedPhone || userData?.phone);
-    
-    diagnosticsHtml += `<p><strong>Linked Students:</strong> ${childrenResult.studentNames.length}</p>`;
-    
-    if (childrenResult.studentNames.length > 0) {
-        diagnosticsHtml += `<ul class="list-disc pl-5 mt-2">`;
-        childrenResult.studentNames.forEach(studentName => {
-            diagnosticsHtml += `<li>${studentName}</li>`;
-        });
-        diagnosticsHtml += `</ul>`;
-    }
-    
-    diagnosticsHtml += `
-            </div>
-            <button onclick="runReportSearchDiagnostics()" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded">
-                Run Diagnostics
-            </button>
-        </div>
-    `;
-    
-    // Add to page temporarily
-    const reportContent = document.getElementById('reportContent');
-    if (reportContent) {
-        reportContent.innerHTML = diagnosticsHtml + reportContent.innerHTML;
-    }
-}
-
-// Run diagnostics
-async function runReportSearchDiagnostics() {
-    const user = auth.currentUser;
-    if (!user) return;
-    
-    const userDoc = await db.collection('parent_users').doc(user.uid).get();
-    const userData = userDoc.data();
-    
-    // 1. Check what data exists
-    console.log("📋 Parent Data:", userData);
-    
-    // 2. Find linked students
-    const children = await comprehensiveFindChildren(userData?.normalizedPhone || userData?.phone);
-    console.log("👥 Linked Students:", children);
-    
-    // 3. Search for reports
-    const searchResults = await searchAllReportsForParent(
-        userData?.normalizedPhone || userData?.phone,
-        userData?.email,
-        user.uid
-    );
-    
-    console.log("📊 Search Results:", searchResults);
-    
-    showMessage(`Diagnostics complete. Found ${searchResults.assessmentResults.length + searchResults.monthlyResults.length} reports.`, 'success');
-}
-
-// ============================================================================
-// SECTION 17: TAB MANAGEMENT & NAVIGATION
-// ============================================================================
-
-function switchMainTab(tab) {
-    const reportTab = document.getElementById('reportTab');
-    const academicsTab = document.getElementById('academicsTab');
-    const rewardsTab = document.getElementById('rewardsTab');
-    
-    const reportContentArea = document.getElementById('reportContentArea');
-    const academicsContentArea = document.getElementById('academicsContentArea');
-    const rewardsContentArea = document.getElementById('rewardsContentArea');
-    
-    // Deactivate all tabs
-    reportTab?.classList.remove('tab-active-main');
-    reportTab?.classList.add('tab-inactive-main');
-    academicsTab?.classList.remove('tab-active-main');
-    academicsTab?.classList.add('tab-inactive-main');
-    rewardsTab?.classList.remove('tab-active-main');
-    rewardsTab?.classList.add('tab-inactive-main');
-    
-    // Hide all content areas
-    reportContentArea?.classList.add('hidden');
-    academicsContentArea?.classList.add('hidden');
-    rewardsContentArea?.classList.add('hidden');
-    
-    // Activate selected tab and show content
-    if (tab === 'reports') {
-        reportTab?.classList.remove('tab-inactive-main');
-        reportTab?.classList.add('tab-active-main');
-        reportContentArea?.classList.remove('hidden');
-    } else if (tab === 'academics') {
-        academicsTab?.classList.remove('tab-inactive-main');
-        academicsTab?.classList.add('tab-active-main');
-        academicsContentArea?.classList.remove('hidden');
-        
-        // Load academics data when the tab is clicked
-        loadAcademicsData();
-    } else if (tab === 'rewards') {
-        rewardsTab?.classList.remove('tab-inactive-main');
-        rewardsTab?.classList.add('tab-active-main');
-        rewardsContentArea?.classList.remove('hidden');
-        
-        // Reload rewards data when the tab is clicked to ensure it's up-to-date
-        const user = auth.currentUser;
-        if (user) {
-            loadReferralRewards(user.uid);
-        }
-    }
-}
-
-function logout() {
-    // Clear remember me on logout
-    localStorage.removeItem('rememberMe');
-    localStorage.removeItem('savedEmail');
-    localStorage.removeItem('isAuthenticated');
-    
-    // Clean up real-time listeners
-    cleanupRealTimeListeners();
-    
-    auth.signOut().then(() => {
-        window.location.reload();
-    });
-}
-
-// ============================================================================
-// SECTION 18: UNIFIED AUTH & DATA MANAGER - OPTIMIZED
+// SECTION 15: UNIFIED AUTH MANAGER
 // ============================================================================
 
 class UnifiedAuthManager {
@@ -3254,23 +2722,18 @@ class UnifiedAuthManager {
         this.isInitialized = false;
         this.isProcessing = false;
         this.lastProcessTime = 0;
-        this.DEBOUNCE_MS = 2000; // 2 second minimum between auth changes
+        this.DEBOUNCE_MS = 2000;
     }
 
-    /**
-     * Initialize auth listener - CALL ONLY ONCE
-     */
     initialize() {
         if (this.isInitialized) {
             return;
         }
 
-        console.log("🔐 Initializing Unified Auth Manager");
+        console.log("🔐 Initializing Optimized Auth Manager");
 
-        // Remove any existing listeners first
         this.cleanup();
 
-        // Set up single auth listener
         this.authListener = auth.onAuthStateChanged(
             (user) => this.handleAuthChange(user),
             (error) => this.handleAuthError(error)
@@ -3280,19 +2743,14 @@ class UnifiedAuthManager {
         console.log("✅ Auth manager initialized");
     }
 
-    /**
-     * Handle auth state changes with debouncing
-     */
     async handleAuthChange(user) {
         const now = Date.now();
         const timeSinceLastProcess = now - this.lastProcessTime;
 
-        // Prevent rapid successive calls
         if (this.isProcessing) {
             return;
         }
 
-        // Debounce to prevent loops
         if (timeSinceLastProcess < this.DEBOUNCE_MS) {
             return;
         }
@@ -3312,36 +2770,28 @@ class UnifiedAuthManager {
             console.error("❌ Auth change error:", error);
             showMessage("Authentication error. Please refresh.", "error");
         } finally {
-            // Reset processing flag after delay
             setTimeout(() => {
                 this.isProcessing = false;
             }, 1000);
         }
     }
 
-    /**
-     * Handle auth errors
-     */
     handleAuthError(error) {
         console.error("❌ Auth listener error:", error);
         showMessage("Authentication error occurred", "error");
     }
 
-    /**
-     * Load user dashboard - OPTIMIZED VERSION
-     */
     async loadUserDashboard(user) {
-        console.log("📊 Loading dashboard for user");
+        console.log("📊 Loading OPTIMIZED dashboard for user");
 
         const authArea = document.getElementById("authArea");
         const reportArea = document.getElementById("reportArea");
         const authLoader = document.getElementById("authLoader");
 
-        // Show loading state
         if (authLoader) authLoader.classList.remove("hidden");
 
         try {
-            // 1. Get user data from Firestore
+            // PARALLEL DATA LOADING
             const userDoc = await db.collection('parent_users').doc(user.uid).get();
             
             if (!userDoc.exists) {
@@ -3360,16 +2810,18 @@ class UnifiedAuthManager {
 
             console.log("👤 User data loaded:", this.currentUser.parentName);
 
-            // 2. Update UI immediately (prevent feeling of lag)
+            // Update UI immediately
             this.showDashboardUI();
 
-            // 3. Load data in sequence (not parallel) to reduce load time
-            await this.loadAllChildrenAndReports();
-            await this.loadReferralsData();
-            await this.loadAcademicsData();
-            await this.setupRealtimeMonitoring();
+            // Load remaining data in parallel
+            await Promise.all([
+                loadAllReportsForParent(this.currentUser.normalizedPhone, user.uid),
+                loadReferralRewards(user.uid),
+                loadAcademicsData()
+            ]);
 
-            // 4. Setup UI components
+            // Setup monitoring and UI
+            this.setupRealtimeMonitoring();
             this.setupUIComponents();
 
             console.log("✅ Dashboard fully loaded");
@@ -3383,9 +2835,6 @@ class UnifiedAuthManager {
         }
     }
 
-    /**
-     * Show dashboard UI
-     */
     showDashboardUI() {
         const authArea = document.getElementById("authArea");
         const reportArea = document.getElementById("reportArea");
@@ -3401,9 +2850,6 @@ class UnifiedAuthManager {
         localStorage.setItem('isAuthenticated', 'true');
     }
 
-    /**
-     * Show auth screen
-     */
     showAuthScreen() {
         const authArea = document.getElementById("authArea");
         const reportArea = document.getElementById("reportArea");
@@ -3415,75 +2861,17 @@ class UnifiedAuthManager {
         cleanupRealTimeListeners();
     }
 
-    /**
-     * Load all children and reports - SIMPLIFIED
-     */
-    async loadAllChildrenAndReports() {
-        console.log("🔍 SIMPLIFIED: Searching for reports");
-
-        try {
-            // Use simple search directly - no child finding first
-            await loadAllReportsForParent(
-                this.currentUser.normalizedPhone,
-                this.currentUser.uid,
-                false
-            );
-
-            console.log("✅ Reports loaded");
-
-        } catch (error) {
-            console.error("❌ Error loading reports:", error);
-            throw error;
-        }
-    }
-
-    /**
-     * Load referrals data
-     */
-    async loadReferralsData() {
-        try {
-            await loadReferralRewards(this.currentUser.uid);
-        } catch (error) {
-            console.error("⚠️ Error loading referrals:", error);
-            // Non-critical, don't throw
-        }
-    }
-
-    /**
-     * Load academics data
-     */
-    async loadAcademicsData() {
-        try {
-            await loadAcademicsData();
-        } catch (error) {
-            console.error("⚠️ Error loading academics:", error);
-            // Non-critical, don't throw
-        }
-    }
-
-    /**
-     * Setup realtime monitoring
-     */
-    async setupRealtimeMonitoring() {
-        try {
+    setupRealtimeMonitoring() {
+        if (this.currentUser) {
             setupRealTimeMonitoring(this.currentUser.normalizedPhone, this.currentUser.uid);
-        } catch (error) {
-            console.error("⚠️ Error setting up monitoring:", error);
-            // Non-critical, don't throw
         }
     }
 
-    /**
-     * Setup UI components
-     */
     setupUIComponents() {
         addManualRefreshButton();
         addLogoutButton();
     }
 
-    /**
-     * Cleanup auth listener
-     */
     cleanup() {
         if (this.authListener && typeof this.authListener === 'function') {
             this.authListener();
@@ -3492,9 +2880,6 @@ class UnifiedAuthManager {
         this.isInitialized = false;
     }
 
-    /**
-     * Force reload dashboard
-     */
     async reloadDashboard() {
         if (!this.currentUser) {
             console.warn("⚠️ No user to reload dashboard for");
@@ -3502,562 +2887,103 @@ class UnifiedAuthManager {
         }
 
         console.log("🔄 Force reloading dashboard");
-        await this.loadAllChildrenAndReports();
+        await loadAllReportsForParent(this.currentUser.normalizedPhone, this.currentUser.uid, true);
     }
 }
 
-// Create singleton instance
 const authManager = new UnifiedAuthManager();
 
 // ============================================================================
-// 2. COMPREHENSIVE CHILDREN FINDER (Finds ALL Children)
+// SECTION 16: NAVIGATION BUTTONS & DYNAMIC UI
 // ============================================================================
 
-/**
- * Comprehensive search for all children linked to a parent
- * This searches EVERY possible phone variation across multiple collections
- */
-async function comprehensiveFindChildren(parentPhone) {
-    console.log("🔍 COMPREHENSIVE DIGIT SEARCH for children with phone:", parentPhone);
-
-    const allChildren = new Map();
-    const studentNameIdMap = new Map();
+// MANUAL REFRESH FUNCTION
+async function manualRefreshReportsV2() {
+    const user = auth.currentUser;
+    if (!user) return;
     
-    // Get parent's phone digits for comparison
-    const parentDigits = extractPhoneDigits(parentPhone);
+    const refreshBtn = document.getElementById('manualRefreshBtn');
+    if (!refreshBtn) return;
     
-    if (!parentDigits) {
-        console.warn("⚠️ No valid digits in parent phone:", parentPhone);
-        return {
-            studentIds: [],
-            studentNameIdMap: new Map(),
-            allStudentData: [],
-            studentNames: []
-        };
-    }
-
+    const originalText = refreshBtn.innerHTML;
+    
+    // Show loading state
+    refreshBtn.innerHTML = '<div class="loading-spinner-small mr-2"></div> Checking...';
+    refreshBtn.disabled = true;
+    
     try {
-        // 1. Search in students collection (FETCH ALL THEN FILTER)
-        console.log("📋 Fetching ALL students for digit matching...");
-        const allStudentsSnapshot = await db.collection('students').get();
-        
-        allStudentsSnapshot.forEach(doc => {
-            const data = doc.data();
-            const studentId = doc.id;
-            const studentName = safeText(data.studentName || data.name || 'Unknown');
-            
-            if (studentName === 'Unknown') return;
-            
-            // Check ALL phone fields in student data
-            const phoneFields = [
-                data.parentPhone,
-                data.guardianPhone,
-                data.motherPhone,
-                data.fatherPhone,
-                data.contactPhone,
-                data.phone,
-                data.parentPhone1,
-                data.parentPhone2,
-                data.emergencyPhone
-            ];
-            
-            let isMatch = false;
-            let matchedField = '';
-            
-            // Compare each phone field by digits only
-            for (const fieldPhone of phoneFields) {
-                if (fieldPhone && comparePhonesByDigits(fieldPhone, parentPhone)) {
-                    isMatch = true;
-                    matchedField = fieldPhone;
-                    break;
-                }
-            }
-            
-            if (isMatch && !allChildren.has(studentId)) {
-                console.log(`✅ DIGIT MATCH: Parent ${parentDigits} = ${matchedField} → Student ${studentName}`);
-                
-                allChildren.set(studentId, {
-                    id: studentId,
-                    name: studentName,
-                    data: data,
-                    isPending: false,
-                    collection: 'students'
-                });
-                
-                // Handle duplicate names
-                if (studentNameIdMap.has(studentName)) {
-                    const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
-                    studentNameIdMap.set(uniqueName, studentId);
-                } else {
-                    studentNameIdMap.set(studentName, studentId);
-                }
-            }
-        });
-        
-        // 2. Search in pending_students collection
-        console.log("📋 Fetching ALL pending students for digit matching...");
-        const allPendingSnapshot = await db.collection('pending_students').get();
-        
-        allPendingSnapshot.forEach(doc => {
-            const data = doc.data();
-            const studentId = doc.id;
-            const studentName = safeText(data.studentName || data.name || 'Unknown');
-            
-            if (studentName === 'Unknown') return;
-            
-            // Check phone fields
-            const phoneFields = [
-                data.parentPhone,
-                data.guardianPhone,
-                data.motherPhone,
-                data.fatherPhone,
-                data.contactPhone,
-                data.phone
-            ];
-            
-            let isMatch = false;
-            let matchedField = '';
-            
-            for (const fieldPhone of phoneFields) {
-                if (fieldPhone && comparePhonesByDigits(fieldPhone, parentPhone)) {
-                    isMatch = true;
-                    matchedField = fieldPhone;
-                    break;
-                }
-            }
-            
-            if (isMatch && !allChildren.has(studentId)) {
-                console.log(`✅ PENDING DIGIT MATCH: Parent ${parentDigits} = ${matchedField} → Student ${studentName}`);
-                
-                allChildren.set(studentId, {
-                    id: studentId,
-                    name: studentName,
-                    data: data,
-                    isPending: true,
-                    collection: 'pending_students'
-                });
-                
-                if (studentNameIdMap.has(studentName)) {
-                    const uniqueName = `${studentName} (${studentId.substring(0, 4)})`;
-                    studentNameIdMap.set(uniqueName, studentId);
-                } else {
-                    studentNameIdMap.set(studentName, studentId);
-                }
-            }
-        });
-
-        // 3. EMAIL MATCHING (backup)
-        console.log("📧 Checking for email matches...");
-        const userDoc = await db.collection('parent_users')
-            .where('normalizedPhone', '==', parentPhone)
-            .limit(1)
-            .get();
-
-        if (!userDoc.empty) {
-            const userData = userDoc.docs[0].data();
-            if (userData.email) {
-                try {
-                    const emailSnapshot = await db.collection('students')
-                        .where('parentEmail', '==', userData.email)
-                        .get();
-
-                    emailSnapshot.forEach(doc => {
-                        const data = doc.data();
-                        const studentId = doc.id;
-                        const studentName = safeText(data.studentName || data.name || 'Unknown');
-
-                        if (studentName !== 'Unknown' && !allChildren.has(studentId)) {
-                            console.log(`✅ EMAIL MATCH: ${userData.email} → Student ${studentName}`);
-                            
-                            allChildren.set(studentId, {
-                                id: studentId,
-                                name: studentName,
-                                data: data,
-                                isPending: false,
-                                collection: 'students'
-                            });
-                            
-                            if (!studentNameIdMap.has(studentName)) {
-                                studentNameIdMap.set(studentName, studentId);
-                            }
-                        }
-                    });
-                } catch (error) {
-                    console.warn("Email search error:", error.message);
-                }
+        if (window.authManager && typeof window.authManager.reloadDashboard === 'function') {
+            await window.authManager.reloadDashboard();
+        } else {
+            const userDoc = await db.collection('parent_users').doc(user.uid).get();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                const userPhone = userData.normalizedPhone || userData.phone;
+                await loadAllReportsForParent(userPhone, user.uid, true);
             }
         }
-
-        // 4. Return results
-        const studentNames = Array.from(studentNameIdMap.keys());
-        const studentIds = Array.from(allChildren.keys());
-        const allStudentData = Array.from(allChildren.values());
-
-        console.log(`🎯 DIGIT SEARCH RESULTS: ${studentNames.length} students found`);
-        console.log("📊 Students:", studentNames);
-
-        return {
-            studentIds,
-            studentNameIdMap,
-            allStudentData,
-            studentNames
-        };
-
+        
+        await checkForNewAcademics();
+        
+        showMessage('Reports refreshed successfully!', 'success');
     } catch (error) {
-        console.error("❌ Comprehensive digit search error:", error);
-        return {
-            studentIds: [],
-            studentNameIdMap: new Map(),
-            allStudentData: [],
-            studentNames: []
-        };
+        console.error('Manual refresh error:', error);
+        showMessage('Refresh failed. Please try again.', 'error');
+    } finally {
+        refreshBtn.innerHTML = originalText;
+        refreshBtn.disabled = false;
     }
 }
 
-// ============================================================================
-// 3. NEW INITIALIZATION FUNCTION
-// ============================================================================
-
-/**
- * NEW initialization function
- */
-function initializeParentPortalV2() {
-    console.log("🚀 Initializing Parent Portal V2 (Optimized Edition)");
-
-    // 1. Setup UI first
-    setupRememberMe();
-    injectCustomCSS();
-    createCountryCodeDropdown();
-    setupEventListeners();
-    setupGlobalErrorHandler();
-
-    // 2. Initialize auth manager (SINGLE SOURCE OF TRUTH)
-    authManager.initialize();
-
-    // 3. Setup cleanup
-    window.addEventListener('beforeunload', () => {
-        authManager.cleanup();
-        cleanupRealTimeListeners();
-    });
-
-    console.log("✅ Parent Portal V2 initialized");
-}
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-// Setup Remember Me Functionality
-function setupRememberMe() {
-    const rememberMe = localStorage.getItem('rememberMe');
-    const savedEmail = localStorage.getItem('savedEmail');
+// ADD MANUAL REFRESH BUTTON
+function addManualRefreshButton() {
+    const welcomeSection = document.querySelector('.bg-green-50');
+    if (!welcomeSection) return;
     
-    if (rememberMe === 'true' && savedEmail) {
-        const loginIdentifier = document.getElementById('loginIdentifier');
-        const rememberMeCheckbox = document.getElementById('rememberMe');
-        
-        if (loginIdentifier) {
-            loginIdentifier.value = safeText(savedEmail);
-        }
-        if (rememberMeCheckbox) {
-            rememberMeCheckbox.checked = true;
-        }
-    }
-}
-
-// Handle Remember Me checkbox change
-function handleRememberMe() {
-    const rememberMeCheckbox = document.getElementById('rememberMe');
-    const identifier = document.getElementById('loginIdentifier');
+    const buttonContainer = welcomeSection.querySelector('.flex.gap-2');
+    if (!buttonContainer) return;
     
-    if (!rememberMeCheckbox || !identifier) return;
+    if (document.getElementById('manualRefreshBtn')) return;
     
-    const rememberMe = rememberMeCheckbox.checked;
-    const email = identifier.value.trim();
+    const refreshBtn = document.createElement('button');
+    refreshBtn.id = 'manualRefreshBtn';
+    refreshBtn.onclick = manualRefreshReportsV2;
+    refreshBtn.className = 'bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 btn-glow flex items-center justify-center';
+    refreshBtn.innerHTML = '<span class="mr-2">🔄</span> Check for New Reports';
     
-    if (rememberMe && email) {
-        localStorage.setItem('rememberMe', 'true');
-        localStorage.setItem('savedEmail', safeText(email));
+    const logoutBtn = buttonContainer.querySelector('button[onclick="logout()"]');
+    if (logoutBtn) {
+        buttonContainer.insertBefore(refreshBtn, logoutBtn);
     } else {
-        localStorage.removeItem('rememberMe');
-        localStorage.removeItem('savedEmail');
+        buttonContainer.appendChild(refreshBtn);
     }
 }
 
-// Basic handleSignIn function for event listeners
-function handleSignIn() {
-    const identifier = document.getElementById('loginIdentifier')?.value.trim();
-    const password = document.getElementById('loginPassword')?.value;
-
-    if (!identifier || !password) {
-        showMessage('Please fill in all fields', 'error');
-        return;
-    }
-
-    const signInBtn = document.getElementById('signInBtn');
-    const authLoader = document.getElementById('authLoader');
-
-    signInBtn.disabled = true;
-    document.getElementById('signInText').textContent = 'Signing In...';
-    document.getElementById('signInSpinner').classList.remove('hidden');
-    authLoader.classList.remove('hidden');
-
-    handleSignInFull(identifier, password, signInBtn, authLoader);
-}
-
-// Basic handleSignUp function for event listeners
-function handleSignUp() {
-    const countryCode = document.getElementById('countryCode')?.value;
-    const localPhone = document.getElementById('signupPhone')?.value.trim();
-    const email = document.getElementById('signupEmail')?.value.trim();
-    const password = document.getElementById('signupPassword')?.value;
-    const confirmPassword = document.getElementById('signupConfirmPassword')?.value;
-
-    // Validation
-    if (!countryCode || !localPhone || !email || !password || !confirmPassword) {
-        showMessage('Please fill in all fields including country code', 'error');
-        return;
-    }
-
-    if (password.length < 6) {
-        showMessage('Password must be at least 6 characters', 'error');
-        return;
-    }
-
-    if (password !== confirmPassword) {
-        showMessage('Passwords do not match', 'error');
-        return;
-    }
-
-    const signUpBtn = document.getElementById('signUpBtn');
-    const authLoader = document.getElementById('authLoader');
-
-    signUpBtn.disabled = true;
-    document.getElementById('signUpText').textContent = 'Creating Account...';
-    document.getElementById('signUpSpinner').classList.remove('hidden');
-    authLoader.classList.remove('hidden');
-
-    handleSignUpFull(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader);
-}
-
-// Basic password reset function
-function handlePasswordReset() {
-    const email = document.getElementById('resetEmail')?.value.trim();
+// ADD LOGOUT BUTTON
+function addLogoutButton() {
+    const welcomeSection = document.querySelector('.bg-green-50');
+    if (!welcomeSection) return;
     
-    if (!email) {
-        showMessage('Please enter your email address', 'error');
-        return;
-    }
-
-    const sendResetBtn = document.getElementById('sendResetBtn');
-    const resetLoader = document.getElementById('resetLoader');
-
-    sendResetBtn.disabled = true;
-    resetLoader.classList.remove('hidden');
-
-    handlePasswordResetFull(email, sendResetBtn, resetLoader);
-}
-
-// Basic tab switching functions
-function switchTab(tab) {
-    const signInTab = document.getElementById('signInTab');
-    const signUpTab = document.getElementById('signUpTab');
-    const signInForm = document.getElementById('signInForm');
-    const signUpForm = document.getElementById('signUpForm');
-
-    if (tab === 'signin') {
-        signInTab?.classList.remove('tab-inactive');
-        signInTab?.classList.add('tab-active');
-        signUpTab?.classList.remove('tab-active');
-        signUpTab?.classList.add('tab-inactive');
-        signInForm?.classList.remove('hidden');
-        signUpForm?.classList.add('hidden');
-    } else {
-        signUpTab?.classList.remove('tab-inactive');
-        signUpTab?.classList.add('tab-active');
-        signInTab?.classList.remove('tab-active');
-        signInTab?.classList.add('tab-inactive');
-        signUpForm?.classList.remove('hidden');
-        signInForm?.classList.add('hidden');
-    }
-}
-
-// Setup all event listeners
-function setupEventListeners() {
-    // Authentication buttons
-    const signInBtn = document.getElementById("signInBtn");
-    const signUpBtn = document.getElementById("signUpBtn");
-    const sendResetBtn = document.getElementById("sendResetBtn");
+    const buttonContainer = welcomeSection.querySelector('.flex.gap-2');
+    if (!buttonContainer) return;
     
-    if (signInBtn) {
-        signInBtn.removeEventListener("click", handleSignIn);
-        signInBtn.addEventListener("click", handleSignIn);
-    }
+    if (buttonContainer.querySelector('button[onclick="logout()"]')) return;
     
-    if (signUpBtn) {
-        signUpBtn.removeEventListener("click", handleSignUp);
-        signUpBtn.addEventListener("click", handleSignUp);
-    }
+    const logoutBtn = document.createElement('button');
+    logoutBtn.onclick = logout;
+    logoutBtn.className = 'bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition-all duration-200 btn-glow flex items-center justify-center';
+    logoutBtn.innerHTML = '<span class="mr-2">🚪</span> Logout';
     
-    if (sendResetBtn) {
-        sendResetBtn.removeEventListener("click", handlePasswordReset);
-        sendResetBtn.addEventListener("click", handlePasswordReset);
-    }
-    
-    // Tab switching
-    const signInTab = document.getElementById("signInTab");
-    const signUpTab = document.getElementById("signUpTab");
-    
-    if (signInTab) {
-        signInTab.removeEventListener("click", () => switchTab('signin'));
-        signInTab.addEventListener("click", () => switchTab('signin'));
-    }
-    
-    if (signUpTab) {
-        signUpTab.removeEventListener("click", () => switchTab('signup'));
-        signUpTab.addEventListener("click", () => switchTab('signup'));
-    }
-    
-    // Password reset
-    const forgotPasswordBtn = document.getElementById("forgotPasswordBtn");
-    if (forgotPasswordBtn) {
-        forgotPasswordBtn.removeEventListener("click", showPasswordResetModal);
-        forgotPasswordBtn.addEventListener("click", showPasswordResetModal);
-    }
-    
-    const cancelResetBtn = document.getElementById("cancelResetBtn");
-    if (cancelResetBtn) {
-        cancelResetBtn.removeEventListener("click", hidePasswordResetModal);
-        cancelResetBtn.addEventListener("click", hidePasswordResetModal);
-    }
-    
-    // Remember me
-    const rememberMeCheckbox = document.getElementById("rememberMe");
-    if (rememberMeCheckbox) {
-        rememberMeCheckbox.removeEventListener("change", handleRememberMe);
-        rememberMeCheckbox.addEventListener("change", handleRememberMe);
-    }
-    
-    // Enter key support
-    const loginPassword = document.getElementById('loginPassword');
-    if (loginPassword) {
-        loginPassword.removeEventListener('keypress', handleLoginEnter);
-        loginPassword.addEventListener('keypress', handleLoginEnter);
-    }
-    
-    const signupConfirmPassword = document.getElementById('signupConfirmPassword');
-    if (signupConfirmPassword) {
-        signupConfirmPassword.removeEventListener('keypress', handleSignupEnter);
-        signupConfirmPassword.addEventListener('keypress', handleSignupEnter);
-    }
-    
-    const resetEmail = document.getElementById('resetEmail');
-    if (resetEmail) {
-        resetEmail.removeEventListener('keypress', handleResetEnter);
-        resetEmail.addEventListener('keypress', handleResetEnter);
-    }
-    
-    // Main tab switching
-    const reportTab = document.getElementById("reportTab");
-    const academicsTab = document.getElementById("academicsTab");
-    const rewardsTab = document.getElementById("rewardsTab");
-    
-    if (reportTab) {
-        reportTab.removeEventListener("click", () => switchMainTab('reports'));
-        reportTab.addEventListener("click", () => switchMainTab('reports'));
-    }
-    
-    if (academicsTab) {
-        academicsTab.removeEventListener("click", () => switchMainTab('academics'));
-        academicsTab.addEventListener("click", () => switchMainTab('academics'));
-    }
-    
-    if (rewardsTab) {
-        rewardsTab.removeEventListener("click", () => switchMainTab('rewards'));
-        rewardsTab.addEventListener("click", () => switchMainTab('rewards'));
-    }
-}
-
-// Helper functions for enter key handling
-function handleLoginEnter(e) {
-    if (e.key === 'Enter') handleSignIn();
-}
-
-function handleSignupEnter(e) {
-    if (e.key === 'Enter') handleSignUp();
-}
-
-function handleResetEnter(e) {
-    if (e.key === 'Enter') handlePasswordReset();
-}
-
-// Modal functions
-function showPasswordResetModal() {
-    const modal = document.getElementById("passwordResetModal");
-    if (modal) {
-        modal.classList.remove("hidden");
-    }
-}
-
-function hidePasswordResetModal() {
-    const modal = document.getElementById("passwordResetModal");
-    if (modal) {
-        modal.classList.add("hidden");
-    }
-}
-
-// Setup global error handler
-function setupGlobalErrorHandler() {
-    // Prevent unhandled promise rejections
-    window.addEventListener('unhandledrejection', function(event) {
-        console.error('Unhandled promise rejection:', event.reason);
-        event.preventDefault();
-    });
-    
-    // Global error handler
-    window.addEventListener('error', function(e) {
-        console.error('Global error:', e.error);
-        if (!e.error?.message?.includes('auth') && 
-            !e.error?.message?.includes('permission-denied')) {
-            showMessage('An unexpected error occurred. Please refresh the page.', 'error');
-        }
-        e.preventDefault();
-    });
-    
-    // Network error handling
-    window.addEventListener('offline', function() {
-        showMessage('You are offline. Some features may not work.', 'warning');
-    });
-    
-    window.addEventListener('online', function() {
-        showMessage('Connection restored.', 'success');
-    });
+    buttonContainer.appendChild(logoutBtn);
 }
 
 // ============================================================================
-// PAGE INITIALIZATION
+// SECTION 17: SETTINGS MANAGER
 // ============================================================================
 
-// Initialize the page when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-    console.log("📄 DOM Content Loaded - Starting V2 initialization");
-    
-    // Initialize the NEW portal
-    initializeParentPortalV2();
-
-    // ============================================================================
-// SECTION 19: SETTINGS & PROFILE MANAGEMENT (FIXED & GLOBAL)
-// ============================================================================
-
-/**
- * SETTINGS MANAGER
- * Handles Parent Profile, Child Data Updates, and Contact Synchronization.
- * Automatically injects itself into the existing UI.
- */
 class SettingsManager {
     constructor() {
         this.isActive = false;
-        // Wait for DOM to be fully ready before injecting
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => this.injectSettingsUI());
         } else {
@@ -4065,12 +2991,9 @@ class SettingsManager {
         }
     }
 
-    // 1. INJECT UI COMPONENTS (Button & Content Area)
     injectSettingsUI() {
-        // A. Add Settings Button to Navigation
         const navContainer = document.querySelector('.bg-green-50 .flex.gap-2');
         
-        // Safety check: if button already exists, don't add it again
         if (navContainer && !document.getElementById('settingsBtn')) {
             const settingsBtn = document.createElement('button');
             settingsBtn.id = 'settingsBtn';
@@ -4078,7 +3001,6 @@ class SettingsManager {
             settingsBtn.className = 'bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-700 transition-all duration-200 btn-glow flex items-center justify-center';
             settingsBtn.innerHTML = '<span class="mr-2">⚙️</span> Settings';
             
-            // Insert before Logout button
             const logoutBtn = navContainer.querySelector('button[onclick="logout()"]');
             if (logoutBtn) {
                 navContainer.insertBefore(settingsBtn, logoutBtn);
@@ -4087,7 +3009,6 @@ class SettingsManager {
             }
         }
 
-        // B. Add Settings Content Area (Hidden by default)
         const mainContainer = document.getElementById('reportArea');
         if (mainContainer && !document.getElementById('settingsContentArea')) {
             const settingsDiv = document.createElement('div');
@@ -4099,7 +3020,7 @@ class SettingsManager {
                         <h2 class="text-xl font-bold text-white flex items-center">
                             <span class="mr-2">⚙️</span> Family Profile & Settings
                         </h2>
-                        <button onclick="manualRefreshReportsV2()" class="text-gray-300 hover:text-white text-sm">
+                        <button onclick="switchMainTab('reports')" class="text-gray-300 hover:text-white text-sm">
                             ← Back to Dashboard
                         </button>
                     </div>
@@ -4112,15 +3033,12 @@ class SettingsManager {
         }
     }
 
-    // 2. OPEN TAB LOGIC
     openSettingsTab() {
-        // Hide other tabs
         ['reportContentArea', 'academicsContentArea', 'rewardsContentArea'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.classList.add('hidden');
         });
         
-        // Deactivate main tabs
         ['reportTab', 'academicsTab', 'rewardsTab'].forEach(id => {
             const el = document.getElementById(id);
             if (el) {
@@ -4129,7 +3047,6 @@ class SettingsManager {
             }
         });
 
-        // Show Settings
         const settingsArea = document.getElementById('settingsContentArea');
         if (settingsArea) {
             settingsArea.classList.remove('hidden');
@@ -4137,18 +3054,15 @@ class SettingsManager {
         }
     }
 
-    // 3. LOAD DATA
     async loadSettingsData() {
         const content = document.getElementById('settingsDynamicContent');
         const user = auth.currentUser;
         if (!user) return;
 
         try {
-            // Fetch fresh data
             const userDoc = await db.collection('parent_users').doc(user.uid).get();
             const userData = userDoc.data();
             
-            // Fetch children using the existing powerful search
             const childrenResult = await comprehensiveFindChildren(userData.normalizedPhone || userData.phone);
             const students = childrenResult.allStudentData;
 
@@ -4160,7 +3074,6 @@ class SettingsManager {
         }
     }
 
-    // 4. RENDER UI
     renderSettingsForm(userData, students) {
         const content = document.getElementById('settingsDynamicContent');
         
@@ -4271,7 +3184,6 @@ class SettingsManager {
         content.innerHTML = html;
     }
 
-    // 5. ACTIONS: SAVE PARENT PROFILE
     async saveParentProfile() {
         const user = auth.currentUser;
         if (!user) return;
@@ -4295,7 +3207,6 @@ class SettingsManager {
                 email: email
             });
 
-            // Update local display immediately
             const welcomeMsg = document.getElementById('welcomeMessage');
             if (welcomeMsg) welcomeMsg.textContent = `Welcome, ${name}!`;
 
@@ -4311,7 +3222,6 @@ class SettingsManager {
         }
     }
 
-    // 6. ACTIONS: UPDATE STUDENT (THE "REFLECT EVERYWHERE" LOGIC)
     async updateStudent(studentId, collectionName) {
         try {
             const nameInput = document.getElementById(`studentName_${studentId}`);
@@ -4328,7 +3238,6 @@ class SettingsManager {
 
             if (!newName) return showMessage('Student name cannot be empty', 'error');
 
-            // Show loading state
             const btn = document.querySelector(`button[onclick="window.settingsManager.updateStudent('${studentId}', '${collectionName}')"]`);
             const originalText = btn ? btn.innerHTML : 'Save Details';
             
@@ -4337,10 +3246,9 @@ class SettingsManager {
                 btn.disabled = true;
             }
 
-            // A. Update Student Profile (Primary)
             const updateData = {
                 studentName: newName,
-                name: newName, // redundancy for safety
+                name: newName,
                 gender: gender,
                 motherPhone: motherPhone,
                 fatherPhone: fatherPhone,
@@ -4350,19 +3258,15 @@ class SettingsManager {
 
             await db.collection(collectionName).doc(studentId).update(updateData);
 
-            // B. "Reflect Everywhere" - Background Batch Update
-            // This ensures reports in other portals show the new name
             this.propagateStudentNameChange(studentId, newName);
 
             showMessage(`${newName}'s details updated successfully!`, 'success');
             
-            // C. Restore Button
             if (btn) {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
             }
 
-            // D. Refresh Dashboard to show changes
             if (window.authManager) {
                 setTimeout(() => window.authManager.reloadDashboard(), 1000);
             }
@@ -4373,19 +3277,16 @@ class SettingsManager {
         }
     }
 
-    // 7. PROPAGATION LOGIC (Updates Tutors/Reports)
     async propagateStudentNameChange(studentId, newName) {
         console.log(`🔄 Propagating name change for ${studentId} to: ${newName}`);
         
-        // We do this silently in the background
         const collections = ['tutor_submissions', 'student_results'];
         
         for (const col of collections) {
             try {
-                // Find docs linked to this student
                 const snapshot = await db.collection(col)
                     .where('studentId', '==', studentId)
-                    .limit(50) // Limit to prevent timeouts
+                    .limit(50)
                     .get();
 
                 if (!snapshot.empty) {
@@ -4402,44 +3303,25 @@ class SettingsManager {
                 }
             } catch (err) {
                 console.warn(`Background update for ${col} failed:`, err);
-                // Non-critical: Profile is already updated, which is what matters most
             }
         }
     }
 }
 
-// ----------------------------------------------------------------------------
-// CRITICAL FIX: EXPOSE TO WINDOW SO HTML BUTTONS CAN FIND IT
-// ----------------------------------------------------------------------------
-window.settingsManager = new SettingsManager();
-    
-    console.log("🎉 Parent Portal V2 initialized");
-});
-
-// Make auth manager globally accessible for debugging
-window.authManager = authManager;
-window.comprehensiveFindChildren = comprehensiveFindChildren;
-window.manualRefreshReportsV2 = manualRefreshReportsV2;
+// Initialize settings manager
+let settingsManager = new SettingsManager();
 
 // ============================================================================
-// SECTION 20: GOOGLE CLASSROOM STYLE HOMEWORK (FULL INTEGRATION)
+// SECTION 18: GOOGLE CLASSROOM HOMEWORK
 // ============================================================================
 
-/**
- * 1. CONFIGURATION
- * Get these from your Cloudinary Dashboard -> Settings -> Upload
- */
 const CLOUDINARY_CONFIG = {
-    cloudName: 'dwjq7j5zp',    // Replace with your Cloud Name
-    uploadPreset: 'tutor_homework' // Replace with your Unsigned Upload Preset
+    cloudName: 'dwjq7j5zp',
+    uploadPreset: 'tutor_homework'
 };
 
-/**
- * 2. STYLE & DEPENDENCY INJECTION
- * Loads Cloudinary and the Google Classroom CSS
- */
-(function injectDependencies() {
-    // Load Cloudinary Widget
+// Inject dependencies
+(function() {
     if (!document.getElementById('cloudinary-script')) {
         const script = document.createElement('script');
         script.id = 'cloudinary-script';
@@ -4447,53 +3329,37 @@ const CLOUDINARY_CONFIG = {
         document.head.appendChild(script);
     }
 
-    // Inject CSS
     const style = document.createElement('style');
     style.textContent = `
-        /* Overlay & Modal */
         .gc-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(4px); animation: fadeIn 0.2s; }
         .gc-modal-container { background: #fff; width: 90%; max-width: 1000px; height: 90vh; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.2); }
         .gc-header { padding: 16px 24px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; }
-        
-        /* Layout */
         .gc-body { display: flex; flex: 1; overflow-y: auto; background: #fff; }
         .gc-main { flex: 1; padding: 24px; border-right: 1px solid #f0f0f0; }
         .gc-sidebar { width: 350px; padding: 24px; background: #fff; }
-        
-        /* Elements */
         .gc-title { font-size: 2rem; color: #1967d2; margin-bottom: 8px; font-weight: 400; }
         .gc-card { background: #fff; border: 1px solid #dadce0; border-radius: 8px; padding: 16px; box-shadow: 0 1px 2px rgba(60,64,67,0.3); margin-bottom: 16px; }
-        
-        /* Buttons */
         .gc-btn-add { display: flex; align-items: center; justify-content: center; width: 100%; padding: 10px; margin-bottom: 10px; background: #fff; border: 1px solid #dadce0; border-radius: 4px; color: #1967d2; font-weight: 500; cursor: pointer; transition: 0.2s; }
         .gc-btn-add:hover { background: #f8f9fa; color: #174ea6; }
-        
         .gc-btn-primary { width: 100%; padding: 10px; background: #1967d2; border: none; border-radius: 4px; color: #fff; font-weight: 500; cursor: pointer; transition: 0.2s; }
         .gc-btn-primary:hover { background: #185abc; }
         .gc-btn-primary:disabled { background: #e0e0e0; cursor: not-allowed; }
-        
         .gc-btn-unsubmit { width: 100%; padding: 10px; background: #fff; border: 1px solid #dadce0; border-radius: 4px; color: #3c4043; font-weight: 500; cursor: pointer; margin-top: 10px; }
         .gc-btn-unsubmit:hover { background: #f1f3f4; }
-        
-        /* Attachments */
         .gc-attachment { display: flex; align-items: center; border: 1px solid #dadce0; border-radius: 4px; padding: 8px; margin-bottom: 12px; cursor: pointer; }
         .gc-att-icon { width: 36px; height: 36px; background: #f1f3f4; color: #1967d2; display: flex; align-items: center; justify-content: center; margin-right: 12px; border-radius: 4px; }
-        
+        .gc-inject-btn { transition: opacity 0.3s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @media (max-width: 768px) { .gc-body { flex-direction: column; } .gc-sidebar { width: 100%; border-top: 1px solid #e0e0e0; } }
     `;
     document.head.appendChild(style);
 })();
 
-/**
- * 3. MODAL LOGIC (OPEN/CLOSE/RENDER)
- */
 let homeworkListenerUnsub = null;
 
 function openGoogleClassroomModal(initialHwData, studentId) {
-    document.body.style.overflow = 'hidden'; // Lock scroll
+    document.body.style.overflow = 'hidden';
     
-    // 1. Create Modal Shell
     const modalHTML = `
         <div class="gc-modal-overlay" id="gcModal">
             <div class="gc-modal-container">
@@ -4516,12 +3382,10 @@ function openGoogleClassroomModal(initialHwData, studentId) {
     div.innerHTML = modalHTML;
     document.body.appendChild(div.firstElementChild);
 
-    // 2. Start Real-Time Listener (Updates if tutor grades while open)
     const hwRef = db.collection('homework_assignments').doc(initialHwData.id);
     homeworkListenerUnsub = hwRef.onSnapshot((doc) => {
         if (doc.exists) {
             const freshData = { id: doc.id, ...doc.data() };
-            // Ensure timestamp compatibility
             if (!freshData.dueTimestamp && freshData.dueDate) {
                 freshData.dueTimestamp = getTimestamp(freshData.dueDate);
             }
@@ -4534,7 +3398,6 @@ function renderGoogleClassroomContent(homework, studentId) {
     const container = document.getElementById('gcBodyContent');
     if (!container) return;
 
-    // --- Status Logic ---
     const isGraded = homework.status === 'graded';
     const isSubmitted = ['submitted', 'completed', 'graded'].includes(homework.status);
     const now = Date.now();
@@ -4547,7 +3410,6 @@ function renderGoogleClassroomContent(homework, studentId) {
     else if (isSubmitted) { statusText = 'Handed in'; statusClass = 'text-green-700 font-bold'; }
     else if (isOverdue) { statusText = 'Missing'; statusClass = 'text-red-600 font-bold'; }
 
-    // --- Render HTML ---
     container.innerHTML = `
         <div class="gc-main">
             <h1 class="gc-title">${safeText(homework.title || homework.subject)}</h1>
@@ -4579,7 +3441,6 @@ function renderGoogleClassroomContent(homework, studentId) {
                     <div class="text-xs uppercase font-bold ${statusClass}">${statusText}</div>
                 </div>
 
-                <!-- Attached File Area -->
                 <div id="gc-file-area" class="mb-4">
                     ${homework.submissionUrl ? `
                         <div class="gc-attachment">
@@ -4589,7 +3450,6 @@ function renderGoogleClassroomContent(homework, studentId) {
                         </div>` : ''}
                 </div>
 
-                <!-- Action Buttons -->
                 ${!isSubmitted ? `
                     <button class="gc-btn-add" onclick="triggerCloudinaryUpload('${homework.id}', '${studentId}')">
                         <span class="mr-2 text-xl">+</span> Add or create
@@ -4623,17 +3483,17 @@ function renderGoogleClassroomContent(homework, studentId) {
 }
 
 function closeGoogleClassroomModal() {
-    if (homeworkListenerUnsub) homeworkListenerUnsub(); // Stop listening
+    if (homeworkListenerUnsub) homeworkListenerUnsub();
     const modal = document.getElementById('gcModal');
     if (modal) modal.remove();
-    document.body.style.overflow = 'auto'; // Restore scroll
+    document.body.style.overflow = 'auto';
 }
 
-/**
- * 4. UPLOAD & SUBMISSION LOGIC
- */
 function triggerCloudinaryUpload(homeworkId, studentId) {
-    if (!window.cloudinary) return alert("Upload widget is loading. Please try again in a few seconds.");
+    if (!window.cloudinary) {
+        showMessage('Upload widget is loading. Please try again in a few seconds.', 'error');
+        return;
+    }
     
     const widget = cloudinary.createUploadWidget({
         cloudName: CLOUDINARY_CONFIG.cloudName,
@@ -4644,12 +3504,13 @@ function triggerCloudinaryUpload(homeworkId, studentId) {
         multiple: false
     }, async (error, result) => {
         if (!error && result && result.event === "success") {
-            // Optimistic update (User sees it immediately via listener)
             await db.collection('homework_assignments').doc(homeworkId).update({
                 submissionUrl: result.info.secure_url,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             showMessage('File uploaded!', 'success');
+        } else if (error) {
+            showMessage('Upload failed. Please try again.', 'error');
         }
     });
     widget.open();
@@ -4679,27 +3540,20 @@ async function unsubmitHomework(homeworkId) {
     if (!confirm("Unsubmit this assignment?")) return;
     await db.collection('homework_assignments').doc(homeworkId).update({
         status: 'assigned',
-        submissionUrl: firebase.firestore.FieldValue.delete() // Remove file link
+        submissionUrl: firebase.firestore.FieldValue.delete()
     });
 }
 
-/**
- * 5. ROBUST SCANNER (ENSURES BUTTONS APPEAR)
- * Scans the DOM every 2 seconds to inject buttons into dynamic content.
- */
+// RELIABLE SCANNER
 function scanAndInjectButtons() {
-    // Select all homework cards in the academics content area
     const cards = document.querySelectorAll('#academicsContent .bg-white.border.rounded-lg');
 
     cards.forEach(card => {
-        // Skip if already injected
         if (card.querySelector('.gc-inject-btn')) return;
 
-        // Verify it's a homework card (look for "Due:" text)
         const textContent = card.textContent || "";
         if (!textContent.includes('Due:')) return;
 
-        // Create Button
         const btnContainer = document.createElement('div');
         btnContainer.className = 'mt-4 pt-3 border-t border-gray-100 flex justify-end gc-inject-btn fade-in';
         btnContainer.innerHTML = `
@@ -4709,13 +3563,11 @@ function scanAndInjectButtons() {
             </button>
         `;
 
-        // Add Click Logic
         const btn = btnContainer.querySelector('button');
         btn.onclick = (e) => {
             e.preventDefault();
-            e.stopPropagation(); // Stop accordion from toggling
+            e.stopPropagation();
             
-            // Find Title to lookup homework
             const titleEl = card.querySelector('h5');
             const titleText = titleEl ? titleEl.textContent.trim() : '';
             if (titleText) findAndOpenHomework(titleText);
@@ -4725,22 +3577,24 @@ function scanAndInjectButtons() {
     });
 }
 
-// Helper to match UI Title -> Database ID
 function findAndOpenHomework(titleText) {
-    // Use the currently selected student, or fallback to the first child
     const selector = document.getElementById('studentSelector');
     let studentName = selector ? selector.value : null;
     if (!studentName && userChildren.length > 0) studentName = userChildren[0];
     
-    if (!studentName) return showMessage('Please select a student first.', 'error');
+    if (!studentName) {
+        showMessage('Please select a student first.', 'error');
+        return;
+    }
     
     const studentId = studentIdMap.get(studentName);
-    if (!studentId) return showMessage('Student ID not found.', 'error');
+    if (!studentId) {
+        showMessage('Student ID not found.', 'error');
+        return;
+    }
 
-    // Show visual feedback
     showMessage('Opening classroom...', 'success');
 
-    // Query DB for this assignment
     db.collection('homework_assignments')
         .where('studentId', '==', studentId)
         .where('title', '==', titleText)
@@ -4750,26 +3604,29 @@ function findAndOpenHomework(titleText) {
             if (!snapshot.empty) {
                 const doc = snapshot.docs[0];
                 const hwData = { id: doc.id, ...doc.data() };
-                // Ensure timestamp exists
-                if (!hwData.dueTimestamp && hwData.dueDate) hwData.dueTimestamp = getTimestamp(hwData.dueDate);
-                
+                if (!hwData.dueTimestamp && hwData.dueDate) {
+                    hwData.dueTimestamp = getTimestamp(hwData.dueDate);
+                }
                 openGoogleClassroomModal(hwData, studentId);
             } else {
-                // Fallback: Try client-side match (if DB query fails due to exact string mismatch)
-                console.warn("Exact title match failed, trying fuzzy match...");
-                 db.collection('homework_assignments').where('studentId', '==', studentId).get().then(snap => {
-                     const found = snap.docs.find(d => {
-                         const dData = d.data();
-                         return (dData.title || dData.subject) === titleText;
-                     });
-                     if (found) {
-                        const hwData = { id: found.id, ...found.data() };
-                        if (!hwData.dueTimestamp && hwData.dueDate) hwData.dueTimestamp = getTimestamp(hwData.dueDate);
-                        openGoogleClassroomModal(hwData, studentId);
-                     } else {
-                         showMessage('Could not find assignment details.', 'error');
-                     }
-                });
+                db.collection('homework_assignments')
+                    .where('studentId', '==', studentId)
+                    .get()
+                    .then(snap => {
+                        const found = snap.docs.find(d => {
+                            const dData = d.data();
+                            return (dData.title || dData.subject) === titleText;
+                        });
+                        if (found) {
+                            const hwData = { id: found.id, ...found.data() };
+                            if (!hwData.dueTimestamp && hwData.dueDate) {
+                                hwData.dueTimestamp = getTimestamp(hwData.dueDate);
+                            }
+                            openGoogleClassroomModal(hwData, studentId);
+                        } else {
+                            showMessage('Could not find assignment details.', 'error');
+                        }
+                    });
             }
         })
         .catch(err => {
@@ -4778,18 +3635,477 @@ function findAndOpenHomework(titleText) {
         });
 }
 
-// 6. INITIALIZATION
-document.addEventListener('DOMContentLoaded', () => {
-    // 1. Initial Scan
-    scanAndInjectButtons();
+// ============================================================================
+// SECTION 19: HELPER FUNCTIONS
+// ============================================================================
 
-    // 2. Observer (Preferred method)
-    const observer = new MutationObserver(() => scanAndInjectButtons());
+async function checkForNewAcademics() {
+    try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const userDoc = await db.collection('parent_users').doc(user.uid).get();
+        const userData = userDoc.data();
+        const parentPhone = userData.normalizedPhone || userData.phone;
+
+        const childrenResult = await comprehensiveFindChildren(parentPhone);
+        
+        let totalUnread = 0;
+
+        for (const [studentName, studentId] of childrenResult.studentNameIdMap) {
+            try {
+                const oneWeekAgo = new Date();
+                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                
+                const [sessionTopicsSnapshot, homeworkSnapshot] = await Promise.all([
+                    db.collection('daily_topics').where('studentId', '==', studentId).get(),
+                    db.collection('homework_assignments').where('studentId', '==', studentId).get()
+                ]);
+                
+                let studentUnread = 0;
+                
+                sessionTopicsSnapshot.forEach(doc => {
+                    const topic = doc.data();
+                    const topicDate = topic.date?.toDate?.() || topic.createdAt?.toDate?.() || new Date(0);
+                    if (topicDate >= oneWeekAgo) {
+                        studentUnread++;
+                    }
+                });
+                
+                homeworkSnapshot.forEach(doc => {
+                    const homework = doc.data();
+                    const assignedDate = homework.assignedDate?.toDate?.() || homework.createdAt?.toDate?.() || new Date(0);
+                    if (assignedDate >= oneWeekAgo) {
+                        studentUnread++;
+                    }
+                });
+                
+                totalUnread += studentUnread;
+                
+            } catch (error) {
+                console.error(`Error checking academics for ${studentName}:`, error);
+            }
+        }
+        
+        updateAcademicsTabBadge(totalUnread);
+
+    } catch (error) {
+        console.error('Error checking for new academics:', error);
+    }
+}
+
+function updateAcademicsTabBadge(count) {
+    const academicsTab = document.getElementById('academicsTab');
+    if (!academicsTab) return;
+    
+    const existingBadge = academicsTab.querySelector('.academics-badge');
+    if (existingBadge) {
+        existingBadge.remove();
+    }
+    
+    if (count > 0) {
+        const badge = document.createElement('span');
+        badge.className = 'academics-badge absolute -top-1 -right-1 bg-red-500 text-white rounded-full text-xs min-w-5 h-5 flex items-center justify-center font-bold animate-pulse px-1';
+        badge.textContent = count > 9 ? '9+' : count;
+        badge.style.lineHeight = '1rem';
+        badge.style.fontSize = '0.7rem';
+        badge.style.padding = '0 4px';
+        academicsTab.style.position = 'relative';
+        academicsTab.appendChild(badge);
+    }
+}
+
+// ============================================================================
+// SECTION 20: INITIALIZATION & UTILITIES
+// ============================================================================
+
+function initializeParentPortalV2() {
+    console.log("🚀 Initializing Parent Portal V2 (Production Edition)");
+
+    setupRememberMe();
+    injectCustomCSS();
+    createCountryCodeDropdown();
+    setupEventListeners();
+    setupGlobalErrorHandler();
+
+    authManager.initialize();
+
+    window.addEventListener('beforeunload', () => {
+        authManager.cleanup();
+        cleanupRealTimeListeners();
+    });
+
+    console.log("✅ Parent Portal V2 initialized");
+}
+
+function setupRememberMe() {
+    const rememberMe = localStorage.getItem('rememberMe');
+    const savedEmail = localStorage.getItem('savedEmail');
+    
+    if (rememberMe === 'true' && savedEmail) {
+        const loginIdentifier = document.getElementById('loginIdentifier');
+        const rememberMeCheckbox = document.getElementById('rememberMe');
+        
+        if (loginIdentifier) {
+            loginIdentifier.value = safeText(savedEmail);
+        }
+        if (rememberMeCheckbox) {
+            rememberMeCheckbox.checked = true;
+        }
+    }
+}
+
+function handleRememberMe() {
+    const rememberMeCheckbox = document.getElementById('rememberMe');
+    const identifier = document.getElementById('loginIdentifier');
+    
+    if (!rememberMeCheckbox || !identifier) return;
+    
+    const rememberMe = rememberMeCheckbox.checked;
+    const email = identifier.value.trim();
+    
+    if (rememberMe && email) {
+        localStorage.setItem('rememberMe', 'true');
+        localStorage.setItem('savedEmail', safeText(email));
+    } else {
+        localStorage.removeItem('rememberMe');
+        localStorage.removeItem('savedEmail');
+    }
+}
+
+function handleSignIn() {
+    const identifier = document.getElementById('loginIdentifier')?.value.trim();
+    const password = document.getElementById('loginPassword')?.value;
+
+    if (!identifier || !password) {
+        showMessage('Please fill in all fields', 'error');
+        return;
+    }
+
+    const signInBtn = document.getElementById('signInBtn');
+    const authLoader = document.getElementById('authLoader');
+
+    signInBtn.disabled = true;
+    document.getElementById('signInText').textContent = 'Signing In...';
+    document.getElementById('signInSpinner').classList.remove('hidden');
+    authLoader.classList.remove('hidden');
+
+    handleSignInFull(identifier, password, signInBtn, authLoader);
+}
+
+function handleSignUp() {
+    const countryCode = document.getElementById('countryCode')?.value;
+    const localPhone = document.getElementById('signupPhone')?.value.trim();
+    const email = document.getElementById('signupEmail')?.value.trim();
+    const password = document.getElementById('signupPassword')?.value;
+    const confirmPassword = document.getElementById('signupConfirmPassword')?.value;
+
+    if (!countryCode || !localPhone || !email || !password || !confirmPassword) {
+        showMessage('Please fill in all fields including country code', 'error');
+        return;
+    }
+
+    if (password.length < 6) {
+        showMessage('Password must be at least 6 characters', 'error');
+        return;
+    }
+
+    if (password !== confirmPassword) {
+        showMessage('Passwords do not match', 'error');
+        return;
+    }
+
+    const signUpBtn = document.getElementById('signUpBtn');
+    const authLoader = document.getElementById('authLoader');
+
+    signUpBtn.disabled = true;
+    document.getElementById('signUpText').textContent = 'Creating Account...';
+    document.getElementById('signUpSpinner').classList.remove('hidden');
+    authLoader.classList.remove('hidden');
+
+    handleSignUpFull(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader);
+}
+
+function handlePasswordReset() {
+    const email = document.getElementById('resetEmail')?.value.trim();
+    
+    if (!email) {
+        showMessage('Please enter your email address', 'error');
+        return;
+    }
+
+    const sendResetBtn = document.getElementById('sendResetBtn');
+    const resetLoader = document.getElementById('resetLoader');
+
+    sendResetBtn.disabled = true;
+    resetLoader.classList.remove('hidden');
+
+    handlePasswordResetFull(email, sendResetBtn, resetLoader);
+}
+
+function switchTab(tab) {
+    const signInTab = document.getElementById('signInTab');
+    const signUpTab = document.getElementById('signUpTab');
+    const signInForm = document.getElementById('signInForm');
+    const signUpForm = document.getElementById('signUpForm');
+
+    if (tab === 'signin') {
+        signInTab?.classList.remove('tab-inactive');
+        signInTab?.classList.add('tab-active');
+        signUpTab?.classList.remove('tab-active');
+        signUpTab?.classList.add('tab-inactive');
+        signInForm?.classList.remove('hidden');
+        signUpForm?.classList.add('hidden');
+    } else {
+        signUpTab?.classList.remove('tab-inactive');
+        signUpTab?.classList.add('tab-active');
+        signInTab?.classList.remove('tab-active');
+        signInTab?.classList.add('tab-inactive');
+        signUpForm?.classList.remove('hidden');
+        signInForm?.classList.add('hidden');
+    }
+}
+
+function switchMainTab(tab) {
+    const reportTab = document.getElementById('reportTab');
+    const academicsTab = document.getElementById('academicsTab');
+    const rewardsTab = document.getElementById('rewardsTab');
+    
+    const reportContentArea = document.getElementById('reportContentArea');
+    const academicsContentArea = document.getElementById('academicsContentArea');
+    const rewardsContentArea = document.getElementById('rewardsContentArea');
+    const settingsContentArea = document.getElementById('settingsContentArea');
+    
+    reportTab?.classList.remove('tab-active-main');
+    reportTab?.classList.add('tab-inactive-main');
+    academicsTab?.classList.remove('tab-active-main');
+    academicsTab?.classList.add('tab-inactive-main');
+    rewardsTab?.classList.remove('tab-active-main');
+    rewardsTab?.classList.add('tab-inactive-main');
+    
+    reportContentArea?.classList.add('hidden');
+    academicsContentArea?.classList.add('hidden');
+    rewardsContentArea?.classList.add('hidden');
+    settingsContentArea?.classList.add('hidden');
+    
+    if (tab === 'reports') {
+        reportTab?.classList.remove('tab-inactive-main');
+        reportTab?.classList.add('tab-active-main');
+        reportContentArea?.classList.remove('hidden');
+    } else if (tab === 'academics') {
+        academicsTab?.classList.remove('tab-inactive-main');
+        academicsTab?.classList.add('tab-active-main');
+        academicsContentArea?.classList.remove('hidden');
+        loadAcademicsData();
+    } else if (tab === 'rewards') {
+        rewardsTab?.classList.remove('tab-inactive-main');
+        rewardsTab?.classList.add('tab-active-main');
+        rewardsContentArea?.classList.remove('hidden');
+        
+        const user = auth.currentUser;
+        if (user) {
+            loadReferralRewards(user.uid);
+        }
+    }
+}
+
+function setupEventListeners() {
+    const signInBtn = document.getElementById("signInBtn");
+    const signUpBtn = document.getElementById("signUpBtn");
+    const sendResetBtn = document.getElementById("sendResetBtn");
+    
+    if (signInBtn) {
+        signInBtn.removeEventListener("click", handleSignIn);
+        signInBtn.addEventListener("click", handleSignIn);
+    }
+    
+    if (signUpBtn) {
+        signUpBtn.removeEventListener("click", handleSignUp);
+        signUpBtn.addEventListener("click", handleSignUp);
+    }
+    
+    if (sendResetBtn) {
+        sendResetBtn.removeEventListener("click", handlePasswordReset);
+        sendResetBtn.addEventListener("click", handlePasswordReset);
+    }
+    
+    const signInTab = document.getElementById("signInTab");
+    const signUpTab = document.getElementById("signUpTab");
+    
+    if (signInTab) {
+        signInTab.removeEventListener("click", () => switchTab('signin'));
+        signInTab.addEventListener("click", () => switchTab('signin'));
+    }
+    
+    if (signUpTab) {
+        signUpTab.removeEventListener("click", () => switchTab('signup'));
+        signUpTab.addEventListener("click", () => switchTab('signup'));
+    }
+    
+    const forgotPasswordBtn = document.getElementById("forgotPasswordBtn");
+    if (forgotPasswordBtn) {
+        forgotPasswordBtn.removeEventListener("click", showPasswordResetModal);
+        forgotPasswordBtn.addEventListener("click", showPasswordResetModal);
+    }
+    
+    const cancelResetBtn = document.getElementById("cancelResetBtn");
+    if (cancelResetBtn) {
+        cancelResetBtn.removeEventListener("click", hidePasswordResetModal);
+        cancelResetBtn.addEventListener("click", hidePasswordResetModal);
+    }
+    
+    const rememberMeCheckbox = document.getElementById("rememberMe");
+    if (rememberMeCheckbox) {
+        rememberMeCheckbox.removeEventListener("change", handleRememberMe);
+        rememberMeCheckbox.addEventListener("change", handleRememberMe);
+    }
+    
+    const loginPassword = document.getElementById('loginPassword');
+    if (loginPassword) {
+        loginPassword.removeEventListener('keypress', handleLoginEnter);
+        loginPassword.addEventListener('keypress', handleLoginEnter);
+    }
+    
+    const signupConfirmPassword = document.getElementById('signupConfirmPassword');
+    if (signupConfirmPassword) {
+        signupConfirmPassword.removeEventListener('keypress', handleSignupEnter);
+        signupConfirmPassword.addEventListener('keypress', handleSignupEnter);
+    }
+    
+    const resetEmail = document.getElementById('resetEmail');
+    if (resetEmail) {
+        resetEmail.removeEventListener('keypress', handleResetEnter);
+        resetEmail.addEventListener('keypress', handleResetEnter);
+    }
+    
+    const reportTab = document.getElementById("reportTab");
+    const academicsTab = document.getElementById("academicsTab");
+    const rewardsTab = document.getElementById("rewardsTab");
+    
+    if (reportTab) {
+        reportTab.removeEventListener("click", () => switchMainTab('reports'));
+        reportTab.addEventListener("click", () => switchMainTab('reports'));
+    }
+    
+    if (academicsTab) {
+        academicsTab.removeEventListener("click", () => switchMainTab('academics'));
+        academicsTab.addEventListener("click", () => switchMainTab('academics'));
+    }
+    
+    if (rewardsTab) {
+        rewardsTab.removeEventListener("click", () => switchMainTab('rewards'));
+        rewardsTab.addEventListener("click", () => switchMainTab('rewards'));
+    }
+}
+
+function handleLoginEnter(e) {
+    if (e.key === 'Enter') handleSignIn();
+}
+
+function handleSignupEnter(e) {
+    if (e.key === 'Enter') handleSignUp();
+}
+
+function handleResetEnter(e) {
+    if (e.key === 'Enter') handlePasswordReset();
+}
+
+function showPasswordResetModal() {
+    const modal = document.getElementById("passwordResetModal");
+    if (modal) {
+        modal.classList.remove("hidden");
+    }
+}
+
+function hidePasswordResetModal() {
+    const modal = document.getElementById("passwordResetModal");
+    if (modal) {
+        modal.classList.add("hidden");
+    }
+}
+
+function logout() {
+    localStorage.removeItem('rememberMe');
+    localStorage.removeItem('savedEmail');
+    localStorage.removeItem('isAuthenticated');
+    
+    cleanupRealTimeListeners();
+    
+    auth.signOut().then(() => {
+        window.location.reload();
+    });
+}
+
+function setupGlobalErrorHandler() {
+    window.addEventListener('unhandledrejection', function(event) {
+        console.error('Unhandled promise rejection:', event.reason);
+        event.preventDefault();
+    });
+    
+    window.addEventListener('error', function(e) {
+        console.error('Global error:', e.error);
+        if (!e.error?.message?.includes('auth') && 
+            !e.error?.message?.includes('permission-denied')) {
+            showMessage('An unexpected error occurred. Please refresh the page.', 'error');
+        }
+        e.preventDefault();
+    });
+    
+    window.addEventListener('offline', function() {
+        showMessage('You are offline. Some features may not work.', 'warning');
+    });
+    
+    window.addEventListener('online', function() {
+        showMessage('Connection restored.', 'success');
+    });
+}
+
+// ============================================================================
+// PAGE INITIALIZATION & GOOGLE CLASSROOM SETUP
+// ============================================================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("📄 DOM Content Loaded - Starting V2 initialization");
+    
+    initializeParentPortalV2();
+    
+    // Initialize Google Classroom scanner
+    setTimeout(scanAndInjectButtons, 500);
+    
+    const observer = new MutationObserver(() => {
+        setTimeout(scanAndInjectButtons, 100);
+    });
+    
     const target = document.getElementById('academicsContent');
     if (target) observer.observe(target, { childList: true, subtree: true });
-
-    // 3. Fallback Interval (The "Hammer" - Ensures it works even if Observer misses)
+    
+    // Fallback interval (every 2 seconds)
     setInterval(scanAndInjectButtons, 2000);
     
-    console.log("🚀 Google Classroom Module Loaded");
+    console.log("🎉 Parent Portal V2 fully initialized");
 });
+
+// ============================================================================
+// GLOBAL EXPORTS
+// ============================================================================
+
+// Make global for debugging
+window.authManager = authManager;
+window.comprehensiveFindChildren = comprehensiveFindChildren;
+window.manualRefreshReportsV2 = manualRefreshReportsV2;
+window.loadAcademicsData = loadAcademicsData;
+window.onStudentSelected = onStudentSelected;
+window.toggleAcademicsAccordion = toggleAcademicsAccordion;
+window.toggleAccordion = toggleAccordion;
+window.downloadSessionReport = downloadSessionReport;
+window.downloadMonthlyReport = downloadMonthlyReport;
+window.switchMainTab = switchMainTab;
+window.logout = logout;
+window.showPasswordResetModal = showPasswordResetModal;
+window.hidePasswordResetModal = hidePasswordResetModal;
+window.switchTab = switchTab;
+window.settingsManager = settingsManager;
+
+// ============================================================================
+// END OF PARENT.JS - PRODUCTION READY
+// ============================================================================
