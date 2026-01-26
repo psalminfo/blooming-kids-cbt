@@ -4419,3 +4419,215 @@ window.settingsManager = new SettingsManager();
 window.authManager = authManager;
 window.comprehensiveFindChildren = comprehensiveFindChildren;
 window.manualRefreshReportsV2 = manualRefreshReportsV2;
+
+/*******************************************************************************
+ * SECTION 16: GOOGLE CLASSROOM GRADING INTERFACE (FINAL)
+ ******************************************************************************/
+
+// 1. INJECT GRADING STYLES
+(function injectGradingStyles() {
+    if(document.getElementById('gc-grading-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'gc-grading-styles';
+    style.textContent = `
+        /* Overlay */
+        .gc-grading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(2px); animation: fadeIn 0.2s ease-out; }
+        .gc-grading-container { background: #f8f9fa; width: 95%; max-width: 1200px; height: 90vh; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.2); }
+        
+        /* Header */
+        .gc-grading-header { background: white; border-bottom: 1px solid #e0e0e0; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; height: 64px; }
+        .gc-student-name { font-size: 1.1rem; font-weight: 500; color: #3c4043; }
+        .gc-assignment-title { font-size: 0.9rem; color: #5f6368; margin-left: 12px; }
+
+        /* Body */
+        .gc-grading-body { display: flex; flex: 1; overflow: hidden; }
+        .gc-work-panel { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
+        
+        /* File Preview */
+        .gc-file-preview { background: white; border: 1px solid #dadce0; border-radius: 8px; width: 100%; max-width: 800px; padding: 40px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; }
+        .gc-file-icon { font-size: 48px; margin-bottom: 16px; }
+        .gc-download-btn { background: #1a73e8; color: white; padding: 8px 24px; border-radius: 4px; text-decoration: none; font-weight: 500; transition: background 0.2s; }
+        .gc-download-btn:hover { background: #1557b0; }
+
+        /* Sidebar */
+        .gc-grading-sidebar { width: 320px; background: white; border-left: 1px solid #e0e0e0; padding: 24px; display: flex; flex-direction: column; overflow-y: auto; }
+        .gc-grade-input { width: 80px; padding: 8px; border: 1px solid #dadce0; border-radius: 4px; text-align: right; font-size: 1rem; }
+        .gc-comment-box { width: 100%; min-height: 150px; padding: 12px; border: 1px solid #dadce0; border-radius: 4px; resize: vertical; margin-top: 8px; background: #f8f9fa; }
+        
+        /* Return Button */
+        .gc-action-footer { margin-top: auto; padding-top: 24px; }
+        .gc-return-btn { width: 100%; background: #1a73e8; color: white; border: none; padding: 10px; border-radius: 4px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
+        .gc-return-btn:hover { background: #1557b0; }
+        .gc-return-btn:disabled { background: #dadce0; color: #80868b; cursor: not-allowed; }
+        
+        /* Inbox Item */
+        .gc-inbox-item { display: flex; justify-content: space-between; align-items: center; padding: 16px; border-bottom: 1px solid #f1f3f4; cursor: pointer; transition: background 0.1s; }
+        .gc-inbox-item:hover { background: #f8f9fa; }
+    `;
+    document.head.appendChild(style);
+})();
+
+// 2. LOGIC: FETCH HOMEWORK INBOX
+async function loadHomeworkInbox(tutorEmail) {
+    const container = document.getElementById('homework-inbox-container');
+    if (!container) return;
+    container.innerHTML = '<div class="spinner mx-auto"></div>';
+
+    try {
+        // Query by Tutor Name OR Email to be safe
+        let q = query(collection(db, "homework_assignments"), 
+            where("tutorName", "==", window.tutorData.name), 
+            where("status", "==", "submitted"));
+            
+        let snapshot = await getDocs(q);
+        
+        if (snapshot.empty) {
+             // Fallback query using email
+             q = query(collection(db, "homework_assignments"), 
+                where("tutorEmail", "==", tutorEmail), 
+                where("status", "==", "submitted"));
+             snapshot = await getDocs(q);
+        }
+
+        if (snapshot.empty) {
+            container.innerHTML = `<div class="text-center py-6"><div class="text-3xl mb-2">🎉</div><p class="text-gray-500 text-sm">No pending homework!</p></div>`;
+            return;
+        }
+
+        let html = '<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">';
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const date = data.submittedAt ? new Date(data.submittedAt.seconds * 1000).toLocaleDateString() : 'Unknown';
+            const isLate = data.dueDate && new Date(data.dueDate) < new Date(data.submittedAt.seconds * 1000);
+            
+            html += `
+                <div class="gc-inbox-item" onclick="openGradingModal('${doc.id}')">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">${data.studentName.charAt(0)}</div>
+                        <div>
+                            <div class="font-medium text-gray-800">${data.studentName}</div>
+                            <div class="text-xs text-gray-500">${data.title}</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs font-bold ${isLate ? 'text-red-600' : 'text-green-600'} uppercase tracking-wide">
+                            ${isLate ? 'Done Late' : 'Turned In'}
+                        </div>
+                        <div class="text-xs text-gray-400">${date}</div>
+                    </div>
+                </div>`;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+
+    } catch (error) {
+        console.error("Inbox Error:", error);
+        container.innerHTML = '<p class="text-red-500 text-center">Error loading inbox.</p>';
+    }
+}
+
+// 3. LOGIC: OPEN GRADING MODAL
+async function openGradingModal(homeworkId) {
+    let hwData;
+    try {
+        const docSnap = await getDoc(doc(db, "homework_assignments", homeworkId));
+        if (!docSnap.exists()) return alert("Assignment not found");
+        hwData = { id: docSnap.id, ...docSnap.data() };
+    } catch (e) { return alert("Error loading assignment"); }
+
+    const modal = document.createElement('div');
+    modal.className = 'gc-grading-overlay';
+    
+    const hasFile = hwData.submissionUrl && hwData.submissionUrl.length > 5;
+    const fileArea = hasFile ? 
+        `<div class="gc-file-preview"><div class="gc-file-icon">📄</div><div class="mb-2 font-medium">Student Submission</div><a href="${hwData.submissionUrl}" target="_blank" class="gc-download-btn">View File</a></div>` : 
+        `<div class="gc-file-preview"><div class="gc-file-icon">⚠️</div><div class="text-gray-500">No file attached</div></div>`;
+
+    modal.innerHTML = `
+        <div class="gc-grading-container">
+            <header class="gc-grading-header">
+                <div class="flex items-center">
+                    <button class="mr-4 text-gray-500 hover:text-gray-800 text-2xl" onclick="this.closest('.gc-grading-overlay').remove()">✕</button>
+                    <div><span class="gc-student-name">${hwData.studentName}</span><span class="gc-assignment-title"> ➤ ${hwData.title}</span></div>
+                </div>
+            </header>
+            <div class="gc-grading-body">
+                <div class="gc-work-panel">
+                    ${fileArea}
+                    <div class="w-full max-w-2xl mt-6 border-t pt-4">
+                        <div class="text-xs font-bold text-gray-500 uppercase mb-2">Original Instructions</div>
+                        <div class="text-gray-700 text-sm">${hwData.description}</div>
+                        ${hwData.fileUrl ? `<div class="mt-2"><a href="${hwData.fileUrl}" target="_blank" class="text-blue-600 text-xs hover:underline">View Assignment Reference</a></div>` : ''}
+                    </div>
+                </div>
+                <div class="gc-grading-sidebar">
+                    <div class="mb-6">
+                        <label class="font-medium text-gray-700 block mb-2">Grade</label>
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="gc-score-input" class="gc-grade-input" min="0" max="100" value="${hwData.score || ''}">
+                            <span class="text-gray-500 text-sm">/ 100</span>
+                        </div>
+                    </div>
+                    <div class="flex-1 flex flex-col">
+                        <label class="font-medium text-gray-700">Private Comments</label>
+                        <textarea id="gc-feedback-input" class="gc-comment-box" placeholder="Add feedback...">${hwData.feedback || ''}</textarea>
+                    </div>
+                    <div class="gc-action-footer">
+                        <button id="gc-return-btn" class="gc-return-btn">Return</button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+    document.body.appendChild(modal);
+
+    modal.querySelector('#gc-return-btn').onclick = async function() {
+        const btn = this;
+        const score = modal.querySelector('#gc-score-input').value;
+        const feedback = modal.querySelector('#gc-feedback-input').value;
+
+        if (!score && !confirm("Return without a numerical grade?")) return;
+
+        btn.innerText = "Returning...";
+        btn.disabled = true;
+
+        try {
+            await updateDoc(doc(db, "homework_assignments", homeworkId), {
+                score: score,
+                feedback: feedback,
+                status: 'graded',
+                gradedAt: new Date(),
+                tutorEmail: window.tutorData.email // Ensure this is tracked for history
+            });
+
+            modal.remove();
+            showCustomAlert(`✅ Returned to ${hwData.studentName}`);
+            loadHomeworkInbox(window.tutorData.email); // Refresh inbox
+        } catch (error) {
+            console.error(error);
+            showCustomAlert("Error returning assignment");
+            btn.innerText = "Return";
+            btn.disabled = false;
+        }
+    };
+}
+
+// 4. DASHBOARD WIDGET INJECTOR
+const inboxObserver = new MutationObserver(() => {
+    const hero = document.querySelector('.hero-section');
+    if (hero && !document.getElementById('homework-inbox-section')) {
+        const div = document.createElement('div');
+        div.id = 'homework-inbox-section';
+        div.className = 'mt-6 mb-8 fade-in';
+        div.innerHTML = `
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-gray-800">📥 Homework Inbox</h3>
+                <button onclick="loadHomeworkInbox(window.tutorData.email)" class="text-sm text-blue-600 hover:underline">Refresh</button>
+            </div>
+            <div id="homework-inbox-container"></div>
+        `;
+        hero.after(div);
+        if (window.tutorData) loadHomeworkInbox(window.tutorData.email);
+    }
+});
+inboxObserver.observe(document.body, { childList: true, subtree: true });
