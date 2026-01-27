@@ -3625,6 +3625,12 @@ function convertPayAdviceToCSV(data) {
 
 async function exportPayAdviceAsXLS() {
     try {
+        // Check if SheetJS is loaded
+        if (typeof XLSX === 'undefined') {
+            alert("Excel library not loaded. Please add the SheetJS library to your page.");
+            return;
+        }
+
         const currentDate = new Date();
         const monthYear = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
         
@@ -3648,121 +3654,113 @@ async function exportPayAdviceAsXLS() {
             };
         });
 
-        const mainPaymentData = processedData.map(tutor => [
-            tutor.tutorName,
-            tutor.beneficiaryBank,
-            '',
-            tutor.beneficiaryAccount,
-            '',
-            'NIP',
-            tutor.mainPayment,
-            'NGN',
-            `${monthYear} Tutor Payment`
+        // Create Main Payment workbook
+        const mainPaymentWB = XLSX.utils.book_new();
+        const mainPaymentWS = XLSX.utils.aoa_to_sheet([
+            ['Beneficiary name', 'Beneficiary Bank name', 'Beneficiary branch', 'Beneficiary account', 'Transaction Unique Reference number', 'payment method code', 'payment amount', 'payment currency', 'remarks']
         ]);
+        
+        processedData.forEach(tutor => {
+            // Force beneficiary account to be treated as text to preserve leading zeros
+            XLSX.utils.sheet_add_aoa(mainPaymentWS, [[
+                tutor.tutorName,
+                tutor.beneficiaryBank,
+                '',
+                String(tutor.beneficiaryAccount), // Convert to string to preserve leading zeros
+                '',
+                'NIP',
+                tutor.mainPayment,
+                'NGN',
+                `${monthYear} Tutor Payment`
+            ]], { origin: -1 });
+        });
+        
+        XLSX.utils.book_append_sheet(mainPaymentWB, mainPaymentWS, 'Main Payment');
 
-        const dataZoomData = processedData.map(tutor => [
-            tutor.tutorName,
-            tutor.beneficiaryBank,
-            '',
-            tutor.beneficiaryAccount,
-            '',
-            'NIP',
-            tutor.dataZoomPayment,
-            'NGN',
-            'DATAZOOMALLOCT'
+        // Create DataZoom Allocation workbook
+        const dataZoomWB = XLSX.utils.book_new();
+        const dataZoomWS = XLSX.utils.aoa_to_sheet([
+            ['Beneficiary name', 'Beneficiary Bank name', 'Beneficiary branch', 'Beneficiary account', 'Transaction Unique Reference number', 'payment method code', 'payment amount', 'payment currency', 'remarks']
         ]);
+        
+        processedData.forEach(tutor => {
+            XLSX.utils.sheet_add_aoa(dataZoomWS, [[
+                tutor.tutorName,
+                tutor.beneficiaryBank,
+                '',
+                String(tutor.beneficiaryAccount), // Convert to string to preserve leading zeros
+                '',
+                'NIP',
+                tutor.dataZoomPayment,
+                'NGN',
+                'DATAZOOMALLOCT'
+            ]], { origin: -1 });
+        });
+        
+        XLSX.utils.book_append_sheet(dataZoomWB, dataZoomWS, 'DataZoom Allocation');
 
-        const tinRemittanceData = processedData.map(tutor => [
-            tutor.tutorName,
-            tutor.tinNumber || '',
-            tutor.tinRemittance,
-            'NGN',
-            monthYear
+        // Create TIN Remittance workbook
+        const tinWB = XLSX.utils.book_new();
+        const tinWS = XLSX.utils.aoa_to_sheet([
+            ['Tutor Name', 'TIN Number', 'Amount', 'Currency', 'Month']
         ]);
+        
+        processedData.forEach(tutor => {
+            XLSX.utils.sheet_add_aoa(tinWS, [[
+                tutor.tutorName,
+                String(tutor.tinNumber || ''), // Convert to string to preserve leading zeros
+                tutor.tinRemittance,
+                'NGN',
+                monthYear
+            ]], { origin: -1 });
+        });
+        
+        XLSX.utils.book_append_sheet(tinWB, tinWS, 'TIN Remittance');
 
-        const fullPayAdviceData = processedData.map(tutor => [
-            tutor.tutorName,
-            tutor.studentCount,
-            tutor.totalStudentFees,
-            tutor.managementFee,
-            tutor.totalPay,
-            tutor.giftAmount,
-            tutor.finalPay,
-            tutor.beneficiaryBank,
-            tutor.beneficiaryAccount,
-            tutor.tutorName
+        // Create Full PayAdvice workbook
+        const fullWB = XLSX.utils.book_new();
+        const fullWS = XLSX.utils.aoa_to_sheet([
+            ['Tutor Name', 'Student Count', 'Total Student Fees (₦)', 'Management Fee (₦)', 'Total Pay (₦)', 'Gift (₦)', 'Final Pay (₦)', 'Beneficiary Bank', 'Beneficiary Account', 'Beneficiary Name']
         ]);
+        
+        processedData.forEach(tutor => {
+            XLSX.utils.sheet_add_aoa(fullWS, [[
+                tutor.tutorName,
+                tutor.studentCount,
+                tutor.totalStudentFees,
+                tutor.managementFee,
+                tutor.totalPay,
+                tutor.giftAmount,
+                tutor.finalPay,
+                tutor.beneficiaryBank,
+                String(tutor.beneficiaryAccount), // Convert to string to preserve leading zeros
+                tutor.tutorName
+            ]], { origin: -1 });
+        });
+        
+        XLSX.utils.book_append_sheet(fullWB, fullWS, 'Full PayAdvice');
 
-        await downloadMultipleXLSFiles([
-            {
-                filename: `Main_Payment_${monthYear.replace(' ', '_')}.xls`,
-                data: mainPaymentData,
-                headers: ['Beneficiary name', 'Beneficiary Bank name', 'Beneficiary branch', 'Beneficiary account', 'Transaction Unique Reference number', 'payment method code', 'payment amount', 'payment currency', 'remarks']
-            },
-            {
-                filename: `DataZoom_Allocation_${monthYear.replace(' ', '_')}.xls`,
-                data: dataZoomData,
-                headers: ['Beneficiary name', 'Beneficiary Bank name', 'Beneficiary branch', 'Beneficiary account', 'Transaction Unique Reference number', 'payment method code', 'payment amount', 'payment currency', 'remarks']
-            },
-            {
-                filename: `TIN_Remittance_${monthYear.replace(' ', '_')}.xls`,
-                data: tinRemittanceData,
-                headers: ['Tutor Name', 'TIN Number', 'Amount', 'Currency', 'Month']
-            },
-            {
-                filename: `Full_PayAdvice_${monthYear.replace(' ', '_')}.xls`,
-                data: fullPayAdviceData,
-                headers: ['Tutor Name', 'Student Count', 'Total Student Fees (₦)', 'Management Fee (₦)', 'Total Pay (₦)', 'Gift (₦)', 'Final Pay (₦)', 'Beneficiary Bank', 'Beneficiary Account', 'Beneficiary Name']
-            }
-        ]);
+        // Download all files
+        XLSX.writeFile(mainPaymentWB, `Main_Payment_${monthYear.replace(' ', '_')}.xlsx`);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        XLSX.writeFile(dataZoomWB, `DataZoom_Allocation_${monthYear.replace(' ', '_')}.xlsx`);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        XLSX.writeFile(tinWB, `TIN_Remittance_${monthYear.replace(' ', '_')}.xlsx`);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        XLSX.writeFile(fullWB, `Full_PayAdvice_${monthYear.replace(' ', '_')}.xlsx`);
 
-        alert('All 4 XLS files downloaded successfully!');
+        alert('All 4 Excel files downloaded successfully!');
 
     } catch (error) {
-        console.error("Error exporting XLS files:", error);
-        alert("Failed to export XLS files. Please try again.");
+        console.error("Error exporting Excel files:", error);
+        alert("Failed to export Excel files. Please try again.");
     }
 }
 
-async function downloadMultipleXLSFiles(files) {
-    for (const file of files) {
-        await downloadAsXLS(file.data, file.headers, file.filename);
-        await new Promise(resolve => setTimeout(resolve, 500));
-    }
-}
-
-function downloadAsXLS(data, headers, filename) {
-    return new Promise((resolve) => {
-        let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Sheet1</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>';
-        html += '<table border="1">';
-        
-        html += '<tr>';
-        headers.forEach(header => {
-            html += `<th>${header}</th>`;
-        });
-        html += '</tr>';
-        
-        data.forEach(row => {
-            html += '<tr>';
-            row.forEach(cell => {
-                html += `<td>${cell}</td>`;
-            });
-            html += '</tr>';
-        });
-        
-        html += '</table></body></html>';
-        
-        const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        resolve();
-    });
-}
+// Remove the old downloadMultipleXLSFiles and downloadAsXLS functions as they're no longer needed
 
 // ======================================================
 // SUBSECTION 4.2: Referral Management Panel
@@ -9246,3 +9244,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
