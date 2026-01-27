@@ -4107,7 +4107,7 @@ window.switchTab = switchTab;
 window.settingsManager = settingsManager;
 
 // ============================================================================
-// SECTION 21: DYNAMIC HOMEWORK STATUS UPDATER
+// SECTION 21: DYNAMIC HOMEWORK STATUS UPDATER (FIXED)
 // ============================================================================
 
 class HomeworkStatusUpdater {
@@ -4116,6 +4116,8 @@ class HomeworkStatusUpdater {
         this.observer = null;
         this.checkInterval = null;
         this.isInitialized = false;
+        this.lastScanTime = 0;
+        this.scanDebounceMs = 1000;
     }
 
     initialize() {
@@ -4123,17 +4125,23 @@ class HomeworkStatusUpdater {
         
         console.log("📚 Initializing Homework Status Updater");
         
-        // Setup MutationObserver to detect new homework cards
-        this.setupMutationObserver();
-        
-        // Setup interval to periodically check for updates
-        this.setupIntervalCheck();
-        
-        // Initial scan
-        setTimeout(() => this.scanAndUpdateAllButtons(), 1000);
-        
-        this.isInitialized = true;
-        console.log("✅ Homework Status Updater initialized");
+        // Wait for page to fully load
+        setTimeout(() => {
+            // Setup MutationObserver to detect new homework cards
+            this.setupMutationObserver();
+            
+            // Setup interval to periodically check for updates
+            this.setupIntervalCheck();
+            
+            // Initial scan with delay to ensure cards are rendered
+            setTimeout(() => this.scanAndUpdateAllButtons(true), 2000);
+            
+            // Also scan after a longer delay for slower connections
+            setTimeout(() => this.scanAndUpdateAllButtons(true), 5000);
+            
+            this.isInitialized = true;
+            console.log("✅ Homework Status Updater initialized");
+        }, 1000);
     }
 
     setupMutationObserver() {
@@ -4141,63 +4149,94 @@ class HomeworkStatusUpdater {
             let shouldUpdate = false;
             
             mutations.forEach((mutation) => {
-                if (mutation.addedNodes.length > 0) {
-                    mutation.addedNodes.forEach((node) => {
-                        if (node.nodeType === 1) { // Element node
-                            if (node.matches?.('.bg-white.border.rounded-lg') || 
-                                node.querySelector?.('.bg-white.border.rounded-lg')) {
-                                shouldUpdate = true;
-                            }
-                        }
-                    });
+                if (mutation.addedNodes.length > 0 || mutation.type === 'childList') {
+                    shouldUpdate = true;
                 }
             });
             
             if (shouldUpdate) {
-                setTimeout(() => this.scanAndUpdateAllButtons(), 300);
+                const now = Date.now();
+                if (now - this.lastScanTime > this.scanDebounceMs) {
+                    this.lastScanTime = now;
+                    setTimeout(() => this.scanAndUpdateAllButtons(), 500);
+                }
             }
         });
         
+        // Observe the entire academics content area
         const target = document.getElementById('academicsContent');
         if (target) {
-            this.observer.observe(target, { childList: true, subtree: true });
+            this.observer.observe(target, { 
+                childList: true, 
+                subtree: true,
+                attributes: false,
+                characterData: false
+            });
+        } else {
+            // If academicsContent doesn't exist yet, retry
+            setTimeout(() => this.setupMutationObserver(), 1000);
         }
     }
 
     setupIntervalCheck() {
-        // Check for status updates every 30 seconds
+        // Check for status updates every 10 seconds
         this.checkInterval = setInterval(() => {
             this.scanAndUpdateAllButtons();
-        }, 30000);
+        }, 10000);
     }
 
-    async scanAndUpdateAllButtons() {
+    async scanAndUpdateAllButtons(force = false) {
+        const now = Date.now();
+        if (!force && now - this.lastScanTime < this.scanDebounceMs) {
+            return;
+        }
+        
+        this.lastScanTime = now;
+        
         const homeworkCards = document.querySelectorAll('#academicsContent .bg-white.border.rounded-lg');
         
-        for (const card of homeworkCards) {
-            await this.updateHomeworkButtonStatus(card);
+        if (homeworkCards.length === 0) {
+            return;
         }
+        
+        console.log(`🔍 Scanning ${homeworkCards.length} homework cards for updates...`);
+        
+        const updatePromises = Array.from(homeworkCards).map(card => 
+            this.updateHomeworkButtonStatus(card)
+        );
+        
+        await Promise.allSettled(updatePromises);
     }
 
     async updateHomeworkButtonStatus(card) {
-        // Find the title element to identify the homework
-        const titleEl = card.querySelector('h5');
-        if (!titleEl) return;
-        
-        const titleText = titleEl.textContent.trim();
-        if (!titleText) return;
-        
-        // Find the student for this card
-        const studentName = this.findStudentForCard(card);
-        if (!studentName) return;
-        
-        const studentId = studentIdMap.get(studentName);
-        if (!studentId) return;
-        
         try {
+            // Find the title element to identify the homework
+            const titleEl = card.querySelector('h5');
+            if (!titleEl) return;
+            
+            const titleText = titleEl.textContent.trim();
+            if (!titleText) return;
+            
+            // Find the student for this card
+            const studentName = this.findStudentForCard(card);
+            if (!studentName) return;
+            
+            const studentId = studentIdMap.get(studentName);
+            if (!studentId) {
+                console.log(`⚠️ No student ID found for: ${studentName}`);
+                return;
+            }
+            
             // Find the homework in database
             const homework = await this.findHomeworkByTitle(studentId, titleText);
-            if (!homework) return;
+            if (!homework) {
+                // Try to match by partial title
+                const partialMatch = await this.findHomeworkByPartialTitle(studentId, titleText);
+                if (partialMatch) {
+                    this.updateButtonAppearance(card, partialMatch);
+                }
+                return;
+            }
             
             // Update the button based on status
             this.updateButtonAppearance(card, homework);
@@ -4209,72 +4248,141 @@ class HomeworkStatusUpdater {
 
     async findHomeworkByTitle(studentId, title) {
         try {
+            // Clean the title for better matching
+            const cleanTitle = title.replace(/\s+/g, ' ').trim();
+            
+            // Try exact match first
             const snapshot = await db.collection('homework_assignments')
                 .where('studentId', '==', studentId)
-                .where('title', '==', title)
+                .where('title', '==', cleanTitle)
                 .limit(1)
                 .get();
             
             if (!snapshot.empty) {
                 const doc = snapshot.docs[0];
-                return { id: doc.id, ...doc.data() };
+                const data = doc.data();
+                return { 
+                    id: doc.id, 
+                    ...data,
+                    dueTimestamp: data.dueDate ? getTimestamp(data.dueDate) : null
+                };
             }
             
-            // Try broader search
-            const allSnapshot = await db.collection('homework_assignments')
+            return null;
+        } catch (error) {
+            console.error('Error finding homework by title:', error);
+            return null;
+        }
+    }
+
+    async findHomeworkByPartialTitle(studentId, partialTitle) {
+        try {
+            const snapshot = await db.collection('homework_assignments')
                 .where('studentId', '==', studentId)
                 .get();
             
-            for (const doc of allSnapshot.docs) {
+            if (snapshot.empty) return null;
+            
+            // Clean the search title
+            const searchTitle = partialTitle.toLowerCase().replace(/\s+/g, ' ').trim();
+            
+            for (const doc of snapshot.docs) {
                 const data = doc.data();
-                if ((data.title || data.subject) === title) {
-                    return { id: doc.id, ...data };
+                const homeworkTitle = (data.title || data.subject || '').toLowerCase();
+                
+                // Check for partial match
+                if (homeworkTitle.includes(searchTitle) || searchTitle.includes(homeworkTitle)) {
+                    return { 
+                        id: doc.id, 
+                        ...data,
+                        dueTimestamp: data.dueDate ? getTimestamp(data.dueDate) : null
+                    };
                 }
             }
             
             return null;
         } catch (error) {
-            console.error('Error finding homework:', error);
+            console.error('Error finding homework by partial title:', error);
             return null;
         }
     }
 
     findStudentForCard(card) {
-        // Try to find the student name from the card hierarchy
-        let currentElement = card;
-        
-        for (let i = 0; i < 10; i++) { // Limit depth search
-            const studentSection = currentElement.closest('[id^="academics-student-"]');
-            if (studentSection) {
-                const id = studentSection.id;
-                return id.replace('academics-student-', '');
-            }
-            
-            if (!currentElement.parentElement) break;
-            currentElement = currentElement.parentElement;
+        // Method 1: Check for student name in nearby elements
+        const studentNameElement = card.closest('[id^="academics-student-"]');
+        if (studentNameElement) {
+            const id = studentNameElement.id;
+            const studentName = id.replace('academics-student-', '');
+            if (studentName) return studentName;
         }
         
-        // Fallback: check student selector
+        // Method 2: Look for student name in the card hierarchy
+        let parent = card.parentElement;
+        for (let i = 0; i < 5; i++) {
+            if (!parent) break;
+            
+            // Look for h2 or h3 with student name
+            const studentHeaders = parent.querySelectorAll('h2, h3');
+            for (const header of studentHeaders) {
+                const text = header.textContent || '';
+                if (text.length < 50 && !text.includes('Session Topics') && !text.includes('Homework')) {
+                    // This might be a student name
+                    const possibleName = text.replace(/\s*\(Pending Registration\)\s*/, '').trim();
+                    if (possibleName && userChildren.includes(possibleName)) {
+                        return possibleName;
+                    }
+                }
+            }
+            
+            parent = parent.parentElement;
+        }
+        
+        // Method 3: Use the student selector
         const selector = document.getElementById('studentSelector');
-        return selector ? selector.value : null;
+        if (selector && selector.value) {
+            return selector.value;
+        }
+        
+        // Method 4: Use the first student if only one exists
+        if (userChildren.length === 1) {
+            return userChildren[0];
+        }
+        
+        console.log('Could not determine student for homework card');
+        return null;
     }
 
     updateButtonAppearance(card, homework) {
-        const existingButton = card.querySelector('.gc-inject-btn button');
-        if (!existingButton) return;
+        // Find or create button container
+        let buttonContainer = card.querySelector('.gc-inject-btn');
+        if (!buttonContainer) {
+            // Create button container if it doesn't exist
+            buttonContainer = document.createElement('div');
+            buttonContainer.className = 'mt-4 pt-3 border-t border-gray-100 flex justify-end gc-inject-btn fade-in';
+            card.appendChild(buttonContainer);
+        }
         
+        // Create or update button
+        let button = buttonContainer.querySelector('button');
+        if (!button) {
+            button = document.createElement('button');
+            button.className = 'flex items-center gap-2 bg-white text-blue-600 border border-blue-200 px-4 py-2 rounded-full text-sm font-medium hover:opacity-90 transition-all shadow-sm group';
+            button.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.openHomeworkDetails(homework);
+            };
+            buttonContainer.appendChild(button);
+        }
+        
+        // Update button based on status
         const status = homework.status || 'assigned';
         const isGraded = status === 'graded';
         const isSubmitted = ['submitted', 'completed', 'graded'].includes(status);
         const grade = homework.grade || homework.score;
         
         // Remove all existing status classes
-        existingButton.classList.remove(
-            'bg-white', 'text-blue-600', 'border-blue-200',
-            'bg-green-100', 'text-green-700', 'border-green-300',
-            'bg-purple-100', 'text-purple-700', 'border-purple-300',
-            'bg-gray-100', 'text-gray-700', 'border-gray-300'
-        );
+        button.className = button.className.replace(/bg-\w+-\d+ text-\w+-\d+ border-\w+-\d+/g, '');
         
         let icon = '📤';
         let text = 'Turn In / View Details';
@@ -4291,71 +4399,136 @@ class HomeworkStatusUpdater {
         }
         
         // Update button appearance
-        existingButton.className = `flex items-center gap-2 ${bgClass} px-4 py-2 rounded-full text-sm font-medium hover:opacity-90 transition-all shadow-sm group`;
-        existingButton.innerHTML = `
+        button.className = `flex items-center gap-2 ${bgClass} px-4 py-2 rounded-full text-sm font-medium hover:opacity-90 transition-all shadow-sm group`;
+        button.innerHTML = `
             <span class="group-hover:scale-110 transition-transform">${icon}</span> 
             <span>${text}</span>
         `;
         
-        // Update tooltip/status indicator
-        this.addStatusTooltip(card, homework);
+        // Update the click handler
+        button.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.openHomeworkDetails(homework);
+        };
+        
+        // Add or update tooltip
+        this.addStatusTooltip(buttonContainer, homework, button);
     }
 
-    addStatusTooltip(card, homework) {
+    addStatusTooltip(container, homework, button) {
         // Remove existing tooltip
-        const existingTooltip = card.querySelector('.homework-status-tooltip');
+        const existingTooltip = container.querySelector('.homework-status-tooltip');
         if (existingTooltip) existingTooltip.remove();
         
         const status = homework.status || 'assigned';
-        const dueDate = homework.dueDate ? new Date(homework.dueTimestamp || getTimestamp(homework.dueDate)) : null;
-        const submittedDate = homework.submittedAt ? new Date(getTimestamp(homework.submittedAt)) : null;
+        const dueDate = homework.dueTimestamp ? new Date(homework.dueTimestamp) : 
+                       homework.dueDate ? new Date(getTimestamp(homework.dueDate)) : null;
+        const submittedDate = homework.submittedAt ? new Date(getTimestamp(homework.submittedAt)) : 
+                             homework.submissionDate ? new Date(getTimestamp(homework.submissionDate)) : null;
         
         let tooltipHtml = '';
         
         if (status === 'graded') {
-            const grade = homework.grade || homework.score;
-            const feedback = homework.feedback ? `<div class="mt-1 text-xs">"${safeText(homework.feedback.substring(0, 50))}..."</div>` : '';
+            const grade = homework.grade || homework.score || 'N/A';
+            const feedback = homework.feedback ? 
+                `<div class="mt-1 text-xs text-gray-700">"${safeText(homework.feedback.substring(0, 60))}${homework.feedback.length > 60 ? '...' : ''}"</div>` : '';
+            
             tooltipHtml = `
-                <div class="homework-status-tooltip absolute top-full left-0 mt-1 w-64 bg-white border border-gray-300 rounded-lg shadow-lg p-3 z-50 hidden group-hover:block">
-                    <div class="font-bold text-purple-700 text-sm">✅ Graded</div>
-                    <div class="text-xs text-gray-600 mt-1">
-                        <div>Score: <span class="font-bold">${grade}%</span></div>
-                        ${submittedDate ? `<div>Submitted: ${submittedDate.toLocaleDateString()}</div>` : ''}
+                <div class="homework-status-tooltip absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-72 bg-white border border-gray-300 rounded-lg shadow-xl p-3 z-50 hidden group-hover:block">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-lg">✅</span>
+                        <div class="font-bold text-purple-700 text-sm">Assignment Graded</div>
+                    </div>
+                    <div class="text-xs text-gray-600 space-y-1">
+                        <div><span class="font-medium">Score:</span> <span class="font-bold text-purple-700">${grade}%</span></div>
+                        ${submittedDate ? `<div><span class="font-medium">Submitted:</span> ${submittedDate.toLocaleDateString()}</div>` : ''}
+                        ${dueDate ? `<div><span class="font-medium">Due:</span> ${dueDate.toLocaleDateString()}</div>` : ''}
                         ${feedback}
                     </div>
                 </div>
             `;
         } else if (status === 'submitted' || status === 'completed') {
             tooltipHtml = `
-                <div class="homework-status-tooltip absolute top-full left-0 mt-1 w-64 bg-white border border-gray-300 rounded-lg shadow-lg p-3 z-50 hidden group-hover:block">
-                    <div class="font-bold text-green-700 text-sm">📨 Submitted</div>
-                    <div class="text-xs text-gray-600 mt-1">
-                        <div>Awaiting tutor review</div>
-                        ${submittedDate ? `<div>Submitted: ${submittedDate.toLocaleDateString()}</div>` : ''}
-                        ${dueDate ? `<div>Due: ${dueDate.toLocaleDateString()}</div>` : ''}
+                <div class="homework-status-tooltip absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-72 bg-white border border-gray-300 rounded-lg shadow-xl p-3 z-50 hidden group-hover:block">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-lg">📨</span>
+                        <div class="font-bold text-green-700 text-sm">Assignment Submitted</div>
+                    </div>
+                    <div class="text-xs text-gray-600 space-y-1">
+                        <div>Awaiting tutor review and grading</div>
+                        ${submittedDate ? `<div><span class="font-medium">Submitted:</span> ${submittedDate.toLocaleDateString()}</div>` : ''}
+                        ${dueDate ? `<div><span class="font-medium">Due:</span> ${dueDate.toLocaleDateString()}</div>` : ''}
+                        <div class="mt-2 text-blue-600 text-xs">Click to view submission details</div>
                     </div>
                 </div>
             `;
         } else {
+            const isOverdue = dueDate && dueDate < new Date();
+            
             tooltipHtml = `
-                <div class="homework-status-tooltip absolute top-full left-0 mt-1 w-64 bg-white border border-gray-300 rounded-lg shadow-lg p-3 z-50 hidden group-hover:block">
-                    <div class="font-bold text-blue-700 text-sm">📤 Turn In</div>
-                    <div class="text-xs text-gray-600 mt-1">
-                        <div>Click to submit or view details</div>
-                        ${dueDate ? `<div>Due: ${dueDate.toLocaleDateString()}</div>` : ''}
-                        ${dueDate && dueDate < new Date() ? '<div class="text-red-600 font-bold">⚠️ Overdue</div>' : ''}
+                <div class="homework-status-tooltip absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-72 bg-white border border-gray-300 rounded-lg shadow-xl p-3 z-50 hidden group-hover:block">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-lg">📤</span>
+                        <div class="font-bold text-blue-700 text-sm">Turn In Assignment</div>
+                    </div>
+                    <div class="text-xs text-gray-600 space-y-1">
+                        <div>Click to submit or view assignment details</div>
+                        ${dueDate ? `<div><span class="font-medium">Due:</span> ${dueDate.toLocaleDateString()}</div>` : ''}
+                        ${isOverdue ? '<div class="text-red-600 font-bold mt-1">⚠️ OVERDUE</div>' : ''}
+                        <div class="mt-2 text-blue-600 text-xs">Click to open assignment</div>
                     </div>
                 </div>
             `;
         }
         
-        const buttonContainer = card.querySelector('.gc-inject-btn');
-        if (buttonContainer) {
-            const tooltipDiv = document.createElement('div');
-            tooltipDiv.innerHTML = tooltipHtml;
-            buttonContainer.appendChild(tooltipDiv.firstElementChild);
-            buttonContainer.style.position = 'relative';
+        const tooltipDiv = document.createElement('div');
+        tooltipDiv.innerHTML = tooltipHtml;
+        container.appendChild(tooltipDiv.firstElementChild);
+        container.style.position = 'relative';
+        
+        // Show tooltip on hover
+        button.addEventListener('mouseenter', () => {
+            const tooltip = container.querySelector('.homework-status-tooltip');
+            if (tooltip) tooltip.classList.remove('hidden');
+        });
+        
+        button.addEventListener('mouseleave', () => {
+            const tooltip = container.querySelector('.homework-status-tooltip');
+            if (tooltip) tooltip.classList.add('hidden');
+        });
+    }
+
+    openHomeworkDetails(homework) {
+        if (!homework || !homework.id) {
+            showMessage('Homework details not available', 'error');
+            return;
         }
+        
+        // Find student ID for this homework
+        const studentName = this.findStudentForHomework(homework);
+        const studentId = studentName ? studentIdMap.get(studentName) : null;
+        
+        if (studentId) {
+            openGoogleClassroomModal(homework, studentId);
+        } else {
+            showMessage('Could not find student for this homework', 'error');
+        }
+    }
+
+    findStudentForHomework(homework) {
+        // Try to find student by ID
+        if (homework.studentId) {
+            for (const [name, id] of studentIdMap.entries()) {
+                if (id === homework.studentId) {
+                    return name;
+                }
+            }
+        }
+        
+        // Fallback to current selector
+        const selector = document.getElementById('studentSelector');
+        return selector ? selector.value : (userChildren[0] || null);
     }
 
     cleanup() {
@@ -4381,44 +4554,70 @@ class HomeworkStatusUpdater {
 // Initialize the updater
 const homeworkStatusUpdater = new HomeworkStatusUpdater();
 
-// Add to initialization function
+// Initialize function
 function initializeHomeworkStatusUpdater() {
     homeworkStatusUpdater.initialize();
 }
 
-// Add cleanup to existing cleanup function
+// Enhanced cleanup function
 function enhancedCleanupRealTimeListeners() {
     cleanupRealTimeListeners();
     homeworkStatusUpdater.cleanup();
 }
 
-// Replace the existing cleanup call in your code
-// Find: cleanupRealTimeListeners();
-// Replace with: enhancedCleanupRealTimeListeners();
-
 // ============================================================================
-// INTEGRATION WITH EXISTING CODE
+// INTEGRATION POINTS
 // ============================================================================
 
-// Add this to your DOMContentLoaded event listener:
+// 1. Add this to the DOMContentLoaded event
 document.addEventListener('DOMContentLoaded', function() {
     // ... existing code ...
     
-    // Initialize homework status updater
-    setTimeout(() => initializeHomeworkStatusUpdater(), 1500);
+    // Initialize homework status updater when academics tab is loaded
+    const academicsTab = document.getElementById('academicsTab');
+    if (academicsTab) {
+        academicsTab.addEventListener('click', () => {
+            setTimeout(() => initializeHomeworkStatusUpdater(), 1000);
+        });
+    }
     
-    // ... existing code ...
+    // Also initialize after page load
+    setTimeout(() => initializeHomeworkStatusUpdater(), 3000);
 });
 
-// Update the existing scanAndInjectButtons function to use our updater
-// Replace the existing setInterval for scanAndInjectButtons with:
+// 2. Replace the existing cleanup call
+// Find all occurrences of cleanupRealTimeListeners() and replace with:
+// enhancedCleanupRealTimeListeners();
+
+// 3. Update the existing scanAndInjectButtons interval
+// Replace:
+// setInterval(scanAndInjectButtons, 2000);
+// With:
 setInterval(() => {
     scanAndInjectButtons();
-    homeworkStatusUpdater.scanAndUpdateAllButtons();
-}, 2000);
+    if (homeworkStatusUpdater.isInitialized) {
+        homeworkStatusUpdater.scanAndUpdateAllButtons();
+    }
+}, 3000);
 
-// Make global for debugging
+// 4. Make sure the updater runs when loadAcademicsData completes
+// Add after loadAcademicsData() calls:
+const originalLoadAcademicsData = window.loadAcademicsData;
+window.loadAcademicsData = async function(...args) {
+    const result = await originalLoadAcademicsData.apply(this, args);
+    setTimeout(() => {
+        if (!homeworkStatusUpdater.isInitialized) {
+            initializeHomeworkStatusUpdater();
+        } else {
+            homeworkStatusUpdater.scanAndUpdateAllButtons(true);
+        }
+    }, 1500);
+    return result;
+};
+
+// 5. Make global for debugging
 window.homeworkStatusUpdater = homeworkStatusUpdater;
+window.initializeHomeworkStatusUpdater = initializeHomeworkStatusUpdater;
 
 // ============================================================================
 // END OF PARENT.JS - PRODUCTION READY
