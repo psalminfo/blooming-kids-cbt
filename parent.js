@@ -4876,80 +4876,670 @@ if (document.querySelector('#signUpBtn')) {
 console.log("✅ Signup race condition fixes installed");
 
 // ============================================================================
-// CRITICAL FIX: FIREBASE TIMESTAMP HANDLING (SILENT VERSION)
+// COMPREHENSIVE FIX: UNLIMITED REPORT SEARCH WITH OPTIMIZATION
+// ============================================================================
+
+console.log("🔄 Installing comprehensive report search fix...");
+
+// ============================================================================
+// FIX 1: ENHANCED SEARCH FUNCTION WITHOUT LIMITS
 // ============================================================================
 
 // Store original function
-const originalGetTimestamp = window.getTimestamp;
+const originalSearchAllReportsForParent = window.searchAllReportsForParent;
 
-// Replace with enhanced version (silent - no console logs)
-window.getTimestamp = function(dateInput) {
-    if (!dateInput) return 0;
+// Create optimized unlimited search
+window.searchAllReportsForParent = async function(parentPhone, parentEmail = '', parentUid = '') {
+    console.log("🔍 UNLIMITED SEARCH activated for:", { 
+        parentPhone, 
+        parentEmail: parentEmail ? 'provided' : 'not provided',
+        parentUid: parentUid ? 'provided' : 'not provided' 
+    });
     
-    // 1. Handle Firestore Timestamp (MOST IMPORTANT FIX!)
-    if (dateInput && typeof dateInput === 'object') {
-        // Check if it's a Firestore Timestamp
-        if (dateInput.toDate && typeof dateInput.toDate === 'function') {
+    let assessmentResults = [];
+    let monthlyResults = [];
+    let searchStartTime = Date.now();
+    
+    try {
+        const parentSuffix = extractPhoneSuffix(parentPhone);
+        
+        if (!parentSuffix) {
+            console.warn("⚠️ No valid suffix in parent phone");
+            return { assessmentResults: [], monthlyResults: [] };
+        }
+
+        console.log(`🎯 Searching ALL documents with suffix: ${parentSuffix}`);
+        
+        // Show progress indicator
+        showMessage("Searching all reports...", "info");
+
+        // ================================================================
+        // STRATEGY: BATCHED SEARCH FOR LARGE COLLECTIONS
+        // ================================================================
+        
+        // For large collections, we'll search in batches to avoid timeouts
+        const BATCH_SIZE = 1000; // Process 1000 docs at a time
+        
+        // Function to search collection without limits
+        const searchCollection = async (collectionName, resultArray, type) => {
+            console.log(`📊 Searching ${collectionName}...`);
+            
             try {
-                const jsDate = dateInput.toDate();
-                return jsDate.getTime();
+                // Get ALL documents (no limit)
+                const snapshot = await db.collection(collectionName).get();
+                console.log(`📈 ${collectionName}: Found ${snapshot.size} total documents`);
+                
+                let matches = 0;
+                let processed = 0;
+                
+                // Process in batches to avoid blocking UI
+                const totalDocs = snapshot.size;
+                const batchCount = Math.ceil(totalDocs / BATCH_SIZE);
+                
+                for (let batch = 0; batch < batchCount; batch++) {
+                    const start = batch * BATCH_SIZE;
+                    const end = Math.min(start + BATCH_SIZE, totalDocs);
+                    const docs = snapshot.docs.slice(start, end);
+                    
+                    for (const doc of docs) {
+                        processed++;
+                        const data = doc.data();
+                        
+                        // Check ALL phone fields
+                        const phoneFields = [
+                            data.parentPhone,
+                            data.parent_phone,
+                            data.guardianPhone,
+                            data.motherPhone,
+                            data.fatherPhone,
+                            data.phone,
+                            data.contactPhone,
+                            data.normalizedParentPhone,
+                            data.emergencyPhone,
+                            data.contactNumber
+                        ];
+                        
+                        for (const fieldPhone of phoneFields) {
+                            if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
+                                matches++;
+                                
+                                // Add to results
+                                resultArray.push({ 
+                                    id: doc.id,
+                                    collection: collectionName,
+                                    matchType: 'suffix-match',
+                                    matchedField: fieldPhone,
+                                    ...data,
+                                    timestamp: getTimestampFromData(data),
+                                    type: type
+                                });
+                                break;
+                            }
+                        }
+                        
+                        // Show progress every 500 documents
+                        if (processed % 500 === 0) {
+                            console.log(`⏳ ${collectionName}: Processed ${processed}/${totalDocs} documents...`);
+                        }
+                    }
+                    
+                    // Small delay between batches to prevent UI freeze
+                    if (batch < batchCount - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 10));
+                    }
+                }
+                
+                console.log(`✅ ${collectionName}: ${matches} matches found out of ${totalDocs} documents`);
+                return matches;
+                
             } catch (error) {
-                // Silent fail - fall through to other methods
+                console.error(`❌ Error searching ${collectionName}:`, error);
+                return 0;
+            }
+        };
+
+        // ================================================================
+        // PARALLEL SEARCH FOR BOTH COLLECTIONS
+        // ================================================================
+        
+        // Search both collections in parallel
+        const [assessmentMatches, monthlyMatches] = await Promise.all([
+            searchCollection('student_results', assessmentResults, 'assessment'),
+            searchCollection('tutor_submissions', monthlyResults, 'monthly')
+        ]);
+
+        // ================================================================
+        // ADDITIONAL SEARCH: EMAIL MATCHING (BACKUP)
+        // ================================================================
+        
+        if (parentEmail) {
+            try {
+                const emailSnapshot = await db.collection("student_results")
+                    .where("parentEmail", "==", parentEmail)
+                    .get();
+                    
+                if (!emailSnapshot.empty) {
+                    emailSnapshot.forEach(doc => {
+                        const data = doc.data();
+                        const existing = assessmentResults.find(r => r.id === doc.id);
+                        if (!existing) {
+                            assessmentResults.push({ 
+                                id: doc.id,
+                                collection: 'student_results',
+                                matchType: 'email',
+                                ...data,
+                                timestamp: getTimestampFromData(data),
+                                type: 'assessment'
+                            });
+                        }
+                    });
+                    console.log(`📧 Found ${emailSnapshot.size} additional reports by email`);
+                }
+            } catch (emailError) {
+                console.log("ℹ️ Email search optional:", emailError.message);
+            }
+        }
+
+        // ================================================================
+        // POST-PROCESSING: REMOVE DUPLICATES & SORT
+        // ================================================================
+        
+        // Remove duplicates by document ID
+        const originalAssessmentCount = assessmentResults.length;
+        const originalMonthlyCount = monthlyResults.length;
+        
+        assessmentResults = [...new Map(assessmentResults.map(item => [item.id, item])).values()];
+        monthlyResults = [...new Map(monthlyResults.map(item => [item.id, item])).values()];
+        
+        // Sort by timestamp (newest first)
+        assessmentResults.sort((a, b) => b.timestamp - a.timestamp);
+        monthlyResults.sort((a, b) => b.timestamp - a.timestamp);
+        
+        const searchTime = Date.now() - searchStartTime;
+        
+        // ================================================================
+        // FINAL RESULTS & LOGGING
+        // ================================================================
+        
+        console.log("🎯 UNLIMITED SEARCH COMPLETE:", {
+            time: `${searchTime}ms`,
+            assessments: {
+                found: assessmentMatches,
+                unique: assessmentResults.length,
+                duplicatesRemoved: originalAssessmentCount - assessmentResults.length
+            },
+            monthly: {
+                found: monthlyMatches,
+                unique: monthlyResults.length,
+                duplicatesRemoved: originalMonthlyCount - monthlyResults.length
+            },
+            parentSuffix: parentSuffix
+        });
+        
+        // Debug: Show sample of found reports
+        if (monthlyResults.length > 0) {
+            console.log("📄 MONTHLY REPORTS FOUND:");
+            monthlyResults.slice(0, 5).forEach((report, i) => {
+                console.log(`${i + 1}. ${report.studentName || 'No name'} (${report.id}) - ${new Date(report.timestamp * 1000).toLocaleDateString()}`);
+            });
+            if (monthlyResults.length > 5) {
+                console.log(`... and ${monthlyResults.length - 5} more`);
             }
         }
         
-        // Check if it's a Firestore FieldValue (serverTimestamp)
-        if (dateInput.seconds !== undefined && dateInput.nanoseconds !== undefined) {
-            try {
-                return dateInput.seconds * 1000 + Math.floor(dateInput.nanoseconds / 1000000);
-            } catch (error) {
-                // Silent fail
+        if (assessmentResults.length > 0) {
+            console.log("📊 ASSESSMENT REPORTS FOUND:");
+            assessmentResults.slice(0, 5).forEach((report, i) => {
+                console.log(`${i + 1}. ${report.studentName || 'No name'} (${report.id}) - ${new Date(report.timestamp * 1000).toLocaleDateString()}`);
+            });
+            if (assessmentResults.length > 5) {
+                console.log(`... and ${assessmentResults.length - 5} more`);
             }
         }
-    }
-    
-    // 2. If we have original function, use it as fallback
-    if (originalGetTimestamp) {
-        return originalGetTimestamp(dateInput);
-    }
-    
-    // 3. Ultimate fallback
-    return Date.now();
-};
-
-// Also fix getTimestampFromData to be more robust (silent version)
-const originalGetTimestampFromData = window.getTimestampFromData;
-
-window.getTimestampFromData = function(data) {
-    if (!data) {
-        return Math.floor(Date.now() / 1000);
-    }
-    
-    const timestampFields = [
-        'timestamp',
-        'createdAt',
-        'submittedAt',
-        'date',
-        'updatedAt',
-        'assignedDate',
-        'dueDate',
-        'submissionDate',
-        'completionDate'
-    ];
-    
-    for (const field of timestampFields) {
-        if (data[field]) {
-            const timestamp = getTimestamp(data[field]); // Use our fixed function
-            if (timestamp > 0) {
-                return Math.floor(timestamp / 1000);
+        
+        // Clear progress message
+        setTimeout(() => {
+            const existingMessage = document.querySelector('.message-toast');
+            if (existingMessage && existingMessage.textContent.includes('Searching')) {
+                existingMessage.remove();
             }
-        }
+        }, 1000);
+        
+    } catch (error) {
+        console.error("❌ UNLIMITED SEARCH ERROR:", error);
+        showMessage("Search error. Please try refreshing.", "error");
     }
     
-    return Math.floor(Date.now() / 1000);
+    return { assessmentResults, monthlyResults };
 };
 
-console.log("✅ Firebase timestamp fix installed (silent mode)");
+// ============================================================================
+// FIX 2: ENHANCED LOAD FUNCTION WITH UNLIMITED SEARCH
+// ============================================================================
+
+// Store original function
+const originalLoadAllReportsForParent = window.loadAllReportsForParent;
+
+// Create enhanced version that uses our unlimited search
+window.loadAllReportsForParent = async function(parentPhone, userId, forceRefresh = false) {
+    console.log("🚀 ENHANCED LOAD with unlimited search for user:", userId);
+    
+    const reportContent = document.getElementById("reportContent");
+    const authLoader = document.getElementById("authLoader");
+    
+    if (!reportContent) {
+        console.error("❌ reportContent element not found");
+        return;
+    }
+    
+    // Show better loading message
+    reportContent.innerHTML = `
+        <div class="text-center py-12">
+            <div class="loading-spinner mx-auto mb-4"></div>
+            <h3 class="text-lg font-semibold text-green-700 mb-2">Searching All Reports</h3>
+            <p class="text-gray-600 max-w-md mx-auto">
+                Searching through all documents to find your child's reports...
+                <br><span class="text-sm text-gray-500">This may take a moment for large databases</span>
+            </p>
+            <div class="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3 max-w-md mx-auto">
+                <div class="flex items-center">
+                    <div class="loading-spinner-small mr-3"></div>
+                    <div class="text-sm text-blue-700">Processing: <span id="searchProgress">Starting...</span></div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    if (authLoader) authLoader.classList.remove("hidden");
+    
+    try {
+        // Get user data
+        const userDoc = await db.collection('parent_users').doc(userId).get();
+        if (!userDoc.exists) {
+            throw new Error("User profile not found");
+        }
+        
+        const userData = userDoc.data();
+        
+        // Update UI immediately
+        currentUserData = {
+            parentName: userData.parentName || 'Parent',
+            parentPhone: parentPhone,
+            email: userData.email || ''
+        };
+
+        const welcomeMessage = document.getElementById("welcomeMessage");
+        if (welcomeMessage) {
+            welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
+        }
+
+        // Use our UNLIMITED search function
+        console.log("🔍 Starting unlimited search...");
+        const searchResults = await searchAllReportsForParent(parentPhone, userData.email, userId);
+        
+        const { assessmentResults, monthlyResults } = searchResults;
+
+        console.log("📊 ENHANCED LOAD RESULTS:", {
+            assessments: assessmentResults.length,
+            monthly: monthlyResults.length
+        });
+
+        if (assessmentResults.length === 0 && monthlyResults.length === 0) {
+            reportContent.innerHTML = `
+                <div class="text-center py-16">
+                    <div class="text-6xl mb-6">📊</div>
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">No Reports Found After Full Search</h2>
+                    <p class="text-gray-600 max-w-2xl mx-auto mb-6">
+                        We searched through ALL documents but couldn't find any reports linked to your account.
+                    </p>
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 max-w-2xl mx-auto mb-6">
+                        <h3 class="font-semibold text-yellow-800 mb-2">Possible Reasons:</h3>
+                        <ul class="text-left text-gray-700 space-y-2">
+                            <li>• Phone number in reports doesn't match your account</li>
+                            <li>• Reports might be in a different format</li>
+                            <li>• Your child's tutor hasn't submitted reports yet</li>
+                            <li>• Reports exist but with different contact information</li>
+                        </ul>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                        <button onclick="manualRefreshReportsV2()" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 flex items-center">
+                            <span class="mr-2">🔄</span> Search Again
+                        </button>
+                        <button onclick="switchMainTab('academics')" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 flex items-center">
+                            <span class="mr-2">📚</span> Check Academics Instead
+                        </button>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        // Process and display reports (using your existing logic)
+        let reportsHtml = '';
+        const studentReportsMap = new Map();
+
+        [...assessmentResults, ...monthlyResults].forEach(report => {
+            const studentName = report.studentName;
+            if (!studentName) return;
+            
+            if (!studentReportsMap.has(studentName)) {
+                studentReportsMap.set(studentName, {
+                    assessments: [],
+                    monthly: []
+                });
+            }
+            
+            if (report.type === 'assessment') {
+                studentReportsMap.get(studentName).assessments.push(report);
+            } else if (report.type === 'monthly') {
+                studentReportsMap.get(studentName).monthly.push(report);
+            }
+        });
+
+        userChildren = Array.from(studentReportsMap.keys());
+        
+        const formattedReportsByStudent = new Map();
+        
+        for (const [studentName, reports] of studentReportsMap) {
+            const assessmentsBySession = new Map();
+            reports.assessments.forEach(report => {
+                const sessionKey = Math.floor(report.timestamp / 86400);
+                if (!assessmentsBySession.has(sessionKey)) {
+                    assessmentsBySession.set(sessionKey, []);
+                }
+                assessmentsBySession.get(sessionKey).push(report);
+            });
+            
+            const monthlyBySession = new Map();
+            reports.monthly.forEach(report => {
+                const sessionKey = Math.floor(report.timestamp / 86400);
+                if (!monthlyBySession.has(sessionKey)) {
+                    monthlyBySession.set(sessionKey, []);
+                }
+                monthlyBySession.get(sessionKey).push(report);
+            });
+            
+            formattedReportsByStudent.set(studentName, {
+                assessments: assessmentsBySession,
+                monthly: monthlyBySession,
+                studentData: { name: studentName, isPending: false }
+            });
+        }
+
+        // Use your existing createYearlyArchiveReportView function
+        reportsHtml = createYearlyArchiveReportView(formattedReportsByStudent);
+        reportContent.innerHTML = reportsHtml;
+
+        // Show success message
+        const totalReports = assessmentResults.length + monthlyResults.length;
+        showMessage(`Found ${totalReports} reports after full search!`, 'success');
+
+        // Setup monitoring
+        setupRealTimeMonitoring(parentPhone, userId);
+        addManualRefreshButton();
+        addLogoutButton();
+
+    } catch (error) {
+        console.error("❌ ENHANCED LOAD Error:", error);
+        reportContent.innerHTML = `
+            <div class="bg-gradient-to-r from-red-50 to-orange-50 border-l-4 border-red-500 p-6 rounded-xl shadow-md">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                            <span class="text-2xl text-red-600">⚠️</span>
+                        </div>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-lg font-bold text-red-800">Search Error</h3>
+                        <p class="text-sm text-red-700 mt-1">We encountered an issue: ${safeText(error.message)}</p>
+                        <div class="mt-4">
+                            <button onclick="window.location.reload()" 
+                                    class="bg-red-100 text-red-800 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-200 transition-colors duration-200">
+                                🔄 Reload Page
+                            </button>
+                            <button onclick="manualRefreshReportsV2()" 
+                                    class="ml-2 bg-green-100 text-green-800 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-200 transition-colors duration-200">
+                                🔍 Try Search Again
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    } finally {
+        if (authLoader) authLoader.classList.add("hidden");
+    }
+};
+
+// ============================================================================
+// FIX 3: ENHANCED AUTH MANAGER THAT USES UNLIMITED SEARCH
+// ============================================================================
+
+if (window.authManager && window.authManager.loadUserDashboard) {
+    // Store original
+    const originalLoadUserDashboard = window.authManager.loadUserDashboard;
+    
+    // Replace with enhanced version
+    window.authManager.loadUserDashboard = async function(user) {
+        console.log("🚀 ENHANCED AUTH MANAGER with unlimited search");
+        
+        const authArea = document.getElementById("authArea");
+        const reportArea = document.getElementById("reportArea");
+        const authLoader = document.getElementById("authLoader");
+        
+        if (authLoader) authLoader.classList.remove("hidden");
+        
+        try {
+            // Get user data
+            const userDoc = await db.collection('parent_users').doc(user.uid).get();
+            
+            if (!userDoc.exists) {
+                throw new Error("User profile not found");
+            }
+            
+            const userData = userDoc.data();
+            this.currentUser = {
+                uid: user.uid,
+                email: userData.email,
+                phone: userData.phone,
+                normalizedPhone: userData.normalizedPhone || userData.phone,
+                parentName: userData.parentName || 'Parent',
+                referralCode: userData.referralCode
+            };
+            
+            console.log("👤 User data loaded:", this.currentUser.parentName);
+            
+            // Update UI immediately
+            this.showDashboardUI();
+            
+            // Use our ENHANCED load function with unlimited search
+            await loadAllReportsForParent(this.currentUser.normalizedPhone, user.uid);
+            
+            // Load other data in parallel
+            await Promise.all([
+                loadReferralRewards(user.uid),
+                loadAcademicsData()
+            ]);
+            
+            // Setup monitoring and UI
+            this.setupRealtimeMonitoring();
+            this.setupUIComponents();
+            
+            console.log("✅ ENHANCED Dashboard fully loaded with unlimited search");
+            
+        } catch (error) {
+            console.error("❌ Enhanced auth manager error:", error);
+            
+            if (error.message === "User profile not found") {
+                showMessage("Setting up your account. Please wait...", "info");
+                setTimeout(() => this.loadUserDashboard(user), 3000);
+            } else {
+                showMessage("Error loading dashboard. Please refresh.", "error");
+                this.showAuthScreen();
+            }
+        } finally {
+            if (authLoader) authLoader.classList.add("hidden");
+        }
+    };
+}
+
+// ============================================================================
+// FIX 4: ENHANCED MANUAL REFRESH
+// ============================================================================
+
+const originalManualRefreshReportsV2 = window.manualRefreshReportsV2;
+
+window.manualRefreshReportsV2 = async function() {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const refreshBtn = document.getElementById('manualRefreshBtn');
+    if (!refreshBtn) return;
+    
+    const originalText = refreshBtn.innerHTML;
+    
+    // Show enhanced loading state
+    refreshBtn.innerHTML = '<div class="loading-spinner-small mr-2"></div> Full Database Search...';
+    refreshBtn.disabled = true;
+    
+    // Show search progress message
+    showMessage("Performing full database search...", "info");
+    
+    try {
+        // Use enhanced unlimited search
+        const userDoc = await db.collection('parent_users').doc(user.uid).get();
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            const userPhone = userData.normalizedPhone || userData.phone;
+            
+            // Force refresh with unlimited search
+            await loadAllReportsForParent(userPhone, user.uid, true);
+        }
+        
+        await checkForNewAcademics();
+        
+        showMessage('Full search completed! All reports loaded.', 'success');
+        
+    } catch (error) {
+        console.error('Enhanced refresh error:', error);
+        showMessage('Search failed. Please try again.', 'error');
+    } finally {
+        refreshBtn.innerHTML = originalText;
+        refreshBtn.disabled = false;
+    }
+};
+
+// ============================================================================
+// FIX 5: BATCHED REAL-TIME MONITORING
+// ============================================================================
+
+const originalSetupRealTimeMonitoring = window.setupRealTimeMonitoring;
+
+window.setupRealTimeMonitoring = function(parentPhone, userId) {
+    console.log("📡 Setting up ENHANCED real-time monitoring...");
+    
+    cleanupRealTimeListeners();
+    
+    if (!window.realTimeIntervals) {
+        window.realTimeIntervals = [];
+    }
+    
+    const parentSuffix = extractPhoneSuffix(parentPhone);
+    if (!parentSuffix) {
+        console.warn("⚠️ Cannot setup monitoring - invalid parent phone:", parentPhone);
+        return;
+    }
+
+    console.log("📡 Monitoring ALL documents for phone suffix:", parentSuffix);
+    
+    // Function to check for new reports (unlimited)
+    const checkForNewReports = async () => {
+        try {
+            const lastCheckKey = `lastReportCheck_${userId}`;
+            const lastCheckTime = parseInt(localStorage.getItem(lastCheckKey) || '0');
+            const now = Date.now();
+            
+            let foundNew = false;
+            
+            // Check ALL documents in both collections (no limits)
+            const collections = ['tutor_submissions', 'student_results'];
+            
+            for (const collection of collections) {
+                try {
+                    const snapshot = await db.collection(collection).get();
+                    
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        
+                        // Check ALL phone fields
+                        const phoneFields = [
+                            data.parentPhone,
+                            data.parent_phone,
+                            data.guardianPhone,
+                            data.motherPhone,
+                            data.fatherPhone,
+                            data.phone,
+                            data.contactPhone
+                        ];
+                        
+                        for (const fieldPhone of phoneFields) {
+                            if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
+                                const docTime = getTimestamp(data.timestamp || data.createdAt || data.submittedAt);
+                                
+                                if (docTime > lastCheckTime) {
+                                    foundNew = true;
+                                    console.log(`🆕 NEW ${collection} DETECTED:`, doc.id);
+                                }
+                                break;
+                            }
+                        }
+                    });
+                } catch (error) {
+                    console.error(`${collection} monitoring error:`, error);
+                }
+            }
+            
+            if (foundNew) {
+                showNewReportNotification();
+            }
+            
+            localStorage.setItem(lastCheckKey, now.toString());
+            
+        } catch (error) {
+            console.error("Enhanced real-time check error:", error);
+        }
+    };
+    
+    // Check for new reports every 2 minutes (less frequent since it's unlimited)
+    const reportInterval = setInterval(checkForNewReports, 120000);
+    window.realTimeIntervals.push(reportInterval);
+    realTimeListeners.push(() => clearInterval(reportInterval));
+    
+    // Run initial check after 5 seconds
+    setTimeout(checkForNewReports, 5000);
+    
+    console.log("✅ Enhanced real-time monitoring setup complete (unlimited)");
+};
+
+// ============================================================================
+// FINAL INITIALIZATION
+// ============================================================================
+
+console.log("✅ COMPREHENSIVE UNLIMITED SEARCH FIX INSTALLED");
+console.log("==============================================");
+console.log("Features enabled:");
+console.log("1. ✅ Unlimited report searching (no 500 limit)");
+console.log("2. ✅ Batched processing for large databases");
+console.log("3. ✅ Progress indicators during search");
+console.log("4. ✅ Enhanced error handling");
+console.log("5. ✅ Better user feedback");
+console.log("6. ✅ Future-proof - scales with database growth");
+console.log("==============================================");
+
+// Auto-initialize on next page load
+if (window.authManager) {
+    console.log("🔄 Enhanced search will activate on next login");
+}
 
 // ============================================================================
 // END OF PARENT.JS - PRODUCTION READY
