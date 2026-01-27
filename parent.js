@@ -4876,5 +4876,81 @@ if (document.querySelector('#signUpBtn')) {
 console.log("✅ Signup race condition fixes installed");
 
 // ============================================================================
+// CRITICAL FIX: FIREBASE TIMESTAMP HANDLING (SILENT VERSION)
+// ============================================================================
+
+// Store original function
+const originalGetTimestamp = window.getTimestamp;
+
+// Replace with enhanced version (silent - no console logs)
+window.getTimestamp = function(dateInput) {
+    if (!dateInput) return 0;
+    
+    // 1. Handle Firestore Timestamp (MOST IMPORTANT FIX!)
+    if (dateInput && typeof dateInput === 'object') {
+        // Check if it's a Firestore Timestamp
+        if (dateInput.toDate && typeof dateInput.toDate === 'function') {
+            try {
+                const jsDate = dateInput.toDate();
+                return jsDate.getTime();
+            } catch (error) {
+                // Silent fail - fall through to other methods
+            }
+        }
+        
+        // Check if it's a Firestore FieldValue (serverTimestamp)
+        if (dateInput.seconds !== undefined && dateInput.nanoseconds !== undefined) {
+            try {
+                return dateInput.seconds * 1000 + Math.floor(dateInput.nanoseconds / 1000000);
+            } catch (error) {
+                // Silent fail
+            }
+        }
+    }
+    
+    // 2. If we have original function, use it as fallback
+    if (originalGetTimestamp) {
+        return originalGetTimestamp(dateInput);
+    }
+    
+    // 3. Ultimate fallback
+    return Date.now();
+};
+
+// Also fix getTimestampFromData to be more robust (silent version)
+const originalGetTimestampFromData = window.getTimestampFromData;
+
+window.getTimestampFromData = function(data) {
+    if (!data) {
+        return Math.floor(Date.now() / 1000);
+    }
+    
+    const timestampFields = [
+        'timestamp',
+        'createdAt',
+        'submittedAt',
+        'date',
+        'updatedAt',
+        'assignedDate',
+        'dueDate',
+        'submissionDate',
+        'completionDate'
+    ];
+    
+    for (const field of timestampFields) {
+        if (data[field]) {
+            const timestamp = getTimestamp(data[field]); // Use our fixed function
+            if (timestamp > 0) {
+                return Math.floor(timestamp / 1000);
+            }
+        }
+    }
+    
+    return Math.floor(Date.now() / 1000);
+};
+
+console.log("✅ Firebase timestamp fix installed (silent mode)");
+
+// ============================================================================
 // END OF PARENT.JS - PRODUCTION READY
 // ============================================================================
