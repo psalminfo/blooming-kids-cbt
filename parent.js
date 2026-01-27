@@ -4508,5 +4508,373 @@ window.switchTab = switchTab;
 window.settingsManager = settingsManager;
 
 // ============================================================================
+// SECTION 21: SIGNUP SUCCESS HANDLER (RACE CONDITION FIX)
+// ============================================================================
+
+// Override the original handleSignUpFull to fix race condition
+const originalHandleSignUpFull = window.handleSignUpFull;
+
+window.handleSignUpFull = async function(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader) {
+    const requestId = `signup_${Date.now()}`;
+    pendingRequests.add(requestId);
+    
+    try {
+        let fullPhoneInput = localPhone;
+        if (!localPhone.startsWith('+')) {
+            fullPhoneInput = countryCode + localPhone;
+        }
+        
+        const normalizedResult = normalizePhoneNumber(fullPhoneInput);
+        
+        if (!normalizedResult.valid) {
+            throw new Error(`Invalid phone number: ${normalizedResult.error}`);
+        }
+        
+        const finalPhone = normalizedResult.normalized;
+        console.log("📱 Processing signup with normalized phone:", finalPhone);
+
+        // Step 1: Create user in Firebase Auth
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+
+        // Step 2: Generate referral code
+        const referralCode = await generateReferralCode();
+
+        // Step 3: Create user profile in Firestore
+        await db.collection('parent_users').doc(user.uid).set({
+            email: email,
+            phone: finalPhone,
+            normalizedPhone: finalPhone,
+            parentName: 'Parent',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            referralCode: referralCode,
+            referralEarnings: 0,
+            uid: user.uid
+        });
+
+        console.log("✅ Account created and profile saved");
+        
+        // CRITICAL FIX: Wait for Firestore write to propagate
+        console.log("⏳ Waiting for profile to sync...");
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Step 4: Show success message
+        showMessage('Account created successfully! Redirecting...', 'success');
+        
+        // Step 5: Clear form
+        if (signUpBtn) signUpBtn.disabled = false;
+        const signUpText = document.getElementById('signUpText');
+        const signUpSpinner = document.getElementById('signUpSpinner');
+        if (signUpText) signUpText.textContent = 'Create Account';
+        if (signUpSpinner) signUpSpinner.classList.add('hidden');
+        if (authLoader) authLoader.classList.add('hidden');
+        
+        // Step 6: Force auth state refresh
+        console.log("🔄 Refreshing auth state...");
+        
+        // Method 1: Reload page (most reliable)
+        setTimeout(() => {
+            window.location.reload();
+        }, 2000);
+        
+        // Method 2: Alternative - trigger auth refresh without reload
+        // await auth.currentUser.reload();
+        // console.log("🔄 Auth state refreshed");
+        
+    } catch (error) {
+        if (!pendingRequests.has(requestId)) return;
+        
+        let errorMessage = "Failed to create account.";
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = "This email is already registered. Please sign in instead.";
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = "Password should be at least 6 characters.";
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+
+        showMessage(errorMessage, 'error');
+
+        if (signUpBtn) signUpBtn.disabled = false;
+        
+        const signUpText = document.getElementById('signUpText');
+        const signUpSpinner = document.getElementById('signUpSpinner');
+        
+        if (signUpText) signUpText.textContent = 'Create Account';
+        if (signUpSpinner) signUpSpinner.classList.add('hidden');
+        if (authLoader) authLoader.classList.add('hidden');
+    } finally {
+        pendingRequests.delete(requestId);
+    }
+};
+
+// ============================================================================
+// SECTION 22: AUTH MANAGER ENHANCEMENT (PROFILE NOT FOUND FIX)
+// ============================================================================
+
+// Store original loadUserDashboard
+const originalLoadUserDashboard = UnifiedAuthManager.prototype.loadUserDashboard;
+
+// Override with enhanced version
+UnifiedAuthManager.prototype.loadUserDashboard = async function(user) {
+    console.log("📊 Loading ENHANCED dashboard for user");
+    
+    const authArea = document.getElementById("authArea");
+    const reportArea = document.getElementById("reportArea");
+    const authLoader = document.getElementById("authLoader");
+    
+    if (authLoader) authLoader.classList.remove("hidden");
+    
+    try {
+        // ENHANCED: Add retry logic for new users
+        console.log("🔍 Checking user profile...");
+        
+        let userDoc;
+        let retryCount = 0;
+        const maxRetries = 4;
+        
+        while (retryCount < maxRetries) {
+            try {
+                userDoc = await db.collection('parent_users').doc(user.uid).get();
+                
+                if (userDoc.exists) {
+                    console.log(`✅ User profile found on attempt ${retryCount + 1}`);
+                    break;
+                }
+                
+                retryCount++;
+                if (retryCount < maxRetries) {
+                    console.log(`🔄 Profile not found, retrying in ${retryCount * 500}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, retryCount * 500));
+                }
+            } catch (err) {
+                console.warn(`Retry ${retryCount + 1} failed:`, err.message);
+                retryCount++;
+            }
+        }
+        
+        if (!userDoc || !userDoc.exists) {
+            console.log("🆕 Creating missing user profile...");
+            
+            // Create a basic profile
+            const minimalProfile = {
+                email: user.email || '',
+                phone: user.phoneNumber || '',
+                normalizedPhone: user.phoneNumber || '',
+                parentName: 'Parent',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                uid: user.uid,
+                // Try to get from recent signup
+                ...window.tempSignupData
+            };
+            
+            await db.collection('parent_users').doc(user.uid).set(minimalProfile);
+            
+            console.log("✅ Created missing profile");
+            
+            // Show user-friendly message
+            showMessage('Welcome! Finishing your account setup...', 'success');
+            
+            // Short delay then reload
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+            
+            return;
+        }
+        
+        // Continue with original logic if profile exists
+        const userData = userDoc.data();
+        this.currentUser = {
+            uid: user.uid,
+            email: userData.email,
+            phone: userData.phone,
+            normalizedPhone: userData.normalizedPhone || userData.phone,
+            parentName: userData.parentName || 'Parent',
+            referralCode: userData.referralCode
+        };
+
+        console.log("👤 User data loaded:", this.currentUser.parentName);
+
+        // Update UI immediately
+        this.showDashboardUI();
+
+        // Load remaining data in parallel
+        await Promise.all([
+            loadAllReportsForParent(this.currentUser.normalizedPhone, user.uid),
+            loadReferralRewards(user.uid),
+            loadAcademicsData()
+        ]);
+
+        // Setup monitoring and UI
+        this.setupRealtimeMonitoring();
+        this.setupUIComponents();
+
+        console.log("✅ Dashboard fully loaded");
+
+    } catch (error) {
+        console.error("❌ Enhanced dashboard load error:", error);
+        
+        // User-friendly error handling
+        if (error.message.includes("profile not found") || error.message.includes("not found")) {
+            showMessage("Almost there! Setting up your account...", "info");
+            
+            // Auto-retry after delay
+            setTimeout(() => {
+                console.log("🔄 Auto-retrying dashboard load...");
+                this.loadUserDashboard(user);
+            }, 3000);
+        } else {
+            showMessage("Temporary issue loading dashboard. Please refresh.", "error");
+            this.showAuthScreen();
+        }
+    } finally {
+        if (authLoader) authLoader.classList.add("hidden");
+    }
+};
+
+// ============================================================================
+// SECTION 23: TEMP SIGNUP DATA STORAGE
+// ============================================================================
+
+// Store signup data temporarily to use if profile creation fails
+window.tempSignupData = null;
+
+// Override the form submission to store data
+document.addEventListener('DOMContentLoaded', function() {
+    const signUpForm = document.getElementById('signUpForm');
+    if (signUpForm) {
+        signUpForm.addEventListener('submit', function(e) {
+            const countryCode = document.getElementById('countryCode')?.value;
+            const localPhone = document.getElementById('signupPhone')?.value.trim();
+            const email = document.getElementById('signupEmail')?.value.trim();
+            
+            if (countryCode && localPhone && email) {
+                const fullPhone = countryCode + localPhone.replace(/\D/g, '');
+                window.tempSignupData = {
+                    email: email,
+                    phone: fullPhone,
+                    normalizedPhone: fullPhone
+                };
+                
+                // Auto-clear after 5 minutes
+                setTimeout(() => {
+                    window.tempSignupData = null;
+                }, 5 * 60 * 1000);
+            }
+        });
+    }
+});
+
+// ============================================================================
+// SECTION 24: SIGNUP PROGRESS INDICATOR
+// ============================================================================
+
+// Add visual feedback during signup
+function showSignupProgress(step) {
+    const steps = [
+        'Creating your account...',
+        'Setting up your profile...',
+        'Almost done...',
+        'Welcome!'
+    ];
+    
+    const message = steps[step - 1] || 'Processing...';
+    
+    // Create or update progress indicator
+    let progressDiv = document.getElementById('signupProgress');
+    if (!progressDiv) {
+        progressDiv = document.createElement('div');
+        progressDiv.id = 'signupProgress';
+        progressDiv.className = 'fixed top-20 right-4 bg-blue-500 text-white p-4 rounded-lg shadow-lg z-50';
+        document.body.appendChild(progressDiv);
+    }
+    
+    progressDiv.innerHTML = `
+        <div class="flex items-center">
+            <div class="loading-spinner-small mr-3"></div>
+            <div>
+                <div class="font-semibold">${message}</div>
+                <div class="text-xs opacity-80 mt-1">Step ${step} of ${steps.length}</div>
+            </div>
+        </div>
+    `;
+}
+
+function hideSignupProgress() {
+    const progressDiv = document.getElementById('signupProgress');
+    if (progressDiv) {
+        progressDiv.remove();
+    }
+}
+
+// ============================================================================
+// SECTION 25: SIGNUP FLOW ENHANCEMENT
+// ============================================================================
+
+// Override the entire signup button handler for better UX
+const originalSignupHandler = document.querySelector('#signUpBtn')?.onclick;
+if (document.querySelector('#signUpBtn')) {
+    document.querySelector('#signUpBtn').onclick = async function(e) {
+        e.preventDefault();
+        
+        // Show step 1
+        showSignupProgress(1);
+        
+        // Call the enhanced handleSignUpFull
+        const countryCode = document.getElementById('countryCode')?.value;
+        const localPhone = document.getElementById('signupPhone')?.value.trim();
+        const email = document.getElementById('signupEmail')?.value.trim();
+        const password = document.getElementById('signupPassword')?.value;
+        const confirmPassword = document.getElementById('signupConfirmPassword')?.value;
+        const authLoader = document.getElementById('authLoader');
+        
+        if (!countryCode || !localPhone || !email || !password || !confirmPassword) {
+            showMessage('Please fill in all fields', 'error');
+            hideSignupProgress();
+            return;
+        }
+        
+        if (password !== confirmPassword) {
+            showMessage('Passwords do not match', 'error');
+            hideSignupProgress();
+            return;
+        }
+        
+        // Update button state
+        const signUpBtn = this;
+        signUpBtn.disabled = true;
+        document.getElementById('signUpText').textContent = 'Creating...';
+        document.getElementById('signUpSpinner').classList.remove('hidden');
+        if (authLoader) authLoader.classList.remove('hidden');
+        
+        try {
+            // Show step 2
+            setTimeout(() => showSignupProgress(2), 1000);
+            
+            // Call the enhanced signup function
+            await window.handleSignUpFull(
+                countryCode, 
+                localPhone, 
+                email, 
+                password, 
+                confirmPassword, 
+                signUpBtn, 
+                authLoader
+            );
+            
+            // Show step 3
+            setTimeout(() => showSignupProgress(3), 2500);
+            
+        } catch (error) {
+            hideSignupProgress();
+            console.error('Signup error:', error);
+        }
+    };
+}
+
+console.log("✅ Signup race condition fixes installed");
+
+// ============================================================================
 // END OF PARENT.JS - PRODUCTION READY
 // ============================================================================
