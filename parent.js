@@ -2024,8 +2024,32 @@ function handleHomeworkAction(homeworkId, studentId, currentStatus) {
                 .then(doc => {
                     const homework = doc.data();
                     if (homework) {
-                        alert(`Assignment Grade: ${homework.grade || 'N/A'}%\n\nTutor Feedback:\n${homework.feedback || 'No feedback provided.'}`);
+                        // Check for grade under different possible field names
+                        const grade = homework.grade || homework.score || homework.overallGrade || 
+                                     homework.percentage || homework.marks || 'N/A';
+                        
+                        // Format grade properly
+                        let gradeDisplay = grade;
+                        if (typeof grade === 'number') {
+                            gradeDisplay = `${grade}%`;
+                        } else if (grade !== 'N/A') {
+                            // Try to parse as number
+                            const parsedGrade = parseFloat(grade);
+                            if (!isNaN(parsedGrade)) {
+                                gradeDisplay = `${parsedGrade}%`;
+                            }
+                        }
+                        
+                        const feedback = homework.feedback || homework.tutorFeedback || 
+                                        homework.comments || homework.notes || 'No feedback provided.';
+                        
+                        // Create a better modal display
+                        showGradeFeedbackModal(gradeDisplay, feedback, homework);
                     }
+                })
+                .catch(error => {
+                    console.error('Error fetching homework:', error);
+                    showMessage('Error loading assignment details', 'error');
                 });
             break;
             
@@ -2043,17 +2067,6 @@ function handleHomeworkAction(homeworkId, studentId, currentStatus) {
             break;
             
         case 'uploaded':
-            // Open the Google Classroom modal for review and submission
-            db.collection('homework_assignments').doc(homeworkId).get()
-                .then(doc => {
-                    const homeworkData = { id: doc.id, ...doc.data() };
-                    if (!homeworkData.dueTimestamp && homeworkData.dueDate) {
-                        homeworkData.dueTimestamp = getTimestamp(homeworkData.dueDate);
-                    }
-                    openGoogleClassroomModal(homeworkData, studentId);
-                });
-            break;
-            
         case 'pending':
         case 'overdue':
         default:
@@ -2070,26 +2083,180 @@ function handleHomeworkAction(homeworkId, studentId, currentStatus) {
     }
 }
 
-function toggleAcademicsAccordion(sectionId) {
-    const content = document.getElementById(`${sectionId}-content`);
-    const arrow = document.getElementById(`${sectionId}-arrow`);
+// Show a better modal for grade and feedback
+function showGradeFeedbackModal(grade, feedback, homeworkData) {
+    // Remove any existing modal
+    const existingModal = document.getElementById('gradeFeedbackModal');
+    if (existingModal) existingModal.remove();
     
-    if (!content || !arrow) {
-        console.error(`Could not find academics accordion elements for ${sectionId}`);
-        return;
-    }
+    const modalHTML = `
+        <div id="gradeFeedbackModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <div class="bg-gradient-to-r from-green-500 to-emerald-600 p-6 rounded-t-xl">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold text-white">Assignment Graded</h3>
+                        <button onclick="document.getElementById('gradeFeedbackModal').remove()" 
+                                class="text-white hover:text-gray-200 text-2xl">&times;</button>
+                    </div>
+                </div>
+                
+                <div class="p-6">
+                    <div class="text-center mb-6">
+                        <div class="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4">
+                            <span class="text-3xl text-green-600">📊</span>
+                        </div>
+                        <h4 class="text-2xl font-bold text-gray-800 mb-2">${grade}</h4>
+                        <p class="text-gray-600">Overall Grade</p>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h5 class="font-semibold text-gray-700 mb-2">Assignment Details</h5>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <p class="text-gray-800"><span class="font-medium">Title:</span> ${safeText(homeworkData.title || homeworkData.subject || 'Untitled')}</p>
+                            ${homeworkData.tutorName ? `<p class="text-gray-800 mt-1"><span class="font-medium">Graded by:</span> ${safeText(homeworkData.tutorName)}</p>` : ''}
+                            ${homeworkData.gradedAt ? `<p class="text-gray-800 mt-1"><span class="font-medium">Graded on:</span> ${formatDetailedDate(homeworkData.gradedAt)}</p>` : ''}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h5 class="font-semibold text-gray-700 mb-2">Tutor's Feedback</h5>
+                        <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                            <p class="text-gray-700 whitespace-pre-wrap">${safeText(feedback)}</p>
+                        </div>
+                    </div>
+                    
+                    ${homeworkData.submissionUrl ? `
+                    <div class="mt-6">
+                        <h5 class="font-semibold text-gray-700 mb-2">Your Submission</h5>
+                        <a href="${safeText(homeworkData.submissionUrl)}" target="_blank" 
+                           class="inline-flex items-center text-green-600 hover:text-green-800 font-medium">
+                            <span class="mr-2">📎</span> View Submitted File
+                        </a>
+                    </div>
+                    ` : ''}
+                    
+                    <div class="mt-8 pt-6 border-t border-gray-200">
+                        <button onclick="document.getElementById('gradeFeedbackModal').remove()" 
+                                class="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
     
-    if (content.classList.contains('hidden')) {
-        content.classList.remove('hidden');
-        arrow.textContent = '▲';
-    } else {
-        content.classList.add('hidden');
-        arrow.textContent = '▼';
-    }
+    const div = document.createElement('div');
+    div.innerHTML = modalHTML;
+    document.body.appendChild(div.firstElementChild);
 }
 
-function onStudentSelected(studentName) {
-    loadAcademicsData(studentName || null);
+// Also update the updateHomeworkSection function to properly display grades
+// Update a specific homework item in the UI
+function updateHomeworkSection(studentName, homeworkId, homeworkData) {
+    const studentId = studentIdMap.get(studentName);
+    if (!studentId) return;
+
+    // Find the homework container for this student
+    const container = document.getElementById(`homework-container-${studentId}`);
+    if (!container) return;
+
+    // Find the specific homework item
+    const homeworkElement = container.querySelector(`[data-homework-id="${homeworkId}"]`);
+    if (!homeworkElement) return;
+
+    // Check for grade under different possible field names
+    const gradeValue = homeworkData.grade || homeworkData.score || homeworkData.overallGrade || 
+                      homeworkData.percentage || homeworkData.marks;
+    
+    let gradeDisplay = 'N/A';
+    if (gradeValue !== undefined && gradeValue !== null) {
+        if (typeof gradeValue === 'number') {
+            gradeDisplay = `${gradeValue}%`;
+        } else {
+            const parsedGrade = parseFloat(gradeValue);
+            if (!isNaN(parsedGrade)) {
+                gradeDisplay = `${parsedGrade}%`;
+            } else {
+                gradeDisplay = gradeValue;
+            }
+        }
+    }
+
+    // Update the status display
+    const statusElement = homeworkElement.querySelector('.homework-status');
+    const buttonElement = homeworkElement.querySelector('.homework-action-btn');
+    
+    if (statusElement && buttonElement) {
+        const now = new Date().getTime();
+        const dueTimestamp = getTimestamp(homeworkData.dueDate);
+        const isOverdue = dueTimestamp && dueTimestamp < now && homeworkData.status !== 'submitted' && homeworkData.status !== 'completed' && homeworkData.status !== 'graded';
+        const isSubmitted = homeworkData.status === 'submitted' || homeworkData.status === 'completed';
+        const isGraded = homeworkData.status === 'graded';
+        
+        let statusColor, statusText, statusIcon, buttonText, buttonColor;
+        
+        if (isGraded) {
+            statusColor = 'bg-green-100 text-green-800';
+            statusText = 'Graded';
+            statusIcon = '✅';
+            buttonText = 'View Grade & Feedback';
+            buttonColor = 'bg-green-600 hover:bg-green-700';
+        } else if (isSubmitted) {
+            statusColor = 'bg-blue-100 text-blue-800';
+            statusText = 'Submitted';
+            statusIcon = '📤';
+            buttonText = 'View Submission';
+            buttonColor = 'bg-blue-600 hover:bg-blue-700';
+        } else if (isOverdue) {
+            statusColor = 'bg-red-100 text-red-800';
+            statusText = 'Overdue';
+            statusIcon = '⚠️';
+            buttonText = 'Upload Assignment';
+            buttonColor = 'bg-red-600 hover:bg-red-700';
+        } else {
+            statusColor = homeworkData.submissionUrl ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800';
+            statusText = homeworkData.submissionUrl ? 'Uploaded - Not Submitted' : 'Not Started';
+            statusIcon = homeworkData.submissionUrl ? '📎' : '📝';
+            buttonText = homeworkData.submissionUrl ? 'Review & Submit' : 'Start Assignment';
+            buttonColor = homeworkData.submissionUrl ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-gray-600 hover:bg-gray-700';
+        }
+        
+        statusElement.className = `text-xs ${statusColor} px-2 py-1 rounded-full`;
+        statusElement.innerHTML = `${statusIcon} ${statusText}`;
+        
+        buttonElement.className = `w-full ${buttonColor} text-white px-4 py-2 rounded-lg font-semibold hover:opacity-90 transition-all duration-200 flex items-center justify-center`;
+        buttonElement.textContent = buttonText;
+        buttonElement.onclick = () => handleHomeworkAction(homeworkId, studentId, isGraded ? 'graded' : isSubmitted ? 'submitted' : homeworkData.submissionUrl ? 'uploaded' : 'pending');
+        
+        // Update grade display if available
+        if (gradeValue !== undefined && gradeValue !== null) {
+            const gradeElement = homeworkElement.querySelector('.homework-grade');
+            if (gradeElement) {
+                const numericGrade = typeof gradeValue === 'number' ? gradeValue : parseFloat(gradeValue);
+                const gradeClass = !isNaN(numericGrade) ? 
+                    (numericGrade >= 70 ? 'text-green-600' : numericGrade >= 50 ? 'text-yellow-600' : 'text-red-600') : 
+                    'text-gray-600';
+                gradeElement.innerHTML = `
+                    <span class="font-medium text-gray-700">Grade:</span>
+                    <span class="ml-1 font-bold ${gradeClass}">${gradeDisplay}</span>
+                `;
+            }
+        }
+        
+        // Update feedback if available
+        const feedback = homeworkData.feedback || homeworkData.tutorFeedback || 
+                        homeworkData.comments || homeworkData.notes;
+        if (feedback) {
+            const feedbackElement = homeworkElement.querySelector('.homework-feedback');
+            if (feedbackElement) {
+                feedbackElement.innerHTML = `
+                    <span class="font-medium text-gray-700 text-sm">Tutor Feedback:</span>
+                    <p class="text-gray-600 text-sm mt-1 bg-blue-50 p-2 rounded">${safeText(feedback)}</p>
+                `;
+            }
+        }
+    }
 }
 
 // ============================================================================
