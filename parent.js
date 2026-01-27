@@ -5255,5 +5255,868 @@ console.log("Parents will NOT see progress messages");
 console.log("Search will be FAST and UNLIMITED");
 
 // ============================================================================
+// SHARED PARENT ACCESS SYSTEM
+// ============================================================================
+
+console.log("👨‍👩‍👧‍👦 Installing shared parent access system...");
+
+// ============================================================================
+// 1. ENHANCED STUDENT SEARCH (SUPPORTS MULTIPLE PARENT PHONES)
+// ============================================================================
+
+// Store original function
+const originalComprehensiveFindChildren = window.comprehensiveFindChildren;
+
+// Create enhanced version that checks ALL parent phone fields
+window.comprehensiveFindChildren = async function(parentPhone) {
+    console.log("🔍 ENHANCED CHILD SEARCH for shared access:", parentPhone);
+    
+    const allChildren = new Map();
+    const studentNameIdMap = new Map();
+    
+    const parentSuffix = extractPhoneSuffix(parentPhone);
+    
+    if (!parentSuffix) {
+        console.warn("⚠️ No valid suffix in parent phone:", parentPhone);
+        return {
+            studentIds: [],
+            studentNameIdMap: new Map(),
+            allStudentData: [],
+            studentNames: []
+        };
+    }
+
+    try {
+        // Search in students and pending_students collections
+        const [studentsSnapshot, pendingSnapshot] = await Promise.all([
+            db.collection('students').get().catch(() => ({ forEach: () => {} })),
+            db.collection('pending_students').get().catch(() => ({ forEach: () => {} }))
+        ]);
+        
+        // Process students - check ALL parent phone fields
+        studentsSnapshot.forEach(doc => {
+            const data = doc.data();
+            const studentId = doc.id;
+            const studentName = safeText(data.studentName || data.name || 'Unknown');
+            
+            if (studentName === 'Unknown') return;
+            
+            // Check ALL phone fields including secondary contacts
+            const phoneFields = [
+                data.parentPhone,
+                data.guardianPhone,
+                data.motherPhone,
+                data.fatherPhone,
+                data.contactPhone,
+                data.phone,
+                data.parentPhone1,
+                data.parentPhone2,
+                data.emergencyPhone,
+                data.secondaryPhone,
+                data.additionalContact
+            ];
+            
+            let isMatch = false;
+            let matchedField = '';
+            
+            for (const fieldPhone of phoneFields) {
+                if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
+                    isMatch = true;
+                    matchedField = fieldPhone;
+                    break;
+                }
+            }
+            
+            if (isMatch && !allChildren.has(studentId)) {
+                console.log(`✅ SHARED ACCESS MATCH: ${parentSuffix} = ${matchedField} → ${studentName}`);
+                
+                allChildren.set(studentId, {
+                    id: studentId,
+                    name: studentName,
+                    data: data,
+                    isPending: false,
+                    collection: 'students',
+                    matchedPhone: matchedField
+                });
+                
+                // Use unique name if duplicates exist
+                const uniqueName = studentNameIdMap.has(studentName) ? 
+                    `${studentName} (${studentId.substring(0, 4)})` : studentName;
+                studentNameIdMap.set(uniqueName, studentId);
+            }
+        });
+        
+        // Process pending students similarly
+        pendingSnapshot.forEach(doc => {
+            const data = doc.data();
+            const studentId = doc.id;
+            const studentName = safeText(data.studentName || data.name || 'Unknown');
+            
+            if (studentName === 'Unknown') return;
+            
+            const phoneFields = [
+                data.parentPhone,
+                data.guardianPhone,
+                data.motherPhone,
+                data.fatherPhone,
+                data.contactPhone,
+                data.phone
+            ];
+            
+            let isMatch = false;
+            let matchedField = '';
+            
+            for (const fieldPhone of phoneFields) {
+                if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
+                    isMatch = true;
+                    matchedField = fieldPhone;
+                    break;
+                }
+            }
+            
+            if (isMatch && !allChildren.has(studentId)) {
+                console.log(`✅ PENDING SHARED ACCESS: ${parentSuffix} = ${matchedField} → ${studentName}`);
+                
+                allChildren.set(studentId, {
+                    id: studentId,
+                    name: studentName,
+                    data: data,
+                    isPending: true,
+                    collection: 'pending_students',
+                    matchedPhone: matchedField
+                });
+                
+                if (!studentNameIdMap.has(studentName)) {
+                    studentNameIdMap.set(studentName, studentId);
+                }
+            }
+        });
+
+        // Email matching for shared access
+        try {
+            // First check if parent exists with this email
+            const emailSnapshot = await db.collection('parent_users')
+                .where('email', '==', parentPhone) // Sometimes email is passed as identifier
+                .limit(1)
+                .get();
+
+            let parentEmail = '';
+            if (!emailSnapshot.empty) {
+                parentEmail = emailSnapshot.docs[0].data().email;
+            }
+            
+            if (parentEmail) {
+                const emailStudentsSnapshot = await db.collection('students')
+                    .where('parentEmail', '==', parentEmail)
+                    .get();
+
+                emailStudentsSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    const studentId = doc.id;
+                    const studentName = safeText(data.studentName || data.name || 'Unknown');
+
+                    if (studentName !== 'Unknown' && !allChildren.has(studentId)) {
+                        console.log(`✅ EMAIL SHARED ACCESS: ${parentEmail} → ${studentName}`);
+                        
+                        allChildren.set(studentId, {
+                            id: studentId,
+                            name: studentName,
+                            data: data,
+                            isPending: false,
+                            collection: 'students',
+                            matchedBy: 'email'
+                        });
+                        
+                        if (!studentNameIdMap.has(studentName)) {
+                            studentNameIdMap.set(studentName, studentId);
+                        }
+                    }
+                });
+            }
+        } catch (error) {
+            console.warn("Email shared access search error:", error.message);
+        }
+
+        const studentNames = Array.from(studentNameIdMap.keys());
+        const studentIds = Array.from(allChildren.keys());
+        const allStudentData = Array.from(allChildren.values());
+
+        console.log(`🎯 ENHANCED SEARCH: ${studentNames.length} students found for shared access`);
+
+        return {
+            studentIds,
+            studentNameIdMap,
+            allStudentData,
+            studentNames
+        };
+
+    } catch (error) {
+        console.error("❌ Enhanced shared access search error:", error);
+        return {
+            studentIds: [],
+            studentNameIdMap: new Map(),
+            allStudentData: [],
+            studentNames: []
+        };
+    }
+};
+
+// ============================================================================
+// 2. ENHANCED REPORT SEARCH (SUPPORTS MULTIPLE PARENT CONTACTS)
+// ============================================================================
+
+// Store original
+const originalSearchAllReportsForParent = window.searchAllReportsForParent;
+
+// Create enhanced version that searches by ALL possible parent contacts
+window.searchAllReportsForParent = async function(parentPhone, parentEmail = '', parentUid = '') {
+    console.log("🔍 SHARED ACCESS REPORT SEARCH for:", { parentPhone, parentEmail });
+    
+    let assessmentResults = [];
+    let monthlyResults = [];
+    
+    try {
+        const parentSuffix = extractPhoneSuffix(parentPhone);
+        
+        if (!parentSuffix) {
+            console.warn("⚠️ No valid suffix in parent phone");
+            return { assessmentResults: [], monthlyResults: [] };
+        }
+
+        // ================================================================
+        // STEP 1: FIND ALL STUDENTS LINKED TO THIS PARENT
+        // ================================================================
+        const childrenResult = await comprehensiveFindChildren(parentPhone);
+        const studentIds = childrenResult.studentIds;
+        
+        console.log(`📊 Found ${studentIds.length} students for shared access search`);
+        
+        // ================================================================
+        // STEP 2: SEARCH REPORTS BY STUDENT ID (MOST RELIABLE)
+        // ================================================================
+        if (studentIds.length > 0) {
+            console.log("🔍 Searching reports by student IDs...");
+            
+            // Search for assessment reports by studentId
+            for (const studentId of studentIds) {
+                try {
+                    const assessmentSnapshot = await db.collection("student_results")
+                        .where("studentId", "==", studentId)
+                        .get();
+                    
+                    assessmentSnapshot.forEach(doc => {
+                        const data = doc.data();
+                        assessmentResults.push({ 
+                            id: doc.id,
+                            collection: 'student_results',
+                            matchType: 'studentId',
+                            studentId: studentId,
+                            ...data,
+                            timestamp: getTimestampFromData(data),
+                            type: 'assessment'
+                        });
+                    });
+                } catch (error) {
+                    console.log("Assessment search by studentId error:", error.message);
+                }
+                
+                try {
+                    const monthlySnapshot = await db.collection("tutor_submissions")
+                        .where("studentId", "==", studentId)
+                        .get();
+                    
+                    monthlySnapshot.forEach(doc => {
+                        const data = doc.data();
+                        monthlyResults.push({ 
+                            id: doc.id,
+                            collection: 'tutor_submissions',
+                            matchType: 'studentId',
+                            studentId: studentId,
+                            ...data,
+                            timestamp: getTimestampFromData(data),
+                            type: 'monthly'
+                        });
+                    });
+                } catch (error) {
+                    console.log("Monthly search by studentId error:", error.message);
+                }
+            }
+            
+            console.log(`✅ Found via studentId: ${assessmentResults.length} assessments, ${monthlyResults.length} monthly`);
+        }
+        
+        // ================================================================
+        // STEP 3: TRADITIONAL PHONE SUFFIX SEARCH (BACKUP)
+        // ================================================================
+        console.log("🔍 Running traditional phone suffix search...");
+        
+        // Search assessment reports by phone
+        try {
+            const assessmentPhoneSnapshot = await db.collection("student_results").get();
+            assessmentPhoneSnapshot.forEach(doc => {
+                const data = doc.data();
+                
+                // Check ALL phone fields
+                const phoneFields = [
+                    data.parentPhone,
+                    data.parent_phone,
+                    data.guardianPhone,
+                    data.motherPhone,
+                    data.fatherPhone,
+                    data.phone,
+                    data.contactPhone,
+                    data.normalizedParentPhone
+                ];
+                
+                for (const fieldPhone of phoneFields) {
+                    if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
+                        // Check if already added via studentId
+                        const existing = assessmentResults.find(r => r.id === doc.id);
+                        if (!existing) {
+                            assessmentResults.push({ 
+                                id: doc.id,
+                                collection: 'student_results',
+                                matchType: 'suffix-match',
+                                matchedField: fieldPhone,
+                                ...data,
+                                timestamp: getTimestampFromData(data),
+                                type: 'assessment'
+                            });
+                        }
+                        break;
+                    }
+                }
+            });
+        } catch (error) {
+            console.log("Assessment phone search error:", error.message);
+        }
+        
+        // Search monthly reports by phone
+        try {
+            const monthlyPhoneSnapshot = await db.collection("tutor_submissions").get();
+            monthlyPhoneSnapshot.forEach(doc => {
+                const data = doc.data();
+                
+                const phoneFields = [
+                    data.parentPhone,
+                    data.parent_phone,
+                    data.guardianPhone,
+                    data.motherPhone,
+                    data.fatherPhone,
+                    data.phone,
+                    data.contactPhone,
+                    data.normalizedParentPhone
+                ];
+                
+                for (const fieldPhone of phoneFields) {
+                    if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
+                        // Check if already added via studentId
+                        const existing = monthlyResults.find(r => r.id === doc.id);
+                        if (!existing) {
+                            monthlyResults.push({ 
+                                id: doc.id,
+                                collection: 'tutor_submissions',
+                                matchType: 'suffix-match',
+                                matchedField: fieldPhone,
+                                ...data,
+                                timestamp: getTimestampFromData(data),
+                                type: 'monthly'
+                            });
+                        }
+                        break;
+                    }
+                }
+            });
+        } catch (error) {
+            console.log("Monthly phone search error:", error.message);
+        }
+        
+        // ================================================================
+        // STEP 4: EMAIL SEARCH (FOR SHARED ACCESS)
+        // ================================================================
+        if (parentEmail) {
+            console.log(`🔍 Searching by email: ${parentEmail}`);
+            
+            try {
+                // Search assessments by email
+                const assessmentEmailSnapshot = await db.collection("student_results")
+                    .where("parentEmail", "==", parentEmail)
+                    .get();
+                
+                assessmentEmailSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    const existing = assessmentResults.find(r => r.id === doc.id);
+                    if (!existing) {
+                        assessmentResults.push({ 
+                            id: doc.id,
+                            collection: 'student_results',
+                            matchType: 'email',
+                            ...data,
+                            timestamp: getTimestampFromData(data),
+                            type: 'assessment'
+                        });
+                    }
+                });
+                
+                // Search monthly reports by email (if field exists)
+                const monthlyEmailSnapshot = await db.collection("tutor_submissions")
+                    .where("parentEmail", "==", parentEmail)
+                    .get();
+                
+                monthlyEmailSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    const existing = monthlyResults.find(r => r.id === doc.id);
+                    if (!existing) {
+                        monthlyResults.push({ 
+                            id: doc.id,
+                            collection: 'tutor_submissions',
+                            matchType: 'email',
+                            ...data,
+                            timestamp: getTimestampFromData(data),
+                            type: 'monthly'
+                        });
+                    }
+                });
+                
+                console.log(`✅ Email search: ${assessmentEmailSnapshot.size} assessments, ${monthlyEmailSnapshot.size} monthly`);
+                
+            } catch (error) {
+                console.log("Email search optional:", error.message);
+            }
+        }
+        
+        // ================================================================
+        // STEP 5: PROCESS AND DEDUPLICATE RESULTS
+        // ================================================================
+        // Remove duplicates
+        assessmentResults = [...new Map(assessmentResults.map(item => [item.id, item])).values()];
+        monthlyResults = [...new Map(monthlyResults.map(item => [item.id, item])).values()];
+        
+        // Sort by timestamp (newest first)
+        assessmentResults.sort((a, b) => b.timestamp - a.timestamp);
+        monthlyResults.sort((a, b) => b.timestamp - a.timestamp);
+        
+        console.log("🎯 SHARED ACCESS SEARCH SUMMARY:", {
+            assessments: assessmentResults.length,
+            monthly: monthlyResults.length,
+            searchMethods: {
+                byStudentId: studentIds.length,
+                byPhoneSuffix: parentSuffix,
+                byEmail: !!parentEmail
+            }
+        });
+        
+        // Debug: Show how each report was found
+        if (assessmentResults.length > 0 || monthlyResults.length > 0) {
+            console.log("📄 Match breakdown:");
+            assessmentResults.forEach(report => {
+                console.log(`- Assessment: ${report.studentName} (${report.matchType})`);
+            });
+            monthlyResults.forEach(report => {
+                console.log(`- Monthly: ${report.studentName} (${report.matchType})`);
+            });
+        }
+        
+    } catch (error) {
+        console.error("❌ Shared access search error:", error);
+    }
+    
+    return { assessmentResults, monthlyResults };
+};
+
+// ============================================================================
+// 3. ENHANCED SETTINGS MANAGER (PROPERLY SAVES SHARED CONTACTS)
+// ============================================================================
+
+if (window.settingsManager && window.settingsManager.updateStudent) {
+    // Store original
+    const originalUpdateStudent = window.settingsManager.updateStudent;
+    
+    // Enhance to update ALL related documents when contacts change
+    window.settingsManager.updateStudent = async function(studentId, collectionName) {
+        try {
+            const nameInput = document.getElementById(`studentName_${studentId}`);
+            const genderInput = document.getElementById(`studentGender_${studentId}`);
+            const motherInput = document.getElementById(`motherPhone_${studentId}`);
+            const fatherInput = document.getElementById(`fatherPhone_${studentId}`);
+            const emailInput = document.getElementById(`guardianEmail_${studentId}`);
+
+            const newName = nameInput.value.trim();
+            const gender = genderInput.value;
+            const motherPhone = motherInput.value.trim();
+            const fatherPhone = fatherInput.value.trim();
+            const email = emailInput.value.trim();
+
+            if (!newName) {
+                showMessage('Student name cannot be empty', 'error');
+                return;
+            }
+
+            const btn = document.querySelector(`button[onclick="window.settingsManager.updateStudent('${studentId}', '${collectionName}')"]`);
+            const originalText = btn ? btn.innerHTML : 'Save Details';
+            
+            if (btn) {
+                btn.innerHTML = '<div class="loading-spinner-small mr-2"></div> Updating All Records...';
+                btn.disabled = true;
+            }
+
+            // ================================================================
+            // STEP 1: UPDATE STUDENT RECORD
+            // ================================================================
+            const updateData = {
+                studentName: newName,
+                name: newName,
+                gender: gender,
+                motherPhone: motherPhone,
+                fatherPhone: fatherPhone,
+                guardianEmail: email,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            await db.collection(collectionName).doc(studentId).update(updateData);
+            
+            console.log("✅ Updated student record with shared contacts:", {
+                motherPhone,
+                fatherPhone,
+                email
+            });
+
+            // ================================================================
+            // STEP 2: UPDATE ALL RELATED REPORTS WITH NEW CONTACTS
+            // ================================================================
+            console.log("🔄 Propagating shared contacts to all reports...");
+            
+            const collectionsToUpdate = ['tutor_submissions', 'student_results'];
+            
+            for (const collection of collectionsToUpdate) {
+                try {
+                    // Find all reports for this student
+                    const reportsSnapshot = await db.collection(collection)
+                        .where('studentId', '==', studentId)
+                        .get();
+
+                    if (!reportsSnapshot.empty) {
+                        const batch = db.batch();
+                        let updateCount = 0;
+                        
+                        reportsSnapshot.forEach(doc => {
+                            const ref = db.collection(collection).doc(doc.id);
+                            
+                            // Update report with parent contact info
+                            const reportUpdate = {
+                                studentName: newName,
+                                // Add mother/father phones if they don't exist
+                                ...(motherPhone && { motherPhone: motherPhone }),
+                                ...(fatherPhone && { fatherPhone: fatherPhone }),
+                                ...(email && { parentEmail: email }),
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            };
+                            
+                            batch.update(ref, reportUpdate);
+                            updateCount++;
+                        });
+                        
+                        if (updateCount > 0) {
+                            await batch.commit();
+                            console.log(`✅ Updated ${updateCount} reports in ${collection} with shared contacts`);
+                        }
+                    }
+                } catch (err) {
+                    console.warn(`Background update for ${collection} failed:`, err.message);
+                }
+            }
+
+            // ================================================================
+            // STEP 3: NOTIFY PRIMARY PARENT ABOUT SHARED ACCESS
+            // ================================================================
+            const user = auth.currentUser;
+            if (user) {
+                const userDoc = await db.collection('parent_users').doc(user.uid).get();
+                const userData = userDoc.data();
+                
+                // Create a log entry for shared access
+                const sharedAccessLog = {
+                    studentId: studentId,
+                    studentName: newName,
+                    primaryParent: userData.parentName || 'Primary Parent',
+                    primaryParentPhone: userData.phone,
+                    sharedContactsAdded: {
+                        motherPhone: motherPhone || 'Not added',
+                        fatherPhone: fatherPhone || 'Not added',
+                        guardianEmail: email || 'Not added'
+                    },
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    type: 'shared_access_update'
+                };
+                
+                // Save to a separate collection for tracking
+                await db.collection('shared_access_logs').add(sharedAccessLog);
+                
+                console.log("📝 Logged shared access update");
+            }
+
+            showMessage(`${newName}'s details updated! Shared contacts saved.`, 'success');
+            
+            if (btn) {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+
+            // Refresh dashboard to show updated data
+            if (window.authManager) {
+                setTimeout(() => {
+                    console.log("🔄 Refreshing dashboard with new shared contacts...");
+                    window.authManager.reloadDashboard();
+                }, 1500);
+            }
+
+        } catch (error) {
+            console.error("Shared access update error:", error);
+            showMessage('Error updating shared contacts.', 'error');
+        }
+    };
+}
+
+// ============================================================================
+// 4. ENHANCED SIGNUP FOR SHARED ACCESS
+// ============================================================================
+
+// Store original
+const originalHandleSignUpFull = window.handleSignUpFull;
+
+// Enhanced signup that checks for existing shared contacts
+window.handleSignUpFull = async function(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader) {
+    const requestId = `signup_${Date.now()}`;
+    pendingRequests.add(requestId);
+    
+    try {
+        let fullPhoneInput = localPhone;
+        if (!localPhone.startsWith('+')) {
+            fullPhoneInput = countryCode + localPhone;
+        }
+        
+        const normalizedResult = normalizePhoneNumber(fullPhoneInput);
+        
+        if (!normalizedResult.valid) {
+            throw new Error(`Invalid phone number: ${normalizedResult.error}`);
+        }
+        
+        const finalPhone = normalizedResult.normalized;
+        console.log("📱 Processing SHARED ACCESS signup with phone:", finalPhone);
+
+        // ================================================================
+        // STEP 1: CHECK IF THIS PHONE/EMAIL EXISTS AS SHARED CONTACT
+        // ================================================================
+        console.log("🔍 Checking for existing shared contacts...");
+        
+        let linkedStudents = [];
+        
+        // Search students collection for this phone as mother/father phone
+        const studentsSnapshot = await db.collection('students').get();
+        studentsSnapshot.forEach(doc => {
+            const data = doc.data();
+            
+            // Check if this phone matches any shared contact fields
+            const sharedFields = [
+                { field: 'motherPhone', type: 'mother' },
+                { field: 'fatherPhone', type: 'father' },
+                { field: 'guardianPhone', type: 'guardian' },
+                { field: 'emergencyPhone', type: 'emergency' }
+            ];
+            
+            for (const { field, type } of sharedFields) {
+                if (data[field] && extractPhoneSuffix(data[field]) === extractPhoneSuffix(finalPhone)) {
+                    console.log(`✅ Found as ${type} phone for student: ${data.studentName}`);
+                    linkedStudents.push({
+                        studentId: doc.id,
+                        studentName: data.studentName,
+                        relationship: type,
+                        matchedField: field,
+                        matchedPhone: data[field]
+                    });
+                }
+            }
+            
+            // Check email
+            if (email && data.guardianEmail === email) {
+                console.log(`✅ Found as guardian email for student: ${data.studentName}`);
+                linkedStudents.push({
+                    studentId: doc.id,
+                    studentName: data.studentName,
+                    relationship: 'guardian',
+                    matchedField: 'guardianEmail',
+                    matchedValue: email
+                });
+            }
+        });
+        
+        // ================================================================
+        // STEP 2: CREATE USER ACCOUNT
+        // ================================================================
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+
+        const referralCode = await generateReferralCode();
+
+        // ================================================================
+        // STEP 3: CREATE PARENT PROFILE WITH SHARED ACCESS INFO
+        // ================================================================
+        const parentProfile = {
+            email: email,
+            phone: finalPhone,
+            normalizedPhone: finalPhone,
+            parentName: 'Parent', // Will be updated after name setup
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            referralCode: referralCode,
+            referralEarnings: 0,
+            uid: user.uid,
+            // Store linked students for shared access
+            linkedStudents: linkedStudents.map(s => ({
+                studentId: s.studentId,
+                studentName: s.studentName,
+                relationship: s.relationship,
+                linkedAt: firebase.firestore.FieldValue.serverTimestamp()
+            })),
+            isSharedContact: linkedStudents.length > 0,
+            originalLinkedStudentsCount: linkedStudents.length
+        };
+
+        await db.collection('parent_users').doc(user.uid).set(parentProfile);
+
+        console.log("✅ Account created with shared access links:", linkedStudents.length);
+        
+        // ================================================================
+        // STEP 4: SHOW APPROPRIATE MESSAGE
+        // ================================================================
+        if (linkedStudents.length > 0) {
+            const studentNames = linkedStudents.map(s => s.studentName).join(', ');
+            showMessage(`Account created! Linked to ${linkedStudents.length} student(s): ${studentNames}`, 'success');
+        } else {
+            showMessage('Account created successfully!', 'success');
+        }
+        
+        // ================================================================
+        // STEP 5: UPDATE STUDENT RECORDS WITH NEW PARENT INFO
+        // ================================================================
+        if (linkedStudents.length > 0) {
+            console.log("🔄 Updating student records with new parent info...");
+            
+            for (const student of linkedStudents) {
+                try {
+                    // Add this parent to the student's sharedParents array
+                    await db.collection('students').doc(student.studentId).update({
+                        sharedParents: firebase.firestore.FieldValue.arrayUnion({
+                            parentUid: user.uid,
+                            parentEmail: email,
+                            parentPhone: finalPhone,
+                            relationship: student.relationship,
+                            linkedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    console.log(`✅ Added ${email} as ${student.relationship} to ${student.studentName}`);
+                } catch (error) {
+                    console.warn(`Could not update student ${student.studentName}:`, error.message);
+                }
+            }
+        }
+
+        // ================================================================
+        // STEP 6: DELAY AND RELOAD
+        // ================================================================
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Clear form
+        if (signUpBtn) signUpBtn.disabled = false;
+        const signUpText = document.getElementById('signUpText');
+        const signUpSpinner = document.getElementById('signUpSpinner');
+        if (signUpText) signUpText.textContent = 'Create Account';
+        if (signUpSpinner) signUpSpinner.classList.add('hidden');
+        if (authLoader) authLoader.classList.add('hidden');
+        
+        // Reload to trigger proper auth flow
+        setTimeout(() => {
+            window.location.reload();
+        }, 2000);
+        
+    } catch (error) {
+        if (!pendingRequests.has(requestId)) return;
+        
+        let errorMessage = "Failed to create account.";
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = "This email is already registered. Please sign in instead.";
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = "Password should be at least 6 characters.";
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+
+        showMessage(errorMessage, 'error');
+
+        if (signUpBtn) signUpBtn.disabled = false;
+        
+        const signUpText = document.getElementById('signUpText');
+        const signUpSpinner = document.getElementById('signUpSpinner');
+        
+        if (signUpText) signUpText.textContent = 'Create Account';
+        if (signUpSpinner) signUpSpinner.classList.add('hidden');
+        if (authLoader) authLoader.classList.add('hidden');
+    } finally {
+        pendingRequests.delete(requestId);
+    }
+};
+
+// ============================================================================
+// 5. ENHANCED WELCOME MESSAGE FOR SHARED ACCESS PARENTS
+// ============================================================================
+
+// Modify the auth manager to show shared access info
+if (window.authManager && window.authManager.loadUserDashboard) {
+    const originalLoadUserDashboard = window.authManager.loadUserDashboard;
+    
+    window.authManager.loadUserDashboard = async function(user) {
+        await originalLoadUserDashboard.call(this, user);
+        
+        // Check if this is a shared access parent
+        setTimeout(async () => {
+            try {
+                const parentDoc = await db.collection('parent_users').doc(user.uid).get();
+                const parentData = parentDoc.data();
+                
+                if (parentData.isSharedContact && parentData.linkedStudents?.length > 0) {
+                    // Update welcome message for shared access parent
+                    const welcomeMsg = document.getElementById('welcomeMessage');
+                    if (welcomeMsg) {
+                        const studentNames = parentData.linkedStudents.map(s => s.studentName).join(', ');
+                        welcomeMsg.textContent = `Welcome! Accessing ${studentNames}'s account`;
+                        
+                        // Add a small info badge
+                        const infoBadge = document.createElement('span');
+                        infoBadge.className = 'ml-2 bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full';
+                        infoBadge.textContent = 'Shared Access';
+                        welcomeMsg.appendChild(infoBadge);
+                    }
+                    
+                    showMessage(`You have access to ${parentData.linkedStudents.length} student(s) as a shared contact`, 'info');
+                }
+            } catch (error) {
+                console.warn("Could not check shared access status:", error);
+            }
+        }, 1000);
+    };
+}
+
+console.log("✅ SHARED PARENT ACCESS SYSTEM INSTALLED");
+console.log("=======================================");
+console.log("Features enabled:");
+console.log("1. ✅ Parents can add mother/father phones in Settings");
+console.log("2. ✅ Those phones/emails can register and see same reports");
+console.log("3. ✅ Search checks ALL phone fields (motherPhone, fatherPhone, etc.)");
+console.log("4. ✅ Automatic linking during signup");
+console.log("5. ✅ Proper shared access tracking");
+console.log("=======================================");
+
+// ============================================================================
 // END OF PARENT.JS - PRODUCTION READY
 // ============================================================================
