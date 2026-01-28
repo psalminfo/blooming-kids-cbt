@@ -5841,5 +5841,187 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
 }
 
 // ============================================================================
+// SECTION 26: PREMIUM DASHBOARD UI OVERRIDE (WORDPRESS/SAAS STYLE)
+// ============================================================================
+(function injectPremiumSlickUI() {
+    const slickStyle = document.createElement('style');
+    slickStyle.textContent = `
+        /* Root Variables for a Modern Palette */
+        :root {
+            --brand-primary: #10b981;
+            --brand-dark: #064e3b;
+            --brand-light: #ecfdf5;
+            --bg-main: #f8fafc;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            --card-hover: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        /* Global Body Styling */
+        body {
+            background-color: var(--bg-main) !important;
+            color: var(--text-main) !important;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+            letter-spacing: -0.01em;
+        }
+
+        /* Container & Glassmorphism */
+        #reportArea, #authArea {
+            max-width: 1200px !important;
+            margin: 2rem auto !important;
+            padding: 0 1.5rem !important;
+        }
+
+        /* Card Styling - WordPress/Slick look */
+        .bg-white, .gc-card, .accordion-item, #assessment-block, #monthly-block {
+            border-radius: 16px !important;
+            border: 1px solid rgba(226, 232, 240, 0.8) !important;
+            box-shadow: var(--card-shadow) !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            overflow: hidden;
+            background: #ffffff !important;
+        }
+
+        .bg-white:hover {
+            box-shadow: var(--card-hover) !important;
+            transform: translateY(-2px);
+        }
+
+        /* Header / Welcome Area */
+        .bg-green-50 {
+            background: linear-gradient(135deg, var(--brand-dark) 0%, #065f46 100%) !important;
+            border-radius: 20px !important;
+            padding: 3rem 2rem !important;
+            color: white !important;
+            margin-bottom: 2rem !important;
+            box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.2) !important;
+        }
+
+        #welcomeMessage {
+            font-size: 2.25rem !important;
+            font-weight: 800 !important;
+            letter-spacing: -0.025em !important;
+            margin-bottom: 0.5rem !important;
+        }
+
+        .bg-green-50 p {
+            color: rgba(255, 255, 255, 0.8) !important;
+            font-size: 1.1rem !important;
+        }
+
+        /* Tabs Navigation - Slick Modern look */
+        .flex.mb-8.bg-gray-100 {
+            background: #e2e8f0 !important;
+            padding: 6px !important;
+            border-radius: 12px !important;
+            display: inline-flex !important;
+            width: auto !important;
+            margin-bottom: 2.5rem !important;
+        }
+
+        .tab-active-main {
+            background: white !important;
+            color: var(--brand-dark) !important;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
+            border-radius: 8px !important;
+            font-weight: 600 !important;
+            padding: 10px 24px !important;
+        }
+
+        .tab-inactive-main {
+            color: var(--text-muted) !important;
+            font-weight: 500 !important;
+            padding: 10px 24px !important;
+            transition: color 0.2s ease !important;
+        }
+
+        /* Modern Buttons */
+        button {
+            border-radius: 10px !important;
+            font-weight: 600 !important;
+            transition: all 0.2s ease !important;
+        }
+
+        .bg-green-600 {
+            background-color: var(--brand-primary) !important;
+            box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.39) !important;
+        }
+
+        .bg-green-600:hover {
+            background-color: #059669 !important;
+            transform: scale(1.02);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.23) !important;
+        }
+
+        /* Accordion Headers */
+        .accordion-header {
+            border: none !important;
+            padding: 1.5rem !important;
+            font-weight: 700 !important;
+        }
+
+        .bg-blue-100 { background-color: #f0f9ff !important; border-left: 5px solid #0ea5e9 !important; }
+        .bg-purple-100 { background-color: #f5f3ff !important; border-left: 5px solid #8b5cf6 !important; }
+        .bg-green-100 { background-color: #ecfdf5 !important; border-left: 5px solid #10b981 !important; }
+
+        /* Tables - Clean & Pro */
+        table {
+            border-radius: 12px !important;
+            border-collapse: separate !important;
+            border-spacing: 0 !important;
+            border: 1px solid #f1f5f9 !important;
+        }
+
+        th {
+            background-color: #f8fafc !important;
+            color: var(--text-muted) !important;
+            text-transform: uppercase !important;
+            font-size: 0.75rem !important;
+            font-weight: 700 !important;
+            padding: 1rem !important;
+        }
+
+        td {
+            padding: 1rem !important;
+            border-bottom: 1px solid #f1f5f9 !important;
+        }
+
+        /* Homework Cards Specific */
+        [data-homework-id] {
+            border-left: 4px solid #cbd5e1 !important;
+        }
+
+        [data-homework-id]:has(.bg-green-100) { border-left-color: #10b981 !important; }
+        [data-homework-id]:has(.bg-red-100) { border-left-color: #ef4444 !important; }
+        [data-homework-id]:has(.bg-blue-100) { border-left-color: #3b82f6 !important; }
+
+        /* Input Fields */
+        input, select {
+            border: 1.5px solid #e2e8f0 !important;
+            border-radius: 10px !important;
+            padding: 0.75rem 1rem !important;
+        }
+
+        input:focus {
+            border-color: var(--brand-primary) !important;
+            box-shadow: 0 0 0 4px var(--brand-light) !important;
+        }
+        
+        /* Floating Message Toasts */
+        .message-toast {
+            border-radius: 12px !important;
+            backdrop-filter: blur(8px) !important;
+            background: rgba(16, 185, 129, 0.9) !important;
+            border: 1px solid rgba(255,255,255,0.2) !important;
+            padding: 1rem 1.5rem !important;
+            font-weight: 500 !important;
+        }
+    `;
+    document.head.appendChild(slickStyle);
+    console.log("💎 Premium Slick UI Skin applied successfully.");
+})();
+
+// ============================================================================
 // END OF PARENT.JS - PRODUCTION READY
 // ============================================================================
