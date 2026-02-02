@@ -1,3 +1,4 @@
+
 /*******************************************************************************
  * SECTION 1: IMPORTS & INITIAL SETUP
  * GitHub: https://github.com/psalminfo/blooming-kids-cbt/blob/main/tutor.js
@@ -1995,934 +1996,55 @@ function initScheduleManager(tutor) {
 }
 
 /*******************************************************************************
- * SECTION 8: ENHANCED HOMEWORK MANAGEMENT SYSTEM
- * (With View/Edit/Recall/Reassign + Google Classroom UI)
+ * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT
+ * (Version: Auto-Sync Parent Data & "Self-Healing" Database)
  ******************************************************************************/
 
 // ==========================================
-// 1. HOMEWORK MANAGEMENT DASHBOARD
+// 1. DAILY TOPIC FUNCTIONS
 // ==========================================
 
-function showHomeworkManagementDashboard(tutorEmail) {
-    const modalHTML = `
-        <div class="modal-overlay">
-            <div class="modal-content max-w-6xl" style="max-height: 90vh;">
-                <div class="modal-header flex justify-between items-center">
-                    <div>
-                        <h3 class="modal-title text-xl font-bold">📚 Homework Management</h3>
-                        <p class="text-sm text-gray-600 mt-1">View, edit, recall, or reassign homework assignments</p>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <button id="refresh-hw-dashboard" class="btn btn-sm btn-secondary flex items-center">
-                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            Refresh
-                        </button>
-                        <button id="close-hw-dashboard" class="btn btn-sm btn-secondary">✕ Close</button>
-                    </div>
-                </div>
-                
-                <div class="modal-body overflow-y-auto">
-                    <!-- Status Filters -->
-                    <div class="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                        <div class="flex flex-wrap gap-2 mb-4">
-                            <span class="text-sm font-medium text-gray-700 mr-3">Filter by Status:</span>
-                            <button data-status="all" class="filter-status-btn px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg">All</button>
-                            <button data-status="assigned" class="filter-status-btn px-3 py-1.5 bg-blue-100 text-blue-700 text-sm rounded-lg hover:bg-blue-200">Assigned</button>
-                            <button data-status="submitted" class="filter-status-btn px-3 py-1.5 bg-yellow-100 text-yellow-700 text-sm rounded-lg hover:bg-yellow-200">Submitted</button>
-                            <button data-status="graded" class="filter-status-btn px-3 py-1.5 bg-green-100 text-green-700 text-sm rounded-lg hover:bg-green-200">Graded</button>
-                            <button data-status="recalled" class="filter-status-btn px-3 py-1.5 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200">Recalled</button>
-                        </div>
-                        
-                        <div class="flex items-center space-x-4">
-                            <div class="relative flex-1">
-                                <input type="text" id="hw-search-input" placeholder="Search by student name, title, or description..." 
-                                    class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                                <svg class="absolute left-3 top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
-                            </div>
-                            <select id="hw-sort-select" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500">
-                                <option value="dueDate_asc">Due Date (Earliest)</option>
-                                <option value="dueDate_desc">Due Date (Latest)</option>
-                                <option value="assigned_desc">Recently Assigned</option>
-                                <option value="title_asc">Title A-Z</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <!-- Homework Grid/Table -->
-                    <div id="homework-grid-container">
-                        <div class="flex justify-center p-8">
-                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="modal-footer">
-                    <div class="text-sm text-gray-500" id="hw-stats">Loading assignments...</div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const modal = document.createElement('div');
-    modal.innerHTML = modalHTML;
-    document.body.appendChild(modal);
-    
-    // Load initial data
-    loadHomeworkAssignments(tutorEmail);
-    
-    // Event Listeners
-    document.getElementById('close-hw-dashboard').addEventListener('click', () => modal.remove());
-    document.getElementById('refresh-hw-dashboard').addEventListener('click', () => loadHomeworkAssignments(tutorEmail));
-    
-    // Filter buttons
-    document.querySelectorAll('.filter-status-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.filter-status-btn').forEach(b => {
-                b.classList.remove('bg-indigo-600', 'text-white');
-                b.classList.add('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
-            });
-            btn.classList.remove('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
-            btn.classList.add('bg-indigo-600', 'text-white');
-            
-            const status = btn.dataset.status;
-            filterHomeworkByStatus(status);
-        });
-    });
-    
-    // Search functionality
-    document.getElementById('hw-search-input').addEventListener('input', debounce(() => {
-        filterHomeworkBySearch();
-    }, 300));
-    
-    // Sort functionality
-    document.getElementById('hw-sort-select').addEventListener('change', () => {
-        sortHomeworkAssignments();
-    });
-}
+function showDailyTopicModal(student) {
+    const date = new Date();
+    const monthName = date.toLocaleString('default', { month: 'long' });
 
-// ==========================================
-// 2. LOAD HOMEWORK ASSIGNMENTS
-// ==========================================
+    // Use local date for storage/display consistency
+    const today = new Date();
+    const localDateString = today.getFullYear() + '-' + 
+                            String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+                            String(today.getDate()).padStart(2, '0');
 
-let allHomeworkAssignments = [];
-
-async function loadHomeworkAssignments(tutorEmail) {
-    const container = document.getElementById('homework-grid-container');
-    if (!container) return;
-    
-    container.innerHTML = `
-        <div class="flex justify-center p-8">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-        </div>
-    `;
-    
-    try {
-        // Query assignments by tutor
-        const q = query(
-            collection(db, "homework_assignments"),
-            where("tutorEmail", "==", tutorEmail),
-            orderBy("assignedDate", "desc")
-        );
-        
-        const snapshot = await getDocs(q);
-        allHomeworkAssignments = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            assignedDate: doc.data().assignedDate?.toDate() || new Date(),
-            dueDate: new Date(doc.data().dueDate)
-        }));
-        
-        renderHomeworkGrid(allHomeworkAssignments);
-        updateHomeworkStats(allHomeworkAssignments);
-        
-    } catch (error) {
-        console.error("Error loading homework:", error);
-        container.innerHTML = `
-            <div class="text-center p-8">
-                <div class="text-red-500 mb-2">❌ Error loading assignments</div>
-                <button onclick="loadHomeworkAssignments('${tutorEmail}')" class="btn btn-sm btn-primary mt-2">Retry</button>
-            </div>
-        `;
-    }
-}
-
-// ==========================================
-// 3. RENDER HOMEWORK GRID
-// ==========================================
-
-function renderHomeworkGrid(assignments) {
-    const container = document.getElementById('homework-grid-container');
-    if (!container) return;
-    
-    if (assignments.length === 0) {
-        container.innerHTML = `
-            <div class="text-center p-12">
-                <div class="text-4xl mb-4">📚</div>
-                <h4 class="text-lg font-medium text-gray-700 mb-2">No assignments found</h4>
-                <p class="text-gray-500">You haven't assigned any homework yet.</p>
-            </div>
-        `;
-        return;
-    }
-    
-    const gridHTML = `
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            ${assignments.map(assignment => createHomeworkCard(assignment)).join('')}
-        </div>
-    `;
-    
-    container.innerHTML = gridHTML;
-    
-    // Add event listeners to action buttons
-    assignments.forEach(assignment => {
-        // Edit button
-        const editBtn = document.getElementById(`edit-hw-${assignment.id}`);
-        if (editBtn) {
-            editBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                showEditHomeworkModal(assignment);
-            });
-        }
-        
-        // Recall button
-        const recallBtn = document.getElementById(`recall-hw-${assignment.id}`);
-        if (recallBtn) {
-            recallBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                recallHomeworkAssignment(assignment);
-            });
-        }
-        
-        // Reassign button
-        const reassignBtn = document.getElementById(`reassign-hw-${assignment.id}`);
-        if (reassignBtn) {
-            reassignBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                showReassignHomeworkModal(assignment);
-            });
-        }
-        
-        // View button
-        const viewBtn = document.getElementById(`view-hw-${assignment.id}`);
-        if (viewBtn) {
-            viewBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                openHomeworkDetails(assignment);
-            });
-        }
-        
-        // Delete button
-        const deleteBtn = document.getElementById(`delete-hw-${assignment.id}`);
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                deleteHomeworkAssignment(assignment.id);
-            });
-        }
-        
-        // Card click for details
-        const card = document.getElementById(`hw-card-${assignment.id}`);
-        if (card) {
-            card.addEventListener('click', () => openHomeworkDetails(assignment));
-        }
-    });
-}
-
-function createHomeworkCard(assignment) {
-    const statusColors = {
-        'assigned': { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Assigned' },
-        'submitted': { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Submitted' },
-        'graded': { bg: 'bg-green-100', text: 'text-green-700', label: 'Graded' },
-        'recalled': { bg: 'bg-red-100', text: 'text-red-700', label: 'Recalled' }
-    };
-    
-    const status = statusColors[assignment.status] || statusColors.assigned;
-    const dueDate = assignment.dueDate;
-    const now = new Date();
-    const isOverdue = dueDate < now && assignment.status === 'assigned';
-    const daysLeft = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
-    
-    const attachmentsCount = assignment.attachments?.length || 0;
-    const hasScore = assignment.score !== undefined && assignment.score !== null;
-    
-    return `
-        <div id="hw-card-${assignment.id}" class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
-            <div class="flex justify-between items-start mb-3">
-                <div>
-                    <h4 class="font-bold text-gray-900 group-hover:text-indigo-600">${assignment.title}</h4>
-                    <div class="flex items-center mt-1">
-                        <span class="text-sm text-gray-600">${assignment.studentName}</span>
-                        ${assignment.parentEmail ? `<span class="mx-2 text-gray-300">•</span><span class="text-xs text-gray-500">${assignment.parentEmail}</span>` : ''}
-                    </div>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <span class="px-2.5 py-1 ${status.bg} ${status.text} text-xs font-medium rounded-full">${status.label}</span>
-                    ${isOverdue ? '<span class="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">Overdue</span>' : ''}
-                </div>
-            </div>
-            
-            <p class="text-sm text-gray-600 mb-4 line-clamp-2">${assignment.description}</p>
-            
-            <div class="flex items-center justify-between text-sm mb-4">
-                <div class="flex items-center space-x-4">
-                    <div class="flex items-center text-gray-500">
-                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <span>Due: ${dueDate.toLocaleDateString()}</span>
-                    </div>
-                    ${attachmentsCount > 0 ? `
-                        <div class="flex items-center text-gray-500">
-                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                            </svg>
-                            <span>${attachmentsCount} file${attachmentsCount !== 1 ? 's' : ''}</span>
-                        </div>
-                    ` : ''}
-                </div>
-                
-                ${hasScore ? `
-                    <div class="px-3 py-1 bg-gray-100 rounded-lg">
-                        <span class="font-bold ${assignment.score >= 70 ? 'text-green-600' : assignment.score >= 50 ? 'text-yellow-600' : 'text-red-600'}">
-                            ${assignment.score}/100
-                        </span>
-                    </div>
-                ` : ''}
-            </div>
-            
-            <div class="flex items-center justify-between border-t pt-4">
-                <div class="flex items-center space-x-2">
-                    <span class="text-xs text-gray-500">
-                        Assigned: ${assignment.assignedDate.toLocaleDateString()}
-                    </span>
-                    ${isOverdue ? `<span class="text-xs font-medium text-red-600">${Math.abs(daysLeft)} days overdue</span>` : 
-                      daysLeft >= 0 ? `<span class="text-xs font-medium ${daysLeft <= 2 ? 'text-red-600' : 'text-green-600'}">${daysLeft} day${daysLeft !== 1 ? 's' : ''} left</span>` : ''}
-                </div>
-                
-                <div class="flex items-center space-x-2" onclick="event.stopPropagation()">
-                    <button id="view-hw-${assignment.id}" class="p-1.5 text-gray-500 hover:text-indigo-600" title="View Details">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                    </button>
-                    
-                    ${assignment.status === 'assigned' ? `
-                        <button id="edit-hw-${assignment.id}" class="p-1.5 text-gray-500 hover:text-blue-600" title="Edit">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                        </button>
-                        <button id="recall-hw-${assignment.id}" class="p-1.5 text-gray-500 hover:text-red-600" title="Recall">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                        </button>
-                    ` : ''}
-                    
-                    <button id="reassign-hw-${assignment.id}" class="p-1.5 text-gray-500 hover:text-purple-600" title="Reassign">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                        </svg>
-                    </button>
-                    
-                    <button id="delete-hw-${assignment.id}" class="p-1.5 text-gray-500 hover:text-red-600" title="Delete">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-// ==========================================
-// 4. HOMEWORK DETAILS MODAL
-// ==========================================
-
-function openHomeworkDetails(assignment) {
-    const modalHTML = `
-        <div class="modal-overlay">
-            <div class="modal-content max-w-4xl">
-                <div class="modal-header flex justify-between items-center">
-                    <div>
-                        <h3 class="modal-title text-xl font-bold">📋 Assignment Details</h3>
-                        <p class="text-sm text-gray-600 mt-1">${assignment.title}</p>
-                    </div>
-                    <button id="close-details-btn" class="btn btn-sm btn-secondary">✕ Close</button>
-                </div>
-                
-                <div class="modal-body overflow-y-auto max-h-[70vh]">
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <!-- Left Column: Assignment Info -->
-                        <div class="lg:col-span-2 space-y-6">
-                            <div class="bg-white p-5 rounded-xl border border-gray-200">
-                                <h4 class="font-bold text-gray-900 mb-3 flex items-center">
-                                    <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    Assignment Description
-                                </h4>
-                                <p class="text-gray-700 whitespace-pre-wrap">${assignment.description}</p>
-                                
-                                ${assignment.attachments?.length > 0 ? `
-                                    <div class="mt-4">
-                                        <h5 class="text-sm font-medium text-gray-700 mb-2">Attached Files:</h5>
-                                        <div class="space-y-2">
-                                            ${assignment.attachments.map((file, index) => `
-                                                <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                                                    <div class="flex items-center">
-                                                        <svg class="w-5 h-5 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                        </svg>
-                                                        <div>
-                                                            <div class="text-sm font-medium">${file.name || 'Attachment'}</div>
-                                                            <div class="text-xs text-gray-500">${hwFormatFileSize(file.size)}</div>
-                                                        </div>
-                                                    </div>
-                                                    <a href="${file.url}" target="_blank" class="btn btn-sm btn-secondary">Download</a>
-                                                </div>
-                                            `).join('')}
-                                        </div>
-                                    </div>
-                                ` : ''}
-                            </div>
-                            
-                            ${assignment.submissionUrl ? `
-                                <div class="bg-white p-5 rounded-xl border border-gray-200">
-                                    <h4 class="font-bold text-gray-900 mb-3 flex items-center">
-                                        <svg class="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        Student Submission
-                                    </h4>
-                                    <div class="flex items-center justify-between">
-                                        <div>
-                                            <p class="text-sm text-gray-600">Submitted on: ${assignment.submittedAt?.toDate ? new Date(assignment.submittedAt.toDate()).toLocaleString() : 'Unknown'}</p>
-                                        </div>
-                                        <a href="${assignment.submissionUrl}" target="_blank" class="btn btn-primary">View Submission</a>
-                                    </div>
-                                </div>
-                            ` : ''}
-                            
-                            ${assignment.feedback ? `
-                                <div class="bg-white p-5 rounded-xl border border-gray-200">
-                                    <h4 class="font-bold text-gray-900 mb-3 flex items-center">
-                                        <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                                        </svg>
-                                        Tutor Feedback
-                                    </h4>
-                                    <p class="text-gray-700 whitespace-pre-wrap">${assignment.feedback}</p>
-                                    ${assignment.score !== undefined && assignment.score !== null ? `
-                                        <div class="mt-3 p-3 bg-gray-50 rounded-lg inline-block">
-                                            <span class="font-bold text-lg ${assignment.score >= 70 ? 'text-green-600' : assignment.score >= 50 ? 'text-yellow-600' : 'text-red-600'}">
-                                                Score: ${assignment.score}/100
-                                            </span>
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            ` : ''}
-                        </div>
-                        
-                        <!-- Right Column: Metadata -->
-                        <div class="space-y-6">
-                            <div class="bg-white p-5 rounded-xl border border-gray-200">
-                                <h4 class="font-bold text-gray-900 mb-4">Assignment Info</h4>
-                                <div class="space-y-3">
-                                    <div>
-                                        <label class="text-xs text-gray-500 block">Student</label>
-                                        <p class="font-medium">${assignment.studentName}</p>
-                                    </div>
-                                    <div>
-                                        <label class="text-xs text-gray-500 block">Parent</label>
-                                        <p class="font-medium">${assignment.parentName || 'Not specified'}</p>
-                                        <p class="text-sm text-gray-600">${assignment.parentEmail || 'No email'}</p>
-                                    </div>
-                                    <div>
-                                        <label class="text-xs text-gray-500 block">Status</label>
-                                        <span class="px-2.5 py-1 ${hwGetStatusColor(assignment.status).bg} ${hwGetStatusColor(assignment.status).text} text-xs font-medium rounded-full">
-                                            ${hwGetStatusColor(assignment.status).label}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <label class="text-xs text-gray-500 block">Assigned Date</label>
-                                        <p class="font-medium">${assignment.assignedDate.toLocaleDateString()}</p>
-                                    </div>
-                                    <div>
-                                        <label class="text-xs text-gray-500 block">Due Date</label>
-                                        <p class="font-medium ${assignment.dueDate < new Date() ? 'text-red-600' : ''}">
-                                            ${assignment.dueDate.toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="bg-white p-5 rounded-xl border border-gray-200">
-                                <h4 class="font-bold text-gray-900 mb-4">Quick Actions</h4>
-                                <div class="space-y-2">
-                                    ${assignment.status === 'assigned' ? `
-                                        <button id="edit-assignment-btn" class="w-full btn btn-secondary justify-start">
-                                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                            </svg>
-                                            Edit Assignment
-                                        </button>
-                                        <button id="recall-assignment-btn" class="w-full btn btn-secondary justify-start text-red-600 hover:text-red-700">
-                                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
-                                            Recall Assignment
-                                        </button>
-                                    ` : ''}
-                                    
-                                    <button id="reassign-btn" class="w-full btn btn-secondary justify-start text-purple-600 hover:text-purple-700">
-                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                                        </svg>
-                                        Reassign to Another Student
-                                    </button>
-                                    
-                                    ${assignment.status === 'submitted' ? `
-                                        <button id="grade-assignment-btn" class="w-full btn btn-primary">
-                                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            Grade Assignment
-                                        </button>
-                                    ` : ''}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const modal = document.createElement('div');
-    modal.innerHTML = modalHTML;
-    document.body.appendChild(modal);
-    
-    // Event listeners
-    document.getElementById('close-details-btn').addEventListener('click', () => modal.remove());
-    
-    if (document.getElementById('edit-assignment-btn')) {
-        document.getElementById('edit-assignment-btn').addEventListener('click', () => {
-            modal.remove();
-            showEditHomeworkModal(assignment);
-        });
-    }
-    
-    if (document.getElementById('recall-assignment-btn')) {
-        document.getElementById('recall-assignment-btn').addEventListener('click', () => {
-            modal.remove();
-            recallHomeworkAssignment(assignment);
-        });
-    }
-    
-    if (document.getElementById('reassign-btn')) {
-        document.getElementById('reassign-btn').addEventListener('click', () => {
-            modal.remove();
-            showReassignHomeworkModal(assignment);
-        });
-    }
-    
-    if (document.getElementById('grade-assignment-btn')) {
-        document.getElementById('grade-assignment-btn').addEventListener('click', () => {
-            modal.remove();
-            openGradingModal(assignment.id);
-        });
-    }
-}
-
-// ==========================================
-// 5. EDIT HOMEWORK MODAL
-// ==========================================
-
-function showEditHomeworkModal(assignment) {
-    const nextWeek = new Date();
-    nextWeek.setDate(nextWeek.getDate() + 7);
-    const maxDate = nextWeek.toISOString().split('T')[0];
-    
-    const modalHTML = `
-        <div class="modal-overlay">
-            <div class="modal-content max-w-2xl">
-                <div class="modal-header">
-                    <h3 class="modal-title">✏️ Edit Homework Assignment</h3>
-                    <p class="text-sm text-gray-600 mt-1">${assignment.studentName} - ${assignment.title}</p>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label class="form-label">Title *</label>
-                        <input type="text" id="edit-hw-title" class="form-input" value="${assignment.title}" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Description *</label>
-                        <textarea id="edit-hw-description" class="form-input form-textarea" required>${assignment.description}</textarea>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Due Date *</label>
-                        <input type="date" id="edit-hw-due-date" class="form-input" 
-                            value="${assignment.dueDate.toISOString().split('T')[0]}" max="${maxDate}" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Current Attachments (${assignment.attachments?.length || 0})</label>
-                        <div id="current-attachments" class="space-y-2 mb-4">
-                            ${assignment.attachments?.map((file, index) => `
-                                <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                                    <div class="flex items-center">
-                                        <svg class="w-5 h-5 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                        <div>
-                                            <div class="text-sm">${file.name || 'Attachment'}</div>
-                                            <div class="text-xs text-gray-500">${hwFormatFileSize(file.size)}</div>
-                                        </div>
-                                    </div>
-                                    <button type="button" data-index="${index}" class="remove-attachment-btn text-red-500 hover:text-red-700">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            `).join('') || '<p class="text-gray-500 text-sm">No attachments</p>'}
-                        </div>
-                        
-                        <label class="form-label">Add New Files (Max 5 total)</label>
-                        <div class="file-upload-container">
-                            <input type="file" id="edit-hw-files" class="hidden" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt">
-                            <label for="edit-hw-files" class="file-upload-label">
-                                <span class="text-primary-color">Click to upload additional files</span>
-                            </label>
-                            <div id="new-files-preview" class="hidden mt-2">
-                                <ul id="new-files-list" class="space-y-2"></ul>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                        <label class="flex items-center space-x-2 mb-2">
-                            <input type="checkbox" id="edit-notify-parent" class="rounded" checked>
-                            <span class="font-bold text-blue-900">Notify parent about changes</span>
-                        </label>
-                        <p class="text-xs text-gray-600">
-                            An email will be sent to ${assignment.parentEmail || 'the parent'} with the updated assignment details.
-                        </p>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button id="cancel-edit-btn" class="btn btn-secondary">Cancel</button>
-                    <button id="save-edit-btn" class="btn btn-primary">Save Changes</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const modal = document.createElement('div');
-    modal.innerHTML = modalHTML;
-    document.body.appendChild(modal);
-    
-    let currentAttachments = [...(assignment.attachments || [])];
-    let newFiles = [];
-    
-    // Remove attachment button
-    document.querySelectorAll('.remove-attachment-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const index = parseInt(e.target.closest('button').dataset.index);
-            currentAttachments.splice(index, 1);
-            renderCurrentAttachments();
-        });
-    });
-    
-    // New file upload
-    const fileInput = document.getElementById('edit-hw-files');
-    fileInput.addEventListener('change', (e) => {
-        const files = Array.from(e.target.files);
-        if (currentAttachments.length + newFiles.length + files.length > 5) {
-            showCustomAlert('Maximum 5 files allowed total');
-            fileInput.value = '';
-            return;
-        }
-        
-        files.forEach(f => {
-            if (f.size <= 10 * 1024 * 1024) {
-                newFiles.push(f);
-            } else {
-                showCustomAlert(`Skipped ${f.name} (>10MB)`);
-            }
-        });
-        
-        renderNewFiles();
-        fileInput.value = '';
-    });
-    
-    function renderCurrentAttachments() {
-        const container = document.getElementById('current-attachments');
-        container.innerHTML = currentAttachments.map((file, index) => `
-            <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                <div class="flex items-center">
-                    <svg class="w-5 h-5 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <div>
-                        <div class="text-sm">${file.name || 'Attachment'}</div>
-                        <div class="text-xs text-gray-500">${hwFormatFileSize(file.size)}</div>
-                    </div>
-                </div>
-                <button type="button" data-index="${index}" class="remove-attachment-btn text-red-500 hover:text-red-700">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-        `).join('') || '<p class="text-gray-500 text-sm">No attachments</p>';
-        
-        // Re-add event listeners
-        document.querySelectorAll('.remove-attachment-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const index = parseInt(e.target.closest('button').dataset.index);
-                currentAttachments.splice(index, 1);
-                renderCurrentAttachments();
-            });
-        });
-    }
-    
-    function renderNewFiles() {
-        const preview = document.getElementById('new-files-preview');
-        const list = document.getElementById('new-files-list');
-        
-        if (newFiles.length === 0) {
-            preview.classList.add('hidden');
-            return;
-        }
-        
-        preview.classList.remove('hidden');
-        list.innerHTML = '';
-        
-        newFiles.forEach((f, i) => {
-            const li = document.createElement('li');
-            li.className = "flex justify-between items-center bg-white p-2 border rounded text-sm";
-            li.innerHTML = `
-                <span>${f.name}</span>
-                <span class="text-red-500 cursor-pointer remove-new-file-btn" data-index="${i}">✕</span>
-            `;
-            list.appendChild(li);
-        });
-        
-        list.querySelectorAll('.remove-new-file-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const idx = parseInt(e.target.dataset.index);
-                newFiles.splice(idx, 1);
-                renderNewFiles();
-            });
-        });
-    }
-    
-    // Save changes
-    document.getElementById('save-edit-btn').addEventListener('click', async () => {
-        const title = document.getElementById('edit-hw-title').value.trim();
-        const description = document.getElementById('edit-hw-description').value.trim();
-        const dueDate = document.getElementById('edit-hw-due-date').value;
-        const notifyParent = document.getElementById('edit-notify-parent').checked;
-        
-        if (!title || !description || !dueDate) {
-            showCustomAlert('Please fill all required fields.');
-            return;
-        }
-        
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const due = new Date(dueDate);
-        due.setHours(0, 0, 0, 0);
-        
-        if (due < today) {
-            showCustomAlert('Due date cannot be in the past.');
-            return;
-        }
-        
-        const saveBtn = document.getElementById('save-edit-btn');
-        saveBtn.disabled = true;
-        saveBtn.innerHTML = 'Saving...';
-        
-        try {
-            // Upload new files
-            let allAttachments = [...currentAttachments];
-            if (newFiles.length > 0) {
-                saveBtn.innerHTML = 'Uploading new files...';
-                const uploadPromises = newFiles.map(f => uploadToCloudinary(f, assignment.studentId));
-                const results = await Promise.all(uploadPromises);
-                results.forEach(res => allAttachments.push({
-                    url: res.url,
-                    name: res.fileName,
-                    size: res.bytes,
-                    type: res.format
-                }));
-            }
-            
-            // Update Firestore
-            saveBtn.innerHTML = 'Updating assignment...';
-            const updateData = {
-                title: title,
-                description: description,
-                dueDate: dueDate,
-                attachments: allAttachments,
-                fileUrl: allAttachments[0]?.url || '',
-                fileName: allAttachments[0]?.name || '',
-                lastUpdated: new Date()
-            };
-            
-            await updateDoc(doc(db, "homework_assignments", assignment.id), updateData);
-            
-            // Send notification email if requested
-            if (notifyParent && assignment.parentEmail) {
-                saveBtn.innerHTML = 'Sending notification...';
-                const GAS_URL = "https://script.google.com/macros/s/AKfycbz9yuiR1egvxRcCLbW1Id-6lxBsYotiID0j_Fpeb9D8RyQGdMPNPPZn8WqOpJ4m_JqJNQ/exec";
-                
-                const emailData = {
-                    ...assignment,
-                    ...updateData,
-                    action: 'updated',
-                    parentName: assignment.parentName,
-                    parentEmail: assignment.parentEmail
-                };
-                
-                fetch(GAS_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(emailData)
-                }).catch(e => console.error('Email error:', e));
-            }
-            
-            modal.remove();
-            showCustomAlert('✅ Assignment updated successfully!');
-            
-            // Refresh the homework dashboard if it's open
-            const dashboard = document.querySelector('.modal-overlay');
-            if (dashboard && window.tutorData?.email) {
-                loadHomeworkAssignments(window.tutorData.email);
-            }
-            
-        } catch (error) {
-            console.error('Error updating assignment:', error);
-            showCustomAlert('❌ Error updating assignment.');
-            saveBtn.disabled = false;
-            saveBtn.innerHTML = 'Save Changes';
-        }
-    });
-    
-    document.getElementById('cancel-edit-btn').addEventListener('click', () => modal.remove());
-}
-
-// ==========================================
-// 6. RECALL HOMEWORK FUNCTION
-// ==========================================
-
-async function recallHomeworkAssignment(assignment) {
-    if (!confirm(`Are you sure you want to recall this assignment from ${assignment.studentName}?\n\nThis will mark the assignment as recalled and notify the parent.`)) {
-        return;
-    }
-    
-    try {
-        // Update assignment status
-        await updateDoc(doc(db, "homework_assignments", assignment.id), {
-            status: 'recalled',
-            recalledAt: new Date(),
-            recallReason: 'Recalled by tutor'
-        });
-        
-        // Send recall notification email
-        if (assignment.parentEmail) {
-            const GAS_URL = "https://script.google.com/macros/s/AKfycbz9yuiR1egvxRcCLbW1Id-6lxBsYotiID0j_Fpeb9D8RyQGdMPNPPZn8WqOpJ4m_JqJNQ/exec";
-            
-            const emailData = {
-                ...assignment,
-                action: 'recalled',
-                parentName: assignment.parentName,
-                parentEmail: assignment.parentEmail,
-                recallReason: 'Assignment has been recalled by the tutor.'
-            };
-            
-            fetch(GAS_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(emailData)
-            }).catch(e => console.error('Recall email error:', e));
-        }
-        
-        showCustomAlert('✅ Assignment recalled successfully!');
-        
-        // Refresh the homework dashboard if it's open
-        const dashboard = document.querySelector('.modal-overlay');
-        if (dashboard && window.tutorData?.email) {
-            loadHomeworkAssignments(window.tutorData.email);
-        }
-        
-    } catch (error) {
-        console.error('Error recalling assignment:', error);
-        showCustomAlert('❌ Error recalling assignment.');
-    }
-}
-
-// ==========================================
-// 7. REASSIGN HOMEWORK MODAL
-// ==========================================
-
-function showReassignHomeworkModal(assignment) {
     const modalHTML = `
         <div class="modal-overlay">
             <div class="modal-content max-w-lg">
                 <div class="modal-header">
-                    <h3 class="modal-title">🔄 Reassign Homework</h3>
-                    <p class="text-sm text-gray-600 mt-1">Reassign "${assignment.title}" to another student</p>
+                    <h3 class="modal-title">📚 Daily Topic: ${student.studentName}</h3>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
-                        <h4 class="font-bold text-blue-900 mb-2">Original Assignment</h4>
-                        <p class="text-sm text-gray-700">From: ${assignment.studentName}</p>
-                        <p class="text-sm text-gray-700">Due: ${assignment.dueDate.toLocaleDateString()}</p>
+                    <div id="topic-history-container" class="mb-5 bg-blue-50 p-3 rounded-lg border border-blue-100 hidden">
+                        <div class="flex justify-between items-center mb-2">
+                            <h5 class="font-bold text-blue-800 text-sm">📅 Topics Covered in ${monthName}</h5>
+                            <span id="topic-count-badge" class="bg-blue-200 text-blue-800 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+                        </div>
+                        <div id="topic-history" class="topic-history text-sm text-gray-700 max-h-60 overflow-y-auto custom-scrollbar">
+                            <div class="flex justify-center p-2">
+                                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-700"></div>
+                            </div>
+                        </div>
                     </div>
-                    
                     <div class="form-group">
-                        <label class="form-label">Select Student *</label>
-                        <select id="reassign-student-select" class="form-input" required>
-                            <option value="">-- Select a student --</option>
-                            <!-- Students will be loaded dynamically -->
-                        </select>
+                        <label class="form-label">Enter Today's Topic *</label>
+                        <textarea id="topic-topics" class="form-input form-textarea report-textarea" 
+                            placeholder="e.g. Long Division, Introduction to Photosynthesis..." required></textarea>
                     </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">New Due Date *</label>
-                        <input type="date" id="reassign-due-date" class="form-input" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Additional Instructions (Optional)</label>
-                        <textarea id="reassign-notes" class="form-input form-textarea" 
-                            placeholder="Add any additional notes for the new student..."></textarea>
-                    </div>
-                    
-                    <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
-                        <label class="flex items-center space-x-2 mb-2">
-                            <input type="checkbox" id="reassign-notify-parent" class="rounded" checked>
-                            <span class="font-bold text-yellow-900">Notify new student's parent</span>
-                        </label>
-                        <p class="text-xs text-gray-600">
-                            An email will be sent to the new student's parent with the reassigned homework details.
-                        </p>
+                    <div class="mt-2 text-xs text-gray-500 flex justify-between">
+                        <span>One topic per line recommended.</span>
+                        <span>Date: ${localDateString}</span>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button id="cancel-reassign-btn" class="btn btn-secondary">Cancel</button>
-                    <button id="save-reassign-btn" class="btn btn-primary">Reassign Homework</button>
+                    <button id="cancel-topic-btn" class="btn btn-secondary">Close</button>
+                    <button id="save-topic-btn" class="btn btn-primary" data-student-id="${student.id}">Save Topic</button>
                 </div>
             </div>
         </div>
@@ -2932,300 +2054,429 @@ function showReassignHomeworkModal(assignment) {
     modal.innerHTML = modalHTML;
     document.body.appendChild(modal);
     
-    // Set default due date (1 week from now)
-    const oneWeekLater = new Date();
-    oneWeekLater.setDate(oneWeekLater.getDate() + 7);
-    document.getElementById('reassign-due-date').value = oneWeekLater.toISOString().split('T')[0];
-    
-    // Load students
-    loadStudentsForReassign();
-    
-    // Save reassignment
-    document.getElementById('save-reassign-btn').addEventListener('click', async () => {
-        const studentId = document.getElementById('reassign-student-select').value;
-        const studentName = document.getElementById('reassign-student-select').selectedOptions[0]?.textContent || '';
-        const dueDate = document.getElementById('reassign-due-date').value;
-        const notes = document.getElementById('reassign-notes').value.trim();
-        const notifyParent = document.getElementById('reassign-notify-parent').checked;
-        
-        if (!studentId || !dueDate) {
-            showCustomAlert('Please select a student and due date.');
-            return;
+    loadDailyTopicHistory(student.id);
+    setTimeout(() => document.getElementById('topic-topics').focus(), 100);
+
+    // Event Delegation for Edit/Delete buttons
+    const historyContainer = document.getElementById('topic-history');
+    historyContainer.addEventListener('click', async (e) => {
+        const target = e.target;
+        const btn = target.closest('button');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        const topicId = btn.dataset.id;
+
+        if (action === 'edit') enableTopicEdit(topicId);
+        else if (action === 'delete') {
+            if (confirm('Are you sure you want to delete this topic?')) await deleteTopic(topicId, student.id);
         }
+        else if (action === 'cancel') cancelTopicEdit(topicId);
+        else if (action === 'save') await saveTopicEdit(topicId, student.id);
+    });
+
+    document.getElementById('cancel-topic-btn').addEventListener('click', () => modal.remove());
+    
+    document.getElementById('save-topic-btn').addEventListener('click', async () => {
+        const topicInput = document.getElementById('topic-topics');
+        const content = topicInput.value.trim();
+        if (!content) { showCustomAlert('⚠️ Please enter a topic before saving.'); return; }
         
-        const saveBtn = document.getElementById('save-reassign-btn');
+        const tutorName = window.tutorData?.name || "Unknown Tutor";
+        const tutorEmail = window.tutorData?.email || "unknown@tutor.com";
+        const saveBtn = document.getElementById('save-topic-btn');
+        const originalBtnText = saveBtn.innerText;
+        
         saveBtn.disabled = true;
-        saveBtn.innerHTML = 'Reassigning...';
+        saveBtn.innerText = "Saving...";
+
+        const topicData = {
+            studentId: student.id,
+            studentName: student.studentName,
+            tutorEmail: tutorEmail,
+            tutorName: tutorName,
+            topics: content,
+            date: localDateString, 
+            createdAt: new Date()
+        };
         
         try {
-            // Fetch student data to get parent info
-            const studentDoc = await getDoc(doc(db, "students", studentId));
-            const studentData = studentDoc.data();
-            
-            // Create new assignment based on the original
-            const newAssignmentRef = doc(collection(db, "homework_assignments"));
-            const newAssignment = {
-                id: newAssignmentRef.id,
-                studentId: studentId,
-                studentName: studentName,
-                parentEmail: studentData.parentEmail || '',
-                parentName: studentData.parentName || '',
-                parentPhone: studentData.parentPhone || '',
-                tutorName: window.tutorData?.name || '',
-                tutorEmail: window.tutorData?.email || '',
-                title: `(Reassigned) ${assignment.title}`,
-                description: notes ? `${assignment.description}\n\nAdditional notes: ${notes}` : assignment.description,
-                dueDate: dueDate,
-                assignedDate: new Date(),
-                status: 'assigned',
-                attachments: assignment.attachments || [],
-                fileUrl: assignment.fileUrl || '',
-                fileName: assignment.fileName || '',
-                reassignedFrom: assignment.id,
-                originalAssignment: assignment.title
-            };
-            
-            await setDoc(newAssignmentRef, newAssignment);
-            
-            // Send notification email if requested
-            if (notifyParent && studentData.parentEmail) {
-                const GAS_URL = "https://script.google.com/macros/s/AKfycbz9yuiR1egvxRcCLbW1Id-6lxBsYotiID0j_Fpeb9D8RyQGdMPNPPZn8WqOpJ4m_JqJNQ/exec";
-                
-                const emailData = {
-                    ...newAssignment,
-                    action: 'reassigned',
-                    parentName: studentData.parentName,
-                    parentEmail: studentData.parentEmail
-                };
-                
-                fetch(GAS_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(emailData)
-                }).catch(e => console.error('Reassign email error:', e));
-            }
-            
-            modal.remove();
-            showCustomAlert(`✅ Homework reassigned to ${studentName}!`);
-            
-            // Refresh the homework dashboard if it's open
-            const dashboard = document.querySelector('.modal-overlay');
-            if (dashboard && window.tutorData?.email) {
-                loadHomeworkAssignments(window.tutorData.email);
-            }
-            
-        } catch (error) {
-            console.error('Error reassigning homework:', error);
-            showCustomAlert('❌ Error reassigning homework.');
+            await setDoc(doc(collection(db, "daily_topics")), topicData);
+            topicInput.value = '';
+            await loadDailyTopicHistory(student.id);
+            showCustomAlert('✅ Topic saved!');
             saveBtn.disabled = false;
-            saveBtn.innerHTML = 'Reassign Homework';
+            saveBtn.innerText = originalBtnText;
+        } catch (error) {
+            console.error("Error saving topic:", error);
+            showCustomAlert('❌ Error saving topic.');
+            saveBtn.disabled = false;
+            saveBtn.innerText = originalBtnText;
         }
     });
-    
-    document.getElementById('cancel-reassign-btn').addEventListener('click', () => modal.remove());
 }
 
-async function loadStudentsForReassign() {
-    const select = document.getElementById('reassign-student-select');
-    if (!select) return;
-    
+// ------------------------------------------
+// HELPER FUNCTIONS FOR EDITING (UNCHANGED)
+// ------------------------------------------
+function enableTopicEdit(topicId) {
+    document.getElementById(`text-${topicId}`).classList.add('hidden');
+    document.getElementById(`btn-edit-${topicId}`).classList.add('hidden');
+    document.getElementById(`btn-delete-${topicId}`).classList.add('hidden');
+    document.getElementById(`input-container-${topicId}`).classList.remove('hidden');
+    document.getElementById(`action-btns-${topicId}`).classList.remove('hidden');
+    const input = document.getElementById(`input-${topicId}`);
+    input.value = document.getElementById(`text-${topicId}`).textContent;
+    input.focus();
+}
+function cancelTopicEdit(topicId) {
+    document.getElementById(`text-${topicId}`).classList.remove('hidden');
+    document.getElementById(`btn-edit-${topicId}`).classList.remove('hidden');
+    document.getElementById(`btn-delete-${topicId}`).classList.remove('hidden');
+    document.getElementById(`input-container-${topicId}`).classList.add('hidden');
+    document.getElementById(`action-btns-${topicId}`).classList.add('hidden');
+}
+async function saveTopicEdit(topicId, studentId) {
+    const newText = document.getElementById(`input-${topicId}`).value.trim();
+    if (!newText) { showCustomAlert("Topic cannot be empty."); return; }
     try {
-        const tutorEmail = window.tutorData?.email;
-        if (!tutorEmail) {
-            select.innerHTML = '<option value="">Tutor data not available</option>';
-            return;
-        }
-        
-        const q = query(
-            collection(db, "students"),
-            where("tutorEmail", "==", tutorEmail)
-        );
-        
-        const snapshot = await getDocs(q);
-        let options = '<option value="">-- Select a student --</option>';
-        
-        snapshot.forEach(doc => {
-            const student = doc.data();
-            options += `<option value="${doc.id}">${student.studentName}</option>`;
+        await updateDoc(doc(db, "daily_topics", topicId), { topics: newText });
+        await loadDailyTopicHistory(studentId);
+        showCustomAlert("✅ Topic updated!");
+    } catch (error) { console.error(error); showCustomAlert("❌ Update failed."); }
+}
+async function deleteTopic(topicId, studentId) {
+    try {
+        await deleteDoc(doc(db, "daily_topics", topicId));
+        await loadDailyTopicHistory(studentId);
+        showCustomAlert("🗑️ Topic deleted.");
+    } catch (error) { console.error(error); showCustomAlert("❌ Delete failed."); }
+}
+async function loadDailyTopicHistory(studentId) {
+    const container = document.getElementById('topic-history');
+    if (!container) return;
+    try {
+        const now = new Date();
+        const q = query(collection(db, "daily_topics"), where("studentId", "==", studentId));
+        const snap = await getDocs(q);
+        let data = [];
+        snap.forEach(d => {
+            let val = d.data(); val.id = d.id;
+            val.parsedDate = val.createdAt?.toDate ? val.createdAt.toDate() : new Date(val.createdAt || new Date());
+            data.push(val);
         });
-        
-        select.innerHTML = options;
-    } catch (error) {
-        console.error('Error loading students:', error);
-        select.innerHTML = '<option value="">Error loading students</option>';
-    }
+        data.sort((a, b) => b.parsedDate - a.parsedDate);
+        let html = '<ul class="space-y-3">';
+        let count = 0;
+        data.forEach(d => {
+            if (d.parsedDate.getMonth() === now.getMonth() && d.parsedDate.getFullYear() === now.getFullYear()) {
+                count++;
+                html += `<li class="flex flex-col border-b border-blue-100 last:border-0 pb-2">
+                    <div class="flex justify-between w-full">
+                        <div class="flex-1 mr-2"><span class="font-bold text-blue-600 text-xs">${d.parsedDate.toLocaleDateString(undefined,{month:'short',day:'numeric'})}: </span>
+                        <span id="text-${d.id}" class="text-sm">${d.topics}</span>
+                        <div id="input-container-${d.id}" class="hidden"><textarea id="input-${d.id}" class="w-full text-sm border rounded p-1" rows="2"></textarea></div></div>
+                        <div class="flex space-x-1">
+                            <button id="btn-edit-${d.id}" data-action="edit" data-id="${d.id}" class="text-gray-400 hover:text-blue-600">✏️</button>
+                            <button id="btn-delete-${d.id}" data-action="delete" data-id="${d.id}" class="text-gray-400 hover:text-red-600">🗑️</button>
+                            <div id="action-btns-${d.id}" class="hidden flex space-x-1">
+                                <button data-action="save" data-id="${d.id}" class="text-green-600">✅</button>
+                                <button data-action="cancel" data-id="${d.id}" class="text-red-500">❌</button>
+                            </div>
+                        </div>
+                    </div></li>`;
+            }
+        });
+        html += '</ul>';
+        container.innerHTML = count > 0 ? html : '<p class="text-center text-gray-500 italic">No topics yet.</p>';
+        document.getElementById('topic-history-container').classList.remove('hidden');
+        document.getElementById('topic-count-badge').textContent = count;
+    } catch (e) { console.error(e); container.innerHTML = '<p class="text-red-500">Error loading history.</p>'; }
 }
 
+
 // ==========================================
-// 8. DELETE HOMEWORK FUNCTION
+// 2. HOMEWORK ASSIGNMENT (SMART SYNC VERSION)
 // ==========================================
 
-async function deleteHomeworkAssignment(homeworkId) {
-    if (!confirm('⚠️ Are you sure you want to permanently delete this homework assignment?\n\nThis action cannot be undone.')) {
-        return;
-    }
-    
+async function uploadToCloudinary(file, studentId) {
+    return new Promise((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+        formData.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
+        formData.append('folder', 'homework_assignments');
+        formData.append('public_id', `homework_${studentId}_${Date.now()}_${file.name.replace(/\.[^/.]+$/, "")}`);
+        
+        fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/upload`, { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(d => d.secure_url ? resolve({url: d.secure_url, publicId: d.public_id, format: d.format, bytes: d.bytes, createdAt: d.created_at, fileName: file.name}) : reject(new Error(d.error?.message)))
+        .catch(e => reject(e));
+    });
+}
+
+// *** NEW: Returns object { email, name } instead of just email
+async function fetchParentDataByPhone(phone) {
+    if (!phone) return null;
     try {
-        await deleteDoc(doc(db, "homework_assignments", homeworkId));
-        showCustomAlert('🗑️ Homework assignment deleted.');
+        const cleanPhone = phone.replace(/[\s\-\(\)]/g, ''); 
+        let q = query(collection(db, "parent_users"), where("phone", "==", phone));
+        let snapshot = await getDocs(q);
         
-        // Refresh the homework dashboard if it's open
-        const dashboard = document.querySelector('.modal-overlay');
-        if (dashboard && window.tutorData?.email) {
-            loadHomeworkAssignments(window.tutorData.email);
+        if (snapshot.empty && cleanPhone !== phone) {
+            q = query(collection(db, "parent_users"), where("phone", "==", cleanPhone));
+            snapshot = await getDocs(q);
         }
-        
+
+        if (!snapshot.empty) {
+            const data = snapshot.docs[0].data();
+            // Return both name and email
+            return { 
+                email: data.email, 
+                name: data.fullName || data.name || data.parentName || "Parent" // Handle various naming conventions
+            };
+        }
     } catch (error) {
-        console.error('Error deleting homework:', error);
-        showCustomAlert('❌ Error deleting homework assignment.');
+        console.error("Error fetching parent data:", error);
     }
+    return null;
 }
 
-// ==========================================
-// 9. FILTER & SORT FUNCTIONS
-// ==========================================
+function showHomeworkModal(student) {
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    const maxDate = nextWeek.toISOString().split('T')[0];
+    let selectedFiles = [];
 
-function filterHomeworkByStatus(status) {
-    if (status === 'all') {
-        renderHomeworkGrid(allHomeworkAssignments);
-        updateHomeworkStats(allHomeworkAssignments);
+    // Check if we already have data in the Student object
+    let currentParentName = student.parentName || "Loading...";
+    let currentParentEmail = student.parentEmail || "Searching...";
+    const parentPhone = student.parentPhone || "Not Found";
+
+    const modalHTML = `
+        <div class="modal-overlay">
+            <div class="modal-content max-w-2xl">
+                <div class="modal-header"><h3 class="modal-title">📝 Assign Homework for ${student.studentName}</h3></div>
+                <div class="modal-body">
+                    <div class="form-group"><label class="form-label">Title *</label><input type="text" id="hw-title" class="form-input" required></div>
+                    <div class="form-group"><label class="form-label">Description *</label><textarea id="hw-description" class="form-input form-textarea" required></textarea></div>
+                    <div class="form-group"><label class="form-label">Due Date *</label><input type="date" id="hw-due-date" class="form-input" max="${maxDate}" required></div>
+                    <div class="form-group"><label class="form-label">Files (Max 5)</label>
+                        <div class="file-upload-container"><input type="file" id="hw-file" class="hidden" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt">
+                        <label for="hw-file" class="file-upload-label"><span class="text-primary-color">Click to upload files</span></label>
+                        <div id="file-list-preview" class="hidden mt-2"><ul id="file-list-ul"></ul><button id="remove-all-files-btn" class="btn btn-danger btn-sm w-full mt-2">Clear Files</button></div></div>
+                    </div>
+                    
+                    <div class="email-settings bg-blue-50 p-3 rounded mt-2 border border-blue-100">
+                        <label class="flex items-center space-x-2 mb-2"><input type="checkbox" id="hw-reminder" class="rounded" checked><span class="font-bold text-blue-900">Notify Parent via Email</span></label>
+                        <div class="grid grid-cols-2 gap-2 text-xs text-gray-700">
+                            <div><span class="font-semibold">Parent:</span> <span id="display-parent-name">${currentParentName}</span></div>
+                            <div><span class="font-semibold">Phone:</span> ${parentPhone}</div>
+                            <div class="col-span-2"><span class="font-semibold">Email:</span> <span id="display-parent-email">${currentParentEmail}</span></div>
+                        </div>
+                        <div id="new-data-badge" class="hidden mt-2 text-xs text-green-600 font-bold">✨ New parent details found! Will be saved to student profile.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-hw-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="save-hw-btn" class="btn btn-primary">Assign Homework</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const modal = document.createElement('div');
+    modal.innerHTML = modalHTML;
+    document.body.appendChild(modal);
+
+    // *** AUTO-FETCH LOGIC: Runs immediately if data is missing ***
+    let fetchedParentData = null;
+
+    if (student.parentPhone && (!student.parentEmail || !student.parentName)) {
+        fetchParentDataByPhone(student.parentPhone).then(data => {
+            if (data) {
+                fetchedParentData = data;
+                // Update UI Live
+                document.getElementById('display-parent-name').textContent = data.name;
+                document.getElementById('display-parent-email').textContent = data.email;
+                document.getElementById('display-parent-name').classList.add('text-green-600', 'font-bold');
+                document.getElementById('display-parent-email').classList.add('text-green-600', 'font-bold');
+                document.getElementById('new-data-badge').classList.remove('hidden');
+            } else {
+                document.getElementById('display-parent-name').textContent = "Unknown";
+                document.getElementById('display-parent-email').textContent = "Not found in database";
+            }
+        });
     } else {
-        const filtered = allHomeworkAssignments.filter(hw => hw.status === status);
-        renderHomeworkGrid(filtered);
-        updateHomeworkStats(filtered, status);
+        // Data already exists, just clear the "Searching..." text if needed
+        if(student.parentName) document.getElementById('display-parent-name').textContent = student.parentName;
+        if(student.parentEmail) document.getElementById('display-parent-email').textContent = student.parentEmail;
     }
-}
 
-function filterHomeworkBySearch() {
-    const searchTerm = document.getElementById('hw-search-input').value.toLowerCase();
-    
-    if (!searchTerm) {
-        renderHomeworkGrid(allHomeworkAssignments);
-        updateHomeworkStats(allHomeworkAssignments);
-        return;
-    }
-    
-    const filtered = allHomeworkAssignments.filter(hw => 
-        hw.studentName?.toLowerCase().includes(searchTerm) ||
-        hw.title?.toLowerCase().includes(searchTerm) ||
-        hw.description?.toLowerCase().includes(searchTerm) ||
-        hw.parentEmail?.toLowerCase().includes(searchTerm)
-    );
-    
-    renderHomeworkGrid(filtered);
-    updateHomeworkStats(filtered, 'search');
-}
-
-function sortHomeworkAssignments() {
-    const sortValue = document.getElementById('hw-sort-select').value;
-    let sorted = [...allHomeworkAssignments];
-    
-    switch (sortValue) {
-        case 'dueDate_asc':
-            sorted.sort((a, b) => a.dueDate - b.dueDate);
-            break;
-        case 'dueDate_desc':
-            sorted.sort((a, b) => b.dueDate - a.dueDate);
-            break;
-        case 'assigned_desc':
-            sorted.sort((a, b) => b.assignedDate - a.assignedDate);
-            break;
-        case 'title_asc':
-            sorted.sort((a, b) => a.title.localeCompare(b.title));
-            break;
-    }
-    
-    renderHomeworkGrid(sorted);
-}
-
-// ==========================================
-// 10. HELPER FUNCTIONS (UNIQUE NAMES)
-// ==========================================
-
-function updateHomeworkStats(assignments, filter = 'all') {
-    const statsElement = document.getElementById('hw-stats');
-    if (!statsElement) return;
-    
-    const total = assignments.length;
-    const assigned = assignments.filter(hw => hw.status === 'assigned').length;
-    const submitted = assignments.filter(hw => hw.status === 'submitted').length;
-    const graded = assignments.filter(hw => hw.status === 'graded').length;
-    const recalled = assignments.filter(hw => hw.status === 'recalled').length;
-    
-    let statsText = `Showing ${total} assignment${total !== 1 ? 's' : ''}`;
-    if (filter === 'all') {
-        statsText += ` (${assigned} assigned, ${submitted} submitted, ${graded} graded, ${recalled} recalled)`;
-    }
-    
-    statsElement.textContent = statsText;
-}
-
-function hwGetStatusColor(status) {
-    const colors = {
-        'assigned': { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Assigned' },
-        'submitted': { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Submitted' },
-        'graded': { bg: 'bg-green-100', text: 'text-green-700', label: 'Graded' },
-        'recalled': { bg: 'bg-red-100', text: 'text-red-700', label: 'Recalled' }
-    };
-    return colors[status] || colors.assigned;
-}
-
-function hwFormatFileSize(bytes) {
-    if (!bytes) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-function hwDebounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
-
-// ==========================================
-// 11. INTEGRATION WITH EXISTING SYSTEM
-// ==========================================
-
-// Add this to your tutor dashboard initialization
-function initializeHomeworkManagement() {
-    // Add homework management button to your UI
-    const homeworkManagementBtn = document.getElementById('homework-management-btn');
-    if (homeworkManagementBtn && window.tutorData) {
-        homeworkManagementBtn.addEventListener('click', () => {
-            showHomeworkManagementDashboard(window.tutorData.email);
+    // File Handling (Standard)
+    const fileInput = document.getElementById('hw-file');
+    const fileListUl = document.getElementById('file-list-ul');
+    fileInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files);
+        if (selectedFiles.length + files.length > 5) { showCustomAlert('Max 5 files.'); fileInput.value=''; return; }
+        files.forEach(f => { if(f.size<=10*1024*1024) selectedFiles.push(f); else showCustomAlert(`Skipped ${f.name} (>10MB)`); });
+        renderFiles();
+    });
+    function renderFiles() {
+        const preview = document.getElementById('file-list-preview');
+        if (selectedFiles.length===0) { preview.classList.add('hidden'); return; }
+        preview.classList.remove('hidden');
+        fileListUl.innerHTML = '';
+        selectedFiles.forEach((f, i) => {
+            const li = document.createElement('li');
+            li.className = "flex justify-between bg-white p-1 mb-1 border rounded text-sm";
+            li.innerHTML = `<span>${f.name}</span><span class="text-red-500 cursor-pointer remove-file-btn" data-index="${i}">✕</span>`;
+            fileListUl.appendChild(li);
+        });
+        
+        fileListUl.querySelectorAll('.remove-file-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const idx = parseInt(e.target.dataset.index);
+                selectedFiles.splice(idx, 1);
+                renderFiles();
+            });
         });
     }
-    
-    // Also add to people tab or wherever appropriate
-    const peopleTab = document.querySelector('#people-tab');
-    if (peopleTab) {
-        const manageHwBtn = document.createElement('button');
-        manageHwBtn.className = 'btn btn-primary ml-2';
-        manageHwBtn.innerHTML = '📚 Manage Homework';
-        manageHwBtn.onclick = () => showHomeworkManagementDashboard(window.tutorData.email);
-        peopleTab.appendChild(manageHwBtn);
-    }
+    document.getElementById('remove-all-files-btn').addEventListener('click', ()=>{ selectedFiles=[]; fileInput.value=''; renderFiles(); });
+    document.getElementById('cancel-hw-btn').addEventListener('click', () => modal.remove());
+
+    // SAVE LOGIC
+    document.getElementById('save-hw-btn').addEventListener('click', async () => {
+        const title = document.getElementById('hw-title').value.trim();
+        const desc = document.getElementById('hw-description').value.trim();
+        const date = document.getElementById('hw-due-date').value;
+        const sendEmail = document.getElementById('hw-reminder').checked;
+        const saveBtn = document.getElementById('save-hw-btn');
+
+        if (!title || !desc || !date) { showCustomAlert('Please fill all fields.'); return; }
+        
+        const tutorName = window.tutorData?.name || "Unknown Tutor";
+        const today = new Date(); today.setHours(0,0,0,0);
+        const due = new Date(date); due.setHours(0,0,0,0);
+        if(due < today) { showCustomAlert('Due date cannot be past.'); return; }
+
+        try {
+            saveBtn.disabled = true;
+            
+            // --- STEP 1: RESOLVE PARENT DATA ---
+            // Priority: 1. Fetched just now (new), 2. Existing on student, 3. Empty
+            let finalParentEmail = fetchedParentData?.email || student.parentEmail || "";
+            let finalParentName = fetchedParentData?.name || student.parentName || "";
+
+            // If we still don't have it, try one last desperate fetch
+            if (sendEmail && !finalParentEmail && student.parentPhone) {
+                saveBtn.innerHTML = "🔍 Finalizing Parent Info...";
+                const lastCheck = await fetchParentDataByPhone(student.parentPhone);
+                if (lastCheck) {
+                    finalParentEmail = lastCheck.email;
+                    finalParentName = lastCheck.name;
+                    fetchedParentData = lastCheck; // Mark as new so we save it below
+                }
+            }
+
+            // *** CRITICAL UPDATE: SYNC TO STUDENTS COLLECTION ***
+            // If we found new data that wasn't there before, update the student record permanently.
+            if (fetchedParentData) {
+                saveBtn.innerHTML = "💾 Syncing Student Data...";
+                try {
+                    await updateDoc(doc(db, "students", student.id), {
+                        parentEmail: finalParentEmail,
+                        parentName: finalParentName
+                    });
+                    console.log("Student record updated with new parent info.");
+                } catch (updateError) {
+                    console.error("Failed to sync student data (non-fatal):", updateError);
+                }
+            }
+
+            // --- STEP 2: UPLOAD FILES ---
+            saveBtn.innerHTML = `Uploading ${selectedFiles.length} files...`;
+            let attachments = [];
+            if (selectedFiles.length > 0) {
+                try {
+                    const uploadPromises = selectedFiles.map(f => uploadToCloudinary(f, student.id));
+                    const results = await Promise.all(uploadPromises);
+                    results.forEach(res => attachments.push({url:res.url, name:res.fileName, size:res.bytes, type:res.format}));
+                } catch(e) { 
+                    console.error("Upload Error:", e);
+                    showCustomAlert(`Upload failed: ${e.message}`); 
+                    saveBtn.disabled=false; 
+                    saveBtn.innerHTML="Assign Homework"; 
+                    return; 
+                }
+            }
+
+            // --- STEP 3: SAVE TO FIREBASE ---
+            saveBtn.innerHTML = "Saving...";
+            const newHwRef = doc(collection(db, "homework_assignments"));
+            
+            const hwData = {
+                id: newHwRef.id,
+                studentId: student.id,
+                studentName: student.studentName,
+                parentEmail: finalParentEmail,
+                parentName: finalParentName, // Now storing Name in HW record too
+                parentPhone: student.parentPhone,
+                tutorName: tutorName,
+                title: title,
+                description: desc,
+                dueDate: date,
+                assignedDate: new Date(),
+                status: 'assigned',
+                attachments: attachments,
+                fileUrl: attachments[0]?.url || '', 
+                fileName: attachments[0]?.name || '' 
+            };
+            
+            await setDoc(newHwRef, hwData);
+
+            // --- STEP 4: SEND EMAIL ---
+            if (sendEmail && finalParentEmail) {
+                saveBtn.innerHTML = "Sending Email...";
+                const GAS_URL = "https://script.google.com/macros/s/AKfycbz9yuiR1egvxRcCLbW1Id-6lxBsYotiID0j_Fpeb9D8RyQGdMPNPPZn8WqOpJ4m_JqJNQ/exec";
+                
+                fetch(GAS_URL, {
+                    method: 'POST', mode: 'no-cors',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(hwData)
+                }).catch(e=>console.error(e));
+                
+                await scheduleEmailReminder(hwData, hwData.fileUrl);
+            }
+
+            modal.remove();
+            showCustomAlert(`✅ Assigned! ${finalParentEmail ? 'Email sent to ' + finalParentName : '(No email found)'}`);
+
+        } catch (error) {
+            console.error("Save Error:", error);
+            showCustomAlert("Error assigning homework.");
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = "Assign Homework";
+        }
+    });
 }
 
-// Initialize when tutor data is loaded
-if (window.tutorData) {
-    initializeHomeworkManagement();
+async function scheduleEmailReminder(hwData, fileUrl = '') {
+    if (!hwData.id) return;
+    try {
+        const d = new Date(hwData.dueDate); d.setDate(d.getDate()-1);
+        await setDoc(doc(collection(db, "email_reminders")), {
+            homeworkId: hwData.id,
+            studentId: hwData.studentId, 
+            parentEmail: hwData.parentEmail,
+            parentName: hwData.parentName || "Parent",
+            title: hwData.title, 
+            dueDate: hwData.dueDate, 
+            reminderDate: d,
+            status: 'scheduled', 
+            createdAt: new Date()
+        });
+    } catch(e){ console.error("Error scheduling reminder:", e); }
 }
-
-// Export functions to window for HTML onclick
-window.showHomeworkManagementDashboard = showHomeworkManagementDashboard;
-window.openHomeworkDetails = openHomeworkDetails;
-window.recallHomeworkAssignment = recallHomeworkAssignment;
-window.deleteHomeworkAssignment = deleteHomeworkAssignment;
 
 /*******************************************************************************
  * SECTION 9: MESSAGING & INBOX FEATURES (CRASH-PROOF EDITION)
