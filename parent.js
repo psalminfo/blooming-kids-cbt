@@ -1364,7 +1364,6 @@ window.forceDownload = function(url, filename) {
     // Fallback: If download attribute doesn't work, try fetch approach
     setTimeout(() => {
         // Check if download likely succeeded by checking if we're still on the page
-        // This is a simple check - in production you might want a more robust solution
         console.log('Download initiated for:', filename || 'assignment');
     }, 1000);
 };
@@ -1378,6 +1377,13 @@ window.openPDFWorkspace = function(homeworkId, studentId, homeworkData) {
         data: homeworkData
     };
     
+    // Create a safe copy of homework data for JSON
+    const safeHomeworkData = {
+        title: homeworkData.title || 'Assignment',
+        fileUrl: homeworkData.fileUrl || '',
+        subject: homeworkData.subject || ''
+    };
+    
     // Create the workspace modal
     const modalHTML = `
         <div id="pdfWorkspaceModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[100] p-4">
@@ -1386,7 +1392,7 @@ window.openPDFWorkspace = function(homeworkId, studentId, homeworkData) {
                 <div class="bg-gradient-to-r from-blue-600 to-purple-600 p-4 rounded-t-xl flex justify-between items-center">
                     <div>
                         <h3 class="text-xl font-bold text-white">Homework Workspace</h3>
-                        <p class="text-blue-100 text-sm">${safeText(homeworkData.title || 'Assignment')}</p>
+                        <p class="text-blue-100 text-sm">${safeText(safeHomeworkData.title)}</p>
                     </div>
                     <div class="flex items-center space-x-3">
                         <button onclick="savePDFWorkspace()" 
@@ -1675,7 +1681,7 @@ window.openPDFWorkspace = function(homeworkId, studentId, homeworkData) {
     document.body.appendChild(div.firstElementChild);
     
     // Load the PDF
-    loadPDFForWorkspace(homeworkData.fileUrl);
+    loadPDFForWorkspace(safeHomeworkData.fileUrl);
     
     // Initialize workspace
     initializePDFWorkspace();
@@ -1706,9 +1712,6 @@ function loadPDFForWorkspace(pdfUrl) {
         console.error('No PDF URL provided');
         return;
     }
-    
-    // In a real implementation, you would use PDF.js here
-    // For now, we'll show the PDF in an iframe and simulate annotation canvas
     
     const pdfViewer = document.getElementById('pdfViewer');
     if (pdfViewer) {
@@ -1860,7 +1863,9 @@ function selectTool(tool) {
     document.querySelectorAll('.pdf-tool-btn').forEach(btn => {
         btn.classList.remove('pdf-tool-active');
     });
-    event.target.classList.add('pdf-tool-active');
+    if (event && event.target) {
+        event.target.classList.add('pdf-tool-active');
+    }
     
     // Update cursor
     const canvas = window.pdfCanvas.canvas;
@@ -1893,7 +1898,9 @@ function selectLineWidth(width) {
     document.querySelectorAll('.pdf-size-btn').forEach(btn => {
         btn.classList.remove('pdf-size-active');
     });
-    event.target.classList.add('pdf-size-active');
+    if (event && event.target) {
+        event.target.classList.add('pdf-size-active');
+    }
 }
 
 // Editor functions
@@ -1915,7 +1922,9 @@ function showEditorTab(tab) {
     document.querySelectorAll('.editor-tab').forEach(el => {
         el.classList.remove('editor-tab-active');
     });
-    event.target.classList.add('editor-tab-active');
+    if (event && event.target) {
+        event.target.classList.add('editor-tab-active');
+    }
 }
 
 function formatText(format) {
@@ -2077,9 +2086,6 @@ function savePDFWorkspace() {
     }
     
     showMessage('Work saved locally', 'success');
-    
-    // In a real implementation, you would save to Firestore
-    // db.collection('homework_workspaces').doc(window.currentHomework.id).set(workspaceData);
 }
 
 function submitPDFWorkspace() {
@@ -2090,14 +2096,14 @@ function submitPDFWorkspace() {
     
     // Ask for confirmation
     if (confirm('Submit your completed assignment? You will not be able to make further changes after submission.')) {
-        // Generate final PDF with annotations
+        // Generate final PDF
         generateFinalPDF();
         
         // Update homework status
         db.collection('homework_assignments').doc(window.currentHomework.id).update({
             status: 'submitted',
             submittedAt: new Date().toISOString(),
-            submissionUrl: window.finalPDFUrl || null, // This would be the URL to the generated PDF
+            submissionUrl: window.finalPDFUrl || null,
             notes: document.getElementById('textEditor')?.value || ''
         }).then(() => {
             showMessage('Assignment submitted successfully!', 'success');
@@ -2115,24 +2121,14 @@ function submitPDFWorkspace() {
 }
 
 function generateFinalPDF() {
-    // In a real implementation, you would:
-    // 1. Combine original PDF with annotations
-    // 2. Add text content as additional pages
-    // 3. Generate a new PDF file
-    // 4. Upload to storage (Google Cloud Storage)
-    // 5. Get the download URL
-    
-    console.log('Generating final PDF...');
     // This is a placeholder - you would need a PDF generation library
-    // like jsPDF or a server-side solution
-    
-    // For now, we'll create a simulated URL
+    console.log('Generating final PDF...');
     window.finalPDFUrl = `https://storage.googleapis.com/your-bucket/submissions/${window.currentHomework.id}_${Date.now()}.pdf`;
 }
 
 function setupAutoSave() {
     // Auto-save every 30 seconds
-    setInterval(() => {
+    window.autoSaveInterval = setInterval(() => {
         savePDFWorkspace();
     }, 30000);
 }
@@ -2143,9 +2139,15 @@ function closePDFWorkspace() {
         modal.remove();
     }
     
+    // Clean up auto-save interval
+    if (window.autoSaveInterval) {
+        clearInterval(window.autoSaveInterval);
+    }
+    
     // Clean up
     delete window.currentHomework;
     delete window.pdfCanvas;
+    delete window.finalPDFUrl;
     
     // Remove added styles
     const style = document.querySelector('style[data-pdf-workspace]');
@@ -2220,7 +2222,11 @@ window.handleHomeworkAction = function(homeworkId, studentId, currentStatus) {
                         openPDFWorkspace(homeworkId, studentId, homeworkData);
                     } else {
                         // Fallback to Google Classroom for non-PDF assignments
-                        openGoogleClassroomModal(homeworkData, studentId);
+                        if (typeof openGoogleClassroomModal === 'function') {
+                            openGoogleClassroomModal(homeworkData, studentId);
+                        } else {
+                            showMessage('This assignment type is not supported for direct editing. Please download and complete it separately.', 'info');
+                        }
                     }
                 });
             break;
@@ -2669,6 +2675,11 @@ async function loadAcademicsData(selectedStudent = null) {
                                 const safeDescription = safeText(homework.description || homework.instructions || 'No description provided.');
                                 const tutorName = safeText(homework.tutorName || homework.assignedBy || 'Tutor');
                                 const isPDF = homework.fileUrl && homework.fileUrl.toLowerCase().endsWith('.pdf');
+                                const safeHomeworkJson = JSON.stringify({
+                                    title: safeTitle,
+                                    fileUrl: homework.fileUrl || '',
+                                    subject: homework.subject || ''
+                                }).replace(/'/g, "\\'");
                                 
                                 homeworkHtml += `
                                     <div class="bg-white border ${isOverdue ? 'border-red-200' : 'border-gray-200'} rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200" data-homework-id="${homework.id}">
@@ -2700,7 +2711,7 @@ async function loadAcademicsData(selectedStudent = null) {
                                                         <span class="mr-1">📥</span> Download Assignment
                                                     </button>
                                                     ${isPDF ? `
-                                                        <button onclick="openPDFWorkspace('${homework.id}', '${studentId}', ${JSON.stringify(homework).replace(/'/g, "\\'")})" 
+                                                        <button onclick="openPDFWorkspace('${homework.id}', '${studentId}', ${safeHomeworkJson})" 
                                                                 class="text-blue-600 hover:text-blue-800 font-medium flex items-center text-sm">
                                                             <span class="mr-1">✏️</span> Work Here
                                                         </button>
