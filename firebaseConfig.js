@@ -3,7 +3,7 @@ import { getFirestore } from "https://www.gstatic.com/firebasejs/12.0.0/firebase
 import { getStorage } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-storage.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
-// --- 1. PRODUCTION CONFIG (Blooming Kids) ---
+// --- 1. PRODUCTION CONFIG (Live Site) ---
 const mainConfig = {
     apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
     authDomain: "bloomingkidsassessment.firebaseapp.com",
@@ -13,7 +13,7 @@ const mainConfig = {
     appId: "1:238975054977:web:87c70b4db044998a204980"
 };
 
-// --- 2. DEVELOPMENT CONFIG (The keys you just gave me) ---
+// --- 2. DEVELOPMENT CONFIG (Your New Dev Project) ---
 const devConfig = {
     apiKey: "AIzaSyAu36oLPNsk0TPKVIwCzEHe9oOtJ7cZQXA",
     authDomain: "blooming-kids-dev.firebaseapp.com",
@@ -26,11 +26,11 @@ const devConfig = {
 // --- 3. THE SMART SWITCH ---
 const hostname = window.location.hostname;
 
-// Logic: Use Dev project if on localhost OR your specific dev Netlify URL
+// This checks if you are coding locally OR viewing your new Netlify dev link
 const isDevelopment = 
     hostname === "localhost" || 
     hostname === "127.0.0.1" || 
-    hostname.includes("dev-site-name.netlify.app"); // <-- Put your NEW Netlify URL here
+    hostname.includes("bkhdevelop.netlify.app");
 
 const firebaseConfig = isDevelopment ? devConfig : mainConfig;
 
@@ -39,5 +39,8 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 const auth = getAuth(app);
+
+// Logic check for your console so you know it's working
+console.log("Environment:", isDevelopment ? "🛠️ DEVELOPMENT" : "🚀 PRODUCTION");
 
 export { db, storage, auth, firebaseConfig };
