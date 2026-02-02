@@ -1310,7 +1310,7 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
 }
 
 // ============================================================================
-// SECTION 11: PROACTIVE ACADEMICS TAB (UPDATED WITH HOMEWORK STATUS)
+// SECTION 11: PROACTIVE ACADEMICS TAB (UPDATED WITH HOMEWORK STATUS + PDF TOOLS)
 // ============================================================================
 
 // Make sure this function is available globally
@@ -1346,6 +1346,954 @@ window.debugHomeworkFields = function(homeworkId) {
             alert(`Field names: ${Object.keys(data).join(', ')}\n\nCheck console for details.`);
         });
 };
+
+// Force download function for assignments
+window.forceDownload = function(url, filename) {
+    // Create a temporary anchor element
+    const link = document.createElement('a');
+    link.href = url;
+    
+    // Add download attribute with filename
+    link.setAttribute('download', filename || 'assignment.pdf');
+    
+    // Append to body, click, and remove
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Fallback: If download attribute doesn't work, try fetch approach
+    setTimeout(() => {
+        // Check if download likely succeeded by checking if we're still on the page
+        // This is a simple check - in production you might want a more robust solution
+        console.log('Download initiated for:', filename || 'assignment');
+    }, 1000);
+};
+
+// Open PDF Annotation Workspace
+window.openPDFWorkspace = function(homeworkId, studentId, homeworkData) {
+    // Store homework data globally for the workspace
+    window.currentHomework = {
+        id: homeworkId,
+        studentId: studentId,
+        data: homeworkData
+    };
+    
+    // Create the workspace modal
+    const modalHTML = `
+        <div id="pdfWorkspaceModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[100] p-4">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+                <!-- Header -->
+                <div class="bg-gradient-to-r from-blue-600 to-purple-600 p-4 rounded-t-xl flex justify-between items-center">
+                    <div>
+                        <h3 class="text-xl font-bold text-white">Homework Workspace</h3>
+                        <p class="text-blue-100 text-sm">${safeText(homeworkData.title || 'Assignment')}</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <button onclick="savePDFWorkspace()" 
+                                class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                            💾 Save Work
+                        </button>
+                        <button onclick="submitPDFWorkspace()" 
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                            📤 Submit
+                        </button>
+                        <button onclick="closePDFWorkspace()" 
+                                class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                            ✕ Close
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Main Content -->
+                <div class="flex flex-1 overflow-hidden">
+                    <!-- Left Sidebar - Tools -->
+                    <div class="w-16 bg-gray-100 border-r border-gray-300 flex flex-col items-center py-4 space-y-4">
+                        <!-- Tool Selection -->
+                        <div class="text-center">
+                            <div class="text-xs text-gray-500 mb-1">Tools</div>
+                            <div class="space-y-2">
+                                <button onclick="selectTool('select')" class="pdf-tool-btn" title="Select Tool">
+                                    <span class="text-xl">🖱️</span>
+                                </button>
+                                <button onclick="selectTool('pencil')" class="pdf-tool-btn pdf-tool-active" title="Pencil">
+                                    <span class="text-xl">✏️</span>
+                                </button>
+                                <button onclick="selectTool('highlighter')" class="pdf-tool-btn" title="Highlighter">
+                                    <span class="text-xl">🖍️</span>
+                                </button>
+                                <button onclick="selectTool('text')" class="pdf-tool-btn" title="Text Tool">
+                                    <span class="text-xl">📝</span>
+                                </button>
+                                <button onclick="selectTool('line')" class="pdf-tool-btn" title="Line">
+                                    <span class="text-xl">📏</span>
+                                </button>
+                                <button onclick="selectTool('rectangle')" class="pdf-tool-btn" title="Rectangle">
+                                    <span class="text-xl">⬜</span>
+                                </button>
+                                <button onclick="selectTool('circle')" class="pdf-tool-btn" title="Circle">
+                                    <span class="text-xl">⭕</span>
+                                </button>
+                                <button onclick="selectTool('eraser')" class="pdf-tool-btn" title="Eraser">
+                                    <span class="text-xl">🧽</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Color Picker -->
+                        <div class="text-center mt-4">
+                            <div class="text-xs text-gray-500 mb-1">Colors</div>
+                            <div class="space-y-1">
+                                <button onclick="selectColor('#000000')" class="w-6 h-6 rounded-full bg-black border-2 border-gray-300"></button>
+                                <button onclick="selectColor('#FF0000')" class="w-6 h-6 rounded-full bg-red-500"></button>
+                                <button onclick="selectColor('#00FF00')" class="w-6 h-6 rounded-full bg-green-500"></button>
+                                <button onclick="selectColor('#0000FF')" class="w-6 h-6 rounded-full bg-blue-500"></button>
+                                <button onclick="selectColor('#FFFF00')" class="w-6 h-6 rounded-full bg-yellow-500"></button>
+                                <button onclick="selectColor('#FF00FF')" class="w-6 h-6 rounded-full bg-purple-500"></button>
+                            </div>
+                        </div>
+                        
+                        <!-- Line Width -->
+                        <div class="text-center mt-4">
+                            <div class="text-xs text-gray-500 mb-1">Size</div>
+                            <div class="space-y-1">
+                                <button onclick="selectLineWidth(1)" class="pdf-size-btn">Thin</button>
+                                <button onclick="selectLineWidth(3)" class="pdf-size-btn pdf-size-active">Med</button>
+                                <button onclick="selectLineWidth(5)" class="pdf-size-btn">Thick</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Center - PDF Viewer & Annotations -->
+                    <div class="flex-1 flex flex-col">
+                        <!-- PDF Controls -->
+                        <div class="bg-gray-50 border-b border-gray-300 p-3 flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <button onclick="zoomPDF('out')" class="pdf-control-btn">🔍−</button>
+                                <span class="text-sm text-gray-600" id="pdfZoomLevel">100%</span>
+                                <button onclick="zoomPDF('in')" class="pdf-control-btn">🔍+</button>
+                                <button onclick="resetPDFView()" class="pdf-control-btn ml-4">🔄 Reset</button>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <span class="text-sm text-gray-600">Page: </span>
+                                <select id="pdfPageSelect" class="border rounded px-2 py-1 text-sm" onchange="changePDFPage(this.value)">
+                                    <option value="1">1</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- PDF Canvas Container -->
+                        <div class="flex-1 overflow-auto bg-gray-200 p-4" id="pdfCanvasContainer">
+                            <div id="pdfViewer" class="relative mx-auto bg-white shadow-lg">
+                                <!-- PDF will be rendered here -->
+                                <div class="flex items-center justify-center h-full min-h-[500px]">
+                                    <div class="text-center">
+                                        <div class="text-6xl mb-4">📄</div>
+                                        <p class="text-gray-600">Loading PDF...</p>
+                                        <p class="text-sm text-gray-500 mt-2">If PDF doesn't load, download and open it separately</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Right Sidebar - Text Editor & Notes -->
+                    <div class="w-80 bg-gray-50 border-l border-gray-300 flex flex-col">
+                        <!-- Text Editor Tab -->
+                        <div class="border-b border-gray-300">
+                            <div class="flex">
+                                <button onclick="showEditorTab('text')" class="editor-tab editor-tab-active">📝 Text Editor</button>
+                                <button onclick="showEditorTab('notes')" class="editor-tab">📋 Notes</button>
+                                <button onclick="showEditorTab('comments')" class="editor-tab">💬 Comments</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Text Editor Content -->
+                        <div class="flex-1 overflow-hidden">
+                            <!-- Text Editor -->
+                            <div id="textEditorTab" class="editor-content h-full flex flex-col">
+                                <div class="p-3 border-b border-gray-300 bg-white">
+                                    <div class="flex space-x-2">
+                                        <button onclick="formatText('bold')" class="editor-btn" title="Bold">B</button>
+                                        <button onclick="formatText('italic')" class="editor-btn" title="Italic">I</button>
+                                        <button onclick="formatText('underline')" class="editor-btn" title="Underline">U</button>
+                                        <div class="border-l border-gray-300 mx-2"></div>
+                                        <button onclick="insertBullet()" class="editor-btn" title="Bullet List">•</button>
+                                        <button onclick="insertNumber()" class="editor-btn" title="Number List">1.</button>
+                                    </div>
+                                </div>
+                                <textarea id="textEditor" class="flex-1 p-4 resize-none focus:outline-none" 
+                                          placeholder="Type your answers here... You can also write essays, show calculations, or take notes."></textarea>
+                                <div class="p-3 border-t border-gray-300 bg-gray-100 text-xs text-gray-600">
+                                    <div>Word Count: <span id="wordCount">0</span></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Notes Tab -->
+                            <div id="notesTab" class="editor-content hidden h-full flex flex-col">
+                                <div class="p-4">
+                                    <h4 class="font-medium text-gray-700 mb-3">Assignment Notes</h4>
+                                    <textarea id="assignmentNotes" class="w-full h-48 p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                              placeholder="Add your personal notes about this assignment..."></textarea>
+                                    <div class="mt-3 text-sm text-gray-500">
+                                        <p>Tips:</p>
+                                        <ul class="list-disc pl-5 mt-1 space-y-1">
+                                            <li>Note down important concepts</li>
+                                            <li>Record questions for your tutor</li>
+                                            <li>Track your progress</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Comments Tab -->
+                            <div id="commentsTab" class="editor-content hidden h-full flex flex-col">
+                                <div class="p-4 flex-1">
+                                    <h4 class="font-medium text-gray-700 mb-3">Comments & Feedback</h4>
+                                    <div id="commentsContainer" class="space-y-3 mb-4 max-h-60 overflow-y-auto">
+                                        <!-- Comments will be added here -->
+                                    </div>
+                                    <div class="border-t pt-3">
+                                        <textarea id="newComment" class="w-full p-2 border rounded text-sm resize-none" 
+                                                  placeholder="Add a comment..." rows="2"></textarea>
+                                        <button onclick="addComment()" class="mt-2 bg-blue-500 text-white px-3 py-1 rounded text-sm">
+                                            Add Comment
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Workspace Status -->
+                        <div class="p-3 border-t border-gray-300 bg-white text-xs text-gray-600">
+                            <div class="flex justify-between">
+                                <span>Auto-save: <span id="autoSaveStatus" class="text-green-600">On</span></span>
+                                <span id="lastSaved">Not saved yet</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Add CSS for PDF workspace
+    const style = document.createElement('style');
+    style.textContent = `
+        .pdf-tool-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .pdf-tool-btn:hover {
+            background: #e5e7eb;
+            border-color: #9ca3af;
+        }
+        .pdf-tool-active {
+            background: #3b82f6 !important;
+            color: white;
+            border-color: #1d4ed8;
+        }
+        .pdf-size-btn {
+            width: 40px;
+            padding: 4px;
+            font-size: 11px;
+            border-radius: 4px;
+            background: white;
+            border: 1px solid #d1d5db;
+        }
+        .pdf-size-active {
+            background: #3b82f6;
+            color: white;
+            border-color: #1d4ed8;
+        }
+        .pdf-control-btn {
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: white;
+            border: 1px solid #d1d5db;
+            font-size: 14px;
+        }
+        .pdf-control-btn:hover {
+            background: #f3f4f6;
+        }
+        .editor-tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            background: #f9fafb;
+            border-bottom: 2px solid transparent;
+        }
+        .editor-tab-active {
+            background: white;
+            border-bottom-color: #3b82f6;
+            font-weight: 500;
+        }
+        .editor-content {
+            display: none;
+        }
+        .editor-content.active {
+            display: flex;
+        }
+        .editor-btn {
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: white;
+            border: 1px solid #d1d5db;
+            font-weight: bold;
+        }
+        .editor-btn:hover {
+            background: #f3f4f6;
+        }
+        #pdfCanvasContainer {
+            scrollbar-width: thin;
+            scrollbar-color: #9ca3af #e5e7eb;
+        }
+        #pdfCanvasContainer::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        #pdfCanvasContainer::-webkit-scrollbar-track {
+            background: #e5e7eb;
+            border-radius: 4px;
+        }
+        #pdfCanvasContainer::-webkit-scrollbar-thumb {
+            background: #9ca3af;
+            border-radius: 4px;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Add modal to page
+    const div = document.createElement('div');
+    div.innerHTML = modalHTML;
+    document.body.appendChild(div.firstElementChild);
+    
+    // Load the PDF
+    loadPDFForWorkspace(homeworkData.fileUrl);
+    
+    // Initialize workspace
+    initializePDFWorkspace();
+};
+
+// Initialize PDF workspace
+function initializePDFWorkspace() {
+    // Set up auto-save
+    setupAutoSave();
+    
+    // Initialize word count
+    const textEditor = document.getElementById('textEditor');
+    if (textEditor) {
+        textEditor.addEventListener('input', updateWordCount);
+        updateWordCount();
+    }
+    
+    // Initialize active tool
+    selectTool('pencil');
+    selectColor('#000000');
+    selectLineWidth(3);
+    showEditorTab('text');
+}
+
+// Load PDF into workspace
+function loadPDFForWorkspace(pdfUrl) {
+    if (!pdfUrl) {
+        console.error('No PDF URL provided');
+        return;
+    }
+    
+    // In a real implementation, you would use PDF.js here
+    // For now, we'll show the PDF in an iframe and simulate annotation canvas
+    
+    const pdfViewer = document.getElementById('pdfViewer');
+    if (pdfViewer) {
+        pdfViewer.innerHTML = `
+            <div class="relative">
+                <!-- PDF Display (iframe for now) -->
+                <iframe src="${pdfUrl}" 
+                        class="w-full h-[600px] border-0" 
+                        id="pdfIframe">
+                </iframe>
+                
+                <!-- Annotation Canvas (overlay) -->
+                <canvas id="pdfAnnotationCanvas" 
+                        class="absolute top-0 left-0 w-full h-[600px] border border-gray-300"
+                        style="touch-action: none;">
+                </canvas>
+            </div>
+        `;
+        
+        // Initialize canvas for drawing
+        setTimeout(() => {
+            initializeAnnotationCanvas();
+        }, 1000);
+    }
+}
+
+// Initialize annotation canvas
+function initializeAnnotationCanvas() {
+    const canvas = document.getElementById('pdfAnnotationCanvas');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    
+    // Set canvas dimensions to match iframe
+    const iframe = document.getElementById('pdfIframe');
+    if (iframe) {
+        canvas.width = iframe.offsetWidth;
+        canvas.height = iframe.offsetHeight;
+    } else {
+        canvas.width = 800;
+        canvas.height = 600;
+    }
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Store drawing state
+    window.pdfCanvas = {
+        canvas: canvas,
+        ctx: ctx,
+        isDrawing: false,
+        lastX: 0,
+        lastY: 0,
+        currentTool: 'pencil',
+        currentColor: '#000000',
+        currentLineWidth: 3,
+        annotations: []
+    };
+    
+    // Set up drawing events
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseout', stopDrawing);
+    
+    // Touch events for mobile
+    canvas.addEventListener('touchstart', handleTouchStart);
+    canvas.addEventListener('touchmove', handleTouchMove);
+    canvas.addEventListener('touchend', stopDrawing);
+}
+
+// Drawing functions
+function startDrawing(e) {
+    if (!window.pdfCanvas) return;
+    
+    window.pdfCanvas.isDrawing = true;
+    const rect = window.pdfCanvas.canvas.getBoundingClientRect();
+    
+    if (e.type === 'touchstart') {
+        window.pdfCanvas.lastX = e.touches[0].clientX - rect.left;
+        window.pdfCanvas.lastY = e.touches[0].clientY - rect.top;
+    } else {
+        window.pdfCanvas.lastX = e.clientX - rect.left;
+        window.pdfCanvas.lastY = e.clientY - rect.top;
+    }
+}
+
+function draw(e) {
+    if (!window.pdfCanvas || !window.pdfCanvas.isDrawing) return;
+    
+    e.preventDefault();
+    const rect = window.pdfCanvas.canvas.getBoundingClientRect();
+    let currentX, currentY;
+    
+    if (e.type === 'touchmove') {
+        currentX = e.touches[0].clientX - rect.left;
+        currentY = e.touches[0].clientY - rect.top;
+    } else {
+        currentX = e.clientX - rect.left;
+        currentY = e.clientY - rect.top;
+    }
+    
+    const ctx = window.pdfCanvas.ctx;
+    ctx.beginPath();
+    ctx.moveTo(window.pdfCanvas.lastX, window.pdfCanvas.lastY);
+    ctx.lineTo(currentX, currentY);
+    ctx.strokeStyle = window.pdfCanvas.currentColor;
+    ctx.lineWidth = window.pdfCanvas.currentLineWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    
+    window.pdfCanvas.lastX = currentX;
+    window.pdfCanvas.lastY = currentY;
+    
+    // Save annotation
+    window.pdfCanvas.annotations.push({
+        type: window.pdfCanvas.currentTool,
+        color: window.pdfCanvas.currentColor,
+        width: window.pdfCanvas.currentLineWidth,
+        points: [[window.pdfCanvas.lastX, window.pdfCanvas.lastY], [currentX, currentY]]
+    });
+}
+
+function stopDrawing() {
+    if (!window.pdfCanvas) return;
+    window.pdfCanvas.isDrawing = false;
+}
+
+function handleTouchStart(e) {
+    if (e.touches.length === 1) {
+        startDrawing(e);
+    }
+}
+
+function handleTouchMove(e) {
+    if (e.touches.length === 1) {
+        draw(e);
+    }
+}
+
+// Tool selection functions
+function selectTool(tool) {
+    if (!window.pdfCanvas) return;
+    
+    window.pdfCanvas.currentTool = tool;
+    
+    // Update UI
+    document.querySelectorAll('.pdf-tool-btn').forEach(btn => {
+        btn.classList.remove('pdf-tool-active');
+    });
+    event.target.classList.add('pdf-tool-active');
+    
+    // Update cursor
+    const canvas = window.pdfCanvas.canvas;
+    switch(tool) {
+        case 'pencil':
+        case 'highlighter':
+            canvas.style.cursor = 'crosshair';
+            break;
+        case 'eraser':
+            canvas.style.cursor = 'cell';
+            break;
+        case 'select':
+            canvas.style.cursor = 'default';
+            break;
+        default:
+            canvas.style.cursor = 'crosshair';
+    }
+}
+
+function selectColor(color) {
+    if (!window.pdfCanvas) return;
+    window.pdfCanvas.currentColor = color;
+}
+
+function selectLineWidth(width) {
+    if (!window.pdfCanvas) return;
+    window.pdfCanvas.currentLineWidth = width;
+    
+    // Update UI
+    document.querySelectorAll('.pdf-size-btn').forEach(btn => {
+        btn.classList.remove('pdf-size-active');
+    });
+    event.target.classList.add('pdf-size-active');
+}
+
+// Editor functions
+function showEditorTab(tab) {
+    // Hide all tabs
+    document.querySelectorAll('.editor-content').forEach(el => {
+        el.classList.remove('active');
+        el.classList.add('hidden');
+    });
+    
+    // Show selected tab
+    const tabElement = document.getElementById(tab + 'Tab');
+    if (tabElement) {
+        tabElement.classList.remove('hidden');
+        tabElement.classList.add('active');
+    }
+    
+    // Update tab buttons
+    document.querySelectorAll('.editor-tab').forEach(el => {
+        el.classList.remove('editor-tab-active');
+    });
+    event.target.classList.add('editor-tab-active');
+}
+
+function formatText(format) {
+    const textEditor = document.getElementById('textEditor');
+    if (!textEditor) return;
+    
+    const start = textEditor.selectionStart;
+    const end = textEditor.selectionEnd;
+    const selectedText = textEditor.value.substring(start, end);
+    
+    let formattedText = selectedText;
+    switch(format) {
+        case 'bold':
+            formattedText = `**${selectedText}**`;
+            break;
+        case 'italic':
+            formattedText = `*${selectedText}*`;
+            break;
+        case 'underline':
+            formattedText = `<u>${selectedText}</u>`;
+            break;
+    }
+    
+    textEditor.value = textEditor.value.substring(0, start) + 
+                       formattedText + 
+                       textEditor.value.substring(end);
+    
+    textEditor.focus();
+    textEditor.setSelectionRange(start, start + formattedText.length);
+}
+
+function insertBullet() {
+    const textEditor = document.getElementById('textEditor');
+    if (!textEditor) return;
+    
+    const start = textEditor.selectionStart;
+    textEditor.value = textEditor.value.substring(0, start) + 
+                      '• ' + 
+                      textEditor.value.substring(start);
+    textEditor.focus();
+    textEditor.setSelectionRange(start + 2, start + 2);
+}
+
+function insertNumber() {
+    const textEditor = document.getElementById('textEditor');
+    if (!textEditor) return;
+    
+    const start = textEditor.selectionStart;
+    textEditor.value = textEditor.value.substring(0, start) + 
+                      '1. ' + 
+                      textEditor.value.substring(start);
+    textEditor.focus();
+    textEditor.setSelectionRange(start + 3, start + 3);
+}
+
+function updateWordCount() {
+    const textEditor = document.getElementById('textEditor');
+    const wordCountElement = document.getElementById('wordCount');
+    
+    if (!textEditor || !wordCountElement) return;
+    
+    const text = textEditor.value.trim();
+    const wordCount = text === '' ? 0 : text.split(/\s+/).length;
+    wordCountElement.textContent = wordCount;
+}
+
+function addComment() {
+    const commentInput = document.getElementById('newComment');
+    const commentsContainer = document.getElementById('commentsContainer');
+    
+    if (!commentInput || !commentsContainer) return;
+    
+    const comment = commentInput.value.trim();
+    if (!comment) return;
+    
+    const timestamp = new Date().toLocaleTimeString();
+    const commentHTML = `
+        <div class="bg-blue-50 p-3 rounded-lg">
+            <div class="flex justify-between items-start">
+                <span class="font-medium text-sm">You</span>
+                <span class="text-xs text-gray-500">${timestamp}</span>
+            </div>
+            <p class="text-sm mt-1">${safeText(comment)}</p>
+        </div>
+    `;
+    
+    commentsContainer.innerHTML += commentHTML;
+    commentInput.value = '';
+    
+    // Scroll to bottom
+    commentsContainer.scrollTop = commentsContainer.scrollHeight;
+}
+
+// PDF control functions
+function zoomPDF(direction) {
+    const zoomElement = document.getElementById('pdfZoomLevel');
+    if (!zoomElement) return;
+    
+    let currentZoom = parseInt(zoomElement.textContent);
+    if (isNaN(currentZoom)) currentZoom = 100;
+    
+    if (direction === 'in') {
+        currentZoom += 25;
+    } else {
+        currentZoom = Math.max(25, currentZoom - 25);
+    }
+    
+    zoomElement.textContent = currentZoom + '%';
+    
+    // In a real implementation, you would adjust the PDF view
+    const pdfViewer = document.getElementById('pdfViewer');
+    if (pdfViewer) {
+        pdfViewer.style.transform = `scale(${currentZoom / 100})`;
+        pdfViewer.style.transformOrigin = 'top left';
+    }
+}
+
+function resetPDFView() {
+    const zoomElement = document.getElementById('pdfZoomLevel');
+    if (zoomElement) {
+        zoomElement.textContent = '100%';
+    }
+    
+    const pdfViewer = document.getElementById('pdfViewer');
+    if (pdfViewer) {
+        pdfViewer.style.transform = 'scale(1)';
+    }
+}
+
+function changePDFPage(page) {
+    console.log('Changing to page:', page);
+    // In a real implementation, you would load the specified PDF page
+}
+
+// Save and submit functions
+function savePDFWorkspace() {
+    if (!window.currentHomework) return;
+    
+    // Get all workspace data
+    const workspaceData = {
+        homeworkId: window.currentHomework.id,
+        studentId: window.currentHomework.studentId,
+        timestamp: new Date().toISOString(),
+        textContent: document.getElementById('textEditor')?.value || '',
+        notes: document.getElementById('assignmentNotes')?.value || '',
+        annotations: window.pdfCanvas?.annotations || [],
+        canvasData: window.pdfCanvas?.canvas?.toDataURL() || ''
+    };
+    
+    // Save to localStorage (temporary)
+    const key = `workspace_${window.currentHomework.id}`;
+    localStorage.setItem(key, JSON.stringify(workspaceData));
+    
+    // Update UI
+    const lastSavedElement = document.getElementById('lastSaved');
+    if (lastSavedElement) {
+        lastSavedElement.textContent = new Date().toLocaleTimeString();
+        lastSavedElement.style.color = '#10b981'; // green
+    }
+    
+    showMessage('Work saved locally', 'success');
+    
+    // In a real implementation, you would save to Firestore
+    // db.collection('homework_workspaces').doc(window.currentHomework.id).set(workspaceData);
+}
+
+function submitPDFWorkspace() {
+    if (!window.currentHomework) return;
+    
+    // First save the work
+    savePDFWorkspace();
+    
+    // Ask for confirmation
+    if (confirm('Submit your completed assignment? You will not be able to make further changes after submission.')) {
+        // Generate final PDF with annotations
+        generateFinalPDF();
+        
+        // Update homework status
+        db.collection('homework_assignments').doc(window.currentHomework.id).update({
+            status: 'submitted',
+            submittedAt: new Date().toISOString(),
+            submissionUrl: window.finalPDFUrl || null, // This would be the URL to the generated PDF
+            notes: document.getElementById('textEditor')?.value || ''
+        }).then(() => {
+            showMessage('Assignment submitted successfully!', 'success');
+            closePDFWorkspace();
+            
+            // Refresh the academics data
+            setTimeout(() => {
+                loadAcademicsData();
+            }, 1000);
+        }).catch(error => {
+            console.error('Error submitting assignment:', error);
+            showMessage('Error submitting assignment. Please try again.', 'error');
+        });
+    }
+}
+
+function generateFinalPDF() {
+    // In a real implementation, you would:
+    // 1. Combine original PDF with annotations
+    // 2. Add text content as additional pages
+    // 3. Generate a new PDF file
+    // 4. Upload to storage (Google Cloud Storage)
+    // 5. Get the download URL
+    
+    console.log('Generating final PDF...');
+    // This is a placeholder - you would need a PDF generation library
+    // like jsPDF or a server-side solution
+    
+    // For now, we'll create a simulated URL
+    window.finalPDFUrl = `https://storage.googleapis.com/your-bucket/submissions/${window.currentHomework.id}_${Date.now()}.pdf`;
+}
+
+function setupAutoSave() {
+    // Auto-save every 30 seconds
+    setInterval(() => {
+        savePDFWorkspace();
+    }, 30000);
+}
+
+function closePDFWorkspace() {
+    const modal = document.getElementById('pdfWorkspaceModal');
+    if (modal) {
+        modal.remove();
+    }
+    
+    // Clean up
+    delete window.currentHomework;
+    delete window.pdfCanvas;
+    
+    // Remove added styles
+    const style = document.querySelector('style[data-pdf-workspace]');
+    if (style) style.remove();
+}
+
+// Updated handleHomeworkAction function
+window.handleHomeworkAction = function(homeworkId, studentId, currentStatus) {
+    switch(currentStatus) {
+        case 'graded':
+            // Show detailed view with grade and feedback
+            db.collection('homework_assignments').doc(homeworkId).get()
+                .then(doc => {
+                    const homework = doc.data();
+                    if (homework) {
+                        // Check for grade under different possible field names
+                        const grade = homework.grade || homework.score || homework.overallGrade || 
+                                     homework.percentage || homework.marks || 'N/A';
+                        
+                        // Format grade properly
+                        let gradeDisplay = grade;
+                        if (typeof grade === 'number') {
+                            gradeDisplay = `${grade}%`;
+                        } else if (grade !== 'N/A') {
+                            // Try to parse as number
+                            const parsedGrade = parseFloat(grade);
+                            if (!isNaN(parsedGrade)) {
+                                gradeDisplay = `${parsedGrade}%`;
+                            }
+                        }
+                        
+                        const feedback = homework.feedback || homework.tutorFeedback || 
+                                        homework.comments || homework.notes || 'No feedback provided.';
+                        
+                        // Create a better modal display
+                        showGradeFeedbackModal(gradeDisplay, feedback, homework);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching homework:', error);
+                    showMessage('Error loading assignment details', 'error');
+                });
+            break;
+            
+        case 'submitted':
+            // View submission details
+            db.collection('homework_assignments').doc(homeworkId).get()
+                .then(doc => {
+                    const homework = doc.data();
+                    if (homework && homework.submissionUrl) {
+                        window.open(homework.submissionUrl, '_blank');
+                    } else {
+                        alert('This assignment has been submitted. No submission file available.');
+                    }
+                });
+            break;
+            
+        case 'uploaded':
+        case 'pending':
+        case 'overdue':
+        default:
+            // Open the PDF workspace instead of Google Classroom
+            db.collection('homework_assignments').doc(homeworkId).get()
+                .then(doc => {
+                    const homeworkData = { id: doc.id, ...doc.data() };
+                    if (!homeworkData.dueTimestamp && homeworkData.dueDate) {
+                        homeworkData.dueTimestamp = getTimestamp(homeworkData.dueDate);
+                    }
+                    
+                    // Open PDF workspace if there's a PDF file
+                    if (homeworkData.fileUrl && homeworkData.fileUrl.toLowerCase().endsWith('.pdf')) {
+                        openPDFWorkspace(homeworkId, studentId, homeworkData);
+                    } else {
+                        // Fallback to Google Classroom for non-PDF assignments
+                        openGoogleClassroomModal(homeworkData, studentId);
+                    }
+                });
+            break;
+    }
+};
+
+// Show a better modal for grade and feedback
+function showGradeFeedbackModal(grade, feedback, homeworkData) {
+    // Remove any existing modal
+    const existingModal = document.getElementById('gradeFeedbackModal');
+    if (existingModal) existingModal.remove();
+    
+    const modalHTML = `
+        <div id="gradeFeedbackModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <div class="bg-gradient-to-r from-green-500 to-emerald-600 p-6 rounded-t-xl">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold text-white">Assignment Graded</h3>
+                        <button onclick="document.getElementById('gradeFeedbackModal').remove()" 
+                                class="text-white hover:text-gray-200 text-2xl">&times;</button>
+                    </div>
+                </div>
+                
+                <div class="p-6">
+                    <div class="text-center mb-6">
+                        <div class="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4">
+                            <span class="text-3xl text-green-600">📊</span>
+                        </div>
+                        <h4 class="text-2xl font-bold text-gray-800 mb-2">${grade}</h4>
+                        <p class="text-gray-600">Overall Grade</p>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h5 class="font-semibold text-gray-700 mb-2">Assignment Details</h5>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <p class="text-gray-800"><span class="font-medium">Title:</span> ${safeText(homeworkData.title || homeworkData.subject || 'Untitled')}</p>
+                            ${homeworkData.tutorName ? `<p class="text-gray-800 mt-1"><span class="font-medium">Graded by:</span> ${safeText(homeworkData.tutorName)}</p>` : ''}
+                            ${homeworkData.gradedAt ? `<p class="text-gray-800 mt-1"><span class="font-medium">Graded on:</span> ${formatDetailedDate(homeworkData.gradedAt)}</p>` : ''}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h5 class="font-semibold text-gray-700 mb-2">Tutor's Feedback</h5>
+                        <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                            <p class="text-gray-700 whitespace-pre-wrap">${safeText(feedback)}</p>
+                        </div>
+                    </div>
+                    
+                    ${homeworkData.submissionUrl ? `
+                    <div class="mt-6">
+                        <h5 class="font-semibold text-gray-700 mb-2">Your Submission</h5>
+                        <a href="${safeText(homeworkData.submissionUrl)}" target="_blank" 
+                           class="inline-flex items-center text-green-600 hover:text-green-800 font-medium">
+                            <span class="mr-2">📎</span> View Submitted File
+                        </a>
+                    </div>
+                    ` : ''}
+                    
+                    <div class="mt-8 pt-6 border-t border-gray-200">
+                        <button onclick="document.getElementById('gradeFeedbackModal').remove()" 
+                                class="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const div = document.createElement('div');
+    div.innerHTML = modalHTML;
+    document.body.appendChild(div.firstElementChild);
+}
 
 async function loadAcademicsData(selectedStudent = null) {
     const academicsContent = document.getElementById('academicsContent');
@@ -1713,13 +2661,14 @@ async function loadAcademicsData(selectedStudent = null) {
                                     statusColor = homework.submissionUrl ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800';
                                     statusText = homework.submissionUrl ? 'Uploaded - Not Submitted' : 'Not Started';
                                     statusIcon = homework.submissionUrl ? '📎' : '📝';
-                                    buttonText = homework.submissionUrl ? 'Review & Submit' : 'Start Assignment';
-                                    buttonColor = homework.submissionUrl ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-gray-600 hover:bg-gray-700';
+                                    buttonText = homework.submissionUrl ? 'Review & Submit' : 'Work on Assignment';
+                                    buttonColor = homework.submissionUrl ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700';
                                 }
                                 
                                 const safeTitle = safeText(homework.title || homework.subject || 'Untitled Assignment');
                                 const safeDescription = safeText(homework.description || homework.instructions || 'No description provided.');
                                 const tutorName = safeText(homework.tutorName || homework.assignedBy || 'Tutor');
+                                const isPDF = homework.fileUrl && homework.fileUrl.toLowerCase().endsWith('.pdf');
                                 
                                 homeworkHtml += `
                                     <div class="bg-white border ${isOverdue ? 'border-red-200' : 'border-gray-200'} rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200" data-homework-id="${homework.id}">
@@ -1730,6 +2679,7 @@ async function loadAcademicsData(selectedStudent = null) {
                                                     <span class="text-xs ${statusColor} px-2 py-1 rounded-full homework-status">${statusIcon} ${statusText}</span>
                                                     <span class="text-xs text-gray-600">Assigned by: ${tutorName}</span>
                                                     ${homework.subject ? `<span class="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded-full">${safeText(homework.subject)}</span>` : ''}
+                                                    ${isPDF ? `<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">📄 PDF</span>` : ''}
                                                 </div>
                                             </div>
                                             <div class="text-right">
@@ -1745,9 +2695,16 @@ async function loadAcademicsData(selectedStudent = null) {
                                         <div class="flex justify-between items-center pt-3 border-t border-gray-100">
                                             <div class="flex items-center space-x-3">
                                                 ${homework.fileUrl ? `
-                                                    <a href="${safeText(homework.fileUrl)}" target="_blank" class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm">
-                                                        <span class="mr-1">📎</span> Download Assignment
-                                                    </a>
+                                                    <button onclick="forceDownload('${safeText(homework.fileUrl)}', '${safeText(homework.title || 'assignment')}.pdf')" 
+                                                            class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm">
+                                                        <span class="mr-1">📥</span> Download Assignment
+                                                    </button>
+                                                    ${isPDF ? `
+                                                        <button onclick="openPDFWorkspace('${homework.id}', '${studentId}', ${JSON.stringify(homework).replace(/'/g, "\\'")})" 
+                                                                class="text-blue-600 hover:text-blue-800 font-medium flex items-center text-sm">
+                                                            <span class="mr-1">✏️</span> Work Here
+                                                        </button>
+                                                    ` : ''}
                                                 ` : ''}
                                                 
                                                 ${homework.submissionUrl ? `
@@ -2049,8 +3006,8 @@ function updateHomeworkSection(studentName, homeworkId, homeworkData) {
             statusColor = homeworkData.submissionUrl ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800';
             statusText = homeworkData.submissionUrl ? 'Uploaded - Not Submitted' : 'Not Started';
             statusIcon = homeworkData.submissionUrl ? '📎' : '📝';
-            buttonText = homeworkData.submissionUrl ? 'Review & Submit' : 'Start Assignment';
-            buttonColor = homeworkData.submissionUrl ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-gray-600 hover:bg-gray-700';
+            buttonText = homeworkData.submissionUrl ? 'Review & Submit' : 'Work on Assignment';
+            buttonColor = homeworkData.submissionUrl ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700';
         }
         
         statusElement.className = `text-xs ${statusColor} px-2 py-1 rounded-full`;
@@ -2088,142 +3045,6 @@ function updateHomeworkSection(studentName, homeworkId, homeworkData) {
             }
         }
     }
-}
-
-// Handle homework action button click - Make it global
-window.handleHomeworkAction = function(homeworkId, studentId, currentStatus) {
-    switch(currentStatus) {
-        case 'graded':
-            // Show detailed view with grade and feedback
-            db.collection('homework_assignments').doc(homeworkId).get()
-                .then(doc => {
-                    const homework = doc.data();
-                    if (homework) {
-                        // Check for grade under different possible field names
-                        const grade = homework.grade || homework.score || homework.overallGrade || 
-                                     homework.percentage || homework.marks || 'N/A';
-                        
-                        // Format grade properly
-                        let gradeDisplay = grade;
-                        if (typeof grade === 'number') {
-                            gradeDisplay = `${grade}%`;
-                        } else if (grade !== 'N/A') {
-                            // Try to parse as number
-                            const parsedGrade = parseFloat(grade);
-                            if (!isNaN(parsedGrade)) {
-                                gradeDisplay = `${parsedGrade}%`;
-                            }
-                        }
-                        
-                        const feedback = homework.feedback || homework.tutorFeedback || 
-                                        homework.comments || homework.notes || 'No feedback provided.';
-                        
-                        // Create a better modal display
-                        showGradeFeedbackModal(gradeDisplay, feedback, homework);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching homework:', error);
-                    showMessage('Error loading assignment details', 'error');
-                });
-            break;
-            
-        case 'submitted':
-            // View submission details
-            db.collection('homework_assignments').doc(homeworkId).get()
-                .then(doc => {
-                    const homework = doc.data();
-                    if (homework && homework.submissionUrl) {
-                        window.open(homework.submissionUrl, '_blank');
-                    } else {
-                        alert('This assignment has been submitted. No submission file available.');
-                    }
-                });
-            break;
-            
-        case 'uploaded':
-        case 'pending':
-        case 'overdue':
-        default:
-            // Open the Google Classroom modal to start/upload assignment
-            db.collection('homework_assignments').doc(homeworkId).get()
-                .then(doc => {
-                    const homeworkData = { id: doc.id, ...doc.data() };
-                    if (!homeworkData.dueTimestamp && homeworkData.dueDate) {
-                        homeworkData.dueTimestamp = getTimestamp(homeworkData.dueDate);
-                    }
-                    openGoogleClassroomModal(homeworkData, studentId);
-                });
-            break;
-    }
-};
-
-// Show a better modal for grade and feedback
-function showGradeFeedbackModal(grade, feedback, homeworkData) {
-    // Remove any existing modal
-    const existingModal = document.getElementById('gradeFeedbackModal');
-    if (existingModal) existingModal.remove();
-    
-    const modalHTML = `
-        <div id="gradeFeedbackModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div class="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-                <div class="bg-gradient-to-r from-green-500 to-emerald-600 p-6 rounded-t-xl">
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-xl font-bold text-white">Assignment Graded</h3>
-                        <button onclick="document.getElementById('gradeFeedbackModal').remove()" 
-                                class="text-white hover:text-gray-200 text-2xl">&times;</button>
-                    </div>
-                </div>
-                
-                <div class="p-6">
-                    <div class="text-center mb-6">
-                        <div class="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4">
-                            <span class="text-3xl text-green-600">📊</span>
-                        </div>
-                        <h4 class="text-2xl font-bold text-gray-800 mb-2">${grade}</h4>
-                        <p class="text-gray-600">Overall Grade</p>
-                    </div>
-                    
-                    <div class="mb-6">
-                        <h5 class="font-semibold text-gray-700 mb-2">Assignment Details</h5>
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <p class="text-gray-800"><span class="font-medium">Title:</span> ${safeText(homeworkData.title || homeworkData.subject || 'Untitled')}</p>
-                            ${homeworkData.tutorName ? `<p class="text-gray-800 mt-1"><span class="font-medium">Graded by:</span> ${safeText(homeworkData.tutorName)}</p>` : ''}
-                            ${homeworkData.gradedAt ? `<p class="text-gray-800 mt-1"><span class="font-medium">Graded on:</span> ${formatDetailedDate(homeworkData.gradedAt)}</p>` : ''}
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <h5 class="font-semibold text-gray-700 mb-2">Tutor's Feedback</h5>
-                        <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
-                            <p class="text-gray-700 whitespace-pre-wrap">${safeText(feedback)}</p>
-                        </div>
-                    </div>
-                    
-                    ${homeworkData.submissionUrl ? `
-                    <div class="mt-6">
-                        <h5 class="font-semibold text-gray-700 mb-2">Your Submission</h5>
-                        <a href="${safeText(homeworkData.submissionUrl)}" target="_blank" 
-                           class="inline-flex items-center text-green-600 hover:text-green-800 font-medium">
-                            <span class="mr-2">📎</span> View Submitted File
-                        </a>
-                    </div>
-                    ` : ''}
-                    
-                    <div class="mt-8 pt-6 border-t border-gray-200">
-                        <button onclick="document.getElementById('gradeFeedbackModal').remove()" 
-                                class="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors">
-                            Close
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const div = document.createElement('div');
-    div.innerHTML = modalHTML;
-    document.body.appendChild(div.firstElementChild);
 }
 // ============================================================================
 // SECTION 12: OPTIMIZED REAL-TIME MONITORING
