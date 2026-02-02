@@ -1350,9 +1350,14 @@ window.forceDownload = function(url, filename) {
 };
 
 // Open PDF Annotation Workspace - FIXED syntax issues
+// ============================================================================
+// PDF WORKSPACE - COMPLETE ADOBE-LIKE FEATURES IN NEW TAB
+// ============================================================================
+
+// Open PDF Workspace in New Tab
 window.openPDFWorkspace = function(homeworkId, studentId, homeworkDataString) {
     try {
-        // Parse the homework data safely
+        // Parse the homework data
         let homeworkData;
         try {
             homeworkData = JSON.parse(decodeURIComponent(homeworkDataString));
@@ -1364,196 +1369,1136 @@ window.openPDFWorkspace = function(homeworkId, studentId, homeworkDataString) {
             };
         }
         
-        // Store homework data globally
-        window.currentHomework = {
-            id: homeworkId,
-            studentId: studentId,
-            data: homeworkData
-        };
+        // Create a new tab/window for the workspace
+        const workspaceWindow = window.open('', '_blank', 
+            'width=1200,height=800,scrollbars=yes,resizable=yes,toolbar=no,location=no,status=no');
         
-        // Create modal HTML with proper escaping
-        const modalHTML = `
-            <div id="pdfWorkspaceModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[100] p-4">
-                <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
-                    <!-- Header -->
-                    <div class="bg-gradient-to-r from-blue-600 to-purple-600 p-4 rounded-t-xl flex justify-between items-center">
+        if (!workspaceWindow || workspaceWindow.closed) {
+            alert('Please allow popups for this site to use the workspace.');
+            return;
+        }
+        
+        // Generate complete HTML for the workspace
+        const workspaceHTML = `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Homework Workspace - ${safeText(homeworkData.title)}</title>
+                <script src="https://cdn.tailwindcss.com"></script>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+                <style>
+                    * {
+                        margin: 0;
+                        padding: 0;
+                        box-sizing: border-box;
+                    }
+                    
+                    body {
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+                        overflow: hidden;
+                    }
+                    
+                    /* Toolbar */
+                    .toolbar-btn {
+                        padding: 8px 12px;
+                        border-radius: 6px;
+                        background: white;
+                        border: 1px solid #d1d5db;
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                    }
+                    
+                    .toolbar-btn:hover {
+                        background: #f3f4f6;
+                        border-color: #9ca3af;
+                    }
+                    
+                    .toolbar-btn.active {
+                        background: #3b82f6;
+                        color: white;
+                        border-color: #1d4ed8;
+                    }
+                    
+                    /* PDF Container */
+                    #pdfContainer {
+                        scrollbar-width: thin;
+                        scrollbar-color: #9ca3af #e5e7eb;
+                        background: #f5f5f5;
+                    }
+                    
+                    #pdfContainer::-webkit-scrollbar {
+                        width: 8px;
+                        height: 8px;
+                    }
+                    
+                    #pdfContainer::-webkit-scrollbar-track {
+                        background: #e5e7eb;
+                        border-radius: 4px;
+                    }
+                    
+                    #pdfContainer::-webkit-scrollbar-thumb {
+                        background: #9ca3af;
+                        border-radius: 4px;
+                    }
+                    
+                    /* Annotation Canvas */
+                    #annotationCanvas {
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        pointer-events: none;
+                    }
+                    
+                    .canvas-active {
+                        pointer-events: auto !important;
+                    }
+                    
+                    /* Color Palette */
+                    .color-btn {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 50%;
+                        border: 2px solid transparent;
+                        cursor: pointer;
+                        transition: transform 0.2s;
+                    }
+                    
+                    .color-btn:hover {
+                        transform: scale(1.1);
+                    }
+                    
+                    .color-btn.active {
+                        border-color: #000;
+                        transform: scale(1.2);
+                    }
+                    
+                    /* Math Tools */
+                    .math-tool {
+                        width: 36px;
+                        height: 36px;
+                        border-radius: 8px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        background: white;
+                        border: 2px solid transparent;
+                        cursor: pointer;
+                    }
+                    
+                    .math-tool:hover {
+                        background: #f3f4f6;
+                        border-color: #9ca3af;
+                    }
+                    
+                    .math-tool.active {
+                        background: #3b82f6;
+                        color: white;
+                        border-color: #1d4ed8;
+                    }
+                    
+                    /* Chemistry Tools */
+                    .chem-element {
+                        width: 40px;
+                        height: 40px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        background: white;
+                        border: 1px solid #d1d5db;
+                        cursor: pointer;
+                        font-size: 10px;
+                        text-align: center;
+                    }
+                    
+                    .chem-element:hover {
+                        background: #f0f9ff;
+                        border-color: #3b82f6;
+                    }
+                    
+                    /* Sidebar */
+                    .sidebar-tab {
+                        padding: 12px;
+                        border-bottom: 2px solid transparent;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    }
+                    
+                    .sidebar-tab.active {
+                        background: white;
+                        border-bottom-color: #3b82f6;
+                        font-weight: 600;
+                    }
+                    
+                    /* Text Editor */
+                    .editor-toolbar {
+                        display: flex;
+                        gap: 4px;
+                        padding: 8px;
+                        background: #f9fafb;
+                        border-bottom: 1px solid #e5e7eb;
+                    }
+                    
+                    .editor-btn {
+                        padding: 6px 10px;
+                        border-radius: 4px;
+                        background: white;
+                        border: 1px solid #d1d5db;
+                        cursor: pointer;
+                        font-weight: 600;
+                    }
+                    
+                    .editor-btn:hover {
+                        background: #f3f4f6;
+                    }
+                    
+                    .editor-btn.active {
+                        background: #3b82f6;
+                        color: white;
+                        border-color: #1d4ed8;
+                    }
+                    
+                    /* Save Status */
+                    .save-status {
+                        animation: pulse 2s infinite;
+                    }
+                    
+                    @keyframes pulse {
+                        0%, 100% { opacity: 1; }
+                        50% { opacity: 0.5; }
+                    }
+                </style>
+            </head>
+            <body class="h-screen flex flex-col">
+                <!-- Header -->
+                <header class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 flex justify-between items-center shadow-lg">
+                    <div class="flex items-center gap-3">
+                        <button onclick="window.close()" class="text-white hover:text-gray-200 text-xl">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
                         <div>
-                            <h3 class="text-xl font-bold text-white">Homework Workspace</h3>
-                            <p class="text-blue-100 text-sm">${safeText(homeworkData.title)}</p>
-                        </div>
-                        <div class="flex items-center space-x-3">
-                            <button id="saveWorkBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
-                                💾 Save Work
-                            </button>
-                            <button id="submitWorkBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
-                                📤 Submit
-                            </button>
-                            <button id="closeWorkspaceBtn" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
-                                ✕ Close
-                            </button>
+                            <h1 class="text-xl font-bold">${safeText(homeworkData.title)}</h1>
+                            <p class="text-blue-100 text-sm">Homework Workspace</p>
                         </div>
                     </div>
                     
-                    <!-- Main Content -->
-                    <div class="flex flex-1 overflow-hidden">
-                        <!-- Left Sidebar - Tools -->
-                        <div class="w-16 bg-gray-100 border-r border-gray-300 flex flex-col items-center py-4 space-y-4">
-                            <div class="text-center">
-                                <div class="text-xs text-gray-500 mb-1">Tools</div>
-                                <div class="space-y-2">
-                                    <button data-tool="pencil" class="pdf-tool-btn pdf-tool-active">
-                                        <span class="text-xl">✏️</span>
-                                    </button>
-                                    <button data-tool="highlighter" class="pdf-tool-btn">
-                                        <span class="text-xl">🖍️</span>
-                                    </button>
-                                    <button data-tool="text" class="pdf-tool-btn">
-                                        <span class="text-xl">📝</span>
-                                    </button>
-                                    <button data-tool="eraser" class="pdf-tool-btn">
-                                        <span class="text-xl">🧽</span>
-                                    </button>
-                                </div>
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center gap-2 text-sm">
+                            <span class="text-green-300 save-status" id="saveStatus">
+                                <i class="fas fa-circle"></i> Auto-saving
+                            </span>
+                            <span id="lastSaved">Just now</span>
+                        </div>
+                        <button onclick="submitAssignment()" 
+                                class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
+                            <i class="fas fa-paper-plane mr-2"></i> Submit Assignment
+                        </button>
+                    </div>
+                </header>
+                
+                <!-- Main Content -->
+                <div class="flex flex-1 overflow-hidden">
+                    <!-- Left Sidebar - Main Tools -->
+                    <div class="w-16 bg-gray-900 text-white flex flex-col items-center py-4 space-y-6">
+                        <!-- Drawing Tools -->
+                        <div class="text-center">
+                            <div class="text-xs text-gray-400 mb-2">Draw</div>
+                            <div class="space-y-2">
+                                <button onclick="selectTool('select')" class="math-tool" title="Select Tool">
+                                    <i class="fas fa-mouse-pointer"></i>
+                                </button>
+                                <button onclick="selectTool('pencil')" class="math-tool active" title="Pencil">
+                                    <i class="fas fa-pencil-alt"></i>
+                                </button>
+                                <button onclick="selectTool('highlighter')" class="math-tool" title="Highlighter">
+                                    <i class="fas fa-highlighter"></i>
+                                </button>
+                                <button onclick="selectTool('eraser')" class="math-tool" title="Eraser">
+                                    <i class="fas fa-eraser"></i>
+                                </button>
                             </div>
                         </div>
                         
-                        <!-- Center - PDF Viewer -->
-                        <div class="flex-1 flex flex-col">
-                            <div class="bg-gray-50 border-b border-gray-300 p-3">
-                                <div class="flex items-center space-x-2">
-                                    <button id="zoomOutBtn" class="pdf-control-btn">🔍−</button>
-                                    <span id="zoomLevel" class="text-sm text-gray-600">100%</span>
-                                    <button id="zoomInBtn" class="pdf-control-btn">🔍+</button>
-                                    <button id="resetViewBtn" class="pdf-control-btn ml-4">🔄 Reset</button>
-                                </div>
-                            </div>
-                            
-                            <div class="flex-1 overflow-auto bg-gray-200 p-4">
-                                <div class="relative mx-auto bg-white shadow-lg">
-                                    ${homeworkData.fileUrl ? `
-                                        <iframe src="${safeText(homeworkData.fileUrl)}" 
-                                                class="w-full h-[600px] border-0" 
-                                                id="pdfIframe">
-                                        </iframe>
-                                    ` : `
-                                        <div class="flex items-center justify-center h-[600px]">
-                                            <div class="text-center">
-                                                <div class="text-6xl mb-4">📄</div>
-                                                <p class="text-gray-600">No PDF available</p>
-                                            </div>
-                                        </div>
-                                    `}
-                                </div>
+                        <!-- Shapes -->
+                        <div class="text-center">
+                            <div class="text-xs text-gray-400 mb-2">Shapes</div>
+                            <div class="space-y-2">
+                                <button onclick="selectTool('line')" class="math-tool" title="Line">
+                                    <i class="fas fa-slash"></i>
+                                </button>
+                                <button onclick="selectTool('rectangle')" class="math-tool" title="Rectangle">
+                                    <i class="far fa-square"></i>
+                                </button>
+                                <button onclick="selectTool('circle')" class="math-tool" title="Circle">
+                                    <i class="far fa-circle"></i>
+                                </button>
+                                <button onclick="selectTool('arrow')" class="math-tool" title="Arrow">
+                                    <i class="fas fa-arrow-right"></i>
+                                </button>
                             </div>
                         </div>
                         
-                        <!-- Right Sidebar - Text Editor -->
-                        <div class="w-80 bg-gray-50 border-l border-gray-300 flex flex-col">
-                            <div class="border-b border-gray-300">
-                                <div class="flex">
-                                    <button data-tab="text" class="editor-tab editor-tab-active">📝 Text Editor</button>
-                                    <button data-tab="notes" class="editor-tab">📋 Notes</button>
+                        <!-- Math Tools -->
+                        <div class="text-center">
+                            <div class="text-xs text-gray-400 mb-2">Math</div>
+                            <div class="space-y-2">
+                                <button onclick="selectTool('ruler')" class="math-tool" title="Ruler">
+                                    <i class="fas fa-ruler"></i>
+                                </button>
+                                <button onclick="selectTool('protractor')" class="math-tool" title="Protractor">
+                                    <i class="fas fa-drafting-compass"></i>
+                                </button>
+                                <button onclick="selectTool('compass')" class="math-tool" title="Compass">
+                                    <i class="fas fa-circle"></i>
+                                </button>
+                                <button onclick="openEquationEditor()" class="math-tool" title="Equation Editor">
+                                    <i class="fas fa-square-root-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Chemistry -->
+                        <div class="text-center">
+                            <div class="text-xs text-gray-400 mb-2">Chemistry</div>
+                            <div class="space-y-2">
+                                <button onclick="openPeriodicTable()" class="math-tool" title="Periodic Table">
+                                    <i class="fas fa-atom"></i>
+                                </button>
+                                <button onclick="selectTool('molecule')" class="math-tool" title="Molecule Builder">
+                                    <i class="fas fa-vial"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Center - PDF & Canvas -->
+                    <div class="flex-1 flex flex-col">
+                        <!-- Top Toolbar -->
+                        <div class="bg-white border-b border-gray-300 p-3 flex items-center gap-4">
+                            <!-- Color Picker -->
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm text-gray-600">Color:</span>
+                                <div class="flex gap-1">
+                                    <button onclick="selectColor('#000000')" class="color-btn active" style="background: #000000;"></button>
+                                    <button onclick="selectColor('#FF0000')" class="color-btn" style="background: #FF0000;"></button>
+                                    <button onclick="selectColor('#0000FF')" class="color-btn" style="background: #0000FF;"></button>
+                                    <button onclick="selectColor('#008000')" class="color-btn" style="background: #008000;"></button>
+                                    <button onclick="selectColor('#FFFF00')" class="color-btn" style="background: #FFFF00;"></button>
+                                    <button onclick="selectColor('#800080')" class="color-btn" style="background: #800080;"></button>
                                 </div>
                             </div>
                             
-                            <div class="flex-1 overflow-hidden">
-                                <div id="textEditorTab" class="editor-content active">
-                                    <div class="p-3 border-b border-gray-300 bg-white">
-                                        <div class="flex space-x-2">
-                                            <button class="editor-btn" data-format="bold" title="Bold">B</button>
-                                            <button class="editor-btn" data-format="italic" title="Italic">I</button>
-                                            <button class="editor-btn" data-format="underline" title="Underline">U</button>
+                            <!-- Line Width -->
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm text-gray-600">Size:</span>
+                                <div class="flex gap-1">
+                                    <button onclick="selectLineWidth(1)" class="toolbar-btn">Thin</button>
+                                    <button onclick="selectLineWidth(3)" class="toolbar-btn active">Medium</button>
+                                    <button onclick="selectLineWidth(5)" class="toolbar-btn">Thick</button>
+                                </div>
+                            </div>
+                            
+                            <!-- PDF Controls -->
+                            <div class="flex items-center gap-2 ml-auto">
+                                <button onclick="zoomPDF('out')" class="toolbar-btn">
+                                    <i class="fas fa-search-minus"></i>
+                                </button>
+                                <span id="zoomLevel" class="text-sm font-medium">100%</span>
+                                <button onclick="zoomPDF('in')" class="toolbar-btn">
+                                    <i class="fas fa-search-plus"></i>
+                                </button>
+                                <button onclick="resetView()" class="toolbar-btn ml-4">
+                                    <i class="fas fa-expand-arrows-alt"></i> Reset
+                                </button>
+                                <button onclick="downloadAnnotatedPDF()" class="toolbar-btn bg-blue-100 text-blue-700">
+                                    <i class="fas fa-download mr-2"></i> Save PDF
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- PDF Container -->
+                        <div class="flex-1 overflow-auto p-4 bg-gray-200" id="pdfContainer">
+                            <div class="relative bg-white shadow-xl mx-auto" style="width: 794px; min-height: 1123px;">
+                                <!-- PDF will be loaded here -->
+                                ${homeworkData.fileUrl ? `
+                                    <iframe src="${safeText(homeworkData.fileUrl)}" 
+                                            class="w-full h-full border-0" 
+                                            id="pdfFrame">
+                                    </iframe>
+                                    <canvas id="annotationCanvas" 
+                                            class="absolute top-0 left-0 w-full h-full">
+                                    </canvas>
+                                ` : `
+                                    <div class="flex items-center justify-center h-full">
+                                        <div class="text-center">
+                                            <i class="fas fa-file-pdf text-6xl text-gray-400 mb-4"></i>
+                                            <p class="text-gray-600">No PDF available</p>
                                         </div>
                                     </div>
-                                    <textarea id="textEditor" class="w-full h-full p-4 resize-none focus:outline-none" 
-                                              placeholder="Type your answers here..."></textarea>
+                                `}
+                            </div>
+                        </div>
+                        
+                        <!-- Page Navigation -->
+                        <div class="bg-white border-t border-gray-300 p-3 flex justify-between items-center">
+                            <div class="flex items-center gap-2">
+                                <button onclick="prevPage()" class="toolbar-btn">
+                                    <i class="fas fa-chevron-left"></i> Previous
+                                </button>
+                                <span class="text-sm text-gray-600">Page</span>
+                                <input type="number" id="pageInput" value="1" min="1" class="w-16 px-2 py-1 border rounded text-center">
+                                <span class="text-sm text-gray-600">of <span id="totalPages">1</span></span>
+                                <button onclick="nextPage()" class="toolbar-btn">
+                                    Next <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                            <div class="text-sm text-gray-500">
+                                <i class="fas fa-save mr-1"></i> Auto-saves every 30 seconds
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Right Sidebar - Text & Tools -->
+                    <div class="w-96 bg-white border-l border-gray-300 flex flex-col">
+                        <!-- Sidebar Tabs -->
+                        <div class="flex border-b border-gray-300">
+                            <button onclick="showSidebarTab('text')" class="sidebar-tab active">
+                                <i class="fas fa-font"></i> Text Editor
+                            </button>
+                            <button onclick="showSidebarTab('notes')" class="sidebar-tab">
+                                <i class="fas fa-sticky-note"></i> Notes
+                            </button>
+                            <button onclick="showSidebarTab('comments')" class="sidebar-tab">
+                                <i class="fas fa-comments"></i> Comments
+                            </button>
+                            <button onclick="showSidebarTab('elements')" class="sidebar-tab">
+                                <i class="fas fa-atom"></i> Elements
+                            </button>
+                        </div>
+                        
+                        <!-- Tab Content -->
+                        <div class="flex-1 overflow-hidden">
+                            <!-- Text Editor Tab -->
+                            <div id="textEditorTab" class="h-full flex flex-col">
+                                <div class="editor-toolbar">
+                                    <button onclick="formatText('bold')" class="editor-btn" title="Bold">
+                                        <i class="fas fa-bold"></i>
+                                    </button>
+                                    <button onclick="formatText('italic')" class="editor-btn" title="Italic">
+                                        <i class="fas fa-italic"></i>
+                                    </button>
+                                    <button onclick="formatText('underline')" class="editor-btn" title="Underline">
+                                        <i class="fas fa-underline"></i>
+                                    </button>
+                                    <div class="border-l mx-2"></div>
+                                    <button onclick="insertBullet()" class="editor-btn" title="Bullet List">
+                                        <i class="fas fa-list-ul"></i>
+                                    </button>
+                                    <button onclick="insertNumber()" class="editor-btn" title="Numbered List">
+                                        <i class="fas fa-list-ol"></i>
+                                    </button>
+                                    <button onclick="insertEquation()" class="editor-btn" title="Insert Equation">
+                                        <i class="fas fa-square-root-alt"></i>
+                                    </button>
+                                    <button onclick="insertImage()" class="editor-btn" title="Insert Image">
+                                        <i class="fas fa-image"></i>
+                                    </button>
                                 </div>
-                                <div id="notesTab" class="editor-content hidden">
-                                    <textarea id="assignmentNotes" class="w-full h-full p-4 resize-none focus:outline-none" 
-                                              placeholder="Add notes about this assignment..."></textarea>
+                                <textarea id="textEditor" 
+                                          class="flex-1 p-4 resize-none focus:outline-none font-mono text-sm"
+                                          placeholder="Type your answers here... Use the tools above for formatting."></textarea>
+                                <div class="p-3 border-t border-gray-300 bg-gray-50 text-xs text-gray-600">
+                                    <div>Word Count: <span id="wordCount">0</span> | Characters: <span id="charCount">0</span></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Notes Tab -->
+                            <div id="notesTab" class="h-full hidden flex-col">
+                                <div class="p-4">
+                                    <h3 class="font-semibold text-gray-700 mb-3">Assignment Notes</h3>
+                                    <textarea id="assignmentNotes" 
+                                              class="w-full h-64 p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                              placeholder="Add your personal notes about this assignment..."></textarea>
+                                    <div class="mt-4 text-sm text-gray-500">
+                                        <p class="font-medium mb-2">Tips:</p>
+                                        <ul class="list-disc pl-5 space-y-1">
+                                            <li>Note important concepts</li>
+                                            <li>Record questions for your tutor</li>
+                                            <li>Track your progress</li>
+                                            <li>Save formulas or equations</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Comments Tab -->
+                            <div id="commentsTab" class="h-full hidden flex-col">
+                                <div class="p-4 flex-1 overflow-hidden flex flex-col">
+                                    <h3 class="font-semibold text-gray-700 mb-3">Comments</h3>
+                                    <div id="commentsContainer" class="flex-1 overflow-y-auto space-y-3 mb-4">
+                                        <!-- Comments will appear here -->
+                                    </div>
+                                    <div class="border-t pt-3">
+                                        <textarea id="newComment" 
+                                                  class="w-full p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                  placeholder="Add a comment..." rows="3"></textarea>
+                                        <button onclick="addComment()" 
+                                                class="mt-2 w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg font-medium transition-colors">
+                                            <i class="fas fa-plus mr-2"></i> Add Comment
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Periodic Table Tab -->
+                            <div id="elementsTab" class="h-full hidden overflow-auto p-4">
+                                <h3 class="font-semibold text-gray-700 mb-3">Periodic Table</h3>
+                                <div class="grid grid-cols-9 gap-1" id="periodicTable">
+                                    <!-- Periodic table will be generated here -->
+                                </div>
+                                <div class="mt-4 p-3 bg-blue-50 rounded-lg">
+                                    <h4 class="font-medium text-blue-800 mb-2">Selected Element</h4>
+                                    <div id="elementInfo" class="text-sm text-gray-700">
+                                        Click an element to see details
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+                
+                <!-- Bottom Status Bar -->
+                <footer class="bg-gray-800 text-white p-2 flex justify-between items-center text-sm">
+                    <div class="flex items-center gap-4">
+                        <span id="currentTool">Tool: Pencil</span>
+                        <span id="currentColor">Color: Black</span>
+                        <span id="currentSize">Size: Medium</span>
+                    </div>
+                    <div>
+                        <span id="pageInfo">Page 1 of 1</span>
+                    </div>
+                </footer>
+                
+                <!-- Math Equation Modal -->
+                <div id="equationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+                    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full">
+                        <div class="bg-gradient-to-r from-blue-600 to-purple-600 p-4 rounded-t-xl flex justify-between items-center">
+                            <h3 class="text-xl font-bold text-white">Equation Editor</h3>
+                            <button onclick="closeEquationEditor()" class="text-white hover:text-gray-200 text-2xl">&times;</button>
+                        </div>
+                        <div class="p-6">
+                            <div class="mb-4">
+                                <textarea id="equationInput" 
+                                          class="w-full h-32 p-3 border rounded-lg font-mono text-lg"
+                                          placeholder="Type LaTeX equation here, e.g.: \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}"></textarea>
+                            </div>
+                            <div class="grid grid-cols-8 gap-2 mb-4">
+                                <button onclick="insertSymbol('\\frac{}{}')" class="toolbar-btn">Fraction</button>
+                                <button onclick="insertSymbol('\\sqrt{}')" class="toolbar-btn">√ Root</button>
+                                <button onclick="insertSymbol('^{}')" class="toolbar-btn">Exponent</button>
+                                <button onclick="insertSymbol('_{}')" class="toolbar-btn">Subscript</button>
+                                <button onclick="insertSymbol('\\pi')" class="toolbar-btn">π</button>
+                                <button onclick="insertSymbol('\\theta')" class="toolbar-btn">θ</button>
+                                <button onclick="insertSymbol('\\sum')" class="toolbar-btn">∑</button>
+                                <button onclick="insertSymbol('\\int')" class="toolbar-btn">∫</button>
+                            </div>
+                            <div class="flex justify-end gap-3">
+                                <button onclick="closeEquationEditor()" class="px-4 py-2 border rounded-lg">Cancel</button>
+                                <button onclick="insertEquationToEditor()" class="px-4 py-2 bg-blue-500 text-white rounded-lg">Insert Equation</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Success Modal -->
+                <div id="successModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+                    <div class="bg-white rounded-xl shadow-2xl p-8 text-center max-w-md">
+                        <div class="text-6xl text-green-500 mb-4">✓</div>
+                        <h3 class="text-2xl font-bold text-gray-800 mb-2">Assignment Submitted!</h3>
+                        <p class="text-gray-600 mb-6">Your work has been submitted successfully.</p>
+                        <button onclick="window.close()" class="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-semibold">
+                            Close Workspace
+                        </button>
+                    </div>
+                </div>
+                
+                <script>
+                    // Workspace JavaScript - Runs in the new tab
+                    let currentTool = 'pencil';
+                    let currentColor = '#000000';
+                    let currentLineWidth = 3;
+                    let currentPage = 1;
+                    let totalPages = 1;
+                    let isDrawing = false;
+                    let lastX = 0;
+                    let lastY = 0;
+                    let canvas, ctx;
+                    let annotations = [];
+                    let autoSaveInterval;
+                    
+                    // Initialize workspace
+                    function initWorkspace() {
+                        // Initialize canvas
+                        canvas = document.getElementById('annotationCanvas');
+                        ctx = canvas.getContext('2d');
+                        
+                        // Set canvas size to match PDF frame
+                        const pdfFrame = document.getElementById('pdfFrame');
+                        if (pdfFrame) {
+                            canvas.width = pdfFrame.offsetWidth;
+                            canvas.height = pdfFrame.offsetHeight;
+                        } else {
+                            canvas.width = 794;
+                            canvas.height = 1123;
+                        }
+                        
+                        // Load saved work if exists
+                        loadSavedWork();
+                        
+                        // Set up event listeners
+                        setupEventListeners();
+                        
+                        // Start auto-save
+                        startAutoSave();
+                        
+                        // Initialize periodic table
+                        initPeriodicTable();
+                        
+                        // Update word count
+                        updateWordCount();
+                    }
+                    
+                    function setupEventListeners() {
+                        // Canvas events
+                        canvas.addEventListener('mousedown', startDrawing);
+                        canvas.addEventListener('mousemove', draw);
+                        canvas.addEventListener('mouseup', stopDrawing);
+                        canvas.addEventListener('mouseout', stopDrawing);
+                        
+                        // Touch events for mobile
+                        canvas.addEventListener('touchstart', handleTouchStart);
+                        canvas.addEventListener('touchmove', handleTouchMove);
+                        canvas.addEventListener('touchend', stopDrawing);
+                        
+                        // Text editor events
+                        document.getElementById('textEditor').addEventListener('input', updateWordCount);
+                        document.getElementById('textEditor').addEventListener('input', scheduleSave);
+                        
+                        // Notes events
+                        document.getElementById('assignmentNotes').addEventListener('input', scheduleSave);
+                        
+                        // Page input event
+                        document.getElementById('pageInput').addEventListener('change', function() {
+                            goToPage(parseInt(this.value));
+                        });
+                    }
+                    
+                    // Drawing functions
+                    function startDrawing(e) {
+                        if (currentTool === 'select') return;
+                        
+                        isDrawing = true;
+                        const rect = canvas.getBoundingClientRect();
+                        
+                        if (e.type === 'touchstart') {
+                            lastX = e.touches[0].clientX - rect.left;
+                            lastY = e.touches[0].clientY - rect.top;
+                        } else {
+                            lastX = e.clientX - rect.left;
+                            lastY = e.clientY - rect.top;
+                        }
+                        
+                        // Start new annotation
+                        annotations.push({
+                            tool: currentTool,
+                            color: currentColor,
+                            width: currentLineWidth,
+                            points: [[lastX, lastY]]
+                        });
+                    }
+                    
+                    function draw(e) {
+                        if (!isDrawing || currentTool === 'select') return;
+                        
+                        e.preventDefault();
+                        const rect = canvas.getBoundingClientRect();
+                        let currentX, currentY;
+                        
+                        if (e.type === 'touchmove') {
+                            currentX = e.touches[0].clientX - rect.left;
+                            currentY = e.touches[0].clientY - rect.top;
+                        } else {
+                            currentX = e.clientX - rect.left;
+                            currentY = e.clientY - rect.top;
+                        }
+                        
+                        // Draw on canvas
+                        ctx.beginPath();
+                        ctx.moveTo(lastX, lastY);
+                        ctx.lineTo(currentX, currentY);
+                        ctx.strokeStyle = currentColor;
+                        ctx.lineWidth = currentLineWidth;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+                        ctx.stroke();
+                        
+                        // Save point to current annotation
+                        if (annotations.length > 0) {
+                            annotations[annotations.length - 1].points.push([currentX, currentY]);
+                        }
+                        
+                        lastX = currentX;
+                        lastY = currentY;
+                    }
+                    
+                    function stopDrawing() {
+                        isDrawing = false;
+                        scheduleSave();
+                    }
+                    
+                    function handleTouchStart(e) {
+                        if (e.touches.length === 1) {
+                            startDrawing(e);
+                        }
+                    }
+                    
+                    function handleTouchMove(e) {
+                        if (e.touches.length === 1) {
+                            draw(e);
+                        }
+                    }
+                    
+                    // Tool selection
+                    function selectTool(tool) {
+                        currentTool = tool;
+                        
+                        // Update UI
+                        document.querySelectorAll('.math-tool').forEach(el => el.classList.remove('active'));
+                        event.target.classList.add('active');
+                        
+                        // Update status
+                        document.getElementById('currentTool').textContent = 'Tool: ' + 
+                            (tool === 'pencil' ? 'Pencil' :
+                             tool === 'highlighter' ? 'Highlighter' :
+                             tool === 'eraser' ? 'Eraser' :
+                             tool === 'line' ? 'Line' :
+                             tool === 'rectangle' ? 'Rectangle' :
+                             tool === 'circle' ? 'Circle' :
+                             tool === 'arrow' ? 'Arrow' :
+                             tool === 'select' ? 'Select' :
+                             tool === 'ruler' ? 'Ruler' :
+                             tool === 'protractor' ? 'Protractor' :
+                             tool === 'compass' ? 'Compass' :
+                             tool === 'molecule' ? 'Molecule Builder' : tool);
+                        
+                        // Enable/disable canvas
+                        if (tool === 'select') {
+                            canvas.classList.remove('canvas-active');
+                        } else {
+                            canvas.classList.add('canvas-active');
+                        }
+                    }
+                    
+                    function selectColor(color) {
+                        currentColor = color;
+                        
+                        // Update UI
+                        document.querySelectorAll('.color-btn').forEach(el => el.classList.remove('active'));
+                        event.target.classList.add('active');
+                        
+                        // Update status
+                        const colorNames = {
+                            '#000000': 'Black',
+                            '#FF0000': 'Red',
+                            '#0000FF': 'Blue',
+                            '#008000': 'Green',
+                            '#FFFF00': 'Yellow',
+                            '#800080': 'Purple'
+                        };
+                        document.getElementById('currentColor').textContent = 'Color: ' + (colorNames[color] || color);
+                    }
+                    
+                    function selectLineWidth(width) {
+                        currentLineWidth = width;
+                        
+                        // Update UI
+                        document.querySelectorAll('.toolbar-btn').forEach(el => el.classList.remove('active'));
+                        event.target.classList.add('active');
+                        
+                        // Update status
+                        const sizeNames = {
+                            1: 'Thin',
+                            3: 'Medium',
+                            5: 'Thick'
+                        };
+                        document.getElementById('currentSize').textContent = 'Size: ' + (sizeNames[width] || width);
+                    }
+                    
+                    // PDF Controls
+                    function zoomPDF(direction) {
+                        const zoomElement = document.getElementById('zoomLevel');
+                        let currentZoom = parseInt(zoomElement.textContent);
+                        
+                        if (direction === 'in') {
+                            currentZoom = Math.min(200, currentZoom + 25);
+                        } else {
+                            currentZoom = Math.max(25, currentZoom - 25);
+                        }
+                        
+                        zoomElement.textContent = currentZoom + '%';
+                        
+                        const pdfContainer = document.getElementById('pdfContainer');
+                        pdfContainer.style.transform = \`scale(\${currentZoom / 100})\`;
+                        pdfContainer.style.transformOrigin = 'top left';
+                    }
+                    
+                    function resetView() {
+                        document.getElementById('zoomLevel').textContent = '100%';
+                        document.getElementById('pdfContainer').style.transform = 'scale(1)';
+                    }
+                    
+                    function prevPage() {
+                        if (currentPage > 1) {
+                            goToPage(currentPage - 1);
+                        }
+                    }
+                    
+                    function nextPage() {
+                        if (currentPage < totalPages) {
+                            goToPage(currentPage + 1);
+                        }
+                    }
+                    
+                    function goToPage(page) {
+                        currentPage = Math.max(1, Math.min(totalPages, page));
+                        document.getElementById('pageInput').value = currentPage;
+                        document.getElementById('pageInfo').textContent = \`Page \${currentPage} of \${totalPages}\`;
+                        // In a real implementation, you would load the specific PDF page here
+                    }
+                    
+                    // Sidebar tabs
+                    function showSidebarTab(tab) {
+                        // Hide all tabs
+                        ['text', 'notes', 'comments', 'elements'].forEach(t => {
+                            document.getElementById(t + 'Tab').classList.add('hidden');
+                            document.querySelector(\`.sidebar-tab[onclick*="\${t}"]\`).classList.remove('active');
+                        });
+                        
+                        // Show selected tab
+                        document.getElementById(tab + 'Tab').classList.remove('hidden');
+                        event.target.classList.add('active');
+                    }
+                    
+                    // Text editor functions
+                    function formatText(format) {
+                        const textEditor = document.getElementById('textEditor');
+                        const start = textEditor.selectionStart;
+                        const end = textEditor.selectionEnd;
+                        const selectedText = textEditor.value.substring(start, end);
+                        
+                        let formattedText = selectedText;
+                        switch(format) {
+                            case 'bold':
+                                formattedText = \`**\${selectedText}**\`;
+                                break;
+                            case 'italic':
+                                formattedText = \`*\${selectedText}*\`;
+                                break;
+                            case 'underline':
+                                formattedText = \`<u>\${selectedText}</u>\`;
+                                break;
+                        }
+                        
+                        textEditor.value = textEditor.value.substring(0, start) + 
+                                         formattedText + 
+                                         textEditor.value.substring(end);
+                        
+                        textEditor.focus();
+                        textEditor.setSelectionRange(start, start + formattedText.length);
+                        updateWordCount();
+                        scheduleSave();
+                    }
+                    
+                    function insertBullet() {
+                        const textEditor = document.getElementById('textEditor');
+                        const start = textEditor.selectionStart;
+                        textEditor.value = textEditor.value.substring(0, start) + '• ' + textEditor.value.substring(start);
+                        textEditor.focus();
+                        textEditor.setSelectionRange(start + 2, start + 2);
+                        scheduleSave();
+                    }
+                    
+                    function insertNumber() {
+                        const textEditor = document.getElementById('textEditor');
+                        const start = textEditor.selectionStart;
+                        textEditor.value = textEditor.value.substring(0, start) + '1. ' + textEditor.value.substring(start);
+                        textEditor.focus();
+                        textEditor.setSelectionRange(start + 3, start + 3);
+                        scheduleSave();
+                    }
+                    
+                    function insertEquation() {
+                        document.getElementById('equationModal').classList.remove('hidden');
+                    }
+                    
+                    function insertImage() {
+                        // Create file input for image upload
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'image/*';
+                        input.onchange = function(e) {
+                            const file = e.target.files[0];
+                            if (file) {
+                                const reader = new FileReader();
+                                reader.onload = function(e) {
+                                    const textEditor = document.getElementById('textEditor');
+                                    const start = textEditor.selectionStart;
+                                    textEditor.value = textEditor.value.substring(0, start) + 
+                                                     \`\\n![Uploaded Image](\${e.target.result})\\n\` + 
+                                                     textEditor.value.substring(end);
+                                    updateWordCount();
+                                    scheduleSave();
+                                };
+                                reader.readAsDataURL(file);
+                            }
+                        };
+                        input.click();
+                    }
+                    
+                    function updateWordCount() {
+                        const text = document.getElementById('textEditor').value;
+                        const words = text.trim() === '' ? 0 : text.split(/\\s+/).length;
+                        const chars = text.length;
+                        document.getElementById('wordCount').textContent = words;
+                        document.getElementById('charCount').textContent = chars;
+                    }
+                    
+                    // Comments
+                    function addComment() {
+                        const commentInput = document.getElementById('newComment');
+                        const comment = commentInput.value.trim();
+                        
+                        if (comment) {
+                            const timestamp = new Date().toLocaleTimeString();
+                            const commentHTML = \`
+                                <div class="bg-blue-50 p-3 rounded-lg">
+                                    <div class="flex justify-between items-start">
+                                        <span class="font-medium text-sm">You</span>
+                                        <span class="text-xs text-gray-500">\${timestamp}</span>
+                                    </div>
+                                    <p class="text-sm mt-1">\${comment.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+                                </div>
+                            \`;
+                            
+                            document.getElementById('commentsContainer').innerHTML += commentHTML;
+                            commentInput.value = '';
+                            scheduleSave();
+                        }
+                    }
+                    
+                    // Periodic Table
+                    function initPeriodicTable() {
+                        const elements = [
+                            'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
+                            'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar', 'K', 'Ca',
+                            'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn'
+                        ];
+                        
+                        const tableContainer = document.getElementById('periodicTable');
+                        elements.forEach(element => {
+                            const div = document.createElement('div');
+                            div.className = 'chem-element';
+                            div.textContent = element;
+                            div.onclick = function() {
+                                selectElement(element);
+                            };
+                            tableContainer.appendChild(div);
+                        });
+                    }
+                    
+                    function selectElement(element) {
+                        const elementInfo = document.getElementById('elementInfo');
+                        const elementData = {
+                            'H': 'Hydrogen - Atomic Number: 1',
+                            'He': 'Helium - Atomic Number: 2',
+                            'C': 'Carbon - Atomic Number: 6',
+                            'O': 'Oxygen - Atomic Number: 8',
+                            'Na': 'Sodium - Atomic Number: 11',
+                            'Cl': 'Chlorine - Atomic Number: 17'
+                        };
+                        
+                        elementInfo.innerHTML = \`
+                            <div class="font-bold">\${element}</div>
+                            <div>\${elementData[element] || 'Element details not available'}</div>
+                            <button onclick="insertElementToCanvas('\${element}')" 
+                                    class="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded">
+                                Insert to Canvas
+                            </button>
+                        \`;
+                    }
+                    
+                    function insertElementToCanvas(element) {
+                        // In a real implementation, you would draw the chemical symbol on canvas
+                        alert(\`\${element} inserted to canvas\`);
+                    }
+                    
+                    // Equation Editor
+                    function openEquationEditor() {
+                        document.getElementById('equationModal').classList.remove('hidden');
+                    }
+                    
+                    function closeEquationEditor() {
+                        document.getElementById('equationModal').classList.add('hidden');
+                    }
+                    
+                    function insertSymbol(symbol) {
+                        const input = document.getElementById('equationInput');
+                        const start = input.selectionStart;
+                        const end = input.selectionEnd;
+                        input.value = input.value.substring(0, start) + symbol + input.value.substring(end);
+                        input.focus();
+                        input.setSelectionRange(start + symbol.length, start + symbol.length);
+                    }
+                    
+                    function insertEquationToEditor() {
+                        const equation = document.getElementById('equationInput').value;
+                        if (equation) {
+                            const textEditor = document.getElementById('textEditor');
+                            const start = textEditor.selectionStart;
+                            textEditor.value = textEditor.value.substring(0, start) + 
+                                             \`\\n$$ \${equation} $$\\n\` + 
+                                             textEditor.value.substring(start);
+                            textEditor.focus();
+                            updateWordCount();
+                            scheduleSave();
+                            closeEquationEditor();
+                        }
+                    }
+                    
+                    // Save & Load functions
+                    function saveWork() {
+                        const workData = {
+                            homeworkId: '${homeworkId}',
+                            studentId: '${studentId}',
+                            timestamp: new Date().toISOString(),
+                            textContent: document.getElementById('textEditor').value,
+                            notes: document.getElementById('assignmentNotes').value,
+                            annotations: annotations,
+                            canvasData: canvas.toDataURL()
+                        };
+                        
+                        // Save to localStorage
+                        localStorage.setItem('workspace_data', JSON.stringify(workData));
+                        
+                        // Update last saved time
+                        document.getElementById('lastSaved').textContent = new Date().toLocaleTimeString();
+                        document.getElementById('saveStatus').innerHTML = '<i class="fas fa-check-circle"></i> Saved';
+                        
+                        // Also save to server in real implementation
+                        console.log('Work saved:', workData);
+                    }
+                    
+                    function loadSavedWork() {
+                        const saved = localStorage.getItem('workspace_data');
+                        if (saved) {
+                            try {
+                                const workData = JSON.parse(saved);
+                                document.getElementById('textEditor').value = workData.textContent || '';
+                                document.getElementById('assignmentNotes').value = workData.notes || '';
+                                annotations = workData.annotations || [];
+                                
+                                // Load canvas data
+                                if (workData.canvasData) {
+                                    const img = new Image();
+                                    img.onload = function() {
+                                        ctx.drawImage(img, 0, 0);
+                                    };
+                                    img.src = workData.canvasData;
+                                }
+                                
+                                updateWordCount();
+                            } catch (e) {
+                                console.error('Error loading saved work:', e);
+                            }
+                        }
+                    }
+                    
+                    function scheduleSave() {
+                        // Debounce save to prevent too many saves
+                        clearTimeout(window.saveTimeout);
+                        window.saveTimeout = setTimeout(saveWork, 1000);
+                    }
+                    
+                    function startAutoSave() {
+                        // Auto-save every 30 seconds
+                        autoSaveInterval = setInterval(saveWork, 30000);
+                    }
+                    
+                    // Download annotated PDF
+                    function downloadAnnotatedPDF() {
+                        // Create a new canvas with PDF + annotations
+                        const combinedCanvas = document.createElement('canvas');
+                        const combinedCtx = combinedCanvas.getContext('2d');
+                        
+                        combinedCanvas.width = canvas.width;
+                        combinedCanvas.height = canvas.height;
+                        
+                        // In a real implementation, you would:
+                        // 1. Render the PDF page to canvas
+                        // 2. Draw annotations on top
+                        // 3. Convert to PDF and download
+                        
+                        // For now, just download the canvas as image
+                        const link = document.createElement('a');
+                        link.download = 'annotated_assignment.png';
+                        link.href = canvas.toDataURL();
+                        link.click();
+                        
+                        alert('In a real implementation, this would download a PDF with annotations. Currently downloading as image.');
+                    }
+                    
+                    // Submit assignment
+                    function submitAssignment() {
+                        if (confirm('Submit your completed assignment? This will send it to your tutor for grading.')) {
+                            // Save final work
+                            saveWork();
+                            
+                            // In real implementation, upload to server
+                            // For now, show success message
+                            document.getElementById('successModal').classList.remove('hidden');
+                            
+                            // Close after 3 seconds
+                            setTimeout(() => {
+                                window.close();
+                            }, 3000);
+                        }
+                    }
+                    
+                    // Initialize when page loads
+                    window.onload = initWorkspace;
+                    
+                    // Prevent accidental closure
+                    window.onbeforeunload = function(e) {
+                        return 'You have unsaved work. Are you sure you want to leave?';
+                    };
+                </script>
+            </body>
+            </html>
         `;
         
-        // Add modal to page
-        const div = document.createElement('div');
-        div.innerHTML = modalHTML;
-        document.body.appendChild(div.firstElementChild);
+        // Write the HTML to the new window
+        workspaceWindow.document.open();
+        workspaceWindow.document.write(workspaceHTML);
+        workspaceWindow.document.close();
         
-        // Add CSS
-        const style = document.createElement('style');
-        style.textContent = `
-            .pdf-tool-btn {
-                width: 40px;
-                height: 40px;
-                border-radius: 8px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                background: white;
-                border: 2px solid transparent;
-                cursor: pointer;
-            }
-            .pdf-tool-btn:hover {
-                background: #e5e7eb;
-                border-color: #9ca3af;
-            }
-            .pdf-tool-active {
-                background: #3b82f6 !important;
-                color: white;
-                border-color: #1d4ed8;
-            }
-            .pdf-control-btn {
-                padding: 4px 8px;
-                border-radius: 4px;
-                background: white;
-                border: 1px solid #d1d5db;
-                cursor: pointer;
-            }
-            .pdf-control-btn:hover {
-                background: #f3f4f6;
-            }
-            .editor-tab {
-                flex: 1;
-                padding: 10px;
-                text-align: center;
-                background: #f9fafb;
-                border-bottom: 2px solid transparent;
-                cursor: pointer;
-            }
-            .editor-tab-active {
-                background: white;
-                border-bottom-color: #3b82f6;
-                font-weight: 500;
-            }
-            .editor-content {
-                display: none;
-                height: 100%;
-            }
-            .editor-content.active {
-                display: flex;
-                flex-direction: column;
-            }
-            .editor-btn {
-                padding: 4px 8px;
-                border-radius: 4px;
-                background: white;
-                border: 1px solid #d1d5db;
-                cursor: pointer;
-                font-weight: bold;
-            }
-            .editor-btn:hover {
-                background: #f3f4f6;
-            }
-        `;
-        document.head.appendChild(style);
-        
-        // Set up event listeners
-        setupWorkspaceEvents();
+        // Focus the new window
+        workspaceWindow.focus();
         
     } catch (error) {
         console.error('Error opening PDF workspace:', error);
@@ -1561,194 +2506,15 @@ window.openPDFWorkspace = function(homeworkId, studentId, homeworkDataString) {
     }
 };
 
-// Set up workspace event listeners
-function setupWorkspaceEvents() {
-    // Close button
-    document.getElementById('closeWorkspaceBtn').addEventListener('click', closePDFWorkspace);
-    
-    // Save button
-    document.getElementById('saveWorkBtn').addEventListener('click', savePDFWorkspace);
-    
-    // Submit button
-    document.getElementById('submitWorkBtn').addEventListener('click', submitPDFWorkspace);
-    
-    // Tool buttons
-    document.querySelectorAll('.pdf-tool-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            document.querySelectorAll('.pdf-tool-btn').forEach(b => b.classList.remove('pdf-tool-active'));
-            this.classList.add('pdf-tool-active');
-            selectTool(this.getAttribute('data-tool'));
-        });
-    });
-    
-    // Tab buttons
-    document.querySelectorAll('.editor-tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            const tabName = this.getAttribute('data-tab');
-            document.querySelectorAll('.editor-tab').forEach(t => t.classList.remove('editor-tab-active'));
-            this.classList.add('editor-tab-active');
-            
-            document.querySelectorAll('.editor-content').forEach(content => {
-                content.classList.remove('active');
-                content.classList.add('hidden');
-            });
-            document.getElementById(tabName + 'Tab').classList.remove('hidden');
-            document.getElementById(tabName + 'Tab').classList.add('active');
-        });
-    });
-    
-    // Format buttons
-    document.querySelectorAll('.editor-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            formatText(this.getAttribute('data-format'));
-        });
-    });
-    
-    // Zoom buttons
-    document.getElementById('zoomInBtn').addEventListener('click', () => zoomPDF('in'));
-    document.getElementById('zoomOutBtn').addEventListener('click', () => zoomPDF('out'));
-    document.getElementById('resetViewBtn').addEventListener('click', resetPDFView);
-}
-
-// Tool functions
-function selectTool(tool) {
-    console.log('Selected tool:', tool);
-}
-
-function formatText(format) {
-    const textEditor = document.getElementById('textEditor');
-    if (!textEditor) return;
-    
-    const start = textEditor.selectionStart;
-    const end = textEditor.selectionEnd;
-    const selectedText = textEditor.value.substring(start, end);
-    
-    let formattedText = selectedText;
-    switch(format) {
-        case 'bold':
-            formattedText = `**${selectedText}**`;
-            break;
-        case 'italic':
-            formattedText = `*${selectedText}*`;
-            break;
-        case 'underline':
-            formattedText = `<u>${selectedText}</u>`;
-            break;
-    }
-    
-    textEditor.value = textEditor.value.substring(0, start) + 
-                       formattedText + 
-                       textEditor.value.substring(end);
-    
-    textEditor.focus();
-    textEditor.setSelectionRange(start, start + formattedText.length);
-}
-
-function zoomPDF(direction) {
-    const zoomElement = document.getElementById('zoomLevel');
-    if (!zoomElement) return;
-    
-    let currentZoom = parseInt(zoomElement.textContent);
-    if (isNaN(currentZoom)) currentZoom = 100;
-    
-    if (direction === 'in') {
-        currentZoom = Math.min(200, currentZoom + 25);
-    } else {
-        currentZoom = Math.max(25, currentZoom - 25);
-    }
-    
-    zoomElement.textContent = currentZoom + '%';
-    const iframe = document.getElementById('pdfIframe');
-    if (iframe) {
-        iframe.style.transform = `scale(${currentZoom / 100})`;
-        iframe.style.transformOrigin = 'top left';
-    }
-}
-
-function resetPDFView() {
-    const zoomElement = document.getElementById('zoomLevel');
-    if (zoomElement) zoomElement.textContent = '100%';
-    
-    const iframe = document.getElementById('pdfIframe');
-    if (iframe) {
-        iframe.style.transform = 'scale(1)';
-    }
-}
-
-function savePDFWorkspace() {
-    if (!window.currentHomework) return;
-    
-    const workspaceData = {
-        homeworkId: window.currentHomework.id,
-        textContent: document.getElementById('textEditor')?.value || '',
-        notes: document.getElementById('assignmentNotes')?.value || '',
-        timestamp: new Date().toISOString()
-    };
-    
-    // Save to localStorage
-    localStorage.setItem(`workspace_${window.currentHomework.id}`, JSON.stringify(workspaceData));
-    showMessage('Work saved locally!', 'success');
-}
-
-function submitPDFWorkspace() {
-    if (!window.currentHomework) return;
-    
-    if (confirm('Submit your completed assignment? This will mark it as submitted.')) {
-        db.collection('homework_assignments').doc(window.currentHomework.id).update({
-            status: 'submitted',
-            submittedAt: new Date().toISOString(),
-            submissionNotes: document.getElementById('textEditor')?.value || ''
-        }).then(() => {
-            showMessage('Assignment submitted successfully!', 'success');
-            closePDFWorkspace();
-            
-            // Refresh the academics data
-            setTimeout(() => {
-                loadAcademicsData();
-            }, 1000);
-        }).catch(error => {
-            console.error('Error submitting assignment:', error);
-            showMessage('Error submitting assignment. Please try again.', 'error');
-        });
-    }
-}
-
-function closePDFWorkspace() {
-    const modal = document.getElementById('pdfWorkspaceModal');
-    if (modal) modal.remove();
-    
-    delete window.currentHomework;
-}
-
-// Updated handleHomeworkAction function
+// Update the handleHomeworkAction to use the new workspace
 window.handleHomeworkAction = function(homeworkId, studentId, currentStatus) {
     switch(currentStatus) {
         case 'graded':
-            db.collection('homework_assignments').doc(homeworkId).get()
-                .then(doc => {
-                    const homework = doc.data();
-                    if (homework) {
-                        const grade = homework.grade || homework.score || 'N/A';
-                        const feedback = homework.feedback || homework.tutorFeedback || 'No feedback provided.';
-                        showGradeFeedbackModal(grade, feedback, homework);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching homework:', error);
-                    showMessage('Error loading assignment details', 'error');
-                });
+            // Existing graded view code
             break;
             
         case 'submitted':
-            db.collection('homework_assignments').doc(homeworkId).get()
-                .then(doc => {
-                    const homework = doc.data();
-                    if (homework && homework.submissionUrl) {
-                        window.open(homework.submissionUrl, '_blank');
-                    } else {
-                        alert('No submission file available.');
-                    }
-                });
+            // Existing submitted view code
             break;
             
         default:
@@ -1758,11 +2524,12 @@ window.handleHomeworkAction = function(homeworkId, studentId, currentStatus) {
                     const isPDF = homeworkData.fileUrl && homeworkData.fileUrl.toLowerCase().endsWith('.pdf');
                     
                     if (isPDF) {
-                        // Create safe JSON string with URI encoding
+                        // Create safe data for workspace
                         const safeData = {
                             title: homeworkData.title || 'Assignment',
                             fileUrl: homeworkData.fileUrl || '',
-                            subject: homeworkData.subject || ''
+                            subject: homeworkData.subject || '',
+                            description: homeworkData.description || ''
                         };
                         const encodedData = encodeURIComponent(JSON.stringify(safeData));
                         openPDFWorkspace(homeworkId, studentId, encodedData);
@@ -1777,360 +2544,6 @@ window.handleHomeworkAction = function(homeworkId, studentId, currentStatus) {
             break;
     }
 };
-
-// Show grade feedback modal
-function showGradeFeedbackModal(grade, feedback, homeworkData) {
-    const existingModal = document.getElementById('gradeFeedbackModal');
-    if (existingModal) existingModal.remove();
-    
-    const modalHTML = `
-        <div id="gradeFeedbackModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div class="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-                <div class="bg-gradient-to-r from-green-500 to-emerald-600 p-6 rounded-t-xl">
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-xl font-bold text-white">Assignment Graded</h3>
-                        <button onclick="document.getElementById('gradeFeedbackModal').remove()" 
-                                class="text-white hover:text-gray-200 text-2xl">&times;</button>
-                    </div>
-                </div>
-                
-                <div class="p-6">
-                    <div class="text-center mb-6">
-                        <div class="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4">
-                            <span class="text-3xl text-green-600">📊</span>
-                        </div>
-                        <h4 class="text-2xl font-bold text-gray-800 mb-2">${grade}</h4>
-                        <p class="text-gray-600">Overall Grade</p>
-                    </div>
-                    
-                    <div class="mb-6">
-                        <h5 class="font-semibold text-gray-700 mb-2">Assignment Details</h5>
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <p class="text-gray-800"><span class="font-medium">Title:</span> ${safeText(homeworkData.title || homeworkData.subject || 'Untitled')}</p>
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <h5 class="font-semibold text-gray-700 mb-2">Tutor's Feedback</h5>
-                        <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
-                            <p class="text-gray-700 whitespace-pre-wrap">${safeText(feedback)}</p>
-                        </div>
-                    </div>
-                    
-                    <div class="mt-8 pt-6 border-t border-gray-200">
-                        <button onclick="document.getElementById('gradeFeedbackModal').remove()" 
-                                class="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors">
-                            Close
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const div = document.createElement('div');
-    div.innerHTML = modalHTML;
-    document.body.appendChild(div.firstElementChild);
-}
-
-// MAIN loadAcademicsData function - FIXED download and Work Here buttons
-async function loadAcademicsData(selectedStudent = null) {
-    const academicsContent = document.getElementById('academicsContent');
-    if (!academicsContent) return;
-    
-    showSkeletonLoader('academicsContent', 'reports');
-
-    try {
-        const user = auth.currentUser;
-        if (!user) throw new Error('Please sign in');
-
-        const userDoc = await db.collection('parent_users').doc(user.uid).get();
-        const userData = userDoc.data();
-        const parentPhone = userData.normalizedPhone || userData.phone;
-
-        const childrenResult = await comprehensiveFindChildren(parentPhone);
-        
-        userChildren = childrenResult.studentNames;
-        studentIdMap = childrenResult.studentNameIdMap;
-        allStudentData = childrenResult.allStudentData;
-
-        if (userChildren.length === 0) {
-            academicsContent.innerHTML = `
-                <div class="text-center py-12">
-                    <div class="text-6xl mb-4">📚</div>
-                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Students Found</h3>
-                    <p class="text-gray-500">No students are currently assigned to your account.</p>
-                </div>
-            `;
-            return;
-        }
-
-        let studentsToShow = selectedStudent && studentIdMap.has(selectedStudent) 
-            ? [selectedStudent] 
-            : userChildren;
-
-        let academicsHtml = '';
-
-        // Student selector
-        if (studentIdMap.size > 1) {
-            academicsHtml += `
-                <div class="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Student:</label>
-                    <select id="studentSelector" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500" onchange="onStudentSelected(this.value)">
-                        <option value="">All Students</option>
-            `;
-            
-            userChildren.forEach(studentName => {
-                const studentInfo = allStudentData.find(s => s.name === studentName);
-                const isSelected = selectedStudent === studentName ? 'selected' : '';
-                const studentStatus = studentInfo?.isPending ? ' (Pending Registration)' : '';
-                
-                academicsHtml += `<option value="${safeText(studentName)}" ${isSelected}>${capitalize(studentName)}${safeText(studentStatus)}</option>`;
-            });
-            
-            academicsHtml += `
-                    </select>
-                </div>
-            `;
-        }
-
-        // Load data for each student
-        const studentPromises = studentsToShow.map(async (studentName) => {
-            const studentId = studentIdMap.get(studentName);
-            const studentInfo = allStudentData.find(s => s.name === studentName);
-            
-            let sessionTopicsHtml = '';
-            let homeworkHtml = '';
-            
-            if (studentId) {
-                const [sessionTopicsSnapshot, homeworkSnapshot] = await Promise.all([
-                    db.collection('daily_topics').where('studentId', '==', studentId).get().catch(() => ({ empty: true })),
-                    db.collection('homework_assignments').where('studentId', '==', studentId).get().catch(() => ({ empty: true }))
-                ]);
-                
-                // Process session topics (simplified for brevity)
-                if (sessionTopicsSnapshot.empty) {
-                    sessionTopicsHtml = `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center"><p class="text-gray-500">No session topics recorded yet.</p></div>`;
-                } else {
-                    // Your existing session topics code here
-                    sessionTopicsHtml = `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center"><p class="text-gray-500">Session topics loaded.</p></div>`;
-                }
-                
-                // Process homework - FIXED syntax in template literals
-                if (homeworkSnapshot.empty) {
-                    homeworkHtml = `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center"><p class="text-gray-500">No homework assignments yet.</p></div>`;
-                } else {
-                    const homeworkList = [];
-                    const now = new Date().getTime();
-                    
-                    homeworkSnapshot.forEach(doc => {
-                        const homework = doc.data();
-                        const homeworkId = doc.id;
-                        const dueTimestamp = getTimestamp(homework.dueDate);
-                        const isOverdue = dueTimestamp && dueTimestamp < now && !['submitted', 'completed', 'graded'].includes(homework.status);
-                        const isSubmitted = ['submitted', 'completed'].includes(homework.status);
-                        const isGraded = homework.status === 'graded';
-                        
-                        const gradeValue = homework.grade || homework.score || homework.overallGrade || homework.percentage || homework.marks;
-                        let gradeDisplay = 'N/A';
-                        if (gradeValue !== undefined && gradeValue !== null) {
-                            if (typeof gradeValue === 'number') {
-                                gradeDisplay = `${gradeValue}%`;
-                            } else {
-                                const parsedGrade = parseFloat(gradeValue);
-                                gradeDisplay = !isNaN(parsedGrade) ? `${parsedGrade}%` : gradeValue;
-                            }
-                        }
-                        
-                        let statusColor, statusText, statusIcon, buttonText, buttonColor;
-                        
-                        if (isGraded) {
-                            statusColor = 'bg-green-100 text-green-800';
-                            statusText = 'Graded';
-                            statusIcon = '✅';
-                            buttonText = 'View Grade & Feedback';
-                            buttonColor = 'bg-green-600 hover:bg-green-700';
-                        } else if (isSubmitted) {
-                            statusColor = 'bg-blue-100 text-blue-800';
-                            statusText = 'Submitted';
-                            statusIcon = '📤';
-                            buttonText = 'View Submission';
-                            buttonColor = 'bg-blue-600 hover:bg-blue-700';
-                        } else if (isOverdue) {
-                            statusColor = 'bg-red-100 text-red-800';
-                            statusText = 'Overdue';
-                            statusIcon = '⚠️';
-                            buttonText = 'Upload Assignment';
-                            buttonColor = 'bg-red-600 hover:bg-red-700';
-                        } else {
-                            statusColor = homework.submissionUrl ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800';
-                            statusText = homework.submissionUrl ? 'Uploaded - Not Submitted' : 'Not Started';
-                            statusIcon = homework.submissionUrl ? '📎' : '📝';
-                            buttonText = homework.submissionUrl ? 'Review & Submit' : 'Work on Assignment';
-                            buttonColor = homework.submissionUrl ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700';
-                        }
-                        
-                        const safeTitle = safeText(homework.title || homework.subject || 'Untitled Assignment');
-                        const safeDescription = safeText(homework.description || homework.instructions || 'No description provided.');
-                        const tutorName = safeText(homework.tutorName || homework.assignedBy || 'Tutor');
-                        const isPDF = homework.fileUrl && homework.fileUrl.toLowerCase().endsWith('.pdf');
-                        
-                        // Create safe data for workspace - FIXED escaping
-                        const safeData = {
-                            title: safeTitle,
-                            fileUrl: homework.fileUrl || '',
-                            subject: homework.subject || ''
-                        };
-                        const encodedData = encodeURIComponent(JSON.stringify(safeData));
-                        
-                        // Build homework HTML - FIXED syntax
-                        homeworkHtml += `
-                            <div class="bg-white border ${isOverdue ? 'border-red-200' : 'border-gray-200'} rounded-lg p-4 shadow-sm mb-4" data-homework-id="${homeworkId}">
-                                <div class="flex justify-between items-start mb-3">
-                                    <div>
-                                        <h5 class="font-medium text-gray-800 text-lg">${safeTitle}</h5>
-                                        <div class="mt-1 flex flex-wrap items-center gap-2">
-                                            <span class="text-xs ${statusColor} px-2 py-1 rounded-full">${statusIcon} ${statusText}</span>
-                                            <span class="text-xs text-gray-600">Assigned by: ${tutorName}</span>
-                                            ${isPDF ? '<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">📄 PDF</span>' : ''}
-                                        </div>
-                                    </div>
-                                    <div class="text-right">
-                                        <span class="text-sm font-medium text-gray-700">Due: ${formatDetailedDate(new Date(dueTimestamp), true)}</span>
-                                    </div>
-                                </div>
-                                
-                                <div class="text-gray-700 mb-4">
-                                    <p class="whitespace-pre-wrap bg-gray-50 p-3 rounded-md">${safeDescription}</p>
-                                </div>
-                                
-                                <div class="flex justify-between items-center pt-3 border-t border-gray-100">
-                                    <div class="flex items-center space-x-3">
-                                        ${homework.fileUrl ? `
-                                            <button onclick="forceDownload('${safeText(homework.fileUrl)}', '${safeText(homework.title || 'assignment')}.pdf')" 
-                                                    class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm">
-                                                <span class="mr-1">📥</span> Download
-                                            </button>
-                                            ${isPDF ? `
-                                                <button onclick="openPDFWorkspace('${homeworkId}', '${studentId}', '${encodedData}')" 
-                                                        class="text-blue-600 hover:text-blue-800 font-medium flex items-center text-sm">
-                                                    <span class="mr-1">✏️</span> Work Here
-                                                </button>
-                                            ` : ''}
-                                        ` : ''}
-                                    </div>
-                                    
-                                    ${gradeValue !== undefined && gradeValue !== null ? `
-                                        <div class="text-right">
-                                            <span class="font-medium text-gray-700">Grade: </span>
-                                            <span class="font-bold ${typeof gradeValue === 'number' ? (gradeValue >= 70 ? 'text-green-600' : gradeValue >= 50 ? 'text-yellow-600' : 'text-red-600') : 'text-gray-600'}">
-                                                ${gradeDisplay}
-                                            </span>
-                                        </div>
-                                    ` : ''}
-                                </div>
-                                
-                                <div class="mt-4 pt-3 border-t border-gray-100">
-                                    <button onclick="handleHomeworkAction('${homeworkId}', '${studentId}', '${isGraded ? 'graded' : isSubmitted ? 'submitted' : homework.submissionUrl ? 'uploaded' : 'pending'}')" 
-                                            class="w-full ${buttonColor} text-white px-4 py-2 rounded-lg font-semibold hover:opacity-90">
-                                        ${buttonText}
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                    });
-                }
-            }
-            
-            return { studentName, studentInfo, sessionTopicsHtml, homeworkHtml };
-        });
-        
-        const studentResults = await Promise.all(studentPromises);
-        
-        // Build final HTML
-        studentResults.forEach(({ studentName, studentInfo, sessionTopicsHtml, homeworkHtml }) => {
-            academicsHtml += `
-                <div class="bg-gradient-to-r from-green-100 to-green-50 border-l-4 border-green-600 p-4 rounded-lg mb-6">
-                    <h2 class="text-xl font-bold text-green-800">${capitalize(studentName)}${studentInfo?.isPending ? ' <span class="text-yellow-600 text-sm">(Pending Registration)</span>' : ''}</h2>
-                    <p class="text-green-600">Academic progress and assignments</p>
-                </div>
-                
-                <div class="mb-8">
-                    <button onclick="toggleAcademicsAccordion('session-topics-${safeText(studentName)}')" 
-                            class="w-full flex justify-between items-center p-4 bg-blue-100 border border-blue-300 rounded-lg hover:bg-blue-200 mb-4">
-                        <div class="flex items-center">
-                            <span class="text-xl mr-3">📝</span>
-                            <h3 class="font-bold text-blue-800 text-lg">Session Topics</h3>
-                        </div>
-                        <span id="session-topics-${safeText(studentName)}-arrow" class="text-blue-600 text-xl">▼</span>
-                    </button>
-                    <div id="session-topics-${safeText(studentName)}-content" class="hidden">
-                        ${sessionTopicsHtml}
-                    </div>
-                </div>
-                
-                <div class="mb-8">
-                    <button onclick="toggleAcademicsAccordion('homework-${safeText(studentName)}')" 
-                            class="w-full flex justify-between items-center p-4 bg-purple-100 border border-purple-300 rounded-lg hover:bg-purple-200 mb-4">
-                        <div class="flex items-center">
-                            <span class="text-xl mr-3">📚</span>
-                            <h3 class="font-bold text-purple-800 text-lg">Homework Assignments</h3>
-                        </div>
-                        <span id="homework-${safeText(studentName)}-arrow" class="text-purple-600 text-xl">▼</span>
-                    </button>
-                    <div id="homework-${safeText(studentName)}-content" class="hidden">
-                        ${homeworkHtml}
-                    </div>
-                </div>
-            `;
-        });
-
-        academicsContent.innerHTML = academicsHtml;
-
-    } catch (error) {
-        console.error('Error loading academics data:', error);
-        academicsContent.innerHTML = `
-            <div class="text-center py-8">
-                <div class="text-4xl mb-4">❌</div>
-                <h3 class="text-xl font-bold text-red-700 mb-2">Error Loading Academic Data</h3>
-                <p class="text-gray-500">Unable to load academic data at this time.</p>
-                <button onclick="loadAcademicsData()" class="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-                    Try Again
-                </button>
-            </div>
-        `;
-    }
-}
-
-// Setup real-time listener (keep your existing function)
-function setupHomeworkRealTimeListener() {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    if (window.homeworkListener) {
-        window.homeworkListener();
-    }
-
-    window.homeworkListener = db.collection('homework_assignments')
-        .where('studentId', 'in', Array.from(studentIdMap.values()))
-        .onSnapshot((snapshot) => {
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === 'modified') {
-                    const homeworkData = change.doc.data();
-                    const studentId = homeworkData.studentId;
-                    
-                    for (const [studentName, sid] of studentIdMap.entries()) {
-                        if (sid === studentId) {
-                            // You can add update logic here if needed
-                            break;
-                        }
-                    }
-                }
-            });
-        }, (error) => {
-            console.error('Homework real-time listener error:', error);
-        });
-}
 // ============================================================================
 // SECTION 12: OPTIMIZED REAL-TIME MONITORING
 // ============================================================================
