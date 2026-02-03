@@ -1,19 +1,15 @@
-// ============================================================================
-// FIREBASE CONFIGURATION
-// ============================================================================
-
-// Firebase config for the 'bloomingkidsassessment' project
-firebase.initializeApp({
-    apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
-    authDomain: "bloomingkidsassessment.firebaseapp.com",
-    projectId: "bloomingkidsassessment",
-    storageBucket: "bloomingkidsassessment.appspot.com",
-    messagingSenderId: "238975054977",
-    appId: "1:238975054977:web:87c70b4db044998a204980"
-});
-
-const db = firebase.firestore();
-const auth = firebase.auth();
+import { db, auth, storage } from './firebaseConfig.js';
+import { 
+    collection, 
+    addDoc, 
+    getDocs, 
+    query, 
+    where, 
+    doc, 
+    updateDoc, 
+    onSnapshot 
+} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
 // ============================================================================
 // SECTION 1: CORE UTILITIES & SECURITY (OPTIMIZED)
