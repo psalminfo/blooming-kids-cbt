@@ -1,5 +1,3 @@
-[file name]: parent (1).js
-[file content begin]
 import { db, auth, storage } from './firebaseConfig.js';
 import { 
     collection, 
@@ -5337,4 +5335,3 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
 // ============================================================================
 // END OF PARENT.JS - PRODUCTION READY
 // ============================================================================
-[file content end]
