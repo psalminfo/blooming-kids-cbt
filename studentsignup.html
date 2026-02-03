@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activate Student Account | Intelligent LMS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { light: '#f0fdf4', primary: '#059669', dark: '#064e3b', accent: '#fbbf24' }
+                    },
+                    borderRadius: { '4xl': '2rem' }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .hero-gradient { background: linear-gradient(135deg, #064e3b 0%, #059669 100%); }
+        .hidden-step { display: none; }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center p-4">
+
+    <div class="flex flex-col lg:flex-row w-full max-w-5xl bg-white rounded-4xl shadow-2xl overflow-hidden min-h-[700px]">
+        <div class="hidden lg:flex lg:w-2/5 hero-gradient p-12 flex-col justify-between text-white">
+            <div class="space-y-6">
+                <div class="bg-white/20 p-4 rounded-2xl w-fit"><i class="fas fa-rocket text-3xl text-accent"></i></div>
+                <h2 class="text-4xl font-extrabold leading-tight">Your Learning <br><span class="text-accent">Starts Here.</span></h2>
+                <p class="text-emerald-100/80">Activate your student profile to access assignments, track progress, and chat with your tutor.</p>
+            </div>
+            <div class="text-xs opacity-60">Powered by Blue Ocean Concepts</div>
+        </div>
+
+        <div class="w-full lg:w-3/5 p-8 lg:p-16 flex flex-col justify-center">
+            
+            <div id="step-1" class="space-y-6 animate-in fade-in duration-500">
+                <div class="mb-8">
+                    <h3 class="text-3xl font-bold text-gray-900">Verify Parent</h3>
+                    <p class="text-gray-500">Enter the email used during registration.</p>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Parent's Registered Email</label>
+                    <input type="email" id="parent-email" placeholder="e.g. mom@email.com" 
+                        class="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none focus:ring-4 focus:ring-emerald-50 transition-all">
+                </div>
+                <button onclick="findStudents()" class="w-full bg-brand-primary text-white font-bold py-5 rounded-2xl shadow-xl hover:-translate-y-1 active:scale-95 transition-all">
+                    Find My Profile
+                </button>
+            </div>
+
+            <div id="step-2" class="hidden-step space-y-6 animate-in slide-in-from-right duration-500">
+                <div class="mb-8">
+                    <h3 class="text-3xl font-bold text-gray-900">Claim Profile</h3>
+                    <p class="text-gray-500">Select your name and set your login details.</p>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Who are you?</label>
+                        <select id="student-select" class="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none cursor-pointer"></select>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Login Email (Student)</label>
+                        <input type="email" id="student-email-input" placeholder="Your own email" 
+                            class="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none">
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Create Password</label>
+                        <input type="password" id="student-pass" placeholder="Minimum 6 characters" 
+                            class="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none">
+                    </div>
+                </div>
+
+                <button onclick="completeRegistration()" class="w-full bg-brand-accent text-emerald-900 font-bold py-5 rounded-2xl shadow-xl hover:-translate-y-1 active:scale-95 transition-all">
+                    Activate My Portal
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { auth, db } from './firebaseConfig.js';
+        import { collection, query, where, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+        import { createUserWithEmailAndPassword, updateProfile } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+
+        window.findStudents = async () => {
+            const email = document.getElementById('parent-email').value.trim();
+            if(!email) return alert("Please enter the parent email.");
+
+            const q = query(collection(db, "students"), where("parentEmail", "==", email));
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+                const select = document.getElementById('student-select');
+                select.innerHTML = '';
+                querySnapshot.forEach(doc => {
+                    const opt = document.createElement('option');
+                    opt.value = doc.id;
+                    opt.textContent = doc.data().studentName;
+                    select.appendChild(opt);
+                });
+                document.getElementById('step-1').classList.add('hidden-step');
+                document.getElementById('step-2').classList.remove('hidden-step');
+            } else {
+                alert("No records found.");
+            }
+        };
+
+        window.completeRegistration = async () => {
+            const docId = document.getElementById('student-select').value;
+            const email = document.getElementById('student-email-input').value.trim();
+            const pass = document.getElementById('student-pass').value;
+
+            if(!email || pass.length < 6) return alert("Valid email and 6-char password required.");
+
+            try {
+                const userCred = await createUserWithEmailAndPassword(auth, email, pass);
+                const studentName = document.getElementById('student-select').options[document.getElementById('student-select').selectedIndex].text;
+                
+                // Link Firebase Auth to the specific Firestore Doc
+                await updateDoc(doc(db, "students", docId), {
+                    studentUid: userCred.user.uid,
+                    status: 'active'
+                });
+
+                await updateProfile(userCred.user, { displayName: studentName });
+                window.location.href = 'student.html';
+            } catch (e) { alert(e.message); }
+        };
+    </script>
+</body>
+</html>
