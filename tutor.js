@@ -1,4 +1,3 @@
-
 /*******************************************************************************
  * SECTION 1: IMPORTS & INITIAL SETUP
  * GitHub: https://github.com/psalminfo/blooming-kids-cbt/blob/main/tutor.js
@@ -1996,19 +1995,309 @@ function initScheduleManager(tutor) {
 }
 
 /*******************************************************************************
- * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT
- * (Version: Auto-Sync Parent Data & "Self-Healing" Database)
+ * SECTION 8: COMPLETE GOOGLE CLASSROOM REPLICA
+ * Features:
+ * 1. Daily Topic Management (CRUD)
+ * 2. Homework Assignment with Parent Auto-Sync
+ * 3. Google Classroom-style Grading Interface
+ * 4. Homework Inbox & Return System
+ * 5. File Upload with Cloudinary
+ * Version: 2.0 - Full Integration
  ******************************************************************************/
 
 // ==========================================
-// 1. DAILY TOPIC FUNCTIONS
+// 1. INJECT GOOGLE CLASSROOM STYLES
+// ==========================================
+(function injectGoogleClassroomStyles() {
+    if (document.getElementById('gc-styles')) return;
+    
+    const style = document.createElement('style');
+    style.id = 'gc-styles';
+    style.textContent = `
+        /* Google Classroom Grading Interface */
+        .gc-grading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 10000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(2px);
+            animation: fadeIn 0.2s ease-out;
+        }
+        
+        .gc-grading-container {
+            background: #f8f9fa;
+            width: 95%;
+            max-width: 1200px;
+            height: 90vh;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+        }
+        
+        .gc-grading-header {
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 64px;
+        }
+        
+        .gc-student-name {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: #3c4043;
+        }
+        
+        .gc-assignment-title {
+            font-size: 0.9rem;
+            color: #5f6368;
+            margin-left: 12px;
+        }
+        
+        .gc-grading-body {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .gc-work-panel {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .gc-file-preview {
+            background: white;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 800px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+        }
+        
+        .gc-file-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        
+        .gc-download-btn {
+            background: #1a73e8;
+            color: white;
+            padding: 8px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        
+        .gc-download-btn:hover {
+            background: #1557b0;
+        }
+        
+        .gc-grading-sidebar {
+            width: 320px;
+            background: white;
+            border-left: 1px solid #e0e0e0;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        
+        .gc-grade-input {
+            width: 80px;
+            padding: 8px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            text-align: right;
+            font-size: 1rem;
+        }
+        
+        .gc-comment-box {
+            width: 100%;
+            min-height: 150px;
+            padding: 12px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            resize: vertical;
+            margin-top: 8px;
+            background: #f8f9fa;
+        }
+        
+        .gc-action-footer {
+            margin-top: auto;
+            padding-top: 24px;
+        }
+        
+        .gc-return-btn {
+            width: 100%;
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .gc-return-btn:hover {
+            background: #1557b0;
+        }
+        
+        .gc-return-btn:disabled {
+            background: #dadce0;
+            color: #80868b;
+            cursor: not-allowed;
+        }
+        
+        .gc-inbox-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid #f1f3f4;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        
+        .gc-inbox-item:hover {
+            background: #f8f9fa;
+        }
+        
+        /* Homework Management Grid */
+        .homework-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+        
+        .homework-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 16px;
+            transition: all 0.2s;
+        }
+        
+        .homework-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-color: #1a73e8;
+        }
+        
+        .homework-status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+        
+        .status-assigned {
+            background: #e8f0fe;
+            color: #1a73e8;
+        }
+        
+        .status-submitted {
+            background: #e6f4ea;
+            color: #137333;
+        }
+        
+        .status-graded {
+            background: #fce8e6;
+            color: #c5221f;
+        }
+        
+        .status-overdue {
+            background: #fef7e0;
+            color: #b06000;
+        }
+        
+        .homework-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        
+        .action-btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+        
+        .action-edit {
+            background: #e8f0fe;
+            color: #1a73e8;
+        }
+        
+        .action-edit:hover {
+            background: #d2e3fc;
+        }
+        
+        .action-recall {
+            background: #fef7e0;
+            color: #b06000;
+        }
+        
+        .action-recall:hover {
+            background: #feecc8;
+        }
+        
+        .action-reassign {
+            background: #e6f4ea;
+            color: #137333;
+        }
+        
+        .action-reassign:hover {
+            background: #ceead6;
+        }
+        
+        .action-grade {
+            background: #fce8e6;
+            color: #c5221f;
+        }
+        
+        .action-grade:hover {
+            background: #fad2cf;
+        }
+    `;
+    
+    document.head.appendChild(style);
+})();
+
+// ==========================================
+// 2. DAILY TOPIC MANAGEMENT
 // ==========================================
 
+/**
+ * Shows modal for entering daily topics with edit/delete history
+ */
 function showDailyTopicModal(student) {
     const date = new Date();
     const monthName = date.toLocaleString('default', { month: 'long' });
-
-    // Use local date for storage/display consistency
+    
     const today = new Date();
     const localDateString = today.getFullYear() + '-' + 
                             String(today.getMonth() + 1).padStart(2, '0') + '-' + 
@@ -2019,9 +2308,10 @@ function showDailyTopicModal(student) {
             <div class="modal-content max-w-lg">
                 <div class="modal-header">
                     <h3 class="modal-title">📚 Daily Topic: ${student.studentName}</h3>
+                    <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
                 </div>
                 <div class="modal-body">
-                    <div id="topic-history-container" class="mb-5 bg-blue-50 p-3 rounded-lg border border-blue-100 hidden">
+                    <div id="topic-history-container" class="mb-5 bg-blue-50 p-3 rounded-lg border border-blue-100">
                         <div class="flex justify-between items-center mb-2">
                             <h5 class="font-bold text-blue-800 text-sm">📅 Topics Covered in ${monthName}</h5>
                             <span id="topic-count-badge" class="bg-blue-200 text-blue-800 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
@@ -2057,7 +2347,7 @@ function showDailyTopicModal(student) {
     loadDailyTopicHistory(student.id);
     setTimeout(() => document.getElementById('topic-topics').focus(), 100);
 
-    // Event Delegation for Edit/Delete buttons
+    // Event delegation for edit/delete buttons
     const historyContainer = document.getElementById('topic-history');
     historyContainer.addEventListener('click', async (e) => {
         const target = e.target;
@@ -2079,7 +2369,10 @@ function showDailyTopicModal(student) {
     document.getElementById('save-topic-btn').addEventListener('click', async () => {
         const topicInput = document.getElementById('topic-topics');
         const content = topicInput.value.trim();
-        if (!content) { showCustomAlert('⚠️ Please enter a topic before saving.'); return; }
+        if (!content) { 
+            showCustomAlert('⚠️ Please enter a topic before saving.'); 
+            return; 
+        }
         
         const tutorName = window.tutorData?.name || "Unknown Tutor";
         const tutorEmail = window.tutorData?.email || "unknown@tutor.com";
@@ -2095,7 +2388,7 @@ function showDailyTopicModal(student) {
             tutorEmail: tutorEmail,
             tutorName: tutorName,
             topics: content,
-            date: localDateString, 
+            date: localDateString,
             createdAt: new Date()
         };
         
@@ -2104,20 +2397,80 @@ function showDailyTopicModal(student) {
             topicInput.value = '';
             await loadDailyTopicHistory(student.id);
             showCustomAlert('✅ Topic saved!');
-            saveBtn.disabled = false;
-            saveBtn.innerText = originalBtnText;
         } catch (error) {
             console.error("Error saving topic:", error);
             showCustomAlert('❌ Error saving topic.');
+        } finally {
             saveBtn.disabled = false;
             saveBtn.innerText = originalBtnText;
         }
     });
 }
 
-// ------------------------------------------
-// HELPER FUNCTIONS FOR EDITING (UNCHANGED)
-// ------------------------------------------
+/**
+ * Loads topic history for a specific student
+ */
+async function loadDailyTopicHistory(studentId) {
+    const container = document.getElementById('topic-history');
+    if (!container) return;
+    
+    try {
+        const now = new Date();
+        const q = query(collection(db, "daily_topics"), where("studentId", "==", studentId));
+        const snap = await getDocs(q);
+        
+        let data = [];
+        snap.forEach(d => {
+            let val = d.data(); 
+            val.id = d.id;
+            val.parsedDate = val.createdAt?.toDate ? val.createdAt.toDate() : new Date(val.createdAt || new Date());
+            data.push(val);
+        });
+        
+        data.sort((a, b) => b.parsedDate - a.parsedDate);
+        
+        let html = '<ul class="space-y-3">';
+        let count = 0;
+        
+        data.forEach(d => {
+            if (d.parsedDate.getMonth() === now.getMonth() && d.parsedDate.getFullYear() === now.getFullYear()) {
+                count++;
+                html += `
+                    <li class="flex flex-col border-b border-blue-100 last:border-0 pb-2">
+                        <div class="flex justify-between w-full">
+                            <div class="flex-1 mr-2">
+                                <span class="font-bold text-blue-600 text-xs">
+                                    ${d.parsedDate.toLocaleDateString(undefined,{month:'short',day:'numeric'})}:
+                                </span>
+                                <span id="text-${d.id}" class="text-sm">${d.topics}</span>
+                                <div id="input-container-${d.id}" class="hidden">
+                                    <textarea id="input-${d.id}" class="w-full text-sm border rounded p-1" rows="2"></textarea>
+                                </div>
+                            </div>
+                            <div class="flex space-x-1">
+                                <button id="btn-edit-${d.id}" data-action="edit" data-id="${d.id}" class="text-gray-400 hover:text-blue-600">✏️</button>
+                                <button id="btn-delete-${d.id}" data-action="delete" data-id="${d.id}" class="text-gray-400 hover:text-red-600">🗑️</button>
+                                <div id="action-btns-${d.id}" class="hidden flex space-x-1">
+                                    <button data-action="save" data-id="${d.id}" class="text-green-600">✅</button>
+                                    <button data-action="cancel" data-id="${d.id}" class="text-red-500">❌</button>
+                                </div>
+                            </div>
+                        </div>
+                    </li>`;
+            }
+        });
+        
+        html += '</ul>';
+        container.innerHTML = count > 0 ? html : '<p class="text-center text-gray-500 italic">No topics yet.</p>';
+        document.getElementById('topic-history-container').classList.remove('hidden');
+        document.getElementById('topic-count-badge').textContent = count;
+    } catch (e) { 
+        console.error(e); 
+        container.innerHTML = '<p class="text-red-500">Error loading history.</p>'; 
+    }
+}
+
+// Helper functions for topic editing
 function enableTopicEdit(topicId) {
     document.getElementById(`text-${topicId}`).classList.add('hidden');
     document.getElementById(`btn-edit-${topicId}`).classList.add('hidden');
@@ -2128,6 +2481,7 @@ function enableTopicEdit(topicId) {
     input.value = document.getElementById(`text-${topicId}`).textContent;
     input.focus();
 }
+
 function cancelTopicEdit(topicId) {
     document.getElementById(`text-${topicId}`).classList.remove('hidden');
     document.getElementById(`btn-edit-${topicId}`).classList.remove('hidden');
@@ -2135,69 +2489,41 @@ function cancelTopicEdit(topicId) {
     document.getElementById(`input-container-${topicId}`).classList.add('hidden');
     document.getElementById(`action-btns-${topicId}`).classList.add('hidden');
 }
+
 async function saveTopicEdit(topicId, studentId) {
     const newText = document.getElementById(`input-${topicId}`).value.trim();
-    if (!newText) { showCustomAlert("Topic cannot be empty."); return; }
+    if (!newText) { 
+        showCustomAlert("Topic cannot be empty."); 
+        return; 
+    }
     try {
         await updateDoc(doc(db, "daily_topics", topicId), { topics: newText });
         await loadDailyTopicHistory(studentId);
         showCustomAlert("✅ Topic updated!");
-    } catch (error) { console.error(error); showCustomAlert("❌ Update failed."); }
+    } catch (error) { 
+        console.error(error); 
+        showCustomAlert("❌ Update failed."); 
+    }
 }
+
 async function deleteTopic(topicId, studentId) {
     try {
         await deleteDoc(doc(db, "daily_topics", topicId));
         await loadDailyTopicHistory(studentId);
         showCustomAlert("🗑️ Topic deleted.");
-    } catch (error) { console.error(error); showCustomAlert("❌ Delete failed."); }
-}
-async function loadDailyTopicHistory(studentId) {
-    const container = document.getElementById('topic-history');
-    if (!container) return;
-    try {
-        const now = new Date();
-        const q = query(collection(db, "daily_topics"), where("studentId", "==", studentId));
-        const snap = await getDocs(q);
-        let data = [];
-        snap.forEach(d => {
-            let val = d.data(); val.id = d.id;
-            val.parsedDate = val.createdAt?.toDate ? val.createdAt.toDate() : new Date(val.createdAt || new Date());
-            data.push(val);
-        });
-        data.sort((a, b) => b.parsedDate - a.parsedDate);
-        let html = '<ul class="space-y-3">';
-        let count = 0;
-        data.forEach(d => {
-            if (d.parsedDate.getMonth() === now.getMonth() && d.parsedDate.getFullYear() === now.getFullYear()) {
-                count++;
-                html += `<li class="flex flex-col border-b border-blue-100 last:border-0 pb-2">
-                    <div class="flex justify-between w-full">
-                        <div class="flex-1 mr-2"><span class="font-bold text-blue-600 text-xs">${d.parsedDate.toLocaleDateString(undefined,{month:'short',day:'numeric'})}: </span>
-                        <span id="text-${d.id}" class="text-sm">${d.topics}</span>
-                        <div id="input-container-${d.id}" class="hidden"><textarea id="input-${d.id}" class="w-full text-sm border rounded p-1" rows="2"></textarea></div></div>
-                        <div class="flex space-x-1">
-                            <button id="btn-edit-${d.id}" data-action="edit" data-id="${d.id}" class="text-gray-400 hover:text-blue-600">✏️</button>
-                            <button id="btn-delete-${d.id}" data-action="delete" data-id="${d.id}" class="text-gray-400 hover:text-red-600">🗑️</button>
-                            <div id="action-btns-${d.id}" class="hidden flex space-x-1">
-                                <button data-action="save" data-id="${d.id}" class="text-green-600">✅</button>
-                                <button data-action="cancel" data-id="${d.id}" class="text-red-500">❌</button>
-                            </div>
-                        </div>
-                    </div></li>`;
-            }
-        });
-        html += '</ul>';
-        container.innerHTML = count > 0 ? html : '<p class="text-center text-gray-500 italic">No topics yet.</p>';
-        document.getElementById('topic-history-container').classList.remove('hidden');
-        document.getElementById('topic-count-badge').textContent = count;
-    } catch (e) { console.error(e); container.innerHTML = '<p class="text-red-500">Error loading history.</p>'; }
+    } catch (error) { 
+        console.error(error); 
+        showCustomAlert("❌ Delete failed."); 
+    }
 }
 
-
 // ==========================================
-// 2. HOMEWORK ASSIGNMENT (SMART SYNC VERSION)
+// 3. HOMEWORK ASSIGNMENT (SMART SYNC VERSION)
 // ==========================================
 
+/**
+ * Uploads file to Cloudinary for homework attachments
+ */
 async function uploadToCloudinary(file, studentId) {
     return new Promise((resolve, reject) => {
         const formData = new FormData();
@@ -2207,14 +2533,26 @@ async function uploadToCloudinary(file, studentId) {
         formData.append('folder', 'homework_assignments');
         formData.append('public_id', `homework_${studentId}_${Date.now()}_${file.name.replace(/\.[^/.]+$/, "")}`);
         
-        fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/upload`, { method: 'POST', body: formData })
+        fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/upload`, { 
+            method: 'POST', 
+            body: formData 
+        })
         .then(r => r.json())
-        .then(d => d.secure_url ? resolve({url: d.secure_url, publicId: d.public_id, format: d.format, bytes: d.bytes, createdAt: d.created_at, fileName: file.name}) : reject(new Error(d.error?.message)))
+        .then(d => d.secure_url ? resolve({
+            url: d.secure_url, 
+            publicId: d.public_id, 
+            format: d.format, 
+            bytes: d.bytes, 
+            createdAt: d.created_at, 
+            fileName: file.name
+        }) : reject(new Error(d.error?.message)))
         .catch(e => reject(e));
     });
 }
 
-// *** NEW: Returns object { email, name } instead of just email
+/**
+ * Fetches parent data by phone number
+ */
 async function fetchParentDataByPhone(phone) {
     if (!phone) return null;
     try {
@@ -2229,10 +2567,9 @@ async function fetchParentDataByPhone(phone) {
 
         if (!snapshot.empty) {
             const data = snapshot.docs[0].data();
-            // Return both name and email
             return { 
                 email: data.email, 
-                name: data.fullName || data.name || data.parentName || "Parent" // Handle various naming conventions
+                name: data.fullName || data.name || data.parentName || "Parent"
             };
         }
     } catch (error) {
@@ -2241,13 +2578,15 @@ async function fetchParentDataByPhone(phone) {
     return null;
 }
 
+/**
+ * Shows modal for assigning homework with parent auto-sync
+ */
 function showHomeworkModal(student) {
     const nextWeek = new Date();
     nextWeek.setDate(nextWeek.getDate() + 7);
     const maxDate = nextWeek.toISOString().split('T')[0];
     let selectedFiles = [];
 
-    // Check if we already have data in the Student object
     let currentParentName = student.parentName || "Loading...";
     let currentParentEmail = student.parentEmail || "Searching...";
     const parentPhone = student.parentPhone || "Not Found";
@@ -2255,25 +2594,50 @@ function showHomeworkModal(student) {
     const modalHTML = `
         <div class="modal-overlay">
             <div class="modal-content max-w-2xl">
-                <div class="modal-header"><h3 class="modal-title">📝 Assign Homework for ${student.studentName}</h3></div>
+                <div class="modal-header">
+                    <h3 class="modal-title">📝 Assign Homework for ${student.studentName}</h3>
+                    <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+                </div>
                 <div class="modal-body">
-                    <div class="form-group"><label class="form-label">Title *</label><input type="text" id="hw-title" class="form-input" required></div>
-                    <div class="form-group"><label class="form-label">Description *</label><textarea id="hw-description" class="form-input form-textarea" required></textarea></div>
-                    <div class="form-group"><label class="form-label">Due Date *</label><input type="date" id="hw-due-date" class="form-input" max="${maxDate}" required></div>
-                    <div class="form-group"><label class="form-label">Files (Max 5)</label>
-                        <div class="file-upload-container"><input type="file" id="hw-file" class="hidden" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt">
-                        <label for="hw-file" class="file-upload-label"><span class="text-primary-color">Click to upload files</span></label>
-                        <div id="file-list-preview" class="hidden mt-2"><ul id="file-list-ul"></ul><button id="remove-all-files-btn" class="btn btn-danger btn-sm w-full mt-2">Clear Files</button></div></div>
+                    <div class="form-group">
+                        <label class="form-label">Title *</label>
+                        <input type="text" id="hw-title" class="form-input" placeholder="e.g., Math Practice Problems" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Description *</label>
+                        <textarea id="hw-description" class="form-input form-textarea" placeholder="Detailed instructions..." required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Due Date *</label>
+                        <input type="date" id="hw-due-date" class="form-input" max="${maxDate}" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Files (Max 5, 10MB each)</label>
+                        <div class="file-upload-container">
+                            <input type="file" id="hw-file" class="hidden" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt">
+                            <label for="hw-file" class="file-upload-label">
+                                <span class="text-primary-color">📎 Click to upload files</span>
+                            </label>
+                            <div id="file-list-preview" class="hidden mt-2">
+                                <ul id="file-list-ul"></ul>
+                                <button id="remove-all-files-btn" class="btn btn-danger btn-sm w-full mt-2">Clear All Files</button>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="email-settings bg-blue-50 p-3 rounded mt-2 border border-blue-100">
-                        <label class="flex items-center space-x-2 mb-2"><input type="checkbox" id="hw-reminder" class="rounded" checked><span class="font-bold text-blue-900">Notify Parent via Email</span></label>
+                        <label class="flex items-center space-x-2 mb-2">
+                            <input type="checkbox" id="hw-reminder" class="rounded" checked>
+                            <span class="font-bold text-blue-900">Notify Parent via Email</span>
+                        </label>
                         <div class="grid grid-cols-2 gap-2 text-xs text-gray-700">
                             <div><span class="font-semibold">Parent:</span> <span id="display-parent-name">${currentParentName}</span></div>
                             <div><span class="font-semibold">Phone:</span> ${parentPhone}</div>
                             <div class="col-span-2"><span class="font-semibold">Email:</span> <span id="display-parent-email">${currentParentEmail}</span></div>
                         </div>
-                        <div id="new-data-badge" class="hidden mt-2 text-xs text-green-600 font-bold">✨ New parent details found! Will be saved to student profile.</div>
+                        <div id="new-data-badge" class="hidden mt-2 text-xs text-green-600 font-bold">
+                            ✨ New parent details found! Will be saved to student profile.
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -2288,14 +2652,14 @@ function showHomeworkModal(student) {
     modal.innerHTML = modalHTML;
     document.body.appendChild(modal);
 
-    // *** AUTO-FETCH LOGIC: Runs immediately if data is missing ***
+    // Auto-fetch parent data if missing
     let fetchedParentData = null;
 
     if (student.parentPhone && (!student.parentEmail || !student.parentName)) {
         fetchParentDataByPhone(student.parentPhone).then(data => {
             if (data) {
                 fetchedParentData = data;
-                // Update UI Live
+                // Update UI live
                 document.getElementById('display-parent-name').textContent = data.name;
                 document.getElementById('display-parent-email').textContent = data.email;
                 document.getElementById('display-parent-name').classList.add('text-green-600', 'font-bold');
@@ -2307,29 +2671,48 @@ function showHomeworkModal(student) {
             }
         });
     } else {
-        // Data already exists, just clear the "Searching..." text if needed
-        if(student.parentName) document.getElementById('display-parent-name').textContent = student.parentName;
-        if(student.parentEmail) document.getElementById('display-parent-email').textContent = student.parentEmail;
+        if (student.parentName) document.getElementById('display-parent-name').textContent = student.parentName;
+        if (student.parentEmail) document.getElementById('display-parent-email').textContent = student.parentEmail;
     }
 
-    // File Handling (Standard)
+    // File handling
     const fileInput = document.getElementById('hw-file');
     const fileListUl = document.getElementById('file-list-ul');
+    
     fileInput.addEventListener('change', (e) => {
         const files = Array.from(e.target.files);
-        if (selectedFiles.length + files.length > 5) { showCustomAlert('Max 5 files.'); fileInput.value=''; return; }
-        files.forEach(f => { if(f.size<=10*1024*1024) selectedFiles.push(f); else showCustomAlert(`Skipped ${f.name} (>10MB)`); });
+        if (selectedFiles.length + files.length > 5) { 
+            showCustomAlert('Maximum 5 files allowed.'); 
+            fileInput.value = ''; 
+            return; 
+        }
+        files.forEach(f => { 
+            if (f.size <= 10 * 1024 * 1024) {
+                selectedFiles.push(f); 
+            } else {
+                showCustomAlert(`Skipped ${f.name} (file exceeds 10MB limit)`); 
+            }
+        });
         renderFiles();
     });
+    
     function renderFiles() {
         const preview = document.getElementById('file-list-preview');
-        if (selectedFiles.length===0) { preview.classList.add('hidden'); return; }
+        if (selectedFiles.length === 0) { 
+            preview.classList.add('hidden'); 
+            return; 
+        }
+        
         preview.classList.remove('hidden');
         fileListUl.innerHTML = '';
+        
         selectedFiles.forEach((f, i) => {
             const li = document.createElement('li');
             li.className = "flex justify-between bg-white p-1 mb-1 border rounded text-sm";
-            li.innerHTML = `<span>${f.name}</span><span class="text-red-500 cursor-pointer remove-file-btn" data-index="${i}">✕</span>`;
+            li.innerHTML = `
+                <span class="truncate max-w-[200px]">${f.name}</span>
+                <span class="text-red-500 cursor-pointer remove-file-btn" data-index="${i}">✕</span>
+            `;
             fileListUl.appendChild(li);
         });
         
@@ -2341,10 +2724,16 @@ function showHomeworkModal(student) {
             });
         });
     }
-    document.getElementById('remove-all-files-btn').addEventListener('click', ()=>{ selectedFiles=[]; fileInput.value=''; renderFiles(); });
+    
+    document.getElementById('remove-all-files-btn').addEventListener('click', () => {
+        selectedFiles = [];
+        fileInput.value = '';
+        renderFiles();
+    });
+    
     document.getElementById('cancel-hw-btn').addEventListener('click', () => modal.remove());
 
-    // SAVE LOGIC
+    // Save homework assignment
     document.getElementById('save-hw-btn').addEventListener('click', async () => {
         const title = document.getElementById('hw-title').value.trim();
         const desc = document.getElementById('hw-description').value.trim();
@@ -2352,40 +2741,49 @@ function showHomeworkModal(student) {
         const sendEmail = document.getElementById('hw-reminder').checked;
         const saveBtn = document.getElementById('save-hw-btn');
 
-        if (!title || !desc || !date) { showCustomAlert('Please fill all fields.'); return; }
+        if (!title || !desc || !date) { 
+            showCustomAlert('Please fill all required fields.'); 
+            return; 
+        }
         
         const tutorName = window.tutorData?.name || "Unknown Tutor";
-        const today = new Date(); today.setHours(0,0,0,0);
-        const due = new Date(date); due.setHours(0,0,0,0);
-        if(due < today) { showCustomAlert('Due date cannot be past.'); return; }
+        const today = new Date(); 
+        today.setHours(0, 0, 0, 0);
+        const due = new Date(date); 
+        due.setHours(0, 0, 0, 0);
+        
+        if (due < today) { 
+            showCustomAlert('Due date cannot be in the past.'); 
+            return; 
+        }
 
         try {
             saveBtn.disabled = true;
+            saveBtn.innerText = "Processing...";
             
-            // --- STEP 1: RESOLVE PARENT DATA ---
-            // Priority: 1. Fetched just now (new), 2. Existing on student, 3. Empty
+            // STEP 1: Resolve parent data
             let finalParentEmail = fetchedParentData?.email || student.parentEmail || "";
             let finalParentName = fetchedParentData?.name || student.parentName || "";
 
-            // If we still don't have it, try one last desperate fetch
+            // Final attempt to fetch if still missing
             if (sendEmail && !finalParentEmail && student.parentPhone) {
-                saveBtn.innerHTML = "🔍 Finalizing Parent Info...";
+                saveBtn.innerText = "🔍 Finalizing Parent Info...";
                 const lastCheck = await fetchParentDataByPhone(student.parentPhone);
                 if (lastCheck) {
                     finalParentEmail = lastCheck.email;
                     finalParentName = lastCheck.name;
-                    fetchedParentData = lastCheck; // Mark as new so we save it below
+                    fetchedParentData = lastCheck;
                 }
             }
 
-            // *** CRITICAL UPDATE: SYNC TO STUDENTS COLLECTION ***
-            // If we found new data that wasn't there before, update the student record permanently.
+            // Sync to students collection if new data found
             if (fetchedParentData) {
-                saveBtn.innerHTML = "💾 Syncing Student Data...";
+                saveBtn.innerText = "💾 Syncing Student Data...";
                 try {
                     await updateDoc(doc(db, "students", student.id), {
                         parentEmail: finalParentEmail,
-                        parentName: finalParentName
+                        parentName: finalParentName,
+                        lastUpdated: new Date()
                     });
                     console.log("Student record updated with new parent info.");
                 } catch (updateError) {
@@ -2393,25 +2791,31 @@ function showHomeworkModal(student) {
                 }
             }
 
-            // --- STEP 2: UPLOAD FILES ---
-            saveBtn.innerHTML = `Uploading ${selectedFiles.length} files...`;
+            // STEP 2: Upload files
             let attachments = [];
             if (selectedFiles.length > 0) {
+                saveBtn.innerText = `Uploading ${selectedFiles.length} file(s)...`;
                 try {
                     const uploadPromises = selectedFiles.map(f => uploadToCloudinary(f, student.id));
                     const results = await Promise.all(uploadPromises);
-                    results.forEach(res => attachments.push({url:res.url, name:res.fileName, size:res.bytes, type:res.format}));
+                    results.forEach(res => attachments.push({
+                        url: res.url, 
+                        name: res.fileName, 
+                        size: res.bytes, 
+                        type: res.format,
+                        uploadedAt: new Date()
+                    }));
                 } catch(e) { 
                     console.error("Upload Error:", e);
                     showCustomAlert(`Upload failed: ${e.message}`); 
-                    saveBtn.disabled=false; 
-                    saveBtn.innerHTML="Assign Homework"; 
+                    saveBtn.disabled = false; 
+                    saveBtn.innerText = "Assign Homework"; 
                     return; 
                 }
             }
 
-            // --- STEP 3: SAVE TO FIREBASE ---
-            saveBtn.innerHTML = "Saving...";
+            // STEP 3: Save to Firebase
+            saveBtn.innerText = "Saving Assignment...";
             const newHwRef = doc(collection(db, "homework_assignments"));
             
             const hwData = {
@@ -2419,64 +2823,673 @@ function showHomeworkModal(student) {
                 studentId: student.id,
                 studentName: student.studentName,
                 parentEmail: finalParentEmail,
-                parentName: finalParentName, // Now storing Name in HW record too
+                parentName: finalParentName,
                 parentPhone: student.parentPhone,
+                tutorId: window.tutorData?.id || "",
                 tutorName: tutorName,
+                tutorEmail: window.tutorData?.email || "",
                 title: title,
                 description: desc,
                 dueDate: date,
                 assignedDate: new Date(),
                 status: 'assigned',
                 attachments: attachments,
-                fileUrl: attachments[0]?.url || '', 
-                fileName: attachments[0]?.name || '' 
+                fileUrl: attachments[0]?.url || '',
+                fileName: attachments[0]?.name || '',
+                version: 1,
+                createdAt: new Date(),
+                updatedAt: new Date()
             };
             
             await setDoc(newHwRef, hwData);
 
-            // --- STEP 4: SEND EMAIL ---
+            // STEP 4: Send email notification
             if (sendEmail && finalParentEmail) {
-                saveBtn.innerHTML = "Sending Email...";
+                saveBtn.innerText = "Sending Email...";
                 const GAS_URL = "https://script.google.com/macros/s/AKfycbz9yuiR1egvxRcCLbW1Id-6lxBsYotiID0j_Fpeb9D8RyQGdMPNPPZn8WqOpJ4m_JqJNQ/exec";
                 
                 fetch(GAS_URL, {
-                    method: 'POST', mode: 'no-cors',
+                    method: 'POST',
+                    mode: 'no-cors',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(hwData)
-                }).catch(e=>console.error(e));
+                }).catch(e => console.error("Email send error:", e));
                 
-                await scheduleEmailReminder(hwData, hwData.fileUrl);
+                await scheduleEmailReminder(hwData);
             }
 
             modal.remove();
-            showCustomAlert(`✅ Assigned! ${finalParentEmail ? 'Email sent to ' + finalParentName : '(No email found)'}`);
+            showCustomAlert(`✅ Homework assigned! ${finalParentEmail ? 'Email sent to ' + finalParentName : '(No email found)'}`);
+            
+            // Refresh homework view if exists
+            if (typeof loadHomeworkView === 'function') {
+                loadHomeworkView(student.id);
+            }
 
         } catch (error) {
             console.error("Save Error:", error);
-            showCustomAlert("Error assigning homework.");
+            showCustomAlert("❌ Error assigning homework. Please try again.");
             saveBtn.disabled = false;
-            saveBtn.innerHTML = "Assign Homework";
+            saveBtn.innerText = "Assign Homework";
         }
     });
 }
 
-async function scheduleEmailReminder(hwData, fileUrl = '') {
-    if (!hwData.id) return;
+/**
+ * Schedules email reminder for homework due date
+ */
+async function scheduleEmailReminder(hwData) {
+    if (!hwData.id || !hwData.parentEmail) return;
     try {
-        const d = new Date(hwData.dueDate); d.setDate(d.getDate()-1);
+        const dueDate = new Date(hwData.dueDate);
+        const reminderDate = new Date(dueDate);
+        reminderDate.setDate(reminderDate.getDate() - 1); // Reminder 1 day before
+        
         await setDoc(doc(collection(db, "email_reminders")), {
             homeworkId: hwData.id,
-            studentId: hwData.studentId, 
+            studentId: hwData.studentId,
+            studentName: hwData.studentName,
             parentEmail: hwData.parentEmail,
             parentName: hwData.parentName || "Parent",
-            title: hwData.title, 
-            dueDate: hwData.dueDate, 
-            reminderDate: d,
-            status: 'scheduled', 
-            createdAt: new Date()
+            title: hwData.title,
+            dueDate: hwData.dueDate,
+            reminderDate: reminderDate,
+            status: 'scheduled',
+            emailType: 'homework_reminder',
+            createdAt: new Date(),
+            tutorName: hwData.tutorName
         });
-    } catch(e){ console.error("Error scheduling reminder:", e); }
+    } catch(e) { 
+        console.error("Error scheduling reminder:", e); 
+    }
 }
+
+// ==========================================
+// 4. HOMEWORK MANAGEMENT & VIEWING
+// ==========================================
+
+/**
+ * Loads all homework assignments for a specific student
+ */
+async function loadHomeworkView(studentId) {
+    const container = document.getElementById('homework-container');
+    if (!container) return;
+    
+    try {
+        const q = query(
+            collection(db, "homework_assignments"), 
+            where("studentId", "==", studentId),
+            orderBy("assignedDate", "desc")
+        );
+        
+        const snapshot = await getDocs(q);
+        
+        if (snapshot.empty) {
+            container.innerHTML = `
+                <div class="text-center py-8">
+                    <div class="text-4xl mb-4">📚</div>
+                    <p class="text-gray-600">No homework assigned yet.</p>
+                    <button onclick="showHomeworkModal(currentStudent)" class="btn btn-primary mt-4">Assign Homework</button>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = `
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold">Homework Assignments</h3>
+                <button onclick="showHomeworkModal(currentStudent)" class="btn btn-primary btn-sm">+ Assign New</button>
+            </div>
+            <div class="homework-grid">
+        `;
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const status = getHomeworkStatus(data);
+            const dueDate = new Date(data.dueDate);
+            const formattedDue = dueDate.toLocaleDateString();
+            
+            html += `
+                <div class="homework-card" data-hw-id="${doc.id}">
+                    <div class="flex justify-between items-start mb-2">
+                        <h4 class="font-bold text-gray-800 truncate">${data.title}</h4>
+                        <span class="homework-status status-${status}">${status}</span>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-2 line-clamp-2">${data.description}</p>
+                    <div class="text-xs text-gray-500 mb-3">
+                        <div>Assigned: ${data.assignedDate.toDate().toLocaleDateString()}</div>
+                        <div>Due: ${formattedDue}</div>
+                        ${data.score ? `<div class="font-bold text-green-600">Grade: ${data.score}/100</div>` : ''}
+                    </div>
+                    <div class="homework-actions">
+                        <button onclick="editHomework('${doc.id}')" class="action-btn action-edit">Edit</button>
+                        <button onclick="recallHomework('${doc.id}')" class="action-btn action-recall">Recall</button>
+                        ${data.status === 'submitted' ? 
+                            `<button onclick="openGradingModal('${doc.id}')" class="action-btn action-grade">Grade</button>` : 
+                            `<button onclick="reassignHomework('${doc.id}')" class="action-btn action-reassign">Reassign</button>`
+                        }
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error("Error loading homework:", error);
+        container.innerHTML = '<p class="text-red-500">Error loading homework assignments.</p>';
+    }
+}
+
+/**
+ * Determines homework status
+ */
+function getHomeworkStatus(hwData) {
+    const now = new Date();
+    const dueDate = new Date(hwData.dueDate);
+    
+    if (hwData.status === 'graded') return 'graded';
+    if (hwData.status === 'submitted') return 'submitted';
+    if (dueDate < now && hwData.status !== 'submitted') return 'overdue';
+    return hwData.status || 'assigned';
+}
+
+/**
+ * Edit an existing homework assignment
+ */
+async function editHomework(homeworkId) {
+    try {
+        const docSnap = await getDoc(doc(db, "homework_assignments", homeworkId));
+        if (!docSnap.exists()) {
+            showCustomAlert("Homework not found.");
+            return;
+        }
+        
+        const hwData = docSnap.data();
+        const student = { 
+            id: hwData.studentId, 
+            studentName: hwData.studentName,
+            parentPhone: hwData.parentPhone,
+            parentEmail: hwData.parentEmail,
+            parentName: hwData.parentName
+        };
+        
+        // Close any existing modals
+        document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
+        
+        // Show homework modal with existing data
+        showHomeworkModal(student);
+        
+        // Populate with existing data
+        setTimeout(() => {
+            if (document.getElementById('hw-title')) {
+                document.getElementById('hw-title').value = hwData.title;
+                document.getElementById('hw-description').value = hwData.description;
+                document.getElementById('hw-due-date').value = hwData.dueDate;
+                
+                // Update button to say "Update Homework"
+                const saveBtn = document.getElementById('save-hw-btn');
+                saveBtn.innerText = "Update Homework";
+                saveBtn.onclick = async () => {
+                    // Save updated homework logic
+                    await updateHomework(homeworkId, hwData);
+                };
+            }
+        }, 100);
+        
+    } catch (error) {
+        console.error("Error editing homework:", error);
+        showCustomAlert("Error loading homework for editing.");
+    }
+}
+
+/**
+ * Update homework assignment
+ */
+async function updateHomework(homeworkId, originalData) {
+    const title = document.getElementById('hw-title').value.trim();
+    const desc = document.getElementById('hw-description').value.trim();
+    const date = document.getElementById('hw-due-date').value;
+    
+    if (!title || !desc || !date) {
+        showCustomAlert('Please fill all required fields.');
+        return;
+    }
+    
+    try {
+        await updateDoc(doc(db, "homework_assignments", homeworkId), {
+            title: title,
+            description: desc,
+            dueDate: date,
+            updatedAt: new Date(),
+            version: (originalData.version || 1) + 1
+        });
+        
+        document.querySelector('.modal-overlay').remove();
+        showCustomAlert('✅ Homework updated!');
+        
+        // Refresh view if available
+        if (typeof loadHomeworkView === 'function') {
+            loadHomeworkView(originalData.studentId);
+        }
+        
+    } catch (error) {
+        console.error("Error updating homework:", error);
+        showCustomAlert("❌ Error updating homework.");
+    }
+}
+
+/**
+ * Recall/delete homework assignment
+ */
+async function recallHomework(homeworkId) {
+    if (!confirm("Are you sure you want to recall this homework? This action cannot be undone.")) {
+        return;
+    }
+    
+    try {
+        const docSnap = await getDoc(doc(db, "homework_assignments", homeworkId));
+        if (!docSnap.exists()) return;
+        
+        const hwData = docSnap.data();
+        
+        // Update status to recalled instead of deleting
+        await updateDoc(doc(db, "homework_assignments", homeworkId), {
+            status: 'recalled',
+            recalledAt: new Date()
+        });
+        
+        showCustomAlert('📤 Homework recalled successfully.');
+        
+        // Refresh view
+        if (typeof loadHomeworkView === 'function') {
+            loadHomeworkView(hwData.studentId);
+        }
+        
+    } catch (error) {
+        console.error("Error recalling homework:", error);
+        showCustomAlert("❌ Error recalling homework.");
+    }
+}
+
+/**
+ * Reassign homework (creates a copy with new due date)
+ */
+async function reassignHomework(homeworkId) {
+    try {
+        const docSnap = await getDoc(doc(db, "homework_assignments", homeworkId));
+        if (!docSnap.exists()) return;
+        
+        const hwData = docSnap.data();
+        
+        // Ask for new due date
+        const newDueDate = prompt("Enter new due date (YYYY-MM-DD):", hwData.dueDate);
+        if (!newDueDate) return;
+        
+        // Create a new assignment based on the old one
+        const newHwRef = doc(collection(db, "homework_assignments"));
+        const now = new Date();
+        
+        const newHwData = {
+            ...hwData,
+            id: newHwRef.id,
+            dueDate: newDueDate,
+            assignedDate: now,
+            status: 'assigned',
+            version: 1,
+            parentAssignmentId: homeworkId, // Track original
+            createdAt: now,
+            updatedAt: now
+        };
+        
+        delete newHwData.score;
+        delete newHwData.feedback;
+        delete newHwData.submittedAt;
+        delete newHwData.submissionUrl;
+        delete newHwData.gradedAt;
+        
+        await setDoc(newHwRef, newHwData);
+        
+        showCustomAlert('✅ Homework reassigned with new due date!');
+        
+        // Refresh view
+        if (typeof loadHomeworkView === 'function') {
+            loadHomeworkView(hwData.studentId);
+        }
+        
+    } catch (error) {
+        console.error("Error reassigning homework:", error);
+        showCustomAlert("❌ Error reassigning homework.");
+    }
+}
+
+// ==========================================
+// 5. GOOGLE CLASSROOM GRADING INTERFACE
+// ==========================================
+
+/**
+ * Loads homework inbox for grading
+ */
+async function loadHomeworkInbox(tutorEmail) {
+    const container = document.getElementById('homework-inbox-container');
+    if (!container) return;
+    
+    container.innerHTML = '<div class="spinner mx-auto"></div>';
+
+    try {
+        // Query by tutor email or name
+        let q = query(
+            collection(db, "homework_assignments"), 
+            where("tutorEmail", "==", tutorEmail || window.tutorData.email),
+            where("status", "==", "submitted")
+        );
+            
+        let snapshot = await getDocs(q);
+        
+        if (snapshot.empty) {
+            // Fallback to tutor name
+            q = query(
+                collection(db, "homework_assignments"), 
+                where("tutorName", "==", window.tutorData.name),
+                where("status", "==", "submitted")
+            );
+            snapshot = await getDocs(q);
+        }
+
+        if (snapshot.empty) {
+            container.innerHTML = `
+                <div class="text-center py-6">
+                    <div class="text-3xl mb-2">🎉</div>
+                    <p class="text-gray-500 text-sm">No pending homework to grade!</p>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">';
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const date = data.submittedAt ? 
+                new Date(data.submittedAt.seconds * 1000).toLocaleDateString() : 
+                'Unknown';
+            
+            const isLate = data.dueDate && data.submittedAt && 
+                new Date(data.dueDate) < new Date(data.submittedAt.seconds * 1000);
+            
+            html += `
+                <div class="gc-inbox-item" onclick="openGradingModal('${doc.id}')">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                            ${data.studentName.charAt(0)}
+                        </div>
+                        <div>
+                            <div class="font-medium text-gray-800">${data.studentName}</div>
+                            <div class="text-xs text-gray-500">${data.title}</div>
+                            <div class="text-xs text-gray-400">Due: ${new Date(data.dueDate).toLocaleDateString()}</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs font-bold ${isLate ? 'text-red-600' : 'text-green-600'} uppercase tracking-wide">
+                            ${isLate ? 'Late' : 'On Time'}
+                        </div>
+                        <div class="text-xs text-gray-400">${date}</div>
+                    </div>
+                </div>`;
+        });
+        
+        html += '</div>';
+        container.innerHTML = html;
+
+    } catch (error) {
+        console.error("Inbox Error:", error);
+        container.innerHTML = '<p class="text-red-500 text-center">Error loading inbox.</p>';
+    }
+}
+
+/**
+ * Opens grading modal (Google Classroom style)
+ */
+async function openGradingModal(homeworkId) {
+    let hwData;
+    try {
+        const docSnap = await getDoc(doc(db, "homework_assignments", homeworkId));
+        if (!docSnap.exists()) {
+            showCustomAlert("Assignment not found.");
+            return;
+        }
+        hwData = { id: docSnap.id, ...docSnap.data() };
+    } catch (e) { 
+        showCustomAlert("Error loading assignment.");
+        return;
+    }
+
+    // Close any existing modals
+    document.querySelectorAll('.gc-grading-overlay').forEach(m => m.remove());
+    
+    const modal = document.createElement('div');
+    modal.className = 'gc-grading-overlay';
+    
+    const hasFile = hwData.submissionUrl && hwData.submissionUrl.length > 5;
+    const fileArea = hasFile ? 
+        `<div class="gc-file-preview">
+            <div class="gc-file-icon">📄</div>
+            <div class="mb-2 font-medium">Student Submission</div>
+            <a href="${hwData.submissionUrl}" target="_blank" class="gc-download-btn">View File</a>
+        </div>` : 
+        `<div class="gc-file-preview">
+            <div class="gc-file-icon">⚠️</div>
+            <div class="text-gray-500">No file attached</div>
+        </div>`;
+
+    modal.innerHTML = `
+        <div class="gc-grading-container">
+            <header class="gc-grading-header">
+                <div class="flex items-center">
+                    <button class="mr-4 text-gray-500 hover:text-gray-800 text-2xl" onclick="this.closest('.gc-grading-overlay').remove()">✕</button>
+                    <div>
+                        <span class="gc-student-name">${hwData.studentName}</span>
+                        <span class="gc-assignment-title"> ➤ ${hwData.title}</span>
+                    </div>
+                </div>
+            </header>
+            <div class="gc-grading-body">
+                <div class="gc-work-panel">
+                    ${fileArea}
+                    <div class="w-full max-w-2xl mt-6 border-t pt-4">
+                        <div class="text-xs font-bold text-gray-500 uppercase mb-2">Original Instructions</div>
+                        <div class="text-gray-700 text-sm">${hwData.description}</div>
+                        ${hwData.fileUrl ? 
+                            `<div class="mt-2">
+                                <a href="${hwData.fileUrl}" target="_blank" class="text-blue-600 text-xs hover:underline">
+                                    View Assignment Reference
+                                </a>
+                            </div>` : 
+                            ''
+                        }
+                        ${hwData.submittedAt ? 
+                            `<div class="mt-2 text-xs text-gray-500">
+                                Submitted: ${new Date(hwData.submittedAt.seconds * 1000).toLocaleString()}
+                            </div>` : 
+                            ''
+                        }
+                    </div>
+                </div>
+                <div class="gc-grading-sidebar">
+                    <div class="mb-6">
+                        <label class="font-medium text-gray-700 block mb-2">Grade</label>
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="gc-score-input" class="gc-grade-input" min="0" max="100" value="${hwData.score || ''}" step="0.5">
+                            <span class="text-gray-500 text-sm">/ 100</span>
+                        </div>
+                    </div>
+                    <div class="flex-1 flex flex-col">
+                        <label class="font-medium text-gray-700">Private Feedback</label>
+                        <textarea id="gc-feedback-input" class="gc-comment-box" placeholder="Add feedback for the student...">${hwData.feedback || ''}</textarea>
+                    </div>
+                    <div class="gc-action-footer">
+                        <button id="gc-return-btn" class="gc-return-btn">Return Assignment</button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+    document.body.appendChild(modal);
+
+    modal.querySelector('#gc-return-btn').onclick = async function() {
+        const btn = this;
+        const score = modal.querySelector('#gc-score-input').value;
+        const feedback = modal.querySelector('#gc-feedback-input').value.trim();
+
+        if (!score && !confirm("Return without a numerical grade?")) return;
+
+        btn.innerText = "Returning...";
+        btn.disabled = true;
+
+        try {
+            await updateDoc(doc(db, "homework_assignments", homeworkId), {
+                score: score ? parseFloat(score) : null,
+                feedback: feedback,
+                status: 'graded',
+                gradedAt: new Date(),
+                tutorEmail: window.tutorData.email,
+                returnedAt: new Date()
+            });
+
+            modal.remove();
+            showCustomAlert(`✅ Assignment returned to ${hwData.studentName}`);
+            
+            // Refresh inbox
+            loadHomeworkInbox(window.tutorData.email);
+            
+            // Send grade notification (optional)
+            if (hwData.parentEmail) {
+                sendGradeNotification(hwData, score, feedback);
+            }
+            
+        } catch (error) {
+            console.error("Error returning assignment:", error);
+            showCustomAlert("❌ Error returning assignment");
+            btn.innerText = "Return Assignment";
+            btn.disabled = false;
+        }
+    };
+}
+
+/**
+ * Sends grade notification to parent/student
+ */
+async function sendGradeNotification(hwData, score, feedback) {
+    // Implement email notification for grades
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbz9yuiR1egvxRcCLbW1Id-6lxBsYotiID0j_Fpeb9D8RyQGdMPNPPZn8WqOpJ4m_JqJNQ/exec";
+    
+    const gradeData = {
+        type: 'grade_notification',
+        studentName: hwData.studentName,
+        parentEmail: hwData.parentEmail,
+        parentName: hwData.parentName,
+        tutorName: window.tutorData.name,
+        assignmentTitle: hwData.title,
+        score: score,
+        feedback: feedback,
+        dueDate: hwData.dueDate,
+        gradedAt: new Date().toLocaleDateString()
+    };
+    
+    try {
+        await fetch(GAS_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(gradeData)
+        });
+        console.log("Grade notification sent");
+    } catch(e) {
+        console.error("Error sending grade notification:", e);
+    }
+}
+
+// ==========================================
+// 6. DASHBOARD WIDGET INJECTOR
+// ==========================================
+
+/**
+ * Injects homework inbox widget into dashboard
+ */
+const inboxObserver = new MutationObserver(() => {
+    const hero = document.querySelector('.hero-section');
+    if (hero && !document.getElementById('homework-inbox-section')) {
+        const div = document.createElement('div');
+        div.id = 'homework-inbox-section';
+        div.className = 'mt-6 mb-8 fade-in';
+        div.innerHTML = `
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-gray-800">📥 Homework Inbox</h3>
+                <button onclick="loadHomeworkInbox(window.tutorData.email)" class="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                    🔄 Refresh
+                </button>
+            </div>
+            <div id="homework-inbox-container"></div>
+        `;
+        hero.after(div);
+        
+        // Load inbox if tutor data is available
+        if (window.tutorData && window.tutorData.email) {
+            setTimeout(() => loadHomeworkInbox(window.tutorData.email), 500);
+        }
+    }
+});
+
+// Start observing
+inboxObserver.observe(document.body, { childList: true, subtree: true });
+
+// ==========================================
+// 7. EXPOSE FUNCTIONS TO WINDOW
+// ==========================================
+
+// Core functions
+window.showDailyTopicModal = showDailyTopicModal;
+window.showHomeworkModal = showHomeworkModal;
+window.loadHomeworkView = loadHomeworkView;
+window.loadHomeworkInbox = loadHomeworkInbox;
+window.openGradingModal = openGradingModal;
+
+// Homework management functions
+window.editHomework = editHomework;
+window.recallHomework = recallHomework;
+window.reassignHomework = reassignHomework;
+
+// Topic helper functions
+window.enableTopicEdit = enableTopicEdit;
+window.cancelTopicEdit = cancelTopicEdit;
+window.saveTopicEdit = saveTopicEdit;
+window.deleteTopic = deleteTopic;
+
+console.log("✅ Section 8: Google Classroom Replica loaded successfully");
+
+// ==========================================
+// 8. INITIALIZATION
+// ==========================================
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Inject styles if not already present
+    if (!document.getElementById('gc-styles')) {
+        injectGoogleClassroomStyles();
+    }
+    
+    // Load inbox if tutor is logged in
+    if (window.tutorData && window.tutorData.email) {
+        setTimeout(() => {
+            if (document.getElementById('homework-inbox-container')) {
+                loadHomeworkInbox(window.tutorData.email);
+            }
+        }, 1000);
+    }
+    
+    console.log("🎯 Google Classroom System Initialized");
+});
 
 /*******************************************************************************
  * SECTION 9: MESSAGING & INBOX FEATURES (CRASH-PROOF EDITION)
@@ -5255,8 +6268,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 500);
 });
 
-
-
 /*******************************************************************************
  * SECTION 16: GOOGLE CLASSROOM GRADING INTERFACE (FINAL)
  ******************************************************************************/
@@ -5471,5 +6482,3 @@ inboxObserver.observe(document.body, { childList: true, subtree: true });
 // EXPOSE FUNCTIONS TO WINDOW (REQUIRED FOR HTML ONCLICK)
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
-
-
