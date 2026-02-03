@@ -2294,7 +2294,7 @@ function initScheduleManager(tutor) {
 /**
  * Shows modal for entering daily topics with edit/delete history
  */
-function showDailyTopicModal(student) {
+window.showDailyTopicModal = function(student) {
     const date = new Date();
     const monthName = date.toLocaleString('default', { month: 'long' });
     
@@ -2303,6 +2303,13 @@ function showDailyTopicModal(student) {
                             String(today.getMonth() + 1).padStart(2, '0') + '-' + 
                             String(today.getDate()).padStart(2, '0');
 
+    // Close any existing topic modals
+    document.querySelectorAll('.modal-overlay').forEach(m => {
+        if (m.querySelector('.modal-title')?.textContent.includes('Daily Topic')) {
+            m.remove();
+        }
+    });
+    
     const modalHTML = `
         <div class="modal-overlay">
             <div class="modal-content max-w-lg">
@@ -2349,20 +2356,22 @@ function showDailyTopicModal(student) {
 
     // Event delegation for edit/delete buttons
     const historyContainer = document.getElementById('topic-history');
-    historyContainer.addEventListener('click', async (e) => {
-        const target = e.target;
-        const btn = target.closest('button');
-        if (!btn) return;
-        const action = btn.dataset.action;
-        const topicId = btn.dataset.id;
+    if (historyContainer) {
+        historyContainer.addEventListener('click', async (e) => {
+            const target = e.target;
+            const btn = target.closest('button');
+            if (!btn) return;
+            const action = btn.dataset.action;
+            const topicId = btn.dataset.id;
 
-        if (action === 'edit') enableTopicEdit(topicId);
-        else if (action === 'delete') {
-            if (confirm('Are you sure you want to delete this topic?')) await deleteTopic(topicId, student.id);
-        }
-        else if (action === 'cancel') cancelTopicEdit(topicId);
-        else if (action === 'save') await saveTopicEdit(topicId, student.id);
-    });
+            if (action === 'edit') window.enableTopicEdit(topicId);
+            else if (action === 'delete') {
+                if (confirm('Are you sure you want to delete this topic?')) await window.deleteTopic(topicId, student.id);
+            }
+            else if (action === 'cancel') window.cancelTopicEdit(topicId);
+            else if (action === 'save') await window.saveTopicEdit(topicId, student.id);
+        });
+    }
 
     document.getElementById('cancel-topic-btn').addEventListener('click', () => modal.remove());
     
@@ -2405,7 +2414,7 @@ function showDailyTopicModal(student) {
             saveBtn.innerText = originalBtnText;
         }
     });
-}
+};
 
 /**
  * Loads topic history for a specific student
@@ -2471,7 +2480,7 @@ async function loadDailyTopicHistory(studentId) {
 }
 
 // Helper functions for topic editing
-function enableTopicEdit(topicId) {
+window.enableTopicEdit = function(topicId) {
     document.getElementById(`text-${topicId}`).classList.add('hidden');
     document.getElementById(`btn-edit-${topicId}`).classList.add('hidden');
     document.getElementById(`btn-delete-${topicId}`).classList.add('hidden');
@@ -2480,17 +2489,17 @@ function enableTopicEdit(topicId) {
     const input = document.getElementById(`input-${topicId}`);
     input.value = document.getElementById(`text-${topicId}`).textContent;
     input.focus();
-}
+};
 
-function cancelTopicEdit(topicId) {
+window.cancelTopicEdit = function(topicId) {
     document.getElementById(`text-${topicId}`).classList.remove('hidden');
     document.getElementById(`btn-edit-${topicId}`).classList.remove('hidden');
     document.getElementById(`btn-delete-${topicId}`).classList.remove('hidden');
     document.getElementById(`input-container-${topicId}`).classList.add('hidden');
     document.getElementById(`action-btns-${topicId}`).classList.add('hidden');
-}
+};
 
-async function saveTopicEdit(topicId, studentId) {
+window.saveTopicEdit = async function(topicId, studentId) {
     const newText = document.getElementById(`input-${topicId}`).value.trim();
     if (!newText) { 
         showCustomAlert("Topic cannot be empty."); 
@@ -2504,9 +2513,9 @@ async function saveTopicEdit(topicId, studentId) {
         console.error(error); 
         showCustomAlert("❌ Update failed."); 
     }
-}
+};
 
-async function deleteTopic(topicId, studentId) {
+window.deleteTopic = async function(topicId, studentId) {
     try {
         await deleteDoc(doc(db, "daily_topics", topicId));
         await loadDailyTopicHistory(studentId);
@@ -2515,7 +2524,7 @@ async function deleteTopic(topicId, studentId) {
         console.error(error); 
         showCustomAlert("❌ Delete failed."); 
     }
-}
+};
 
 // ==========================================
 // 3. HOMEWORK ASSIGNMENT (SMART SYNC VERSION)
@@ -2581,7 +2590,7 @@ async function fetchParentDataByPhone(phone) {
 /**
  * Shows modal for assigning homework with parent auto-sync
  */
-function showHomeworkModal(student) {
+window.showHomeworkModal = function(student) {
     const nextWeek = new Date();
     nextWeek.setDate(nextWeek.getDate() + 7);
     const maxDate = nextWeek.toISOString().split('T')[0];
@@ -2591,6 +2600,13 @@ function showHomeworkModal(student) {
     let currentParentEmail = student.parentEmail || "Searching...";
     const parentPhone = student.parentPhone || "Not Found";
 
+    // Close any existing homework modals
+    document.querySelectorAll('.modal-overlay').forEach(m => {
+        if (m.querySelector('.modal-title')?.textContent.includes('Assign Homework')) {
+            m.remove();
+        }
+    });
+    
     const modalHTML = `
         <div class="modal-overlay">
             <div class="modal-content max-w-2xl">
@@ -2660,76 +2676,95 @@ function showHomeworkModal(student) {
             if (data) {
                 fetchedParentData = data;
                 // Update UI live
-                document.getElementById('display-parent-name').textContent = data.name;
-                document.getElementById('display-parent-email').textContent = data.email;
-                document.getElementById('display-parent-name').classList.add('text-green-600', 'font-bold');
-                document.getElementById('display-parent-email').classList.add('text-green-600', 'font-bold');
-                document.getElementById('new-data-badge').classList.remove('hidden');
+                const nameEl = document.getElementById('display-parent-name');
+                const emailEl = document.getElementById('display-parent-email');
+                const badgeEl = document.getElementById('new-data-badge');
+                
+                if (nameEl && emailEl && badgeEl) {
+                    nameEl.textContent = data.name;
+                    emailEl.textContent = data.email;
+                    nameEl.classList.add('text-green-600', 'font-bold');
+                    emailEl.classList.add('text-green-600', 'font-bold');
+                    badgeEl.classList.remove('hidden');
+                }
             } else {
-                document.getElementById('display-parent-name').textContent = "Unknown";
-                document.getElementById('display-parent-email').textContent = "Not found in database";
+                const nameEl = document.getElementById('display-parent-name');
+                const emailEl = document.getElementById('display-parent-email');
+                if (nameEl) nameEl.textContent = "Unknown";
+                if (emailEl) emailEl.textContent = "Not found in database";
             }
         });
     } else {
-        if (student.parentName) document.getElementById('display-parent-name').textContent = student.parentName;
-        if (student.parentEmail) document.getElementById('display-parent-email').textContent = student.parentEmail;
+        const nameEl = document.getElementById('display-parent-name');
+        const emailEl = document.getElementById('display-parent-email');
+        if (student.parentName && nameEl) nameEl.textContent = student.parentName;
+        if (student.parentEmail && emailEl) emailEl.textContent = student.parentEmail;
     }
 
     // File handling
     const fileInput = document.getElementById('hw-file');
     const fileListUl = document.getElementById('file-list-ul');
     
-    fileInput.addEventListener('change', (e) => {
-        const files = Array.from(e.target.files);
-        if (selectedFiles.length + files.length > 5) { 
-            showCustomAlert('Maximum 5 files allowed.'); 
-            fileInput.value = ''; 
-            return; 
-        }
-        files.forEach(f => { 
-            if (f.size <= 10 * 1024 * 1024) {
-                selectedFiles.push(f); 
-            } else {
-                showCustomAlert(`Skipped ${f.name} (file exceeds 10MB limit)`); 
+    if (fileInput) {
+        fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (selectedFiles.length + files.length > 5) { 
+                showCustomAlert('Maximum 5 files allowed.'); 
+                fileInput.value = ''; 
+                return; 
             }
+            files.forEach(f => { 
+                if (f.size <= 10 * 1024 * 1024) {
+                    selectedFiles.push(f); 
+                } else {
+                    showCustomAlert(`Skipped ${f.name} (file exceeds 10MB limit)`); 
+                }
+            });
+            renderFiles();
         });
-        renderFiles();
-    });
+    }
     
     function renderFiles() {
         const preview = document.getElementById('file-list-preview');
+        if (!preview) return;
+        
         if (selectedFiles.length === 0) { 
             preview.classList.add('hidden'); 
             return; 
         }
         
         preview.classList.remove('hidden');
-        fileListUl.innerHTML = '';
-        
-        selectedFiles.forEach((f, i) => {
-            const li = document.createElement('li');
-            li.className = "flex justify-between bg-white p-1 mb-1 border rounded text-sm";
-            li.innerHTML = `
-                <span class="truncate max-w-[200px]">${f.name}</span>
-                <span class="text-red-500 cursor-pointer remove-file-btn" data-index="${i}">✕</span>
-            `;
-            fileListUl.appendChild(li);
-        });
-        
-        fileListUl.querySelectorAll('.remove-file-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const idx = parseInt(e.target.dataset.index);
-                selectedFiles.splice(idx, 1);
-                renderFiles();
+        if (fileListUl) {
+            fileListUl.innerHTML = '';
+            
+            selectedFiles.forEach((f, i) => {
+                const li = document.createElement('li');
+                li.className = "flex justify-between bg-white p-1 mb-1 border rounded text-sm";
+                li.innerHTML = `
+                    <span class="truncate max-w-[200px]">${f.name}</span>
+                    <span class="text-red-500 cursor-pointer remove-file-btn" data-index="${i}">✕</span>
+                `;
+                fileListUl.appendChild(li);
             });
-        });
+            
+            fileListUl.querySelectorAll('.remove-file-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idx = parseInt(e.target.dataset.index);
+                    selectedFiles.splice(idx, 1);
+                    renderFiles();
+                });
+            });
+        }
     }
     
-    document.getElementById('remove-all-files-btn').addEventListener('click', () => {
-        selectedFiles = [];
-        fileInput.value = '';
-        renderFiles();
-    });
+    const removeAllBtn = document.getElementById('remove-all-files-btn');
+    if (removeAllBtn) {
+        removeAllBtn.addEventListener('click', () => {
+            selectedFiles = [];
+            if (fileInput) fileInput.value = '';
+            renderFiles();
+        });
+    }
     
     document.getElementById('cancel-hw-btn').addEventListener('click', () => modal.remove());
 
@@ -2862,8 +2897,8 @@ function showHomeworkModal(student) {
             showCustomAlert(`✅ Homework assigned! ${finalParentEmail ? 'Email sent to ' + finalParentName : '(No email found)'}`);
             
             // Refresh homework view if exists
-            if (typeof loadHomeworkView === 'function') {
-                loadHomeworkView(student.id);
+            if (typeof window.loadHomeworkView === 'function') {
+                window.loadHomeworkView(student.id);
             }
 
         } catch (error) {
@@ -2873,7 +2908,7 @@ function showHomeworkModal(student) {
             saveBtn.innerText = "Assign Homework";
         }
     });
-}
+};
 
 /**
  * Schedules email reminder for homework due date
@@ -2911,7 +2946,7 @@ async function scheduleEmailReminder(hwData) {
 /**
  * Loads all homework assignments for a specific student
  */
-async function loadHomeworkView(studentId) {
+window.loadHomeworkView = async function(studentId) {
     const container = document.getElementById('homework-container');
     if (!container) return;
     
@@ -2929,7 +2964,7 @@ async function loadHomeworkView(studentId) {
                 <div class="text-center py-8">
                     <div class="text-4xl mb-4">📚</div>
                     <p class="text-gray-600">No homework assigned yet.</p>
-                    <button onclick="showHomeworkModal(currentStudent)" class="btn btn-primary mt-4">Assign Homework</button>
+                    <button onclick="window.showHomeworkModal(currentStudent)" class="btn btn-primary mt-4">Assign Homework</button>
                 </div>
             `;
             return;
@@ -2938,7 +2973,7 @@ async function loadHomeworkView(studentId) {
         let html = `
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-bold">Homework Assignments</h3>
-                <button onclick="showHomeworkModal(currentStudent)" class="btn btn-primary btn-sm">+ Assign New</button>
+                <button onclick="window.showHomeworkModal(currentStudent)" class="btn btn-primary btn-sm">+ Assign New</button>
             </div>
             <div class="homework-grid">
         `;
@@ -2962,11 +2997,11 @@ async function loadHomeworkView(studentId) {
                         ${data.score ? `<div class="font-bold text-green-600">Grade: ${data.score}/100</div>` : ''}
                     </div>
                     <div class="homework-actions">
-                        <button onclick="editHomework('${doc.id}')" class="action-btn action-edit">Edit</button>
-                        <button onclick="recallHomework('${doc.id}')" class="action-btn action-recall">Recall</button>
+                        <button onclick="window.editHomework('${doc.id}')" class="action-btn action-edit">Edit</button>
+                        <button onclick="window.recallHomework('${doc.id}')" class="action-btn action-recall">Recall</button>
                         ${data.status === 'submitted' ? 
-                            `<button onclick="openGradingModal('${doc.id}')" class="action-btn action-grade">Grade</button>` : 
-                            `<button onclick="reassignHomework('${doc.id}')" class="action-btn action-reassign">Reassign</button>`
+                            `<button onclick="window.openGradingModal('${doc.id}')" class="action-btn action-grade">Grade</button>` : 
+                            `<button onclick="window.reassignHomework('${doc.id}')" class="action-btn action-reassign">Reassign</button>`
                         }
                     </div>
                 </div>
@@ -2980,7 +3015,7 @@ async function loadHomeworkView(studentId) {
         console.error("Error loading homework:", error);
         container.innerHTML = '<p class="text-red-500">Error loading homework assignments.</p>';
     }
-}
+};
 
 /**
  * Determines homework status
@@ -2998,7 +3033,7 @@ function getHomeworkStatus(hwData) {
 /**
  * Edit an existing homework assignment
  */
-async function editHomework(homeworkId) {
+window.editHomework = async function(homeworkId) {
     try {
         const docSnap = await getDoc(doc(db, "homework_assignments", homeworkId));
         if (!docSnap.exists()) {
@@ -3019,7 +3054,7 @@ async function editHomework(homeworkId) {
         document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
         
         // Show homework modal with existing data
-        showHomeworkModal(student);
+        window.showHomeworkModal(student);
         
         // Populate with existing data
         setTimeout(() => {
@@ -3042,7 +3077,7 @@ async function editHomework(homeworkId) {
         console.error("Error editing homework:", error);
         showCustomAlert("Error loading homework for editing.");
     }
-}
+};
 
 /**
  * Update homework assignment
@@ -3070,8 +3105,8 @@ async function updateHomework(homeworkId, originalData) {
         showCustomAlert('✅ Homework updated!');
         
         // Refresh view if available
-        if (typeof loadHomeworkView === 'function') {
-            loadHomeworkView(originalData.studentId);
+        if (typeof window.loadHomeworkView === 'function') {
+            window.loadHomeworkView(originalData.studentId);
         }
         
     } catch (error) {
@@ -3083,7 +3118,7 @@ async function updateHomework(homeworkId, originalData) {
 /**
  * Recall/delete homework assignment
  */
-async function recallHomework(homeworkId) {
+window.recallHomework = async function(homeworkId) {
     if (!confirm("Are you sure you want to recall this homework? This action cannot be undone.")) {
         return;
     }
@@ -3103,20 +3138,20 @@ async function recallHomework(homeworkId) {
         showCustomAlert('📤 Homework recalled successfully.');
         
         // Refresh view
-        if (typeof loadHomeworkView === 'function') {
-            loadHomeworkView(hwData.studentId);
+        if (typeof window.loadHomeworkView === 'function') {
+            window.loadHomeworkView(hwData.studentId);
         }
         
     } catch (error) {
         console.error("Error recalling homework:", error);
         showCustomAlert("❌ Error recalling homework.");
     }
-}
+};
 
 /**
  * Reassign homework (creates a copy with new due date)
  */
-async function reassignHomework(homeworkId) {
+window.reassignHomework = async function(homeworkId) {
     try {
         const docSnap = await getDoc(doc(db, "homework_assignments", homeworkId));
         if (!docSnap.exists()) return;
@@ -3154,15 +3189,15 @@ async function reassignHomework(homeworkId) {
         showCustomAlert('✅ Homework reassigned with new due date!');
         
         // Refresh view
-        if (typeof loadHomeworkView === 'function') {
-            loadHomeworkView(hwData.studentId);
+        if (typeof window.loadHomeworkView === 'function') {
+            window.loadHomeworkView(hwData.studentId);
         }
         
     } catch (error) {
         console.error("Error reassigning homework:", error);
         showCustomAlert("❌ Error reassigning homework.");
     }
-}
+};
 
 // ==========================================
 // 5. GOOGLE CLASSROOM GRADING INTERFACE
@@ -3171,7 +3206,7 @@ async function reassignHomework(homeworkId) {
 /**
  * Loads homework inbox for grading
  */
-async function loadHomeworkInbox(tutorEmail) {
+window.loadHomeworkInbox = async function(tutorEmail) {
     const container = document.getElementById('homework-inbox-container');
     if (!container) return;
     
@@ -3219,7 +3254,7 @@ async function loadHomeworkInbox(tutorEmail) {
                 new Date(data.dueDate) < new Date(data.submittedAt.seconds * 1000);
             
             html += `
-                <div class="gc-inbox-item" onclick="openGradingModal('${doc.id}')">
+                <div class="gc-inbox-item" onclick="window.openGradingModal('${doc.id}')">
                     <div class="flex items-center gap-4">
                         <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
                             ${data.studentName.charAt(0)}
@@ -3246,12 +3281,12 @@ async function loadHomeworkInbox(tutorEmail) {
         console.error("Inbox Error:", error);
         container.innerHTML = '<p class="text-red-500 text-center">Error loading inbox.</p>';
     }
-}
+};
 
 /**
  * Opens grading modal (Google Classroom style)
  */
-async function openGradingModal(homeworkId) {
+window.openGradingModal = async function(homeworkId) {
     let hwData;
     try {
         const docSnap = await getDoc(doc(db, "homework_assignments", homeworkId));
@@ -3361,7 +3396,7 @@ async function openGradingModal(homeworkId) {
             showCustomAlert(`✅ Assignment returned to ${hwData.studentName}`);
             
             // Refresh inbox
-            loadHomeworkInbox(window.tutorData.email);
+            window.loadHomeworkInbox(window.tutorData.email);
             
             // Send grade notification (optional)
             if (hwData.parentEmail) {
@@ -3375,7 +3410,7 @@ async function openGradingModal(homeworkId) {
             btn.disabled = false;
         }
     };
-}
+};
 
 /**
  * Sends grade notification to parent/student
@@ -3426,7 +3461,7 @@ const inboxObserver = new MutationObserver(() => {
         div.innerHTML = `
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-xl font-bold text-gray-800">📥 Homework Inbox</h3>
-                <button onclick="loadHomeworkInbox(window.tutorData.email)" class="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                <button onclick="window.loadHomeworkInbox(window.tutorData.email)" class="text-sm text-blue-600 hover:underline flex items-center gap-1">
                     🔄 Refresh
                 </button>
             </div>
@@ -3436,7 +3471,7 @@ const inboxObserver = new MutationObserver(() => {
         
         // Load inbox if tutor data is available
         if (window.tutorData && window.tutorData.email) {
-            setTimeout(() => loadHomeworkInbox(window.tutorData.email), 500);
+            setTimeout(() => window.loadHomeworkInbox(window.tutorData.email), 500);
         }
     }
 });
@@ -3445,31 +3480,7 @@ const inboxObserver = new MutationObserver(() => {
 inboxObserver.observe(document.body, { childList: true, subtree: true });
 
 // ==========================================
-// 7. EXPOSE FUNCTIONS TO WINDOW
-// ==========================================
-
-// Core functions
-window.showDailyTopicModal = showDailyTopicModal;
-window.showHomeworkModal = showHomeworkModal;
-window.loadHomeworkView = loadHomeworkView;
-window.loadHomeworkInbox = loadHomeworkInbox;
-window.openGradingModal = openGradingModal;
-
-// Homework management functions
-window.editHomework = editHomework;
-window.recallHomework = recallHomework;
-window.reassignHomework = reassignHomework;
-
-// Topic helper functions
-window.enableTopicEdit = enableTopicEdit;
-window.cancelTopicEdit = cancelTopicEdit;
-window.saveTopicEdit = saveTopicEdit;
-window.deleteTopic = deleteTopic;
-
-console.log("✅ Section 8: Google Classroom Replica loaded successfully");
-
-// ==========================================
-// 8. INITIALIZATION
+// 7. INITIALIZATION
 // ==========================================
 
 // Initialize when DOM is ready
@@ -3483,13 +3494,18 @@ document.addEventListener('DOMContentLoaded', function() {
     if (window.tutorData && window.tutorData.email) {
         setTimeout(() => {
             if (document.getElementById('homework-inbox-container')) {
-                loadHomeworkInbox(window.tutorData.email);
+                window.loadHomeworkInbox(window.tutorData.email);
             }
         }, 1000);
     }
     
     console.log("🎯 Google Classroom System Initialized");
 });
+
+// ==========================================
+// 8. EXPORT CHECK
+// ==========================================
+console.log("✅ Section 8: Google Classroom Replica loaded successfully");
 
 /*******************************************************************************
  * SECTION 9: MESSAGING & INBOX FEATURES (CRASH-PROOF EDITION)
@@ -6482,3 +6498,4 @@ inboxObserver.observe(document.body, { childList: true, subtree: true });
 // EXPOSE FUNCTIONS TO WINDOW (REQUIRED FOR HTML ONCLICK)
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
+
