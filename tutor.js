@@ -1319,7 +1319,7 @@ let isBypassApprovalEnabled = false;
 let showStudentFees = false;
 let showEditDeleteButtons = false;
 
-// Pay Scheme Configuration
+// Pay Scheme Configuration - FIXED: Added missing closing braces
 const PAY_SCHEMES = {
   NEW_TUTOR: {
     academic: {
@@ -1337,7 +1337,7 @@ const PAY_SCHEMES = {
         "Chess": 25000,
         "Public Speaking": 25000,
         "English Proficiency": 25000,
-        "Counseling Programs": 25000}
+        "Counseling Programs": 25000
       },
       group: {
         "Music": 25000,
