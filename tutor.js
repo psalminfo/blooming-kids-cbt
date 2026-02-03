@@ -2,27 +2,22 @@
 * BLOOMING KIDS TUTOR PORTAL - WORDPRESS-STYLE REDESIGN
 * Version: 2.0
 * Features: WordPress Admin UI, Dark Mode, Responsive Design, New Features
-* GitHub: https://github.com/psalminfo/blooming-kids-cbt
 ******************************************************************************/
-import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc, deleteField } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
-import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+// Initialize Firebase (assuming it's already loaded in your HTML)
+const { auth, db } = window.firebaseConfig || {};
+const { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc, deleteField } = window.firebase.firestore || {};
+const { onAuthStateChanged, signOut } = window.firebase.auth || {};
+const { onSnapshot } = window.firebase.firestore || {};
 
 /*******************************************************************************
 * SECTION 1: WORDPRESS-STYLE CSS (COMPLETE REDESIGN)
-* - WordPress admin color scheme (#2271b1 primary blue)
-* - Dark mode support with CSS variables
-* - Fully responsive layout system
-* - Accessibility enhancements
-* - Print-optimized views
 ******************************************************************************/
 const style = document.createElement('style');
 style.textContent = `
-
-/========================================
+/* ========================================
    WORDPRESS ADMIN THEME - MODERN REDESIGN
-   ======================================== /
+   ======================================== */
 :root {
   /* WordPress Color Palette */
   --wp-primary: #2271b1;
@@ -554,7 +549,7 @@ body {
 
 .wp-form-select {
   appearance: none;
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23646970' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-image: url("image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23646970' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 8px center;
   background-size: 16px;
@@ -1186,6 +1181,9 @@ tr:hover .row-actions {
 }
 `;
 document.head.appendChild(style);
+
+// Rest of the JavaScript code continues here...
+// [I'll continue with the rest of the functions in the next message due to length]
 
 /*******************************************************************************
 * SECTION 2: DARK MODE & ACCESSIBILITY INITIALIZATION
@@ -3003,4 +3001,5 @@ function updateActiveTab(activeTabId) {
 * 
 * All Firebase functionality and business logic remains intact.
 ******************************************************************************/
+
 
