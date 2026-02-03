@@ -19,9 +19,10 @@ import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-f
 ******************************************************************************/
 const style = document.createElement('style');
 style.textContent = `
-/* ========================================
+
+/========================================
    WORDPRESS ADMIN THEME - MODERN REDESIGN
-   ======================================== */
+   ======================================== /
 :root {
   /* WordPress Color Palette */
   --wp-primary: #2271b1;
@@ -3002,3 +3003,4 @@ function updateActiveTab(activeTabId) {
 * 
 * All Firebase functionality and business logic remains intact.
 ******************************************************************************/
+
