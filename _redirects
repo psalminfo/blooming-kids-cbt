@@ -1,29 +1,31 @@
 # ========== AUTH PAGES ==========
-/tutor-auth*       /tutor-auth.html     200
-/parent-auth*      /parent-auth.html    200
-/management-auth*  /management-auth.html 200
-/admin-auth*       /admin-auth.html     200
-/enrollment*       /enrollment.html     200
+/student-signup* /signup.html         200
+/tutor-auth* /tutor-auth.html     200
+/parent-auth* /parent-auth.html    200
+/management-auth* /management-auth.html 200
+/admin-auth* /admin-auth.html     200
+/enrollment* /enrollment.html     200
 /enrollment-portal /enrollment.html     200
 
 # ========== PORTAL PAGES ==========
-/tutor*            /tutor.html          200
-/parent*           /parent.html         200
-/management*       /management.html     200
-/admin*            /admin.html          200
+/student* /student.html        200
+/tutor* /tutor.html          200
+/parent* /parent.html         200
+/management* /management.html     200
+/admin* /admin.html          200
 
 # ========== STATIC FILES ==========
 /portal-sessions-minimal.js  /portal-sessions-minimal.js  200
 /portal-universe.js    /portal-universe.js    200
-/*.js                 /*.js                 200
-/*.css                /*.css                200
-/*.png                /*.png                200
-/*.jpg                /*.jpg                200
-/*.svg                /*.svg                200
-/*.ico                /*.ico                200
+/*.js                  /*.js                  200
+/*.css                 /*.css                 200
+/*.png                 /*.png                 200
+/*.jpg                 /*.jpg                 200
+/*.svg                 /*.svg                 200
+/*.ico                 /*.ico                 200
 
 # ========== ROOT ==========
 /                     /index.html          200
 
 # ========== CATCH-ALL ==========
-/*                    /index.html          404
+/* /index.html          404
