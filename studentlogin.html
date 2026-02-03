@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard | Intelligent LMS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { brand: { light: '#d1fae5', primary: '#059669', dark: '#064e3b', accent: '#fbbf24' } }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+    <aside class="fixed left-0 top-0 h-full w-64 bg-brand-dark text-white p-6 z-50 transition-transform transform -translate-x-full lg:translate-x-0">
+        <div class="flex items-center gap-3 mb-10">
+            <i class="fas fa-graduation-cap text-2xl text-brand-accent"></i>
+            <span class="font-bold text-lg tracking-tight">Portal v2.0</span>
+        </div>
+        
+        <nav class="space-y-4">
+            <a href="#" class="flex items-center gap-3 p-3 bg-white/10 rounded-xl text-brand-accent"><i class="fas fa-th-large"></i> Dashboard</a>
+            <a href="#" class="flex items-center gap-3 p-3 text-emerald-100 hover:bg-white/5 rounded-xl"><i class="fas fa-book"></i> My Lessons</a>
+            <a href="#" class="flex items-center gap-3 p-3 text-emerald-100 hover:bg-white/5 rounded-xl"><i class="fas fa-tasks"></i> Homework</a>
+        </nav>
+    </aside>
+
+    <main class="lg:ml-64 p-4 lg:p-8">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Welcome, <span id="student-name">...</span></h1>
+                <p class="text-gray-500">Assigned Tutor: <span id="tutor-name" class="font-semibold text-brand-primary">Loading...</span></p>
+            </div>
+            <button onclick="logout()" class="px-6 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all">Sign Out</button>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                <p class="text-gray-400 text-sm font-bold uppercase tracking-wider">Upcoming Tasks</p>
+                <h2 class="text-4xl font-bold text-gray-800 mt-2">04</h2>
+            </div>
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                <p class="text-gray-400 text-sm font-bold uppercase tracking-wider">Attendance</p>
+                <h2 class="text-4xl font-bold text-emerald-600 mt-2">98%</h2>
+            </div>
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                <p class="text-gray-400 text-sm font-bold uppercase tracking-wider">Tutor Feedback</p>
+                <h2 class="text-4xl font-bold text-brand-accent mt-2">Excellent</h2>
+            </div>
+        </div>
+
+        <div id="homework-section" class="bg-white rounded-4xl p-8 shadow-sm border border-gray-100 min-h-[400px]">
+            <h3 class="text-xl font-bold mb-6">Recent Assignments</h3>
+            <div id="homework-list" class="space-y-4">
+                <div class="animate-pulse flex space-x-4">
+                    <div class="flex-1 space-y-4 py-1">
+                        <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div class="h-4 bg-gray-200 rounded"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { auth, db } from './firebaseConfig.js';
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+        import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                document.getElementById('student-name').innerText = user.displayName || "Student";
+                
+                // CRITICAL: Fetch the assigned tutor for this specific user UID
+                const q = query(collection(db, "students"), where("studentUid", "==", user.uid));
+                const snap = await getDocs(q);
+                
+                if (!snap.empty) {
+                    const studentData = snap.docs[0].data();
+                    document.getElementById('tutor-name').innerText = studentData.assignedTutor || "Not Assigned";
+                    
+                    // Now load homework for this tutor + student
+                    loadHomework(studentData.assignedTutor, user.displayName);
+                }
+            } else {
+                window.location.href = 'signup.html';
+            }
+        });
+
+        async function loadHomework(tutorEmail, studentName) {
+            const container = document.getElementById('homework-list');
+            // Logic to pull from your homework collection based on tutorEmail
+            // Matches the inbox logic in your tutor.js
+        }
+
+        window.logout = () => signOut(auth);
+    </script>
+</body>
+</html>
