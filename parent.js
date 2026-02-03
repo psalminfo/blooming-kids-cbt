@@ -1,3 +1,5 @@
+[file name]: parent (1).js
+[file content begin]
 import { db, auth, storage } from './firebaseConfig.js';
 import { 
     collection, 
@@ -5138,209 +5140,12 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
         }
     }
 
-    // ============================================================================
-    // 4. ENHANCED SIGNUP WITH AUTO-LINKING
-    // ============================================================================
-
-    // Check for existing signup function and enhance it
-    if (typeof window.handleSignUpFull === 'function') {
-        const originalSignupFunction = window.handleSignUpFull;
-        
-        window.handleSignUpFull = async function(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader) {
-            try {
-                let fullPhoneInput = localPhone;
-                if (!localPhone.startsWith('+')) {
-                    fullPhoneInput = countryCode + localPhone;
-                }
-                
-                const normalizedResult = normalizePhoneNumber(fullPhoneInput);
-                
-                if (!normalizedResult.valid) {
-                    throw new Error(`Invalid phone number: ${normalizedResult.error}`);
-                }
-                
-                const finalPhone = normalizedResult.normalized;
-                
-                // Check if this phone/email exists as a shared contact
-                console.log("🔍 Checking for shared contact links...");
-                const linkedStudents = await findLinkedStudentsForContact(finalPhone, email);
-                
-                // Call original signup function
-                await originalSignupFunction(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader);
-                
-                // If linked students were found, update the parent profile
-                if (linkedStudents.length > 0) {
-                    const user = auth.currentUser;
-                    if (user) {
-                        await updateParentWithSharedAccess(user.uid, finalPhone, email, linkedStudents);
-                        
-                        // Show special message for shared access
-                        const studentNames = linkedStudents.map(s => s.studentName).join(', ');
-                        showMessage(`Account created! You now have access to ${studentNames} as a shared contact.`, 'success');
-                    }
-                }
-                
-            } catch (error) {
-                console.error("Enhanced signup error:", error);
-                throw error;
-            }
-        };
-    }
-
-    // Find students linked to a contact
-    async function findLinkedStudentsForContact(phone, email) {
-        const linkedStudents = [];
-        const phoneSuffix = extractPhoneSuffix(phone);
-        
-        if (!phoneSuffix && !email) return linkedStudents;
-        
-        try {
-            const studentsSnapshot = await db.collection('students').get();
-            
-            studentsSnapshot.forEach(doc => {
-                const data = doc.data();
-                const studentName = data.studentName || data.name;
-                
-                if (!studentName) return;
-                
-                // Check phone matches
-                if (phoneSuffix) {
-                    const contactFields = ['motherPhone', 'fatherPhone', 'guardianPhone', 'emergencyPhone'];
-                    
-                    for (const field of contactFields) {
-                        const fieldPhone = data[field];
-                        if (fieldPhone && extractPhoneSuffix(fieldPhone) === phoneSuffix) {
-                            linkedStudents.push({
-                                studentId: doc.id,
-                                studentName: studentName,
-                                relationship: field.replace('Phone', ''),
-                                matchedBy: 'phone'
-                            });
-                            break;
-                        }
-                    }
-                }
-                
-                // Check email matches
-                if (email && data.guardianEmail === email) {
-                    linkedStudents.push({
-                        studentId: doc.id,
-                        studentName: studentName,
-                        relationship: 'guardian',
-                        matchedBy: 'email'
-                    });
-                }
-            });
-            
-            console.log(`✅ Found ${linkedStudents.length} linked students for contact`);
-            
-        } catch (error) {
-            console.error("Error finding linked students:", error);
-        }
-        
-        return linkedStudents;
-    }
-
-    // Update parent profile with shared access info
-    async function updateParentWithSharedAccess(parentUid, phone, email, linkedStudents) {
-        try {
-            const updateData = {
-                isSharedContact: true,
-                linkedStudents: linkedStudents.map(student => ({
-                    studentId: student.studentId,
-                    studentName: student.studentName,
-                    relationship: student.relationship,
-                    linkedAt: firebase.firestore.FieldValue.serverTimestamp()
-                })),
-                sharedContactInfo: {
-                    phone: phone,
-                    email: email,
-                    linkedAt: firebase.firestore.FieldValue.serverTimestamp()
-                }
-            };
-            
-            await db.collection('parent_users').doc(parentUid).update(updateData);
-            console.log("✅ Updated parent profile with shared access");
-            
-            // Also update student records with parent info
-            for (const student of linkedStudents) {
-                try {
-                    await db.collection('students').doc(student.studentId).update({
-                        sharedParents: firebase.firestore.FieldValue.arrayUnion({
-                            parentUid: parentUid,
-                            parentEmail: email,
-                            parentPhone: phone,
-                            relationship: student.relationship,
-                            linkedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        })
-                    });
-                } catch (error) {
-                    console.warn(`Could not update student ${student.studentName}:`, error.message);
-                }
-            }
-            
-        } catch (error) {
-            console.error("Error updating parent with shared access:", error);
-        }
-    }
-
-    // ============================================================================
-    // 5. UTILITY FUNCTIONS
-    // ============================================================================
-
-    // Function to check if a phone/email is a shared contact
-    window.isSharedContact = async function(phone, email) {
-        const phoneSuffix = extractPhoneSuffix(phone);
-        let isShared = false;
-        let linkedStudents = [];
-        
-        try {
-            const studentsSnapshot = await db.collection('students').get();
-            
-            studentsSnapshot.forEach(doc => {
-                const data = doc.data();
-                
-                // Check phone
-                if (phoneSuffix) {
-                    const contactFields = ['motherPhone', 'fatherPhone', 'guardianPhone'];
-                    for (const field of contactFields) {
-                        const fieldPhone = data[field];
-                        if (fieldPhone && extractPhoneSuffix(fieldPhone) === phoneSuffix) {
-                            isShared = true;
-                            linkedStudents.push({
-                                studentId: doc.id,
-                                studentName: data.studentName || data.name,
-                                relationship: field.replace('Phone', '')
-                            });
-                        }
-                    }
-                }
-                
-                // Check email
-                if (email && data.guardianEmail === email) {
-                    isShared = true;
-                    linkedStudents.push({
-                        studentId: doc.id,
-                        studentName: data.studentName || data.name,
-                        relationship: 'guardian'
-                    });
-                }
-            });
-            
-        } catch (error) {
-            console.error("Error checking shared contact:", error);
-        }
-        
-        return { isShared, linkedStudents };
-    };
-
     console.log("✅ SHARED PARENT ACCESS SYSTEM SUCCESSFULLY INSTALLED");
     console.log("=====================================================");
     console.log("Parents can now:");
     console.log("1. Add mother/father phones in Settings");
     console.log("2. Those contacts can register and see same reports");
-    console.log("3. Automatic linking during signup");
-    console.log("4. Shared access tracking");
+    console.log("3. Shared access tracking");
     console.log("=====================================================");
     
 } else {
@@ -5532,3 +5337,4 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
 // ============================================================================
 // END OF PARENT.JS - PRODUCTION READY
 // ============================================================================
+[file content end]
