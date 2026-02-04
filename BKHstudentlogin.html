@@ -70,7 +70,8 @@
     </main>
 
     <script type="module">
-        import { auth, db } from './firebaseConfig.js';
+        // Import modular Firebase config (smart environment switching)
+        import { auth, db } from './firebaseConfig-studentsignupmodular.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
         import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -88,12 +89,14 @@
         // Initialize logout button
         document.getElementById('logout-btn').addEventListener('click', window.logout);
 
+        // Monitor auth state
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 try {
+                    // Set student name
                     document.getElementById('student-name').innerText = user.displayName || "Student";
                     
-                    // Fetch the assigned tutor for this specific user UID
+                    // Fetch assigned tutor for this specific user UID
                     const q = query(collection(db, "students"), where("studentUid", "==", user.uid));
                     const snap = await getDocs(q);
                     
@@ -106,16 +109,20 @@
                     } else {
                         console.log("No student data found");
                         document.getElementById('tutor-name').innerText = "Not Assigned";
+                        document.getElementById('homework-list').innerHTML = '<p class="text-gray-500">No student profile found.</p>';
                     }
                 } catch (error) {
                     console.error('Error loading user data:', error);
                     document.getElementById('tutor-name').innerText = "Error loading data";
+                    document.getElementById('homework-list').innerHTML = '<p class="text-red-500">Error loading profile data.</p>';
                 }
             } else {
+                // No user signed in, redirect to signup
                 window.location.href = 'studentsignup.html';
             }
         });
 
+        // Load homework assignments
         async function loadHomework(tutorEmail, studentName) {
             const container = document.getElementById('homework-list');
             
@@ -123,7 +130,7 @@
                 // Clear loading animation
                 container.innerHTML = '';
                 
-                if (!tutorEmail) {
+                if (!tutorEmail || tutorEmail === "Not Assigned") {
                     container.innerHTML = '<p class="text-gray-500">No tutor assigned yet.</p>';
                     return;
                 }
