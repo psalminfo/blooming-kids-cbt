@@ -5,8 +5,20 @@
 // Import Firebase configuration from external file
 // Make sure to load firebaseParentConfig.js BEFORE this file in your HTML
 
-const db = window.firebaseDb || firebase.firestore();
-const auth = window.firebaseAuth || firebase.auth();
+// Safely initialize Firebase if not already initialized
+if (!window.firebaseInitialized) {
+    if (!window.firebaseDb) {
+        window.firebaseDb = firebase.firestore();
+    }
+    if (!window.firebaseAuth) {
+        window.firebaseAuth = firebase.auth();
+    }
+    window.firebaseInitialized = true;
+}
+
+// Use the global instances
+const db = window.firebaseDb;
+const auth = window.firebaseAuth;
 
 // Use global error handler if available
 const handleFirebaseError = window.firebaseHandleError || ((error) => {
