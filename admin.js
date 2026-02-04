@@ -2791,3 +2791,97 @@ if (typeof window.saveAs === 'undefined') {
         document.body.removeChild(link);
     };
 }
+
+// ========================================================
+// DOCUMENT INITIALIZATION SCRIPT (Safe to add anywhere)
+// ========================================================
+
+// This ensures global_settings document exists for all branches
+// Runs once when admin panel loads, safe to add to any branch
+async function initializeGlobalSettings() {
+    try {
+        const settingsDocRef = doc(db, "settings", "global_settings");
+        const docSnap = await getDoc(settingsDocRef);
+        
+        if (!docSnap.exists()) {
+            // Document doesn't exist - create it with default values
+            await setDoc(settingsDocRef, {
+                isReportEnabled: true,          // Default: reports enabled
+                isTutorAddEnabled: true,        // Default: tutors can add students
+                isSummerBreakEnabled: false,    // Default: summer break disabled
+                showStudentFees: true,          // Default: show fees
+                showEditDeleteButtons: true,    // Default: show edit/delete
+                bypassPendingApproval: false,   // Default: require approval
+                showTransitionButton: true,     // Default: show transition button
+                preschoolAddTransition: true,   // Default: allow preschool add/transition
+                lastUpdated: Timestamp.now(),   // Track when created/updated
+                createdAt: Timestamp.now()      // Track creation time
+            });
+            
+            console.log("✅ Created global_settings document with default values");
+            
+            // Also patch any existing toggle event listeners to use setDoc instead of updateDoc
+            patchToggleListeners();
+        } else {
+            console.log("✅ global_settings document already exists");
+        }
+    } catch (error) {
+        console.error("⚠️ Error initializing global_settings:", error);
+    }
+}
+
+// Safely patch toggle event listeners to use setDoc instead of updateDoc
+// This prevents the "No document to update" error
+function patchToggleListeners() {
+    // Wait a moment for DOM to be ready
+    setTimeout(() => {
+        const settingsDocRef = doc(db, "settings", "global_settings");
+        
+        // Helper function to patch a single toggle
+        const patchToggle = (toggleId, fieldName) => {
+            const toggle = document.getElementById(toggleId);
+            if (toggle) {
+                // Remove existing listeners (if any)
+                const newToggle = toggle.cloneNode(true);
+                toggle.parentNode.replaceChild(newToggle, toggle);
+                
+                // Add new listener with setDoc (merge: true)
+                newToggle.addEventListener('change', e => {
+                    setDoc(settingsDocRef, { [fieldName]: e.target.checked }, { merge: true })
+                        .catch(error => console.error(`Error updating ${fieldName}:`, error));
+                });
+            }
+        };
+        
+        // Patch all toggle switches
+        patchToggle('report-toggle', 'isReportEnabled');
+        patchToggle('tutor-add-toggle', 'isTutorAddEnabled');
+        patchToggle('summer-break-toggle', 'isSummerBreakEnabled');
+        patchToggle('show-fees-toggle', 'showStudentFees');
+        patchToggle('edit-delete-toggle', 'showEditDeleteButtons');
+        patchToggle('bypass-approval-toggle', 'bypassPendingApproval');
+        patchToggle('show-transition-toggle', 'showTransitionButton');
+        patchToggle('preschool-add-toggle', 'preschoolAddTransition');
+        
+        console.log("✅ Toggle listeners patched to use setDoc with merge");
+    }, 1000); // Wait 1 second for DOM
+}
+
+// Run initialization when auth state changes (safest place)
+onAuthStateChanged(auth, async (user) => {
+    if (user && user.email === ADMIN_EMAIL) {
+        // Initialize global_settings for any branch
+        await initializeGlobalSettings();
+    }
+});
+
+// Also run initialization on page load as backup
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeGlobalSettings);
+} else {
+    initializeGlobalSettings();
+}
+
+// ========================================================
+// END OF SAFE INITIALIZATION SCRIPT
+// ========================================================
