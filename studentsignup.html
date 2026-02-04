@@ -3,15 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Activate Student Account | Intelligent LMS</title>
+    <title>Activate/Login Student Account | Intelligent LMS</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js"></script>
-    
     <script>
         tailwind.config = {
             theme: {
@@ -23,27 +17,6 @@
                 }
             }
         }
-
-        // Firebase Configuration (Replace with your actual config)
-        const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_AUTH_DOMAIN",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        };
-
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-
-        // Initialize Google Auth Provider
-        const googleProvider = new firebase.auth.GoogleAuthProvider();
-        googleProvider.setCustomParameters({
-            prompt: 'select_account'
-        });
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
@@ -51,8 +24,24 @@
         .hero-gradient { background: linear-gradient(135deg, #064e3b 0%, #059669 100%); }
         .hidden-step { display: none; }
         .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); }
-        .animate-in { animation: fadeIn 0.5s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .google-btn {
+            background: white;
+            color: #757575;
+            border: 1px solid #ddd;
+            transition: all 0.3s;
+        }
+        .google-btn:hover {
+            background: #f8f8f8;
+            border-color: #ccc;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .tab-btn {
+            transition: all 0.3s;
+        }
+        .tab-btn.active {
+            background: #059669;
+            color: white;
+        }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen flex items-center justify-center p-4">
@@ -62,193 +51,188 @@
             <div class="space-y-6">
                 <div class="bg-white/20 p-4 rounded-2xl w-fit"><i class="fas fa-rocket text-3xl text-accent"></i></div>
                 <h2 class="text-4xl font-extrabold leading-tight">Your Learning <br><span class="text-accent">Starts Here.</span></h2>
-                <p class="text-emerald-100/80">Activate your student profile to access assignments, track progress, and chat with your tutor.</p>
+                <p class="text-emerald-100/80">Activate your student profile or login to access assignments, track progress, and chat with your tutor.</p>
             </div>
             <div class="text-xs opacity-60">Powered by Blue Ocean Concepts</div>
         </div>
 
         <div class="w-full lg:w-3/5 p-8 lg:p-16 flex flex-col justify-center">
             
-            <div id="step-1" class="space-y-6 animate-in">
-                <div class="mb-8">
-                    <h3 class="text-3xl font-bold text-gray-900">Verify Parent</h3>
-                    <p class="text-gray-500">Enter the email used during registration.</p>
+            <!-- Tabs for Activation vs Login -->
+            <div class="flex mb-8 bg-gray-100 p-1 rounded-2xl w-fit mx-auto">
+                <button id="tab-activate" class="tab-btn active px-6 py-3 rounded-2xl font-semibold" onclick="switchTab('activate')">Activate Account</button>
+                <button id="tab-login" class="tab-btn px-6 py-3 rounded-2xl font-semibold text-gray-600" onclick="switchTab('login')">Login</button>
+            </div>
+
+            <!-- Activation Flow (Original) -->
+            <div id="activation-flow" class="space-y-6">
+                <!-- Step 1: Parent Verification -->
+                <div id="step-1" class="space-y-6 animate-in fade-in duration-500">
+                    <div class="mb-8">
+                        <h3 class="text-3xl font-bold text-gray-900">Verify Parent</h3>
+                        <p class="text-gray-500">Enter the email used during registration.</p>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Parent's Registered Email</label>
+                        <input type="email" id="parent-email" placeholder="e.g. mom@email.com" 
+                            class="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none focus:ring-4 focus:ring-emerald-50 transition-all">
+                    </div>
+                    <button onclick="findStudents()" class="w-full bg-brand-primary text-white font-bold py-5 rounded-2xl shadow-xl hover:-translate-y-1 active:scale-95 transition-all">
+                        Find My Profile
+                    </button>
+                    
+                    <!-- Divider with Google Sign-in option -->
+                    <div class="relative py-4">
+                        <div class="absolute inset-0 flex items-center">
+                            <div class="w-full border-t border-gray-200"></div>
+                        </div>
+                        <div class="relative flex justify-center text-sm">
+                            <span class="px-4 bg-white text-gray-500">Or activate with</span>
+                        </div>
+                    </div>
+                    
+                    <button onclick="signInWithGoogleForActivation()" class="w-full google-btn font-semibold py-4 rounded-2xl flex items-center justify-center gap-3">
+                        <img src="https://www.google.com/favicon.ico" alt="Google" class="w-5 h-5">
+                        Google Account
+                    </button>
                 </div>
-                <div class="space-y-2">
-                    <label class="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Parent's Registered Email</label>
-                    <input type="email" id="parent-email" placeholder="e.g. mom@email.com" 
-                        class="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none focus:ring-4 focus:ring-emerald-50 transition-all">
-                </div>
-                <button onclick="findStudents()" id="find-btn" class="w-full bg-brand-primary text-white font-bold py-5 rounded-2xl shadow-xl hover:-translate-y-1 active:scale-95 transition-all flex items-center justify-center gap-2">
-                    <span id="find-text">Find My Profile</span>
-                    <i id="find-spinner" class="fas fa-spinner fa-spin hidden"></i>
-                </button>
-                <div class="text-center text-gray-500 text-sm">
-                    Already activated? 
-                    <a href="BKHstudentlogin.html" class="text-brand-primary font-semibold hover:underline">Log in here</a>
+
+                <!-- Step 2: Claim Profile -->
+                <div id="step-2" class="hidden-step space-y-6 animate-in slide-in-from-right duration-500">
+                    <div class="mb-8">
+                        <h3 class="text-3xl font-bold text-gray-900">Claim Profile</h3>
+                        <p class="text-gray-500">Select your name and set your login details.</p>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Who are you?</label>
+                            <select id="student-select" class="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none cursor-pointer"></select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Login Email (Student)</label>
+                            <input type="email" id="student-email-input" placeholder="Your own email" 
+                                class="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none">
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Create Password</label>
+                            <input type="password" id="student-pass" placeholder="Minimum 6 characters" 
+                                class="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none">
+                        </div>
+                    </div>
+
+                    <button onclick="completeRegistration()" class="w-full bg-brand-accent text-emerald-900 font-bold py-5 rounded-2xl shadow-xl hover:-translate-y-1 active:scale-95 transition-all">
+                        Activate My Portal
+                    </button>
+                    
+                    <p class="text-center text-sm text-gray-500 mt-4">
+        Already activated? <a href="javascript:void(0)" onclick="switchTab('login')" class="text-brand-primary font-semibold hover:underline">Switch to Login</a>
+    </p>
                 </div>
             </div>
 
-            <div id="step-2" class="hidden-step space-y-6 animate-in">
+            <!-- Login Flow -->
+            <div id="login-flow" class="hidden-step space-y-6">
                 <div class="mb-8">
-                    <h3 class="text-3xl font-bold text-gray-900">Claim Profile</h3>
-                    <p class="text-gray-500">Select your name and set your login details.</p>
+                    <h3 class="text-3xl font-bold text-gray-900">Student Login</h3>
+                    <p class="text-gray-500">Enter your student credentials to access your portal.</p>
                 </div>
                 
                 <div class="space-y-4">
                     <div class="space-y-2">
-                        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Who are you?</label>
-                        <select id="student-select" class="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none cursor-pointer focus:ring-4 focus:ring-emerald-50"></select>
+                        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Student Email</label>
+                        <input type="email" id="login-email" placeholder="Your student email" 
+                            class="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none focus:ring-4 focus:ring-emerald-50 transition-all">
                     </div>
 
                     <div class="space-y-2">
-                        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Login Email (Student)</label>
-                        <input type="email" id="student-email-input" placeholder="Your own email" 
-                            class="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none focus:ring-4 focus:ring-emerald-50">
-                    </div>
-
-                    <div class="space-y-2">
-                        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Create Password</label>
-                        <div class="relative">
-                            <input type="password" id="student-pass" placeholder="Minimum 8 characters with uppercase, lowercase & number" 
-                                class="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none focus:ring-4 focus:ring-emerald-50 pr-12">
-                            <button type="button" onclick="togglePassword('student-pass', 'pass-toggle')" id="pass-toggle" class="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        </div>
-                        <p class="text-xs text-gray-500 ml-1 mt-1">Password must be at least 8 characters with uppercase, lowercase, and a number</p>
+                        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Password</label>
+                        <input type="password" id="login-password" placeholder="Enter your password" 
+                            class="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none focus:ring-4 focus:ring-emerald-50 transition-all">
                     </div>
                 </div>
 
-                <button onclick="completeRegistration()" id="activate-btn" class="w-full bg-brand-accent text-emerald-900 font-bold py-5 rounded-2xl shadow-xl hover:-translate-y-1 active:scale-95 transition-all flex items-center justify-center gap-2">
-                    <span id="activate-text">Activate My Portal</span>
-                    <i id="activate-spinner" class="fas fa-spinner fa-spin hidden"></i>
+                <button onclick="loginStudent()" class="w-full bg-brand-primary text-white font-bold py-5 rounded-2xl shadow-xl hover:-translate-y-1 active:scale-95 transition-all">
+                    Login to Portal
                 </button>
-
-                <div class="relative my-4">
-                    <div class="absolute inset-0 flex items-center">
-                        <div class="w-full border-t border-gray-200"></div>
-                    </div>
-                    <div class="relative flex justify-center text-sm">
-                        <span class="px-4 bg-white text-gray-500">Or activate with</span>
-                    </div>
-                </div>
-
-                <button onclick="activateWithGoogle()" id="google-btn" class="w-full border-2 border-gray-200 text-gray-700 font-bold py-4 rounded-2xl hover:bg-gray-50 transition-all flex items-center justify-center gap-3">
-                    <i class="fab fa-google text-red-500"></i>
-                    <span id="google-text">Activate with Google</span>
-                    <i id="google-spinner" class="fas fa-spinner fa-spin hidden"></i>
+                
+                <button onclick="signInWithGoogle()" class="w-full google-btn font-semibold py-4 rounded-2xl flex items-center justify-center gap-3">
+                    <img src="https://www.google.com/favicon.ico" alt="Google" class="w-5 h-5">
+                    Continue with Google
                 </button>
-            </div>
-
-            <div id="success-message" class="hidden-step text-center space-y-6 animate-in">
-                <div class="text-emerald-500 text-6xl mb-4">
-                    <i class="fas fa-check-circle"></i>
-                </div>
-                <h3 class="text-3xl font-bold text-gray-900">Account Activated!</h3>
-                <p class="text-gray-600">Your student portal has been successfully activated. You can now log in with your credentials.</p>
-                <a href="BKHstudentlogin.html" class="inline-block w-full bg-brand-primary text-white font-bold py-5 rounded-2xl shadow-xl hover:-translate-y-1 active:scale-95 transition-all">
-                    Go to Login
-                </a>
+                
+                <p class="text-center text-sm text-gray-500 mt-4">
+                    Haven't activated your account? <a href="javascript:void(0)" onclick="switchTab('activate')" class="text-brand-primary font-semibold hover:underline">Switch to Activation</a>
+                </p>
             </div>
         </div>
     </div>
 
-    <script>
-        // Password toggle function
-        function togglePassword(inputId, toggleId) {
-            const input = document.getElementById(inputId);
-            const toggle = document.getElementById(toggleId);
-            const icon = toggle.querySelector('i');
+    <script type="module">
+        // IMPORTANT: Changed to use the new modular Firebase config file
+        import { auth, db } from './firebaseConfig-studentsignupmodular.js';
+        import { collection, query, where, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+        import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+
+        // Tab switching
+        window.switchTab = (tab) => {
+            const activateTab = document.getElementById('tab-activate');
+            const loginTab = document.getElementById('tab-login');
+            const activationFlow = document.getElementById('activation-flow');
+            const loginFlow = document.getElementById('login-flow');
             
-            if (input.type === 'password') {
-                input.type = 'text';
-                icon.classList.remove('fa-eye');
-                icon.classList.add('fa-eye-slash');
+            if (tab === 'activate') {
+                activateTab.classList.add('active');
+                activateTab.classList.remove('text-gray-600');
+                loginTab.classList.remove('active');
+                loginTab.classList.add('text-gray-600');
+                activationFlow.classList.remove('hidden-step');
+                loginFlow.classList.add('hidden-step');
+                // Reset to step 1
+                document.getElementById('step-1').classList.remove('hidden-step');
+                document.getElementById('step-2').classList.add('hidden-step');
             } else {
-                input.type = 'password';
-                icon.classList.remove('fa-eye-slash');
-                icon.classList.add('fa-eye');
+                loginTab.classList.add('active');
+                loginTab.classList.remove('text-gray-600');
+                activateTab.classList.remove('active');
+                activateTab.classList.add('text-gray-600');
+                loginFlow.classList.remove('hidden-step');
+                activationFlow.classList.add('hidden-step');
             }
-        }
+        };
 
-        // Password validation function
-        function validatePassword(password) {
-            const minLength = 8;
-            const hasUpperCase = /[A-Z]/.test(password);
-            const hasLowerCase = /[a-z]/.test(password);
-            const hasNumbers = /\d/.test(password);
-            
-            return password.length >= minLength && hasUpperCase && hasLowerCase && hasNumbers;
-        }
-
-        // Email validation function
-        function validateEmail(email) {
-            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            return re.test(email);
-        }
-
-        // Show loading state
-        function setLoading(buttonId, isLoading) {
-            const btn = document.getElementById(buttonId);
-            const spinner = document.getElementById(buttonId + '-spinner');
-            const text = document.getElementById(buttonId + '-text');
-            
-            if (isLoading) {
-                spinner.classList.remove('hidden');
-                text.classList.add('opacity-50');
-                btn.disabled = true;
-            } else {
-                spinner.classList.add('hidden');
-                text.classList.remove('opacity-50');
-                btn.disabled = false;
-            }
-        }
-
+        // Original activation functions
         window.findStudents = async () => {
             const email = document.getElementById('parent-email').value.trim();
-            
-            if(!email) {
-                alert("Please enter the parent email.");
-                return;
-            }
-            
-            if(!validateEmail(email)) {
-                alert("Please enter a valid email address.");
-                return;
-            }
+            if(!email) return alert("Please enter the parent email.");
 
-            setLoading('find-btn', true);
-            
-            try {
-                const q = firebase.firestore().collection("students").where("parentEmail", "==", email).where("status", "!=", "active");
-                const querySnapshot = await q.get();
+            const q = query(collection(db, "students"), where("parentEmail", "==", email));
+            const querySnapshot = await getDocs(q);
 
-                if (!querySnapshot.empty) {
-                    const select = document.getElementById('student-select');
-                    select.innerHTML = '<option value="">Select your name</option>';
-                    
-                    querySnapshot.forEach(doc => {
-                        const data = doc.data();
-                        if (!data.studentUid) { // Only show unactivated accounts
-                            const opt = document.createElement('option');
-                            opt.value = doc.id;
-                            opt.textContent = data.studentName;
-                            opt.dataset.studentName = data.studentName;
-                            select.appendChild(opt);
-                        }
-                    });
-                    
+            if (!querySnapshot.empty) {
+                const select = document.getElementById('student-select');
+                select.innerHTML = '';
+                querySnapshot.forEach(doc => {
+                    const data = doc.data();
+                    // Only show students who haven't been activated yet
+                    if (!data.studentUid || data.status !== 'active') {
+                        const opt = document.createElement('option');
+                        opt.value = doc.id;
+                        opt.textContent = data.studentName;
+                        select.appendChild(opt);
+                    }
+                });
+                
+                if (select.options.length > 0) {
                     document.getElementById('step-1').classList.add('hidden-step');
                     document.getElementById('step-2').classList.remove('hidden-step');
                 } else {
-                    alert("No inactive student records found for this email. Please check the email or contact support if you believe this is an error.");
+                    alert("All students under this email are already activated. Please login instead.");
                 }
-            } catch (error) {
-                console.error("Error finding students:", error);
-                alert("An error occurred. Please try again.");
-            } finally {
-                setLoading('find-btn', false);
+            } else {
+                alert("No records found.");
             }
         };
 
@@ -256,189 +240,168 @@
             const docId = document.getElementById('student-select').value;
             const email = document.getElementById('student-email-input').value.trim();
             const pass = document.getElementById('student-pass').value;
-            const studentName = document.getElementById('student-select').options[document.getElementById('student-select').selectedIndex]?.dataset.studentName;
 
-            if(!docId) {
-                alert("Please select your name from the list.");
-                return;
-            }
-            
-            if(!email || !validateEmail(email)) {
-                alert("Please enter a valid email address.");
-                return;
-            }
-            
-            if(!validatePassword(pass)) {
-                alert("Password must be at least 8 characters long and contain uppercase, lowercase letters, and a number.");
-                return;
-            }
-            
-            if(!studentName) {
-                alert("Student name not found. Please refresh and try again.");
-                return;
-            }
-
-            setLoading('activate-btn', true);
+            if(!email || pass.length < 6) return alert("Valid email and 6-char password required.");
 
             try {
-                // Check if email already exists in Firebase Auth
-                try {
-                    const signInMethods = await firebase.auth().fetchSignInMethodsForEmail(email);
-                    if (signInMethods.length > 0) {
-                        alert("This email is already registered. Please use a different email or log in instead.");
-                        setLoading('activate-btn', false);
-                        return;
-                    }
-                } catch (error) {
-                    console.log("Email check completed");
+                // Check if email already exists
+                const emailCheck = query(collection(db, "students"), where("studentEmail", "==", email));
+                const emailSnapshot = await getDocs(emailCheck);
+                
+                if (!emailSnapshot.empty) {
+                    return alert("This email is already registered. Please use a different email or login.");
                 }
 
-                // Create user in Firebase Auth
-                const userCred = await firebase.auth().createUserWithEmailAndPassword(email, pass);
+                const userCred = await createUserWithEmailAndPassword(auth, email, pass);
+                const studentName = document.getElementById('student-select').options[document.getElementById('student-select').selectedIndex].text;
                 
-                // Update user profile with student name
-                await userCred.user.updateProfile({
-                    displayName: studentName
-                });
-
                 // Link Firebase Auth to the specific Firestore Doc
-                await firebase.firestore().collection("students").doc(docId).update({
+                await updateDoc(doc(db, "students", docId), {
                     studentUid: userCred.user.uid,
                     studentEmail: email,
                     status: 'active',
-                    activatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    authMethod: 'email'
+                    activatedAt: new Date().toISOString()
                 });
 
-                // Show success message
-                document.getElementById('step-2').classList.add('hidden-step');
-                document.getElementById('success-message').classList.remove('hidden-step');
-                
-            } catch (error) {
-                console.error("Registration error:", error);
-                
-                // User-friendly error messages
-                switch(error.code) {
-                    case 'auth/email-already-in-use':
-                        alert("This email is already registered. Please use a different email or log in instead.");
-                        break;
-                    case 'auth/weak-password':
-                        alert("Password is too weak. Please use a stronger password.");
-                        break;
-                    case 'auth/invalid-email':
-                        alert("Invalid email address. Please check and try again.");
-                        break;
-                    case 'auth/operation-not-allowed':
-                        alert("Email/password sign-up is not enabled. Please contact support.");
-                        break;
-                    case 'auth/network-request-failed':
-                        alert("Network error. Please check your connection and try again.");
-                        break;
-                    default:
-                        alert("An error occurred: " + error.message);
-                }
-            } finally {
-                setLoading('activate-btn', false);
+                await updateProfile(userCred.user, { displayName: studentName });
+                window.location.href = 'BKHstudentlogin.html';
+            } catch (e) { 
+                alert(e.message); 
             }
         };
 
-        window.activateWithGoogle = async () => {
-            const docId = document.getElementById('student-select').value;
-            const studentName = document.getElementById('student-select').options[document.getElementById('student-select').selectedIndex]?.dataset.studentName;
+        // Login function
+        window.loginStudent = async () => {
+            const email = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value;
 
-            if(!docId) {
-                alert("Please select your name from the list.");
-                return;
-            }
-            
-            if(!studentName) {
-                alert("Student name not found. Please refresh and try again.");
-                return;
-            }
-
-            setLoading('google-btn', true);
+            if (!email || !password) return alert("Please enter both email and password.");
 
             try {
-                // Sign in with Google
-                const result = await firebase.auth().signInWithPopup(googleProvider);
-                const user = result.user;
+                const userCred = await signInWithEmailAndPassword(auth, email, password);
                 
-                // Check if this Google account is already linked to a student
-                const existingUserQuery = await firebase.firestore().collection("students")
-                    .where("studentUid", "==", user.uid)
-                    .get();
-                
-                if (!existingUserQuery.empty) {
-                    // User already exists, redirect to login
-                    alert("This Google account is already linked to a student account. Please log in instead.");
+                // Verify the user exists in students collection
+                const q = query(collection(db, "students"), where("studentUid", "==", userCred.user.uid));
+                const querySnapshot = await getDocs(q);
+
+                if (!querySnapshot.empty) {
                     window.location.href = 'BKHstudentlogin.html';
-                    return;
+                } else {
+                    alert("Student account not found. Please contact support.");
+                    auth.signOut();
                 }
-
-                // Link Google account to the specific Firestore Doc
-                await firebase.firestore().collection("students").doc(docId).update({
-                    studentUid: user.uid,
-                    studentEmail: user.email,
-                    status: 'active',
-                    activatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    authMethod: 'google',
-                    photoURL: user.photoURL || null
-                });
-
-                // Update display name if not set
-                if (!user.displayName) {
-                    await user.updateProfile({
-                        displayName: studentName
-                    });
+            } catch (e) {
+                if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password') {
+                    alert("Invalid email or password. Please try again.");
+                } else if (e.code === 'auth/user-disabled') {
+                    alert("Account disabled. Please contact support.");
+                } else {
+                    alert("Login failed: " + e.message);
                 }
-
-                // Show success message
-                document.getElementById('step-2').classList.add('hidden-step');
-                document.getElementById('success-message').classList.remove('hidden-step');
-                
-            } catch (error) {
-                console.error("Google sign-in error:", error);
-                
-                // Handle specific Google sign-in errors
-                switch(error.code) {
-                    case 'auth/popup-blocked':
-                        alert("Popup was blocked by your browser. Please allow popups and try again.");
-                        break;
-                    case 'auth/popup-closed-by-user':
-                        // User closed the popup, no action needed
-                        break;
-                    case 'auth/cancelled-popup-request':
-                        // Multiple popups opened, no action needed
-                        break;
-                    case 'auth/account-exists-with-different-credential':
-                        alert("An account already exists with the same email but different sign-in method. Please use email/password login instead.");
-                        break;
-                    default:
-                        alert("An error occurred during Google sign-in: " + error.message);
-                }
-            } finally {
-                setLoading('google-btn', false);
             }
         };
 
-        // Check if user is already logged in (optional redirect)
-        firebase.auth().onAuthStateChanged((user) => {
-            if (user) {
-                console.log("User already logged in:", user.email);
-                // Optional: Redirect to dashboard if already logged in
-                // window.location.href = 'student-dashboard.html';
-            }
-        });
+        // Google Sign-in functions
+        window.signInWithGoogle = async () => {
+            const provider = new GoogleAuthProvider();
+            provider.addScope('email');
+            provider.addScope('profile');
 
-        // Auto-fill student email when name is selected
-        document.getElementById('student-select').addEventListener('change', function() {
-            const studentName = this.options[this.selectedIndex]?.dataset.studentName;
-            if (studentName) {
-                // Suggest an email based on student name (optional)
-                const suggestedEmail = studentName.toLowerCase().replace(/\s+/g, '.') + '@example.com';
-                document.getElementById('student-email-input').placeholder = suggestedEmail;
+            try {
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user;
+                
+                // Check if this Google user is in our students collection
+                const q = query(collection(db, "students"), where("studentUid", "==", user.uid));
+                const querySnapshot = await getDocs(q);
+
+                if (!querySnapshot.empty) {
+                    window.location.href = 'BKHstudentlogin.html';
+                } else {
+                    // Check if they have a matching email in students collection
+                    const emailQ = query(collection(db, "students"), where("studentEmail", "==", user.email));
+                    const emailSnapshot = await getDocs(emailQ);
+                    
+                    if (!emailSnapshot.empty) {
+                        // Link the Google account to existing student record
+                        const docId = emailSnapshot.docs[0].id;
+                        await updateDoc(doc(db, "students", docId), {
+                            studentUid: user.uid
+                        });
+                        window.location.href = 'BKHstudentlogin.html';
+                    } else {
+                        alert("No student account found for this Google account. Please activate your account first.");
+                        auth.signOut();
+                    }
+                }
+            } catch (e) {
+                console.error("Google sign-in error:", e);
+                alert("Google sign-in failed: " + e.message);
             }
-        });
+        };
+
+        window.signInWithGoogleForActivation = async () => {
+            const provider = new GoogleAuthProvider();
+            provider.addScope('email');
+            provider.addScope('profile');
+
+            try {
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user;
+                
+                // Check if this Google user already has a student account
+                const q = query(collection(db, "students"), where("studentUid", "==", user.uid));
+                const querySnapshot = await getDocs(q);
+
+                if (!querySnapshot.empty) {
+                    alert("You already have an activated account. Please login instead.");
+                    switchTab('login');
+                    auth.signOut();
+                } else {
+                    // Proceed to step 2 for profile selection
+                    // We need the parent email first, so we'll ask for it
+                    const parentEmail = prompt("Please enter the parent email associated with your registration:");
+                    if (!parentEmail) {
+                        auth.signOut();
+                        return;
+                    }
+                    
+                    // Find students under this parent email
+                    const parentQ = query(collection(db, "students"), where("parentEmail", "==", parentEmail.trim()));
+                    const parentSnapshot = await getDocs(parentQ);
+                    
+                    if (!parentSnapshot.empty) {
+                        const select = document.getElementById('student-select');
+                        select.innerHTML = '';
+                        parentSnapshot.forEach(doc => {
+                            const data = doc.data();
+                            if (!data.studentUid || data.status !== 'active') {
+                                const opt = document.createElement('option');
+                                opt.value = doc.id;
+                                opt.textContent = data.studentName;
+                                select.appendChild(opt);
+                            }
+                        });
+                        
+                        if (select.options.length > 0) {
+                            // Auto-fill the email with Google email
+                            document.getElementById('student-email-input').value = user.email;
+                            document.getElementById('step-1').classList.add('hidden-step');
+                            document.getElementById('step-2').classList.remove('hidden-step');
+                        } else {
+                            alert("All students under this email are already activated. Please login instead.");
+                            auth.signOut();
+                        }
+                    } else {
+                        alert("No records found for this parent email.");
+                        auth.signOut();
+                    }
+                }
+            } catch (e) {
+                console.error("Google sign-in error:", e);
+                alert("Google sign-in failed: " + e.message);
+            }
+        };
     </script>
 </body>
 </html>
