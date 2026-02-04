@@ -1,4 +1,12 @@
 import { db, auth } from './firebaseConfig.js';
+import { 
+    collection, 
+    query, 
+    where, 
+    getDocs, 
+    doc, 
+    updateDoc 
+} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 // ============================================================================
 // SECTION 1: CORE UTILITIES & SECURITY (OPTIMIZED)
