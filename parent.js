@@ -4810,7 +4810,7 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
 
         try {
             // Search for students where this phone is in ANY contact field
-            const studentsSnapshot = await db.collection('students').get();
+            const studentsSnapshot = await getDocs(collection(firebase.firestore(), 'students'));
             
             studentsSnapshot.forEach(doc => {
                 const data = doc.data();
@@ -5284,7 +5284,7 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
         let linkedStudents = [];
         
         try {
-            const studentsSnapshot = await db.collection('students').get();
+            const studentsSnapshot = await getDocs(collection(firebase.firestore(), 'students'));
             
             studentsSnapshot.forEach(doc => {
                 const data = doc.data();
