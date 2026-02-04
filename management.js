@@ -1,3 +1,4 @@
+
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc, limit, startAfter } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -1302,7 +1303,33 @@ function renderDirectoryFromCache(searchTerm = '') {
             })
             .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
 
+        // Count students by status
+        const activeStudentsCount = assignedStudents.filter(s => 
+            !s.status || s.status === 'active' || s.status === 'approved'
+        ).length;
+        
+        const breakStudentsCount = assignedStudents.filter(s => 
+            s.status && s.status.toLowerCase().includes('break')
+        ).length;
+        
+        const transitioningStudentsCount = assignedStudents.filter(s => 
+            s.status && s.status.toLowerCase().includes('transition')
+        ).length;
+
         const studentsTableRows = assignedStudents.map(student => {
+            // Get status indicator
+            let statusBadge = '';
+            if (student.status) {
+                const statusLower = student.status.toLowerCase();
+                if (statusLower.includes('break')) {
+                    statusBadge = `<span class="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">On Break</span>`;
+                } else if (statusLower.includes('transition')) {
+                    statusBadge = `<span class="ml-2 px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">Transitioning</span>`;
+                } else if (statusLower === 'active' || statusLower === 'approved') {
+                    statusBadge = `<span class="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Active</span>`;
+                }
+            }
+            
             const subjects = Array.isArray(student.subjects) ? 
                 student.subjects.join(', ') : 
                 safeToString(student.subjects);
@@ -1319,7 +1346,10 @@ function renderDirectoryFromCache(searchTerm = '') {
             
             return `
                 <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-2 font-medium">${student.studentName || 'N/A'}</td>
+                    <td class="px-4 py-2 font-medium">
+                        ${student.studentName || 'N/A'}
+                        ${statusBadge}
+                    </td>
                     <td class="px-4 py-2">₦${(student.studentFee || 0).toFixed(2)}</td>
                     <td class="px-4 py-2">${student.grade || 'N/A'}</td>
                     <td class="px-4 py-2">${student.days || 'N/A'}</td>
@@ -1338,6 +1368,17 @@ function renderDirectoryFromCache(searchTerm = '') {
                         <div>
                             <span class="text-green-700">${tutor.name || 'Unnamed Tutor'}</span>
                             <span class="ml-2 text-sm font-normal text-gray-500">${tutor.email || ''}</span>
+                            <div class="flex gap-2 mt-1">
+                                <span class="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">
+                                    ${activeStudentsCount} Active
+                                </span>
+                                ${breakStudentsCount > 0 ? `<span class="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full">
+                                    ${breakStudentsCount} On Break
+                                </span>` : ''}
+                                ${transitioningStudentsCount > 0 ? `<span class="text-xs px-2 py-1 bg-purple-100 text-purple-800 rounded-full">
+                                    ${transitioningStudentsCount} Transitioning
+                                </span>` : ''}
+                            </div>
                         </div>
                         <div class="flex items-center">
                             <span class="ml-2 text-sm font-normal px-2 py-1 bg-green-100 text-green-800 rounded-full">
@@ -9332,3 +9373,8 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
+
+
+
+
