@@ -894,7 +894,7 @@ window.refreshAllDashboardData = async function() {
 };
 
 // ======================================================
-// SUBSECTION 3.1: Tutor Directory Panel - UPDATED VERSION
+// SUBSECTION 3.1: Tutor Directory Panel - FIXED FILTER
 // ======================================================
 
 // Helper function for safe string operations
@@ -1114,7 +1114,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             tutor && (!tutor.status || tutor.status === 'active')
         );
         
-        // Process ALL students but FILTER OUT archived/inactive students
+        // Process ALL students
         const allStudents = studentsSnapshot.docs.map(doc => {
             const data = doc.data();
             return {
@@ -1136,19 +1136,18 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             };
         });
         
-        // Filter out archived/inactive students but KEEP break/transitioning students
+        // --- CRITICAL FIX: LESS AGGRESSIVE FILTERING ---
+        // Only filter out students who are explicitly Archived or Deleted.
+        // DO NOT filter out "inactive", "suspended", "break", etc.
         const nonArchivedStudents = allStudents.filter(student => {
             if (!student) return false;
             
             const status = student.status ? student.status.toLowerCase() : 'active';
             
-            // Filter OUT archived, inactive, deleted, etc.
-            const excludedStatuses = [
-                'archived', 'deleted', 'inactive', 'cancelled', 
-                'terminated', 'ended', 'closed', 'completed'
-            ];
+            // Only strictly removed statuses
+            const excludedStatuses = ['archived', 'deleted'];
             
-            // Check if status contains any excluded term
+            // Check if status contains excluded terms
             for (const excludedStatus of excludedStatuses) {
                 if (status.includes(excludedStatus)) {
                     return false;
@@ -1318,7 +1317,6 @@ function renderDirectoryFromCache(searchTerm = '') {
             .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
 
         // --- UNIFIED STATUS CLASSIFICATION ---
-        // Helper to determine exact category for counters and badges
         const getStudentCategory = (s) => {
             const status = safeToString(s.status).toLowerCase().trim();
             if (status.includes('break') || status.includes('pause') || status.includes('hold') || status.includes('suspended')) {
@@ -9421,5 +9419,6 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
