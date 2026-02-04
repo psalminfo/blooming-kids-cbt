@@ -96,7 +96,7 @@
             const email = document.getElementById('parent-email').value.trim();
             if(!email) return alert("Please enter the parent email.");
 
-            const q = query(collection(db, "students"), where("parentPhone", "==", email));
+            const q = query(collection(db, "students"), where("parentEmail", "==", email));
             const querySnapshot = await getDocs(q);
 
             if (!querySnapshot.empty) {
