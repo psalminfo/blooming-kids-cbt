@@ -7,14 +7,9 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
     <link rel="icon" href="favicon.ico" />
 
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
-
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
     
-    <!-- Global Phone Number Support -->
     <script src="https://cdn.jsdelivr.net/npm/libphonenumber-js@1.9.6/bundle/libphonenumber-js.min.js"></script>
 
     <style>
@@ -328,7 +323,6 @@
                             Phone Number
                         </label>
                         <div id="phoneInputContainer">
-                            <!-- Country code dropdown will be inserted here by JavaScript -->
                             <input id="signupPhone" 
                                    type="tel" 
                                    placeholder="Enter your phone number (any format)"
@@ -392,7 +386,6 @@
                         <p class="text-green-600">Thank you for being part of Blooming Kids House family</p>
                     </div>
                     <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                        <!-- Buttons will be added here by JavaScript -->
                         <button onclick="logout()" 
                                 class="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition-all duration-200 btn-glow flex items-center justify-center">
                             <span class="mr-2">🚪</span> Logout
@@ -428,51 +421,31 @@
                 </div>
                 
                 <div id="reportContent" class="space-y-6">
-                    <!-- Accordion reports will be inserted here by JavaScript -->
-                </div>
+                    </div>
             </div>
             
             <div id="academicsContentArea" class="hidden">
                 <h2 class="text-2xl font-bold text-green-800 mb-6">Academic Progress & Assignments</h2>
-                
-                <!-- Student Selection Dropdown Container -->
-                <div id="academicsStudentDropdown" class="mb-6">
-                    <!-- Student dropdown will be inserted here by JavaScript -->
-                </div>
-                
-                <div id="academicsContent" class="bg-white rounded-xl card-glow p-6 min-h-[400px]">
-                    <!-- Academics data will be inserted here by JavaScript -->
-                </div>
+                <div id="academicsStudentDropdown" class="mb-6"></div>
+                <div id="academicsContent" class="bg-white rounded-xl card-glow p-6 min-h-[400px]"></div>
             </div>
             
             <div id="rewardsContentArea" class="hidden">
                 <h2 class="text-2xl font-bold text-green-800 mb-6">Parent Referral Rewards</h2>
-                <div id="rewardsContent" class="bg-white rounded-xl card-glow p-6 min-h-[400px]">
-                    <!-- Rewards data will be inserted here by JavaScript -->
-                </div>
+                <div id="rewardsContent" class="bg-white rounded-xl card-glow p-6 min-h-[400px]"></div>
             </div>
         </div>
 
-        <!-- Feedback Modal -->
         <div id="feedbackModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
             <div class="bg-white rounded-2xl p-6 md:p-8 max-w-2xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-2xl font-bold text-gray-800">Send Feedback</h3>
-                    <button onclick="hideFeedbackModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
-                        &times;
-                    </button>
+                    <button onclick="hideFeedbackModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
                 </div>
-                
-                <p class="text-gray-600 mb-6">We value your feedback! Please fill out the form below.</p>
-                
                 <div class="space-y-4">
                     <div>
-                        <label for="feedbackCategory" class="block text-sm font-medium text-gray-700 mb-2">
-                            Category *
-                        </label>
-                        <select id="feedbackCategory" 
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                                required>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Category *</label>
+                        <select id="feedbackCategory" class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200" required>
                             <option value="">Select category</option>
                             <option value="Feedback">General Feedback</option>
                             <option value="Request">Special Request</option>
@@ -480,14 +453,9 @@
                             <option value="Suggestion">Suggestion</option>
                         </select>
                     </div>
-
                     <div>
-                        <label for="feedbackPriority" class="block text-sm font-medium text-gray-700 mb-2">
-                            Priority *
-                        </label>
-                        <select id="feedbackPriority" 
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                                required>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Priority *</label>
+                        <select id="feedbackPriority" class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200" required>
                             <option value="">Select priority</option>
                             <option value="Low">Low</option>
                             <option value="Medium">Medium</option>
@@ -495,71 +463,23 @@
                             <option value="Urgent">Urgent</option>
                         </select>
                     </div>
-
                     <div>
-                        <label for="feedbackStudent" class="block text-sm font-medium text-gray-700 mb-2">
-                            Regarding Student *
-                        </label>
-                        <select id="feedbackStudent" 
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                                required>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Regarding Student *</label>
+                        <select id="feedbackStudent" class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200" required>
                             <option value="">Select student</option>
                         </select>
                     </div>
-
                     <div>
-                        <label for="feedbackMessage" class="block text-sm font-medium text-gray-700 mb-2">
-                            Your Message *
-                        </label>
-                        <textarea id="feedbackMessage" 
-                                  rows="6"
-                                  placeholder="Please provide details about your feedback..."
-                                  class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200 preserve-whitespace"
-                                  required></textarea>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Your Message *</label>
+                        <textarea id="feedbackMessage" rows="6" placeholder="Please provide details about your feedback..." class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200 preserve-whitespace" required></textarea>
                     </div>
-                    
                     <div class="flex flex-col sm:flex-row gap-2 pt-4">
-                        <button id="submitFeedbackBtn" 
-                                class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
+                        <button id="submitFeedbackBtn" class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
                             <span id="submitFeedbackText">Submit Feedback</span>
                             <div id="submitFeedbackSpinner" class="loading-spinner hidden"></div>
                         </button>
-                        <button onclick="hideFeedbackModal()" 
-                                class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">
-                            Cancel
-                        </button>
+                        <button onclick="hideFeedbackModal()" class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">Cancel</button>
                     </div>
-                </div>
-
-                <div class="mt-6 text-center">
-                    <p class="text-sm text-gray-500">
-                        Your feedback is important to us. We'll respond within 24-48 hours.
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Admin Responses Modal -->
-        <div id="responsesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
-            <div class="bg-white rounded-2xl p-6 md:p-8 max-w-4xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-2xl font-bold text-gray-800">📨 Admin Responses</h3>
-                    <button onclick="hideResponsesModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
-                        &times;
-                    </button>
-                </div>
-                
-                <p class="text-gray-600 mb-6">Responses from our staff to your feedback.</p>
-                
-                <div id="responsesContent" class="space-y-4">
-                    <!-- Responses will be inserted here by JavaScript -->
-                </div>
-
-                <div class="mt-6 text-center">
-                    <button onclick="hideResponsesModal()" 
-                            class="bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 transition-all duration-200">
-                        Close
-                    </button>
                 </div>
             </div>
         </div>
@@ -567,36 +487,18 @@
         <div id="passwordResetModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
             <div class="bg-white rounded-2xl p-6 md:p-8 max-w-md w-full mx-auto card-glow">
                 <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Reset Password</h3>
-                <p class="text-gray-600 mb-4 text-center">Enter your email address to receive a password reset link.</p>
-                
                 <div class="space-y-4">
                     <div>
-                        <label for="resetEmail" class="block text-sm font-medium text-gray-700 mb-2">
-                            Email Address
-                        </label>
-                        <input id="resetEmail" 
-                               type="email" 
-                               placeholder="Enter your registered email"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required>
+                        <label for="resetEmail" class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                        <input id="resetEmail" type="email" placeholder="Enter your registered email" class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200" required>
                     </div>
-                    
                     <div class="flex flex-col sm:flex-row gap-2">
-                        <button id="sendResetBtn" 
-                                class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
+                        <button id="sendResetBtn" class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
                             <span id="sendResetText">Send Reset Link</span>
                             <div id="sendResetSpinner" class="loading-spinner hidden"></div>
                         </button>
-                        <button id="cancelResetBtn" 
-                                class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">
-                            Cancel
-                        </button>
+                        <button id="cancelResetBtn" class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">Cancel</button>
                     </div>
-                </div>
-                
-                <div id="resetLoader" class="hidden text-center mt-4">
-                    <div class="loading-spinner mx-auto"></div>
-                    <p class="text-green-600 font-semibold mt-2">Sending reset link...</p>
                 </div>
             </div>
         </div>
@@ -607,6 +509,6 @@
         </div>
     </div>
 
-    <script src="parent.js"></script>
+    <script type="module" src="./parent.js"></script>
 </body>
 </html>
