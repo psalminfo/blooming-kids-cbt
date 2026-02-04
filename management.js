@@ -1317,79 +1317,37 @@ function renderDirectoryFromCache(searchTerm = '') {
             })
             .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
 
-        // Count students by status (EXCLUDING archived) - FIXED LOGIC
-        const breakStudentsCount = assignedStudents.filter(s => {
-            if (!s.status) return false;
-            const statusLower = s.status.toLowerCase();
-            return statusLower.includes('break') || 
-                   statusLower.includes('pause') ||
-                   statusLower.includes('hold') ||
-                   statusLower.includes('suspended');
-        }).length;
-        
-        const transitioningStudentsCount = assignedStudents.filter(s => {
-            if (!s.status) return false;
-            const statusLower = s.status.toLowerCase();
-            return statusLower.includes('transition') || 
-                   statusLower.includes('transfer') ||
-                   statusLower.includes('moving') ||
-                   statusLower.includes('changing');
-        }).length;
-        
-        // Active students are those NOT break and NOT transitioning
-        const activeStudentsCount = assignedStudents.filter(s => {
-            if (!s.status) return true; // No status means active by default
-            
-            const statusLower = s.status.toLowerCase();
-            
-            // Check if it's a break status
-            const isBreak = statusLower.includes('break') || 
-                           statusLower.includes('pause') ||
-                           statusLower.includes('hold') ||
-                           statusLower.includes('suspended');
-            
-            // Check if it's a transitioning status
-            const isTransitioning = statusLower.includes('transition') || 
-                                   statusLower.includes('transfer') ||
-                                   statusLower.includes('moving') ||
-                                   statusLower.includes('changing');
-            
-            // Active if NOT break AND NOT transitioning
-            return !isBreak && !isTransitioning;
-        }).length;
-        
+        // --- UNIFIED STATUS CLASSIFICATION ---
+        // Helper to determine exact category for counters and badges
+        const getStudentCategory = (s) => {
+            const status = safeToString(s.status).toLowerCase().trim();
+            if (status.includes('break') || status.includes('pause') || status.includes('hold') || status.includes('suspended')) {
+                return 'break';
+            }
+            if (status.includes('transition') || status.includes('transfer') || status.includes('moving') || status.includes('changing')) {
+                return 'transitioning';
+            }
+            return 'active'; // Default to active if not break or transitioning
+        };
+
+        // --- CALCULATE COUNTERS ---
+        const breakStudentsCount = assignedStudents.filter(s => getStudentCategory(s) === 'break').length;
+        const transitioningStudentsCount = assignedStudents.filter(s => getStudentCategory(s) === 'transitioning').length;
+        const activeStudentsCount = assignedStudents.filter(s => getStudentCategory(s) === 'active').length;
         const totalStudentsCount = assignedStudents.length;
 
         const studentsTableRows = assignedStudents.map(student => {
-            // Get status indicator with proper alignment - FIXED LOGIC
+            // --- DETERMINE BADGE ---
+            const category = getStudentCategory(student);
             let statusBadge = '';
-            let statusColor = 'green';
-            let statusText = 'Active';
             
-            if (student.status) {
-                const statusLower = student.status.toLowerCase();
-                
-                if (statusLower.includes('break') || statusLower.includes('pause') || statusLower.includes('hold') || statusLower.includes('suspended')) {
-                    statusColor = 'yellow';
-                    statusText = 'On Break';
-                } else if (statusLower.includes('transition') || statusLower.includes('transfer') || statusLower.includes('moving') || statusLower.includes('changing')) {
-                    statusColor = 'purple';
-                    statusText = 'Transitioning';
-                } else if (statusLower === 'active' || statusLower === 'approved' || statusLower === '') {
-                    statusColor = 'green';
-                    statusText = 'Active';
-                } else {
-                    // Other non-archived statuses
-                    statusColor = 'gray';
-                    statusText = student.status;
-                }
+            if (category === 'break') {
+                statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 ml-2">On Break</span>`;
+            } else if (category === 'transitioning') {
+                statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 ml-2">Transitioning</span>`;
             } else {
-                // No status specified - default to Active
-                statusColor = 'green';
-                statusText = 'Active';
+                statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">Active</span>`;
             }
-            
-            statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${statusColor}-100 text-${statusColor}-800 ml-2">${statusText}</span>`;
             
             const subjects = Array.isArray(student.subjects) ? 
                 student.subjects.join(', ') : 
@@ -1712,7 +1670,6 @@ function createReassignModalHtml(students, tutors) {
     return `
         <div id="reassign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
             <div class="relative bg-white w-full max-w-4xl rounded-lg shadow-xl animate-fadeIn">
-                <!-- Modal Header -->
                 <div class="flex items-center justify-between p-6 border-b">
                     <div>
                         <h3 class="text-xl font-bold text-blue-700">Reassign Student</h3>
@@ -1724,10 +1681,8 @@ function createReassignModalHtml(students, tutors) {
                     </button>
                 </div>
                 
-                <!-- Modal Body -->
                 <div class="p-6">
                     <form id="reassign-student-form">
-                        <!-- Search Section -->
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -1766,9 +1721,7 @@ function createReassignModalHtml(students, tutors) {
                             </div>
                         </div>
                         
-                        <!-- Selection Grid -->
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                            <!-- Student Selection -->
                             <div class="space-y-2">
                                 <label class="block text-sm font-medium text-gray-700">
                                     Select Student to Reassign
@@ -1791,7 +1744,6 @@ function createReassignModalHtml(students, tutors) {
                                 </div>
                             </div>
                             
-                            <!-- Tutor Selection -->
                             <div class="space-y-2">
                                 <label class="block text-sm font-medium text-gray-700">
                                     Select New Tutor
@@ -1815,7 +1767,6 @@ function createReassignModalHtml(students, tutors) {
                             </div>
                         </div>
                         
-                        <!-- Reason Section -->
                         <div class="mb-6">
                             <label class="block text-sm font-medium text-gray-700 mb-2">
                                 Reason for Reassignment
@@ -1832,7 +1783,6 @@ function createReassignModalHtml(students, tutors) {
                             </div>
                         </div>
                         
-                        <!-- Action Buttons -->
                         <div class="flex justify-end space-x-3 pt-4 border-t">
                             <button type="button" 
                                     onclick="closeReassignModal()" 
@@ -9471,4 +9421,5 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
