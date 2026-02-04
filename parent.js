@@ -4523,7 +4523,47 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
 export { initializeParentPortalV2 };
 
 // ============================================================================
-// GLOBAL EXPORTS FOR DEBUGGING
+// SECTION: ACCORDION FUNCTIONS (ADD THIS SECTION)
+// ============================================================================
+
+function toggleAccordion(elementId) {
+    const content = document.getElementById(`${elementId}-content`);
+    const arrow = document.getElementById(`${elementId}-arrow`);
+    
+    if (!content || !arrow) {
+        console.error(`Could not find accordion elements for ${elementId}`);
+        return;
+    }
+    
+    if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        arrow.textContent = '▲';
+    } else {
+        content.classList.add('hidden');
+        arrow.textContent = '▼';
+    }
+}
+
+function toggleAcademicsAccordion(sectionId) {
+    const content = document.getElementById(`${sectionId}-content`);
+    const arrow = document.getElementById(`${sectionId}-arrow`);
+    
+    if (!content || !arrow) {
+        console.error(`Could not find academics accordion elements for ${sectionId}`);
+        return;
+    }
+    
+    if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        arrow.textContent = '▲';
+    } else {
+        content.classList.add('hidden');
+        arrow.textContent = '▼';
+    }
+}
+
+// ============================================================================
+// GLOBAL EXPORTS (UPDATE THIS SECTION)
 // ============================================================================
 
 // Make global for debugging
@@ -4533,7 +4573,7 @@ window.manualRefreshReportsV2 = manualRefreshReportsV2;
 window.loadAcademicsData = loadAcademicsData;
 window.onStudentSelected = onStudentSelected;
 window.toggleAcademicsAccordion = toggleAcademicsAccordion;
-window.toggleAccordion = toggleAccordion;
+window.toggleAccordion = toggleAccordion; // ADD THIS LINE
 window.downloadSessionReport = downloadSessionReport;
 window.downloadMonthlyReport = downloadMonthlyReport;
 window.switchMainTab = switchMainTab;
@@ -4542,3 +4582,6 @@ window.showPasswordResetModal = showPasswordResetModal;
 window.hidePasswordResetModal = hidePasswordResetModal;
 window.switchTab = switchTab;
 window.settingsManager = settingsManager;
+window.forceDownload = forceDownload;
+window.handleHomeworkAction = handleHomeworkAction;
+window.checkForNewAcademics = checkForNewAcademics;
