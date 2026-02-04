@@ -1,4 +1,3 @@
-
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc, limit, startAfter } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -1115,7 +1114,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             tutor && (!tutor.status || tutor.status === 'active')
         );
         
-        // Process ALL students with safe data handling - NO STATUS FILTERING
+        // Process ALL students but FILTER OUT archived/inactive students
         const allStudents = studentsSnapshot.docs.map(doc => {
             const data = doc.data();
             return {
@@ -1137,8 +1136,27 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             };
         });
         
-        // NO FILTERING HERE - Save ALL students to cache
-        const allStudentsList = allStudents.filter(student => student);
+        // Filter out archived/inactive students but KEEP break/transitioning students
+        const nonArchivedStudents = allStudents.filter(student => {
+            if (!student) return false;
+            
+            const status = student.status ? student.status.toLowerCase() : 'active';
+            
+            // Filter OUT archived, inactive, deleted, etc.
+            const excludedStatuses = [
+                'archived', 'deleted', 'inactive', 'cancelled', 
+                'terminated', 'ended', 'closed', 'completed'
+            ];
+            
+            // Check if status contains any excluded term
+            for (const excludedStatus of excludedStatuses) {
+                if (status.includes(excludedStatus)) {
+                    return false;
+                }
+            }
+            
+            return true;
+        });
         
         // Process tutor assignments with safe data handling
         const tutorAssignments = {};
@@ -1174,15 +1192,15 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             );
         });
         
-        // Save to cache - ALL students, not just active ones
+        // Save to cache - NON-ARCHIVED students only
         saveToLocalStorage('tutors', activeTutors);
-        saveToLocalStorage('students', allStudentsList);
+        saveToLocalStorage('students', nonArchivedStudents);
         sessionCache.tutorAssignments = tutorAssignments;
         sessionCache._lastUpdate = Date.now(); // Add timestamp for cache freshness
         
         console.log("Cache updated:", {
             tutors: activeTutors.length,
-            students: allStudentsList.length,
+            students: nonArchivedStudents.length,
             assignments: Object.keys(tutorAssignments).length
         });
         
@@ -1227,7 +1245,7 @@ function renderDirectoryFromCache(searchTerm = '') {
     // Safe search term handling
     const searchTermLower = safeToString(searchTerm).toLowerCase();
     
-    // Group ALL students by tutor email (regardless of status)
+    // Group NON-ARCHIVED students by tutor email
     const studentsByTutor = {};
     
     students.forEach(student => {
@@ -1299,13 +1317,21 @@ function renderDirectoryFromCache(searchTerm = '') {
             })
             .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
 
-        // Count students by status (ALL statuses)
+        // Count students by status (EXCLUDING archived)
         const activeStudentsCount = assignedStudents.filter(s => {
             if (!s.status) return true;
             const statusLower = s.status.toLowerCase();
             return statusLower === 'active' || 
                    statusLower === 'approved' || 
-                   statusLower === '';
+                   statusLower === '' ||
+                   (!statusLower.includes('break') && 
+                    !statusLower.includes('pause') && 
+                    !statusLower.includes('hold') && 
+                    !statusLower.includes('suspended') &&
+                    !statusLower.includes('transition') && 
+                    !statusLower.includes('transfer') &&
+                    !statusLower.includes('moving') &&
+                    !statusLower.includes('changing'));
         }).length;
         
         const breakStudentsCount = assignedStudents.filter(s => {
@@ -1326,21 +1352,7 @@ function renderDirectoryFromCache(searchTerm = '') {
                    statusLower.includes('changing');
         }).length;
         
-        // Other statuses (not active, break, or transitioning)
-        const otherStudentsCount = assignedStudents.filter(s => {
-            if (!s.status) return false;
-            const statusLower = s.status.toLowerCase();
-            return !statusLower.includes('active') &&
-                   !statusLower.includes('approved') &&
-                   !statusLower.includes('break') &&
-                   !statusLower.includes('pause') &&
-                   !statusLower.includes('hold') &&
-                   !statusLower.includes('suspended') &&
-                   !statusLower.includes('transition') &&
-                   !statusLower.includes('transfer') &&
-                   !statusLower.includes('moving') &&
-                   !statusLower.includes('changing');
-        }).length;
+        const totalStudentsCount = assignedStudents.length;
 
         const studentsTableRows = assignedStudents.map(student => {
             // Get status indicator with proper alignment
@@ -1354,11 +1366,11 @@ function renderDirectoryFromCache(searchTerm = '') {
                 } else if (statusLower === 'active' || statusLower === 'approved' || statusLower === '') {
                     statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">Active</span>`;
                 } else {
-                    // Other statuses
+                    // Other non-archived statuses
                     statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 ml-2">${student.status}</span>`;
                 }
             } else {
-                // No status specified
+                // No status specified - default to Active
                 statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">Active</span>`;
             }
             
@@ -1431,14 +1443,6 @@ function renderDirectoryFromCache(searchTerm = '') {
                                         ${transitioningStudentsCount} Transitioning
                                     </span>
                                     ` : ''}
-                                    ${otherStudentsCount > 0 ? `
-                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clip-rule="evenodd"/>
-                                        </svg>
-                                        ${otherStudentsCount} Other
-                                    </span>
-                                    ` : ''}
                                 </div>
                             </div>
                         </div>
@@ -1447,7 +1451,7 @@ function renderDirectoryFromCache(searchTerm = '') {
                                 <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                     <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
                                 </svg>
-                                ${assignedStudents.length} student${assignedStudents.length !== 1 ? 's' : ''}
+                                ${totalStudentsCount} student${totalStudentsCount !== 1 ? 's' : ''}
                             </span>
                             <svg class="w-5 h-5 text-gray-400 transform transition-transform duration-200 group-open:rotate-180 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -1564,7 +1568,7 @@ function getCleanStudents() {
                 return acc;
             }, {})
         }));
-        // REMOVED THE FILTER - Now includes ALL students regardless of status
+        // INCLUDES ALL non-archived students (active, break, transitioning)
 }
 
 /**
@@ -9450,3 +9454,4 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
