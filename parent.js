@@ -5184,7 +5184,7 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
         if (!phoneSuffix && !email) return linkedStudents;
         
         try {
-            const studentsSnapshot = await firebase.firestore().collection('students').get();
+            const studentsSnapshot = await getDocs(collection(firebase.firestore(), 'students'));
             
             studentsSnapshot.forEach(doc => {
                 const data = doc.data();
