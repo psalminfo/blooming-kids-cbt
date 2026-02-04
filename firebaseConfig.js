@@ -25,8 +25,6 @@ const devConfig = {
 
 // --- 3. THE SMART SWITCH ---
 const hostname = window.location.hostname;
-
-// This checks if you are coding locally OR viewing your new Netlify dev link
 const isDevelopment = 
     hostname === "localhost" || 
     hostname === "127.0.0.1" || 
@@ -34,13 +32,11 @@ const isDevelopment =
 
 const firebaseConfig = isDevelopment ? devConfig : mainConfig;
 
-// --- 4. INITIALIZE ---
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const storage = getStorage(app);
-const auth = getAuth(app);
+// --- 4. INITIALIZE & EXPORT ---
+// Added 'export' here so parent.js can see these
+export const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
+export const auth = getAuth(app);
 
-// Logic check for your console so you know it's working
 console.log("Environment:", isDevelopment ? "🛠️ DEVELOPMENT" : "🚀 PRODUCTION");
-
-export { db, storage, auth, firebaseConfig };
