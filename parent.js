@@ -5177,7 +5177,7 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
     }
 
     // Find students linked to a contact
-   async function findLinkedStudentsForContact(phone, email) {
+  async function findLinkedStudentsForContact(phone, email) {
     console.log("🔍 Checking for shared contact links...");
     
     try {
@@ -5186,8 +5186,8 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
         
         if (!phoneSuffix && !email) return linkedStudents;
         
-        // Use the globally available 'db' that was imported
-        const studentsSnapshot = await firebase.firestore().collection('students').get();
+        // Use the globally available 'db' that was imported at the top
+        const studentsSnapshot = await db.collection('students').get();
         
         studentsSnapshot.forEach(doc => {
             const data = doc.data();
