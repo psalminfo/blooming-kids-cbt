@@ -1,4 +1,4 @@
-import { db, auth, storage } from './firebaseConfig.js';
+import { db, auth } from './firebaseConfig.js';
 
 // ============================================================================
 // SECTION 1: CORE UTILITIES & SECURITY (OPTIMIZED)
