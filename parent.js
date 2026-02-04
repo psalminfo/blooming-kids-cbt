@@ -1,19 +1,18 @@
 // ============================================================================
-// FIREBASE CONFIGURATION
+// FIREBASE CONFIGURATION (Now in separate file)
 // ============================================================================
 
-// Firebase config for the 'bloomingkidsassessment' project
-firebase.initializeApp({
-    apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
-    authDomain: "bloomingkidsassessment.firebaseapp.com",
-    projectId: "bloomingkidsassessment",
-    storageBucket: "bloomingkidsassessment.appspot.com",
-    messagingSenderId: "238975054977",
-    appId: "1:238975054977:web:87c70b4db044998a204980"
-});
+// Import Firebase configuration from external file
+// Make sure to load firebaseParentConfig.js BEFORE this file in your HTML
 
-const db = firebase.firestore();
-const auth = firebase.auth();
+const db = window.firebaseDb || firebase.firestore();
+const auth = window.firebaseAuth || firebase.auth();
+
+// Use global error handler if available
+const handleFirebaseError = window.firebaseHandleError || ((error) => {
+    console.error("Firebase error:", error);
+    return error.message;
+});
 
 // ============================================================================
 // SECTION 1: CORE UTILITIES & SECURITY (OPTIMIZED)
