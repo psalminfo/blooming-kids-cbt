@@ -1,92 +1,612 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Parent Portal - Blooming Kids House</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-    <link rel="icon" href="favicon.ico" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Parent Portal - Blooming Kids House</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+    <link rel="icon" href="favicon.ico" />
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/libphonenumber-js@1.9.6/bundle/libphonenumber-js.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
 
-    <style>
-        /* ... (Keep your existing styles exactly as they were) ... */
-        body {
-            background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 50%, #d1fae5 100%);
-            background-size: 400% 400%;
-            animation: gradient 15s ease infinite;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 100vh;
-        }
-        @keyframes gradient {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-        .logo-glow { filter: drop-shadow(0 0 15px rgba(34, 197, 94, 0.3)); }
-        .card-glow { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
-        .btn-glow { transition: all 0.3s ease; }
-        .hidden { display: none !important; }
-        .tab-active { background-color: #059669; color: white; }
-        .tab-inactive { background-color: #d1fae5; color: #065f46; }
-        .loading-spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #10b981;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
+    
+    <!-- Global Phone Number Support -->
+    <script src="https://cdn.jsdelivr.net/npm/libphonenumber-js@1.9.6/bundle/libphonenumber-js.min.js"></script>
+
+    <style>
+        body {
+            background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 50%, #d1fae5 100%);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .logo-glow {
+            filter: drop-shadow(0 0 15px rgba(34, 197, 94, 0.3));
+        }
+        .card-glow {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .btn-glow {
+            box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.3), 0 2px 4px -1px rgba(34, 197, 94, 0.1);
+            transition: all 0.3s ease;
+        }
+        .btn-glow:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(34, 197, 94, 0.4), 0 4px 6px -2px rgba(34, 197, 94, 0.2);
+        }
+        .input-focus:focus {
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+            border-color: #10b981;
+        }
+        .hidden { 
+            display: none !important; 
+        }
+        /* Auth Tabs */
+        .tab-active {
+            background-color: #059669;
+            color: white;
+        }
+        .tab-inactive {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        /* Main Content Tabs */
+        .tab-active-main {
+            background-color: #10b981;
+            color: white;
+            position: relative;
+        }
+        .tab-inactive-main {
+            background-color: #ecfdf5;
+            color: #059669;
+            position: relative;
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #10b981;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        .loading-spinner-small {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #10b981;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+        }
+        .toast.show {
+            transform: translateX(0);
+        }
+        .toast.success {
+            background-color: #10b981;
+        }
+        .toast.error {
+            background-color: #ef4444;
+        }
+        .toast.warning {
+            background-color: #f59e0b;
+        }
+        .response-bubble {
+            background-color: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 8px;
+        }
+        .response-header {
+            font-weight: 600;
+            color: #065f46;
+            margin-bottom: 4px;
+        }
+        /* Accordion Styles */
+        .accordion-header {
+            transition: all 0.3s ease;
+        }
+        .accordion-header:hover {
+            background-color: #bbf7d0 !important;
+        }
+        /* Slide Down Animation */
+        .slide-down {
+            animation: slideDown 0.3s ease-out;
+        }
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+                max-height: 0;
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+                max-height: 5000px;
+            }
+        }
+        .preserve-whitespace {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        /* Notification Badge */
+        .notification-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background-color: #ef4444;
+            color: white;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            min-width: 1.25rem;
+            height: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 0.25rem;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        /* Message urgent styling */
+        .urgent-message {
+            border-left: 4px solid #ef4444;
+            background-color: #fef2f2;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a1;
+        }
+        /* Academics Section Specific */
+        .academics-student-selector {
+            background: linear-gradient(to right, #3b82f6, #1d4ed8);
+            color: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .topic-item {
+            transition: all 0.2s ease;
+            border-left: 4px solid #3b82f6;
+        }
+        .topic-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+        }
+        .homework-item {
+            transition: all 0.2s ease;
+            border-left: 4px solid #8b5cf6;
+        }
+        .homework-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+        }
+        .status-overdue {
+            background-color: #fef2f2;
+            color: #dc2626;
+            border-color: #fca5a5;
+        }
+        .status-pending {
+            background-color: #eff6ff;
+            color: #1d4ed8;
+            border-color: #93c5fd;
+        }
+        .status-submitted {
+            background-color: #f0fdf4;
+            color: #15803d;
+            border-color: #86efac;
+        }
+    </style>
 </head>
 <body class="flex flex-col items-center p-4">
-    <div id="toastContainer"></div>
+    <div id="toastContainer"></div>
 
-    <div class="w-full max-w-6xl">
-        <div class="text-center mb-8">
-            <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
-                 alt="Blooming Kids House Logo" 
-                 class="h-20 w-auto mx-auto logo-glow mb-4">
-            <h1 class="text-4xl font-bold text-green-800 mb-2">Parent Portal</h1>
-            <p class="text-green-600 text-lg">Secure Access to Your Children's Progress Reports</p>
-        </div>
+    <div class="w-full max-w-6xl">
+        <div class="text-center mb-8">
+            <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
+                 alt="Blooming Kids House Logo" 
+                 class="h-20 w-auto mx-auto logo-glow mb-4">
+            <h1 class="text-4xl font-bold text-green-800 mb-2">Parent Portal</h1>
+            <p class="text-green-600 text-lg">Secure Access to Your Children's Progress Reports</p>
+        </div>
 
-        <div id="authArea" class="bg-white rounded-2xl card-glow p-8 mb-8">
-            <div class="flex mb-6 rounded-xl overflow-hidden border border-green-200">
-                <button id="signInTab" class="flex-1 py-3 font-semibold tab-active">Sign In</button>
-                <button id="signUpTab" class="flex-1 py-3 font-semibold tab-inactive">Sign Up</button>
-            </div>
+        <div id="authArea" class="bg-white rounded-2xl card-glow p-8 mb-8 fade-in">
+            <div class="flex mb-6 rounded-xl overflow-hidden border border-green-200">
+                <button id="signInTab" class="flex-1 py-3 font-semibold tab-active transition-all duration-200">
+                    Sign In
+                </button>
+                <button id="signUpTab" class="flex-1 py-3 font-semibold tab-inactive transition-all duration-200">
+                    Sign Up
+                </button>
+            </div>
 
-            <div id="signInForm">
-                <div class="space-y-4">
-                    <input id="loginIdentifier" type="text" placeholder="Phone or Email" class="w-full px-4 py-3 border border-gray-300 rounded-xl">
-                    <input id="loginPassword" type="password" placeholder="Password" class="w-full px-4 py-3 border border-gray-300 rounded-xl">
-                    <button id="signInBtn" class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow">
-                        <span id="signInText">Sign In</span>
-                        <div id="signInSpinner" class="loading-spinner hidden mx-auto"></div>
-                    </button>
-                </div>
-            </div>
-            </div>
+            <div id="signInForm">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Welcome Back</h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label for="loginIdentifier" class="block text-sm font-medium text-gray-700 mb-2">
+                            Phone Number or Email
+                        </label>
+                        <input id="loginIdentifier" 
+                               type="text" 
+                               placeholder="Enter your phone number or email"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required>
+                    </div>
+                    
+                    <div>
+                        <label for="loginPassword" class="block text-sm font-medium text-gray-700 mb-2">
+                            Password
+                        </label>
+                        <input id="loginPassword" 
+                               type="password" 
+                               placeholder="Enter your password"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required>
+                    </div>
 
-        <div id="reportArea" class="hidden">
-            <div class="flex mb-6 rounded-xl overflow-hidden shadow-lg border border-green-200">
-                <button id="reportTab" class="flex-1 py-3 font-semibold tab-active">Reports</button>
-                <button id="academicsTab" class="flex-1 py-3 font-semibold tab-inactive">Academics</button>
-                <button id="rewardsTab" class="flex-1 py-3 font-semibold tab-inactive">Rewards</button>
-            </div>
-            <div id="reportContent" class="space-y-6"></div>
-        </div>
+                    <div class="flex items-center">
+                        <input id="rememberMe" type="checkbox" class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
+                        <label for="rememberMe" class="ml-2 block text-sm text-gray-700">
+                            Remember me
+                        </label>
+                    </div>
+                    
+                    <button id="signInBtn" 
+                            class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
+                        <span id="signInText">Sign In</span>
+                        <div id="signInSpinner" class="loading-spinner hidden"></div>
+                    </button>
 
-        <div class="text-center mt-12">
-            <p class="text-green-800 font-semibold">BLOOMING KIDS HOUSE</p>
-            <p class="text-green-600 text-sm">Where Every Child Blossoms</p>
-        </div>
-    </div>
+                    <div class="text-center">
+                        <button id="forgotPasswordBtn" class="text-green-600 hover:text-green-800 text-sm transition-colors duration-200">
+                            Forgot Password?
+                        </button>
+                    </div>
+                </div>
+            </div>
 
-    <script type="module" src="./parent.js"></script>
+            <div id="signUpForm" class="hidden">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Create Account</h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label for="signupPhone" class="block text-sm font-medium text-gray-700 mb-2">
+                            Phone Number
+                        </label>
+                        <div id="phoneInputContainer">
+                            <!-- Country code dropdown will be inserted here by JavaScript -->
+                            <input id="signupPhone" 
+                                   type="tel" 
+                                   placeholder="Enter your phone number (any format)"
+                                   class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                                   required>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="signupEmail" class="block text-sm font-medium text-gray-700 mb-2">
+                            Email Address
+                        </label>
+                        <input id="signupEmail" 
+                               type="email" 
+                               placeholder="Enter your email address"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required>
+                    </div>
+                    
+                    <div>
+                        <label for="signupPassword" class="block text-sm font-medium text-gray-700 mb-2">
+                            Password
+                        </label>
+                        <input id="signupPassword" 
+                               type="password" 
+                               placeholder="Minimum 6 characters"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required minlength="6">
+                    </div>
+                    
+                    <div>
+                        <label for="signupConfirmPassword" class="block text-sm font-medium text-gray-700 mb-2">
+                            Confirm Password
+                        </label>
+                        <input id="signupConfirmPassword" 
+                               type="password" 
+                               placeholder="Confirm your password"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required minlength="6">
+                    </div>
+                    
+                    <button id="signUpBtn" 
+                            class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
+                        <span id="signUpText">Create Account</span>
+                        <div id="signUpSpinner" class="loading-spinner hidden"></div>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="authLoader" class="hidden text-center mt-4">
+                <div class="loading-spinner"></div>
+                <p class="text-green-600 font-semibold mt-2">Processing... Please wait.</p>
+            </div>
+        </div>
+
+        <div id="reportArea" class="hidden fade-in">
+            <div class="bg-green-50 border-l-4 border-green-600 p-6 rounded-lg mb-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h2 id="welcomeMessage" class="text-2xl font-bold text-green-800">Welcome!</h2>
+                        <p class="text-green-600">Thank you for being part of Blooming Kids House family</p>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                        <!-- Buttons will be added here by JavaScript -->
+                        <button onclick="logout()" 
+                                class="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition-all duration-200 btn-glow flex items-center justify-center">
+                            <span class="mr-2">🚪</span> Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex mb-6 rounded-xl overflow-hidden shadow-lg border border-green-200">
+                <button id="reportTab" class="flex-1 py-3 font-semibold tab-active-main hover:bg-green-500 transition-all duration-200">
+                    <span class="mr-2">📄</span> Progress Reports
+                </button>
+                <button id="academicsTab" class="flex-1 py-3 font-semibold tab-inactive-main hover:bg-green-100 transition-all duration-200">
+                    <span class="mr-2">📚</span> Academics
+                </button>
+                <button id="rewardsTab" class="flex-1 py-3 font-semibold tab-inactive-main hover:bg-green-100 transition-all duration-200">
+                    <span class="mr-2">🎁</span> Rewards Dashboard
+                </button>
+            </div>
+
+            <div id="reportContentArea">
+                <h2 class="text-2xl font-bold text-green-800 mb-6">Your Children's Reports</h2>
+                
+                <div id="reportsLoading" class="hidden text-center py-8">
+                    <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+                    <p class="text-green-600 font-semibold mt-4">Loading reports...</p>
+                </div>
+                
+                <div id="reportsEmpty" class="hidden text-center py-12 bg-white rounded-xl card-glow">
+                    <div class="text-6xl mb-4">📬</div>
+                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Reports Available</h3>
+                    <p class="text-gray-500 max-w-md mx-auto">No progress reports are available for your children at this time. Please check back later.</p>
+                </div>
+                
+                <div id="reportContent" class="space-y-6">
+                    <!-- Accordion reports will be inserted here by JavaScript -->
+                </div>
+            </div>
+            
+            <div id="academicsContentArea" class="hidden">
+                <h2 class="text-2xl font-bold text-green-800 mb-6">Academic Progress & Assignments</h2>
+                
+                <!-- Student Selection Dropdown Container -->
+                <div id="academicsStudentDropdown" class="mb-6">
+                    <!-- Student dropdown will be inserted here by JavaScript -->
+                </div>
+                
+                <div id="academicsContent" class="bg-white rounded-xl card-glow p-6 min-h-[400px]">
+                    <!-- Academics data will be inserted here by JavaScript -->
+                </div>
+            </div>
+            
+            <div id="rewardsContentArea" class="hidden">
+                <h2 class="text-2xl font-bold text-green-800 mb-6">Parent Referral Rewards</h2>
+                <div id="rewardsContent" class="bg-white rounded-xl card-glow p-6 min-h-[400px]">
+                    <!-- Rewards data will be inserted here by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Feedback Modal -->
+        <div id="feedbackModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+            <div class="bg-white rounded-2xl p-6 md:p-8 max-w-2xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800">Send Feedback</h3>
+                    <button onclick="hideFeedbackModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
+                        &times;
+                    </button>
+                </div>
+                
+                <p class="text-gray-600 mb-6">We value your feedback! Please fill out the form below.</p>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label for="feedbackCategory" class="block text-sm font-medium text-gray-700 mb-2">
+                            Category *
+                        </label>
+                        <select id="feedbackCategory" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                                required>
+                            <option value="">Select category</option>
+                            <option value="Feedback">General Feedback</option>
+                            <option value="Request">Special Request</option>
+                            <option value="Complaint">Complaint</option>
+                            <option value="Suggestion">Suggestion</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="feedbackPriority" class="block text-sm font-medium text-gray-700 mb-2">
+                            Priority *
+                        </label>
+                        <select id="feedbackPriority" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                                required>
+                            <option value="">Select priority</option>
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                            <option value="Urgent">Urgent</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="feedbackStudent" class="block text-sm font-medium text-gray-700 mb-2">
+                            Regarding Student *
+                        </label>
+                        <select id="feedbackStudent" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                                required>
+                            <option value="">Select student</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="feedbackMessage" class="block text-sm font-medium text-gray-700 mb-2">
+                            Your Message *
+                        </label>
+                        <textarea id="feedbackMessage" 
+                                  rows="6"
+                                  placeholder="Please provide details about your feedback..."
+                                  class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200 preserve-whitespace"
+                                  required></textarea>
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row gap-2 pt-4">
+                        <button id="submitFeedbackBtn" 
+                                class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
+                            <span id="submitFeedbackText">Submit Feedback</span>
+                            <div id="submitFeedbackSpinner" class="loading-spinner hidden"></div>
+                        </button>
+                        <button onclick="hideFeedbackModal()" 
+                                class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-6 text-center">
+                    <p class="text-sm text-gray-500">
+                        Your feedback is important to us. We'll respond within 24-48 hours.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Responses Modal -->
+        <div id="responsesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+            <div class="bg-white rounded-2xl p-6 md:p-8 max-w-4xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800">📨 Admin Responses</h3>
+                    <button onclick="hideResponsesModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
+                        &times;
+                    </button>
+                </div>
+                
+                <p class="text-gray-600 mb-6">Responses from our staff to your feedback.</p>
+                
+                <div id="responsesContent" class="space-y-4">
+                    <!-- Responses will be inserted here by JavaScript -->
+                </div>
+
+                <div class="mt-6 text-center">
+                    <button onclick="hideResponsesModal()" 
+                            class="bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 transition-all duration-200">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="passwordResetModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+            <div class="bg-white rounded-2xl p-6 md:p-8 max-w-md w-full mx-auto card-glow">
+                <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Reset Password</h3>
+                <p class="text-gray-600 mb-4 text-center">Enter your email address to receive a password reset link.</p>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label for="resetEmail" class="block text-sm font-medium text-gray-700 mb-2">
+                            Email Address
+                        </label>
+                        <input id="resetEmail" 
+                               type="email" 
+                               placeholder="Enter your registered email"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required>
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <button id="sendResetBtn" 
+                                class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
+                            <span id="sendResetText">Send Reset Link</span>
+                            <div id="sendResetSpinner" class="loading-spinner hidden"></div>
+                        </button>
+                        <button id="cancelResetBtn" 
+                                class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="resetLoader" class="hidden text-center mt-4">
+                    <div class="loading-spinner mx-auto"></div>
+                    <p class="text-green-600 font-semibold mt-2">Sending reset link...</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-12">
+            <p class="text-green-800 font-semibold">BLOOMING KIDS HOUSE</p>
+            <p class="text-green-600 text-sm">Where Every Child Blossoms</p>
+        </div>
+    </div>
+
+    <script type="module" src="js/parent.js"></script>
 </body>
-</html>
+</html> 
