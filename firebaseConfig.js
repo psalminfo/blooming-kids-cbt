@@ -1,3 +1,4 @@
+// firebaseConfig.js - UPDATED & FUTURE-PROOF
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { getStorage } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-storage.js";
@@ -33,12 +34,9 @@ const isDevelopment =
 const firebaseConfig = isDevelopment ? devConfig : mainConfig;
 
 // --- 4. INITIALIZE & EXPORT ---
-// Initialize the app with the smart-switched config
-const app = firebase.initializeApp(firebaseConfig); 
-
-// Export the compat versions so parent (6).js can import them
-export const db = firebase.firestore();
-export const auth = firebase.auth();
+const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
+export const auth = getAuth(app);
+export const storage = getStorage(app);
 
 console.log("Environment:", isDevelopment ? "🛠️ DEVELOPMENT" : "🚀 PRODUCTION");
-
