@@ -666,6 +666,49 @@
             updateProfile
         };
 
+        // Define global functions that need to be accessible from HTML event handlers
+        window.toggleAccordion = function(id) {
+            const content = document.getElementById(`content-${id}`);
+            const icon = document.getElementById(`icon-${id}`);
+            
+            if (content && icon) {
+                if (content.classList.contains('hidden')) {
+                    // Show content
+                    content.classList.remove('hidden');
+                    content.classList.add('slide-down');
+                    icon.textContent = '▼';
+                } else {
+                    // Hide content
+                    content.classList.add('hidden');
+                    content.classList.remove('slide-down');
+                    icon.textContent = '▶';
+                }
+            }
+        };
+
+        window.logout = function() {
+            if (window.authFunctions && window.authFunctions.signOut) {
+                window.authFunctions.signOut(window.auth)
+                    .then(() => {
+                        window.location.reload();
+                    })
+                    .catch((error) => {
+                        console.error('Logout error:', error);
+                        showToast('Error logging out. Please try again.', 'error');
+                    });
+            }
+        };
+
+        window.hideFeedbackModal = function() {
+            const modal = document.getElementById('feedbackModal');
+            if (modal) modal.classList.add('hidden');
+        };
+
+        window.hideResponsesModal = function() {
+            const modal = document.getElementById('responsesModal');
+            if (modal) modal.classList.add('hidden');
+        };
+
         // Initialize the app when DOM is loaded
         document.addEventListener('DOMContentLoaded', () => {
             console.log("🚀 Initializing Parent Portal with modular Firebase...");
