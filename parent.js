@@ -5192,7 +5192,7 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
         if (!phoneSuffix && !email) return linkedStudents;
         
         try {
-            const studentsSnapshot = await db.collection('students').get();
+          const studentsSnapshot = await getDocs(collection(db, 'students'));
             
             studentsSnapshot.forEach(doc => {
                 const data = doc.data();
