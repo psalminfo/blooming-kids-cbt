@@ -7,6 +7,10 @@ import {
     doc, 
     updateDoc 
 } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { 
+    getAuth, 
+    createUserWithEmailAndPassword // <--- Add this
+} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
 // ============================================================================
 // SECTION 1: CORE UTILITIES & SECURITY (OPTIMIZED)
@@ -751,8 +755,8 @@ async function handleSignUpFull(countryCode, localPhone, email, password, confir
         const finalPhone = normalizedResult.normalized;
         console.log("📱 Processing signup with normalized phone:", finalPhone);
 
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        const user = userCredential.user;
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+const user = userCredential.user;
 
         const referralCode = await generateReferralCode();
 
@@ -4038,8 +4042,8 @@ window.handleSignUpFull = async function(countryCode, localPhone, email, passwor
         console.log("📱 Processing signup with normalized phone:", finalPhone);
 
         // Step 1: Create user in Firebase Auth
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        const user = userCredential.user;
+       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+const user = userCredential.user;
 
         // Step 2: Generate referral code
         const referralCode = await generateReferralCode();
