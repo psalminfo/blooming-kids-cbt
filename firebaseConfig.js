@@ -33,10 +33,12 @@ const isDevelopment =
 const firebaseConfig = isDevelopment ? devConfig : mainConfig;
 
 // --- 4. INITIALIZE & EXPORT ---
-// Added 'export' here so parent.js can see these
-export const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
-export const auth = getAuth(app);
+// Initialize the app with the smart-switched config
+const app = firebase.initializeApp(firebaseConfig); 
+
+// Export the compat versions so parent (6).js can import them
+export const db = firebase.firestore();
+export const auth = firebase.auth();
 
 console.log("Environment:", isDevelopment ? "🛠️ DEVELOPMENT" : "🚀 PRODUCTION");
+
