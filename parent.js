@@ -5187,7 +5187,7 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
         if (!phoneSuffix && !email) return linkedStudents;
         
         // Use the globally available 'db' that was imported
-        const studentsSnapshot = await db.collection('students').get();
+        const studentsSnapshot = await firebase.firestore().collection('students').get();
         
         studentsSnapshot.forEach(doc => {
             const data = doc.data();
