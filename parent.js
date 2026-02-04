@@ -5527,5 +5527,234 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
 })();
 
 // ============================================================================
+// SINGLE FIX FOR DOUBLE REGISTRATION & EMAIL LINKING
+// ============================================================================
+
+// 1. FIX: Override the signup function to prevent double registration
+const originalHandleSignUpFull = window.handleSignUpFull;
+window.handleSignUpFull = async function(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader) {
+    const requestId = `signup_${Date.now()}`;
+    pendingRequests.add(requestId);
+    
+    try {
+        let fullPhoneInput = localPhone;
+        if (!localPhone.startsWith('+')) {
+            fullPhoneInput = countryCode + localPhone;
+        }
+        
+        const normalizedResult = normalizePhoneNumber(fullPhoneInput);
+        
+        if (!normalizedResult.valid) {
+            throw new Error(`Invalid phone number: ${normalizedResult.error}`);
+        }
+        
+        const finalPhone = normalizedResult.normalized;
+        console.log("📱 SINGLE SIGNUP with phone:", finalPhone);
+
+        // Step 1: Create user in Firebase Auth
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+
+        // Step 2: Generate referral code
+        const referralCode = await generateReferralCode();
+
+        // Step 3: Create user profile in Firestore - ONLY ONCE
+        await db.collection('parent_users').doc(user.uid).set({
+            email: email,
+            phone: finalPhone,
+            normalizedPhone: finalPhone,
+            parentName: 'Parent',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            referralCode: referralCode,
+            referralEarnings: 0,
+            uid: user.uid
+        });
+
+        console.log("✅ Account created and profile saved");
+        
+        // Step 4: CRITICAL - Link parent email to student records
+        await linkParentEmailToStudents(email, finalPhone);
+        
+        // Step 5: Show success and auto-login
+        showMessage('Account created successfully! Logging you in...', 'success');
+        
+        // Step 6: Clear form
+        if (signUpBtn) signUpBtn.disabled = false;
+        const signUpText = document.getElementById('signUpText');
+        const signUpSpinner = document.getElementById('signUpSpinner');
+        if (signUpText) signUpText.textContent = 'Create Account';
+        if (signUpSpinner) signUpSpinner.classList.add('hidden');
+        if (authLoader) authLoader.classList.add('hidden');
+        
+        // Step 7: Prevent enhanced auth manager from creating duplicate
+        window.skipProfileCreation = true;
+        
+        // Step 8: Short delay and let auth listener handle the rest
+        setTimeout(() => {
+            window.skipProfileCreation = false;
+        }, 5000);
+        
+    } catch (error) {
+        if (!pendingRequests.has(requestId)) return;
+        
+        let errorMessage = "Failed to create account.";
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = "This email is already registered. Please sign in instead.";
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = "Password should be at least 6 characters.";
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+
+        showMessage(errorMessage, 'error');
+
+        if (signUpBtn) signUpBtn.disabled = false;
+        
+        const signUpText = document.getElementById('signUpText');
+        const signUpSpinner = document.getElementById('signUpSpinner');
+        
+        if (signUpText) signUpText.textContent = 'Create Account';
+        if (signUpSpinner) signUpSpinner.classList.add('hidden');
+        if (authLoader) authLoader.classList.add('hidden');
+    } finally {
+        pendingRequests.delete(requestId);
+    }
+};
+
+// 2. FIX: Function to link parent email to student records
+async function linkParentEmailToStudents(parentEmail, parentPhone) {
+    console.log("🔗 Linking parent email to student records...");
+    
+    try {
+        const phoneSuffix = extractPhoneSuffix(parentPhone);
+        if (!phoneSuffix) {
+            console.log("⚠️ No valid phone suffix for linking");
+            return;
+        }
+        
+        // Search for students with matching phone
+        const studentsSnapshot = await db.collection('students').get();
+        let updateCount = 0;
+        
+        // Use batch for efficiency
+        const batch = db.batch();
+        
+        studentsSnapshot.forEach(doc => {
+            const data = doc.data();
+            const studentId = doc.id;
+            
+            // Check all phone fields
+            const phoneFields = [
+                data.parentPhone,
+                data.guardianPhone,
+                data.motherPhone,
+                data.fatherPhone,
+                data.contactPhone,
+                data.phone
+            ];
+            
+            let hasPhoneMatch = false;
+            
+            for (const fieldPhone of phoneFields) {
+                if (fieldPhone && extractPhoneSuffix(fieldPhone) === phoneSuffix) {
+                    hasPhoneMatch = true;
+                    break;
+                }
+            }
+            
+            // If phone matches AND parentEmail is not already set
+            if (hasPhoneMatch && data.parentEmail !== parentEmail) {
+                const studentRef = db.collection('students').doc(studentId);
+                batch.update(studentRef, {
+                    parentEmail: parentEmail,
+                    parentEmailUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                updateCount++;
+                console.log(`✅ Will update student: ${data.studentName || data.name}`);
+            }
+        });
+        
+        if (updateCount > 0) {
+            await batch.commit();
+            console.log(`✅ Successfully linked parent email to ${updateCount} student records`);
+            showMessage(`Your email has been linked to ${updateCount} student record(s)`, 'success');
+        } else {
+            console.log("ℹ️ No matching student records found for linking");
+        }
+        
+    } catch (error) {
+        console.error("❌ Error linking parent email to students:", error);
+        // Don't show error to user - this is a background process
+    }
+}
+
+// 3. FIX: Override enhanced auth manager to skip duplicate creation
+if (window.authManager && window.authManager.loadUserDashboard) {
+    const originalLoadUserDashboard = window.authManager.loadUserDashboard;
+    
+    window.authManager.loadUserDashboard = async function(user) {
+        console.log("🔍 ENHANCED: Loading dashboard with skip check");
+        
+        // Check if we should skip profile creation
+        if (window.skipProfileCreation) {
+            console.log("⏸️ Skipping profile creation - already handled by signup");
+            
+            // Just load the dashboard without creating profile
+            const authArea = document.getElementById("authArea");
+            const reportArea = document.getElementById("reportArea");
+            const authLoader = document.getElementById("authLoader");
+            
+            if (authLoader) authLoader.classList.remove("hidden");
+            
+            try {
+                // Get existing profile
+                const userDoc = await db.collection('parent_users').doc(user.uid).get();
+                
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    this.currentUser = {
+                        uid: user.uid,
+                        email: userData.email,
+                        phone: userData.phone,
+                        normalizedPhone: userData.normalizedPhone || userData.phone,
+                        parentName: userData.parentName || 'Parent',
+                        referralCode: userData.referralCode
+                    };
+                    
+                    this.showDashboardUI();
+                    
+                    // Load data
+                    await Promise.all([
+                        loadAllReportsForParent(this.currentUser.normalizedPhone, user.uid),
+                        loadReferralRewards(user.uid),
+                        loadAcademicsData()
+                    ]);
+                    
+                    this.setupRealtimeMonitoring();
+                    this.setupUIComponents();
+                    
+                } else {
+                    // Fallback to original if profile truly doesn't exist
+                    await originalLoadUserDashboard.call(this, user);
+                }
+                
+            } catch (error) {
+                console.error("Enhanced dashboard error:", error);
+                await originalLoadUserDashboard.call(this, user);
+            } finally {
+                if (authLoader) authLoader.classList.add("hidden");
+            }
+            
+        } else {
+            // Use original function
+            await originalLoadUserDashboard.call(this, user);
+        }
+    };
+}
+
+console.log("✅ SINGLE FIX APPLIED: Double registration & email linking resolved");
+
+// ============================================================================
 // END OF PARENT.JS - PRODUCTION READY
 // ============================================================================
