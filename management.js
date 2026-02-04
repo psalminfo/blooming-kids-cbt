@@ -897,28 +897,32 @@ window.refreshAllDashboardData = async function() {
 // SUBSECTION 3.1: Tutor Directory Panel - OPTIMIZED VERSION
 // ======================================================
 
-// OPTIMIZED HELPER FUNCTIONS
-const safeToString = (value) => {
-    if (value == null) return '';
-    if (typeof value === 'object') {
-        try {
-            return JSON.stringify(value);
-        } catch {
-            return '';
+// OPTIMIZED HELPER FUNCTIONS (ONLY IF NOT ALREADY DEFINED)
+if (typeof safeToString === 'undefined') {
+    const safeToString = (value) => {
+        if (value == null) return '';
+        if (typeof value === 'object') {
+            try {
+                return JSON.stringify(value);
+            } catch {
+                return '';
+            }
         }
-    }
-    return String(value);
-};
+        return String(value);
+    };
+}
 
-const safeSearch = (text, searchTerm) => {
-    if (!searchTerm || safeToString(searchTerm).trim() === '') return true;
-    if (!text) return false;
-    return safeToString(text).toLowerCase().includes(safeToString(searchTerm).toLowerCase());
-};
+if (typeof safeSearch === 'undefined') {
+    const safeSearch = (text, searchTerm) => {
+        if (!searchTerm || safeToString(searchTerm).trim() === '') return true;
+        if (!text) return false;
+        return safeToString(text).toLowerCase().includes(safeToString(searchTerm).toLowerCase());
+    };
+}
 
 // Optimized student search with caching
 const studentSearchCache = new Map();
-function searchStudentFromFirebase(student, searchTerm, tutors = []) {
+function searchStudentFromFirebaseOptimized(student, searchTerm, tutors = []) {
     if (!student) return false;
     if (!searchTerm || safeToString(searchTerm).trim() === '') return true;
     
@@ -979,7 +983,7 @@ const debouncedSearch = (callback, delay = 300) => {
     searchDebounceTimer = setTimeout(callback, delay);
 };
 
-// MAIN RENDER FUNCTION
+// MAIN RENDER FUNCTION - REPLACE EXISTING ONE
 async function renderManagementTutorView(container) {
     // Clear search cache when rendering new view
     studentSearchCache.clear();
@@ -1044,7 +1048,7 @@ async function renderManagementTutorView(container) {
         const searchInput = document.getElementById('directory-search');
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
-                debouncedSearch(() => renderDirectoryFromCache(e.target.value));
+                debouncedSearch(() => renderDirectoryFromCacheOptimized(e.target.value));
             });
         }
         
@@ -1057,12 +1061,12 @@ async function renderManagementTutorView(container) {
         if (reassignBtn) reassignBtn.onclick = window.showEnhancedReassignStudentModal || showBasicReassignModal;
         if (refreshBtn) refreshBtn.onclick = () => {
             studentSearchCache.clear();
-            fetchAndRenderDirectory(true);
+            fetchAndRenderDirectoryOptimized(true);
         };
-        if (historyBtn) historyBtn.onclick = showStudentHistoryModal;
+        if (historyBtn) historyBtn.onclick = showStudentHistoryModalOptimized;
     }, 0);
     
-    fetchAndRenderDirectory();
+    fetchAndRenderDirectoryOptimized();
 }
 
 // Optimized data fetching with parallel requests and caching
@@ -1075,7 +1079,7 @@ let directoryDataCache = {
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-async function fetchAndRenderDirectory(forceRefresh = false) {
+async function fetchAndRenderDirectoryOptimized(forceRefresh = false) {
     const now = Date.now();
     const shouldUseCache = !forceRefresh && 
                           directoryDataCache.tutors && 
@@ -1084,7 +1088,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
     
     if (shouldUseCache) {
         console.log("Using cached directory data");
-        renderDirectoryFromCache();
+        renderDirectoryFromCacheOptimized();
         return;
     }
     
@@ -1208,7 +1212,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
         };
         
         // Update counters
-        updateStudentCounters(activeCount, breakCount, archivedCount, activeTutors.length);
+        updateStudentCountersOptimized(activeCount, breakCount, archivedCount, activeTutors.length);
         
         // Save to session cache for other functions
         saveToLocalStorage('tutors', activeTutors);
@@ -1216,7 +1220,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
         sessionCache.tutorAssignments = tutorAssignmentsMap;
         sessionCache._lastUpdate = now;
         
-        renderDirectoryFromCache();
+        renderDirectoryFromCacheOptimized();
         
     } catch (error) {
         console.error("Error fetching directory data:", error);
@@ -1225,7 +1229,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             directoryList.innerHTML = `
                 <div class="text-center py-10">
                     <p class="text-red-500 mb-4">Failed to load data: ${error.message}</p>
-                    <button onclick="fetchAndRenderDirectory(true)" 
+                    <button onclick="fetchAndRenderDirectoryOptimized(true)" 
                             class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition-colors">
                         Retry Loading Data
                     </button>
@@ -1235,7 +1239,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
     }
 }
 
-function updateStudentCounters(activeCount, breakCount, archivedCount, tutorCount) {
+function updateStudentCountersOptimized(activeCount, breakCount, archivedCount, tutorCount) {
     const activeEl = document.getElementById('active-students-count');
     const breakEl = document.getElementById('break-students-count');
     const archivedEl = document.getElementById('archived-students-count');
@@ -1256,7 +1260,7 @@ function updateStudentCounters(activeCount, breakCount, archivedCount, tutorCoun
     if (archivedSub) archivedSub.textContent = `${archivedCount} completed or moved`;
 }
 
-function renderDirectoryFromCache(searchTerm = '') {
+function renderDirectoryFromCacheOptimized(searchTerm = '') {
     const { tutors = [], students = [], tutorAssignments = {}, stats = {} } = directoryDataCache;
     const directoryList = document.getElementById('directory-list');
     
@@ -1271,7 +1275,7 @@ function renderDirectoryFromCache(searchTerm = '') {
         directoryList.innerHTML = `
             <div class="text-center py-10">
                 <p class="text-gray-500 mb-2">No directory data found.</p>
-                <button onclick="fetchAndRenderDirectory(true)" 
+                <button onclick="fetchAndRenderDirectoryOptimized(true)" 
                         class="text-blue-600 hover:text-blue-800 underline">
                     Click here to fetch from server
                 </button>
@@ -1290,14 +1294,14 @@ function renderDirectoryFromCache(searchTerm = '') {
         
         // Check if any assigned student matches
         const assignedStudents = students.filter(s => s.tutorEmail === tutor.email);
-        return assignedStudents.some(student => searchStudentFromFirebase(student, searchTerm, tutors));
+        return assignedStudents.some(student => searchStudentFromFirebaseOptimized(student, searchTerm, tutors));
     }) : tutors;
     
     if (searchTerm && filteredTutors.length === 0) {
         directoryList.innerHTML = `
             <div class="text-center py-10">
                 <p class="text-gray-500 mb-2">No results found for "${searchTerm}"</p>
-                <button onclick="document.getElementById('directory-search').value = ''; renderDirectoryFromCache();" 
+                <button onclick="document.getElementById('directory-search').value = ''; renderDirectoryFromCacheOptimized();" 
                         class="text-blue-600 hover:text-blue-800 underline">
                     Clear search
                 </button>
@@ -1325,7 +1329,7 @@ function renderDirectoryFromCache(searchTerm = '') {
         // Filter students based on search term
         const displayStudents = searchTerm ? 
             assignedStudents.filter(student => 
-                searchStudentFromFirebase(student, searchTerm, tutors)
+                searchStudentFromFirebaseOptimized(student, searchTerm, tutors)
             ) : assignedStudents;
         
         // Build student table rows
@@ -1372,11 +1376,11 @@ function renderDirectoryFromCache(searchTerm = '') {
             
             const actionButtons = `
                 ${canEditStudents ? `<button class="edit-student-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-full text-xs transition-colors" 
-                                         data-student-id="${student.id}">
+                                         data-student-id="${student.id}" onclick="handleEditStudent('${student.id}')">
                     <i class="fas fa-edit mr-1"></i>Edit
                 </button>` : ''}
                 ${canDeleteStudents ? `<button class="delete-student-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full text-xs transition-colors" 
-                                           data-student-id="${student.id}">
+                                           data-student-id="${student.id}" onclick="handleDeleteStudent('${student.id}')">
                     <i class="fas fa-trash mr-1"></i>Delete
                 </button>` : ''}
                 ${historyButton}
@@ -1486,39 +1490,6 @@ function renderDirectoryFromCache(searchTerm = '') {
     });
     
     directoryList.innerHTML = html;
-    
-    // Add event listeners
-    addDirectoryEventListeners();
-}
-
-function addDirectoryEventListeners() {
-    // Edit student buttons
-    document.querySelectorAll('.edit-student-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const studentId = e.currentTarget.dataset.studentId;
-            handleEditStudent(studentId);
-        });
-    });
-    
-    // Delete student buttons
-    document.querySelectorAll('.delete-student-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const studentId = e.currentTarget.dataset.studentId;
-            handleDeleteStudent(studentId);
-        });
-    });
-    
-    // View history buttons
-    document.querySelectorAll('.view-history-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const studentId = e.currentTarget.dataset.studentId;
-            if (typeof window.viewStudentTutorHistory === 'function') {
-                window.viewStudentTutorHistory(studentId);
-            } else {
-                alert('View history function not available');
-            }
-        });
-    });
 }
 
 // HELPER FUNCTIONS FOR REASSIGN STUDENT (FALLBACK IF ORIGINAL NOT AVAILABLE)
@@ -1649,7 +1620,7 @@ async function showBasicReassignModal() {
                 
                 // Refresh data
                 studentSearchCache.clear();
-                fetchAndRenderDirectory(true);
+                fetchAndRenderDirectoryOptimized(true);
                 
             } catch (error) {
                 console.error("Error reassigning student:", error);
@@ -1664,7 +1635,7 @@ async function showBasicReassignModal() {
 }
 
 // Helper function for student history modal
-function showStudentHistoryModal() {
+function showStudentHistoryModalOptimized() {
     const students = directoryDataCache.students || [];
     const activeStudents = students.filter(student => 
         student && (!student.status || student.status === 'active' || student.status === 'approved')
@@ -1729,17 +1700,6 @@ function showStudentHistoryModal() {
     }
 }
 
-// PLACEHOLDER FUNCTIONS (Will be replaced by existing ones from other files)
-function handleEditStudent(studentId) {
-    alert(`Edit student ${studentId} - This function needs to be implemented`);
-}
-
-function handleDeleteStudent(studentId) {
-    if (confirm(`Are you sure you want to delete student ${studentId}?`)) {
-        alert(`Delete student ${studentId} - This function needs to be implemented`);
-    }
-}
-
 // Ensure global functions exist
 if (typeof window.closeManagementModal === 'undefined') {
     window.closeManagementModal = function(modalId) {
@@ -1751,7 +1711,9 @@ if (typeof window.closeManagementModal === 'undefined') {
 }
 
 // Export to global scope
-window.showEnhancedReassignStudentModal = window.showEnhancedReassignStudentModal || showBasicReassignModal;
+if (typeof window.showEnhancedReassignStudentModal === 'undefined') {
+    window.showEnhancedReassignStudentModal = showBasicReassignModal;
+}
 
 
 // ======================================================
@@ -8827,5 +8789,6 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
