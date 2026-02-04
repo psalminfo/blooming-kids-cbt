@@ -1,10 +1,12 @@
 // ============================================================================
 // FIREBASE CONFIGURATION (Now in separate file)
 // ============================================================================
-const handleFirebaseError = window.firebaseHandleError || ((error) => {
-    console.error("Firebase error:", error);
-    return error.message;
-});
+if (typeof handleFirebaseError === 'undefined') {
+    var handleFirebaseError = window.firebaseHandleError || ((error) => {
+        console.error("Firebase error:", error);
+        return error.message;
+    });
+}
 
 // ============================================================================
 // SECTION 1: CORE UTILITIES & SECURITY (OPTIMIZED)
