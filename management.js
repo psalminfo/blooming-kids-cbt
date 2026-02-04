@@ -897,7 +897,7 @@ window.refreshAllDashboardData = async function() {
 // SUBSECTION 3.1: Tutor Directory Panel - OPTIMIZED VERSION
 // ======================================================
 
-// Optimized helper functions
+// OPTIMIZED HELPER FUNCTIONS
 const safeToString = (value) => {
     if (value == null) return '';
     if (typeof value === 'object') {
@@ -979,6 +979,7 @@ const debouncedSearch = (callback, delay = 300) => {
     searchDebounceTimer = setTimeout(callback, delay);
 };
 
+// MAIN RENDER FUNCTION
 async function renderManagementTutorView(container) {
     // Clear search cache when rendering new view
     studentSearchCache.clear();
@@ -1052,8 +1053,8 @@ async function renderManagementTutorView(container) {
         const refreshBtn = document.getElementById('refresh-directory-btn');
         const historyBtn = document.getElementById('view-tutor-history-directory-btn');
         
-        if (assignBtn) assignBtn.onclick = showAssignStudentModal;
-        if (reassignBtn) reassignBtn.onclick = showEnhancedReassignStudentModal;
+        if (assignBtn) assignBtn.onclick = window.showAssignStudentModal || function() { alert('Assign student feature not available'); };
+        if (reassignBtn) reassignBtn.onclick = window.showEnhancedReassignStudentModal || showBasicReassignModal;
         if (refreshBtn) refreshBtn.onclick = () => {
             studentSearchCache.clear();
             fetchAndRenderDirectory(true);
@@ -1520,6 +1521,148 @@ function addDirectoryEventListeners() {
     });
 }
 
+// HELPER FUNCTIONS FOR REASSIGN STUDENT (FALLBACK IF ORIGINAL NOT AVAILABLE)
+async function showBasicReassignModal() {
+    try {
+        const { students = [], tutors = [] } = directoryDataCache;
+        
+        const assignedStudents = students.filter(s => s.tutorEmail && s.tutorEmail.trim() !== '');
+        if (assignedStudents.length === 0) {
+            alert("No students are currently assigned to tutors.");
+            return;
+        }
+        
+        const studentOptions = assignedStudents.map(student => {
+            const currentTutor = tutors.find(t => t.email === student.tutorEmail);
+            return `
+                <option value="${student.id}">
+                    ${student.studentName} (Grade: ${student.grade}) - Currently with: ${currentTutor?.name || 'Unknown'}
+                </option>
+            `;
+        }).join('');
+        
+        const tutorOptions = tutors.map(tutor => 
+            `<option value="${tutor.email}">${tutor.name} (${tutor.email})</option>`
+        ).join('');
+        
+        const modalHtml = `
+            <div id="basic-reassign-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+                <div class="relative bg-white w-full max-w-lg rounded-lg shadow-xl">
+                    <div class="flex items-center justify-between p-6 border-b">
+                        <h3 class="text-xl font-bold text-blue-700">Reassign Student</h3>
+                        <button onclick="closeManagementModal('basic-reassign-modal')" 
+                                class="text-gray-400 hover:text-gray-800 text-2xl font-bold transition-colors">
+                            &times;
+                        </button>
+                    </div>
+                    <div class="p-6">
+                        <form id="basic-reassign-form">
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Select Student</label>
+                                <select id="basic-student-select" required class="w-full p-3 border rounded-lg">
+                                    <option value="">Select a student...</option>
+                                    ${studentOptions}
+                                </select>
+                            </div>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Select New Tutor</label>
+                                <select id="basic-tutor-select" required class="w-full p-3 border rounded-lg">
+                                    <option value="">Select a tutor...</option>
+                                    ${tutorOptions}
+                                </select>
+                            </div>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Reason (Optional)</label>
+                                <textarea id="basic-reassign-reason" class="w-full p-3 border rounded-lg" rows="3"></textarea>
+                            </div>
+                            <div class="flex justify-end space-x-3">
+                                <button type="button" onclick="closeManagementModal('basic-reassign-modal')" 
+                                        class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
+                                    Cancel
+                                </button>
+                                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                                    Reassign Student
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        document.getElementById('basic-reassign-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const studentId = document.getElementById('basic-student-select').value;
+            const tutorEmail = document.getElementById('basic-tutor-select').value;
+            const reason = document.getElementById('basic-reassign-reason').value;
+            
+            if (!studentId || !tutorEmail) {
+                alert("Please select both a student and a tutor.");
+                return;
+            }
+            
+            const student = students.find(s => s.id === studentId);
+            const newTutor = tutors.find(t => t.email === tutorEmail);
+            
+            if (!student || !newTutor) {
+                alert("Student or tutor not found.");
+                return;
+            }
+            
+            if (student.tutorEmail === tutorEmail) {
+                alert("Student is already assigned to this tutor.");
+                return;
+            }
+            
+            if (!confirm(`Reassign "${student.studentName}" to ${newTutor.name}?`)) {
+                return;
+            }
+            
+            try {
+                // Update student in Firestore
+                await updateDoc(doc(db, "students", studentId), {
+                    tutorEmail: newTutor.email,
+                    tutorName: newTutor.name,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: window.userData?.email || 'management'
+                });
+                
+                // Create assignment history
+                await addDoc(collection(db, "tutorAssignments"), {
+                    studentId: studentId,
+                    studentName: student.studentName,
+                    oldTutorEmail: student.tutorEmail,
+                    newTutorEmail: newTutor.email,
+                    newTutorName: newTutor.name,
+                    reason: reason || 'Reassignment',
+                    assignedBy: window.userData?.name || 'Admin',
+                    assignedByEmail: window.userData?.email || 'admin',
+                    assignedAt: new Date().toISOString(),
+                    timestamp: new Date().toISOString()
+                });
+                
+                alert("Student reassigned successfully!");
+                closeManagementModal('basic-reassign-modal');
+                
+                // Refresh data
+                studentSearchCache.clear();
+                fetchAndRenderDirectory(true);
+                
+            } catch (error) {
+                console.error("Error reassigning student:", error);
+                alert("Failed to reassign student: " + error.message);
+            }
+        });
+        
+    } catch (error) {
+        console.error("Error showing reassign modal:", error);
+        alert("Failed to load reassign data.");
+    }
+}
+
 // Helper function for student history modal
 function showStudentHistoryModal() {
     const students = directoryDataCache.students || [];
@@ -1578,28 +1721,37 @@ function showStudentHistoryModal() {
                 closeManagementModal('select-student-modal');
                 if (typeof window.viewStudentTutorHistory === 'function') {
                     window.viewStudentTutorHistory(studentId);
+                } else {
+                    alert("Tutor history feature not available");
                 }
             }
         });
     }
 }
 
-// Optimized modal close function
+// PLACEHOLDER FUNCTIONS (Will be replaced by existing ones from other files)
+function handleEditStudent(studentId) {
+    alert(`Edit student ${studentId} - This function needs to be implemented`);
+}
+
+function handleDeleteStudent(studentId) {
+    if (confirm(`Are you sure you want to delete student ${studentId}?`)) {
+        alert(`Delete student ${studentId} - This function needs to be implemented`);
+    }
+}
+
+// Ensure global functions exist
 if (typeof window.closeManagementModal === 'undefined') {
     window.closeManagementModal = function(modalId) {
         const modal = document.getElementById(modalId);
         if (modal) {
-            modal.classList.add('opacity-0', 'scale-95');
-            setTimeout(() => modal.remove(), 150);
+            modal.remove();
         }
     };
 }
 
 // Export to global scope
-if (typeof window.showEnhancedReassignStudentModal === 'undefined') {
-    window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
-    window.closeReassignModal = closeReassignModal;
-}
+window.showEnhancedReassignStudentModal = window.showEnhancedReassignStudentModal || showBasicReassignModal;
 
 
 // ======================================================
@@ -8675,4 +8827,5 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
