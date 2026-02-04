@@ -604,6 +604,73 @@
         </div>
     </div>
 
-    <script type="module" src="parent.js"></script>
+    <script type="module">
+        // Import Firebase configuration and functions
+        import {
+            db,
+            auth,
+            collection,
+            doc,
+            getDoc,
+            getDocs,
+            query,
+            where,
+            setDoc,
+            updateDoc,
+            serverTimestamp,
+            onSnapshot,
+            createUserWithEmailAndPassword,
+            signInWithEmailAndPassword,
+            signOut,
+            onAuthStateChanged,
+            sendPasswordResetEmail,
+            updateProfile,
+            limit,
+            orderBy
+        } from './firebaseParentConfig.js';
+
+        // Import the main parent portal logic
+        import { initializeParentPortalV2 } from './parent.js';
+
+        // Attach Firebase modules to window for compatibility
+        window.firebase = {
+            firestore: {
+                FieldValue: { serverTimestamp }
+            }
+        };
+
+        // Attach individual modules for use in parent.js
+        window.db = db;
+        window.auth = auth;
+        window.firestoreFunctions = {
+            collection,
+            doc,
+            getDoc,
+            getDocs,
+            query,
+            where,
+            setDoc,
+            updateDoc,
+            serverTimestamp,
+            onSnapshot,
+            limit,
+            orderBy
+        };
+        
+        window.authFunctions = {
+            createUserWithEmailAndPassword,
+            signInWithEmailAndPassword,
+            signOut,
+            onAuthStateChanged,
+            sendPasswordResetEmail,
+            updateProfile
+        };
+
+        // Initialize the app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("🚀 Initializing Parent Portal with modular Firebase...");
+            initializeParentPortalV2();
+        });
+    </script>
 </body>
 </html>
