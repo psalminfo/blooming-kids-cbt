@@ -1317,23 +1317,7 @@ function renderDirectoryFromCache(searchTerm = '') {
             })
             .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
 
-        // Count students by status (EXCLUDING archived)
-        const activeStudentsCount = assignedStudents.filter(s => {
-            if (!s.status) return true;
-            const statusLower = s.status.toLowerCase();
-            return statusLower === 'active' || 
-                   statusLower === 'approved' || 
-                   statusLower === '' ||
-                   (!statusLower.includes('break') && 
-                    !statusLower.includes('pause') && 
-                    !statusLower.includes('hold') && 
-                    !statusLower.includes('suspended') &&
-                    !statusLower.includes('transition') && 
-                    !statusLower.includes('transfer') &&
-                    !statusLower.includes('moving') &&
-                    !statusLower.includes('changing'));
-        }).length;
-        
+        // Count students by status (EXCLUDING archived) - FIXED LOGIC
         const breakStudentsCount = assignedStudents.filter(s => {
             if (!s.status) return false;
             const statusLower = s.status.toLowerCase();
@@ -1352,27 +1336,60 @@ function renderDirectoryFromCache(searchTerm = '') {
                    statusLower.includes('changing');
         }).length;
         
+        // Active students are those NOT break and NOT transitioning
+        const activeStudentsCount = assignedStudents.filter(s => {
+            if (!s.status) return true; // No status means active by default
+            
+            const statusLower = s.status.toLowerCase();
+            
+            // Check if it's a break status
+            const isBreak = statusLower.includes('break') || 
+                           statusLower.includes('pause') ||
+                           statusLower.includes('hold') ||
+                           statusLower.includes('suspended');
+            
+            // Check if it's a transitioning status
+            const isTransitioning = statusLower.includes('transition') || 
+                                   statusLower.includes('transfer') ||
+                                   statusLower.includes('moving') ||
+                                   statusLower.includes('changing');
+            
+            // Active if NOT break AND NOT transitioning
+            return !isBreak && !isTransitioning;
+        }).length;
+        
         const totalStudentsCount = assignedStudents.length;
 
         const studentsTableRows = assignedStudents.map(student => {
-            // Get status indicator with proper alignment
+            // Get status indicator with proper alignment - FIXED LOGIC
             let statusBadge = '';
+            let statusColor = 'green';
+            let statusText = 'Active';
+            
             if (student.status) {
                 const statusLower = student.status.toLowerCase();
+                
                 if (statusLower.includes('break') || statusLower.includes('pause') || statusLower.includes('hold') || statusLower.includes('suspended')) {
-                    statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 ml-2">On Break</span>`;
+                    statusColor = 'yellow';
+                    statusText = 'On Break';
                 } else if (statusLower.includes('transition') || statusLower.includes('transfer') || statusLower.includes('moving') || statusLower.includes('changing')) {
-                    statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 ml-2">Transitioning</span>`;
+                    statusColor = 'purple';
+                    statusText = 'Transitioning';
                 } else if (statusLower === 'active' || statusLower === 'approved' || statusLower === '') {
-                    statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">Active</span>`;
+                    statusColor = 'green';
+                    statusText = 'Active';
                 } else {
                     // Other non-archived statuses
-                    statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 ml-2">${student.status}</span>`;
+                    statusColor = 'gray';
+                    statusText = student.status;
                 }
             } else {
                 // No status specified - default to Active
-                statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">Active</span>`;
+                statusColor = 'green';
+                statusText = 'Active';
             }
+            
+            statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${statusColor}-100 text-${statusColor}-800 ml-2">${statusText}</span>`;
             
             const subjects = Array.isArray(student.subjects) ? 
                 student.subjects.join(', ') : 
@@ -9454,4 +9471,5 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
