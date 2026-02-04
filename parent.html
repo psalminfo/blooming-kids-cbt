@@ -7,7 +7,12 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
     <link rel="icon" href="favicon.ico" />
 
-    <!-- Firebase will be loaded by firebaseParentConfig.js -->
+    <!-- Firebase Dependencies -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    
+    <!-- Other Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
     
@@ -252,7 +257,7 @@
 
     <div class="w-full max-w-6xl">
         <div class="text-center mb-8">
-            <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
+            <img src="https://res.cloudinary.com/dy2xcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
                  alt="Blooming Kids House Logo" 
                  class="h-20 w-auto mx-auto logo-glow mb-4">
             <h1 class="text-4xl font-bold text-green-800 mb-2">Parent Portal</h1>
@@ -604,69 +609,50 @@
         </div>
     </div>
 
-    <script type="module">
-        // Import Firebase configuration and functions
-        import {
-            db,
-            auth,
-            collection,
-            doc,
-            getDoc,
-            getDocs,
-            query,
-            where,
-            setDoc,
-            updateDoc,
-            serverTimestamp,
-            onSnapshot,
-            createUserWithEmailAndPassword,
-            signInWithEmailAndPassword,
-            signOut,
-            onAuthStateChanged,
-            sendPasswordResetEmail,
-            updateProfile,
-            limit,
-            orderBy
-        } from './firebaseParentConfig.js';
+    <!-- Load Firebase configuration -->
+    <script src="firebaseParentConfig.js"></script>
+    
+    <!-- Load main parent portal logic -->
+    <script src="parent.js"></script>
 
-        // Import the main parent portal logic
-        import { initializeParentPortalV2 } from './parent.js';
-
-        // Attach Firebase modules to window for compatibility
-        window.firebase = {
-            firestore: {
-                FieldValue: { serverTimestamp }
+    <script>
+        // Wait for DOM to be fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("🚀 Parent Portal initialized");
+            
+            // Initialize parent portal
+            if (typeof initializeParentPortal === 'function') {
+                initializeParentPortal();
+            } else if (typeof initializeParentPortalV2 === 'function') {
+                initializeParentPortalV2();
+            } else {
+                console.error("Parent portal initialization function not found!");
             }
-        };
-
-        // Attach individual modules for use in parent.js
-        window.db = db;
-        window.auth = auth;
-        window.firestoreFunctions = {
-            collection,
-            doc,
-            getDoc,
-            getDocs,
-            query,
-            where,
-            setDoc,
-            updateDoc,
-            serverTimestamp,
-            onSnapshot,
-            limit,
-            orderBy
-        };
+        });
         
-        window.authFunctions = {
-            createUserWithEmailAndPassword,
-            signInWithEmailAndPassword,
-            signOut,
-            onAuthStateChanged,
-            sendPasswordResetEmail,
-            updateProfile
-        };
-
-        // Define global functions that need to be accessible from HTML event handlers
+        // Global helper function to show toast messages
+        function showToast(message, type = 'success') {
+            const toastContainer = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            toastContainer.appendChild(toast);
+            
+            // Show toast
+            setTimeout(() => toast.classList.add('show'), 100);
+            
+            // Remove toast after 5 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                }, 300);
+            }, 5000);
+        }
+        
+        // Global toggleAccordion function
         window.toggleAccordion = function(id) {
             const content = document.getElementById(`content-${id}`);
             const icon = document.getElementById(`icon-${id}`);
@@ -685,10 +671,11 @@
                 }
             }
         };
-
+        
+        // Global logout function
         window.logout = function() {
-            if (window.authFunctions && window.authFunctions.signOut) {
-                window.authFunctions.signOut(window.auth)
+            if (window.firebaseAuth && typeof window.firebaseAuth.signOut === 'function') {
+                window.firebaseAuth.signOut()
                     .then(() => {
                         window.location.reload();
                     })
@@ -696,24 +683,53 @@
                         console.error('Logout error:', error);
                         showToast('Error logging out. Please try again.', 'error');
                     });
+            } else {
+                showToast('Logout function not available. Please refresh the page.', 'error');
             }
         };
-
+        
+        // Global modal functions
         window.hideFeedbackModal = function() {
             const modal = document.getElementById('feedbackModal');
             if (modal) modal.classList.add('hidden');
         };
-
+        
         window.hideResponsesModal = function() {
             const modal = document.getElementById('responsesModal');
             if (modal) modal.classList.add('hidden');
         };
-
-        // Initialize the app when DOM is loaded
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log("🚀 Initializing Parent Portal with modular Firebase...");
-            initializeParentPortalV2();
-        });
+        
+        // Global generatePDF function (if needed)
+        window.generatePDF = function(elementId, filename = 'report.pdf') {
+            const element = document.getElementById(elementId);
+            if (!element) {
+                showToast('Report content not found.', 'error');
+                return;
+            }
+            
+            const opt = {
+                margin: [10, 10, 10, 10],
+                filename: filename,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            
+            showToast('Generating PDF...', 'success');
+            
+            // Temporarily show all content
+            const hiddenElements = element.querySelectorAll('.hidden');
+            hiddenElements.forEach(el => el.classList.remove('hidden'));
+            
+            html2pdf().set(opt).from(element).save().then(() => {
+                // Restore hidden elements
+                hiddenElements.forEach(el => el.classList.add('hidden'));
+                showToast('PDF downloaded successfully!', 'success');
+            }).catch(err => {
+                console.error('PDF generation error:', err);
+                showToast('Failed to generate PDF.', 'error');
+            });
+        };
     </script>
 </body>
 </html>
