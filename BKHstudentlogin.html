@@ -38,7 +38,7 @@
                 <h1 class="text-3xl font-bold text-gray-900">Welcome, <span id="student-name">...</span></h1>
                 <p class="text-gray-500">Assigned Tutor: <span id="tutor-name" class="font-semibold text-brand-primary">Loading...</span></p>
             </div>
-            <button onclick="logout()" class="px-6 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all">Sign Out</button>
+            <button id="logout-btn" class="px-6 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all">Sign Out</button>
         </header>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -74,33 +74,97 @@
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
         import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
+        // Global logout function
+        window.logout = async () => {
+            try {
+                await signOut(auth);
+                window.location.href = 'studentsignup.html';
+            } catch (error) {
+                console.error('Logout error:', error);
+                alert('Error signing out. Please try again.');
+            }
+        };
+
+        // Initialize logout button
+        document.getElementById('logout-btn').addEventListener('click', window.logout);
+
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                document.getElementById('student-name').innerText = user.displayName || "Student";
-                
-                // CRITICAL: Fetch the assigned tutor for this specific user UID
-                const q = query(collection(db, "students"), where("studentUid", "==", user.uid));
-                const snap = await getDocs(q);
-                
-                if (!snap.empty) {
-                    const studentData = snap.docs[0].data();
-                    document.getElementById('tutor-name').innerText = studentData.assignedTutor || "Not Assigned";
+                try {
+                    document.getElementById('student-name').innerText = user.displayName || "Student";
                     
-                    // Now load homework for this tutor + student
-                    loadHomework(studentData.assignedTutor, user.displayName);
+                    // Fetch the assigned tutor for this specific user UID
+                    const q = query(collection(db, "students"), where("studentUid", "==", user.uid));
+                    const snap = await getDocs(q);
+                    
+                    if (!snap.empty) {
+                        const studentData = snap.docs[0].data();
+                        document.getElementById('tutor-name').innerText = studentData.assignedTutor || "Not Assigned";
+                        
+                        // Load homework for this tutor + student
+                        await loadHomework(studentData.assignedTutor, user.displayName);
+                    } else {
+                        console.log("No student data found");
+                        document.getElementById('tutor-name').innerText = "Not Assigned";
+                    }
+                } catch (error) {
+                    console.error('Error loading user data:', error);
+                    document.getElementById('tutor-name').innerText = "Error loading data";
                 }
             } else {
-              window.location.href = 'studentsignup.html';
+                window.location.href = 'studentsignup.html';
             }
         });
 
         async function loadHomework(tutorEmail, studentName) {
             const container = document.getElementById('homework-list');
-            // Logic to pull from your homework collection based on tutorEmail
-            // Matches the inbox logic in your tutor.js
-        }
+            
+            try {
+                // Clear loading animation
+                container.innerHTML = '';
+                
+                if (!tutorEmail) {
+                    container.innerHTML = '<p class="text-gray-500">No tutor assigned yet.</p>';
+                    return;
+                }
 
-        window.logout = () => signOut(auth);
+                // Query homework collection
+                const homeworkQuery = query(
+                    collection(db, "homework"),
+                    where("studentName", "==", studentName),
+                    where("tutorEmail", "==", tutorEmail)
+                );
+                
+                const snapshot = await getDocs(homeworkQuery);
+                
+                if (snapshot.empty) {
+                    container.innerHTML = '<p class="text-gray-500">No assignments found.</p>';
+                    return;
+                }
+
+                // Display homework items
+                snapshot.forEach((doc) => {
+                    const hw = doc.data();
+                    const hwElement = document.createElement('div');
+                    hwElement.className = 'p-4 bg-gray-50 rounded-xl border border-gray-200';
+                    hwElement.innerHTML = `
+                        <h4 class="font-bold text-gray-800">${hw.subject || 'Assignment'}</h4>
+                        <p class="text-gray-600 mt-1">${hw.description || 'No description provided'}</p>
+                        <div class="flex justify-between items-center mt-3">
+                            <span class="text-sm text-gray-500">Due: ${hw.dueDate || 'Not specified'}</span>
+                            <span class="px-3 py-1 text-sm rounded-full ${hw.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                                ${hw.status || 'pending'}
+                            </span>
+                        </div>
+                    `;
+                    container.appendChild(hwElement);
+                });
+
+            } catch (error) {
+                console.error('Error loading homework:', error);
+                container.innerHTML = '<p class="text-red-500">Error loading assignments. Please try again.</p>';
+            }
+        }
     </script>
 </body>
 </html>
