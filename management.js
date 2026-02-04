@@ -897,292 +897,259 @@ window.refreshAllDashboardData = async function() {
 // SUBSECTION 3.1: Tutor Directory Panel - OPTIMIZED VERSION
 // ======================================================
 
-// OPTIMIZED HELPER FUNCTIONS (ONLY IF NOT ALREADY DEFINED)
-if (typeof safeToString === 'undefined') {
-    const safeToString = (value) => {
-        if (value == null) return '';
-        if (typeof value === 'object') {
-            try {
-                return JSON.stringify(value);
-            } catch {
-                return '';
-            }
-        }
-        return String(value);
-    };
+// Cache for faster loading
+let directoryCache = null;
+let lastCacheTime = 0;
+const CACHE_TTL = 300000; // 5 minutes cache
+
+// Optimized helper function to get student status
+function getStudentStatus(student) {
+    if (!student) return 'active';
+    
+    if (student.summerBreak === true || student.isOnBreak === true || student.status === 'break') {
+        return 'break';
+    }
+    if (student.status === 'archived' || student.status === 'graduated' || student.status === 'transferred') {
+        return 'archived';
+    }
+    if (student.status === 'transitioning' || student.isTransitioning === true) {
+        return 'transitioning';
+    }
+    return 'active';
 }
 
-if (typeof safeSearch === 'undefined') {
-    const safeSearch = (text, searchTerm) => {
-        if (!searchTerm || safeToString(searchTerm).trim() === '') return true;
-        if (!text) return false;
-        return safeToString(text).toLowerCase().includes(safeToString(searchTerm).toLowerCase());
-    };
+// Optimized status badge HTML generator
+function getStatusBadgeHTML(status) {
+    switch(status) {
+        case 'break':
+            return `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                <i class="fas fa-pause-circle mr-1"></i>On Break
+            </span>`;
+        case 'archived':
+            return `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                <i class="fas fa-archive mr-1"></i>Archived
+            </span>`;
+        case 'transitioning':
+            return `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <i class="fas fa-exchange-alt mr-1"></i>Transitioning
+            </span>`;
+        default:
+            return `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                <i class="fas fa-check-circle mr-1"></i>Active
+            </span>`;
+    }
 }
 
-// Optimized student search with caching
-const studentSearchCache = new Map();
-function searchStudentFromFirebaseOptimized(student, searchTerm, tutors = []) {
-    if (!student) return false;
-    if (!searchTerm || safeToString(searchTerm).trim() === '') return true;
-    
-    const cacheKey = `${student.id}_${searchTerm.toLowerCase()}`;
-    if (studentSearchCache.has(cacheKey)) {
-        return studentSearchCache.get(cacheKey);
-    }
-    
-    const searchLower = safeToString(searchTerm).toLowerCase();
-    const studentFields = ['studentName', 'grade', 'days', 'parentName', 'parentPhone', 
-                          'parentEmail', 'address', 'status', 'tutorEmail', 'tutorName',
-                          'createdBy', 'updatedBy', 'notes', 'school', 'location'];
-    
-    // Check student fields
-    for (const field of studentFields) {
-        if (student[field] && safeToString(student[field]).toLowerCase().includes(searchLower)) {
-            studentSearchCache.set(cacheKey, true);
-            return true;
-        }
-    }
-    
-    // Check fee
-    if (student.studentFee != null && safeToString(student.studentFee).includes(searchLower)) {
-        studentSearchCache.set(cacheKey, true);
-        return true;
-    }
-    
-    // Check subjects
-    if (student.subjects) {
-        const subjects = Array.isArray(student.subjects) ? student.subjects : [student.subjects];
-        if (subjects.some(subject => safeToString(subject).toLowerCase().includes(searchLower))) {
-            studentSearchCache.set(cacheKey, true);
-            return true;
-        }
-    }
-    
-    // Check tutor info
-    if (student.tutorEmail && tutors.length) {
-        const tutor = tutors.find(t => t?.email === student.tutorEmail);
-        if (tutor) {
-            const tutorFields = ['name', 'email', 'phone', 'qualification', 'subjects'];
-            if (tutorFields.some(field => 
-                tutor[field] && safeToString(tutor[field]).toLowerCase().includes(searchLower))) {
-                studentSearchCache.set(cacheKey, true);
-                return true;
-            }
-        }
-    }
-    
-    studentSearchCache.set(cacheKey, false);
-    return false;
-}
-
-// Optimized render function with debounced search
-let searchDebounceTimer;
-const debouncedSearch = (callback, delay = 300) => {
-    clearTimeout(searchDebounceTimer);
-    searchDebounceTimer = setTimeout(callback, delay);
-};
-
-// MAIN RENDER FUNCTION - REPLACE EXISTING ONE
 async function renderManagementTutorView(container) {
-    // Clear search cache when rendering new view
-    studentSearchCache.clear();
-    
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
                 <h2 class="text-2xl font-bold text-green-700">Tutor & Student Directory</h2>
                 <div class="flex items-center gap-4 flex-wrap">
-                    <input type="search" id="directory-search" placeholder="Search Tutors, Students, Parents, Subjects, Grades..." 
-                           class="p-2 border rounded-md w-64 focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    <button id="assign-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors">
-                        Assign New Student
-                    </button>
-                    <button id="reassign-student-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors">
-                        Reassign Student
-                    </button>
-                    <button id="view-tutor-history-directory-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition-colors">
-                        View Tutor History
-                    </button>
-                    <button id="refresh-directory-btn" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors">
-                        <i class="fas fa-sync-alt mr-1"></i> Refresh
-                    </button>
+                    <input type="search" id="directory-search" placeholder="Search Tutors, Students, Parents, Subjects, Grades..." class="p-2 border rounded-md w-64">
+                    <button id="assign-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Assign New Student</button>
+                    <button id="reassign-student-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Reassign Student</button>
+                    <button id="view-tutor-history-directory-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">View Tutor History</button>
+                    <button id="refresh-directory-btn" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Refresh</button>
                 </div>
             </div>
-            
-            <!-- Student Status Counters -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div class="bg-green-100 p-4 rounded-lg shadow text-center">
-                    <h4 class="font-bold text-green-800 text-sm mb-1">Active Tutors</h4>
-                    <p id="tutor-count-badge" class="text-2xl font-extrabold text-green-700">0</p>
+            <div class="flex space-x-4 mb-4">
+                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-green-800 text-sm">Active Tutors</h4>
+                    <p id="tutor-count-badge" class="text-2xl font-extrabold">0</p>
                 </div>
-                <div class="bg-blue-100 p-4 rounded-lg shadow text-center">
-                    <h4 class="font-bold text-blue-800 text-sm mb-1">Active Students</h4>
-                    <p id="active-students-count" class="text-2xl font-extrabold text-blue-700">0</p>
-                    <p class="text-xs text-blue-600 mt-1" id="active-students-subtext">Currently learning</p>
+                <div class="bg-blue-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-blue-800 text-sm">Active Students</h4>
+                    <p id="active-students-count" class="text-2xl font-extrabold">0</p>
                 </div>
-                <div class="bg-yellow-100 p-4 rounded-lg shadow text-center">
-                    <h4 class="font-bold text-yellow-800 text-sm mb-1">On Break</h4>
-                    <p id="break-students-count" class="text-2xl font-extrabold text-yellow-700">0</p>
-                    <p class="text-xs text-yellow-600 mt-1" id="break-students-subtext">Temporary pause</p>
+                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-yellow-800 text-sm">On Break</h4>
+                    <p id="break-students-count" class="text-2xl font-extrabold">0</p>
                 </div>
-                <div class="bg-red-100 p-4 rounded-lg shadow text-center">
-                    <h4 class="font-bold text-red-800 text-sm mb-1">Archived/Transition</h4>
-                    <p id="archived-students-count" class="text-2xl font-extrabold text-red-700">0</p>
-                    <p class="text-xs text-red-600 mt-1" id="archived-students-subtext">Completed or moved</p>
+                <div class="bg-red-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-red-800 text-sm">Archived/Transition</h4>
+                    <p id="archived-students-count" class="text-2xl font-extrabold">0</p>
                 </div>
             </div>
-            
-            <!-- Tutor List with Summary -->
             <div id="directory-list" class="space-y-4">
-                <div class="text-center py-10">
-                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
-                    <p class="text-gray-500 mt-2">Loading directory...</p>
-                </div>
+                <p class="text-center text-gray-500 py-10">Loading directory...</p>
             </div>
         </div>
     `;
     
-    // Add event listeners
-    setTimeout(() => {
-        const searchInput = document.getElementById('directory-search');
-        if (searchInput) {
-            searchInput.addEventListener('input', (e) => {
-                debouncedSearch(() => renderDirectoryFromCacheOptimized(e.target.value));
-            });
-        }
-        
-        const assignBtn = document.getElementById('assign-student-btn');
-        const reassignBtn = document.getElementById('reassign-student-btn');
-        const refreshBtn = document.getElementById('refresh-directory-btn');
-        const historyBtn = document.getElementById('view-tutor-history-directory-btn');
-        
-        if (assignBtn) assignBtn.onclick = window.showAssignStudentModal || function() { alert('Assign student feature not available'); };
-        if (reassignBtn) reassignBtn.onclick = window.showEnhancedReassignStudentModal || showBasicReassignModal;
-        if (refreshBtn) refreshBtn.onclick = () => {
-            studentSearchCache.clear();
-            fetchAndRenderDirectoryOptimized(true);
-        };
-        if (historyBtn) historyBtn.onclick = showStudentHistoryModalOptimized;
-    }, 0);
-    
-    fetchAndRenderDirectoryOptimized();
-}
-
-// Optimized data fetching with parallel requests and caching
-let directoryDataCache = {
-    tutors: null,
-    students: null,
-    tutorAssignments: null,
-    lastFetch: 0
-};
-
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
-async function fetchAndRenderDirectoryOptimized(forceRefresh = false) {
-    const now = Date.now();
-    const shouldUseCache = !forceRefresh && 
-                          directoryDataCache.tutors && 
-                          directoryDataCache.students &&
-                          (now - directoryDataCache.lastFetch) < CACHE_DURATION;
-    
-    if (shouldUseCache) {
-        console.log("Using cached directory data");
-        renderDirectoryFromCacheOptimized();
-        return;
-    }
-    
+    // Add event listeners - wrapped in try-catch to prevent crash if elements missing
     try {
-        const directoryList = document.getElementById('directory-list');
-        if (directoryList) {
-            directoryList.innerHTML = `
-                <div class="text-center py-10">
-                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
-                    <p class="text-gray-500 mt-2">Fetching data from server...</p>
+        document.getElementById('assign-student-btn').addEventListener('click', showAssignStudentModal);
+        document.getElementById('reassign-student-btn').addEventListener('click', showEnhancedReassignStudentModal);
+        document.getElementById('refresh-directory-btn').addEventListener('click', () => {
+            directoryCache = null; // Clear cache on refresh
+            fetchAndRenderDirectory(true);
+        });
+        document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
+        
+        document.getElementById('view-tutor-history-directory-btn').addEventListener('click', async () => {
+            if (!sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
+                alert("No tutor history available. Please refresh the directory first.");
+                return;
+            }
+            
+            const students = sessionCache.students || [];
+            const activeStudents = students.filter(student => 
+                student && (!student.status || student.status === 'active' || student.status === 'approved')
+            );
+            
+            if (activeStudents.length === 0) {
+                alert("No active students found.");
+                return;
+            }
+            
+            const studentOptions = activeStudents.map(student => 
+                `<option value="${student.id}">${student.studentName} (${student.grade || 'No grade'})</option>`
+            ).join('');
+            
+            const modalHtml = `
+                <div id="select-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                    <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
+                        <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('select-student-modal')">&times;</button>
+                        <h3 class="text-xl font-bold mb-4">Select Student to View Tutor History</h3>
+                        <form id="select-student-form">
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-2">Select Student</label>
+                                <select id="select-student" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                    <option value="" disabled selected>Select a student...</option>
+                                    ${studentOptions}
+                                </select>
+                            </div>
+                            <div class="flex justify-end mt-4">
+                                <button type="button" onclick="closeManagementModal('select-student-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                                <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">View History</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             `;
-        }
-        
-        // Parallel fetch for better performance
-        const [tutorsSnapshot, studentsSnapshot, tutorAssignmentsSnapshot] = await Promise.all([
-            getDocs(query(collection(db, "tutors"), orderBy("name"))),
-            getDocs(query(collection(db, "students"), orderBy("studentName"))),
-            getDocs(query(collection(db, "tutorAssignments"), orderBy("assignedAt", "desc")))
-        ]);
-        
-        console.log(`Fetched: ${tutorsSnapshot.size} tutors, ${studentsSnapshot.size} students, ${tutorAssignmentsSnapshot.size} assignments`);
-        
-        // Process data
-        const activeTutors = [];
-        const allStudents = [];
-        const tutorAssignmentsMap = {};
-        
-        // Process tutors
-        tutorsSnapshot.docs.forEach(doc => {
-            const data = doc.data();
-            if (!data.status || data.status === 'active') {
-                activeTutors.push({
-                    id: doc.id,
-                    name: data.name || 'Unnamed Tutor',
-                    email: data.email || '',
-                    phone: data.phone || '',
-                    subjects: Array.isArray(data.subjects) ? data.subjects : (data.subjects ? [data.subjects] : []),
-                    ...data
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            const form = document.getElementById('select-student-form');
+            if(form) {
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const selectEl = document.getElementById('select-student');
+                    if (selectEl) {
+                        const studentId = selectEl.value;
+                        closeManagementModal('select-student-modal');
+                        if (typeof window.viewStudentTutorHistory === 'function') {
+                            window.viewStudentTutorHistory(studentId);
+                        }
+                    }
                 });
             }
         });
+    } catch (e) {
+        console.error("Error attaching event listeners:", e);
+    }
+    
+    fetchAndRenderDirectory();
+}
+
+async function fetchAndRenderDirectory(forceRefresh = false) {
+    // Use cache if available and not forced refresh
+    const now = Date.now();
+    if (!forceRefresh && directoryCache && (now - lastCacheTime) < CACHE_TTL) {
+        console.log("Using cached directory data");
+        renderDirectoryFromCache();
+        return;
+    }
+
+    if (forceRefresh) {
+        invalidateCache('tutors');
+        invalidateCache('students');
+        invalidateCache('tutorAssignments');
+    }
+
+    try {
+        const directoryList = document.getElementById('directory-list');
+        if (directoryList) {
+            directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data from server...</p>`;
+        }
         
-        // Process students with status categorization
-        let activeCount = 0;
-        let breakCount = 0;
-        let archivedCount = 0;
+        // Fetch all data in parallel - OPTIMIZED
+        const [tutorsSnapshot, studentsSnapshot, tutorAssignmentsSnapshot] = await Promise.all([
+            getDocs(query(collection(db, "tutors"), orderBy("name"))),
+            getDocs(query(collection(db, "students"), orderBy("studentName"))),
+            getDocs(collection(db, "tutorAssignments"))
+        ]);
         
-        studentsSnapshot.docs.forEach(doc => {
+        console.log(`Fetched ${tutorsSnapshot.size} tutors, ${studentsSnapshot.size} students, ${tutorAssignmentsSnapshot.size} tutor assignments`);
+        
+        // Process tutors with safe data handling
+        const allTutors = tutorsSnapshot.docs.map(doc => {
             const data = doc.data();
-            const student = {
+            return {
+                id: doc.id,
+                name: data.name || 'Unnamed Tutor',
+                email: data.email || '',
+                status: data.status || 'active',
+                phone: data.phone || '',
+                subjects: Array.isArray(data.subjects) ? data.subjects : (data.subjects ? [data.subjects] : []),
+                qualification: data.qualification || '',
+                createdAt: data.createdAt || new Date().toISOString(),
+                ...data
+            };
+        });
+        
+        const activeTutors = allTutors.filter(tutor => 
+            tutor && (!tutor.status || tutor.status === 'active')
+        );
+        
+        // Process students with safe data handling and status detection
+        const allStudents = studentsSnapshot.docs.map(doc => {
+            const data = doc.data();
+            const studentObj = {
                 id: doc.id,
                 studentName: data.studentName || 'Unnamed Student',
                 tutorEmail: data.tutorEmail || '',
                 tutorName: data.tutorName || '',
-                studentFee: Number(data.studentFee) || 0,
+                studentFee: typeof data.studentFee === 'number' ? data.studentFee : 0,
                 grade: data.grade || '',
                 days: data.days || '',
                 subjects: Array.isArray(data.subjects) ? data.subjects : (data.subjects ? [data.subjects] : []),
                 parentName: data.parentName || '',
                 parentPhone: data.parentPhone || '',
                 parentEmail: data.parentEmail || '',
+                address: data.address || '',
                 status: data.status || 'active',
-                isOnBreak: data.summerBreak === true || data.isOnBreak === true || data.status === 'break',
-                isArchived: data.status === 'archived' || data.status === 'graduated' || data.status === 'transferred',
-                isTransitioning: data.status === 'transitioning' || data.isTransitioning === true,
+                summerBreak: data.summerBreak || false,
+                isOnBreak: data.isOnBreak || false,
+                isTransitioning: data.isTransitioning || false,
+                createdAt: data.createdAt || new Date().toISOString(),
                 ...data
             };
             
-            allStudents.push(student);
-            
-            // Count by status
-            if (student.isArchived || student.isTransitioning) {
-                archivedCount++;
-            } else if (student.isOnBreak) {
-                breakCount++;
-            } else if (!student.status || student.status === 'active' || student.status === 'approved') {
-                activeCount++;
-            }
+            // Add status field for easy access
+            studentObj.displayStatus = getStudentStatus(studentObj);
+            return studentObj;
         });
         
-        // Process tutor assignments
+        const activeStudents = allStudents.filter(student => 
+            student && (!student.status || student.status === 'active' || student.status === 'approved')
+        );
+        
+        // Process tutor assignments with safe data handling
+        const tutorAssignments = {};
         tutorAssignmentsSnapshot.docs.forEach(doc => {
             const data = doc.data();
             const studentId = data.studentId;
             
             if (studentId) {
-                if (!tutorAssignmentsMap[studentId]) {
-                    tutorAssignmentsMap[studentId] = [];
+                if (!tutorAssignments[studentId]) {
+                    tutorAssignments[studentId] = [];
                 }
                 
-                tutorAssignmentsMap[studentId].push({
+                tutorAssignments[studentId].push({
                     id: doc.id,
-                    studentId,
+                    studentId: studentId,
                     tutorId: data.tutorId || '',
                     tutorName: data.tutorName || '',
                     tutorEmail: data.tutorEmail || '',
@@ -1196,31 +1163,35 @@ async function fetchAndRenderDirectoryOptimized(forceRefresh = false) {
             }
         });
         
-        // Update cache
-        directoryDataCache = {
-            tutors: activeTutors,
-            students: allStudents,
-            tutorAssignments: tutorAssignmentsMap,
-            lastFetch: now,
-            stats: {
-                activeCount,
-                breakCount,
-                archivedCount,
-                totalTutors: activeTutors.length,
-                totalStudents: allStudents.length
-            }
-        };
+        // Sort tutor assignments by date (most recent first)
+        Object.keys(tutorAssignments).forEach(studentId => {
+            tutorAssignments[studentId].sort((a, b) => 
+                new Date(b.assignedAt || 0) - new Date(a.assignedAt || 0)
+            );
+        });
         
-        // Update counters
-        updateStudentCountersOptimized(activeCount, breakCount, archivedCount, activeTutors.length);
-        
-        // Save to session cache for other functions
+        // Save to cache
         saveToLocalStorage('tutors', activeTutors);
         saveToLocalStorage('students', allStudents);
-        sessionCache.tutorAssignments = tutorAssignmentsMap;
-        sessionCache._lastUpdate = now;
+        sessionCache.tutorAssignments = tutorAssignments;
+        sessionCache._lastUpdate = Date.now();
         
-        renderDirectoryFromCacheOptimized();
+        // Update cache for faster loading
+        directoryCache = {
+            tutors: activeTutors,
+            students: allStudents,
+            tutorAssignments: tutorAssignments,
+            timestamp: now
+        };
+        lastCacheTime = now;
+        
+        console.log("Cache updated:", {
+            tutors: activeTutors.length,
+            students: allStudents.length,
+            assignments: Object.keys(tutorAssignments).length
+        });
+        
+        renderDirectoryFromCache();
         
     } catch (error) {
         console.error("Error fetching directory data:", error);
@@ -1229,8 +1200,7 @@ async function fetchAndRenderDirectoryOptimized(forceRefresh = false) {
             directoryList.innerHTML = `
                 <div class="text-center py-10">
                     <p class="text-red-500 mb-4">Failed to load data: ${error.message}</p>
-                    <button onclick="fetchAndRenderDirectoryOptimized(true)" 
-                            class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition-colors">
+                    <button onclick="fetchAndRenderDirectory(true)" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
                         Retry Loading Data
                     </button>
                 </div>
@@ -1239,480 +1209,263 @@ async function fetchAndRenderDirectoryOptimized(forceRefresh = false) {
     }
 }
 
-function updateStudentCountersOptimized(activeCount, breakCount, archivedCount, tutorCount) {
-    const activeEl = document.getElementById('active-students-count');
-    const breakEl = document.getElementById('break-students-count');
-    const archivedEl = document.getElementById('archived-students-count');
-    const tutorEl = document.getElementById('tutor-count-badge');
-    
-    if (activeEl) activeEl.textContent = activeCount;
-    if (breakEl) breakEl.textContent = breakCount;
-    if (archivedEl) archivedEl.textContent = archivedCount;
-    if (tutorEl) tutorEl.textContent = tutorCount;
-    
-    // Update subtexts
-    const activeSub = document.getElementById('active-students-subtext');
-    const breakSub = document.getElementById('break-students-subtext');
-    const archivedSub = document.getElementById('archived-students-subtext');
-    
-    if (activeSub) activeSub.textContent = `${activeCount} currently learning`;
-    if (breakSub) breakSub.textContent = `${breakCount} on temporary break`;
-    if (archivedSub) archivedSub.textContent = `${archivedCount} completed or moved`;
-}
-
-function renderDirectoryFromCacheOptimized(searchTerm = '') {
-    const { tutors = [], students = [], tutorAssignments = {}, stats = {} } = directoryDataCache;
+function renderDirectoryFromCache(searchTerm = '') {
+    const tutors = directoryCache?.tutors || sessionCache.tutors || [];
+    const students = directoryCache?.students || sessionCache.students || [];
+    const tutorAssignments = directoryCache?.tutorAssignments || sessionCache.tutorAssignments || {};
     const directoryList = document.getElementById('directory-list');
     
     if (!directoryList) return;
-    
-    // Clear search cache if search term changed
-    if (searchTerm) {
-        studentSearchCache.clear();
-    }
-    
+
     if (tutors.length === 0 && students.length === 0) {
         directoryList.innerHTML = `
-            <div class="text-center py-10">
-                <p class="text-gray-500 mb-2">No directory data found.</p>
-                <button onclick="fetchAndRenderDirectoryOptimized(true)" 
-                        class="text-blue-600 hover:text-blue-800 underline">
+            <p class="text-center text-gray-500 py-10">
+                No directory data found. 
+                <button onclick="fetchAndRenderDirectory(true)" class="text-blue-500 hover:underline ml-1">
                     Click here to fetch from server
                 </button>
-            </div>
+            </p>
         `;
         return;
     }
+
+    // Safe search term handling
+    const searchTermLower = safeToString(searchTerm).toLowerCase();
     
+    // Group students by tutor email and count statuses
+    const studentsByTutor = {};
+    const statusCountsByTutor = {};
+    
+    students.forEach(student => {
+        if (!student) return;
+        const tutorEmail = student.tutorEmail || '';
+        if (tutorEmail) {
+            if (!studentsByTutor[tutorEmail]) {
+                studentsByTutor[tutorEmail] = [];
+                statusCountsByTutor[tutorEmail] = { active: 0, break: 0, archived: 0, transitioning: 0 };
+            }
+            studentsByTutor[tutorEmail].push(student);
+            
+            // Count statuses
+            const status = getStudentStatus(student);
+            if (statusCountsByTutor[tutorEmail][status] !== undefined) {
+                statusCountsByTutor[tutorEmail][status]++;
+            }
+        }
+    });
+
+    // Calculate overall status counts for the counters
+    let activeCount = 0;
+    let breakCount = 0;
+    let archivedCount = 0;
+    
+    students.forEach(student => {
+        const status = getStudentStatus(student);
+        switch(status) {
+            case 'break':
+                breakCount++;
+                break;
+            case 'archived':
+            case 'transitioning':
+                archivedCount++;
+                break;
+            default:
+                activeCount++;
+        }
+    });
+    
+    // Update counters
+    const tutorCountBadge = document.getElementById('tutor-count-badge');
+    const activeStudentsCount = document.getElementById('active-students-count');
+    const breakStudentsCount = document.getElementById('break-students-count');
+    const archivedStudentsCount = document.getElementById('archived-students-count');
+    const studentCountBadge = document.getElementById('student-count-badge');
+    const historyCountBadge = document.getElementById('history-count-badge');
+    
+    if (tutorCountBadge) tutorCountBadge.textContent = tutors.length;
+    if (activeStudentsCount) activeStudentsCount.textContent = activeCount;
+    if (breakStudentsCount) breakStudentsCount.textContent = breakCount;
+    if (archivedStudentsCount) archivedStudentsCount.textContent = archivedCount;
+    if (studentCountBadge) studentCountBadge.textContent = students.length;
+    if (historyCountBadge) historyCountBadge.textContent = Object.keys(tutorAssignments).length;
+
     // Filter tutors based on search term
-    const searchLower = safeToString(searchTerm).toLowerCase();
-    const filteredTutors = searchTerm ? tutors.filter(tutor => {
-        const tutorMatch = safeToString(tutor.name).toLowerCase().includes(searchLower) ||
-                          safeToString(tutor.email).toLowerCase().includes(searchLower);
+    const filteredTutors = tutors.filter(tutor => {
+        if (!tutor) return false;
+        if (!searchTerm) return true;
         
-        if (tutorMatch) return true;
+        const assignedStudents = studentsByTutor[tutor.email] || [];
+        
+        // Check tutor info
+        const tutorNameMatch = safeSearch(tutor.name, searchTerm);
+        const tutorEmailMatch = safeSearch(tutor.email, searchTerm);
         
         // Check if any assigned student matches
-        const assignedStudents = students.filter(s => s.tutorEmail === tutor.email);
-        return assignedStudents.some(student => searchStudentFromFirebaseOptimized(student, searchTerm, tutors));
-    }) : tutors;
-    
+        const studentMatch = assignedStudents.some(student => {
+            return searchStudentFromFirebase(student, searchTerm, tutors);
+        });
+        
+        return tutorNameMatch || tutorEmailMatch || studentMatch;
+    });
+
     if (searchTerm && filteredTutors.length === 0) {
         directoryList.innerHTML = `
             <div class="text-center py-10">
                 <p class="text-gray-500 mb-2">No results found for "${searchTerm}"</p>
-                <button onclick="document.getElementById('directory-search').value = ''; renderDirectoryFromCacheOptimized();" 
-                        class="text-blue-600 hover:text-blue-800 underline">
+                <button onclick="document.getElementById('directory-search').value = ''; renderDirectoryFromCache();" 
+                        class="text-blue-500 hover:underline">
                     Clear search
                 </button>
             </div>
         `;
         return;
     }
-    
-    // Build directory view
-    let html = '';
-    
-    filteredTutors.forEach(tutor => {
-        // Get all students assigned to this tutor
-        const assignedStudents = students.filter(student => 
-            student.tutorEmail === tutor.email
-        );
+
+    // Check permissions
+    const canEditStudents = window.userData?.permissions?.actions?.canEditStudents === true;
+    const canDeleteStudents = window.userData?.permissions?.actions?.canDeleteStudents === true;
+    const showActionsColumn = canEditStudents || canDeleteStudents;
+
+    // Build the directory view
+    directoryList.innerHTML = filteredTutors.map(tutor => {
+        if (!tutor) return '';
         
-        // Categorize students
-        const activeStudents = assignedStudents.filter(s => 
-            !s.isArchived && !s.isOnBreak && !s.isTransitioning
-        );
-        const breakStudents = assignedStudents.filter(s => s.isOnBreak);
-        const archivedStudents = assignedStudents.filter(s => s.isArchived || s.isTransitioning);
-        
-        // Filter students based on search term
-        const displayStudents = searchTerm ? 
-            assignedStudents.filter(student => 
-                searchStudentFromFirebaseOptimized(student, searchTerm, tutors)
-            ) : assignedStudents;
-        
-        // Build student table rows
-        const studentsTableRows = displayStudents.map(student => {
+        const assignedStudents = (studentsByTutor[tutor.email] || [])
+            .filter(student => {
+                if (!student) return false;
+                if (!searchTerm) return true;
+                return searchStudentFromFirebase(student, searchTerm, tutors) || safeSearch(tutor.name, searchTerm);
+            })
+            .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
+            
+        const statusCounts = statusCountsByTutor[tutor.email] || { active: 0, break: 0, archived: 0, transitioning: 0 };
+
+        const studentsTableRows = assignedStudents.map(student => {
             const subjects = Array.isArray(student.subjects) ? 
                 student.subjects.join(', ') : 
                 safeToString(student.subjects);
             
-            // Determine status badge
-            let statusBadge = '';
-            let statusClass = '';
-            let statusText = '';
-            
-            if (student.isOnBreak) {
-                statusBadge = '<i class="fas fa-pause-circle text-yellow-500 mr-1"></i>';
-                statusClass = 'bg-yellow-100 text-yellow-800';
-                statusText = 'On Break';
-            } else if (student.isArchived) {
-                statusBadge = '<i class="fas fa-archive text-red-500 mr-1"></i>';
-                statusClass = 'bg-red-100 text-red-800';
-                statusText = student.status === 'graduated' ? 'Graduated' : 
-                            student.status === 'transferred' ? 'Transferred' : 
-                            'Archived';
-            } else if (student.isTransitioning) {
-                statusBadge = '<i class="fas fa-exchange-alt text-purple-500 mr-1"></i>';
-                statusClass = 'bg-purple-100 text-purple-800';
-                statusText = 'Transitioning';
-            } else {
-                statusBadge = '<i class="fas fa-check-circle text-green-500 mr-1"></i>';
-                statusClass = 'bg-green-100 text-green-800';
-                statusText = 'Active';
-            }
-            
             const studentHistory = tutorAssignments[student.id];
             const historyButton = studentHistory ? 
-                `<button class="view-history-btn bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded-full text-xs ml-1 transition-colors" 
-                        data-student-id="${student.id}">
-                    <i class="fas fa-history mr-1"></i>History
-                </button>` : '';
-            
-            // Check permissions for action buttons
-            const canEditStudents = window.userData?.permissions?.actions?.canEditStudents === true;
-            const canDeleteStudents = window.userData?.permissions?.actions?.canDeleteStudents === true;
+                `<button class="view-history-btn bg-purple-500 text-white px-3 py-1 rounded-full text-xs ml-1 hover:bg-purple-600" data-student-id="${student.id}">History</button>` : '';
             
             const actionButtons = `
-                ${canEditStudents ? `<button class="edit-student-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-full text-xs transition-colors" 
-                                         data-student-id="${student.id}" onclick="handleEditStudent('${student.id}')">
-                    <i class="fas fa-edit mr-1"></i>Edit
-                </button>` : ''}
-                ${canDeleteStudents ? `<button class="delete-student-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full text-xs transition-colors" 
-                                           data-student-id="${student.id}" onclick="handleDeleteStudent('${student.id}')">
-                    <i class="fas fa-trash mr-1"></i>Delete
-                </button>` : ''}
+                ${canEditStudents ? `<button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded-full text-xs hover:bg-blue-600" data-student-id="${student.id}">Edit</button>` : ''}
+                ${canDeleteStudents ? `<button class="delete-student-btn bg-red-500 text-white px-3 py-1 rounded-full text-xs hover:bg-red-600" data-student-id="${student.id}">Delete</button>` : ''}
                 ${historyButton}
             `;
             
-            const showActions = canEditStudents || canDeleteStudents || historyButton;
+            // Get status badge for student
+            const status = getStudentStatus(student);
+            const statusBadge = getStatusBadgeHTML(status);
             
             return `
-                <tr class="hover:bg-gray-50 transition-colors">
-                    <td class="px-4 py-3">
-                        <div class="font-medium text-gray-900">${student.studentName || 'N/A'}</div>
-                        <div class="mt-1">
-                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusClass}">
-                                ${statusBadge} ${statusText}
-                            </span>
-                        </div>
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2">
+                        <div class="font-medium">${student.studentName || 'N/A'}</div>
+                        <div class="mt-1">${statusBadge}</div>
                     </td>
-                    <td class="px-4 py-3">
-                        <span class="font-medium">₦${(student.studentFee || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                    </td>
-                    <td class="px-4 py-3">${student.grade || 'N/A'}</td>
-                    <td class="px-4 py-3">${student.days || 'N/A'}</td>
-                    <td class="px-4 py-3">${subjects || 'N/A'}</td>
-                    <td class="px-4 py-3">${student.parentName || 'N/A'}</td>
-                    <td class="px-4 py-3">${student.parentPhone || 'N/A'}</td>
-                    ${showActions ? `<td class="px-4 py-3 space-x-1">${actionButtons}</td>` : ''}
+                    <td class="px-4 py-2">₦${(student.studentFee || 0).toFixed(2)}</td>
+                    <td class="px-4 py-2">${student.grade || 'N/A'}</td>
+                    <td class="px-4 py-2">${student.days || 'N/A'}</td>
+                    <td class="px-4 py-2">${subjects || 'N/A'}</td>
+                    <td class="px-4 py-2">${student.parentName || 'N/A'}</td>
+                    <td class="px-4 py-2">${student.parentPhone || 'N/A'}</td>
+                    ${showActionsColumn || historyButton ? `<td class="px-4 py-2 space-x-1">${actionButtons}</td>` : ''}
                 </tr>
             `;
         }).join('');
-        
-        // Build tutor card
-        html += `
-            <div class="border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
-                <details open class="group">
-                    <summary class="p-4 cursor-pointer flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition-colors rounded-t-lg">
-                        <div class="flex items-center">
-                            <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
-                                <i class="fas fa-chalkboard-teacher text-green-600"></i>
-                            </div>
-                            <div>
-                                <h3 class="font-bold text-lg text-gray-900">${tutor.name || 'Unnamed Tutor'}</h3>
-                                <div class="flex items-center mt-1">
-                                    <span class="text-sm text-gray-600">${tutor.email || ''}</span>
-                                    <span class="mx-2 text-gray-400">•</span>
-                                    <div class="flex items-center space-x-2">
+
+        return `
+            <div class="border rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                <details open>
+                    <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg bg-gray-50 hover:bg-gray-100">
+                        <div>
+                            <div class="flex items-center">
+                                <span class="text-green-700">${tutor.name || 'Unnamed Tutor'}</span>
+                                <div class="ml-3 flex items-center space-x-2">
+                                    ${statusCounts.active > 0 ? `
                                         <span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
-                                            <i class="fas fa-user-graduate mr-1"></i>${activeStudents.length} Active
+                                            ${statusCounts.active} Active
                                         </span>
-                                        ${breakStudents.length > 0 ? `
-                                            <span class="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
-                                                <i class="fas fa-pause-circle mr-1"></i>${breakStudents.length} On Break
-                                            </span>
-                                        ` : ''}
-                                        ${archivedStudents.length > 0 ? `
-                                            <span class="text-xs px-2 py-1 rounded-full bg-red-100 text-red-800">
-                                                <i class="fas fa-archive mr-1"></i>${archivedStudents.length} Archived
-                                            </span>
-                                        ` : ''}
-                                    </div>
+                                    ` : ''}
+                                    ${statusCounts.break > 0 ? `
+                                        <span class="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
+                                            ${statusCounts.break} On Break
+                                        </span>
+                                    ` : ''}
+                                    ${(statusCounts.archived + statusCounts.transitioning) > 0 ? `
+                                        <span class="text-xs px-2 py-1 rounded-full bg-red-100 text-red-800">
+                                            ${statusCounts.archived + statusCounts.transitioning} Archived/Transition
+                                        </span>
+                                    ` : ''}
                                 </div>
                             </div>
+                            <div class="mt-1 text-sm text-gray-500">${tutor.email || ''}</div>
                         </div>
                         <div class="flex items-center">
-                            <span class="text-sm font-medium px-3 py-1 bg-blue-100 text-blue-800 rounded-full">
-                                ${assignedStudents.length} Total Students
+                            <span class="ml-2 text-sm font-normal px-2 py-1 bg-green-100 text-green-800 rounded-full">
+                                ${assignedStudents.length} student${assignedStudents.length !== 1 ? 's' : ''}
                             </span>
-                            <svg class="w-5 h-5 ml-2 text-gray-500 transform transition-transform duration-200 group-open:rotate-180" 
-                                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-5 h-5 ml-2 text-gray-500 transform transition-transform duration-200 group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>
                         </div>
                     </summary>
-                    
                     <div class="border-t">
-                        ${displayStudents.length > 0 ? `
+                        ${assignedStudents.length > 0 ? `
                             <div class="overflow-x-auto">
                                 <table class="min-w-full text-sm">
-                                    <thead class="bg-gray-50">
+                                    <thead class="bg-gray-50 text-left">
                                         <tr>
-                                            <th class="px-4 py-3 text-left font-medium text-gray-700">Student Name & Status</th>
-                                            <th class="px-4 py-3 text-left font-medium text-gray-700">Fee</th>
-                                            <th class="px-4 py-3 text-left font-medium text-gray-700">Grade</th>
-                                            <th class="px-4 py-3 text-left font-medium text-gray-700">Days/Week</th>
-                                            <th class="px-4 py-3 text-left font-medium text-gray-700">Subjects</th>
-                                            <th class="px-4 py-3 text-left font-medium text-gray-700">Parent</th>
-                                            <th class="px-4 py-3 text-left font-medium text-gray-700">Parent Phone</th>
-                                            ${(canEditStudents || canDeleteStudents) ? `
-                                                <th class="px-4 py-3 text-left font-medium text-gray-700">Actions</th>
-                                            ` : ''}
+                                            <th class="px-4 py-2 font-medium">Student Name & Status</th>
+                                            <th class="px-4 py-2 font-medium">Fee</th>
+                                            <th class="px-4 py-2 font-medium">Grade</th>
+                                            <th class="px-4 py-2 font-medium">Days/Week</th>
+                                            <th class="px-4 py-2 font-medium">Subject</th>
+                                            <th class="px-4 py-2 font-medium">Parent's Name</th>
+                                            <th class="px-4 py-2 font-medium">Parent's Phone</th>
+                                            ${showActionsColumn ? `<th class="px-4 py-2 font-medium">Actions</th>` : ''}
                                         </tr>
                                     </thead>
-                                    <tbody class="divide-y divide-gray-200">
+                                    <tbody class="bg-white divide-y divide-gray-200">
                                         ${studentsTableRows}
                                     </tbody>
                                 </table>
                             </div>
                         ` : `
                             <div class="p-6 text-center text-gray-500">
-                                <i class="fas fa-user-slash text-3xl mb-3 text-gray-300"></i>
-                                <p>No students assigned to this tutor${searchTerm ? ' matching your search' : ''}.</p>
+                                No students assigned to this tutor${searchTerm ? ' matching your search' : ''}.
                             </div>
                         `}
                     </div>
                 </details>
             </div>
         `;
+    }).join('');
+
+    // Add event listeners for action buttons
+    if (canEditStudents) {
+        document.querySelectorAll('.edit-student-btn').forEach(button => {
+            button.addEventListener('click', () => handleEditStudent(button.dataset.studentId));
+        });
+    }
+    
+    if (canDeleteStudents) {
+        document.querySelectorAll('.delete-student-btn').forEach(button => {
+            button.addEventListener('click', () => handleDeleteStudent(button.dataset.studentId));
+        });
+    }
+    
+    document.querySelectorAll('.view-history-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            if (typeof window.viewStudentTutorHistory === 'function') {
+                window.viewStudentTutorHistory(button.dataset.studentId);
+            } else {
+                alert('View history function not available');
+            }
+        });
     });
-    
-    directoryList.innerHTML = html;
-}
-
-// HELPER FUNCTIONS FOR REASSIGN STUDENT (FALLBACK IF ORIGINAL NOT AVAILABLE)
-async function showBasicReassignModal() {
-    try {
-        const { students = [], tutors = [] } = directoryDataCache;
-        
-        const assignedStudents = students.filter(s => s.tutorEmail && s.tutorEmail.trim() !== '');
-        if (assignedStudents.length === 0) {
-            alert("No students are currently assigned to tutors.");
-            return;
-        }
-        
-        const studentOptions = assignedStudents.map(student => {
-            const currentTutor = tutors.find(t => t.email === student.tutorEmail);
-            return `
-                <option value="${student.id}">
-                    ${student.studentName} (Grade: ${student.grade}) - Currently with: ${currentTutor?.name || 'Unknown'}
-                </option>
-            `;
-        }).join('');
-        
-        const tutorOptions = tutors.map(tutor => 
-            `<option value="${tutor.email}">${tutor.name} (${tutor.email})</option>`
-        ).join('');
-        
-        const modalHtml = `
-            <div id="basic-reassign-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-                <div class="relative bg-white w-full max-w-lg rounded-lg shadow-xl">
-                    <div class="flex items-center justify-between p-6 border-b">
-                        <h3 class="text-xl font-bold text-blue-700">Reassign Student</h3>
-                        <button onclick="closeManagementModal('basic-reassign-modal')" 
-                                class="text-gray-400 hover:text-gray-800 text-2xl font-bold transition-colors">
-                            &times;
-                        </button>
-                    </div>
-                    <div class="p-6">
-                        <form id="basic-reassign-form">
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Select Student</label>
-                                <select id="basic-student-select" required class="w-full p-3 border rounded-lg">
-                                    <option value="">Select a student...</option>
-                                    ${studentOptions}
-                                </select>
-                            </div>
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Select New Tutor</label>
-                                <select id="basic-tutor-select" required class="w-full p-3 border rounded-lg">
-                                    <option value="">Select a tutor...</option>
-                                    ${tutorOptions}
-                                </select>
-                            </div>
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Reason (Optional)</label>
-                                <textarea id="basic-reassign-reason" class="w-full p-3 border rounded-lg" rows="3"></textarea>
-                            </div>
-                            <div class="flex justify-end space-x-3">
-                                <button type="button" onclick="closeManagementModal('basic-reassign-modal')" 
-                                        class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
-                                    Cancel
-                                </button>
-                                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                                    Reassign Student
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        
-        document.getElementById('basic-reassign-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const studentId = document.getElementById('basic-student-select').value;
-            const tutorEmail = document.getElementById('basic-tutor-select').value;
-            const reason = document.getElementById('basic-reassign-reason').value;
-            
-            if (!studentId || !tutorEmail) {
-                alert("Please select both a student and a tutor.");
-                return;
-            }
-            
-            const student = students.find(s => s.id === studentId);
-            const newTutor = tutors.find(t => t.email === tutorEmail);
-            
-            if (!student || !newTutor) {
-                alert("Student or tutor not found.");
-                return;
-            }
-            
-            if (student.tutorEmail === tutorEmail) {
-                alert("Student is already assigned to this tutor.");
-                return;
-            }
-            
-            if (!confirm(`Reassign "${student.studentName}" to ${newTutor.name}?`)) {
-                return;
-            }
-            
-            try {
-                // Update student in Firestore
-                await updateDoc(doc(db, "students", studentId), {
-                    tutorEmail: newTutor.email,
-                    tutorName: newTutor.name,
-                    updatedAt: new Date().toISOString(),
-                    updatedBy: window.userData?.email || 'management'
-                });
-                
-                // Create assignment history
-                await addDoc(collection(db, "tutorAssignments"), {
-                    studentId: studentId,
-                    studentName: student.studentName,
-                    oldTutorEmail: student.tutorEmail,
-                    newTutorEmail: newTutor.email,
-                    newTutorName: newTutor.name,
-                    reason: reason || 'Reassignment',
-                    assignedBy: window.userData?.name || 'Admin',
-                    assignedByEmail: window.userData?.email || 'admin',
-                    assignedAt: new Date().toISOString(),
-                    timestamp: new Date().toISOString()
-                });
-                
-                alert("Student reassigned successfully!");
-                closeManagementModal('basic-reassign-modal');
-                
-                // Refresh data
-                studentSearchCache.clear();
-                fetchAndRenderDirectoryOptimized(true);
-                
-            } catch (error) {
-                console.error("Error reassigning student:", error);
-                alert("Failed to reassign student: " + error.message);
-            }
-        });
-        
-    } catch (error) {
-        console.error("Error showing reassign modal:", error);
-        alert("Failed to load reassign data.");
-    }
-}
-
-// Helper function for student history modal
-function showStudentHistoryModalOptimized() {
-    const students = directoryDataCache.students || [];
-    const activeStudents = students.filter(student => 
-        student && (!student.status || student.status === 'active' || student.status === 'approved')
-    );
-    
-    if (activeStudents.length === 0) {
-        alert("No active students found.");
-        return;
-    }
-    
-    const studentOptions = activeStudents.map(student => 
-        `<option value="${student.id}">${student.studentName} (${student.grade || 'No grade'})</option>`
-    ).join('');
-    
-    const modalHtml = `
-        <div id="select-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
-                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold transition-colors" 
-                        onclick="closeManagementModal('select-student-modal')">&times;</button>
-                <h3 class="text-xl font-bold mb-4 text-gray-800">Select Student to View Tutor History</h3>
-                <form id="select-student-form">
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Student</label>
-                        <select id="select-student" required 
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                            <option value="" disabled selected>Select a student...</option>
-                            ${studentOptions}
-                        </select>
-                    </div>
-                    <div class="flex justify-end mt-6 space-x-3">
-                        <button type="button" onclick="closeManagementModal('select-student-modal')" 
-                                class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors">
-                            Cancel
-                        </button>
-                        <button type="submit" 
-                                class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
-                            View History
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
-    const form = document.getElementById('select-student-form');
-    if (form) {
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const selectEl = document.getElementById('select-student');
-            if (selectEl) {
-                const studentId = selectEl.value;
-                closeManagementModal('select-student-modal');
-                if (typeof window.viewStudentTutorHistory === 'function') {
-                    window.viewStudentTutorHistory(studentId);
-                } else {
-                    alert("Tutor history feature not available");
-                }
-            }
-        });
-    }
-}
-
-// Ensure global functions exist
-if (typeof window.closeManagementModal === 'undefined') {
-    window.closeManagementModal = function(modalId) {
-        const modal = document.getElementById(modalId);
-        if (modal) {
-            modal.remove();
-        }
-    };
-}
-
-// Export to global scope
-if (typeof window.showEnhancedReassignStudentModal === 'undefined') {
-    window.showEnhancedReassignStudentModal = showBasicReassignModal;
 }
 
 
@@ -8789,6 +8542,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
