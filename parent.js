@@ -5527,11 +5527,10 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
 })();
 
 // ============================================================================
-// SINGLE FIX FOR DOUBLE REGISTRATION & EMAIL LINKING
+// SINGLE FIX FOR DOUBLE REGISTRATION & EMAIL LINKING (FIXED VERSION)
 // ============================================================================
 
-// 1. FIX: Override the signup function to prevent double registration
-const originalHandleSignUpFull = window.handleSignUpFull;
+// 1. FIX: Replace the signup function to prevent double registration
 window.handleSignUpFull = async function(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader) {
     const requestId = `signup_${Date.now()}`;
     pendingRequests.add(requestId);
