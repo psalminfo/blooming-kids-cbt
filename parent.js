@@ -5177,101 +5177,61 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
     }
 
     // Find students linked to a contact
-    async function findLinkedStudentsForContact(phone, email, db) {
-        const linkedStudents = [];
+   async function findLinkedStudentsForContact(phone, email) {
+    console.log("🔍 Checking for shared contact links...");
+    
+    try {
         const phoneSuffix = extractPhoneSuffix(phone);
+        const linkedStudents = [];
         
         if (!phoneSuffix && !email) return linkedStudents;
         
-        try {
-            const studentsSnapshot = await getDocs(collection(firebase.firestore(), 'students'));
-            
-            studentsSnapshot.forEach(doc => {
-                const data = doc.data();
-                const studentName = data.studentName || data.name;
-                
-                if (!studentName) return;
-                
-                // Check phone matches
-                if (phoneSuffix) {
-                    const contactFields = ['motherPhone', 'fatherPhone', 'guardianPhone', 'emergencyPhone'];
-                    
-                    for (const field of contactFields) {
-                        const fieldPhone = data[field];
-                        if (fieldPhone && extractPhoneSuffix(fieldPhone) === phoneSuffix) {
-                            linkedStudents.push({
-                                studentId: doc.id,
-                                studentName: studentName,
-                                relationship: field.replace('Phone', ''),
-                                matchedBy: 'phone'
-                            });
-                            break;
-                        }
-                    }
-                }
-                
-                // Check email matches
-                if (email && data.guardianEmail === email) {
-                    linkedStudents.push({
-                        studentId: doc.id,
-                        studentName: studentName,
-                        relationship: 'guardian',
-                        matchedBy: 'email'
-                    });
-                }
-            });
-            
-            console.log(`✅ Found ${linkedStudents.length} linked students for contact`);
-            
-        } catch (error) {
-            console.error("Error finding linked students:", error);
-        }
+        // Use the globally available 'db' that was imported
+        const studentsSnapshot = await db.collection('students').get();
         
-        return linkedStudents;
-    }
-
-    // Update parent profile with shared access info
-    async function updateParentWithSharedAccess(parentUid, phone, email, linkedStudents) {
-        try {
-            const updateData = {
-                isSharedContact: true,
-                linkedStudents: linkedStudents.map(student => ({
-                    studentId: student.studentId,
-                    studentName: student.studentName,
-                    relationship: student.relationship,
-                    linkedAt: firebase.firestore.FieldValue.serverTimestamp()
-                })),
-                sharedContactInfo: {
-                    phone: phone,
-                    email: email,
-                    linkedAt: firebase.firestore.FieldValue.serverTimestamp()
-                }
-            };
+        studentsSnapshot.forEach(doc => {
+            const data = doc.data();
+            const studentName = data.studentName || data.name;
             
-            await db.collection('parent_users').doc(parentUid).update(updateData);
-            console.log("✅ Updated parent profile with shared access");
+            if (!studentName) return;
             
-            // Also update student records with parent info
-            for (const student of linkedStudents) {
-                try {
-                    await db.collection('students').doc(student.studentId).update({
-                        sharedParents: firebase.firestore.FieldValue.arrayUnion({
-                            parentUid: parentUid,
-                            parentEmail: email,
-                            parentPhone: phone,
-                            relationship: student.relationship,
-                            linkedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        })
-                    });
-                } catch (error) {
-                    console.warn(`Could not update student ${student.studentName}:`, error.message);
+            // Check phone matches
+            if (phoneSuffix) {
+                const contactFields = ['motherPhone', 'fatherPhone', 'guardianPhone', 'emergencyPhone'];
+                
+                for (const field of contactFields) {
+                    const fieldPhone = data[field];
+                    if (fieldPhone && extractPhoneSuffix(fieldPhone) === phoneSuffix) {
+                        linkedStudents.push({
+                            studentId: doc.id,
+                            studentName: studentName,
+                            relationship: field.replace('Phone', ''),
+                            matchedBy: 'phone'
+                        });
+                        break;
+                    }
                 }
             }
             
-        } catch (error) {
-            console.error("Error updating parent with shared access:", error);
-        }
+            // Check email matches
+            if (email && data.guardianEmail === email) {
+                linkedStudents.push({
+                    studentId: doc.id,
+                    studentName: studentName,
+                    relationship: 'guardian',
+                    matchedBy: 'email'
+                });
+            }
+        });
+        
+        console.log(`✅ Found ${linkedStudents.length} linked students for contact`);
+        return linkedStudents;
+        
+    } catch (error) {
+        console.error("Error finding linked students:", error);
+        return []; // Return empty array on error
     }
+}
 
     // ============================================================================
     // 5. UTILITY FUNCTIONS
