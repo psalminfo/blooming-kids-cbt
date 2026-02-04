@@ -5152,7 +5152,7 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
                 
                 // Check if this phone/email exists as a shared contact
                 console.log("🔍 Checking for shared contact links...");
-                const linkedStudents = await findLinkedStudentsForContact(finalPhone, email);
+                const linkedStudents = await findLinkedStudentsForContact(finalPhone, email, db);
                 
                 // Call original signup function
                 await originalSignupFunction(countryCode, localPhone, email, password, confirmPassword, signUpBtn, authLoader);
@@ -5177,7 +5177,7 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
     }
 
     // Find students linked to a contact
-    async function findLinkedStudentsForContact(phone, email) {
+    async function findLinkedStudentsForContact(phone, email, db) {
         const linkedStudents = [];
         const phoneSuffix = extractPhoneSuffix(phone);
         
