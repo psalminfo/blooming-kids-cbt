@@ -989,7 +989,7 @@ async function renderManagementTutorView(container) {
                     <p id="tutor-count-badge" class="text-2xl font-extrabold">0</p>
                 </div>
                 <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-yellow-800 text-sm">Active Students</h4>
+                    <h4 class="font-bold text-yellow-800 text-sm">All Students</h4>
                     <p id="student-count-badge" class="text-2xl font-extrabold">0</p>
                 </div>
                 <div class="bg-purple-100 p-3 rounded-lg text-center shadow w-full">
@@ -1017,16 +1017,13 @@ async function renderManagementTutorView(container) {
             }
             
             const students = sessionCache.students || [];
-            const activeStudents = students.filter(student => 
-                student && (!student.status || student.status === 'active' || student.status === 'approved')
-            );
             
-            if (activeStudents.length === 0) {
-                alert("No active students found.");
+            if (students.length === 0) {
+                alert("No students found.");
                 return;
             }
             
-            const studentOptions = activeStudents.map(student => 
+            const studentOptions = students.map(student => 
                 `<option value="${student.id}">${student.studentName} (${student.grade || 'No grade'})</option>`
             ).join('');
             
@@ -1118,7 +1115,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             tutor && (!tutor.status || tutor.status === 'active')
         );
         
-        // Process students with safe data handling
+        // Process ALL students with safe data handling - NO STATUS FILTERING
         const allStudents = studentsSnapshot.docs.map(doc => {
             const data = doc.data();
             return {
@@ -1140,9 +1137,8 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             };
         });
         
-        const activeStudents = allStudents.filter(student => 
-            student && (!student.status || student.status === 'active' || student.status === 'approved')
-        );
+        // NO FILTERING HERE - Save ALL students to cache
+        const allStudentsList = allStudents.filter(student => student);
         
         // Process tutor assignments with safe data handling
         const tutorAssignments = {};
@@ -1178,15 +1174,15 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             );
         });
         
-        // Save to cache
+        // Save to cache - ALL students, not just active ones
         saveToLocalStorage('tutors', activeTutors);
-        saveToLocalStorage('students', activeStudents);
+        saveToLocalStorage('students', allStudentsList);
         sessionCache.tutorAssignments = tutorAssignments;
         sessionCache._lastUpdate = Date.now(); // Add timestamp for cache freshness
         
         console.log("Cache updated:", {
             tutors: activeTutors.length,
-            students: activeStudents.length,
+            students: allStudentsList.length,
             assignments: Object.keys(tutorAssignments).length
         });
         
@@ -1231,7 +1227,7 @@ function renderDirectoryFromCache(searchTerm = '') {
     // Safe search term handling
     const searchTermLower = safeToString(searchTerm).toLowerCase();
     
-    // Group students by tutor email
+    // Group ALL students by tutor email (regardless of status)
     const studentsByTutor = {};
     
     students.forEach(student => {
@@ -1303,31 +1299,67 @@ function renderDirectoryFromCache(searchTerm = '') {
             })
             .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
 
-        // Count students by status
-        const activeStudentsCount = assignedStudents.filter(s => 
-            !s.status || s.status === 'active' || s.status === 'approved'
-        ).length;
+        // Count students by status (ALL statuses)
+        const activeStudentsCount = assignedStudents.filter(s => {
+            if (!s.status) return true;
+            const statusLower = s.status.toLowerCase();
+            return statusLower === 'active' || 
+                   statusLower === 'approved' || 
+                   statusLower === '';
+        }).length;
         
-        const breakStudentsCount = assignedStudents.filter(s => 
-            s.status && s.status.toLowerCase().includes('break')
-        ).length;
+        const breakStudentsCount = assignedStudents.filter(s => {
+            if (!s.status) return false;
+            const statusLower = s.status.toLowerCase();
+            return statusLower.includes('break') || 
+                   statusLower.includes('pause') ||
+                   statusLower.includes('hold') ||
+                   statusLower.includes('suspended');
+        }).length;
         
-        const transitioningStudentsCount = assignedStudents.filter(s => 
-            s.status && s.status.toLowerCase().includes('transition')
-        ).length;
+        const transitioningStudentsCount = assignedStudents.filter(s => {
+            if (!s.status) return false;
+            const statusLower = s.status.toLowerCase();
+            return statusLower.includes('transition') || 
+                   statusLower.includes('transfer') ||
+                   statusLower.includes('moving') ||
+                   statusLower.includes('changing');
+        }).length;
+        
+        // Other statuses (not active, break, or transitioning)
+        const otherStudentsCount = assignedStudents.filter(s => {
+            if (!s.status) return false;
+            const statusLower = s.status.toLowerCase();
+            return !statusLower.includes('active') &&
+                   !statusLower.includes('approved') &&
+                   !statusLower.includes('break') &&
+                   !statusLower.includes('pause') &&
+                   !statusLower.includes('hold') &&
+                   !statusLower.includes('suspended') &&
+                   !statusLower.includes('transition') &&
+                   !statusLower.includes('transfer') &&
+                   !statusLower.includes('moving') &&
+                   !statusLower.includes('changing');
+        }).length;
 
         const studentsTableRows = assignedStudents.map(student => {
-            // Get status indicator
+            // Get status indicator with proper alignment
             let statusBadge = '';
             if (student.status) {
                 const statusLower = student.status.toLowerCase();
-                if (statusLower.includes('break')) {
-                    statusBadge = `<span class="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">On Break</span>`;
-                } else if (statusLower.includes('transition')) {
-                    statusBadge = `<span class="ml-2 px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">Transitioning</span>`;
-                } else if (statusLower === 'active' || statusLower === 'approved') {
-                    statusBadge = `<span class="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Active</span>`;
+                if (statusLower.includes('break') || statusLower.includes('pause') || statusLower.includes('hold') || statusLower.includes('suspended')) {
+                    statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 ml-2">On Break</span>`;
+                } else if (statusLower.includes('transition') || statusLower.includes('transfer') || statusLower.includes('moving') || statusLower.includes('changing')) {
+                    statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 ml-2">Transitioning</span>`;
+                } else if (statusLower === 'active' || statusLower === 'approved' || statusLower === '') {
+                    statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">Active</span>`;
+                } else {
+                    // Other statuses
+                    statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 ml-2">${student.status}</span>`;
                 }
+            } else {
+                // No status specified
+                statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">Active</span>`;
             }
             
             const subjects = Array.isArray(student.subjects) ? 
@@ -1336,73 +1368,106 @@ function renderDirectoryFromCache(searchTerm = '') {
             
             const studentHistory = tutorAssignments[student.id];
             const historyButton = studentHistory ? 
-                `<button class="view-history-btn bg-purple-500 text-white px-3 py-1 rounded-full text-xs ml-1 hover:bg-purple-600" data-student-id="${student.id}">History</button>` : '';
+                `<button class="view-history-btn inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-full shadow-sm text-white bg-purple-600 hover:bg-purple-700 ml-1" data-student-id="${student.id}">History</button>` : '';
             
             const actionButtons = `
-                ${canEditStudents ? `<button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded-full text-xs hover:bg-blue-600" data-student-id="${student.id}">Edit</button>` : ''}
-                ${canDeleteStudents ? `<button class="delete-student-btn bg-red-500 text-white px-3 py-1 rounded-full text-xs hover:bg-red-600" data-student-id="${student.id}">Delete</button>` : ''}
+                ${canEditStudents ? `<button class="edit-student-btn inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-full shadow-sm text-white bg-blue-600 hover:bg-blue-700" data-student-id="${student.id}">Edit</button>` : ''}
+                ${canDeleteStudents ? `<button class="delete-student-btn inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-full shadow-sm text-white bg-red-600 hover:bg-red-700 ml-1" data-student-id="${student.id}">Delete</button>` : ''}
                 ${historyButton}
             `;
             
             return `
                 <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-2 font-medium">
-                        ${student.studentName || 'N/A'}
-                        ${statusBadge}
+                    <td class="px-4 py-3 align-middle">
+                        <div class="flex items-center">
+                            <span class="font-medium text-gray-900">${student.studentName || 'N/A'}</span>
+                            <div class="ml-2">${statusBadge}</div>
+                        </div>
                     </td>
-                    <td class="px-4 py-2">₦${(student.studentFee || 0).toFixed(2)}</td>
-                    <td class="px-4 py-2">${student.grade || 'N/A'}</td>
-                    <td class="px-4 py-2">${student.days || 'N/A'}</td>
-                    <td class="px-4 py-2">${subjects || 'N/A'}</td>
-                    <td class="px-4 py-2">${student.parentName || 'N/A'}</td>
-                    <td class="px-4 py-2">${student.parentPhone || 'N/A'}</td>
-                    ${showActionsColumn || historyButton ? `<td class="px-4 py-2 space-x-1">${actionButtons}</td>` : ''}
+                    <td class="px-4 py-3 align-middle">₦${(student.studentFee || 0).toFixed(2)}</td>
+                    <td class="px-4 py-3 align-middle">${student.grade || 'N/A'}</td>
+                    <td class="px-4 py-3 align-middle">${student.days || 'N/A'}</td>
+                    <td class="px-4 py-3 align-middle">${subjects || 'N/A'}</td>
+                    <td class="px-4 py-3 align-middle">${student.parentName || 'N/A'}</td>
+                    <td class="px-4 py-3 align-middle">${student.parentPhone || 'N/A'}</td>
+                    ${showActionsColumn || historyButton ? `<td class="px-4 py-3 align-middle space-x-1">${actionButtons}</td>` : ''}
                 </tr>
             `;
         }).join('');
 
         return `
-            <div class="border rounded-lg shadow-sm hover:shadow-md transition-shadow">
+            <div class="border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
                 <details open>
-                    <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg bg-gray-50 hover:bg-gray-100">
-                        <div>
-                            <span class="text-green-700">${tutor.name || 'Unnamed Tutor'}</span>
-                            <span class="ml-2 text-sm font-normal text-gray-500">${tutor.email || ''}</span>
-                            <div class="flex gap-2 mt-1">
-                                <span class="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">
-                                    ${activeStudentsCount} Active
-                                </span>
-                                ${breakStudentsCount > 0 ? `<span class="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full">
-                                    ${breakStudentsCount} On Break
-                                </span>` : ''}
-                                ${transitioningStudentsCount > 0 ? `<span class="text-xs px-2 py-1 bg-purple-100 text-purple-800 rounded-full">
-                                    ${transitioningStudentsCount} Transitioning
-                                </span>` : ''}
+                    <summary class="p-5 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between bg-gradient-to-r from-gray-50 to-white hover:from-gray-100 hover:to-gray-50 border-b">
+                        <div class="flex-1">
+                            <div class="flex flex-col sm:flex-row sm:items-start sm:space-x-3">
+                                <div>
+                                    <h3 class="text-lg font-semibold text-green-700 flex items-center">
+                                        ${tutor.name || 'Unnamed Tutor'}
+                                        <span class="ml-2 text-sm font-normal text-gray-500 hidden sm:inline">(${tutor.email || ''})</span>
+                                    </h3>
+                                    <p class="text-sm text-gray-500 mt-1 sm:hidden">${tutor.email || ''}</p>
+                                </div>
+                                <div class="mt-2 sm:mt-0 flex flex-wrap gap-2">
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                        </svg>
+                                        ${activeStudentsCount} Active
+                                    </span>
+                                    ${breakStudentsCount > 0 ? `
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                                        </svg>
+                                        ${breakStudentsCount} On Break
+                                    </span>
+                                    ` : ''}
+                                    ${transitioningStudentsCount > 0 ? `
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10.293 15.707a1 1 0 010-1.414L14.586 10l-4.293-4.293a1 1 0 111.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                        ${transitioningStudentsCount} Transitioning
+                                    </span>
+                                    ` : ''}
+                                    ${otherStudentsCount > 0 ? `
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clip-rule="evenodd"/>
+                                        </svg>
+                                        ${otherStudentsCount} Other
+                                    </span>
+                                    ` : ''}
+                                </div>
                             </div>
                         </div>
-                        <div class="flex items-center">
-                            <span class="ml-2 text-sm font-normal px-2 py-1 bg-green-100 text-green-800 rounded-full">
+                        <div class="mt-3 sm:mt-0 flex items-center space-x-2">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-700">
+                                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
+                                </svg>
                                 ${assignedStudents.length} student${assignedStudents.length !== 1 ? 's' : ''}
                             </span>
-                            <svg class="w-5 h-5 ml-2 text-gray-500 transform transition-transform duration-200 group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-5 h-5 text-gray-400 transform transition-transform duration-200 group-open:rotate-180 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>
                         </div>
                     </summary>
-                    <div class="border-t">
+                    <div class="bg-white">
                         ${assignedStudents.length > 0 ? `
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full text-sm">
-                                    <thead class="bg-gray-50 text-left">
+                            <div class="overflow-x-auto border-t border-gray-100">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
                                         <tr>
-                                            <th class="px-4 py-2 font-medium">Student Name</th>
-                                            <th class="px-4 py-2 font-medium">Fee</th>
-                                            <th class="px-4 py-2 font-medium">Grade</th>
-                                            <th class="px-4 py-2 font-medium">Days/Week</th>
-                                            <th class="px-4 py-2 font-medium">Subject</th>
-                                            <th class="px-4 py-2 font-medium">Parent's Name</th>
-                                            <th class="px-4 py-2 font-medium">Parent's Phone</th>
-                                            ${showActionsColumn ? `<th class="px-4 py-2 font-medium">Actions</th>` : ''}
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student Name</th>
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fee</th>
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days/Week</th>
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent's Name</th>
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent's Phone</th>
+                                            ${showActionsColumn ? `<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>` : ''}
                                         </tr>
                                     </thead>
                                     <tbody class="bg-white divide-y divide-gray-200">
@@ -1411,8 +1476,12 @@ function renderDirectoryFromCache(searchTerm = '') {
                                 </table>
                             </div>
                         ` : `
-                            <div class="p-6 text-center text-gray-500">
-                                No students assigned to this tutor${searchTerm ? ' matching your search' : ''}.
+                            <div class="p-8 text-center border-t border-gray-100">
+                                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-8.5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/>
+                                </svg>
+                                <h3 class="mt-2 text-sm font-medium text-gray-900">No students assigned</h3>
+                                <p class="mt-1 text-sm text-gray-500">${searchTerm ? 'No students match your search criteria.' : 'This tutor has no students assigned yet.'}</p>
                             </div>
                         `}
                     </div>
@@ -1494,12 +1563,8 @@ function getCleanStudents() {
                 }
                 return acc;
             }, {})
-        }))
-        .filter(student => 
-            !student.status || 
-            student.status === 'active' || 
-            student.status === 'approved'
-        );
+        }));
+        // REMOVED THE FILTER - Now includes ALL students regardless of status
 }
 
 /**
@@ -1537,7 +1602,7 @@ function getCleanTutors() {
  */
 function validateReassignData(students, tutors) {
     if (students.length === 0) {
-        showReassignAlert("No active students found. Please add students first.", 'warning');
+        showReassignAlert("No students found. Please add students first.", 'warning');
         return false;
     }
     
@@ -1565,8 +1630,19 @@ function createReassignModalHtml(students, tutors) {
             const currentTutor = tutors.find(t => t.email === student.tutorEmail);
             const currentTutorName = currentTutor ? currentTutor.name : 'No tutor';
             
+            // Add status indicator
+            let statusIndicator = '';
+            if (student.status) {
+                const statusLower = student.status.toLowerCase();
+                if (statusLower.includes('break') || statusLower.includes('pause') || statusLower.includes('hold')) {
+                    statusIndicator = '⏸️ ';
+                } else if (statusLower.includes('transition') || statusLower.includes('transfer')) {
+                    statusIndicator = '🔄 ';
+                }
+            }
+            
             const displayParts = [
-                student.studentName,
+                statusIndicator + student.studentName,
                 student.grade ? `Grade ${student.grade}` : '',
                 student.parentName ? `Parent: ${student.parentName}` : '',
                 `Current: ${currentTutorName}`
@@ -1580,7 +1656,8 @@ function createReassignModalHtml(students, tutors) {
                 student.parentPhone || '',
                 student.parentEmail || '',
                 Array.isArray(student.subjects) ? student.subjects.join(' ') : (student.subjects || ''),
-                currentTutorName
+                currentTutorName,
+                student.status || ''
             ].join(' ').toLowerCase();
             
             return `
@@ -1643,7 +1720,7 @@ function createReassignModalHtml(students, tutors) {
                                     </div>
                                     <input type="search" 
                                            id="reassign-search-students" 
-                                           placeholder="Search by name, grade, parent, subject..." 
+                                           placeholder="Search by name, grade, parent, subject, status..." 
                                            class="pl-10 w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
                                 </div>
                                 <p class="text-xs text-gray-500 mt-2">Search anywhere in student details</p>
@@ -9373,8 +9450,3 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
-
-
-
-
-
