@@ -894,10 +894,11 @@ window.refreshAllDashboardData = async function() {
 };
 
 // ======================================================
-// SUBSECTION 3.1: Tutor Directory Panel - FINAL CORRECTED VERSION
+// SUBSECTION 3.1: Tutor Directory Panel - FINAL FIXED VERSION
 // ======================================================
 
-// Helper function for safe string operations
+// --- HELPER FUNCTIONS ---
+
 function safeToString(value) {
     if (value === null || value === undefined) return '';
     if (typeof value === 'object') {
@@ -910,14 +911,12 @@ function safeToString(value) {
     return String(value);
 }
 
-// Helper function for safe search
 function safeSearch(text, searchTerm) {
     if (!searchTerm || safeToString(searchTerm).trim() === '') return true;
     if (!text) return false;
     return safeToString(text).toLowerCase().includes(safeToString(searchTerm).toLowerCase());
 }
 
-// Function to search student comprehensively
 function searchStudentFromFirebase(student, searchTerm, tutors = []) {
     if (!student) return false;
     if (!searchTerm || safeToString(searchTerm).trim() === '') return true;
@@ -931,19 +930,14 @@ function searchStudentFromFirebase(student, searchTerm, tutors = []) {
         'createdBy', 'updatedBy', 'notes', 'school', 'location'
     ];
     
-    // Check all known student fields
     for (const field of studentFieldsToSearch) {
-        if (student[field] && safeSearch(student[field], searchTerm)) {
-            return true;
-        }
+        if (student[field] && safeSearch(student[field], searchTerm)) return true;
     }
     
-    // Search student fee
     if (student.studentFee !== undefined && student.studentFee !== null) {
         if (safeToString(student.studentFee).includes(searchLower)) return true;
     }
     
-    // Search subjects (can be string or array)
     if (student.subjects) {
         if (Array.isArray(student.subjects)) {
             for (const subject of student.subjects) {
@@ -954,11 +948,9 @@ function searchStudentFromFirebase(student, searchTerm, tutors = []) {
         }
     }
     
-    // Search tutor information
     if (student.tutorEmail && tutors && tutors.length > 0) {
         const tutor = tutors.find(t => t && t.email === student.tutorEmail);
         if (tutor) {
-            // Search tutor properties
             const tutorFieldsToSearch = ['name', 'email', 'phone', 'qualification', 'subjects'];
             for (const field of tutorFieldsToSearch) {
                 if (tutor[field] && safeSearch(tutor[field], searchTerm)) return true;
@@ -968,6 +960,8 @@ function searchStudentFromFirebase(student, searchTerm, tutors = []) {
     
     return false;
 }
+
+// --- MAIN VIEW RENDERER ---
 
 async function renderManagementTutorView(container) {
     container.innerHTML = `
@@ -1002,22 +996,37 @@ async function renderManagementTutorView(container) {
         </div>
     `;
     
-    // Add event listeners
     try {
-        document.getElementById('assign-student-btn').addEventListener('click', showAssignStudentModal);
-        document.getElementById('reassign-student-btn').addEventListener('click', showEnhancedReassignStudentModal);
+        // Event Listeners
+        document.getElementById('assign-student-btn').addEventListener('click', () => {
+            if (typeof window.showAssignStudentModal === 'function') {
+                window.showAssignStudentModal();
+            } else {
+                console.warn("showAssignStudentModal not found");
+            }
+        });
+
+        // Use the global window reference to avoid ReferenceError
+        document.getElementById('reassign-student-btn').addEventListener('click', () => {
+            if (typeof window.showEnhancedReassignStudentModal === 'function') {
+                window.showEnhancedReassignStudentModal();
+            } else {
+                console.error("showEnhancedReassignStudentModal is not defined globally.");
+                alert("Feature loading... please try again in a moment.");
+            }
+        });
+
         document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
         document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
         
+        // History Button Logic
         document.getElementById('view-tutor-history-directory-btn').addEventListener('click', async () => {
             if (!sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
                 alert("No tutor history available. Please refresh the directory first.");
                 return;
             }
             
-            // Use nonArchivedStudents logic here too so we can see history for break students
             const students = sessionCache.students || [];
-            
             if (students.length === 0) {
                 alert("No students found.");
                 return;
@@ -1073,6 +1082,8 @@ async function renderManagementTutorView(container) {
     fetchAndRenderDirectory();
 }
 
+// --- DATA FETCHING ---
+
 async function fetchAndRenderDirectory(forceRefresh = false) {
     if (forceRefresh) {
         invalidateCache('tutors');
@@ -1093,9 +1104,9 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             getDocs(collection(db, "tutorAssignments"))
         ]);
         
-        console.log(`Fetched ${tutorsSnapshot.size} tutors, ${studentsSnapshot.size} students, ${tutorAssignmentsSnapshot.size} tutor assignments`);
+        console.log(`Fetched ${tutorsSnapshot.size} tutors, ${studentsSnapshot.size} students.`);
         
-        // Process tutors with safe data handling
+        // Process tutors
         const allTutors = tutorsSnapshot.docs.map(doc => {
             const data = doc.data();
             return {
@@ -1131,25 +1142,21 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
                 parentPhone: data.parentPhone || '',
                 parentEmail: data.parentEmail || '',
                 address: data.address || '',
-                status: data.status || 'active', // Default to active if missing
+                status: data.status || 'active', 
                 createdAt: data.createdAt || new Date().toISOString(),
                 ...data
             };
         });
         
-        // --- FIXED FILTERING LOGIC ---
-        // We only remove strictly archived or deleted students.
-        // We KEEP inactive, break, suspended, transitioning, etc.
+        // --- CRITICAL FILTER FIX ---
+        // Only exclude students explicitly marked as 'archived' or 'deleted'.
+        // Keep 'inactive', 'break', 'suspended', 'transitioning'.
         const nonArchivedStudents = allStudents.filter(student => {
             if (!student) return false;
-            
             const status = student.status ? student.status.toLowerCase() : 'active';
-            const excludedStatuses = ['archived', 'deleted'];
             
-            for (const excludedStatus of excludedStatuses) {
-                if (status.includes(excludedStatus)) {
-                    return false;
-                }
+            if (status.includes('archived') || status.includes('deleted')) {
+                return false; 
             }
             return true;
         });
@@ -1184,7 +1191,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             );
         });
         
-        // Save to cache - using nonArchivedStudents instead of "activeStudents"
+        // Save to cache
         saveToLocalStorage('tutors', activeTutors);
         saveToLocalStorage('students', nonArchivedStudents); 
         sessionCache.tutorAssignments = tutorAssignments;
@@ -1207,6 +1214,8 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
         }
     }
 }
+
+// --- DIRECTORY RENDERER ---
 
 function renderDirectoryFromCache(searchTerm = '') {
     const tutors = sessionCache.tutors || [];
@@ -1241,7 +1250,7 @@ function renderDirectoryFromCache(searchTerm = '') {
         }
     });
 
-    // Filter tutors
+    // Filter tutors based on search
     const filteredTutors = tutors.filter(tutor => {
         if (!tutor) return false;
         if (!searchTerm) return true;
@@ -1249,9 +1258,7 @@ function renderDirectoryFromCache(searchTerm = '') {
         const assignedStudents = studentsByTutor[tutor.email] || [];
         const tutorNameMatch = safeSearch(tutor.name, searchTerm);
         const tutorEmailMatch = safeSearch(tutor.email, searchTerm);
-        const studentMatch = assignedStudents.some(student => {
-            return searchStudentFromFirebase(student, searchTerm, tutors);
-        });
+        const studentMatch = assignedStudents.some(student => searchStudentFromFirebase(student, searchTerm, tutors));
         
         return tutorNameMatch || tutorEmailMatch || studentMatch;
     });
@@ -1276,7 +1283,7 @@ function renderDirectoryFromCache(searchTerm = '') {
     const canDeleteStudents = window.userData?.permissions?.actions?.canDeleteStudents === true;
     const showActionsColumn = canEditStudents || canDeleteStudents;
 
-    // --- RENDER TUTORS ---
+    // --- RENDER CARDS ---
     directoryList.innerHTML = filteredTutors.map(tutor => {
         if (!tutor) return '';
         
@@ -1288,28 +1295,28 @@ function renderDirectoryFromCache(searchTerm = '') {
             })
             .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
 
-        // --- ENHANCED CATEGORY LOGIC ---
+        // --- STATUS CATEGORIZER ---
         const getStudentCategory = (s) => {
             const status = safeToString(s.status).toLowerCase().trim();
             
-            // 1. Check for Transitioning keywords
+            // Transitioning
             if (status.includes('transition') || status.includes('transfer') || status.includes('moving') || status.includes('changing')) {
                 return 'transitioning';
             }
             
-            // 2. Check for Break/Inactive keywords (Includes 'inactive', 'stopped', 'left', 'suspended')
+            // Break / Inactive / Suspended / Stopped / Left
             if (status.includes('break') || status.includes('pause') || status.includes('hold') || 
                 status.includes('suspended') || status.includes('inactive') || status.includes('stopped') || 
                 status.includes('left') || status.includes('cancel')) {
                 return 'break';
             }
             
-            // 3. Strict Active check
+            // Strict Active
             if (status === 'active' || status === 'approved' || status === '') {
                 return 'active';
             }
             
-            // 4. Fallback for others
+            // Catch-all (e.g., Pending, Trial)
             return 'other';
         };
 
@@ -1321,9 +1328,8 @@ function renderDirectoryFromCache(searchTerm = '') {
         const studentsTableRows = assignedStudents.map(student => {
             const category = getStudentCategory(student);
             let statusBadge = '';
-            // Capitalize the actual status text for display
-            const displayStatus = student.status ? 
-                (student.status.charAt(0).toUpperCase() + student.status.slice(1)) : 'Active';
+            // Capitalize for display
+            const displayStatus = student.status ? (student.status.charAt(0).toUpperCase() + student.status.slice(1)) : 'Active';
             
             if (category === 'break') {
                 statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 ml-2">${displayStatus}</span>`;
@@ -1332,7 +1338,6 @@ function renderDirectoryFromCache(searchTerm = '') {
             } else if (category === 'active') {
                 statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">Active</span>`;
             } else {
-                // For 'other' statuses
                 statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 ml-2">${displayStatus}</span>`;
             }
             
@@ -1453,7 +1458,7 @@ function renderDirectoryFromCache(searchTerm = '') {
         `;
     }).join('');
 
-    // Add event listeners for action buttons
+    // Re-attach button listeners
     if (canEditStudents) {
         document.querySelectorAll('.edit-student-btn').forEach(button => {
             button.addEventListener('click', () => handleEditStudent(button.dataset.studentId));
@@ -1476,6 +1481,310 @@ function renderDirectoryFromCache(searchTerm = '') {
         });
     });
 }
+
+// ======================================================
+// ENHANCED REASSIGN STUDENT FEATURE - DEFINITIONS
+// ======================================================
+
+function isCacheValid(requiredKeys = []) {
+    if (!sessionCache) return false;
+    for (const key of requiredKeys) {
+        if (!sessionCache[key] || !Array.isArray(sessionCache[key]) || sessionCache[key].length === 0) {
+            return false;
+        }
+    }
+    const cacheTime = sessionCache._lastUpdate || 0;
+    const maxAge = 5 * 60 * 1000; 
+    return Date.now() - cacheTime < maxAge;
+}
+
+function getCleanStudents() {
+    const rawStudents = sessionCache.students || [];
+    return rawStudents.filter(student => student && typeof student === 'object').map(student => ({
+        id: student.id || '',
+        studentName: student.studentName || 'Unnamed Student',
+        tutorEmail: student.tutorEmail || '',
+        tutorName: student.tutorName || '',
+        grade: student.grade || '',
+        parentName: student.parentName || '',
+        parentPhone: student.parentPhone || '',
+        parentEmail: student.parentEmail || '',
+        subjects: Array.isArray(student.subjects) ? student.subjects : (student.subjects ? [student.subjects] : []),
+        status: student.status || 'active',
+        ...Object.keys(student).reduce((acc, key) => {
+            if (student[key] !== undefined && student[key] !== null) acc[key] = student[key];
+            return acc;
+        }, {})
+    }));
+}
+
+function getCleanTutors() {
+    const rawTutors = sessionCache.tutors || [];
+    return rawTutors.filter(tutor => tutor && typeof tutor === 'object').map(tutor => ({
+        id: tutor.id || '',
+        name: tutor.name || 'Unnamed Tutor',
+        email: tutor.email || '',
+        phone: tutor.phone || '',
+        status: tutor.status || 'active',
+        subjects: Array.isArray(tutor.subjects) ? tutor.subjects : (tutor.subjects ? [tutor.subjects] : []),
+        ...Object.keys(tutor).reduce((acc, key) => {
+            if (tutor[key] !== undefined && tutor[key] !== null) acc[key] = tutor[key];
+            return acc;
+        }, {})
+    })).filter(tutor => !tutor.status || tutor.status === 'active');
+}
+
+function validateReassignData(students, tutors) {
+    if (students.length === 0) {
+        showReassignAlert("No students found. Please add students first.", 'warning');
+        return false;
+    }
+    if (tutors.length === 0) {
+        showReassignAlert("No active tutors found. Please add tutors first.", 'warning');
+        return false;
+    }
+    const assignedStudents = students.filter(s => s.tutorEmail && s.tutorEmail.trim() !== '');
+    if (assignedStudents.length === 0) {
+        showReassignAlert("No students are currently assigned to tutors.", 'info');
+        return false;
+    }
+    return true;
+}
+
+function createReassignModalHtml(students, tutors) {
+    const studentOptions = students.filter(student => student.tutorEmail && student.tutorEmail.trim() !== '').map(student => {
+        const currentTutor = tutors.find(t => t.email === student.tutorEmail);
+        const currentTutorName = currentTutor ? currentTutor.name : 'No tutor';
+        
+        let statusIndicator = '';
+        if (student.status) {
+            const statusLower = student.status.toLowerCase();
+            if (statusLower.includes('break') || statusLower.includes('pause') || statusLower.includes('hold')) statusIndicator = '⏸️ ';
+            else if (statusLower.includes('transition') || statusLower.includes('transfer')) statusIndicator = '🔄 ';
+        }
+        
+        const displayParts = [
+            statusIndicator + student.studentName,
+            student.grade ? `Grade ${student.grade}` : '',
+            student.parentName ? `Parent: ${student.parentName}` : '',
+            `Current: ${currentTutorName}`
+        ].filter(part => part && part.trim() !== '');
+        
+        const searchText = [
+            student.studentName || '', student.grade || '', student.parentName || '', student.parentPhone || '',
+            student.parentEmail || '', Array.isArray(student.subjects) ? student.subjects.join(' ') : (student.subjects || ''),
+            currentTutorName, student.status || ''
+        ].join(' ').toLowerCase();
+        
+        return `<option value="${student.id}" data-tutor-email="${student.tutorEmail || ''}" data-student-name="${student.studentName || ''}" data-search-text="${searchText}">${displayParts.join(' | ')}</option>`;
+    }).join('');
+    
+    const tutorOptions = tutors.map(tutor => {
+        const searchText = [
+            tutor.name || '', tutor.email || '', tutor.phone || '',
+            Array.isArray(tutor.subjects) ? tutor.subjects.join(' ') : (tutor.subjects || '')
+        ].join(' ').toLowerCase();
+        return `<option value="${tutor.email}" data-tutor-name="${tutor.name || ''}" data-search-text="${searchText}">${tutor.name} (${tutor.email})</option>`;
+    }).join('');
+    
+    return `
+        <div id="reassign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+            <div class="relative bg-white w-full max-w-4xl rounded-lg shadow-xl animate-fadeIn">
+                <div class="flex items-center justify-between p-6 border-b">
+                    <div><h3 class="text-xl font-bold text-blue-700">Reassign Student</h3><p class="text-sm text-gray-600 mt-1">Transfer student to a different tutor</p></div>
+                    <button onclick="closeReassignModal()" class="text-gray-400 hover:text-gray-800 text-2xl font-bold transition-colors">&times;</button>
+                </div>
+                <div class="p-6">
+                    <form id="reassign-student-form">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Search Students</label>
+                                <input type="search" id="reassign-search-students" placeholder="Search by name, grade, parent..." class="w-full p-3 border border-gray-300 rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Search Tutors</label>
+                                <input type="search" id="reassign-search-tutors" placeholder="Search by name, email..." class="w-full p-3 border border-gray-300 rounded-lg">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                            <div class="space-y-2">
+                                <label class="block text-sm font-medium text-gray-700">Select Student <span class="text-red-500">*</span></label>
+                                <select id="reassign-student-id" required class="block w-full rounded-md border-gray-300 shadow-sm p-3 h-64 overflow-y-auto" size="10">
+                                    <option value="" disabled selected>Select a student...</option>${studentOptions}
+                                </select>
+                            </div>
+                            <div class="space-y-2">
+                                <label class="block text-sm font-medium text-gray-700">Select New Tutor <span class="text-red-500">*</span></label>
+                                <select id="reassign-tutor-email" required class="block w-full rounded-md border-gray-300 shadow-sm p-3 h-48 overflow-y-auto" size="8">
+                                    <option value="" disabled selected>Select a tutor...</option>${tutorOptions}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Reason (Optional)</label>
+                            <textarea id="reassign-reason" class="w-full rounded-md border-gray-300 shadow-sm p-3" rows="3" maxlength="500"></textarea>
+                        </div>
+                        <div class="flex justify-end space-x-3 pt-4 border-t">
+                            <button type="button" onclick="closeReassignModal()" class="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-lg">Cancel</button>
+                            <button type="submit" id="reassign-submit-btn" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Reassign Student</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function enhancedSearchFilter(options, searchTerm, searchAttribute = 'data-search-text') {
+    if (!searchTerm.trim()) {
+        options.forEach(option => { if (option.value !== "") option.style.display = 'block'; });
+        return options.filter(opt => opt.value !== "" && opt.style.display !== 'none');
+    }
+    const searchLower = searchTerm.toLowerCase();
+    options.forEach(option => {
+        if (option.value === "") option.style.display = 'block';
+        else {
+            const searchText = option.getAttribute(searchAttribute) || option.textContent.toLowerCase();
+            const isMatch = searchText.includes(searchLower);
+            option.style.display = isMatch ? 'block' : 'none';
+        }
+    });
+    return options.filter(opt => opt.value !== "" && opt.style.display !== 'none');
+}
+
+function initializeReassignModal(students, tutors) {
+    const studentSearchInput = document.getElementById('reassign-search-students');
+    const tutorSearchInput = document.getElementById('reassign-search-tutors');
+    const studentSelect = document.getElementById('reassign-student-id');
+    const tutorSelect = document.getElementById('reassign-tutor-email');
+    const reasonTextarea = document.getElementById('reassign-reason');
+    const form = document.getElementById('reassign-student-form');
+    
+    if (studentSearchInput && studentSelect) {
+        studentSearchInput.addEventListener('input', function() {
+            enhancedSearchFilter(Array.from(studentSelect.options), this.value.trim(), 'data-search-text');
+        });
+    }
+    
+    if (tutorSearchInput && tutorSelect) {
+        tutorSearchInput.addEventListener('input', function() {
+            enhancedSearchFilter(Array.from(tutorSelect.options), this.value.trim(), 'data-search-text');
+        });
+    }
+    
+    if (form) {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const studentId = studentSelect.value;
+            const tutorEmail = tutorSelect.value;
+            const reason = reasonTextarea ? reasonTextarea.value.trim() : '';
+            
+            if (!studentId || !tutorEmail) { showReassignAlert("Select both student and tutor.", 'warning'); return; }
+            
+            const student = students.find(s => s.id === studentId);
+            const newTutor = tutors.find(t => t.email === tutorEmail);
+            const currentTutor = tutors.find(t => t.email === student?.tutorEmail);
+            
+            if (!student || !newTutor) return;
+            if (student.tutorEmail === tutorEmail) { showReassignAlert("Student is already assigned to this tutor.", 'warning'); return; }
+            
+            const confirmed = await showReassignConfirmationDialog(
+                `Reassign Student`,
+                `Reassign <strong>${student.studentName}</strong> to <strong>${newTutor.name}</strong>?`,
+                'warning'
+            );
+            
+            if (confirmed) await performReassignment(student, newTutor, reason, currentTutor);
+        });
+    }
+}
+
+async function performReassignment(student, newTutor, reason, currentTutor = null) {
+    const submitBtn = document.getElementById('reassign-submit-btn');
+    const originalBtnContent = submitBtn.innerHTML;
+    try {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Processing...";
+        const currentUser = window.userData?.name || 'Admin';
+        const currentUserEmail = window.userData?.email || 'admin@system';
+        
+        await addDoc(collection(db, "tutorAssignments"), {
+            studentId: student.id, studentName: student.studentName,
+            oldTutorEmail: student.tutorEmail || '', oldTutorName: currentTutor?.name || 'Unknown',
+            newTutorEmail: newTutor.email, newTutorName: newTutor.name,
+            reason: reason || 'Reassignment', assignedBy: currentUser, assignedByEmail: currentUserEmail,
+            assignedAt: new Date().toISOString(), timestamp: new Date().toISOString()
+        });
+        
+        await updateDoc(doc(db, "students", student.id), {
+            tutorEmail: newTutor.email, tutorName: newTutor.name,
+            updatedAt: new Date().toISOString(), updatedBy: currentUser, updatedByEmail: currentUserEmail
+        });
+        
+        if (sessionCache.students) {
+            const index = sessionCache.students.findIndex(s => s.id === student.id);
+            if (index !== -1) {
+                sessionCache.students[index].tutorEmail = newTutor.email;
+                sessionCache.students[index].tutorName = newTutor.name;
+                saveToLocalStorage('students', sessionCache.students);
+            }
+        }
+        
+        showReassignAlert("Success!", 'success');
+        setTimeout(() => { closeReassignModal(); fetchAndRenderDirectory(true); }, 1500);
+    } catch (error) {
+        console.error(error);
+        showReassignAlert("Failed: " + error.message, 'error');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnContent;
+    }
+}
+
+function showReassignAlert(message, type = 'info') {
+    const colors = { success: 'bg-green-100 text-green-700', error: 'bg-red-100 text-red-700', warning: 'bg-yellow-100 text-yellow-700', info: 'bg-blue-100 text-blue-700' };
+    const alertHtml = `<div class="reassign-alert fixed top-4 right-4 ${colors[type] || colors.info} border px-6 py-4 rounded-lg shadow-lg z-50">${message}</div>`;
+    document.body.insertAdjacentHTML('beforeend', alertHtml);
+    setTimeout(() => { const a = document.querySelector('.reassign-alert'); if(a) a.remove(); }, 5000);
+}
+
+function showReassignConfirmationDialog(title, message) {
+    return new Promise((resolve) => {
+        const dialogHtml = `
+            <div id="reassign-confirm-dialog" class="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
+                <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
+                    <h3 class="text-lg font-bold mb-3">${title}</h3><div class="mb-6">${message}</div>
+                    <div class="flex justify-end space-x-3">
+                        <button id="confirm-cancel" class="px-4 py-2 bg-gray-100 rounded">Cancel</button>
+                        <button id="confirm-ok" class="px-4 py-2 bg-blue-600 text-white rounded">Confirm</button>
+                    </div>
+                </div>
+            </div>`;
+        document.body.insertAdjacentHTML('beforeend', dialogHtml);
+        document.getElementById('confirm-cancel').onclick = () => { document.getElementById('reassign-confirm-dialog').remove(); resolve(false); };
+        document.getElementById('confirm-ok').onclick = () => { document.getElementById('reassign-confirm-dialog').remove(); resolve(true); };
+    });
+}
+
+function showEnhancedReassignStudentModal() {
+    if (!isCacheValid(['students', 'tutors'])) { fetchAndRenderDirectory(true); return; }
+    const students = getCleanStudents();
+    const tutors = getCleanTutors();
+    if (!validateReassignData(students, tutors)) return;
+    document.body.insertAdjacentHTML('beforeend', createReassignModalHtml(students, tutors));
+    initializeReassignModal(students, tutors);
+}
+
+function closeReassignModal() {
+    const modal = document.getElementById('reassign-student-modal');
+    if (modal) modal.remove();
+}
+
+// ======================================================
+// EXPOSE GLOBALS (FIX FOR REFERENCE ERROR)
+// ======================================================
+window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
+window.closeReassignModal = closeReassignModal;
+window.closeManagementModal = function(id) { const m = document.getElementById(id); if(m) m.remove(); };
 
 
 // ======================================================
@@ -8551,6 +8860,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
