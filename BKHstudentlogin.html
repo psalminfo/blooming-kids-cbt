@@ -350,254 +350,251 @@
 
     </main>
 
-    <!-- ========== SECTION 17: MAIN APPLICATION LOGIC ========== -->
-    <script type="module">
-        // Wait for DOM and Firebase modules to be ready
-        document.addEventListener('DOMContentLoaded', async function() {
-            // ========== SUBSECTION 17.1: INITIALIZATION ==========
-            console.log('Student Portal Initializing...');
+  <!-- ========== SECTION 17: MAIN APPLICATION LOGIC ========== -->
+<script type="module">
+    // Wait for DOM and Firebase modules to be ready
+    document.addEventListener('DOMContentLoaded', async function() {
+        // ========== SUBSECTION 17.1: INITIALIZATION ==========
+        console.log('Student Portal Initializing...');
+        
+        // Set current date
+        const dateElement = document.getElementById('page-date');
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        dateElement.innerText = new Date().toLocaleDateString('en-US', options);
+        
+        // Initialize chart
+        initializeChart();
+        
+        // ========== SUBSECTION 17.2: AUTHENTICATION ==========
+        try {
+            // Check if Firebase modules are loaded
+            if (!window.firebaseModules) {
+                throw new Error('Firebase modules not loaded. Check your firebaseConfig path.');
+            }
             
-            // Set current date
-            const dateElement = document.getElementById('page-date');
-            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-            dateElement.innerText = new Date().toLocaleDateString('en-US', options);
+            const { auth, onAuthStateChanged, signOut, db, collection, query, where, getDocs, getDoc, doc } = window.firebaseModules;
             
-            // Initialize chart
-            initializeChart();
-            
-            // ========== SUBSECTION 17.2: AUTHENTICATION ==========
-            try {
-                // Check if Firebase modules are loaded
-                if (!window.firebaseModules) {
-                    throw new Error('Firebase modules not loaded. Check your firebaseConfig path.');
+            // Global logout function
+            window.logout = async () => {
+                try {
+                    await signOut(auth);
+                    window.location.href = 'studentsignup.html';
+                } catch (error) {
+                    console.error('Logout error:', error);
+                    alert('Error signing out. Please try again.');
                 }
-                
-                const { auth, onAuthStateChanged, signOut, db, collection, query, where, getDocs, getDoc, doc } = window.firebaseModules;
-                
-                // Global logout function
-                window.logout = async () => {
-                    try {
-                        await signOut(auth);
-                        window.location.href = 'studentsignup.html';
-                    } catch (error) {
-                        console.error('Logout error:', error);
-                        alert('Error signing out. Please try again.');
-                    }
-                };
-                
-                // ========== SUBSECTION 17.3: AUTH STATE LISTENER ==========
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        console.log('User authenticated:', user.uid);
-                        await loadStudentData(user);
+            };
+            
+            // ========== SUBSECTION 17.3: AUTH STATE LISTENER ==========
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    console.log('User authenticated:', user.uid);
+                    await loadStudentData(user);
+                } else {
+                    // No user signed in, redirect to signup
+                    console.log('No user, redirecting to signup...');
+                    window.location.href = 'studentsignup.html';
+                }
+            });
+            
+            // ========== SUBSECTION 17.4: LOAD STUDENT DATA ==========
+            async function loadStudentData(user) {
+                try {
+                    // Update profile section
+                    document.getElementById('student-display-name').innerText = user.displayName || "Student";
+                    
+                    // Fetch student document from Firestore
+                    const studentQuery = query(collection(db, "students"), where("studentUid", "==", user.uid));
+                    const studentSnapshot = await getDocs(studentQuery);
+                    
+                    if (!studentSnapshot.empty) {
+                        const studentDoc = studentSnapshot.docs[0];
+                        const studentData = studentDoc.data();
+                        
+                        // Get tutor information from student data
+                        const tutorEmail = studentData.assignedTutor || studentData.tutorEmail;
+                        const tutorName = studentData.tutorName || "Tutor";
+                        
+                        // Display student info
+                        const gradeCountry = `${studentData.grade || 'Grade'} • ${studentData.country || 'Country'}`;
+                        document.getElementById('student-grade-country').innerText = gradeCountry;
+                        
+                        // Load all dashboard data with tutor info
+                        await Promise.all([
+                            loadAttendance(studentData),
+                            loadPendingTasks(user.uid),
+                            loadAverageGrade(user.uid),
+                            loadNextClass(studentData),
+                            loadUpcomingSchedule(studentData),
+                            loadCourses(studentData),
+                            loadAssignments(user.uid),
+                            loadResults(user.uid),
+                            loadSchedule(studentData),
+                            loadGames(studentData.grade || 3)
+                        ]);
+                        
                     } else {
-                        // No user signed in, redirect to signup
-                        console.log('No user, redirecting to signup...');
-                        window.location.href = 'studentsignup.html';
+                        console.error('No student data found for UID:', user.uid);
+                        document.getElementById('student-grade-country').innerText = 'Profile Not Found';
                     }
-                });
-                
-                // ========== SUBSECTION 17.4: LOAD STUDENT DATA ==========
-                async function loadStudentData(user) {
-                    try {
-                        // Update profile section
-                        document.getElementById('student-display-name').innerText = user.displayName || "Student";
-                        
-                        // Fetch student document from Firestore
-                        const studentQuery = query(collection(db, "students"), where("studentUid", "==", user.uid));
-                        const studentSnapshot = await getDocs(studentQuery);
-                        
-                        if (!studentSnapshot.empty) {
-                            const studentDoc = studentSnapshot.docs[0];
-                            const studentData = studentDoc.data();
-                            
-                            // Display student info
-                            const gradeCountry = `${studentData.grade || 'Grade'} • ${studentData.country || 'Country'}`;
-                            document.getElementById('student-grade-country').innerText = gradeCountry;
-                            
-                            // Load all dashboard data
-                            await Promise.all([
-                                loadAttendance(studentData),
-                                loadPendingTasks(user.uid, studentData.assignedTutor),
-                                loadAverageGrade(user.uid),
-                                loadNextClass(studentData),
-                                loadUpcomingSchedule(studentData),
-                                loadCourses(studentData),
-                                loadAssignments(user.uid, studentData.assignedTutor),
-                                loadResults(user.uid),
-                                loadSchedule(studentData),
-                                loadGames(studentData.grade || 3)
-                            ]);
-                            
-                        } else {
-                            console.error('No student data found for UID:', user.uid);
-                            document.getElementById('student-grade-country').innerText = 'Profile Not Found';
-                        }
-                        
-                    } catch (error) {
-                        console.error('Error loading student data:', error);
-                        // Fallback to mock data for demo
-                        loadMockData();
-                    }
+                    
+                } catch (error) {
+                    console.error('Error loading student data:', error);
+                    // Fallback to mock data for demo
+                    loadMockData();
                 }
-                
-                // ========== SUBSECTION 17.5: ATTENDANCE CALCULATION ==========
-                async function loadAttendance(studentData) {
-                    try {
-                        // Query schedules collection for this student's tutor
-                        if (studentData.assignedTutor) {
-                            const schedulesQuery = query(
-                                collection(db, "schedules"),
-                                where("tutorEmail", "==", studentData.assignedTutor),
-                                where("studentName", "==", studentData.studentName || studentData.displayName)
-                            );
-                            
-                            const schedulesSnapshot = await getDocs(schedulesQuery);
-                            const totalClasses = schedulesSnapshot.size;
-                            
-                            // Query homework submissions to count attended classes
-                            const homeworkQuery = query(
-                                collection(db, "homework_assignments"),
-                                where("studentId", "==", studentData.studentUid),
-                                where("status", "==", "submitted")
-                            );
-                            
-                            const homeworkSnapshot = await getDocs(homeworkQuery);
-                            const attendedClasses = homeworkSnapshot.size;
-                            
-                            // Calculate attendance percentage
-                            const attendancePercent = totalClasses > 0 ? 
-                                Math.round((attendedClasses / totalClasses) * 100) : 100;
-                            
-                            document.getElementById('attendance-percent').innerText = `${attendancePercent}%`;
-                            
-                            // Calculate trend (mock for now)
-                            const trend = attendancePercent >= 95 ? '+3% this month' : 
-                                         attendancePercent >= 90 ? '+1% this month' : 
-                                         attendancePercent >= 85 ? 'No change' : '-2% this month';
-                            
-                            const trendColor = attendancePercent >= 90 ? 'text-green-600' : 
-                                              attendancePercent >= 80 ? 'text-yellow-600' : 'text-red-600';
-                            
-                            document.getElementById('attendance-trend').innerHTML = 
-                                `<i class="fas ${attendancePercent >= 85 ? 'fa-arrow-up' : 'fa-arrow-down'} mr-1"></i> ${trend}`;
-                            document.getElementById('attendance-trend').className = `text-xs ${trendColor} mt-auto flex items-center`;
-                            
-                        } else {
-                            document.getElementById('attendance-percent').innerText = 'No Tutor';
-                            document.getElementById('attendance-trend').innerText = 'Tutor not assigned';
-                        }
-                        
-                    } catch (error) {
-                        console.error('Error loading attendance:', error);
-                        document.getElementById('attendance-percent').innerText = 'Error';
-                    }
-                }
-                
-                // ========== SUBSECTION 17.6: PENDING TASKS ==========
-                async function loadPendingTasks(studentUid, tutorEmail) {
-                    try {
-                        if (!tutorEmail) {
-                            document.getElementById('pending-tasks-count').innerText = '0';
-                            document.getElementById('pending-due').innerText = 'No tutor assigned';
-                            document.getElementById('pending-count').innerText = '0';
-                            return;
-                        }
-                        
-                        // Query pending homework
-                        const pendingQuery = query(
-                            collection(db, "homework_assignments"),
-                            where("studentId", "==", studentUid),
+            }
+            
+            // ========== SUBSECTION 17.5: ATTENDANCE CALCULATION ==========
+            async function loadAttendance(studentData) {
+                try {
+                    // Query schedules collection for this student's tutor
+                    if (studentData.assignedTutor || studentData.tutorEmail) {
+                        const tutorEmail = studentData.assignedTutor || studentData.tutorEmail;
+                        const schedulesQuery = query(
+                            collection(db, "schedules"),
                             where("tutorEmail", "==", tutorEmail),
-                            where("status", "in", ["assigned", "pending"])
+                            where("studentName", "==", studentData.studentName || studentData.displayName)
                         );
                         
-                        const pendingSnapshot = await getDocs(pendingQuery);
-                        const pendingCount = pendingSnapshot.size;
+                        const schedulesSnapshot = await getDocs(schedulesQuery);
+                        const totalClasses = schedulesSnapshot.size;
                         
-                        document.getElementById('pending-tasks-count').innerText = pendingCount;
-                        document.getElementById('pending-count').innerText = pendingCount;
-                        
-                        // Check due dates
-                        const now = new Date();
-                        let dueSoon = 0;
-                        
-                        pendingSnapshot.forEach(doc => {
-                            const data = doc.data();
-                            if (data.dueDate) {
-                                const dueDate = new Date(data.dueDate);
-                                const diffHours = (dueDate - now) / (1000 * 60 * 60);
-                                if (diffHours <= 48) dueSoon++;
-                            }
-                        });
-                        
-                        if (dueSoon > 0) {
-                            document.getElementById('pending-due').innerText = `${dueSoon} due within 48 hours`;
-                            document.getElementById('pending-due').className = 'text-xs text-red-500 mt-auto';
-                        } else {
-                            document.getElementById('pending-due').innerText = 'No immediate deadlines';
-                        }
-                        
-                    } catch (error) {
-                        console.error('Error loading pending tasks:', error);
-                    }
-                }
-                
-                // ========== SUBSECTION 17.7: AVERAGE GRADE ==========
-                async function loadAverageGrade(studentUid) {
-                    try {
-                        // Query all graded assignments
-                        const gradesQuery = query(
+                        // Query homework submissions to count attended classes
+                        const homeworkQuery = query(
                             collection(db, "homework_assignments"),
-                            where("studentId", "==", studentUid),
-                            where("status", "==", "graded"),
-                            where("grade", "!=", null)
+                            where("studentId", "==", studentData.studentUid),
+                            where("status", "==", "submitted")
                         );
                         
-                        const gradesSnapshot = await getDocs(gradesQuery);
+                        const homeworkSnapshot = await getDocs(homeworkQuery);
+                        const attendedClasses = homeworkSnapshot.size;
                         
-                        if (gradesSnapshot.empty) {
-                            document.getElementById('average-grade').innerText = '--';
-                            document.getElementById('grade-ranking').innerText = 'No grades yet';
-                            return;
-                        }
+                        // Calculate attendance percentage
+                        const attendancePercent = totalClasses > 0 ? 
+                            Math.round((attendedClasses / totalClasses) * 100) : 100;
                         
-                        // Calculate average
-                        let total = 0;
-                        let count = 0;
+                        document.getElementById('attendance-percent').innerText = `${attendancePercent}%`;
                         
-                        gradesSnapshot.forEach(doc => {
-                            const grade = doc.data().grade;
-                            if (typeof grade === 'number') {
-                                total += grade;
-                                count++;
-                            }
-                        });
+                        // Calculate trend (mock for now)
+                        const trend = attendancePercent >= 95 ? '+3% this month' : 
+                                     attendancePercent >= 90 ? '+1% this month' : 
+                                     attendancePercent >= 85 ? 'No change' : '-2% this month';
                         
-                        const average = count > 0 ? Math.round(total / count) : 0;
+                        const trendColor = attendancePercent >= 90 ? 'text-green-600' : 
+                                          attendancePercent >= 80 ? 'text-yellow-600' : 'text-red-600';
                         
-                        // Convert to letter grade
-                        let letterGrade = '--';
-                        if (average >= 90) letterGrade = 'A';
-                        else if (average >= 80) letterGrade = 'B+';
-                        else if (average >= 70) letterGrade = 'B';
-                        else if (average >= 60) letterGrade = 'C+';
-                        else if (average >= 50) letterGrade = 'C';
-                        else letterGrade = 'F';
+                        document.getElementById('attendance-trend').innerHTML = 
+                            `<i class="fas ${attendancePercent >= 85 ? 'fa-arrow-up' : 'fa-arrow-down'} mr-1"></i> ${trend}`;
+                        document.getElementById('attendance-trend').className = `text-xs ${trendColor} mt-auto flex items-center`;
                         
-                        document.getElementById('average-grade').innerText = letterGrade;
-                        
-                        // Mock ranking (you would need to compare with other students)
-                        const ranking = average >= 85 ? 'Top 10% of class' :
-                                      average >= 75 ? 'Top 25% of class' :
-                                      average >= 65 ? 'Above average' : 'Average';
-                        
-                        document.getElementById('grade-ranking').innerText = ranking;
-                        
-                    } catch (error) {
-                        console.error('Error loading average grade:', error);
+                    } else {
+                        document.getElementById('attendance-percent').innerText = 'No Tutor';
+                        document.getElementById('attendance-trend').innerText = 'Tutor not assigned';
                     }
+                    
+                } catch (error) {
+                    console.error('Error loading attendance:', error);
+                    document.getElementById('attendance-percent').innerText = 'Error';
                 }
+            }
+            
+            // ========== SUBSECTION 17.6: PENDING TASKS ==========
+            async function loadPendingTasks(studentUid) {
+                try {
+                    // Query pending homework using studentId
+                    const pendingQuery = query(
+                        collection(db, "homework_assignments"),
+                        where("studentId", "==", studentUid),
+                        where("status", "in", ["assigned", "pending"])
+                    );
+                    
+                    const pendingSnapshot = await getDocs(pendingQuery);
+                    const pendingCount = pendingSnapshot.size;
+                    
+                    document.getElementById('pending-tasks-count').innerText = pendingCount;
+                    document.getElementById('pending-count').innerText = pendingCount;
+                    
+                    // Check due dates
+                    const now = new Date();
+                    let dueSoon = 0;
+                    
+                    pendingSnapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (data.dueDate) {
+                            const dueDate = new Date(data.dueDate);
+                            const diffHours = (dueDate - now) / (1000 * 60 * 60);
+                            if (diffHours <= 48) dueSoon++;
+                        }
+                    });
+                    
+                    if (dueSoon > 0) {
+                        document.getElementById('pending-due').innerText = `${dueSoon} due within 48 hours`;
+                        document.getElementById('pending-due').className = 'text-xs text-red-500 mt-auto';
+                    } else {
+                        document.getElementById('pending-due').innerText = 'No immediate deadlines';
+                    }
+                    
+                } catch (error) {
+                    console.error('Error loading pending tasks:', error);
+                }
+            }
+            
+            // ========== SUBSECTION 17.7: AVERAGE GRADE ==========
+            async function loadAverageGrade(studentUid) {
+                try {
+                    // Query all graded assignments using studentId
+                    const gradesQuery = query(
+                        collection(db, "homework_assignments"),
+                        where("studentId", "==", studentUid),
+                        where("status", "==", "graded"),
+                        where("grade", "!=", null)
+                    );
+                    
+                    const gradesSnapshot = await getDocs(gradesQuery);
+                    
+                    if (gradesSnapshot.empty) {
+                        document.getElementById('average-grade').innerText = '--';
+                        document.getElementById('grade-ranking').innerText = 'No grades yet';
+                        return;
+                    }
+                    
+                    // Calculate average
+                    let total = 0;
+                    let count = 0;
+                    
+                    gradesSnapshot.forEach(doc => {
+                        const grade = doc.data().grade;
+                        if (typeof grade === 'number') {
+                            total += grade;
+                            count++;
+                        }
+                    });
+                    
+                    const average = count > 0 ? Math.round(total / count) : 0;
+                    
+                    // Convert to letter grade
+                    let letterGrade = '--';
+                    if (average >= 90) letterGrade = 'A';
+                    else if (average >= 80) letterGrade = 'B+';
+                    else if (average >= 70) letterGrade = 'B';
+                    else if (average >= 60) letterGrade = 'C+';
+                    else if (average >= 50) letterGrade = 'C';
+                    else letterGrade = 'F';
+                    
+                    document.getElementById('average-grade').innerText = letterGrade;
+                    
+                    // Mock ranking (you would need to compare with other students)
+                    const ranking = average >= 85 ? 'Top 10% of class' :
+                                  average >= 75 ? 'Top 25% of class' :
+                                  average >= 65 ? 'Above average' : 'Average';
+                    
+                    document.getElementById('grade-ranking').innerText = ranking;
+                    
+                } catch (error) {
+                    console.error('Error loading average grade:', error);
+                }
+            }
                 
                 // ========== SUBSECTION 17.8: NEXT CLASS WITH TIMEZONE ==========
                 async function loadNextClass(studentData) {
@@ -844,62 +841,56 @@
                 }
                 
                 // ========== SUBSECTION 17.13: ASSIGNMENTS LOADING ==========
-                async function loadAssignments(studentUid, tutorEmail) {
-                    try {
-                        const container = document.getElementById('assignments-list');
-                        
-                        if (!tutorEmail) {
-                            container.innerHTML = '<p class="text-gray-500 p-8 text-center">No tutor assigned.</p>';
-                            return;
-                        }
-                        
-                        // Query assignments
-                        const assignmentsQuery = query(
-                            collection(db, "homework_assignments"),
-                            where("studentId", "==", studentUid),
-                            where("tutorEmail", "==", tutorEmail)
-                        );
-                        
-                        const assignmentsSnapshot = await getDocs(assignmentsQuery);
-                        
-                        if (assignmentsSnapshot.empty) {
-                            container.innerHTML = `
-                                <div class="p-8 text-center text-gray-400">
-                                    <i class="fas fa-clipboard-check text-3xl mb-3"></i>
-                                    <p>No assignments found.</p>
-                                </div>
-                            `;
-                            return;
-                        }
-                        
-                        container.innerHTML = '';
-                        
-                        // Filter buttons functionality
-                        document.getElementById('filter-all').onclick = () => filterAssignments('all');
-                        document.getElementById('filter-pending').onclick = () => filterAssignments('pending');
-                        document.getElementById('filter-graded').onclick = () => filterAssignments('graded');
-                        
-                        // Store assignments for filtering
-                        window.allAssignments = [];
-                        
-                        assignmentsSnapshot.forEach(doc => {
-                            const assignment = { id: doc.id, ...doc.data() };
-                            window.allAssignments.push(assignment);
-                            displayAssignment(assignment, container);
-                        });
-                        
-                        // Update pending count
-                        const pendingCount = window.allAssignments.filter(a => 
-                            a.status === 'assigned' || a.status === 'pending'
-                        ).length;
-                        
-                        document.getElementById('pending-count').innerText = pendingCount;
-                        document.getElementById('pending-tasks-count').innerText = pendingCount;
-                        
-                    } catch (error) {
-                        console.error('Error loading assignments:', error);
+            async function loadAssignments(studentUid) {
+                try {
+                    const container = document.getElementById('assignments-list');
+                    
+                    // Query assignments using studentId
+                    const assignmentsQuery = query(
+                        collection(db, "homework_assignments"),
+                        where("studentId", "==", studentUid)
+                    );
+                    
+                    const assignmentsSnapshot = await getDocs(assignmentsQuery);
+                    
+                    if (assignmentsSnapshot.empty) {
+                        container.innerHTML = `
+                            <div class="p-8 text-center text-gray-400">
+                                <i class="fas fa-clipboard-check text-3xl mb-3"></i>
+                                <p>No assignments found.</p>
+                            </div>
+                        `;
+                        return;
                     }
+                    
+                    container.innerHTML = '';
+                    
+                    // Filter buttons functionality
+                    document.getElementById('filter-all').onclick = () => filterAssignments('all');
+                    document.getElementById('filter-pending').onclick = () => filterAssignments('pending');
+                    document.getElementById('filter-graded').onclick = () => filterAssignments('graded');
+                    
+                    // Store assignments for filtering
+                    window.allAssignments = [];
+                    
+                    assignmentsSnapshot.forEach(doc => {
+                        const assignment = { id: doc.id, ...doc.data() };
+                        window.allAssignments.push(assignment);
+                        displayAssignment(assignment, container);
+                    });
+                    
+                    // Update pending count
+                    const pendingCount = window.allAssignments.filter(a => 
+                        a.status === 'assigned' || a.status === 'pending'
+                    ).length;
+                    
+                    document.getElementById('pending-count').innerText = pendingCount;
+                    document.getElementById('pending-tasks-count').innerText = pendingCount;
+                    
+                } catch (error) {
+                    console.error('Error loading assignments:', error);
                 }
+            }
                 
                 // ========== SUBSECTION 17.14: ASSIGNMENT FILTERING ==========
                 function filterAssignments(filter) {
@@ -1003,90 +994,90 @@
                     container.appendChild(assignmentElement);
                 }
                 
-                // ========== SUBSECTION 17.16: RESULTS LOADING ==========
-                async function loadResults(studentUid) {
-                    try {
-                        const container = document.getElementById('results-container');
+               // ========== SUBSECTION 17.16: RESULTS LOADING ==========
+            async function loadResults(studentUid) {
+                try {
+                    const container = document.getElementById('results-container');
+                    
+                    // Query graded assignments using studentId
+                    const resultsQuery = query(
+                        collection(db, "homework_assignments"),
+                        where("studentId", "==", studentUid),
+                        where("status", "==", "graded"),
+                        where("grade", "!=", null)
+                    );
+                    
+                    const resultsSnapshot = await getDocs(resultsQuery);
+                    
+                    if (resultsSnapshot.empty) {
+                        container.innerHTML = `
+                            <div class="text-center py-8 text-gray-400">
+                                <i class="fas fa-chart-line text-3xl mb-3"></i>
+                                <p>No graded results available yet.</p>
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    // Group by subject
+                    const resultsBySubject = {};
+                    resultsSnapshot.forEach(doc => {
+                        const result = doc.data();
+                        const subject = result.subject || 'General';
                         
-                        // Query graded assignments
-                        const resultsQuery = query(
-                            collection(db, "homework_assignments"),
-                            where("studentId", "==", studentUid),
-                            where("status", "==", "graded"),
-                            where("grade", "!=", null)
-                        );
+                        if (!resultsBySubject[subject]) {
+                            resultsBySubject[subject] = [];
+                        }
                         
-                        const resultsSnapshot = await getDocs(resultsQuery);
+                        resultsBySubject[subject].push({
+                            title: result.title,
+                            grade: result.grade,
+                            date: result.submittedDate || result.gradedDate,
+                            feedback: result.feedback
+                        });
+                    });
+                    
+                    // Display results
+                    container.innerHTML = '';
+                    for (const [subject, results] of Object.entries(resultsBySubject)) {
+                        const subjectElement = document.createElement('div');
+                        subjectElement.className = 'mb-6 pb-6 border-b border-gray-100 last:border-0';
                         
-                        if (resultsSnapshot.empty) {
-                            container.innerHTML = `
-                                <div class="text-center py-8 text-gray-400">
-                                    <i class="fas fa-chart-line text-3xl mb-3"></i>
-                                    <p>No graded results available yet.</p>
+                        let subjectHTML = `
+                            <h4 class="font-bold text-gray-700 mb-3">${subject}</h4>
+                            <div class="space-y-3">
+                        `;
+                        
+                        results.forEach(result => {
+                            // Determine grade color
+                            let gradeColor = 'text-red-600';
+                            if (result.grade >= 90) gradeColor = 'text-green-600';
+                            else if (result.grade >= 80) gradeColor = 'text-blue-600';
+                            else if (result.grade >= 70) gradeColor = 'text-yellow-600';
+                            
+                            subjectHTML += `
+                                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-800">${result.title}</p>
+                                        <p class="text-xs text-gray-500">${result.date ? new Date(result.date).toLocaleDateString() : 'No date'}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-lg font-bold ${gradeColor}">${result.grade}%</p>
+                                        ${result.feedback ? `<p class="text-xs text-gray-500">${result.feedback}</p>` : ''}
+                                    </div>
                                 </div>
                             `;
-                            return;
-                        }
-                        
-                        // Group by subject
-                        const resultsBySubject = {};
-                        resultsSnapshot.forEach(doc => {
-                            const result = doc.data();
-                            const subject = result.subject || 'General';
-                            
-                            if (!resultsBySubject[subject]) {
-                                resultsBySubject[subject] = [];
-                            }
-                            
-                            resultsBySubject[subject].push({
-                                title: result.title,
-                                grade: result.grade,
-                                date: result.submittedDate || result.gradedDate,
-                                feedback: result.feedback
-                            });
                         });
                         
-                        // Display results
-                        container.innerHTML = '';
-                        for (const [subject, results] of Object.entries(resultsBySubject)) {
-                            const subjectElement = document.createElement('div');
-                            subjectElement.className = 'mb-6 pb-6 border-b border-gray-100 last:border-0';
-                            
-                            let subjectHTML = `
-                                <h4 class="font-bold text-gray-700 mb-3">${subject}</h4>
-                                <div class="space-y-3">
-                            `;
-                            
-                            results.forEach(result => {
-                                // Determine grade color
-                                let gradeColor = 'text-red-600';
-                                if (result.grade >= 90) gradeColor = 'text-green-600';
-                                else if (result.grade >= 80) gradeColor = 'text-blue-600';
-                                else if (result.grade >= 70) gradeColor = 'text-yellow-600';
-                                
-                                subjectHTML += `
-                                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                                        <div>
-                                            <p class="text-sm font-medium text-gray-800">${result.title}</p>
-                                            <p class="text-xs text-gray-500">${result.date ? new Date(result.date).toLocaleDateString() : 'No date'}</p>
-                                        </div>
-                                        <div class="text-right">
-                                            <p class="text-lg font-bold ${gradeColor}">${result.grade}%</p>
-                                            ${result.feedback ? `<p class="text-xs text-gray-500">${result.feedback}</p>` : ''}
-                                        </div>
-                                    </div>
-                                `;
-                            });
-                            
-                            subjectHTML += `</div>`;
-                            subjectElement.innerHTML = subjectHTML;
-                            container.appendChild(subjectElement);
-                        }
-                        
-                    } catch (error) {
-                        console.error('Error loading results:', error);
+                        subjectHTML += `</div>`;
+                        subjectElement.innerHTML = subjectHTML;
+                        container.appendChild(subjectElement);
                     }
+                    
+                } catch (error) {
+                    console.error('Error loading results:', error);
                 }
+            }
                 
                 // ========== SUBSECTION 17.17: SCHEDULE LOADING ==========
                 async function loadSchedule(studentData) {
