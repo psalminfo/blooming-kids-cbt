@@ -893,6 +893,8 @@ window.refreshAllDashboardData = async function() {
     alert('Dashboard data refreshed successfully!');
 };
 
+[file name]: 3.1.txt
+[file content begin]
 // ======================================================
 // SUBSECTION 3.1: Tutor Directory Panel - UPDATED VERSION
 // ======================================================
@@ -1004,7 +1006,7 @@ async function renderManagementTutorView(container) {
     
     // Add event listeners - wrapped in try-catch to prevent crash if elements missing
     try {
-        document.getElementById('assign-student-btn').addEventListener('click', showAssignStudentModal);
+        document.getElementById('assign-student-btn').addEventListener('click', showEnhancedAssignStudentModal);
         document.getElementById('reassign-student-btn').addEventListener('click', showEnhancedReassignStudentModal);
         document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
         document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
@@ -1402,6 +1404,209 @@ function renderDirectoryFromCache(searchTerm = '') {
             }
         });
     });
+}
+
+// ======================================================
+// ENHANCED ASSIGN STUDENT MODAL - INTEGRATED FROM YOUR CODE
+// ======================================================
+
+function showEnhancedAssignStudentModal() {
+    if (!isCacheValid(['tutors'])) { 
+        showReassignAlert("Refreshing tutor data...", 'info');
+        fetchAndRenderDirectory(true);
+        setTimeout(() => showEnhancedAssignStudentModal(), 1000);
+        return;
+    }
+    
+    const tutors = getCleanTutors();
+    
+    if (!tutors.length) {
+        showReassignAlert("No active tutors available", 'warning');
+        return;
+    }
+    
+    const modalHtml = `
+    <div id="assign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white w-full max-w-lg rounded-lg shadow-xl p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-green-700">Assign New Student</h3>
+                <button onclick="closeAssignModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <form id="assign-student-form">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2 text-gray-700">Student Name *</label>
+                    <input type="text" 
+                           id="assign-student-name" 
+                           class="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                           placeholder="Enter student full name"
+                           required>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2 text-gray-700">Select Tutor *</label>
+                    ${createSearchableSelect(
+                        tutors.map(t => ({ 
+                            email: t.email, 
+                            name: t.name,
+                            subjects: t.subjects || []
+                        })), 
+                        "Type tutor name or email...", 
+                        "assign-tutor",
+                        true
+                    )}
+                </div>
+                
+                <div id="assign-tutor-info" class="mb-4 p-3 bg-green-50 rounded-md hidden">
+                    <div class="text-sm">
+                        <div class="font-medium" id="assign-selected-tutor-name"></div>
+                        <div class="text-gray-600" id="assign-selected-tutor-details"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium mb-2 text-gray-700">Initial Notes</label>
+                    <textarea id="assign-notes" 
+                              class="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                              rows="3" 
+                              placeholder="Enter any initial notes..."></textarea>
+                </div>
+                
+                <div class="flex justify-end gap-3">
+                    <button type="button" 
+                            onclick="closeAssignModal()" 
+                            class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            id="assign-submit-btn" 
+                            class="px-5 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        Assign Student
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>`;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('assign-student-modal');
+    if (existingModal) existingModal.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Initialize searchable select
+    setTimeout(() => {
+        initializeSearchableSelect('assign-tutor');
+        
+        // Handle tutor selection change
+        document.getElementById('assign-tutor').addEventListener('change', function() {
+            const tutorEmail = this.value;
+            const tutor = tutors.find(t => t.email === tutorEmail);
+            const infoDiv = document.getElementById('assign-tutor-info');
+            const nameDiv = document.getElementById('assign-selected-tutor-name');
+            const detailsDiv = document.getElementById('assign-selected-tutor-details');
+            
+            if (tutor) {
+                infoDiv.classList.remove('hidden');
+                nameDiv.textContent = tutor.name;
+                detailsDiv.innerHTML = `
+                    Email: ${tutor.email} | 
+                    Subjects: ${Array.isArray(tutor.subjects) ? tutor.subjects.join(', ') : tutor.subjects || 'N/A'}
+                `;
+            } else {
+                infoDiv.classList.add('hidden');
+            }
+        });
+        
+        // Handle form submission
+        document.getElementById('assign-student-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const studentName = document.getElementById('assign-student-name').value.trim();
+            const tutorEmail = document.getElementById('assign-tutor').value;
+            const notes = document.getElementById('assign-notes').value.trim();
+            
+            if (!studentName) {
+                showReassignAlert("Please enter student name", 'warning');
+                return;
+            }
+            
+            if (!tutorEmail) {
+                showReassignAlert("Please select a tutor", 'warning');
+                return;
+            }
+            
+            const tutor = tutors.find(t => t.email === tutorEmail);
+            
+            if (!confirm(`Assign "${studentName}" to "${tutor.name}"?`)) {
+                return;
+            }
+            
+            const btn = document.getElementById('assign-submit-btn');
+            const originalText = btn.textContent;
+            btn.textContent = "Creating...";
+            btn.disabled = true;
+            
+            try {
+                const user = window.userData?.name || 'Admin';
+                const userEmail = window.userData?.email || 'admin@system';
+                
+                // Create student document
+                const studentRef = await addDoc(collection(db, "students"), {
+                    studentName,
+                    tutorEmail: tutor.email,
+                    tutorName: tutor.name,
+                    status: 'active',
+                    createdAt: new Date().toISOString(),
+                    createdBy: user,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: user,
+                    notes: notes || '',
+                    studentFee: 0, // Default fee
+                    grade: '', // Empty by default
+                    days: '', // Empty by default
+                    subjects: [], // Empty array by default
+                    parentName: '', // Empty by default
+                    parentPhone: '', // Empty by default
+                    parentEmail: '', // Empty by default
+                    summerBreak: false,
+                    isTransitioning: false
+                });
+                
+                // Create assignment history record
+                await addDoc(collection(db, "tutorAssignments"), {
+                    studentId: studentRef.id,
+                    studentName: studentName,
+                    oldTutorEmail: '', 
+                    oldTutorName: 'Unassigned',
+                    newTutorEmail: tutor.email, 
+                    newTutorName: tutor.name,
+                    reason: 'Initial assignment', 
+                    assignedBy: user, 
+                    assignedByEmail: userEmail,
+                    assignedAt: new Date().toISOString(), 
+                    timestamp: new Date().toISOString()
+                });
+                
+                showReassignAlert(`Successfully assigned ${studentName} to ${tutor.name}!`, 'success');
+                
+                setTimeout(() => { 
+                    closeAssignModal(); 
+                    fetchAndRenderDirectory(true); 
+                }, 1500);
+                
+            } catch (error) {
+                console.error("Assignment error:", error);
+                showReassignAlert("Error: " + error.message, 'error');
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        });
+    }, 100);
+}
+
+function closeAssignModal() {
+    const modal = document.getElementById('assign-student-modal');
+    if (modal) modal.remove();
 }
 
 // ======================================================
@@ -2256,6 +2461,12 @@ if (typeof window.closeManagementModal === 'undefined') {
 if (typeof window.showEnhancedReassignStudentModal === 'undefined') {
     window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
     window.closeReassignModal = closeReassignModal;
+}
+
+// Export assign student function
+if (typeof window.showEnhancedAssignStudentModal === 'undefined') {
+    window.showEnhancedAssignStudentModal = showEnhancedAssignStudentModal;
+    window.closeAssignModal = closeAssignModal;
 }
 
 // ======================================================
@@ -9331,6 +9542,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
