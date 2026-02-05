@@ -26,11 +26,23 @@
             where, 
             getDocs, 
             doc, 
-            getDoc 
+            getDoc,
+            updateDoc,
+            addDoc,
+            Timestamp
         } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+        import { 
+            getStorage,
+            ref,
+            uploadBytes,
+            getDownloadURL
+        } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-storage.js";
         
         // Make Firebase available globally
-        window.firebaseModules = { auth, db, onAuthStateChanged, signOut, collection, query, where, getDocs, doc, getDoc };
+        window.firebaseModules = { 
+            auth, db, onAuthStateChanged, signOut, collection, query, where, getDocs, 
+            doc, getDoc, updateDoc, addDoc, Timestamp, getStorage, ref, uploadBytes, getDownloadURL 
+        };
     </script>
     
     <!-- ========== SECTION 4: TAILWIND CONFIG ========== -->
@@ -77,6 +89,21 @@
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .annotation-toolbar {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .canvas-container {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            background: white;
         }
         
         /* ========== SECTION 6: SECURITY HEADERS (Recommended for pentest) ========== */
@@ -173,6 +200,7 @@
 
         <!-- ========== SECTION 11: DASHBOARD VIEW ========== -->
         <div id="view-dashboard" class="view-section fade-in space-y-6">
+            <!-- Dashboard content remains the same -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <!-- Attendance Card -->
                 <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-32 relative overflow-hidden group hover:shadow-md transition-all">
@@ -378,7 +406,13 @@
                     throw new Error('Firebase modules not loaded. Check your firebaseConfig path.');
                 }
                 
-                const { auth, onAuthStateChanged, signOut, db, collection, query, where, getDocs, getDoc, doc } = window.firebaseModules;
+                const { 
+                    auth, db, onAuthStateChanged, signOut, collection, query, where, 
+                    getDocs, getDoc, doc, updateDoc, addDoc, Timestamp, getStorage, 
+                    ref, uploadBytes, getDownloadURL 
+                } = window.firebaseModules;
+                
+                const storage = getStorage();
                 
                 // Global logout function
                 window.logout = async () => {
@@ -425,7 +459,7 @@
                         // Update profile section
                         document.getElementById('student-display-name').innerText = user.displayName || "Student";
                         
-                        // Fetch student document from Firestore using the authentication UID
+                        // Fetch student document from Firestore
                         const studentQuery = query(collection(db, "students"), where("studentUid", "==", user.uid));
                         const studentSnapshot = await getDocs(studentQuery);
                         
@@ -437,24 +471,35 @@
                             const gradeCountry = `${studentData.grade || 'Grade'} • ${studentData.country || 'Country'}`;
                             document.getElementById('student-grade-country').innerText = gradeCountry;
                             
-                            // THE KEY FIX: We need to get the student's unique identifier from the student document
-                            // This could be stored in different fields. Let's check for common field names:
-                            const studentIdentifier = studentData.id || studentData.studentId || studentData.userId || studentDoc.id;
-                            console.log("Student Identifier found:", studentIdentifier);
-                            console.log("Student Data:", studentData);
+                            // Get student identifier - check multiple possible fields
+                            const studentId = studentData.id || studentData.studentId || studentData.userId || studentDoc.id;
+                            console.log("Student Identifier:", studentId);
+                            console.log("Full Student Data:", studentData);
+                            
+                            // Store student data globally for later use
+                            window.currentStudent = {
+                                uid: user.uid,
+                                id: studentId,
+                                name: studentData.studentName || studentData.displayName || user.displayName,
+                                email: studentData.email || user.email,
+                                grade: studentData.grade,
+                                country: studentData.country,
+                                tutorEmail: studentData.assignedTutor || studentData.tutorEmail,
+                                tutorName: studentData.tutorName
+                            };
                             
                             // Load all dashboard data
                             await Promise.all([
-                                loadAttendance(studentData, studentIdentifier),
-                                loadPendingTasks(studentIdentifier),
-                                loadAverageGrade(studentIdentifier),
-                                loadNextClass(studentData, studentIdentifier),
-                                loadUpcomingSchedule(studentData, studentIdentifier),
-                                loadCourses(studentData),
-                                loadAssignments(studentIdentifier),
-                                loadResults(studentIdentifier),
-                                loadSchedule(studentData, studentIdentifier),
-                                loadGames(studentData.grade || 3)
+                                loadAttendance(),
+                                loadPendingTasks(),
+                                loadAverageGrade(),
+                                loadNextClass(),
+                                loadUpcomingSchedule(),
+                                loadCourses(),
+                                loadAssignments(),
+                                loadResults(),
+                                loadSchedule(),
+                                loadGames()
                             ]);
                             
                         } else {
@@ -470,66 +515,50 @@
                 }
                 
                 // ========== SUBSECTION 17.5: ATTENDANCE CALCULATION ==========
-                async function loadAttendance(studentData, studentIdentifier) {
+                async function loadAttendance() {
                     try {
-                        // Get tutor email from student data
-                        const tutorEmail = studentData.assignedTutor || studentData.tutorEmail;
-                        
-                        if (tutorEmail) {
-                            // Query schedules collection for this student's tutor
-                            // Try multiple field combinations
-                            let schedulesQuery = query(
-                                collection(db, "schedules"),
-                                where("tutorEmail", "==", tutorEmail),
-                                where("studentId", "==", studentIdentifier)
-                            );
-                            
-                            let schedulesSnapshot = await getDocs(schedulesQuery);
-                            
-                            // If no results, try studentName field
-                            if (schedulesSnapshot.empty) {
-                                schedulesQuery = query(
-                                    collection(db, "schedules"),
-                                    where("tutorEmail", "==", tutorEmail),
-                                    where("studentName", "==", studentData.studentName || studentData.displayName)
-                                );
-                                schedulesSnapshot = await getDocs(schedulesQuery);
-                            }
-                            
-                            const totalClasses = schedulesSnapshot.size;
-                            
-                            // Query homework submissions to count attended classes
-                            const homeworkQuery = query(
-                                collection(db, "homework_assignments"),
-                                where("studentId", "==", studentIdentifier),
-                                where("status", "==", "submitted")
-                            );
-                            
-                            const homeworkSnapshot = await getDocs(homeworkQuery);
-                            const attendedClasses = homeworkSnapshot.size;
-                            
-                            // Calculate attendance percentage
-                            const attendancePercent = totalClasses > 0 ? 
-                                Math.round((attendedClasses / totalClasses) * 100) : 100;
-                            
-                            document.getElementById('attendance-percent').innerText = `${attendancePercent}%`;
-                            
-                            // Calculate trend
-                            const trend = attendancePercent >= 95 ? '+3% this month' : 
-                                         attendancePercent >= 90 ? '+1% this month' : 
-                                         attendancePercent >= 85 ? 'No change' : '-2% this month';
-                            
-                            const trendColor = attendancePercent >= 90 ? 'text-green-600' : 
-                                              attendancePercent >= 80 ? 'text-yellow-600' : 'text-red-600';
-                            
-                            document.getElementById('attendance-trend').innerHTML = 
-                                `<i class="fas ${attendancePercent >= 85 ? 'fa-arrow-up' : 'fa-arrow-down'} mr-1"></i> ${trend}`;
-                            document.getElementById('attendance-trend').className = `text-xs ${trendColor} mt-auto flex items-center`;
-                            
-                        } else {
+                        if (!window.currentStudent?.tutorEmail) {
                             document.getElementById('attendance-percent').innerText = 'No Tutor';
                             document.getElementById('attendance-trend').innerText = 'Tutor not assigned';
+                            return;
                         }
+                        
+                        // Query schedules for this student
+                        const schedulesQuery = query(
+                            collection(db, "schedules"),
+                            where("studentName", "==", window.currentStudent.name)
+                        );
+                        
+                        const schedulesSnapshot = await getDocs(schedulesQuery);
+                        const totalClasses = schedulesSnapshot.size;
+                        
+                        // Query submitted homework
+                        const homeworkQuery = query(
+                            collection(db, "homework_assignments"),
+                            where("studentId", "==", window.currentStudent.id),
+                            where("status", "==", "submitted")
+                        );
+                        
+                        const homeworkSnapshot = await getDocs(homeworkQuery);
+                        const attendedClasses = homeworkSnapshot.size;
+                        
+                        // Calculate attendance percentage
+                        const attendancePercent = totalClasses > 0 ? 
+                            Math.round((attendedClasses / totalClasses) * 100) : 100;
+                        
+                        document.getElementById('attendance-percent').innerText = `${attendancePercent}%`;
+                        
+                        // Calculate trend
+                        const trend = attendancePercent >= 95 ? '+3% this month' : 
+                                     attendancePercent >= 90 ? '+1% this month' : 
+                                     attendancePercent >= 85 ? 'No change' : '-2% this month';
+                        
+                        const trendColor = attendancePercent >= 90 ? 'text-green-600' : 
+                                          attendancePercent >= 80 ? 'text-yellow-600' : 'text-red-600';
+                        
+                        document.getElementById('attendance-trend').innerHTML = 
+                            `<i class="fas ${attendancePercent >= 85 ? 'fa-arrow-up' : 'fa-arrow-down'} mr-1"></i> ${trend}`;
+                        document.getElementById('attendance-trend').className = `text-xs ${trendColor} mt-auto flex items-center`;
                         
                     } catch (error) {
                         console.error('Error loading attendance:', error);
@@ -538,12 +567,14 @@
                 }
                 
                 // ========== SUBSECTION 17.6: PENDING TASKS ==========
-                async function loadPendingTasks(studentIdentifier) {
+                async function loadPendingTasks() {
                     try {
-                        // Query pending homework using studentId
+                        if (!window.currentStudent?.id) return;
+                        
+                        // Query pending homework
                         const pendingQuery = query(
                             collection(db, "homework_assignments"),
-                            where("studentId", "==", studentIdentifier),
+                            where("studentId", "==", window.currentStudent.id),
                             where("status", "in", ["assigned", "pending"])
                         );
                         
@@ -573,45 +604,19 @@
                             document.getElementById('pending-due').innerText = 'No immediate deadlines';
                         }
                         
-                        console.log(`Found ${pendingCount} pending tasks for student identifier: ${studentIdentifier}`);
-                        
                     } catch (error) {
                         console.error('Error loading pending tasks:', error);
-                        // Try alternative approach - query all and filter client-side
-                        try {
-                            const allAssignmentsQuery = query(
-                                collection(db, "homework_assignments")
-                            );
-                            const allSnapshot = await getDocs(allAssignmentsQuery);
-                            
-                            let pendingCount = 0;
-                            allSnapshot.forEach(doc => {
-                                const data = doc.data();
-                                // Check if this assignment belongs to the student (multiple possible fields)
-                                if ((data.studentId === studentIdentifier || 
-                                     data.studentUid === studentIdentifier ||
-                                     data.studentName === document.getElementById('student-display-name').innerText) &&
-                                    (data.status === 'assigned' || data.status === 'pending')) {
-                                    pendingCount++;
-                                }
-                            });
-                            
-                            document.getElementById('pending-tasks-count').innerText = pendingCount;
-                            document.getElementById('pending-count').innerText = pendingCount;
-                            
-                        } catch (error2) {
-                            console.error('Alternative query also failed:', error2);
-                        }
                     }
                 }
                 
                 // ========== SUBSECTION 17.7: AVERAGE GRADE ==========
-                async function loadAverageGrade(studentIdentifier) {
+                async function loadAverageGrade() {
                     try {
-                        // Query all graded assignments using studentId
+                        if (!window.currentStudent?.id) return;
+                        
                         const gradesQuery = query(
                             collection(db, "homework_assignments"),
-                            where("studentId", "==", studentIdentifier),
+                            where("studentId", "==", window.currentStudent.id),
                             where("status", "==", "graded"),
                             where("grade", "!=", null)
                         );
@@ -662,78 +667,62 @@
                 }
                 
                 // ========== SUBSECTION 17.8: NEXT CLASS WITH TIMEZONE ==========
-                async function loadNextClass(studentData, studentIdentifier) {
+                async function loadNextClass() {
                     try {
-                        // Get tutor email from student data
-                        const tutorEmail = studentData.assignedTutor || studentData.tutorEmail;
-                        
-                        if (tutorEmail) {
-                            // Query upcoming schedules
-                            const now = new Date();
-                            let schedulesQuery = query(
-                                collection(db, "schedules"),
-                                where("tutorEmail", "==", tutorEmail),
-                                where("studentId", "==", studentIdentifier),
-                                where("dateTime", ">=", now.toISOString())
-                            );
-                            
-                            let schedulesSnapshot = await getDocs(schedulesQuery);
-                            
-                            // If no results, try studentName field
-                            if (schedulesSnapshot.empty) {
-                                schedulesQuery = query(
-                                    collection(db, "schedules"),
-                                    where("tutorEmail", "==", tutorEmail),
-                                    where("studentName", "==", studentData.studentName || studentData.displayName),
-                                    where("dateTime", ">=", now.toISOString())
-                                );
-                                schedulesSnapshot = await getDocs(schedulesQuery);
-                            }
-                            
-                            if (schedulesSnapshot.empty) {
-                                document.getElementById('next-class-subject').innerText = 'No upcoming classes';
-                                document.getElementById('next-class-time').innerText = 'Schedule not set';
-                                return;
-                            }
-                            
-                            // Find the next class
-                            let nextClass = null;
-                            let nextTime = null;
-                            
-                            schedulesSnapshot.forEach(doc => {
-                                const schedule = doc.data();
-                                const classTime = new Date(schedule.dateTime);
-                                
-                                if (!nextTime || classTime < nextTime) {
-                                    nextTime = classTime;
-                                    nextClass = schedule;
-                                }
-                            });
-                            
-                            if (nextClass) {
-                                // Convert to student's local time
-                                const studentCountry = studentData.country || 'NG';
-                                const localTime = convertToLocalTime(nextTime, studentCountry);
-                                
-                                document.getElementById('next-class-subject').innerText = 
-                                    `${nextClass.subject || 'Class'} (${nextClass.grade || 'All'})`;
-                                
-                                document.getElementById('next-class-time').innerText = 
-                                    `${localTime.date} at ${localTime.time}`;
-                                
-                                // Update join button
-                                const joinBtn = document.getElementById('join-room-btn');
-                                joinBtn.innerHTML = `<i class="fas fa-video mr-1"></i> Join at ${localTime.time}`;
-                                joinBtn.className = 'mt-auto bg-white text-brand-primary text-xs font-bold py-2 px-4 rounded-lg w-fit hover:bg-gray-50 transition-colors';
-                                joinBtn.onclick = () => joinClass(nextClass.zoomLink || '#');
-                                
-                                // Store class info for join button
-                                joinBtn.dataset.zoomLink = nextClass.zoomLink || '#';
-                            }
-                            
-                        } else {
+                        if (!window.currentStudent?.name || !window.currentStudent?.tutorEmail) {
                             document.getElementById('next-class-subject').innerText = 'No tutor assigned';
                             document.getElementById('next-class-time').innerText = 'Please contact admin';
+                            return;
+                        }
+                        
+                        const now = new Date();
+                        
+                        // Query schedules using studentName and tutorEmail
+                        const schedulesQuery = query(
+                            collection(db, "schedules"),
+                            where("studentName", "==", window.currentStudent.name),
+                            where("tutorEmail", "==", window.currentStudent.tutorEmail),
+                            where("dateTime", ">=", now.toISOString())
+                        );
+                        
+                        const schedulesSnapshot = await getDocs(schedulesQuery);
+                        
+                        if (schedulesSnapshot.empty) {
+                            document.getElementById('next-class-subject').innerText = 'No upcoming classes';
+                            document.getElementById('next-class-time').innerText = 'Schedule not set';
+                            return;
+                        }
+                        
+                        // Find the next class
+                        let nextClass = null;
+                        let nextTime = null;
+                        
+                        schedulesSnapshot.forEach(doc => {
+                            const schedule = doc.data();
+                            const classTime = new Date(schedule.dateTime);
+                            
+                            if (!nextTime || classTime < nextTime) {
+                                nextTime = classTime;
+                                nextClass = schedule;
+                            }
+                        });
+                        
+                        if (nextClass) {
+                            const localTime = convertToLocalTime(nextTime, window.currentStudent.country || 'NG');
+                            
+                            document.getElementById('next-class-subject').innerText = 
+                                `${nextClass.subject || 'Class'} (${nextClass.grade || 'All'})`;
+                            
+                            document.getElementById('next-class-time').innerText = 
+                                `${localTime.date} at ${localTime.time}`;
+                            
+                            // Update join button
+                            const joinBtn = document.getElementById('join-room-btn');
+                            joinBtn.innerHTML = `<i class="fas fa-video mr-1"></i> Join at ${localTime.time}`;
+                            joinBtn.className = 'mt-auto bg-white text-brand-primary text-xs font-bold py-2 px-4 rounded-lg w-fit hover:bg-gray-50 transition-colors';
+                            joinBtn.onclick = () => joinClass(nextClass.zoomLink || '#');
+                            
+                            joinBtn.dataset.zoomLink = nextClass.zoomLink || '#';
                         }
                         
                     } catch (error) {
@@ -773,15 +762,12 @@
                 }
                 
                 // ========== SUBSECTION 17.11: UPCOMING SCHEDULE ==========
-                async function loadUpcomingSchedule(studentData, studentIdentifier) {
+                async function loadUpcomingSchedule() {
                     try {
                         const container = document.getElementById('upcoming-schedule-list');
                         container.innerHTML = '';
                         
-                        // Get tutor email from student data
-                        const tutorEmail = studentData.assignedTutor || studentData.tutorEmail;
-                        
-                        if (!tutorEmail) {
+                        if (!window.currentStudent?.name || !window.currentStudent?.tutorEmail) {
                             container.innerHTML = '<p class="text-gray-500">No tutor assigned.</p>';
                             return;
                         }
@@ -790,27 +776,15 @@
                         const weekFromNow = new Date();
                         weekFromNow.setDate(now.getDate() + 7);
                         
-                        let schedulesQuery = query(
+                        const schedulesQuery = query(
                             collection(db, "schedules"),
-                            where("tutorEmail", "==", tutorEmail),
-                            where("studentId", "==", studentIdentifier),
+                            where("studentName", "==", window.currentStudent.name),
+                            where("tutorEmail", "==", window.currentStudent.tutorEmail),
                             where("dateTime", ">=", now.toISOString()),
                             where("dateTime", "<=", weekFromNow.toISOString())
                         );
                         
-                        let schedulesSnapshot = await getDocs(schedulesQuery);
-                        
-                        // If no results, try studentName field
-                        if (schedulesSnapshot.empty) {
-                            schedulesQuery = query(
-                                collection(db, "schedules"),
-                                where("tutorEmail", "==", tutorEmail),
-                                where("studentName", "==", studentData.studentName || studentData.displayName),
-                                where("dateTime", ">=", now.toISOString()),
-                                where("dateTime", "<=", weekFromNow.toISOString())
-                            );
-                            schedulesSnapshot = await getDocs(schedulesQuery);
-                        }
+                        const schedulesSnapshot = await getDocs(schedulesQuery);
                         
                         if (schedulesSnapshot.empty) {
                             container.innerHTML = '<p class="text-gray-500">No upcoming classes this week.</p>';
@@ -828,7 +802,7 @@
                         // Display first 3
                         schedules.slice(0, 3).forEach(schedule => {
                             const time = new Date(schedule.dateTime);
-                            const localTime = convertToLocalTime(schedule.dateTime, studentData.country || 'NG');
+                            const localTime = convertToLocalTime(schedule.dateTime, window.currentStudent.country || 'NG');
                             
                             const scheduleElement = document.createElement('div');
                             scheduleElement.className = 'flex items-start gap-4 pb-4 border-b border-gray-50 last:border-0 last:pb-0';
@@ -852,14 +826,13 @@
                 }
                 
                 // ========== SUBSECTION 17.12: COURSES LOADING ==========
-                async function loadCourses(studentData) {
+                async function loadCourses() {
                     try {
                         const container = document.getElementById('courses-container');
                         
-                        // Query courses for student's grade/subjects
                         const coursesQuery = query(
                             collection(db, "courses"),
-                            where("grade", "==", studentData.grade || 4),
+                            where("grade", "==", window.currentStudent?.grade || 4),
                             where("status", "==", "active")
                         );
                         
@@ -878,7 +851,6 @@
                         
                         container.innerHTML = '';
                         
-                        // Display courses
                         coursesSnapshot.forEach(doc => {
                             const course = doc.data();
                             const progress = course.progress || Math.floor(Math.random() * 100);
@@ -889,7 +861,7 @@
                                 <div class="h-32 bg-gray-200 relative overflow-hidden">
                                     <div class="w-full h-full bg-gradient-to-r from-blue-500 to-purple-600 group-hover:scale-105 transition-transform duration-500"></div>
                                     <div class="absolute top-4 right-4 bg-white/90 backdrop-blur text-xs font-bold px-2 py-1 rounded text-gray-800">
-                                        ${course.grade || 'Yr'} ${studentData.grade || 4}
+                                        ${course.grade || 'Yr'} ${window.currentStudent?.grade || 4}
                                     </div>
                                 </div>
                                 <div class="p-6">
@@ -932,52 +904,56 @@
                 }
                 
                 // ========== SUBSECTION 17.13: ASSIGNMENTS LOADING ==========
-                async function loadAssignments(studentIdentifier) {
+                async function loadAssignments() {
                     try {
                         const container = document.getElementById('assignments-list');
                         
-                        // Try multiple query approaches
-                        console.log("Loading assignments for student identifier:", studentIdentifier);
+                        if (!window.currentStudent?.id) {
+                            container.innerHTML = '<p class="text-gray-500">Student data not loaded.</p>';
+                            return;
+                        }
                         
-                        // Query assignments using studentId field
+                        // Query assignments using studentId
                         const assignmentsQuery = query(
                             collection(db, "homework_assignments"),
-                            where("studentId", "==", studentIdentifier)
+                            where("studentId", "==", window.currentStudent.id)
                         );
                         
                         const assignmentsSnapshot = await getDocs(assignmentsQuery);
                         
                         if (assignmentsSnapshot.empty) {
-                            console.log("No assignments found with studentId field, trying studentName...");
-                            
-                            // Try studentName field as alternative
-                            const studentName = document.getElementById('student-display-name').innerText;
-                            const assignmentsQuery2 = query(
-                                collection(db, "homework_assignments"),
-                                where("studentName", "==", studentName)
-                            );
-                            
-                            const assignmentsSnapshot2 = await getDocs(assignmentsQuery2);
-                            
-                            if (assignmentsSnapshot2.empty) {
-                                console.log("No assignments found with studentName either, showing empty state");
-                                container.innerHTML = `
-                                    <div class="p-8 text-center text-gray-400">
-                                        <i class="fas fa-clipboard-check text-3xl mb-3"></i>
-                                        <p>No assignments found.</p>
-                                        <p class="text-xs mt-2">Student ID: ${studentIdentifier}</p>
-                                        <p class="text-xs">Student Name: ${studentName}</p>
-                                    </div>
-                                `;
-                                return;
-                            }
-                            
-                            // Process assignments from second query
-                            processAssignments(assignmentsSnapshot2, container, studentIdentifier);
-                        } else {
-                            // Process assignments from first query
-                            processAssignments(assignmentsSnapshot, container, studentIdentifier);
+                            container.innerHTML = `
+                                <div class="p-8 text-center text-gray-400">
+                                    <i class="fas fa-clipboard-check text-3xl mb-3"></i>
+                                    <p>No assignments found.</p>
+                                </div>
+                            `;
+                            return;
                         }
+                        
+                        container.innerHTML = '';
+                        
+                        // Filter buttons functionality
+                        document.getElementById('filter-all').onclick = () => filterAssignments('all');
+                        document.getElementById('filter-pending').onclick = () => filterAssignments('pending');
+                        document.getElementById('filter-graded').onclick = () => filterAssignments('graded');
+                        
+                        // Store assignments for filtering
+                        window.allAssignments = [];
+                        
+                        assignmentsSnapshot.forEach(doc => {
+                            const assignment = { id: doc.id, ...doc.data() };
+                            window.allAssignments.push(assignment);
+                            displayAssignment(assignment, container);
+                        });
+                        
+                        // Update pending count
+                        const pendingCount = window.allAssignments.filter(a => 
+                            a.status === 'assigned' || a.status === 'pending'
+                        ).length;
+                        
+                        document.getElementById('pending-count').innerText = pendingCount;
+                        document.getElementById('pending-tasks-count').innerText = pendingCount;
                         
                     } catch (error) {
                         console.error('Error loading assignments:', error);
@@ -988,39 +964,6 @@
                                 <p>Error loading assignments: ${error.message}</p>
                             </div>
                         `;
-                    }
-                }
-                
-                function processAssignments(assignmentsSnapshot, container, studentIdentifier) {
-                    container.innerHTML = '';
-                    
-                    // Filter buttons functionality
-                    document.getElementById('filter-all').onclick = () => filterAssignments('all');
-                    document.getElementById('filter-pending').onclick = () => filterAssignments('pending');
-                    document.getElementById('filter-graded').onclick = () => filterAssignments('graded');
-                    
-                    // Store assignments for filtering
-                    window.allAssignments = [];
-                    
-                    assignmentsSnapshot.forEach(doc => {
-                        const assignment = { id: doc.id, ...doc.data() };
-                        window.allAssignments.push(assignment);
-                        displayAssignment(assignment, container);
-                    });
-                    
-                    // Update pending count
-                    const pendingCount = window.allAssignments.filter(a => 
-                        a.status === 'assigned' || a.status === 'pending'
-                    ).length;
-                    
-                    document.getElementById('pending-count').innerText = pendingCount;
-                    document.getElementById('pending-tasks-count').innerText = pendingCount;
-                    
-                    console.log(`Loaded ${window.allAssignments.length} assignments for student ${studentIdentifier}`);
-                    
-                    // If we found assignments but pending count is 0, show success message
-                    if (window.allAssignments.length > 0) {
-                        console.log("Assignments loaded successfully!");
                     }
                 }
                 
@@ -1113,11 +1056,11 @@
                                 ${statusText}${assignment.grade ? `: ${assignment.grade}%` : ''}
                             </span>
                             ${assignment.status === 'assigned' || assignment.status === 'pending' ? 
-                                `<button onclick="uploadAssignment('${assignment.id}')" class="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-xs font-bold shadow-sm hover:bg-gray-50">
-                                    Upload <i class="fas fa-upload ml-1"></i>
+                                `<button onclick="openAssignmentWorkspace('${assignment.id}')" class="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-xs font-bold shadow-sm hover:bg-gray-50">
+                                    Work on it <i class="fas fa-edit ml-1"></i>
                                 </button>` :
-                                `<button onclick="viewAssignment('${assignment.id}')" class="text-gray-400 hover:text-brand-primary">
-                                    <i class="fas fa-eye"></i>
+                                `<button onclick="viewAssignmentDetails('${assignment.id}')" class="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-xs font-bold shadow-sm hover:bg-gray-50">
+                                    View <i class="fas fa-eye ml-1"></i>
                                 </button>`
                             }
                         </div>
@@ -1127,14 +1070,15 @@
                 }
                 
                 // ========== SUBSECTION 17.16: RESULTS LOADING ==========
-                async function loadResults(studentIdentifier) {
+                async function loadResults() {
                     try {
                         const container = document.getElementById('results-container');
                         
-                        // Query graded assignments
+                        if (!window.currentStudent?.id) return;
+                        
                         const resultsQuery = query(
                             collection(db, "homework_assignments"),
-                            where("studentId", "==", studentIdentifier),
+                            where("studentId", "==", window.currentStudent.id),
                             where("status", "==", "graded"),
                             where("grade", "!=", null)
                         );
@@ -1162,6 +1106,7 @@
                             }
                             
                             resultsBySubject[subject].push({
+                                id: doc.id,
                                 title: result.title,
                                 grade: result.grade,
                                 date: result.submittedDate || result.gradedDate,
@@ -1181,7 +1126,6 @@
                             `;
                             
                             results.forEach(result => {
-                                // Determine grade color
                                 let gradeColor = 'text-red-600';
                                 if (result.grade >= 90) gradeColor = 'text-green-600';
                                 else if (result.grade >= 80) gradeColor = 'text-blue-600';
@@ -1196,6 +1140,9 @@
                                         <div class="text-right">
                                             <p class="text-lg font-bold ${gradeColor}">${result.grade}%</p>
                                             ${result.feedback ? `<p class="text-xs text-gray-500">${result.feedback}</p>` : ''}
+                                            <button onclick="downloadGradedAssignment('${result.id}')" class="mt-2 text-xs text-brand-primary hover:text-brand-dark">
+                                                <i class="fas fa-download mr-1"></i> Download
+                                            </button>
                                         </div>
                                     </div>
                                 `;
@@ -1212,14 +1159,11 @@
                 }
                 
                 // ========== SUBSECTION 17.17: SCHEDULE LOADING ==========
-                async function loadSchedule(studentData, studentIdentifier) {
+                async function loadSchedule() {
                     try {
                         const container = document.getElementById('full-schedule-container');
                         
-                        // Get tutor email from student data
-                        const tutorEmail = studentData.assignedTutor || studentData.tutorEmail;
-                        
-                        if (!tutorEmail) {
+                        if (!window.currentStudent?.name || !window.currentStudent?.tutorEmail) {
                             container.innerHTML = '<p class="text-gray-500">No tutor assigned.</p>';
                             return;
                         }
@@ -1228,27 +1172,15 @@
                         const monthFromNow = new Date();
                         monthFromNow.setMonth(now.getMonth() + 1);
                         
-                        let schedulesQuery = query(
+                        const schedulesQuery = query(
                             collection(db, "schedules"),
-                            where("tutorEmail", "==", tutorEmail),
-                            where("studentId", "==", studentIdentifier),
+                            where("studentName", "==", window.currentStudent.name),
+                            where("tutorEmail", "==", window.currentStudent.tutorEmail),
                             where("dateTime", ">=", now.toISOString()),
                             where("dateTime", "<=", monthFromNow.toISOString())
                         );
                         
-                        let schedulesSnapshot = await getDocs(schedulesQuery);
-                        
-                        // If no results, try studentName field
-                        if (schedulesSnapshot.empty) {
-                            schedulesQuery = query(
-                                collection(db, "schedules"),
-                                where("tutorEmail", "==", tutorEmail),
-                                where("studentName", "==", studentData.studentName || studentData.displayName),
-                                where("dateTime", ">=", now.toISOString()),
-                                where("dateTime", "<=", monthFromNow.toISOString())
-                            );
-                            schedulesSnapshot = await getDocs(schedulesQuery);
-                        }
+                        const schedulesSnapshot = await getDocs(schedulesQuery);
                         
                         if (schedulesSnapshot.empty) {
                             container.innerHTML = `
@@ -1300,7 +1232,7 @@
                             
                             schedules.forEach(schedule => {
                                 const time = new Date(schedule.dateTime);
-                                const localTime = convertToLocalTime(schedule.dateTime, studentData.country || 'NG');
+                                const localTime = convertToLocalTime(schedule.dateTime, window.currentStudent.country || 'NG');
                                 
                                 weekHTML += `
                                     <div class="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
@@ -1341,9 +1273,10 @@
                 }
                 
                 // ========== SUBSECTION 17.18: EDUCATIONAL GAMES ==========
-                async function loadGames(grade) {
+                async function loadGames() {
                     try {
                         const container = document.getElementById('games-container');
+                        const grade = window.currentStudent?.grade || 3;
                         const games = getGamesByGrade(grade);
                         
                         container.innerHTML = '';
@@ -1367,7 +1300,7 @@
                                         <span class="text-xs font-bold ${game.subject === 'Math' ? 'text-blue-600' : game.subject === 'English' ? 'text-purple-600' : 'text-green-600'}">
                                             ${game.subject}
                                         </span>
-                                        <button onclick="startGame('${game.id}', '${game.name}')" class="px-4 py-2 bg-brand-primary text-white text-xs font-bold rounded-lg hover:bg-brand-dark transition-colors">
+                                        <button onclick="startGame('${game.id}', '${game.name}', '${game.subject}')" class="px-4 py-2 bg-brand-primary text-white text-xs font-bold rounded-lg hover:bg-brand-dark transition-colors">
                                             Play <i class="fas fa-play ml-1"></i>
                                         </button>
                                     </div>
@@ -1520,11 +1453,9 @@
                 function loadMockData() {
                     console.log('Loading mock data for demo...');
                     
-                    // Mock profile
                     document.getElementById('student-display-name').innerText = 'Demo Student';
                     document.getElementById('student-grade-country').innerText = 'Year 4 • UK';
                     
-                    // Mock dashboard data
                     document.getElementById('attendance-percent').innerText = '94%';
                     document.getElementById('pending-tasks-count').innerText = '3';
                     document.getElementById('pending-count').innerText = '3';
@@ -1539,7 +1470,6 @@
                     joinBtn.className = 'mt-auto bg-white text-brand-primary text-xs font-bold py-2 px-4 rounded-lg w-fit hover:bg-gray-50 transition-colors';
                     joinBtn.onclick = () => alert('Join class functionality would open Zoom link');
                     
-                    // Mock upcoming schedule
                     const scheduleContainer = document.getElementById('upcoming-schedule-list');
                     scheduleContainer.innerHTML = `
                         <div class="flex items-start gap-4 pb-4 border-b border-gray-50">
@@ -1565,8 +1495,7 @@
                         </div>
                     `;
                     
-                    // Load mock games
-                    loadGames(4);
+                    loadGames();
                 }
                 
             } catch (error) {
@@ -1590,114 +1519,478 @@
                 alert(`Continue course ${courseId} - This would open the next lesson`);
             };
             
-            window.uploadAssignment = (assignmentId) => {
-                const modal = document.createElement('div');
-                modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
-                modal.innerHTML = `
-                    <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="font-bold text-gray-800">Upload Assignment</h3>
-                            <button onclick="this.parentElement.parentElement.parentElement.remove()" class="text-gray-400 hover:text-gray-600">
-                                <i class="fas fa-times"></i>
-                            </button>
+            // ========== ASSIGNMENT WORKSPACE ==========
+            window.openAssignmentWorkspace = async (assignmentId) => {
+                try {
+                    const { db, doc, getDoc, getStorage, ref, getDownloadURL } = window.firebaseModules;
+                    
+                    // Get assignment details
+                    const assignmentDoc = await getDoc(doc(db, "homework_assignments", assignmentId));
+                    const assignment = assignmentDoc.data();
+                    
+                    // Create workspace modal
+                    const modal = document.createElement('div');
+                    modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto';
+                    modal.innerHTML = `
+                        <div class="bg-white rounded-2xl w-full max-w-6xl mx-auto my-8">
+                            <div class="flex justify-between items-center p-6 border-b border-gray-100">
+                                <div>
+                                    <h3 class="font-bold text-gray-800 text-xl">Assignment: ${assignment.title || 'Untitled'}</h3>
+                                    <p class="text-sm text-gray-500">${assignment.subject || 'Subject'} • Due: ${assignment.dueDate || 'No due date'}</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="downloadAssignmentFile('${assignmentId}')" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
+                                        <i class="fas fa-download mr-1"></i> Download
+                                    </button>
+                                    <button onclick="saveAnnotations('${assignmentId}')" class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200">
+                                        <i class="fas fa-save mr-1"></i> Save Draft
+                                    </button>
+                                    <button onclick="submitAssignmentFromWorkspace('${assignmentId}')" class="px-4 py-2 bg-brand-primary text-white rounded-lg text-sm font-medium hover:bg-brand-dark">
+                                        <i class="fas fa-paper-plane mr-1"></i> Submit
+                                    </button>
+                                    <button onclick="this.parentElement.parentElement.parentElement.parentElement.remove()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="p-6">
+                                <div class="mb-6">
+                                    <h4 class="font-bold text-gray-700 mb-2">Instructions:</h4>
+                                    <div class="bg-gray-50 p-4 rounded-lg">
+                                        <p class="text-gray-700">${assignment.instructions || 'No specific instructions provided.'}</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    <div class="lg:col-span-2">
+                                        <div class="mb-4">
+                                            <div class="flex justify-between items-center mb-2">
+                                                <h4 class="font-bold text-gray-700">Assignment Document</h4>
+                                                <div class="flex gap-2">
+                                                    <button onclick="setTool('pen')" class="px-3 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">
+                                                        <i class="fas fa-pen mr-1"></i> Pen
+                                                    </button>
+                                                    <button onclick="setTool('highlighter')" class="px-3 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-medium">
+                                                        <i class="fas fa-highlighter mr-1"></i> Highlighter
+                                                    </button>
+                                                    <button onclick="setTool('text')" class="px-3 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                                                        <i class="fas fa-font mr-1"></i> Text
+                                                    </button>
+                                                    <button onclick="clearCanvas()" class="px-3 py-1 bg-red-100 text-red-700 rounded text-xs font-medium">
+                                                        <i class="fas fa-eraser mr-1"></i> Clear
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="canvas-container">
+                                                <div id="pdf-viewer-${assignmentId}" class="h-96 flex items-center justify-center bg-gray-100">
+                                                    <div class="text-center">
+                                                        <i class="fas fa-file-pdf text-4xl text-red-500 mb-2"></i>
+                                                        <p class="text-gray-600">Loading assignment document...</p>
+                                                        <p class="text-sm text-gray-500 mt-2">${assignment.attachmentName || 'assignment.pdf'}</p>
+                                                        <button onclick="loadPdfDocument('${assignmentId}', '${assignment.attachmentUrl || ''}')" class="mt-4 px-4 py-2 bg-brand-primary text-white rounded-lg text-sm">
+                                                            Load Document
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <canvas id="annotation-canvas-${assignmentId}" class="absolute top-0 left-0 w-full h-96" style="pointer-events: none;"></canvas>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="bg-gray-50 p-4 rounded-lg">
+                                            <h5 class="font-bold text-gray-700 mb-2">Your Work:</h5>
+                                            <textarea id="work-text-${assignmentId}" class="w-full h-32 p-3 border border-gray-300 rounded-lg" placeholder="Type your answers or notes here...">${assignment.studentWork || ''}</textarea>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                                            <h5 class="font-bold text-gray-700 mb-2">Upload Your Work</h5>
+                                            <input type="file" id="file-upload-${assignmentId}" class="w-full p-2 border border-gray-300 rounded mb-2">
+                                            <button onclick="uploadWorkFile('${assignmentId}')" class="w-full px-4 py-2 bg-gray-800 text-white rounded-lg text-sm hover:bg-gray-900">
+                                                <i class="fas fa-upload mr-1"></i> Upload File
+                                            </button>
+                                        </div>
+                                        
+                                        <div class="bg-blue-50 p-4 rounded-lg">
+                                            <h5 class="font-bold text-gray-700 mb-2">Submission Status</h5>
+                                            <div class="space-y-2">
+                                                <div class="flex justify-between">
+                                                    <span class="text-sm text-gray-600">Status:</span>
+                                                    <span class="text-sm font-bold text-orange-600">In Progress</span>
+                                                </div>
+                                                <div class="flex justify-between">
+                                                    <span class="text-sm text-gray-600">Due:</span>
+                                                    <span class="text-sm">${assignment.dueDate || 'No due date'}</span>
+                                                </div>
+                                                <div class="flex justify-between">
+                                                    <span class="text-sm text-gray-600">Files:</span>
+                                                    <span id="file-count-${assignmentId}" class="text-sm">0 files</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="space-y-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Select File</label>
-                                <input type="file" id="assignment-file" class="w-full p-3 border border-gray-300 rounded-lg">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Comments (Optional)</label>
-                                <textarea id="assignment-comments" class="w-full p-3 border border-gray-300 rounded-lg" rows="3" placeholder="Add any comments for your tutor..."></textarea>
-                            </div>
-                            <div class="flex gap-3 pt-4">
-                                <button onclick="submitAssignment('${assignmentId}')" class="flex-1 bg-brand-primary text-white py-3 rounded-lg font-medium hover:bg-brand-dark transition-colors">
-                                    Submit
-                                </button>
-                                <button onclick="this.parentElement.parentElement.parentElement.parentElement.remove()" class="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-200 transition-colors">
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                document.body.appendChild(modal);
-            };
-            
-            window.submitAssignment = async (assignmentId) => {
-                const fileInput = document.getElementById('assignment-file');
-                const comments = document.getElementById('assignment-comments').value;
-                
-                if (!fileInput.files[0]) {
-                    alert('Please select a file to upload.');
-                    return;
+                    `;
+                    
+                    document.body.appendChild(modal);
+                    
+                } catch (error) {
+                    console.error('Error opening workspace:', error);
+                    alert('Error loading assignment workspace.');
                 }
-                
-                alert(`Assignment ${assignmentId} submitted successfully!\n\nFile: ${fileInput.files[0].name}\nComments: ${comments || 'None'}`);
-                
-                document.querySelector('.fixed.inset-0').remove();
-                alert('Assignment submitted! Your tutor will grade it soon.');
             };
             
-            window.viewAssignment = (assignmentId) => {
-                alert(`View assignment ${assignmentId} - This would show details and feedback`);
+            window.downloadAssignmentFile = async (assignmentId) => {
+                try {
+                    const { db, doc, getDoc, getStorage, ref, getDownloadURL } = window.firebaseModules;
+                    
+                    const assignmentDoc = await getDoc(doc(db, "homework_assignments", assignmentId));
+                    const assignment = assignmentDoc.data();
+                    
+                    if (assignment.attachmentUrl) {
+                        // Create a temporary link to download the file
+                        const link = document.createElement('a');
+                        link.href = assignment.attachmentUrl;
+                        link.download = assignment.attachmentName || 'assignment.pdf';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    } else {
+                        alert('No file attached to this assignment.');
+                    }
+                } catch (error) {
+                    console.error('Error downloading file:', error);
+                    alert('Error downloading assignment file.');
+                }
             };
             
-            window.startGame = (gameId, gameName) => {
-                // Create a game window/modal
-                const gameModal = document.createElement('div');
-                gameModal.className = 'fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-50 p-4';
-                gameModal.innerHTML = `
-                    <div class="w-full max-w-4xl bg-gray-900 rounded-2xl overflow-hidden">
-                        <div class="flex justify-between items-center p-4 bg-gray-800">
-                            <h3 class="text-xl font-bold text-white">${gameName}</h3>
+            window.downloadGradedAssignment = async (assignmentId) => {
+                try {
+                    const { db, doc, getDoc } = window.firebaseModules;
+                    
+                    const assignmentDoc = await getDoc(doc(db, "homework_assignments", assignmentId));
+                    const assignment = assignmentDoc.data();
+                    
+                    if (assignment.gradedFileUrl) {
+                        const link = document.createElement('a');
+                        link.href = assignment.gradedFileUrl;
+                        link.download = `graded_${assignment.attachmentName || 'assignment.pdf'}`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    } else {
+                        alert('No graded file available for download.');
+                    }
+                } catch (error) {
+                    console.error('Error downloading graded assignment:', error);
+                    alert('Error downloading graded assignment.');
+                }
+            };
+            
+            window.viewAssignmentDetails = async (assignmentId) => {
+                try {
+                    const { db, doc, getDoc } = window.firebaseModules;
+                    
+                    const assignmentDoc = await getDoc(doc(db, "homework_assignments", assignmentId));
+                    const assignment = assignmentDoc.data();
+                    
+                    const modal = document.createElement('div');
+                    modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4';
+                    modal.innerHTML = `
+                        <div class="bg-white rounded-2xl w-full max-w-2xl">
+                            <div class="flex justify-between items-center p-6 border-b border-gray-100">
+                                <h3 class="font-bold text-gray-800 text-xl">Assignment Details</h3>
+                                <button onclick="this.parentElement.parentElement.parentElement.remove()" class="text-gray-400 hover:text-gray-600">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <div class="p-6 space-y-4">
+                                <div>
+                                    <h4 class="font-bold text-gray-700 mb-1">${assignment.title || 'Untitled'}</h4>
+                                    <p class="text-sm text-gray-500">${assignment.subject || 'Subject'}</p>
+                                </div>
+                                
+                                ${assignment.grade ? `
+                                    <div class="bg-green-50 p-4 rounded-lg">
+                                        <div class="flex justify-between items-center">
+                                            <div>
+                                                <h5 class="font-bold text-green-800">Graded: ${assignment.grade}%</h5>
+                                                <p class="text-sm text-green-600">${assignment.feedback || 'No feedback provided.'}</p>
+                                            </div>
+                                            ${assignment.gradedFileUrl ? `
+                                                <button onclick="downloadGradedAssignment('${assignmentId}')" class="px-4 py-2 bg-green-100 text-green-700 rounded-lg text-sm hover:bg-green-200">
+                                                    <i class="fas fa-download mr-1"></i> Download Graded
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                
+                                <div class="bg-gray-50 p-4 rounded-lg">
+                                    <h5 class="font-bold text-gray-700 mb-2">Instructions:</h5>
+                                    <p class="text-gray-700">${assignment.instructions || 'No specific instructions provided.'}</p>
+                                </div>
+                                
+                                ${assignment.attachmentUrl ? `
+                                    <div class="bg-blue-50 p-4 rounded-lg">
+                                        <h5 class="font-bold text-gray-700 mb-2">Attached File:</h5>
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center">
+                                                <i class="fas fa-file-pdf text-red-500 text-xl mr-3"></i>
+                                                <span>${assignment.attachmentName || 'assignment.pdf'}</span>
+                                            </div>
+                                            <button onclick="downloadAssignmentFile('${assignmentId}')" class="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm">
+                                                Download
+                                            </button>
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                
+                                <div class="flex gap-3 pt-4">
+                                    <button onclick="this.parentElement.parentElement.parentElement.remove()" class="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200">
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    document.body.appendChild(modal);
+                    
+                } catch (error) {
+                    console.error('Error viewing assignment:', error);
+                    alert('Error loading assignment details.');
+                }
+            };
+            
+            window.submitAssignmentFromWorkspace = async (assignmentId) => {
+                try {
+                    const { db, doc, updateDoc, Timestamp } = window.firebaseModules;
+                    
+                    await updateDoc(doc(db, "homework_assignments", assignmentId), {
+                        status: 'submitted',
+                        submittedDate: Timestamp.now(),
+                        studentWork: document.getElementById(`work-text-${assignmentId}`)?.value || ''
+                    });
+                    
+                    alert('Assignment submitted successfully!');
+                    document.querySelector('.fixed.inset-0.bg-black\\/50').remove();
+                    
+                    // Refresh assignments list
+                    await loadAssignments();
+                    await loadPendingTasks();
+                    
+                } catch (error) {
+                    console.error('Error submitting assignment:', error);
+                    alert('Error submitting assignment. Please try again.');
+                }
+            };
+            
+            // ========== GAMES IMPLEMENTATION ==========
+            window.startGame = (gameId, gameName, subject) => {
+                // Create game container
+                const gameContainer = document.createElement('div');
+                gameContainer.className = 'fixed inset-0 bg-gradient-to-br from-gray-900 to-black flex flex-col items-center justify-center z-50 p-4';
+                gameContainer.innerHTML = `
+                    <div class="w-full max-w-4xl bg-gray-800 rounded-2xl overflow-hidden shadow-2xl">
+                        <div class="flex justify-between items-center p-4 bg-gray-900">
+                            <div>
+                                <h3 class="text-xl font-bold text-white">${gameName}</h3>
+                                <p class="text-sm text-gray-300">${subject} • Educational Game</p>
+                            </div>
                             <button onclick="this.parentElement.parentElement.parentElement.remove()" class="text-gray-300 hover:text-white">
                                 <i class="fas fa-times text-2xl"></i>
                             </button>
                         </div>
+                        
                         <div class="p-6">
-                            <div class="bg-gray-800 rounded-lg p-8 text-center mb-6">
-                                <i class="fas fa-gamepad text-6xl text-brand-primary mb-4"></i>
-                                <h4 class="text-2xl font-bold text-white mb-2">${gameName}</h4>
-                                <p class="text-gray-300 mb-6">Educational game loading...</p>
-                                <div class="flex justify-center gap-4">
-                                    <button onclick="startGameLevel('${gameId}', 1)" class="px-6 py-3 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark">
-                                        Start Level 1
-                                    </button>
-                                    <button onclick="startGameLevel('${gameId}', 'practice')" class="px-6 py-3 bg-gray-700 text-white font-bold rounded-lg hover:bg-gray-600">
-                                        Practice Mode
-                                    </button>
+                            <div id="game-area-${gameId}" class="bg-gray-900 rounded-lg p-6 mb-6">
+                                <!-- Game will be loaded here -->
+                                <div class="text-center py-12">
+                                    <i class="fas fa-gamepad text-6xl text-brand-primary mb-4"></i>
+                                    <h4 class="text-2xl font-bold text-white mb-4">${gameName}</h4>
+                                    <p class="text-gray-300 mb-6">Select a game mode to start playing!</p>
+                                    <div class="flex justify-center gap-4">
+                                        <button onclick="startMathGame('${gameId}')" class="px-6 py-3 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark transition-all transform hover:scale-105">
+                                            <i class="fas fa-play mr-2"></i> Start Game
+                                        </button>
+                                        <button onclick="showInstructions('${gameId}')" class="px-6 py-3 bg-gray-700 text-white font-bold rounded-lg hover:bg-gray-600">
+                                            <i class="fas fa-info-circle mr-2"></i> How to Play
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
+                            
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div class="bg-gray-800 p-4 rounded-lg">
-                                    <h5 class="font-bold text-white mb-2">How to Play</h5>
-                                    <p class="text-gray-300 text-sm">Complete challenges to earn points and unlock new levels.</p>
+                                <div class="bg-gray-900 p-4 rounded-lg">
+                                    <h5 class="font-bold text-white mb-2">Score: <span id="score-${gameId}">0</span></h5>
+                                    <div class="w-full bg-gray-700 rounded-full h-2">
+                                        <div id="progress-${gameId}" class="bg-brand-primary h-2 rounded-full" style="width: 0%"></div>
+                                    </div>
                                 </div>
-                                <div class="bg-gray-800 p-4 rounded-lg">
-                                    <h5 class="font-bold text-white mb-2">Subjects</h5>
-                                    <p class="text-gray-300 text-sm">Math, English, Science, and Logic puzzles.</p>
+                                <div class="bg-gray-900 p-4 rounded-lg">
+                                    <h5 class="font-bold text-white mb-2">Time: <span id="time-${gameId}">60s</span></h5>
+                                    <div class="w-full bg-gray-700 rounded-full h-2">
+                                        <div id="time-progress-${gameId}" class="bg-blue-500 h-2 rounded-full" style="width: 100%"></div>
+                                    </div>
                                 </div>
-                                <div class="bg-gray-800 p-4 rounded-lg">
-                                    <h5 class="font-bold text-white mb-2">Rewards</h5>
-                                    <p class="text-gray-300 text-sm">Earn badges and climb the leaderboard!</p>
+                                <div class="bg-gray-900 p-4 rounded-lg">
+                                    <h5 class="font-bold text-white mb-2">Level: <span id="level-${gameId}">1</span></h5>
+                                    <button onclick="nextLevel('${gameId}')" class="w-full px-4 py-2 bg-green-600 text-white rounded text-sm font-bold hover:bg-green-700">
+                                        Next Level
+                                    </button>
                                 </div>
                             </div>
                         </div>
                     </div>
                 `;
-                document.body.appendChild(gameModal);
+                
+                document.body.appendChild(gameContainer);
             };
             
-            window.startGameLevel = (gameId, level) => {
-                // In a real implementation, this would load the actual game
-                alert(`Starting ${gameId} at level ${level}...\n\nThis would load an interactive educational game.`);
-                // Close the modal
-                document.querySelector('.fixed.inset-0.bg-black\\/90')?.remove();
+            window.startMathGame = (gameId) => {
+                const gameArea = document.getElementById(`game-area-${gameId}`);
+                
+                // Simple math game implementation
+                let score = 0;
+                let timeLeft = 60;
+                let level = 1;
+                let timer;
+                
+                const updateGame = () => {
+                    // Generate math problem based on level
+                    let num1, num2, operator, answer;
+                    
+                    if (level === 1) {
+                        // Addition
+                        num1 = Math.floor(Math.random() * 10) + 1;
+                        num2 = Math.floor(Math.random() * 10) + 1;
+                        operator = '+';
+                        answer = num1 + num2;
+                    } else if (level === 2) {
+                        // Subtraction
+                        num1 = Math.floor(Math.random() * 20) + 10;
+                        num2 = Math.floor(Math.random() * 10) + 1;
+                        operator = '-';
+                        answer = num1 - num2;
+                    } else if (level === 3) {
+                        // Multiplication
+                        num1 = Math.floor(Math.random() * 10) + 1;
+                        num2 = Math.floor(Math.random() * 10) + 1;
+                        operator = '×';
+                        answer = num1 * num2;
+                    } else {
+                        // Division
+                        num2 = Math.floor(Math.random() * 5) + 2;
+                        answer = Math.floor(Math.random() * 10) + 1;
+                        num1 = answer * num2;
+                        operator = '÷';
+                    }
+                    
+                    // Generate wrong answers
+                    const wrongAnswers = [];
+                    while (wrongAnswers.length < 3) {
+                        const wrong = answer + (Math.floor(Math.random() * 10) - 5);
+                        if (wrong !== answer && wrong > 0 && !wrongAnswers.includes(wrong)) {
+                            wrongAnswers.push(wrong);
+                        }
+                    }
+                    
+                    // Combine answers and shuffle
+                    const allAnswers = [answer, ...wrongAnswers];
+                    allAnswers.sort(() => Math.random() - 0.5);
+                    
+                    gameArea.innerHTML = `
+                        <div class="text-center">
+                            <h4 class="text-2xl font-bold text-white mb-6">Solve the Math Problem!</h4>
+                            <div class="text-5xl font-bold text-white mb-8">
+                                ${num1} ${operator} ${num2} = ?
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                ${allAnswers.map((ans, index) => `
+                                    <button onclick="checkAnswer(${ans === answer}, '${gameId}')" 
+                                            class="p-4 bg-gray-700 text-white text-xl font-bold rounded-lg hover:bg-gray-600 transition-all transform hover:scale-105">
+                                        ${ans}
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                };
+                
+                // Start timer
+                timer = setInterval(() => {
+                    timeLeft--;
+                    document.getElementById(`time-${gameId}`).textContent = `${timeLeft}s`;
+                    document.getElementById(`time-progress-${gameId}`).style.width = `${(timeLeft / 60) * 100}%`;
+                    
+                    if (timeLeft <= 0) {
+                        clearInterval(timer);
+                        gameArea.innerHTML = `
+                            <div class="text-center py-12">
+                                <h4 class="text-3xl font-bold text-white mb-4">Time's Up!</h4>
+                                <p class="text-xl text-gray-300 mb-6">Final Score: ${score}</p>
+                                <button onclick="startMathGame('${gameId}')" class="px-6 py-3 bg-brand-primary text-white font-bold rounded-lg">
+                                    Play Again
+                                </button>
+                            </div>
+                        `;
+                    }
+                }, 1000);
+                
+                // Update score display
+                window.checkAnswer = (isCorrect, gameId) => {
+                    if (isCorrect) {
+                        score += level * 10;
+                        document.getElementById(`score-${gameId}`).textContent = score;
+                        alert('Correct! +' + (level * 10) + ' points');
+                        
+                        // Progress to next level every 50 points
+                        if (score % 50 === 0) {
+                            level++;
+                            document.getElementById(`level-${gameId}`).textContent = level;
+                            document.getElementById(`progress-${gameId}`).style.width = `${Math.min(score, 100)}%`;
+                        }
+                    } else {
+                        alert('Try again!');
+                    }
+                    updateGame();
+                };
+                
+                window.nextLevel = (gameId) => {
+                    level++;
+                    document.getElementById(`level-${gameId}`).textContent = level;
+                    updateGame();
+                };
+                
+                updateGame();
+            };
+            
+            window.showInstructions = (gameId) => {
+                const gameArea = document.getElementById(`game-area-${gameId}`);
+                gameArea.innerHTML = `
+                    <div class="text-center">
+                        <h4 class="text-2xl font-bold text-white mb-6">How to Play</h4>
+                        <div class="text-left space-y-4 text-gray-300">
+                            <p>1. Solve the math problems as quickly as you can!</p>
+                            <p>2. Click on the correct answer from the options.</p>
+                            <p>3. Each correct answer earns you points.</p>
+                            <p>4. Points multiplier increases with each level.</p>
+                            <p>5. Complete before the timer runs out!</p>
+                        </div>
+                        <button onclick="startMathGame('${gameId}')" class="mt-8 px-6 py-3 bg-brand-primary text-white font-bold rounded-lg">
+                            Start Game Now
+                        </button>
+                    </div>
+                `;
             };
             
             window.shareLeaderboard = () => {
-                alert('Leaderboard shared!\n\nIn a real implementation, this would generate a shareable image.');
+                alert('Leaderboard shared! In production, this would generate a shareable image.');
             };
             
         });
