@@ -894,7 +894,7 @@ window.refreshAllDashboardData = async function() {
 };
 
 // ======================================================
-// SUBSECTION 3.1: Tutor Directory Panel - UPDATED
+// SUBSECTION 3.1: Tutor Directory Panel - FINAL WITH REPORT STATUS
 // ======================================================
 
 // --- HELPER FUNCTIONS ---
@@ -926,15 +926,10 @@ function searchStudentFromFirebase(student, searchTerm, tutors = []) {
     if (!student) return false;
     if (!searchTerm || safeToString(searchTerm).trim() === '') return true;
     const searchLower = safeToString(searchTerm).toLowerCase();
-    
     if (searchLower === 'break' && student.summerBreak === true) return true;
     if (searchLower === 'transitioning' && student.isTransitioning === true) return true;
 
-    const studentFieldsToSearch = [
-        'studentName', 'grade', 'days', 'parentName', 'parentPhone', 
-        'parentEmail', 'address', 'status', 'tutorEmail', 'tutorName'
-    ];
-    
+    const studentFieldsToSearch = ['studentName', 'grade', 'days', 'parentName', 'parentPhone', 'tutorName'];
     for (const field of studentFieldsToSearch) {
         if (student[field] && safeSearch(student[field], searchTerm)) return true;
     }
@@ -951,7 +946,6 @@ async function renderManagementTutorView(container) {
                 <div class="flex items-center gap-4 flex-wrap">
                     <input type="search" id="directory-search" placeholder="Search Tutors, Students..." class="p-2 border rounded-md w-64">
                     <button id="reassign-student-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Assign / Reassign Students</button>
-                    <button id="view-tutor-history-directory-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">View History</button>
                     <button id="refresh-directory-btn" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Refresh</button>
                 </div>
             </div>
@@ -961,7 +955,7 @@ async function renderManagementTutorView(container) {
                     <p id="tutor-count-badge" class="text-2xl font-extrabold">0</p>
                 </div>
                 <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-yellow-800 text-sm">All Students</h4>
+                    <h4 class="font-bold text-yellow-800 text-sm">Total Students</h4>
                     <p id="student-count-badge" class="text-2xl font-extrabold">0</p>
                 </div>
             </div>
@@ -981,26 +975,23 @@ async function renderManagementTutorView(container) {
 // --- DATA FETCHING ---
 
 async function fetchAndRenderDirectory(forceRefresh = false) {
-    if (forceRefresh) {
-        invalidateCache('tutors'); invalidateCache('students');
-    }
+    if (forceRefresh) { invalidateCache('tutors'); invalidateCache('students'); }
     try {
-        const [tutorsSnap, studentsSnap] = await Promise.all([
+        const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
             getDocs(query(collection(db, "tutors"), orderBy("name"))),
             getDocs(query(collection(db, "students"), orderBy("studentName")))
         ]);
         
-        const allTutors = tutorsSnap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-        const allStudents = studentsSnap.docs.map(doc => ({ 
+        const tutors = tutorsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })).filter(t => !t.status || t.status === 'active');
+        const students = studentsSnapshot.docs.map(doc => ({ 
             ...doc.data(), 
             id: doc.id,
-            summerBreak: doc.data().summerBreak === true,
-            isTransitioning: doc.data().isTransitioning === true
-        }));
+            isTransitioning: doc.data().isTransitioning === true,
+            summerBreak: doc.data().summerBreak === true
+        })).filter(s => !s.status?.toLowerCase().includes('archived'));
 
-        saveToLocalStorage('tutors', allTutors.filter(t => !t.status || t.status === 'active'));
-        saveToLocalStorage('students', allStudents.filter(s => !s.status?.toLowerCase().includes('archived')));
-        
+        saveToLocalStorage('tutors', tutors);
+        saveToLocalStorage('students', students);
         renderDirectoryFromCache();
     } catch (e) { console.error(e); }
 }
@@ -1021,6 +1012,9 @@ function renderDirectoryFromCache(searchTerm = '') {
         }
     });
 
+    document.getElementById('tutor-count-badge').textContent = tutors.length;
+    document.getElementById('student-count-badge').textContent = students.length;
+
     directoryList.innerHTML = tutors.filter(t => {
         const assigned = studentsByTutor[t.email] || [];
         return safeSearch(t.name, searchTerm) || assigned.some(s => searchStudentFromFirebase(s, searchTerm));
@@ -1028,35 +1022,48 @@ function renderDirectoryFromCache(searchTerm = '') {
         const assigned = (studentsByTutor[tutor.email] || []).sort((a,b) => a.studentName.localeCompare(b.studentName));
         
         const rows = assigned.map(s => {
-            let badge = s.isTransitioning ? `<span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-xs">Transitioning</span>` : 
-                        s.summerBreak ? `<span class="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full text-xs">On Break</span>` : 
-                        `<span class="bg-green-100 text-green-800 px-2 py-0.5 rounded-full text-xs">Active</span>`;
+            let statusBadge = s.isTransitioning ? `<span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-xs">Transitioning</span>` : 
+                              s.summerBreak ? `<span class="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full text-xs">On Break</span>` : 
+                              `<span class="bg-green-100 text-green-800 px-2 py-0.5 rounded-full text-xs">Active</span>`;
             
+            // Report Status Logic for the Table
+            let reportBadge = '';
+            if (s.reportEligibility === 'exempt') {
+                reportBadge = `<span class="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded ml-1">No Report Required</span>`;
+            } else if (s.reportEligibility === 'mandatory') {
+                reportBadge = `<span class="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded ml-1">Report Due</span>`;
+            }
+
             return `
                 <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3">${s.studentName} ${badge}</td>
-                    <td class="px-4 py-3">${s.grade || '-'}</td>
-                    <td class="px-4 py-3">${s.subjects || '-'}</td>
+                    <td class="px-4 py-3 text-sm font-medium">${s.studentName} ${statusBadge} ${reportBadge}</td>
+                    <td class="px-4 py-3 text-sm">${s.grade || '-'}</td>
+                    <td class="px-4 py-3 text-sm">${Array.isArray(s.subjects) ? s.subjects.join(', ') : (s.subjects || '-')}</td>
                     <td class="px-4 py-3">
-                        <button class="edit-student-btn text-blue-600" data-student-id="${s.id}">Edit</button>
+                        <button class="edit-student-btn text-blue-600 hover:underline text-sm" data-student-id="${s.id}">Edit</button>
                     </td>
                 </tr>`;
         }).join('');
 
         return `
-            <div class="border rounded-lg overflow-hidden mb-4">
+            <div class="border rounded-lg mb-4">
                 <details open>
-                    <summary class="p-4 bg-gray-50 cursor-pointer font-bold text-green-700">${tutor.name} (${assigned.length} Students)</summary>
+                    <summary class="p-4 bg-gray-50 cursor-pointer font-bold text-green-700 flex justify-between">
+                        <span>${tutor.name}</span>
+                        <span class="text-gray-500 text-sm font-normal">${assigned.length} Students</span>
+                    </summary>
                     <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50"><tr><th class="px-4 py-2 text-left text-xs">Name</th><th class="px-4 py-2 text-left text-xs">Grade</th><th class="px-4 py-2 text-left text-xs">Subjects</th><th class="px-4 py-2 text-left text-xs">Action</th></tr></thead>
-                        <tbody>${rows || '<tr><td colspan="4" class="p-4 text-center">No students</td></tr>'}</tbody>
+                        <thead class="bg-gray-100"><tr><th class="px-4 py-2 text-left text-xs uppercase">Student</th><th class="px-4 py-2 text-left text-xs uppercase">Grade</th><th class="px-4 py-2 text-left text-xs uppercase">Subjects</th><th class="px-4 py-2 text-left text-xs uppercase">Action</th></tr></thead>
+                        <tbody>${rows || '<tr><td colspan="4" class="p-4 text-center">No students assigned</td></tr>'}</tbody>
                     </table>
                 </details>
             </div>`;
     }).join('');
+
+    document.querySelectorAll('.edit-student-btn').forEach(b => b.addEventListener('click', () => handleEditStudent(b.dataset.studentId)));
 }
 
-// --- REASSIGN MODAL & GROUP FEATURE ---
+// --- ENHANCED MODAL WITH MULTI-SELECT & 3-WEEK LOGIC ---
 
 function createReassignModalHtml(students, tutors) {
     const sOpts = students.map(s => `<option value="${s.studentName}" data-id="${s.id}">`).join('');
@@ -1068,23 +1075,23 @@ function createReassignModalHtml(students, tutors) {
             <h3 class="text-xl font-bold mb-4">Assign / Reassign Students</h3>
             <form id="reassign-student-form">
                 <div class="mb-4">
-                    <label class="block text-sm font-medium mb-1">Type Student Name(s)</label>
-                    <input list="student-list" id="reassign-student-input" class="w-full border p-2 rounded" placeholder="Search student...">
+                    <label class="block text-sm font-medium mb-1">Search & Select Student(s)</label>
+                    <input list="student-list" id="reassign-student-input" class="w-full border p-2 rounded" placeholder="Type student name...">
                     <datalist id="student-list">${sOpts}</datalist>
                     <div id="selected-students-chips" class="flex flex-wrap gap-2 mt-2"></div>
                 </div>
                 <div class="mb-4">
                     <label class="block text-sm font-medium mb-1">Target Tutor</label>
-                    <input list="tutor-list" id="reassign-tutor-input" class="w-full border p-2 rounded" placeholder="Search tutor...">
+                    <input list="tutor-list" id="reassign-tutor-input" class="w-full border p-2 rounded" placeholder="Type tutor name...">
                     <datalist id="tutor-list">${tOpts}</datalist>
                 </div>
                 <div class="mb-4">
-                    <label class="block text-sm font-medium mb-1">Reason</label>
+                    <label class="block text-sm font-medium mb-1">Reason (Optional)</label>
                     <textarea id="reassign-reason" class="w-full border p-2 rounded" rows="2"></textarea>
                 </div>
                 <div class="flex justify-end gap-2">
                     <button type="button" onclick="closeReassignModal()" class="px-4 py-2 bg-gray-200 rounded">Cancel</button>
-                    <button type="submit" id="reassign-submit-btn" class="px-4 py-2 bg-blue-600 text-white rounded">Execute Assignment</button>
+                    <button type="submit" id="reassign-submit-btn" class="px-4 py-2 bg-blue-600 text-white rounded">Confirm Assignment</button>
                 </div>
             </form>
         </div>
@@ -1109,9 +1116,9 @@ function showEnhancedReassignStudentModal() {
                 selectedIds.add(id);
                 const chip = document.createElement('span');
                 chip.className = "bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs flex items-center gap-1";
-                chip.innerHTML = `${name} <b class="cursor-pointer font-bold ml-1" onclick="this.parentElement.remove(); window._tempSelectedIds.delete('${id}')">&times;</b>`;
+                chip.innerHTML = `${name} <b class="cursor-pointer font-bold ml-1" onclick="this.parentElement.remove(); window._activeAssignmentIds.delete('${id}')">&times;</b>`;
                 chipsContainer.appendChild(chip);
-                window._tempSelectedIds = selectedIds; 
+                window._activeAssignmentIds = selectedIds;
             }
             studentInput.value = '';
         }
@@ -1121,13 +1128,10 @@ function showEnhancedReassignStudentModal() {
         e.preventDefault();
         const tVal = document.getElementById('reassign-tutor-input').value;
         const tOpt = document.querySelector(`#tutor-list option[value="${tVal}"]`);
-        if (!selectedIds.size || !tOpt) return alert("Select students and a valid tutor.");
+        if (!selectedIds.size || !tOpt) return alert("Please select at least one student and a valid tutor.");
         
-        const newTutor = { name: tVal, email: tOpt.dataset.email };
-        const reason = document.getElementById('reassign-reason').value;
-        
-        if(confirm(`Confirm assignment for ${selectedIds.size} students?`)) {
-            await performReassignment(Array.from(selectedIds), newTutor, reason);
+        if(confirm(`Assign ${selectedIds.size} student(s) to ${tVal}?`)) {
+            await performReassignment(Array.from(selectedIds), { name: tVal, email: tOpt.dataset.email }, document.getElementById('reassign-reason').value);
         }
     };
 }
@@ -1136,16 +1140,17 @@ async function performReassignment(studentIds, newTutor, reason) {
     const btn = document.getElementById('reassign-submit-btn');
     btn.textContent = "Processing..."; btn.disabled = true;
     try {
+        const user = window.userData?.name || 'Admin';
         for (const sid of studentIds) {
             const student = sessionCache.students.find(x => x.id === sid);
             
-            // Logic for Report Requirement (3-week transition rule)
+            // 3-WEEK RULE CALCULATION
             let reportRequired = true;
             if (student.isTransitioning) {
                 const now = new Date();
                 const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
                 const daysLeft = (endOfMonth - now) / (1000 * 60 * 60 * 24);
-                if (daysLeft < 21) reportRequired = false; // Less than 3 weeks
+                if (daysLeft < 21) reportRequired = false; // Less than 3 weeks = No Report
             }
 
             await addDoc(collection(db, "tutorAssignments"), {
@@ -1158,7 +1163,7 @@ async function performReassignment(studentIds, newTutor, reason) {
             await updateDoc(doc(db, "students", sid), {
                 tutorEmail: newTutor.email, tutorName: newTutor.name,
                 reportEligibility: reportRequired ? 'mandatory' : 'exempt',
-                updatedAt: new Date().toISOString()
+                updatedAt: new Date().toISOString(), updatedBy: user
             });
         }
         closeReassignModal();
@@ -1166,13 +1171,8 @@ async function performReassignment(studentIds, newTutor, reason) {
     } catch (e) { console.error(e); btn.disabled = false; }
 }
 
-function closeReassignModal() { 
-    const m = document.getElementById('reassign-student-modal'); 
-    if(m) m.remove(); 
-}
-
+function closeReassignModal() { const m = document.getElementById('reassign-student-modal'); if(m) m.remove(); }
 window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
-window.closeReassignModal = closeReassignModal;
 
 // ======================================================
 // SUBSECTION 3.2: Inactive Tutors Panel
@@ -8247,6 +8247,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
