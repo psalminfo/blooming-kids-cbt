@@ -1113,11 +1113,11 @@ async function renderManagementTutorView(container) {
     try {
         // Event Listeners
         document.getElementById('assign-student-btn').addEventListener('click', () => {
-            if (typeof window.showEnhancedAssignStudentModal === 'function') window.showEnhancedAssignStudentModal();
+            showEnhancedAssignStudentModal();
         });
 
         document.getElementById('reassign-student-btn').addEventListener('click', () => {
-            if (typeof window.showEnhancedReassignStudentModal === 'function') window.showEnhancedReassignStudentModal();
+            showEnhancedReassignStudentModal();
         });
 
         document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
@@ -1404,192 +1404,12 @@ function renderDirectoryFromCache(searchTerm = '') {
 }
 
 // ======================================================
-// ENHANCED REASSIGN MODAL (With Searchable Selectors)
+// ENHANCED ASSIGN STUDENT MODAL (New Function)
 // ======================================================
-
-function isCacheValid(keys) {
-    if (!sessionCache) return false;
-    for(let k of keys) if(!sessionCache[k] || !sessionCache[k].length) return false;
-    return (Date.now() - (sessionCache._lastUpdate||0)) < 300000;
-}
-
-function getCleanStudents() { 
-    return (sessionCache.students || [])
-        .filter(s => !s.status || !s.status.toLowerCase().includes('archived')); 
-}
 
 function getCleanTutors() { 
     return (sessionCache.tutors || [])
-        .filter(t => !t.status || t.status === 'active'); 
-}
-
-function validateReassignData(students, tutors) {
-    if (!students.length || !tutors.length) { 
-        showReassignAlert("Missing student or tutor data. Please refresh.", 'warning'); 
-        return false; 
-    }
-    return true;
-}
-
-function createEnhancedReassignModalHtml(students, tutors) {
-    return `
-    <div id="reassign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white w-full max-w-lg rounded-lg shadow-xl p-6">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-bold text-blue-700">Reassign Student</h3>
-                <button onclick="closeReassignModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
-            </div>
-            <form id="reassign-student-form">
-                <div class="mb-4">
-                    <label class="block text-sm font-medium mb-2 text-gray-700">Select Student</label>
-                    ${createSearchableSelect(
-                        students.map(s => ({ 
-                            id: s.id, 
-                            studentName: s.studentName,
-                            grade: s.grade,
-                            currentTutor: s.tutorName || 'Unassigned'
-                        })), 
-                        "Type student name...", 
-                        "reassign-student"
-                    )}
-                </div>
-                
-                <div id="student-info" class="mb-4 p-3 bg-blue-50 rounded-md hidden">
-                    <div class="text-sm">
-                        <div class="font-medium" id="selected-student-name"></div>
-                        <div class="text-gray-600" id="selected-student-details"></div>
-                    </div>
-                </div>
-                
-                <div class="mb-4">
-                    <label class="block text-sm font-medium mb-2 text-gray-700">Select New Tutor</label>
-                    ${createSearchableSelect(
-                        tutors.map(t => ({ 
-                            email: t.email, 
-                            name: t.name,
-                            subjects: t.subjects || []
-                        })), 
-                        "Type tutor name or email...", 
-                        "reassign-tutor",
-                        true
-                    )}
-                </div>
-                
-                <div id="tutor-info" class="mb-4 p-3 bg-green-50 rounded-md hidden">
-                    <div class="text-sm">
-                        <div class="font-medium" id="selected-tutor-name"></div>
-                        <div class="text-gray-600" id="selected-tutor-details"></div>
-                    </div>
-                </div>
-                
-                <div class="mb-6">
-                    <label class="block text-sm font-medium mb-2 text-gray-700">Reason for Reassignment</label>
-                    <textarea id="reassign-reason" 
-                              class="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-                              rows="3" 
-                              placeholder="Enter reason for reassignment..."></textarea>
-                </div>
-                
-                <div class="flex justify-end gap-3">
-                    <button type="button" 
-                            onclick="closeReassignModal()" 
-                            class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
-                        Cancel
-                    </button>
-                    <button type="submit" 
-                            id="reassign-submit-btn" 
-                            class="px-5 py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                        Confirm Reassignment
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>`;
-}
-
-function updateStudentInfo(student) {
-    const infoDiv = document.getElementById('student-info');
-    const nameDiv = document.getElementById('selected-student-name');
-    const detailsDiv = document.getElementById('selected-student-details');
-    
-    if (student) {
-        infoDiv.classList.remove('hidden');
-        nameDiv.textContent = student.studentName;
-        detailsDiv.innerHTML = `
-            Grade: ${student.grade || 'N/A'} | 
-            Fee: ₦${(student.studentFee || 0).toFixed(2)} | 
-            Current Tutor: ${student.tutorName || 'Unassigned'}
-        `;
-    } else {
-        infoDiv.classList.add('hidden');
-    }
-}
-
-function updateTutorInfo(tutor) {
-    const infoDiv = document.getElementById('tutor-info');
-    const nameDiv = document.getElementById('selected-tutor-name');
-    const detailsDiv = document.getElementById('selected-tutor-details');
-    
-    if (tutor) {
-        infoDiv.classList.remove('hidden');
-        nameDiv.textContent = tutor.name;
-        detailsDiv.innerHTML = `
-            Email: ${tutor.email} | 
-            Subjects: ${Array.isArray(tutor.subjects) ? tutor.subjects.join(', ') : tutor.subjects || 'N/A'}
-        `;
-    } else {
-        infoDiv.classList.add('hidden');
-    }
-}
-
-async function performReassignment(student, newTutor, reason, currentTutor) {
-    const btn = document.getElementById('reassign-submit-btn');
-    const originalText = btn.textContent;
-    btn.textContent = "Processing..."; 
-    btn.disabled = true;
-    
-    try {
-        const user = window.userData?.name || 'Admin';
-        const userEmail = window.userData?.email || 'admin@system';
-        
-        // 1. Create assignment history record
-        await addDoc(collection(db, "tutorAssignments"), {
-            studentId: student.id, 
-            studentName: student.studentName,
-            oldTutorEmail: student.tutorEmail || '', 
-            oldTutorName: currentTutor?.name || 'Unassigned',
-            newTutorEmail: newTutor.email, 
-            newTutorName: newTutor.name,
-            reason, 
-            assignedBy: user, 
-            assignedByEmail: userEmail,
-            assignedAt: new Date().toISOString(), 
-            timestamp: new Date().toISOString()
-        });
-        
-        // 2. Update student record
-        await updateDoc(doc(db, "students", student.id), {
-            tutorEmail: newTutor.email, 
-            tutorName: newTutor.name,
-            updatedAt: new Date().toISOString(), 
-            updatedBy: user
-        });
-        
-        // 3. Show success
-        showReassignAlert(`Successfully reassigned ${student.studentName} to ${newTutor.name}!`, 'success');
-        
-        // 4. Refresh and close
-        setTimeout(() => { 
-            closeReassignModal(); 
-            fetchAndRenderDirectory(true); 
-        }, 1500);
-        
-    } catch (e) {
-        console.error("Reassignment error:", e);
-        showReassignAlert("Error: " + e.message, 'error'); 
-        btn.textContent = originalText;
-        btn.disabled = false;
-    }
+        .filter(t => t && (!t.status || t.status === 'active')); 
 }
 
 function showReassignAlert(msg, type) {
@@ -1608,85 +1428,9 @@ function showReassignAlert(msg, type) {
     setTimeout(() => alert.remove(), 4000);
 }
 
-function showEnhancedReassignStudentModal() {
-    if (!isCacheValid(['students', 'tutors'])) { 
-        showReassignAlert("Refreshing data...", 'info');
-        fetchAndRenderDirectory(true);
-        setTimeout(() => showEnhancedReassignStudentModal(), 1000);
-        return;
-    }
-    
-    const students = getCleanStudents();
-    const tutors = getCleanTutors();
-    
-    if (!validateReassignData(students, tutors)) return;
-    
-    // Remove existing modal if any
-    closeReassignModal();
-    
-    document.body.insertAdjacentHTML('beforeend', createEnhancedReassignModalHtml(students, tutors));
-    
-    // Initialize searchable selects
-    setTimeout(() => {
-        initializeSearchableSelect('reassign-student');
-        initializeSearchableSelect('reassign-tutor');
-        
-        // Handle student selection change
-        document.getElementById('reassign-student').addEventListener('change', function() {
-            const studentId = this.value;
-            const student = students.find(s => s.id === studentId);
-            updateStudentInfo(student);
-        });
-        
-        // Handle tutor selection change
-        document.getElementById('reassign-tutor').addEventListener('change', function() {
-            const tutorEmail = this.value;
-            const tutor = tutors.find(t => t.email === tutorEmail);
-            updateTutorInfo(tutor);
-        });
-        
-        // Handle form submission
-        document.getElementById('reassign-student-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const studentId = document.getElementById('reassign-student').value;
-            const tutorEmail = document.getElementById('reassign-tutor').value;
-            const reason = document.getElementById('reassign-reason').value.trim();
-            
-            if (!studentId || !tutorEmail) {
-                showReassignAlert("Please select both a student and a tutor", 'warning');
-                return;
-            }
-            
-            if (!reason) {
-                showReassignAlert("Please enter a reason for reassignment", 'warning');
-                return;
-            }
-            
-            const student = students.find(s => s.id === studentId);
-            const newTutor = tutors.find(t => t.email === tutorEmail);
-            const currentTutor = tutors.find(t => t.email === student.tutorEmail);
-            
-            // Check if trying to reassign to same tutor
-            if (student.tutorEmail === tutorEmail) {
-                showReassignAlert("Student is already assigned to this tutor", 'warning');
-                return;
-            }
-            
-            // Confirmation dialog
-            if (confirm(`Reassign ${student.studentName} from "${currentTutor?.name || 'Unassigned'}" to "${newTutor.name}"?`)) {
-                await performReassignment(student, newTutor, reason, currentTutor);
-            }
-        });
-    }, 100);
-}
-
-// ======================================================
-// ENHANCED ASSIGN STUDENT MODAL (New Function)
-// ======================================================
-
 function showEnhancedAssignStudentModal() {
-    if (!isCacheValid(['tutors'])) { 
+    // Validate cache exists
+    if (!sessionCache || !sessionCache.tutors || sessionCache.tutors.length === 0) {
         showReassignAlert("Refreshing tutor data...", 'info');
         fetchAndRenderDirectory(true);
         setTimeout(() => showEnhancedAssignStudentModal(), 1000);
@@ -1695,8 +1439,8 @@ function showEnhancedAssignStudentModal() {
     
     const tutors = getCleanTutors();
     
-    if (!tutors.length) {
-        showReassignAlert("No active tutors available", 'warning');
+    if (tutors.length === 0) {
+        showReassignAlert("No active tutors available. Please add tutors first.", 'warning');
         return;
     }
     
@@ -1882,6 +1626,263 @@ function showEnhancedAssignStudentModal() {
 function closeAssignModal() {
     const modal = document.getElementById('assign-student-modal');
     if (modal) modal.remove();
+}
+
+// ======================================================
+// ENHANCED REASSIGN MODAL (With Searchable Selectors)
+// ======================================================
+
+function isCacheValid(keys) {
+    if (!sessionCache) return false;
+    for(let k of keys) if(!sessionCache[k] || !sessionCache[k].length) return false;
+    return (Date.now() - (sessionCache._lastUpdate||0)) < 300000;
+}
+
+function getCleanStudents() { 
+    return (sessionCache.students || [])
+        .filter(s => !s.status || !s.status.toLowerCase().includes('archived')); 
+}
+
+function validateReassignData(students, tutors) {
+    if (!students.length || !tutors.length) { 
+        showReassignAlert("Missing student or tutor data. Please refresh.", 'warning'); 
+        return false; 
+    }
+    return true;
+}
+
+function createEnhancedReassignModalHtml(students, tutors) {
+    return `
+    <div id="reassign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white w-full max-w-lg rounded-lg shadow-xl p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-blue-700">Reassign Student</h3>
+                <button onclick="closeReassignModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <form id="reassign-student-form">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2 text-gray-700">Select Student</label>
+                    ${createSearchableSelect(
+                        students.map(s => ({ 
+                            id: s.id, 
+                            studentName: s.studentName,
+                            grade: s.grade,
+                            currentTutor: s.tutorName || 'Unassigned'
+                        })), 
+                        "Type student name...", 
+                        "reassign-student"
+                    )}
+                </div>
+                
+                <div id="student-info" class="mb-4 p-3 bg-blue-50 rounded-md hidden">
+                    <div class="text-sm">
+                        <div class="font-medium" id="selected-student-name"></div>
+                        <div class="text-gray-600" id="selected-student-details"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2 text-gray-700">Select New Tutor</label>
+                    ${createSearchableSelect(
+                        tutors.map(t => ({ 
+                            email: t.email, 
+                            name: t.name,
+                            subjects: t.subjects || []
+                        })), 
+                        "Type tutor name or email...", 
+                        "reassign-tutor",
+                        true
+                    )}
+                </div>
+                
+                <div id="tutor-info" class="mb-4 p-3 bg-green-50 rounded-md hidden">
+                    <div class="text-sm">
+                        <div class="font-medium" id="selected-tutor-name"></div>
+                        <div class="text-gray-600" id="selected-tutor-details"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium mb-2 text-gray-700">Reason for Reassignment</label>
+                    <textarea id="reassign-reason" 
+                              class="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                              rows="3" 
+                              placeholder="Enter reason for reassignment..."></textarea>
+                </div>
+                
+                <div class="flex justify-end gap-3">
+                    <button type="button" 
+                            onclick="closeReassignModal()" 
+                            class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            id="reassign-submit-btn" 
+                            class="px-5 py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        Confirm Reassignment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>`;
+}
+
+function updateStudentInfo(student) {
+    const infoDiv = document.getElementById('student-info');
+    const nameDiv = document.getElementById('selected-student-name');
+    const detailsDiv = document.getElementById('selected-student-details');
+    
+    if (student) {
+        infoDiv.classList.remove('hidden');
+        nameDiv.textContent = student.studentName;
+        detailsDiv.innerHTML = `
+            Grade: ${student.grade || 'N/A'} | 
+            Fee: ₦${(student.studentFee || 0).toFixed(2)} | 
+            Current Tutor: ${student.tutorName || 'Unassigned'}
+        `;
+    } else {
+        infoDiv.classList.add('hidden');
+    }
+}
+
+function updateTutorInfo(tutor) {
+    const infoDiv = document.getElementById('tutor-info');
+    const nameDiv = document.getElementById('selected-tutor-name');
+    const detailsDiv = document.getElementById('selected-tutor-details');
+    
+    if (tutor) {
+        infoDiv.classList.remove('hidden');
+        nameDiv.textContent = tutor.name;
+        detailsDiv.innerHTML = `
+            Email: ${tutor.email} | 
+            Subjects: ${Array.isArray(tutor.subjects) ? tutor.subjects.join(', ') : tutor.subjects || 'N/A'}
+        `;
+    } else {
+        infoDiv.classList.add('hidden');
+    }
+}
+
+async function performReassignment(student, newTutor, reason, currentTutor) {
+    const btn = document.getElementById('reassign-submit-btn');
+    const originalText = btn.textContent;
+    btn.textContent = "Processing..."; 
+    btn.disabled = true;
+    
+    try {
+        const user = window.userData?.name || 'Admin';
+        const userEmail = window.userData?.email || 'admin@system';
+        
+        // 1. Create assignment history record
+        await addDoc(collection(db, "tutorAssignments"), {
+            studentId: student.id, 
+            studentName: student.studentName,
+            oldTutorEmail: student.tutorEmail || '', 
+            oldTutorName: currentTutor?.name || 'Unassigned',
+            newTutorEmail: newTutor.email, 
+            newTutorName: newTutor.name,
+            reason, 
+            assignedBy: user, 
+            assignedByEmail: userEmail,
+            assignedAt: new Date().toISOString(), 
+            timestamp: new Date().toISOString()
+        });
+        
+        // 2. Update student record
+        await updateDoc(doc(db, "students", student.id), {
+            tutorEmail: newTutor.email, 
+            tutorName: newTutor.name,
+            updatedAt: new Date().toISOString(), 
+            updatedBy: user
+        });
+        
+        // 3. Show success
+        showReassignAlert(`Successfully reassigned ${student.studentName} to ${newTutor.name}!`, 'success');
+        
+        // 4. Refresh and close
+        setTimeout(() => { 
+            closeReassignModal(); 
+            fetchAndRenderDirectory(true); 
+        }, 1500);
+        
+    } catch (e) {
+        console.error("Reassignment error:", e);
+        showReassignAlert("Error: " + e.message, 'error'); 
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+function showEnhancedReassignStudentModal() {
+    if (!isCacheValid(['students', 'tutors'])) { 
+        showReassignAlert("Refreshing data...", 'info');
+        fetchAndRenderDirectory(true);
+        setTimeout(() => showEnhancedReassignStudentModal(), 1000);
+        return;
+    }
+    
+    const students = getCleanStudents();
+    const tutors = getCleanTutors();
+    
+    if (!validateReassignData(students, tutors)) return;
+    
+    // Remove existing modal if any
+    closeReassignModal();
+    
+    document.body.insertAdjacentHTML('beforeend', createEnhancedReassignModalHtml(students, tutors));
+    
+    // Initialize searchable selects
+    setTimeout(() => {
+        initializeSearchableSelect('reassign-student');
+        initializeSearchableSelect('reassign-tutor');
+        
+        // Handle student selection change
+        document.getElementById('reassign-student').addEventListener('change', function() {
+            const studentId = this.value;
+            const student = students.find(s => s.id === studentId);
+            updateStudentInfo(student);
+        });
+        
+        // Handle tutor selection change
+        document.getElementById('reassign-tutor').addEventListener('change', function() {
+            const tutorEmail = this.value;
+            const tutor = tutors.find(t => t.email === tutorEmail);
+            updateTutorInfo(tutor);
+        });
+        
+        // Handle form submission
+        document.getElementById('reassign-student-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const studentId = document.getElementById('reassign-student').value;
+            const tutorEmail = document.getElementById('reassign-tutor').value;
+            const reason = document.getElementById('reassign-reason').value.trim();
+            
+            if (!studentId || !tutorEmail) {
+                showReassignAlert("Please select both a student and a tutor", 'warning');
+                return;
+            }
+            
+            if (!reason) {
+                showReassignAlert("Please enter a reason for reassignment", 'warning');
+                return;
+            }
+            
+            const student = students.find(s => s.id === studentId);
+            const newTutor = tutors.find(t => t.email === tutorEmail);
+            const currentTutor = tutors.find(t => t.email === student.tutorEmail);
+            
+            // Check if trying to reassign to same tutor
+            if (student.tutorEmail === tutorEmail) {
+                showReassignAlert("Student is already assigned to this tutor", 'warning');
+                return;
+            }
+            
+            // Confirmation dialog
+            if (confirm(`Reassign ${student.studentName} from "${currentTutor?.name || 'Unassigned'}" to "${newTutor.name}"?`)) {
+                await performReassignment(student, newTutor, reason, currentTutor);
+            }
+        });
+    }, 100);
 }
 
 function closeReassignModal() {
@@ -8972,6 +8973,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
