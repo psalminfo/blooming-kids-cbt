@@ -1,86 +1,773 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Parent Portal - Blooming Kids House</title>
-    
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Portal | Blue Ocean</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
-
-    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
-
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.43/moment-timezone-with-data.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            light: '#d1fae5', 
+                            primary: '#059669', 
+                            dark: '#064e3b', 
+                            accent: '#fbbf24', 
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        /* ... Brand Styling (Green Gradient & Glossy UI) ... */
-        :root { --brand-green: #10b981; --brand-dark: #065f46; }
-        body { background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 50%, #d1fae5 100%); min-height: 100vh; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        .stat-card { background: white; border-radius: 1rem; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Glass/Glossy Effects */
+        .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        .nav-item.active { background-color: #ecfdf5; color: #059669; border-right: 4px solid #059669; }
+        
+        /* Animations */
+        .fade-in { animation: fadeIn 0.4s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Game Canvas */
+        .game-active { border: 2px solid #059669; box-shadow: 0 0 15px rgba(5, 150, 105, 0.2); }
     </style>
 </head>
-<body class="p-4">
-    <div id="toastContainer"></div>
+<body class="bg-gray-50 text-gray-800 font-sans antialiased h-screen flex overflow-hidden">
 
-    <div class="max-w-6xl mx-auto">
-        <header class="text-center mb-8">
-            <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Logo" class="h-16 mx-auto mb-4">
-            <h1 class="text-3xl font-bold text-green-900">Parent Portal</h1>
+    <aside class="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col justify-between z-20 shadow-lg">
+        <div>
+            <div class="h-20 flex items-center px-8 border-b border-gray-100">
+                <div class="h-10 w-10 bg-brand-primary rounded-lg flex items-center justify-center text-white font-bold text-xl mr-3 shadow-lg shadow-emerald-200">
+                    <i class="fas fa-graduation-cap"></i>
+                </div>
+                <span class="text-xl font-bold tracking-tight text-gray-900">Student Portal</span>
+            </div>
+
+            <nav class="mt-8 px-4 space-y-2">
+                <a href="#" onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item active flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+                    <i class="fas fa-th-large w-6"></i> Dashboard
+                </a>
+                <a href="#" onclick="switchTab('courses')" id="nav-courses" class="nav-item flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+                    <i class="fas fa-book w-6"></i> My Courses
+                </a>
+                <a href="#" onclick="switchTab('assignments')" id="nav-assignments" class="nav-item flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+                    <i class="fas fa-clipboard-list w-6"></i> Assignments
+                </a>
+                <a href="#" onclick="switchTab('results')" id="nav-results" class="nav-item flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+                    <i class="fas fa-chart-line w-6"></i> Results
+                </a>
+                <a href="#" onclick="switchTab('games')" id="nav-games" class="nav-item flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+                    <i class="fas fa-gamepad w-6"></i> EduGames
+                </a>
+            </nav>
+        </div>
+
+        <div class="p-4 border-t border-gray-100">
+            <div class="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-200">
+                <div class="h-10 w-10 rounded-full bg-brand-primary text-white flex items-center justify-center font-bold" id="sidebar-initials">--</div>
+                <div>
+                    <p class="text-sm font-semibold text-gray-700" id="sidebar-name">Loading...</p>
+                    <p class="text-xs text-gray-500" id="sidebar-meta">...</p>
+                </div>
+            </div>
+            <button id="logout-btn" class="mt-3 w-full py-2 text-xs font-bold text-red-500 hover:bg-red-50 rounded-lg">Sign Out</button>
+        </div>
+    </aside>
+
+    <div class="md:hidden fixed top-0 w-full bg-white z-30 border-b px-4 h-16 flex items-center justify-between shadow-sm">
+        <div class="font-bold text-lg text-brand-primary">Student Portal</div>
+        <button class="text-gray-600"><i class="fas fa-bars text-xl"></i></button>
+    </div>
+
+    <main class="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-8 pt-20 md:pt-8 relative">
+        
+        <header class="flex justify-between items-center mb-8">
+            <div>
+                <h1 id="page-title" class="text-2xl font-bold text-gray-900">Dashboard Overview</h1>
+                <p id="page-date" class="text-sm text-gray-500 mt-1">...</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <button onclick="switchTab('games')" class="hidden md:block bg-brand-accent text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-yellow-500 transition-all">
+                    <i class="fas fa-trophy mr-2"></i> Leaderboard
+                </button>
+            </div>
         </header>
 
-        <section id="authArea" class="bg-white rounded-2xl shadow-xl p-6 mb-8">
-            </section>
-
-        <main id="reportArea" class="hidden">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div class="stat-card border-l-4 border-blue-500">
-                    <h3 class="text-gray-500 text-sm font-semibold uppercase">Next Live Class</h3>
-                    <div id="liveClassTimer" class="text-2xl font-bold text-blue-600 mt-2">Calculating...</div>
-                    <p id="liveClassTopic" class="text-sm text-gray-600">Syncing with schedule...</p>
+        <div id="view-dashboard" class="view-section fade-in space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-36 relative overflow-hidden">
+                    <div class="absolute right-0 top-0 h-full w-1 bg-brand-primary"></div>
+                    <div>
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Attendance</p>
+                        <h3 class="text-3xl font-bold text-gray-800 mt-1" id="stat-attendance">--%</h3>
+                        <p class="text-xs text-gray-400 mt-2">Based on schedules & homework</p>
+                    </div>
+                    <div class="w-full bg-gray-100 rounded-full h-1.5 mt-auto">
+                        <div class="bg-brand-primary h-1.5 rounded-full" id="bar-attendance" style="width: 0%"></div>
+                    </div>
                 </div>
-                <div class="stat-card border-l-4 border-green-500">
-                    <h3 class="text-gray-500 text-sm font-semibold uppercase">Overall Average</h3>
-                    <div id="overallAverage" class="text-2xl font-bold text-green-600 mt-2">--%</div>
-                    <p class="text-sm text-gray-600">Based on recent assessments</p>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-36 relative overflow-hidden">
+                    <div class="absolute right-0 top-0 h-full w-1 bg-brand-accent"></div>
+                    <div>
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Pending Tasks</p>
+                        <h3 class="text-3xl font-bold text-gray-800 mt-1" id="stat-pending">0</h3>
+                        <p class="text-xs text-gray-400 mt-2">Active assignments</p>
+                    </div>
+                    <div class="h-8 w-8 absolute bottom-6 right-6 rounded-full bg-yellow-50 flex items-center justify-center text-yellow-600"><i class="fas fa-clock"></i></div>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-36">
+                    <div>
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Avg Grade</p>
+                        <h3 class="text-3xl font-bold text-gray-800 mt-1" id="stat-grade">--</h3>
+                        <p class="text-xs text-gray-400 mt-2">From assignments</p>
+                    </div>
+                    <div class="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 self-end"><i class="fas fa-star"></i></div>
+                </div>
+                
+                <div class="bg-brand-primary p-6 rounded-2xl shadow-lg shadow-emerald-200 text-white flex flex-col justify-between h-36 relative overflow-hidden">
+                    <div class="absolute -right-6 -bottom-6 text-white opacity-10 text-9xl"><i class="fas fa-video"></i></div>
+                    <div>
+                        <p class="text-xs font-bold text-emerald-100 uppercase tracking-wider">Next Live Class</p>
+                        <h3 class="text-xl font-bold mt-1" id="next-class-time">Loading...</h3>
+                        <p class="text-xs text-emerald-100 opacity-80" id="next-class-local">(Calculating local time...)</p>
+                    </div>
+                    <div class="mt-auto flex justify-between items-end">
+                         <span class="text-xs font-mono bg-black/20 px-2 py-1 rounded" id="user-timezone">UTC</span>
+                         <button id="btn-join-class" class="bg-white text-brand-primary text-xs font-bold px-3 py-1 rounded shadow-sm hover:scale-105 transition hidden">Join Now</button>
+                    </div>
                 </div>
             </div>
 
-            <nav class="flex space-x-2 mb-6 bg-white p-2 rounded-xl shadow-inner">
-                <button data-target="reportContentArea" class="nav-tab flex-1 py-2 rounded-lg font-bold bg-green-600 text-white">Progress Reports</button>
-                <button data-target="academicsContentArea" class="nav-tab flex-1 py-2 rounded-lg font-bold text-green-700 hover:bg-green-50">Academics</button>
-                <button data-target="rewardsContentArea" class="nav-tab flex-1 py-2 rounded-lg font-bold text-green-700 hover:bg-green-50">Rewards</button>
-            </nav>
-
-            <section id="reportContentArea" class="tab-content active">
-                <div id="reportContent" class="grid grid-cols-1 gap-6">
-                    </div>
-            </section>
-
-            <section id="academicsContentArea" class="tab-content">
-                <div class="bg-white rounded-xl shadow p-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                     <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-xl font-bold text-green-800">Learning Journey</h2>
-                        <select id="studentSelector" class="border rounded-lg px-3 py-1"></select>
+                        <h3 class="font-bold text-gray-800">Performance Overview</h3>
+                        <div class="flex gap-2">
+                            <button onclick="updateChart('month')" class="text-xs bg-gray-100 px-3 py-1 rounded-md text-gray-600 hover:bg-brand-primary hover:text-white transition">Monthly</button>
+                            <button onclick="updateChart('year')" class="text-xs bg-gray-100 px-3 py-1 rounded-md text-gray-600 hover:bg-brand-primary hover:text-white transition">Yearly</button>
+                        </div>
                     </div>
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div class="h-64"><canvas id="subjectChart"></canvas></div>
-                        <div class="h-64"><canvas id="progressLineChart"></canvas></div>
+                    <div class="h-64">
+                        <canvas id="performanceChart"></canvas>
                     </div>
                 </div>
-            </section>
 
-            <section id="rewardsContentArea" class="tab-content">
-                <div id="rewardsContent" class="bg-white rounded-xl shadow p-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h3 class="font-bold text-gray-800 mb-4">Upcoming Schedule</h3>
+                    <div id="schedule-list" class="space-y-4">
+                        <div class="animate-pulse flex space-x-4">
+                            <div class="rounded-full bg-gray-200 h-10 w-10"></div>
+                            <div class="flex-1 space-y-2 py-1">
+                                <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+                                <div class="h-4 bg-gray-200 rounded"></div>
+                            </div>
+                        </div>
                     </div>
-            </section>
-        </main>
-    </div>
+                    <button onclick="switchTab('games')" class="w-full mt-4 border-2 border-dashed border-gray-200 text-gray-400 py-2 rounded-xl text-sm hover:border-brand-primary hover:text-brand-primary transition">
+                        <i class="fas fa-plus mr-2"></i> Join Educational Game
+                    </button>
+                </div>
+            </div>
+        </div>
 
-    <script type="module" src="firebaseConfig.js"></script>
-    <script type="module" src="parent (6).js"></script>
+        <div id="view-courses" class="view-section hidden fade-in">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold">My Learning Materials</h2>
+            </div>
+            <div id="courses-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="col-span-full text-center py-10 text-gray-500">
+                    <i class="fas fa-spinner fa-spin mr-2"></i> Loading materials...
+                </div>
+            </div>
+        </div>
+
+        <div id="view-assignments" class="view-section hidden fade-in">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="font-bold text-gray-800">Assignments</h3>
+                    <button class="bg-brand-primary text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-brand-dark transition">
+                        <i class="fas fa-download mr-2"></i> Download All
+                    </button>
+                </div>
+                <div id="assignments-list" class="divide-y divide-gray-50">
+                    </div>
+            </div>
+        </div>
+
+        <div id="view-results" class="view-section hidden fade-in">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden p-6">
+                <h3 class="font-bold text-gray-800 mb-4">Academic Results</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-gray-500">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3">Date</th>
+                                <th class="px-6 py-3">Subject / Assessment</th>
+                                <th class="px-6 py-3">Score</th>
+                                <th class="px-6 py-3">Grade</th>
+                                <th class="px-6 py-3">Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-table-body">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-games" class="view-section hidden fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 space-y-6">
+                    <div class="bg-brand-primary rounded-2xl p-6 text-white relative overflow-hidden">
+                        <h2 class="text-2xl font-bold mb-2">Brain Gym</h2>
+                        <p class="opacity-90">Sharpen your skills with these curriculum-based games. (Grade 3+)</p>
+                        <i class="fas fa-brain absolute right-4 bottom-[-20px] text-9xl opacity-10"></i>
+                    </div>
+
+                    <div id="game-warning" class="hidden bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 text-sm font-bold">
+                        <i class="fas fa-lock mr-2"></i> These games are available for Grade 3 and above.
+                    </div>
+
+                    <div id="games-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition cursor-pointer group" onclick="startGame('math')">
+                            <div class="h-12 w-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center mb-4 text-xl group-hover:scale-110 transition"><i class="fas fa-calculator"></i></div>
+                            <h3 class="font-bold text-gray-800">Maths Sprint</h3>
+                            <p class="text-xs text-gray-500 mt-1">Quick-fire arithmetic for your grade level.</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition cursor-pointer group" onclick="startGame('science')">
+                            <div class="h-12 w-12 rounded-lg bg-green-100 text-green-600 flex items-center justify-center mb-4 text-xl group-hover:scale-110 transition"><i class="fas fa-flask"></i></div>
+                            <h3 class="font-bold text-gray-800">Science Trivia</h3>
+                            <p class="text-xs text-gray-500 mt-1">Test your knowledge of the natural world.</p>
+                        </div>
+                         <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition cursor-pointer group" onclick="startGame('logic')">
+                            <div class="h-12 w-12 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center mb-4 text-xl group-hover:scale-110 transition"><i class="fas fa-puzzle-piece"></i></div>
+                            <h3 class="font-bold text-gray-800">Logic Master</h3>
+                            <p class="text-xs text-gray-500 mt-1">Pattern recognition and problem solving.</p>
+                        </div>
+                    </div>
+
+                    <div id="game-container" class="hidden bg-white p-8 rounded-xl border-2 border-brand-primary min-h-[400px] flex flex-col items-center justify-center text-center shadow-2xl relative">
+                        <button onclick="closeGame()" class="absolute top-4 right-4 text-gray-400 hover:text-red-500"><i class="fas fa-times text-xl"></i></button>
+                        <h3 id="game-title" class="text-2xl font-bold mb-6 text-brand-dark">Game Title</h3>
+                        <div id="game-content" class="w-full max-w-md"></div>
+                        <div id="game-score-display" class="mt-4 font-bold text-xl text-brand-primary hidden">Score: <span id="current-score">0</span></div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col" id="leaderboard-panel">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="font-bold text-gray-800"><i class="fas fa-trophy text-yellow-500 mr-2"></i>Top Scholars</h3>
+                        <button onclick="shareLeaderboard()" class="text-xs bg-brand-light text-brand-primary px-3 py-1.5 rounded-lg font-bold hover:bg-brand-primary hover:text-white transition"><i class="fas fa-share-alt mr-1"></i> Share</button>
+                    </div>
+                    <div class="space-y-4 flex-1">
+                        <div class="flex items-center gap-3 p-3 bg-yellow-50 rounded-xl border border-yellow-100">
+                            <div class="font-bold text-yellow-600 text-lg w-6">1</div>
+                            <div class="h-10 w-10 rounded-full bg-yellow-200 flex items-center justify-center text-yellow-700 font-bold border-2 border-white shadow-sm">JD</div>
+                            <div class="flex-1">
+                                <p class="text-sm font-bold text-gray-800">You (Student)</p>
+                                <p class="text-xs text-gray-500" id="user-xp">0 XP</p>
+                            </div>
+                            <i class="fas fa-medal text-yellow-500 text-xl"></i>
+                        </div>
+                        <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 opacity-60">
+                            <div class="font-bold text-gray-400 text-lg w-6">2</div>
+                            <div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold border-2 border-white">AI</div>
+                            <div class="flex-1">
+                                <p class="text-sm font-bold text-gray-800">Alex I.</p>
+                                <p class="text-xs text-gray-500">1,100 XP</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 p-3 bg-orange-50 rounded-xl border border-orange-100 opacity-60">
+                            <div class="font-bold text-orange-400 text-lg w-6">3</div>
+                            <div class="h-10 w-10 rounded-full bg-orange-200 flex items-center justify-center text-orange-700 font-bold border-2 border-white">MK</div>
+                            <div class="flex-1">
+                                <p class="text-sm font-bold text-gray-800">Mike K.</p>
+                                <p class="text-xs text-gray-500">980 XP</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <input type="file" id="file-upload-input" class="hidden">
+
+    <script type="module">
+        import { auth, db } from './firebaseConfig-studentsignupmodular.js';
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+        import { collection, query, where, getDocs, updateDoc, doc, addDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+        // --- GLOBAL STATE ---
+        let currentUser = null;
+        let studentProfile = null;
+        let assignedTutorEmail = null;
+        let chartInstance = null;
+
+        // --- UI NAVIGATION ---
+        window.switchTab = (tabName) => {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            const selected = document.getElementById('view-' + tabName);
+            if(selected) {
+                selected.classList.remove('hidden');
+                selected.classList.add('fade-in');
+            }
+            
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            const nav = document.getElementById('nav-' + tabName);
+            if(nav) nav.classList.add('active');
+
+            const titles = {
+                'dashboard': 'Dashboard Overview',
+                'courses': 'My Learning Materials',
+                'assignments': 'Assignments & Homework',
+                'results': 'Academic Results',
+                'games': 'Brain Gym & Games'
+            };
+            document.getElementById('page-title').innerText = titles[tabName] || 'Dashboard';
+        }
+
+        window.logout = async () => {
+            await signOut(auth);
+            window.location.href = 'studentsignup.html';
+        };
+        document.getElementById('logout-btn').addEventListener('click', window.logout);
+
+        // --- AUTH & DATA LOADING ---
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user;
+                await loadStudentProfile(user.uid);
+            } else {
+                window.location.href = 'studentsignup.html';
+            }
+        });
+
+        async function loadStudentProfile(uid) {
+            try {
+                const q = query(collection(db, "students"), where("studentUid", "==", uid));
+                const snap = await getDocs(q);
+                
+                if (!snap.empty) {
+                    const docSnap = snap.docs[0];
+                    studentProfile = { id: docSnap.id, ...docSnap.data() };
+                    assignedTutorEmail = studentProfile.assignedTutor;
+
+                    // UI Updates
+                    document.getElementById('sidebar-name').innerText = studentProfile.studentName;
+                    document.getElementById('sidebar-meta').innerText = `${studentProfile.grade || 'Grade ?'} • ${studentProfile.country || 'Global'}`;
+                    document.getElementById('sidebar-initials').innerText = (studentProfile.studentName || 'ST').substring(0,2).toUpperCase();
+                    document.getElementById('page-date').innerText = moment().format('dddd, MMMM Do YYYY');
+
+                    // Check Grade Logic (Games & Promotion)
+                    checkGradeAccess();
+                    await checkAndPromoteGrade();
+
+                    // Load Data
+                    loadDashboardStats();
+                    loadSchedule();
+                    loadCourses();
+                    loadAssignments();
+                    loadResults();
+                    initChart();
+                } else {
+                    alert("Student profile not found. Please contact admin.");
+                }
+            } catch (e) {
+                console.error("Profile Error:", e);
+            }
+        }
+
+        // --- AUTOMATED GRADE PROMOTION ---
+        async function checkAndPromoteGrade() {
+            if (!studentProfile) return;
+            
+            const currentMonth = new Date().getMonth(); // 0-11
+            const country = (studentProfile.country || "").toLowerCase();
+            let shouldPromote = false;
+            let promotionMonth = 7; // August default
+
+            if (country.includes('nigeria') || country.includes('uk')) promotionMonth = 8; // September
+            if (country.includes('usa')) promotionMonth = 5; // June
+
+            const lastPromoted = studentProfile.lastPromotedYear || 0;
+            const currentYear = new Date().getFullYear();
+
+            // If we are past the promotion month and haven't promoted this year
+            if (currentMonth >= promotionMonth && lastPromoted < currentYear) {
+                let currentGradeStr = studentProfile.grade || "";
+                let num = parseInt(currentGradeStr.replace(/\D/g, ''));
+                
+                if (!isNaN(num)) {
+                    let newGrade = currentGradeStr.replace(num, num + 1);
+                    
+                    // Update Firebase
+                    const studentRef = doc(db, "students", studentProfile.id);
+                    await updateDoc(studentRef, {
+                        grade: newGrade,
+                        lastPromotedYear: currentYear
+                    });
+                    
+                    // Notify & Refresh
+                    alert(`🎉 Welcome to the new academic year! You have been promoted to ${newGrade}.`);
+                    studentProfile.grade = newGrade;
+                    document.getElementById('sidebar-meta').innerText = `${newGrade} • ${studentProfile.country}`;
+                }
+            }
+        }
+
+        // --- DASHBOARD STATS ---
+        async function loadDashboardStats() {
+            if (!assignedTutorEmail) return;
+
+            // 1. Attendance Logic: (Completed Homework + 1) / (Total Schedules + Total Homework) roughly
+            // Precise request: "based on number of days of classes in schedules... and attending to homework"
+            const schedQ = query(collection(db, "schedules"), where("tutorEmail", "==", assignedTutorEmail));
+            const hwQ = query(collection(db, "homework_assignments"), where("studentName", "==", studentProfile.studentName));
+            
+            const [schedSnap, hwSnap] = await Promise.all([getDocs(schedQ), getDocs(hwQ)]);
+            
+            let totalClasses = schedSnap.size || 10; // Default buffer to prevent /0
+            let submittedHw = 0;
+            let totalHw = hwSnap.size;
+
+            hwSnap.forEach(d => { if(d.data().status === 'submitted' || d.data().status === 'graded') submittedHw++; });
+
+            // Logic: Weight Class days higher than HW
+            let attendancePct = 0;
+            if(totalHw + totalClasses > 0) {
+                 // Mocking class attendance as 100% if schedule exists, penalizing only for missing HW
+                 let score = (totalClasses + submittedHw) / (totalClasses + totalHw);
+                 attendancePct = Math.round(score * 100);
+            }
+            if(attendancePct > 100) attendancePct = 100;
+            
+            document.getElementById('stat-attendance').innerText = `${attendancePct}%`;
+            document.getElementById('bar-attendance').style.width = `${attendancePct}%`;
+            document.getElementById('stat-pending').innerText = (totalHw - submittedHw);
+
+            // 2. Average Grade
+            // Fetch from tutor_submissions (Results) and homework_assignments (if graded)
+            const resultsQ = query(collection(db, "tutor_submissions"), where("studentName", "==", studentProfile.studentName));
+            const resultsSnap = await getDocs(resultsQ);
+            
+            let totalScore = 0, countScore = 0;
+            resultsSnap.forEach(d => {
+                let s = parseFloat(d.data().score);
+                if(!isNaN(s)) { totalScore += s; countScore++; }
+            });
+            
+            hwSnap.forEach(d => {
+                 let s = parseFloat(d.data().grade); // Assuming grade is stored in homework too
+                 if(!isNaN(s)) { totalScore += s; countScore++; }
+            });
+
+            let avg = countScore > 0 ? Math.round(totalScore / countScore) : 0;
+            document.getElementById('stat-grade').innerText = `${avg}%`;
+        }
+
+        // --- TIMEZONE SCHEDULE ---
+        async function loadSchedule() {
+            if (!assignedTutorEmail) return;
+
+            const q = query(collection(db, "schedules"), where("tutorEmail", "==", assignedTutorEmail));
+            const snap = await getDocs(q);
+            const list = document.getElementById('schedule-list');
+            list.innerHTML = '';
+
+            let now = moment();
+            let nextClass = null;
+            let userZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            document.getElementById('user-timezone').innerText = userZone; // Show detected zone
+
+            let schedules = [];
+            snap.forEach(doc => schedules.push(doc.data()));
+
+            // Sort logic would go here, simplified for display
+            schedules.forEach(sch => {
+                // Parse Time (Assuming Tutor uses 'Africa/Lagos' or WAT)
+                // Format expected in DB: date="2025-05-20", time="14:00"
+                let dateStr = `${sch.date} ${sch.time}`;
+                let tutorTime = moment.tz(dateStr, "YYYY-MM-DD HH:mm", "Africa/Lagos");
+                let localTime = tutorTime.clone().tz(userZone);
+
+                // Find Next Class
+                if (tutorTime.isAfter(now)) {
+                    if (!nextClass || tutorTime.isBefore(nextClass.tutorTime)) {
+                        nextClass = { ...sch, tutorTime, localTime };
+                    }
+                }
+
+                // Append to List
+                const item = document.createElement('div');
+                item.className = "flex items-start gap-4 pb-4 border-b border-gray-50 last:border-0";
+                item.innerHTML = `
+                    <div class="flex flex-col items-center justify-center bg-gray-50 rounded-lg h-12 w-12 text-gray-500">
+                        <span class="text-xs font-bold uppercase">${localTime.format('MMM')}</span>
+                        <span class="text-lg font-bold text-gray-800">${localTime.format('DD')}</span>
+                    </div>
+                    <div class="flex-1">
+                        <h4 class="text-sm font-bold text-gray-800">${sch.subject || 'Class Session'}</h4>
+                        <div class="flex justify-between items-center mt-1">
+                            <p class="text-xs text-gray-500">${localTime.format('h:mm A')} (${userZone})</p>
+                            <a href="${sch.link || '#'}" target="_blank" class="text-[10px] font-bold bg-brand-light text-brand-primary px-2 py-1 rounded hover:bg-brand-primary hover:text-white transition">Join</a>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+
+            // Update Header Banner
+            if (nextClass) {
+                document.getElementById('next-class-time').innerText = nextClass.localTime.format('h:mm A');
+                document.getElementById('next-class-local').innerText = `${nextClass.localTime.format('ddd, MMM Do')} • ${userZone}`;
+                const btn = document.getElementById('btn-join-class');
+                btn.classList.remove('hidden');
+                btn.onclick = () => window.open(nextClass.link || '#', '_blank');
+            } else {
+                document.getElementById('next-class-time').innerText = "No classes soon";
+                document.getElementById('next-class-local').innerText = "Check back later";
+            }
+        }
+
+        // --- COURSES ---
+        async function loadCourses() {
+            const grid = document.getElementById('courses-grid');
+            grid.innerHTML = '';
+            
+            // Collection: 'courses'
+            // Filter by grade or assigned subject if needed, fetching all for now as requested
+            const q = query(collection(db, "courses"));
+            const snap = await getDocs(q);
+
+            if (snap.empty) {
+                grid.innerHTML = `<div class="col-span-full border-2 border-dashed border-gray-200 rounded-xl p-8 text-center"><p class="text-gray-400">No course materials uploaded yet.</p></div>`;
+                return;
+            }
+
+            snap.forEach(doc => {
+                const c = doc.data();
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all group";
+                card.innerHTML = `
+                    <div class="h-32 bg-gray-200 relative overflow-hidden">
+                        <img src="${c.thumbnail || 'https://via.placeholder.com/400x200?text=Material'}" class="w-full h-full object-cover group-hover:scale-105 transition-transform">
+                        <span class="absolute top-2 right-2 bg-white/90 text-[10px] font-bold px-2 py-1 rounded shadow-sm">${c.subject || 'General'}</span>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="font-bold text-lg text-gray-800 mb-2 truncate">${c.title || 'Course Material'}</h3>
+                        <p class="text-xs text-gray-500 mb-4 line-clamp-2">${c.description || 'View attached materials.'}</p>
+                        <a href="${c.link || '#'}" target="_blank" class="block w-full text-center bg-gray-50 hover:bg-brand-primary hover:text-white text-gray-700 py-2 rounded-lg text-sm font-bold transition-colors">
+                            Access Material <i class="fas fa-external-link-alt ml-1"></i>
+                        </a>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // --- ASSIGNMENTS ---
+        async function loadAssignments() {
+            const list = document.getElementById('assignments-list');
+            list.innerHTML = '';
+
+            const q = query(collection(db, "homework_assignments"), where("studentName", "==", studentProfile.studentName));
+            const snap = await getDocs(q);
+
+            if (snap.empty) {
+                list.innerHTML = '<p class="p-6 text-gray-400 text-center">No assignments due.</p>';
+                return;
+            }
+
+            snap.forEach(doc => {
+                const hw = doc.data();
+                const isDone = hw.status === 'submitted' || hw.status === 'graded';
+                
+                const div = document.createElement('div');
+                div.className = "p-6 flex flex-col md:flex-row gap-4 justify-between items-center hover:bg-gray-50 transition-colors";
+                div.innerHTML = `
+                    <div class="flex items-center gap-4 w-full md:w-auto">
+                        <div class="h-10 w-10 rounded-lg ${isDone ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'} flex items-center justify-center font-bold">
+                            <i class="fas ${isDone ? 'fa-check' : 'fa-pen'}"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-bold text-gray-800">${hw.title || 'Homework Task'}</h4>
+                            <p class="text-xs text-gray-500">${hw.subject} • Due: ${hw.dueDate || 'No Date'}</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 w-full md:w-auto">
+                        ${hw.fileLink ? `<a href="${hw.fileLink}" download="Assignment_${hw.title}" class="flex-1 md:flex-none text-center bg-white border border-gray-200 text-gray-600 px-3 py-2 rounded-lg text-xs font-bold hover:bg-gray-100"><i class="fas fa-download"></i> Save</a>` : ''}
+                        ${!isDone ? `<button onclick="alert('Editor placeholder: You can type answers here later.')" class="flex-1 md:flex-none bg-brand-primary text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-brand-dark">Do Now</button>` : `<span class="px-4 py-2 bg-green-50 text-green-600 text-xs font-bold rounded-lg">Done</span>`}
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        // --- RESULTS ---
+        async function loadResults() {
+            const tbody = document.getElementById('results-table-body');
+            tbody.innerHTML = '';
+            
+            // Source: 'tutor_submissions'
+            const q = query(collection(db, "tutor_submissions"), where("studentName", "==", studentProfile.studentName));
+            const snap = await getDocs(q);
+
+            if (snap.empty) {
+                tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-gray-400">No results published yet.</td></tr>';
+                return;
+            }
+
+            snap.forEach(doc => {
+                const r = doc.data();
+                const row = document.createElement('tr');
+                row.className = "bg-white border-b hover:bg-gray-50 transition-colors";
+                row.innerHTML = `
+                    <td class="px-6 py-4 font-medium text-gray-900">${r.date || moment().format('YYYY-MM-DD')}</td>
+                    <td class="px-6 py-4">${r.subject || 'Assessment'}</td>
+                    <td class="px-6 py-4 font-bold text-brand-primary">${r.score || 0}%</td>
+                    <td class="px-6 py-4"><span class="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded">${r.grade || '-'}</span></td>
+                    <td class="px-6 py-4 text-xs italic text-gray-500">${r.feedback || 'Good effort.'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // --- GAMES LOGIC ---
+        function checkGradeAccess() {
+            if(!studentProfile || !studentProfile.grade) return;
+            const gradeNum = parseInt(studentProfile.grade.replace(/\D/g, ''));
+            const gamesGrid = document.getElementById('games-grid');
+            const warning = document.getElementById('game-warning');
+            
+            if (!isNaN(gradeNum) && gradeNum < 3) {
+                gamesGrid.classList.add('opacity-50', 'pointer-events-none');
+                warning.classList.remove('hidden');
+            }
+        }
+
+        window.startGame = (type) => {
+            document.getElementById('game-container').classList.remove('hidden');
+            document.getElementById('games-grid').classList.add('hidden');
+            const content = document.getElementById('game-content');
+            const title = document.getElementById('game-title');
+            content.innerHTML = '';
+            
+            if(type === 'math') {
+                title.innerText = "Maths Sprint";
+                let q1 = Math.floor(Math.random() * 12) + 1;
+                let q2 = Math.floor(Math.random() * 12) + 1;
+                let ans = q1 * q2;
+                content.innerHTML = `
+                    <div class="text-4xl font-bold mb-8 text-gray-800">${q1} × ${q2} = ?</div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <button onclick="endGame(true)" class="p-4 bg-gray-100 rounded-xl font-bold text-xl hover:bg-brand-light hover:text-brand-primary hover:border-brand-primary border-2 border-transparent transition">${ans}</button>
+                        <button onclick="endGame(false)" class="p-4 bg-gray-100 rounded-xl font-bold text-xl hover:bg-red-50 hover:text-red-500 border-2 border-transparent transition">${ans + 5}</button>
+                        <button onclick="endGame(false)" class="p-4 bg-gray-100 rounded-xl font-bold text-xl hover:bg-red-50 hover:text-red-500 border-2 border-transparent transition">${ans - 3}</button>
+                        <button onclick="endGame(false)" class="p-4 bg-gray-100 rounded-xl font-bold text-xl hover:bg-red-50 hover:text-red-500 border-2 border-transparent transition">${ans + 10}</button>
+                    </div>
+                `;
+            } else if (type === 'science') {
+                title.innerText = "Science Trivia";
+                content.innerHTML = `
+                    <p class="text-lg font-medium mb-4">What implies the green pigment in plants?</p>
+                    <div class="space-y-3">
+                        <button onclick="endGame(false)" class="w-full p-3 bg-gray-50 rounded-lg hover:bg-red-100 text-left px-6">A) Mitochondria</button>
+                        <button onclick="endGame(true)" class="w-full p-3 bg-gray-50 rounded-lg hover:bg-green-100 text-left px-6">B) Chlorophyll</button>
+                        <button onclick="endGame(false)" class="w-full p-3 bg-gray-50 rounded-lg hover:bg-red-100 text-left px-6">C) Nucleus</button>
+                    </div>
+                `;
+            } else {
+                title.innerText = "Logic Master";
+                content.innerHTML = `
+                    <p class="text-lg font-medium mb-4">2, 4, 8, 16, ... What comes next?</p>
+                    <input type="number" id="logic-ans" class="w-full border-2 border-gray-200 rounded-xl p-3 mb-4 text-center text-xl font-bold focus:border-brand-primary outline-none">
+                    <button onclick="checkLogic()" class="w-full bg-brand-primary text-white py-3 rounded-xl font-bold hover:bg-brand-dark">Submit</button>
+                `;
+            }
+        }
+
+        window.checkLogic = () => {
+            const val = document.getElementById('logic-ans').value;
+            if(val == 32) endGame(true); else endGame(false);
+        }
+
+        window.endGame = (win) => {
+            const content = document.getElementById('game-content');
+            if(win) {
+                content.innerHTML = `<div class="text-center animate-bounce"><i class="fas fa-crown text-6xl text-yellow-400 mb-4"></i><h3 class="text-2xl font-bold text-green-600">Correct!</h3><p class="text-gray-500 mt-2">+50 XP added to leaderboard</p></div>`;
+                document.getElementById('user-xp').innerText = "50 XP"; 
+            } else {
+                content.innerHTML = `<div class="text-center"><i class="fas fa-times-circle text-6xl text-red-400 mb-4"></i><h3 class="text-2xl font-bold text-gray-800">Try Again</h3></div>`;
+            }
+            setTimeout(() => { window.closeGame(); }, 2000);
+        }
+
+        window.closeGame = () => {
+            document.getElementById('game-container').classList.add('hidden');
+            document.getElementById('games-grid').classList.remove('hidden');
+        }
+
+        window.shareLeaderboard = () => {
+            const el = document.getElementById('leaderboard-panel');
+            html2canvas(el).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'My_Leaderboard_Rank.png';
+                link.href = canvas.toDataURL();
+                link.click();
+            });
+        }
+
+        // --- CHART CONFIG ---
+        window.updateChart = (period) => {
+            // Placeholder logic to switch datasets
+            // In production, query db for specific ranges
+            console.log("Switching chart to", period);
+            // Re-render chart logic here
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb'], // Months
+                    datasets: [{
+                        label: 'Performance Trend',
+                        data: [65, 72, 78, 85, 82, 90],
+                        borderColor: '#059669',
+                        backgroundColor: 'rgba(5, 150, 105, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: false, grid: { borderDash: [2, 4] } }, x: { grid: { display: false } } }
+                }
+            });
+        }
+    </script>
 </body>
 </html>
