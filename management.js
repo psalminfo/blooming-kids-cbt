@@ -894,7 +894,7 @@ window.refreshAllDashboardData = async function() {
 };
 
 // ======================================================
-// SUBSECTION 3.1: Tutor Directory Panel - BOOLEAN & DATE FIX
+// SUBSECTION 3.1: Tutor Directory Panel - FINAL STABLE VERSION
 // ======================================================
 
 // --- HELPER FUNCTIONS ---
@@ -1018,15 +1018,27 @@ async function renderManagementTutorView(container) {
         });
 
         document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
-        
         document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
         
+        // --- FIXED HISTORY BUTTON LOGIC ---
         document.getElementById('view-tutor-history-directory-btn').addEventListener('click', async () => {
             if (!sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
                 alert("No tutor history available. Please refresh."); return;
             }
+            
             const students = sessionCache.students || [];
-            const studentOptions = students.map(s => `<option value="${s.id}">${s.studentName}</option>`).join('');
+            // FILTER: Only show students who actually have history records to prevent crashing
+            const studentsWithHistory = students.filter(s => 
+                sessionCache.tutorAssignments[s.id] && 
+                sessionCache.tutorAssignments[s.id].length > 0
+            );
+
+            if (studentsWithHistory.length === 0) {
+                alert("No students currently have history records."); 
+                return;
+            }
+            
+            const studentOptions = studentsWithHistory.map(s => `<option value="${s.id}">${s.studentName}</option>`).join('');
             
             const modalHtml = `
                 <div id="select-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
@@ -1168,7 +1180,7 @@ function renderDirectoryFromCache(searchTerm = '') {
         directoryList.innerHTML = `<p class="text-center py-10">No results found.</p>`; return;
     }
 
-    // --- CATEGORIZATION LOGIC (The "Bucket" Sorter) ---
+    // --- CATEGORIZATION LOGIC ---
     const getStudentCategory = (s) => {
         // Priority 1: Transitioning Boolean
         if (s.isTransitioning === true) return 'transitioning';
@@ -1220,7 +1232,8 @@ function renderDirectoryFromCache(searchTerm = '') {
                 badge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">Active</span>`;
             }
             
-            const historyBtn = tutorAssignments[student.id] ? 
+            // Safety Check: only show history button if records exist
+            const historyBtn = (tutorAssignments[student.id] && tutorAssignments[student.id].length > 0) ? 
                 `<button class="view-history-btn px-2 py-1 text-xs bg-purple-600 text-white rounded-full ml-1" data-student-id="${student.id}">History</button>` : '';
 
             const actions = `
@@ -1298,7 +1311,6 @@ function validateReassignData(students, tutors) {
 }
 
 function createReassignModalHtml(students, tutors) {
-    // Basic implementation for brevity - same as previous but cleaner
     const sOpts = students.map(s => `<option value="${s.id}">${s.studentName}</option>`).join('');
     const tOpts = tutors.map(t => `<option value="${t.email}">${t.name}</option>`).join('');
     return `
@@ -1349,13 +1361,31 @@ function showReassignAlert(msg, type) {
     setTimeout(() => d.remove(), 3000);
 }
 
+function showReassignConfirmationDialog(title, message) {
+    return new Promise((resolve) => {
+        const dialogHtml = `
+            <div id="reassign-confirm-dialog" class="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
+                <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
+                    <h3 class="text-lg font-bold mb-3">${title}</h3><div class="mb-6">${message}</div>
+                    <div class="flex justify-end space-x-3">
+                        <button id="confirm-cancel" class="px-4 py-2 bg-gray-100 rounded">Cancel</button>
+                        <button id="confirm-ok" class="px-4 py-2 bg-blue-600 text-white rounded">Confirm</button>
+                    </div>
+                </div>
+            </div>`;
+        document.body.insertAdjacentHTML('beforeend', dialogHtml);
+        document.getElementById('confirm-cancel').onclick = () => { document.getElementById('reassign-confirm-dialog').remove(); resolve(false); };
+        document.getElementById('confirm-ok').onclick = () => { document.getElementById('reassign-confirm-dialog').remove(); resolve(true); };
+    });
+}
+
 function showEnhancedReassignStudentModal() {
     if (!isCacheValid(['students', 'tutors'])) { fetchAndRenderDirectory(true); return; }
     const s = getCleanStudents(); const t = getCleanTutors();
     if (!validateReassignData(s, t)) return;
     document.body.insertAdjacentHTML('beforeend', createReassignModalHtml(s, t));
     
-    // Initialize simple search/filter logic if needed, or simple select
+    // Initialize simple select logic
     document.getElementById('reassign-student-form').onsubmit = async (e) => {
         e.preventDefault();
         const sid = document.getElementById('reassign-student-id').value;
@@ -8455,6 +8485,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
