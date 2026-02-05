@@ -894,7 +894,7 @@ window.refreshAllDashboardData = async function() {
 };
 
 // ======================================================
-// SUBSECTION 3.1: Tutor Directory Panel - FINAL WITH REPORT STATUS
+// SUBSECTION 3.1: Tutor Directory Panel - UPDATED
 // ======================================================
 
 // --- HELPER FUNCTIONS ---
@@ -917,7 +917,7 @@ function formatBadgeDate(dateString) {
     if (!dateString) return '';
     try {
         const d = new Date(dateString);
-        if (isNaN(d.getTime())) return '';
+        if (isNaN(d.getTime())) return ''; 
         return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
     } catch (e) { return ''; }
 }
@@ -928,7 +928,6 @@ function searchStudentFromFirebase(student, searchTerm, tutors = []) {
     const searchLower = safeToString(searchTerm).toLowerCase();
     if (searchLower === 'break' && student.summerBreak === true) return true;
     if (searchLower === 'transitioning' && student.isTransitioning === true) return true;
-
     const studentFieldsToSearch = ['studentName', 'grade', 'days', 'parentName', 'parentPhone', 'tutorName'];
     for (const field of studentFieldsToSearch) {
         if (student[field] && safeSearch(student[field], searchTerm)) return true;
@@ -964,11 +963,9 @@ async function renderManagementTutorView(container) {
             </div>
         </div>
     `;
-    
     document.getElementById('reassign-student-btn').addEventListener('click', () => window.showEnhancedReassignStudentModal());
     document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
     document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
-    
     fetchAndRenderDirectory();
 }
 
@@ -977,19 +974,16 @@ async function renderManagementTutorView(container) {
 async function fetchAndRenderDirectory(forceRefresh = false) {
     if (forceRefresh) { invalidateCache('tutors'); invalidateCache('students'); }
     try {
-        const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
+        const [tSnap, sSnap] = await Promise.all([
             getDocs(query(collection(db, "tutors"), orderBy("name"))),
             getDocs(query(collection(db, "students"), orderBy("studentName")))
         ]);
-        
-        const tutors = tutorsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })).filter(t => !t.status || t.status === 'active');
-        const students = studentsSnapshot.docs.map(doc => ({ 
-            ...doc.data(), 
-            id: doc.id,
+        const tutors = tSnap.docs.map(doc => ({ ...doc.data(), id: doc.id })).filter(t => !t.status || t.status === 'active');
+        const students = sSnap.docs.map(doc => ({ 
+            ...doc.data(), id: doc.id,
             isTransitioning: doc.data().isTransitioning === true,
             summerBreak: doc.data().summerBreak === true
         })).filter(s => !s.status?.toLowerCase().includes('archived'));
-
         saveToLocalStorage('tutors', tutors);
         saveToLocalStorage('students', students);
         renderDirectoryFromCache();
@@ -1003,7 +997,6 @@ function renderDirectoryFromCache(searchTerm = '') {
     const students = sessionCache.students || [];
     const directoryList = document.getElementById('directory-list');
     if (!directoryList) return;
-
     const studentsByTutor = {};
     students.forEach(s => {
         if (s.tutorEmail) {
@@ -1011,87 +1004,70 @@ function renderDirectoryFromCache(searchTerm = '') {
             studentsByTutor[s.tutorEmail].push(s);
         }
     });
-
     document.getElementById('tutor-count-badge').textContent = tutors.length;
     document.getElementById('student-count-badge').textContent = students.length;
-
     directoryList.innerHTML = tutors.filter(t => {
         const assigned = studentsByTutor[t.email] || [];
         return safeSearch(t.name, searchTerm) || assigned.some(s => searchStudentFromFirebase(s, searchTerm));
     }).map(tutor => {
         const assigned = (studentsByTutor[tutor.email] || []).sort((a,b) => a.studentName.localeCompare(b.studentName));
-        
         const rows = assigned.map(s => {
-            let statusBadge = s.isTransitioning ? `<span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-xs">Transitioning</span>` : 
-                              s.summerBreak ? `<span class="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full text-xs">On Break</span>` : 
-                              `<span class="bg-green-100 text-green-800 px-2 py-0.5 rounded-full text-xs">Active</span>`;
+            let sBadge = s.isTransitioning ? `<span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-xs">Transitioning</span>` : 
+                         s.summerBreak ? `<span class="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full text-xs">On Break</span>` : 
+                         `<span class="bg-green-100 text-green-800 px-2 py-0.5 rounded-full text-xs">Active</span>`;
             
-            // Report Status Logic for the Table
-            let reportBadge = '';
-            if (s.reportEligibility === 'exempt') {
-                reportBadge = `<span class="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded ml-1">No Report Required</span>`;
-            } else if (s.reportEligibility === 'mandatory') {
-                reportBadge = `<span class="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded ml-1">Report Due</span>`;
-            }
+            let reportTag = s.reportEligibility === 'exempt' ? `<span class="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded ml-1">Exempt (Short Stay)</span>` : 
+                             s.reportEligibility === 'mandatory' ? `<span class="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded ml-1">Report Required</span>` : '';
 
             return `
                 <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3 text-sm font-medium">${s.studentName} ${statusBadge} ${reportBadge}</td>
+                    <td class="px-4 py-3 text-sm font-medium">${s.studentName} ${sBadge} ${reportTag}</td>
                     <td class="px-4 py-3 text-sm">${s.grade || '-'}</td>
                     <td class="px-4 py-3 text-sm">${Array.isArray(s.subjects) ? s.subjects.join(', ') : (s.subjects || '-')}</td>
-                    <td class="px-4 py-3">
-                        <button class="edit-student-btn text-blue-600 hover:underline text-sm" data-student-id="${s.id}">Edit</button>
-                    </td>
+                    <td class="px-4 py-3"><button class="edit-student-btn text-blue-600 text-sm" data-student-id="${s.id}">Edit</button></td>
                 </tr>`;
         }).join('');
-
         return `
             <div class="border rounded-lg mb-4">
                 <details open>
                     <summary class="p-4 bg-gray-50 cursor-pointer font-bold text-green-700 flex justify-between">
-                        <span>${tutor.name}</span>
-                        <span class="text-gray-500 text-sm font-normal">${assigned.length} Students</span>
+                        <span>${tutor.name}</span> <span class="text-gray-500 text-sm">${assigned.length} Students</span>
                     </summary>
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-100"><tr><th class="px-4 py-2 text-left text-xs uppercase">Student</th><th class="px-4 py-2 text-left text-xs uppercase">Grade</th><th class="px-4 py-2 text-left text-xs uppercase">Subjects</th><th class="px-4 py-2 text-left text-xs uppercase">Action</th></tr></thead>
-                        <tbody>${rows || '<tr><td colspan="4" class="p-4 text-center">No students assigned</td></tr>'}</tbody>
+                        <tbody>${rows || '<tr><td colspan="4" class="p-4 text-center">No students</td></tr>'}</tbody>
                     </table>
                 </details>
             </div>`;
     }).join('');
-
     document.querySelectorAll('.edit-student-btn').forEach(b => b.addEventListener('click', () => handleEditStudent(b.dataset.studentId)));
 }
 
-// --- ENHANCED MODAL WITH MULTI-SELECT & 3-WEEK LOGIC ---
+// --- MODAL & LOGIC ---
 
 function createReassignModalHtml(students, tutors) {
     const sOpts = students.map(s => `<option value="${s.studentName}" data-id="${s.id}">`).join('');
     const tOpts = tutors.map(t => `<option value="${t.name}" data-email="${t.email}">`).join('');
-    
     return `
     <div id="reassign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div class="bg-white w-full max-w-lg rounded-lg shadow-xl p-6">
             <h3 class="text-xl font-bold mb-4">Assign / Reassign Students</h3>
             <form id="reassign-student-form">
                 <div class="mb-4">
-                    <label class="block text-sm font-medium mb-1">Search & Select Student(s)</label>
-                    <input list="student-list" id="reassign-student-input" class="w-full border p-2 rounded" placeholder="Type student name...">
+                    <label class="block text-sm font-medium">Type Student Name(s)</label>
+                    <input list="student-list" id="reassign-student-input" class="w-full border p-2 rounded" placeholder="Search and pick...">
                     <datalist id="student-list">${sOpts}</datalist>
                     <div id="selected-students-chips" class="flex flex-wrap gap-2 mt-2"></div>
                 </div>
                 <div class="mb-4">
-                    <label class="block text-sm font-medium mb-1">Target Tutor</label>
-                    <input list="tutor-list" id="reassign-tutor-input" class="w-full border p-2 rounded" placeholder="Type tutor name...">
+                    <label class="block text-sm font-medium">Type Tutor Name</label>
+                    <input list="tutor-list" id="reassign-tutor-input" class="w-full border p-2 rounded" placeholder="Search tutor...">
                     <datalist id="tutor-list">${tOpts}</datalist>
                 </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium mb-1">Reason (Optional)</label>
-                    <textarea id="reassign-reason" class="w-full border p-2 rounded" rows="2"></textarea>
-                </div>
+                <div class="mb-4"><label class="block text-sm font-medium">Reason</label><textarea id="reassign-reason" class="w-full border p-2 rounded"></textarea></div>
                 <div class="flex justify-end gap-2">
                     <button type="button" onclick="closeReassignModal()" class="px-4 py-2 bg-gray-200 rounded">Cancel</button>
-                    <button type="submit" id="reassign-submit-btn" class="px-4 py-2 bg-blue-600 text-white rounded">Confirm Assignment</button>
+                    <button type="submit" id="reassign-submit-btn" class="px-4 py-2 bg-blue-600 text-white rounded">Apply Assignment</button>
                 </div>
             </form>
         </div>
@@ -1099,37 +1075,31 @@ function createReassignModalHtml(students, tutors) {
 }
 
 function showEnhancedReassignStudentModal() {
-    const s = sessionCache.students || [];
-    const t = sessionCache.tutors || [];
+    const s = sessionCache.students || []; const t = sessionCache.tutors || [];
     document.body.insertAdjacentHTML('beforeend', createReassignModalHtml(s, t));
-    
     const studentInput = document.getElementById('reassign-student-input');
     const chipsContainer = document.getElementById('selected-students-chips');
     const selectedIds = new Set();
-
     studentInput.addEventListener('change', (e) => {
-        const option = document.querySelector(`#student-list option[value="${e.target.value}"]`);
-        if (option) {
-            const id = option.dataset.id;
-            const name = e.target.value;
+        const opt = document.querySelector(`#student-list option[value="${e.target.value}"]`);
+        if (opt) {
+            const id = opt.dataset.id;
             if (!selectedIds.has(id)) {
                 selectedIds.add(id);
                 const chip = document.createElement('span');
                 chip.className = "bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs flex items-center gap-1";
-                chip.innerHTML = `${name} <b class="cursor-pointer font-bold ml-1" onclick="this.parentElement.remove(); window._activeAssignmentIds.delete('${id}')">&times;</b>`;
+                chip.innerHTML = `${e.target.value} <b class="cursor-pointer" onclick="this.parentElement.remove(); window._curIds.delete('${id}')">&times;</b>`;
                 chipsContainer.appendChild(chip);
-                window._activeAssignmentIds = selectedIds;
+                window._curIds = selectedIds;
             }
             studentInput.value = '';
         }
     });
-
     document.getElementById('reassign-student-form').onsubmit = async (e) => {
         e.preventDefault();
         const tVal = document.getElementById('reassign-tutor-input').value;
         const tOpt = document.querySelector(`#tutor-list option[value="${tVal}"]`);
-        if (!selectedIds.size || !tOpt) return alert("Please select at least one student and a valid tutor.");
-        
+        if (!selectedIds.size || !tOpt) return alert("Select student(s) and a valid tutor.");
         if(confirm(`Assign ${selectedIds.size} student(s) to ${tVal}?`)) {
             await performReassignment(Array.from(selectedIds), { name: tVal, email: tOpt.dataset.email }, document.getElementById('reassign-reason').value);
         }
@@ -1144,30 +1114,26 @@ async function performReassignment(studentIds, newTutor, reason) {
         for (const sid of studentIds) {
             const student = sessionCache.students.find(x => x.id === sid);
             
-            // 3-WEEK RULE CALCULATION
-            let reportRequired = true;
+            // 3-Week Transition Logic
+            let reportReq = true;
             if (student.isTransitioning) {
                 const now = new Date();
-                const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-                const daysLeft = (endOfMonth - now) / (1000 * 60 * 60 * 24);
-                if (daysLeft < 21) reportRequired = false; // Less than 3 weeks = No Report
+                const daysInMonthLeft = (new Date(now.getFullYear(), now.getMonth() + 1, 0) - now) / (1000 * 60 * 60 * 24);
+                if (daysInMonthLeft < 21) reportReq = false; // Less than 3 weeks remaining
             }
 
             await addDoc(collection(db, "tutorAssignments"), {
                 studentId: sid, studentName: student.studentName,
                 newTutorEmail: newTutor.email, newTutorName: newTutor.name,
-                reason, assignedAt: new Date().toISOString(),
-                requiresReport: reportRequired
+                reason, assignedAt: new Date().toISOString(), requiresReport: reportReq
             });
-
             await updateDoc(doc(db, "students", sid), {
                 tutorEmail: newTutor.email, tutorName: newTutor.name,
-                reportEligibility: reportRequired ? 'mandatory' : 'exempt',
+                reportEligibility: reportReq ? 'mandatory' : 'exempt',
                 updatedAt: new Date().toISOString(), updatedBy: user
             });
         }
-        closeReassignModal();
-        fetchAndRenderDirectory(true);
+        closeReassignModal(); fetchAndRenderDirectory(true);
     } catch (e) { console.error(e); btn.disabled = false; }
 }
 
@@ -8247,6 +8213,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
