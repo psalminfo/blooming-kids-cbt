@@ -1418,10 +1418,7 @@ function getCleanStudents() {
         .filter(s => !s.status || !s.status.toLowerCase().includes('archived')); 
 }
 
-function getCleanTutors() { 
-    return (sessionCache.tutors || [])
-        .filter(t => !t.status || t.status === 'active'); 
-}
+// NOTE: getCleanTutors() function removed from here since it's now defined in the assign section
 
 function validateReassignData(students, tutors) {
     if (!students.length || !tutors.length) { 
@@ -1609,15 +1606,16 @@ function showReassignAlert(msg, type) {
 }
 
 function showEnhancedReassignStudentModal() {
+    // Use the getCleanTutors() function from the assign section
+    const tutors = getCleanTutors ? getCleanTutors() : (sessionCache.tutors || []).filter(t => !t.status || t.status === 'active');
+    const students = getCleanStudents();
+    
     if (!isCacheValid(['students', 'tutors'])) { 
         showReassignAlert("Refreshing data...", 'info');
         fetchAndRenderDirectory(true);
         setTimeout(() => showEnhancedReassignStudentModal(), 1000);
         return;
     }
-    
-    const students = getCleanStudents();
-    const tutors = getCleanTutors();
     
     if (!validateReassignData(students, tutors)) return;
     
@@ -9334,6 +9332,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
