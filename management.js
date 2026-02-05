@@ -893,8 +893,6 @@ window.refreshAllDashboardData = async function() {
     alert('Dashboard data refreshed successfully!');
 };
 
-[file name]: 3.1.txt
-[file content begin]
 // ======================================================
 // SUBSECTION 3.1: Tutor Directory Panel - UPDATED VERSION
 // ======================================================
@@ -9542,6 +9540,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
