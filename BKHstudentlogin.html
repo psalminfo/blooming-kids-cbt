@@ -125,15 +125,21 @@
         </div>
 
         <div class="p-4 border-t border-gray-100">
-            <div id="profile-section" class="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-200">
+            <div id="profile-section" class="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors" onclick="toggleProfileMenu()">
                 <!-- Profile will be loaded dynamically -->
                 <div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
                     <i class="fas fa-user text-gray-500"></i>
                 </div>
-                <div>
+                <div class="flex-1">
                     <p id="student-display-name" class="text-sm font-semibold text-gray-700">Loading...</p>
                     <p id="student-grade-country" class="text-xs text-gray-500">Loading...</p>
                 </div>
+                <i class="fas fa-chevron-down text-gray-400 text-xs"></i>
+            </div>
+            <div id="profile-menu" class="hidden mt-2 bg-white border border-gray-200 rounded-lg shadow-lg">
+                <button onclick="logout()" class="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 rounded-lg flex items-center">
+                    <i class="fas fa-sign-out-alt mr-2"></i> Logout
+                </button>
             </div>
         </div>
     </aside>
@@ -350,311 +356,381 @@
 
     </main>
 
-  <!-- ========== SECTION 17: MAIN APPLICATION LOGIC ========== -->
-<script type="module">
-    // Wait for DOM and Firebase modules to be ready
-    document.addEventListener('DOMContentLoaded', async function() {
-        // ========== SUBSECTION 17.1: INITIALIZATION ==========
-        console.log('Student Portal Initializing...');
-        
-        // Set current date
-        const dateElement = document.getElementById('page-date');
-        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        dateElement.innerText = new Date().toLocaleDateString('en-US', options);
-        
-        // Initialize chart
-        initializeChart();
-        
-        // ========== SUBSECTION 17.2: AUTHENTICATION ==========
-        try {
-            // Check if Firebase modules are loaded
-            if (!window.firebaseModules) {
-                throw new Error('Firebase modules not loaded. Check your firebaseConfig path.');
-            }
+    <!-- ========== SECTION 17: MAIN APPLICATION LOGIC ========== -->
+    <script type="module">
+        // Wait for DOM and Firebase modules to be ready
+        document.addEventListener('DOMContentLoaded', async function() {
+            // ========== SUBSECTION 17.1: INITIALIZATION ==========
+            console.log('Student Portal Initializing...');
             
-            const { auth, onAuthStateChanged, signOut, db, collection, query, where, getDocs, getDoc, doc } = window.firebaseModules;
+            // Set current date
+            const dateElement = document.getElementById('page-date');
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            dateElement.innerText = new Date().toLocaleDateString('en-US', options);
             
-            // Global logout function
-            window.logout = async () => {
-                try {
-                    await signOut(auth);
-                    window.location.href = 'studentsignup.html';
-                } catch (error) {
-                    console.error('Logout error:', error);
-                    alert('Error signing out. Please try again.');
+            // Initialize chart
+            initializeChart();
+            
+            // ========== SUBSECTION 17.2: AUTHENTICATION ==========
+            try {
+                // Check if Firebase modules are loaded
+                if (!window.firebaseModules) {
+                    throw new Error('Firebase modules not loaded. Check your firebaseConfig path.');
                 }
-            };
-            
-            // ========== SUBSECTION 17.3: AUTH STATE LISTENER ==========
-            onAuthStateChanged(auth, async (user) => {
-                if (user) {
-                    console.log('User authenticated:', user.uid);
-                    await loadStudentData(user);
-                } else {
-                    // No user signed in, redirect to signup
-                    console.log('No user, redirecting to signup...');
-                    window.location.href = 'studentsignup.html';
-                }
-            });
-            
-            // ========== SUBSECTION 17.4: LOAD STUDENT DATA ==========
-            async function loadStudentData(user) {
-                try {
-                    // Update profile section
-                    document.getElementById('student-display-name').innerText = user.displayName || "Student";
-                    
-                    // Fetch student document from Firestore
-                    const studentQuery = query(collection(db, "students"), where("studentUid", "==", user.uid));
-                    const studentSnapshot = await getDocs(studentQuery);
-                    
-                    if (!studentSnapshot.empty) {
-                        const studentDoc = studentSnapshot.docs[0];
-                        const studentData = studentDoc.data();
-                        
-                        // Get tutor information from student data
-                        const tutorEmail = studentData.assignedTutor || studentData.tutorEmail;
-                        const tutorName = studentData.tutorName || "Tutor";
-                        
-                        // Display student info
-                        const gradeCountry = `${studentData.grade || 'Grade'} • ${studentData.country || 'Country'}`;
-                        document.getElementById('student-grade-country').innerText = gradeCountry;
-                        
-                        // Load all dashboard data with tutor info
-                        await Promise.all([
-                            loadAttendance(studentData),
-                            loadPendingTasks(user.uid),
-                            loadAverageGrade(user.uid),
-                            loadNextClass(studentData),
-                            loadUpcomingSchedule(studentData),
-                            loadCourses(studentData),
-                            loadAssignments(user.uid),
-                            loadResults(user.uid),
-                            loadSchedule(studentData),
-                            loadGames(studentData.grade || 3)
-                        ]);
-                        
-                    } else {
-                        console.error('No student data found for UID:', user.uid);
-                        document.getElementById('student-grade-country').innerText = 'Profile Not Found';
+                
+                const { auth, onAuthStateChanged, signOut, db, collection, query, where, getDocs, getDoc, doc } = window.firebaseModules;
+                
+                // Global logout function
+                window.logout = async () => {
+                    try {
+                        await signOut(auth);
+                        window.location.href = 'studentsignup.html';
+                    } catch (error) {
+                        console.error('Logout error:', error);
+                        alert('Error signing out. Please try again.');
                     }
+                };
+                
+                // Profile menu toggle
+                window.toggleProfileMenu = () => {
+                    const menu = document.getElementById('profile-menu');
+                    menu.classList.toggle('hidden');
+                };
+                
+                // Close profile menu when clicking outside
+                document.addEventListener('click', (event) => {
+                    const profileSection = document.getElementById('profile-section');
+                    const profileMenu = document.getElementById('profile-menu');
                     
-                } catch (error) {
-                    console.error('Error loading student data:', error);
-                    // Fallback to mock data for demo
-                    loadMockData();
+                    if (!profileSection.contains(event.target) && !profileMenu.contains(event.target)) {
+                        profileMenu.classList.add('hidden');
+                    }
+                });
+                
+                // ========== SUBSECTION 17.3: AUTH STATE LISTENER ==========
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        console.log('User authenticated:', user.uid);
+                        await loadStudentData(user);
+                    } else {
+                        // No user signed in, redirect to signup
+                        console.log('No user, redirecting to signup...');
+                        window.location.href = 'studentsignup.html';
+                    }
+                });
+                
+                // ========== SUBSECTION 17.4: LOAD STUDENT DATA ==========
+                async function loadStudentData(user) {
+                    try {
+                        // Update profile section
+                        document.getElementById('student-display-name').innerText = user.displayName || "Student";
+                        
+                        // Fetch student document from Firestore
+                        const studentQuery = query(collection(db, "students"), where("studentUid", "==", user.uid));
+                        const studentSnapshot = await getDocs(studentQuery);
+                        
+                        if (!studentSnapshot.empty) {
+                            const studentDoc = studentSnapshot.docs[0];
+                            const studentData = studentDoc.data();
+                            
+                            // Display student info
+                            const gradeCountry = `${studentData.grade || 'Grade'} • ${studentData.country || 'Country'}`;
+                            document.getElementById('student-grade-country').innerText = gradeCountry;
+                            
+                            // Load all dashboard data
+                            await Promise.all([
+                                loadAttendance(studentData),
+                                loadPendingTasks(user.uid),
+                                loadAverageGrade(user.uid),
+                                loadNextClass(studentData),
+                                loadUpcomingSchedule(studentData),
+                                loadCourses(studentData),
+                                loadAssignments(user.uid),
+                                loadResults(user.uid),
+                                loadSchedule(studentData),
+                                loadGames(studentData.grade || 3)
+                            ]);
+                            
+                        } else {
+                            console.error('No student data found for UID:', user.uid);
+                            document.getElementById('student-grade-country').innerText = 'Profile Not Found';
+                        }
+                        
+                    } catch (error) {
+                        console.error('Error loading student data:', error);
+                        // Fallback to mock data for demo
+                        loadMockData();
+                    }
                 }
-            }
-            
-            // ========== SUBSECTION 17.5: ATTENDANCE CALCULATION ==========
-            async function loadAttendance(studentData) {
-                try {
-                    // Query schedules collection for this student's tutor
-                    if (studentData.assignedTutor || studentData.tutorEmail) {
+                
+                // ========== SUBSECTION 17.5: ATTENDANCE CALCULATION ==========
+                async function loadAttendance(studentData) {
+                    try {
+                        // Get tutor email from student data
                         const tutorEmail = studentData.assignedTutor || studentData.tutorEmail;
-                        const schedulesQuery = query(
-                            collection(db, "schedules"),
-                            where("tutorEmail", "==", tutorEmail),
-                            where("studentName", "==", studentData.studentName || studentData.displayName)
-                        );
                         
-                        const schedulesSnapshot = await getDocs(schedulesQuery);
-                        const totalClasses = schedulesSnapshot.size;
+                        if (tutorEmail) {
+                            // Query schedules collection for this student's tutor
+                            const schedulesQuery = query(
+                                collection(db, "schedules"),
+                                where("tutorEmail", "==", tutorEmail),
+                                where("studentName", "==", studentData.studentName || studentData.displayName)
+                            );
+                            
+                            const schedulesSnapshot = await getDocs(schedulesQuery);
+                            const totalClasses = schedulesSnapshot.size;
+                            
+                            // Query homework submissions to count attended classes
+                            const homeworkQuery = query(
+                                collection(db, "homework_assignments"),
+                                where("studentId", "==", studentData.studentUid),
+                                where("status", "==", "submitted")
+                            );
+                            
+                            const homeworkSnapshot = await getDocs(homeworkQuery);
+                            const attendedClasses = homeworkSnapshot.size;
+                            
+                            // Calculate attendance percentage
+                            const attendancePercent = totalClasses > 0 ? 
+                                Math.round((attendedClasses / totalClasses) * 100) : 100;
+                            
+                            document.getElementById('attendance-percent').innerText = `${attendancePercent}%`;
+                            
+                            // Calculate trend (mock for now)
+                            const trend = attendancePercent >= 95 ? '+3% this month' : 
+                                         attendancePercent >= 90 ? '+1% this month' : 
+                                         attendancePercent >= 85 ? 'No change' : '-2% this month';
+                            
+                            const trendColor = attendancePercent >= 90 ? 'text-green-600' : 
+                                              attendancePercent >= 80 ? 'text-yellow-600' : 'text-red-600';
+                            
+                            document.getElementById('attendance-trend').innerHTML = 
+                                `<i class="fas ${attendancePercent >= 85 ? 'fa-arrow-up' : 'fa-arrow-down'} mr-1"></i> ${trend}`;
+                            document.getElementById('attendance-trend').className = `text-xs ${trendColor} mt-auto flex items-center`;
+                            
+                        } else {
+                            document.getElementById('attendance-percent').innerText = 'No Tutor';
+                            document.getElementById('attendance-trend').innerText = 'Tutor not assigned';
+                        }
                         
-                        // Query homework submissions to count attended classes
-                        const homeworkQuery = query(
+                    } catch (error) {
+                        console.error('Error loading attendance:', error);
+                        document.getElementById('attendance-percent').innerText = 'Error';
+                    }
+                }
+                
+                // ========== SUBSECTION 17.6: PENDING TASKS ==========
+                async function loadPendingTasks(studentUid) {
+                    try {
+                        // Query pending homework using studentId
+                        const pendingQuery = query(
                             collection(db, "homework_assignments"),
-                            where("studentId", "==", studentData.studentUid),
-                            where("status", "==", "submitted")
+                            where("studentId", "==", studentUid),
+                            where("status", "in", ["assigned", "pending"])
                         );
                         
-                        const homeworkSnapshot = await getDocs(homeworkQuery);
-                        const attendedClasses = homeworkSnapshot.size;
+                        const pendingSnapshot = await getDocs(pendingQuery);
+                        const pendingCount = pendingSnapshot.size;
                         
-                        // Calculate attendance percentage
-                        const attendancePercent = totalClasses > 0 ? 
-                            Math.round((attendedClasses / totalClasses) * 100) : 100;
+                        document.getElementById('pending-tasks-count').innerText = pendingCount;
+                        document.getElementById('pending-count').innerText = pendingCount;
                         
-                        document.getElementById('attendance-percent').innerText = `${attendancePercent}%`;
+                        // Check due dates
+                        const now = new Date();
+                        let dueSoon = 0;
                         
-                        // Calculate trend (mock for now)
-                        const trend = attendancePercent >= 95 ? '+3% this month' : 
-                                     attendancePercent >= 90 ? '+1% this month' : 
-                                     attendancePercent >= 85 ? 'No change' : '-2% this month';
+                        pendingSnapshot.forEach(doc => {
+                            const data = doc.data();
+                            if (data.dueDate) {
+                                const dueDate = new Date(data.dueDate);
+                                const diffHours = (dueDate - now) / (1000 * 60 * 60);
+                                if (diffHours <= 48) dueSoon++;
+                            }
+                        });
                         
-                        const trendColor = attendancePercent >= 90 ? 'text-green-600' : 
-                                          attendancePercent >= 80 ? 'text-yellow-600' : 'text-red-600';
-                        
-                        document.getElementById('attendance-trend').innerHTML = 
-                            `<i class="fas ${attendancePercent >= 85 ? 'fa-arrow-up' : 'fa-arrow-down'} mr-1"></i> ${trend}`;
-                        document.getElementById('attendance-trend').className = `text-xs ${trendColor} mt-auto flex items-center`;
-                        
-                    } else {
-                        document.getElementById('attendance-percent').innerText = 'No Tutor';
-                        document.getElementById('attendance-trend').innerText = 'Tutor not assigned';
-                    }
-                    
-                } catch (error) {
-                    console.error('Error loading attendance:', error);
-                    document.getElementById('attendance-percent').innerText = 'Error';
-                }
-            }
-            
-            // ========== SUBSECTION 17.6: PENDING TASKS ==========
-            async function loadPendingTasks(studentUid) {
-                try {
-                    // Query pending homework using studentId
-                    const pendingQuery = query(
-                        collection(db, "homework_assignments"),
-                        where("studentId", "==", studentUid),
-                        where("status", "in", ["assigned", "pending"])
-                    );
-                    
-                    const pendingSnapshot = await getDocs(pendingQuery);
-                    const pendingCount = pendingSnapshot.size;
-                    
-                    document.getElementById('pending-tasks-count').innerText = pendingCount;
-                    document.getElementById('pending-count').innerText = pendingCount;
-                    
-                    // Check due dates
-                    const now = new Date();
-                    let dueSoon = 0;
-                    
-                    pendingSnapshot.forEach(doc => {
-                        const data = doc.data();
-                        if (data.dueDate) {
-                            const dueDate = new Date(data.dueDate);
-                            const diffHours = (dueDate - now) / (1000 * 60 * 60);
-                            if (diffHours <= 48) dueSoon++;
+                        if (dueSoon > 0) {
+                            document.getElementById('pending-due').innerText = `${dueSoon} due within 48 hours`;
+                            document.getElementById('pending-due').className = 'text-xs text-red-500 mt-auto';
+                        } else {
+                            document.getElementById('pending-due').innerText = 'No immediate deadlines';
                         }
-                    });
-                    
-                    if (dueSoon > 0) {
-                        document.getElementById('pending-due').innerText = `${dueSoon} due within 48 hours`;
-                        document.getElementById('pending-due').className = 'text-xs text-red-500 mt-auto';
-                    } else {
-                        document.getElementById('pending-due').innerText = 'No immediate deadlines';
-                    }
-                    
-                } catch (error) {
-                    console.error('Error loading pending tasks:', error);
-                }
-            }
-            
-            // ========== SUBSECTION 17.7: AVERAGE GRADE ==========
-            async function loadAverageGrade(studentUid) {
-                try {
-                    // Query all graded assignments using studentId
-                    const gradesQuery = query(
-                        collection(db, "homework_assignments"),
-                        where("studentId", "==", studentUid),
-                        where("status", "==", "graded"),
-                        where("grade", "!=", null)
-                    );
-                    
-                    const gradesSnapshot = await getDocs(gradesQuery);
-                    
-                    if (gradesSnapshot.empty) {
-                        document.getElementById('average-grade').innerText = '--';
-                        document.getElementById('grade-ranking').innerText = 'No grades yet';
-                        return;
-                    }
-                    
-                    // Calculate average
-                    let total = 0;
-                    let count = 0;
-                    
-                    gradesSnapshot.forEach(doc => {
-                        const grade = doc.data().grade;
-                        if (typeof grade === 'number') {
-                            total += grade;
-                            count++;
+                        
+                    } catch (error) {
+                        console.error('Error loading pending tasks:', error);
+                        // Try alternative field name
+                        try {
+                            const pendingQuery = query(
+                                collection(db, "homework_assignments"),
+                                where("studentUid", "==", studentUid),
+                                where("status", "in", ["assigned", "pending"])
+                            );
+                            
+                            const pendingSnapshot = await getDocs(pendingQuery);
+                            const pendingCount = pendingSnapshot.size;
+                            
+                            document.getElementById('pending-tasks-count').innerText = pendingCount;
+                            document.getElementById('pending-count').innerText = pendingCount;
+                        } catch (error2) {
+                            console.error('Error with alternative query:', error2);
                         }
-                    });
-                    
-                    const average = count > 0 ? Math.round(total / count) : 0;
-                    
-                    // Convert to letter grade
-                    let letterGrade = '--';
-                    if (average >= 90) letterGrade = 'A';
-                    else if (average >= 80) letterGrade = 'B+';
-                    else if (average >= 70) letterGrade = 'B';
-                    else if (average >= 60) letterGrade = 'C+';
-                    else if (average >= 50) letterGrade = 'C';
-                    else letterGrade = 'F';
-                    
-                    document.getElementById('average-grade').innerText = letterGrade;
-                    
-                    // Mock ranking (you would need to compare with other students)
-                    const ranking = average >= 85 ? 'Top 10% of class' :
-                                  average >= 75 ? 'Top 25% of class' :
-                                  average >= 65 ? 'Above average' : 'Average';
-                    
-                    document.getElementById('grade-ranking').innerText = ranking;
-                    
-                } catch (error) {
-                    console.error('Error loading average grade:', error);
+                    }
                 }
-            }
+                
+                // ========== SUBSECTION 17.7: AVERAGE GRADE ==========
+                async function loadAverageGrade(studentUid) {
+                    try {
+                        // Query all graded assignments using studentId
+                        const gradesQuery = query(
+                            collection(db, "homework_assignments"),
+                            where("studentId", "==", studentUid),
+                            where("status", "==", "graded"),
+                            where("grade", "!=", null)
+                        );
+                        
+                        const gradesSnapshot = await getDocs(gradesQuery);
+                        
+                        if (gradesSnapshot.empty) {
+                            document.getElementById('average-grade').innerText = '--';
+                            document.getElementById('grade-ranking').innerText = 'No grades yet';
+                            return;
+                        }
+                        
+                        // Calculate average
+                        let total = 0;
+                        let count = 0;
+                        
+                        gradesSnapshot.forEach(doc => {
+                            const grade = doc.data().grade;
+                            if (typeof grade === 'number') {
+                                total += grade;
+                                count++;
+                            }
+                        });
+                        
+                        const average = count > 0 ? Math.round(total / count) : 0;
+                        
+                        // Convert to letter grade
+                        let letterGrade = '--';
+                        if (average >= 90) letterGrade = 'A';
+                        else if (average >= 80) letterGrade = 'B+';
+                        else if (average >= 70) letterGrade = 'B';
+                        else if (average >= 60) letterGrade = 'C+';
+                        else if (average >= 50) letterGrade = 'C';
+                        else letterGrade = 'F';
+                        
+                        document.getElementById('average-grade').innerText = letterGrade;
+                        
+                        // Mock ranking (you would need to compare with other students)
+                        const ranking = average >= 85 ? 'Top 10% of class' :
+                                      average >= 75 ? 'Top 25% of class' :
+                                      average >= 65 ? 'Above average' : 'Average';
+                        
+                        document.getElementById('grade-ranking').innerText = ranking;
+                        
+                    } catch (error) {
+                        console.error('Error loading average grade:', error);
+                        // Try alternative field name
+                        try {
+                            const gradesQuery = query(
+                                collection(db, "homework_assignments"),
+                                where("studentUid", "==", studentUid),
+                                where("status", "==", "graded"),
+                                where("grade", "!=", null)
+                            );
+                            
+                            const gradesSnapshot = await getDocs(gradesQuery);
+                            
+                            if (!gradesSnapshot.empty) {
+                                let total = 0;
+                                let count = 0;
+                                
+                                gradesSnapshot.forEach(doc => {
+                                    const grade = doc.data().grade;
+                                    if (typeof grade === 'number') {
+                                        total += grade;
+                                        count++;
+                                    }
+                                });
+                                
+                                const average = count > 0 ? Math.round(total / count) : 0;
+                                let letterGrade = '--';
+                                if (average >= 90) letterGrade = 'A';
+                                else if (average >= 80) letterGrade = 'B+';
+                                else if (average >= 70) letterGrade = 'B';
+                                else if (average >= 60) letterGrade = 'C+';
+                                else if (average >= 50) letterGrade = 'C';
+                                else letterGrade = 'F';
+                                
+                                document.getElementById('average-grade').innerText = letterGrade;
+                            }
+                        } catch (error2) {
+                            console.error('Error with alternative query:', error2);
+                        }
+                    }
+                }
                 
                 // ========== SUBSECTION 17.8: NEXT CLASS WITH TIMEZONE ==========
                 async function loadNextClass(studentData) {
                     try {
-                        if (!studentData.assignedTutor) {
+                        // Get tutor email from student data
+                        const tutorEmail = studentData.assignedTutor || studentData.tutorEmail;
+                        
+                        if (tutorEmail) {
+                            // Query upcoming schedules
+                            const now = new Date();
+                            const schedulesQuery = query(
+                                collection(db, "schedules"),
+                                where("tutorEmail", "==", tutorEmail),
+                                where("studentName", "==", studentData.studentName || studentData.displayName),
+                                where("dateTime", ">=", now.toISOString())
+                            );
+                            
+                            const schedulesSnapshot = await getDocs(schedulesQuery);
+                            
+                            if (schedulesSnapshot.empty) {
+                                document.getElementById('next-class-subject').innerText = 'No upcoming classes';
+                                document.getElementById('next-class-time').innerText = 'Schedule not set';
+                                return;
+                            }
+                            
+                            // Find the next class
+                            let nextClass = null;
+                            let nextTime = null;
+                            
+                            schedulesSnapshot.forEach(doc => {
+                                const schedule = doc.data();
+                                const classTime = new Date(schedule.dateTime);
+                                
+                                if (!nextTime || classTime < nextTime) {
+                                    nextTime = classTime;
+                                    nextClass = schedule;
+                                }
+                            });
+                            
+                            if (nextClass) {
+                                // Convert to student's local time
+                                const studentCountry = studentData.country || 'NG'; // Default to Nigeria
+                                const localTime = convertToLocalTime(nextTime, studentCountry);
+                                
+                                document.getElementById('next-class-subject').innerText = 
+                                    `${nextClass.subject || 'Class'} (${nextClass.grade || 'All'})`;
+                                
+                                document.getElementById('next-class-time').innerText = 
+                                    `${localTime.date} at ${localTime.time}`;
+                                
+                                // Update join button
+                                const joinBtn = document.getElementById('join-room-btn');
+                                joinBtn.innerHTML = `<i class="fas fa-video mr-1"></i> Join at ${localTime.time}`;
+                                joinBtn.className = 'mt-auto bg-white text-brand-primary text-xs font-bold py-2 px-4 rounded-lg w-fit hover:bg-gray-50 transition-colors';
+                                joinBtn.onclick = () => joinClass(nextClass.zoomLink || '#');
+                                
+                                // Store class info for join button
+                                joinBtn.dataset.zoomLink = nextClass.zoomLink || '#';
+                            }
+                            
+                        } else {
                             document.getElementById('next-class-subject').innerText = 'No tutor assigned';
                             document.getElementById('next-class-time').innerText = 'Please contact admin';
-                            return;
-                        }
-                        
-                        // Query upcoming schedules
-                        const now = new Date();
-                        const schedulesQuery = query(
-                            collection(db, "schedules"),
-                            where("tutorEmail", "==", studentData.assignedTutor),
-                            where("studentName", "==", studentData.studentName || studentData.displayName),
-                            where("dateTime", ">=", now.toISOString())
-                        );
-                        
-                        const schedulesSnapshot = await getDocs(schedulesQuery);
-                        
-                        if (schedulesSnapshot.empty) {
-                            document.getElementById('next-class-subject').innerText = 'No upcoming classes';
-                            document.getElementById('next-class-time').innerText = 'Schedule not set';
-                            return;
-                        }
-                        
-                        // Find the next class
-                        let nextClass = null;
-                        let nextTime = null;
-                        
-                        schedulesSnapshot.forEach(doc => {
-                            const schedule = doc.data();
-                            const classTime = new Date(schedule.dateTime);
-                            
-                            if (!nextTime || classTime < nextTime) {
-                                nextTime = classTime;
-                                nextClass = schedule;
-                            }
-                        });
-                        
-                        if (nextClass) {
-                            // Convert to student's local time
-                            const studentCountry = studentData.country || 'NG'; // Default to Nigeria
-                            const localTime = convertToLocalTime(nextTime, studentCountry);
-                            
-                            document.getElementById('next-class-subject').innerText = 
-                                `${nextClass.subject || 'Class'} (${nextClass.grade || 'All'})`;
-                            
-                            document.getElementById('next-class-time').innerText = 
-                                `${localTime.date} at ${localTime.time}`;
-                            
-                            // Update join button
-                            const joinBtn = document.getElementById('join-room-btn');
-                            joinBtn.innerHTML = `<i class="fas fa-video mr-1"></i> Join at ${localTime.time}`;
-                            joinBtn.className = 'mt-auto bg-white text-brand-primary text-xs font-bold py-2 px-4 rounded-lg w-fit hover:bg-gray-50 transition-colors';
-                            joinBtn.onclick = () => joinClass(nextClass.zoomLink || '#');
-                            
-                            // Store class info for join button
-                            joinBtn.dataset.zoomLink = nextClass.zoomLink || '#';
                         }
                         
                     } catch (error) {
@@ -702,7 +778,10 @@
                         const container = document.getElementById('upcoming-schedule-list');
                         container.innerHTML = '';
                         
-                        if (!studentData.assignedTutor) {
+                        // Get tutor email from student data
+                        const tutorEmail = studentData.assignedTutor || studentData.tutorEmail;
+                        
+                        if (!tutorEmail) {
                             container.innerHTML = '<p class="text-gray-500">No tutor assigned.</p>';
                             return;
                         }
@@ -713,7 +792,7 @@
                         
                         const schedulesQuery = query(
                             collection(db, "schedules"),
-                            where("tutorEmail", "==", studentData.assignedTutor),
+                            where("tutorEmail", "==", tutorEmail),
                             where("studentName", "==", studentData.studentName || studentData.displayName),
                             where("dateTime", ">=", now.toISOString()),
                             where("dateTime", "<=", weekFromNow.toISOString())
@@ -841,28 +920,59 @@
                 }
                 
                 // ========== SUBSECTION 17.13: ASSIGNMENTS LOADING ==========
-            async function loadAssignments(studentUid) {
-                try {
-                    const container = document.getElementById('assignments-list');
-                    
-                    // Query assignments using studentId
-                    const assignmentsQuery = query(
-                        collection(db, "homework_assignments"),
-                        where("studentId", "==", studentUid)
-                    );
-                    
-                    const assignmentsSnapshot = await getDocs(assignmentsQuery);
-                    
-                    if (assignmentsSnapshot.empty) {
+                async function loadAssignments(studentUid) {
+                    try {
+                        const container = document.getElementById('assignments-list');
+                        
+                        // Query assignments using studentId
+                        const assignmentsQuery = query(
+                            collection(db, "homework_assignments"),
+                            where("studentId", "==", studentUid)
+                        );
+                        
+                        const assignmentsSnapshot = await getDocs(assignmentsQuery);
+                        
+                        if (assignmentsSnapshot.empty) {
+                            // Try alternative field name
+                            const assignmentsQuery2 = query(
+                                collection(db, "homework_assignments"),
+                                where("studentUid", "==", studentUid)
+                            );
+                            
+                            const assignmentsSnapshot2 = await getDocs(assignmentsQuery2);
+                            
+                            if (assignmentsSnapshot2.empty) {
+                                container.innerHTML = `
+                                    <div class="p-8 text-center text-gray-400">
+                                        <i class="fas fa-clipboard-check text-3xl mb-3"></i>
+                                        <p>No assignments found.</p>
+                                        <p class="text-xs mt-2">Student ID: ${studentUid}</p>
+                                    </div>
+                                `;
+                                return;
+                            }
+                            
+                            // Process assignments from second query
+                            processAssignments(assignmentsSnapshot2, container);
+                        } else {
+                            // Process assignments from first query
+                            processAssignments(assignmentsSnapshot, container);
+                        }
+                        
+                    } catch (error) {
+                        console.error('Error loading assignments:', error);
+                        const container = document.getElementById('assignments-list');
                         container.innerHTML = `
-                            <div class="p-8 text-center text-gray-400">
-                                <i class="fas fa-clipboard-check text-3xl mb-3"></i>
-                                <p>No assignments found.</p>
+                            <div class="p-8 text-center text-red-400">
+                                <i class="fas fa-exclamation-triangle text-3xl mb-3"></i>
+                                <p>Error loading assignments: ${error.message}</p>
+                                <p class="text-xs mt-2">Please try refreshing the page</p>
                             </div>
                         `;
-                        return;
                     }
-                    
+                }
+                
+                function processAssignments(assignmentsSnapshot, container) {
                     container.innerHTML = '';
                     
                     // Filter buttons functionality
@@ -887,10 +997,8 @@
                     document.getElementById('pending-count').innerText = pendingCount;
                     document.getElementById('pending-tasks-count').innerText = pendingCount;
                     
-                } catch (error) {
-                    console.error('Error loading assignments:', error);
+                    console.log(`Loaded ${window.allAssignments.length} assignments`);
                 }
-            }
                 
                 // ========== SUBSECTION 17.14: ASSIGNMENT FILTERING ==========
                 function filterAssignments(filter) {
@@ -994,31 +1102,55 @@
                     container.appendChild(assignmentElement);
                 }
                 
-               // ========== SUBSECTION 17.16: RESULTS LOADING ==========
-            async function loadResults(studentUid) {
-                try {
-                    const container = document.getElementById('results-container');
-                    
-                    // Query graded assignments using studentId
-                    const resultsQuery = query(
-                        collection(db, "homework_assignments"),
-                        where("studentId", "==", studentUid),
-                        where("status", "==", "graded"),
-                        where("grade", "!=", null)
-                    );
-                    
-                    const resultsSnapshot = await getDocs(resultsQuery);
-                    
-                    if (resultsSnapshot.empty) {
-                        container.innerHTML = `
-                            <div class="text-center py-8 text-gray-400">
-                                <i class="fas fa-chart-line text-3xl mb-3"></i>
-                                <p>No graded results available yet.</p>
-                            </div>
-                        `;
-                        return;
+                // ========== SUBSECTION 17.16: RESULTS LOADING ==========
+                async function loadResults(studentUid) {
+                    try {
+                        const container = document.getElementById('results-container');
+                        
+                        // Query graded assignments using studentId
+                        const resultsQuery = query(
+                            collection(db, "homework_assignments"),
+                            where("studentId", "==", studentUid),
+                            where("status", "==", "graded"),
+                            where("grade", "!=", null)
+                        );
+                        
+                        const resultsSnapshot = await getDocs(resultsQuery);
+                        
+                        if (resultsSnapshot.empty) {
+                            // Try alternative field name
+                            const resultsQuery2 = query(
+                                collection(db, "homework_assignments"),
+                                where("studentUid", "==", studentUid),
+                                where("status", "==", "graded"),
+                                where("grade", "!=", null)
+                            );
+                            
+                            const resultsSnapshot2 = await getDocs(resultsQuery2);
+                            
+                            if (resultsSnapshot2.empty) {
+                                container.innerHTML = `
+                                    <div class="text-center py-8 text-gray-400">
+                                        <i class="fas fa-chart-line text-3xl mb-3"></i>
+                                        <p>No graded results available yet.</p>
+                                    </div>
+                                `;
+                                return;
+                            }
+                            
+                            // Process results from second query
+                            processResults(resultsSnapshot2, container);
+                        } else {
+                            // Process results from first query
+                            processResults(resultsSnapshot, container);
+                        }
+                        
+                    } catch (error) {
+                        console.error('Error loading results:', error);
                     }
-                    
+                }
+                
+                function processResults(resultsSnapshot, container) {
                     // Group by subject
                     const resultsBySubject = {};
                     resultsSnapshot.forEach(doc => {
@@ -1073,18 +1205,17 @@
                         subjectElement.innerHTML = subjectHTML;
                         container.appendChild(subjectElement);
                     }
-                    
-                } catch (error) {
-                    console.error('Error loading results:', error);
                 }
-            }
                 
                 // ========== SUBSECTION 17.17: SCHEDULE LOADING ==========
                 async function loadSchedule(studentData) {
                     try {
                         const container = document.getElementById('full-schedule-container');
                         
-                        if (!studentData.assignedTutor) {
+                        // Get tutor email from student data
+                        const tutorEmail = studentData.assignedTutor || studentData.tutorEmail;
+                        
+                        if (!tutorEmail) {
                             container.innerHTML = '<p class="text-gray-500">No tutor assigned.</p>';
                             return;
                         }
@@ -1095,7 +1226,7 @@
                         
                         const schedulesQuery = query(
                             collection(db, "schedules"),
-                            where("tutorEmail", "==", studentData.assignedTutor),
+                            where("tutorEmail", "==", tutorEmail),
                             where("studentName", "==", studentData.studentName || studentData.displayName),
                             where("dateTime", ">=", now.toISOString()),
                             where("dateTime", "<=", monthFromNow.toISOString())
