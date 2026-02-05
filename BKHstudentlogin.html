@@ -3,174 +3,684 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Dashboard | Intelligent LMS</title>
+    <title>Student Portal | Blue Ocean</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.43/moment-timezone-with-data.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: { brand: { light: '#d1fae5', primary: '#059669', dark: '#064e3b', accent: '#fbbf24' } }
+                    colors: {
+                        brand: {
+                            light: '#d1fae5', 
+                            primary: '#059669', 
+                            dark: '#064e3b', 
+                            accent: '#fbbf24', 
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
                 }
             }
         }
     </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        .nav-item.active { background-color: #ecfdf5; color: #059669; border-right: 4px solid #059669; }
+        .fade-in { animation: fadeIn 0.4s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
 </head>
-<body class="bg-slate-50 min-h-screen">
+<body class="bg-gray-50 text-gray-800 font-sans antialiased h-screen flex overflow-hidden">
 
-    <aside class="fixed left-0 top-0 h-full w-64 bg-brand-dark text-white p-6 z-50 transition-transform transform -translate-x-full lg:translate-x-0">
-        <div class="flex items-center gap-3 mb-10">
-            <i class="fas fa-graduation-cap text-2xl text-brand-accent"></i>
-            <span class="font-bold text-lg tracking-tight">Portal v2.0</span>
+    <aside class="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col justify-between z-20 shadow-lg">
+        <div>
+            <div class="h-20 flex items-center px-8 border-b border-gray-100">
+                <div class="h-10 w-10 bg-brand-primary rounded-lg flex items-center justify-center text-white font-bold text-xl mr-3 shadow-lg shadow-emerald-200">
+                    <i class="fas fa-graduation-cap"></i>
+                </div>
+                <span class="text-xl font-bold tracking-tight text-gray-900">Student Portal</span>
+            </div>
+
+            <nav class="mt-8 px-4 space-y-2">
+                <a href="#" onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item active flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+                    <i class="fas fa-th-large w-6"></i> Dashboard
+                </a>
+                <a href="#" onclick="switchTab('courses')" id="nav-courses" class="nav-item flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+                    <i class="fas fa-book w-6"></i> My Courses
+                </a>
+                <a href="#" onclick="switchTab('assignments')" id="nav-assignments" class="nav-item flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+                    <i class="fas fa-clipboard-list w-6"></i> Assignments
+                </a>
+                <a href="#" onclick="switchTab('results')" id="nav-results" class="nav-item flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+                    <i class="fas fa-chart-line w-6"></i> Results
+                </a>
+                <a href="#" onclick="switchTab('games')" id="nav-games" class="nav-item flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+                    <i class="fas fa-gamepad w-6"></i> EduGames
+                </a>
+            </nav>
         </div>
-        
-        <nav class="space-y-4">
-            <a href="#" class="flex items-center gap-3 p-3 bg-white/10 rounded-xl text-brand-accent"><i class="fas fa-th-large"></i> Dashboard</a>
-            <a href="#" class="flex items-center gap-3 p-3 text-emerald-100 hover:bg-white/5 rounded-xl"><i class="fas fa-book"></i> My Lessons</a>
-            <a href="#" class="flex items-center gap-3 p-3 text-emerald-100 hover:bg-white/5 rounded-xl"><i class="fas fa-tasks"></i> Homework</a>
-        </nav>
+
+        <div class="p-4 border-t border-gray-100">
+            <div class="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-200">
+                <div class="h-10 w-10 rounded-full bg-brand-primary text-white flex items-center justify-center font-bold" id="sidebar-initials">ST</div>
+                <div>
+                    <p class="text-sm font-semibold text-gray-700" id="sidebar-name">Loading...</p>
+                    <p class="text-xs text-gray-500" id="sidebar-meta">...</p>
+                </div>
+            </div>
+            <button id="logout-btn" class="mt-3 w-full py-2 text-xs font-bold text-red-500 hover:bg-red-50 rounded-lg">Sign Out</button>
+        </div>
     </aside>
 
-    <main class="lg:ml-64 p-4 lg:p-8">
-        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+    <div class="md:hidden fixed top-0 w-full bg-white z-30 border-b px-4 h-16 flex items-center justify-between shadow-sm">
+        <div class="font-bold text-lg text-brand-primary">Student Portal</div>
+        <button class="text-gray-600"><i class="fas fa-bars text-xl"></i></button>
+    </div>
+
+    <main class="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-8 pt-20 md:pt-8 relative">
+        
+        <header class="flex justify-between items-center mb-8">
             <div>
-                <h1 class="text-3xl font-bold text-gray-900">Welcome, <span id="student-name">...</span></h1>
-                <p class="text-gray-500">Assigned Tutor: <span id="tutor-name" class="font-semibold text-brand-primary">Loading...</span></p>
+                <h1 id="page-title" class="text-2xl font-bold text-gray-900">Dashboard Overview</h1>
+                <p id="page-date" class="text-sm text-gray-500 mt-1">...</p>
             </div>
-            <button id="logout-btn" class="px-6 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all">Sign Out</button>
+            <div class="flex items-center gap-4">
+                <button class="hidden md:block bg-brand-primary hover:bg-brand-dark text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-lg shadow-emerald-200 transition-all transform hover:-translate-y-0.5">
+                    <i class="fas fa-video mr-2"></i> Zoom Class
+                </button>
+            </div>
         </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-                <p class="text-gray-400 text-sm font-bold uppercase tracking-wider">Upcoming Tasks</p>
-                <h2 class="text-4xl font-bold text-gray-800 mt-2">04</h2>
-            </div>
-            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-                <p class="text-gray-400 text-sm font-bold uppercase tracking-wider">Attendance</p>
-                <h2 class="text-4xl font-bold text-emerald-600 mt-2">98%</h2>
-            </div>
-            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-                <p class="text-gray-400 text-sm font-bold uppercase tracking-wider">Tutor Feedback</p>
-                <h2 class="text-4xl font-bold text-brand-accent mt-2">Excellent</h2>
-            </div>
-        </div>
+        <div id="view-dashboard" class="view-section fade-in space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-36 relative overflow-hidden">
+                    <div class="absolute right-0 top-0 h-full w-1 bg-brand-primary"></div>
+                    <div>
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Attendance</p>
+                        <h3 class="text-3xl font-bold text-gray-800 mt-1" id="stat-attendance">--%</h3>
+                        <p class="text-xs text-gray-400 mt-2">Based on schedules & homework</p>
+                    </div>
+                    <div class="w-full bg-gray-100 rounded-full h-1.5 mt-auto">
+                        <div class="bg-brand-primary h-1.5 rounded-full" id="bar-attendance" style="width: 0%"></div>
+                    </div>
+                </div>
 
-        <div id="homework-section" class="bg-white rounded-4xl p-8 shadow-sm border border-gray-100 min-h-[400px]">
-            <h3 class="text-xl font-bold mb-6">Recent Assignments</h3>
-            <div id="homework-list" class="space-y-4">
-                <div class="animate-pulse flex space-x-4">
-                    <div class="flex-1 space-y-4 py-1">
-                        <div class="h-4 bg-gray-200 rounded w-3/4"></div>
-                        <div class="h-4 bg-gray-200 rounded"></div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-36 relative overflow-hidden">
+                    <div class="absolute right-0 top-0 h-full w-1 bg-brand-accent"></div>
+                    <div>
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Pending Tasks</p>
+                        <h3 class="text-3xl font-bold text-gray-800 mt-1" id="stat-pending">0</h3>
+                        <p class="text-xs text-gray-400 mt-2">Active homework</p>
+                    </div>
+                    <div class="h-8 w-8 absolute bottom-6 right-6 rounded-full bg-yellow-50 flex items-center justify-center text-yellow-600"><i class="fas fa-clock"></i></div>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-36">
+                    <div>
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Avg Grade</p>
+                        <h3 class="text-3xl font-bold text-gray-800 mt-1" id="stat-grade">--</h3>
+                        <p class="text-xs text-gray-400 mt-2">From tutor records</p>
+                    </div>
+                    <div class="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 self-end"><i class="fas fa-star"></i></div>
+                </div>
+                
+                <div class="bg-brand-primary p-6 rounded-2xl shadow-lg shadow-emerald-200 text-white flex flex-col justify-between h-36 relative overflow-hidden">
+                    <div class="absolute -right-6 -bottom-6 text-white opacity-10 text-9xl"><i class="fas fa-video"></i></div>
+                    <div>
+                        <p class="text-xs font-bold text-emerald-100 uppercase tracking-wider">Next Live Class</p>
+                        <h3 class="text-xl font-bold mt-1" id="next-class-time">Loading...</h3>
+                        <p class="text-xs text-emerald-100 opacity-80" id="next-class-local">(Calculating local time...)</p>
+                    </div>
+                    <div class="mt-auto flex justify-between items-end">
+                         <span class="text-xs font-mono bg-black/20 px-2 py-1 rounded" id="user-timezone">UTC</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="font-bold text-gray-800">Performance Overview</h3>
+                        <div class="flex gap-2">
+                            <button class="text-xs bg-gray-100 px-3 py-1 rounded-md text-gray-600 hover:bg-brand-primary hover:text-white transition">Monthly</button>
+                            <button class="text-xs bg-gray-100 px-3 py-1 rounded-md text-gray-600 hover:bg-brand-primary hover:text-white transition">Yearly</button>
+                        </div>
+                    </div>
+                    <div class="h-64">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h3 class="font-bold text-gray-800 mb-4">Upcoming Schedule</h3>
+                    <div id="schedule-list" class="space-y-4">
+                        <div class="animate-pulse flex space-x-4">
+                            <div class="rounded-full bg-gray-200 h-10 w-10"></div>
+                            <div class="flex-1 space-y-2 py-1">
+                                <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+                                <div class="h-4 bg-gray-200 rounded"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <div id="view-courses" class="view-section hidden fade-in">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold">My Learning Materials</h2>
+            </div>
+            <div id="courses-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="col-span-full text-center py-10 text-gray-500">
+                    <i class="fas fa-spinner fa-spin mr-2"></i> Loading materials...
+                </div>
+            </div>
+        </div>
+
+        <div id="view-assignments" class="view-section hidden fade-in">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="font-bold text-gray-800">Assignments</h3>
+                </div>
+                <div id="assignments-list" class="divide-y divide-gray-50">
+                    </div>
+            </div>
+        </div>
+
+        <div id="view-results" class="view-section hidden fade-in">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden p-6">
+                <h3 class="font-bold text-gray-800 mb-4">Academic Results</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-gray-500">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3">Date</th>
+                                <th class="px-6 py-3">Subject / Assessment</th>
+                                <th class="px-6 py-3">Score</th>
+                                <th class="px-6 py-3">Grade</th>
+                                <th class="px-6 py-3">Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-table-body">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-games" class="view-section hidden fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 space-y-6">
+                    <div class="bg-brand-primary rounded-2xl p-6 text-white relative overflow-hidden">
+                        <h2 class="text-2xl font-bold mb-2">Brain Gym</h2>
+                        <p class="opacity-90">Sharpen your skills with these curriculum-based games.</p>
+                        <i class="fas fa-brain absolute right-4 bottom-[-20px] text-9xl opacity-10"></i>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition cursor-pointer" onclick="startGame('math')">
+                            <div class="h-12 w-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center mb-4 text-xl"><i class="fas fa-calculator"></i></div>
+                            <h3 class="font-bold text-gray-800">Maths Sprint</h3>
+                            <p class="text-xs text-gray-500 mt-1">Quick-fire arithmetic for your grade level.</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition cursor-pointer" onclick="startGame('science')">
+                            <div class="h-12 w-12 rounded-lg bg-green-100 text-green-600 flex items-center justify-center mb-4 text-xl"><i class="fas fa-flask"></i></div>
+                            <h3 class="font-bold text-gray-800">Science Trivia</h3>
+                            <p class="text-xs text-gray-500 mt-1">Test your knowledge of the natural world.</p>
+                        </div>
+                         <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition cursor-pointer" onclick="startGame('logic')">
+                            <div class="h-12 w-12 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center mb-4 text-xl"><i class="fas fa-puzzle-piece"></i></div>
+                            <h3 class="font-bold text-gray-800">Logic Master</h3>
+                            <p class="text-xs text-gray-500 mt-1">Pattern recognition and problem solving.</p>
+                        </div>
+                    </div>
+
+                    <div id="game-container" class="hidden bg-white p-6 rounded-xl border-2 border-brand-primary min-h-[300px] flex flex-col items-center justify-center text-center">
+                        <h3 id="game-title" class="text-xl font-bold mb-4">Game Title</h3>
+                        <div id="game-content" class="w-full"></div>
+                        <button onclick="closeGame()" class="mt-6 text-sm text-gray-500 hover:text-red-500">Exit Game</button>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100" id="leaderboard-panel">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-gray-800"><i class="fas fa-trophy text-yellow-500 mr-2"></i>Top 3 Scholars</h3>
+                        <button onclick="shareLeaderboard()" class="text-xs bg-brand-light text-brand-primary px-2 py-1 rounded hover:bg-brand-primary hover:text-white transition"><i class="fas fa-share-alt"></i> Share</button>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-100">
+                            <div class="font-bold text-yellow-600 text-lg">1</div>
+                            <div class="h-8 w-8 rounded-full bg-yellow-200 flex items-center justify-center text-yellow-700 font-bold">JD</div>
+                            <div class="flex-1">
+                                <p class="text-sm font-bold">John Doe</p>
+                                <p class="text-xs text-gray-500">1,250 XP</p>
+                            </div>
+                            <i class="fas fa-medal text-yellow-500"></i>
+                        </div>
+                        <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                            <div class="font-bold text-gray-400 text-lg">2</div>
+                            <div class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold">AS</div>
+                            <div class="flex-1">
+                                <p class="text-sm font-bold">Sarah A.</p>
+                                <p class="text-xs text-gray-500">1,100 XP</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 p-3 bg-orange-50 rounded-lg border border-orange-100">
+                            <div class="font-bold text-orange-400 text-lg">3</div>
+                            <div class="h-8 w-8 rounded-full bg-orange-200 flex items-center justify-center text-orange-700 font-bold">MK</div>
+                            <div class="flex-1">
+                                <p class="text-sm font-bold">Mike K.</p>
+                                <p class="text-xs text-gray-500">980 XP</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </main>
 
+    <input type="file" id="file-upload-input" class="hidden">
+
     <script type="module">
-        // Import modular Firebase config (smart environment switching)
         import { auth, db } from './firebaseConfig-studentsignupmodular.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
-        import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+        import { collection, query, where, getDocs, updateDoc, doc, addDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
-        // Global logout function
+        // Global State
+        let currentUser = null;
+        let studentProfile = null;
+        let assignedTutorEmail = null;
+
+        // UI Helpers
+        window.switchTab = (tabName) => {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            const selected = document.getElementById('view-' + tabName);
+            if(selected) selected.classList.remove('hidden');
+            
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            const nav = document.getElementById('nav-' + tabName);
+            if(nav) nav.classList.add('active');
+
+            const titles = {
+                'dashboard': 'Dashboard Overview',
+                'courses': 'My Learning Materials',
+                'assignments': 'Homework & Tasks',
+                'results': 'Academic Results',
+                'games': 'Educational Games'
+            };
+            document.getElementById('page-title').innerText = titles[tabName] || 'Dashboard';
+        }
+
         window.logout = async () => {
-            try {
-                await signOut(auth);
-                window.location.href = 'studentsignup.html';
-            } catch (error) {
-                console.error('Logout error:', error);
-                alert('Error signing out. Please try again.');
-            }
+            await signOut(auth);
+            window.location.href = 'studentsignup.html';
         };
-
-        // Initialize logout button
         document.getElementById('logout-btn').addEventListener('click', window.logout);
 
-        // Monitor auth state
+        // --- AUTH & DATA LOADING ---
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                try {
-                    // Set student name
-                    document.getElementById('student-name').innerText = user.displayName || "Student";
-                    
-                    // Fetch assigned tutor for this specific user UID
-                    const q = query(collection(db, "students"), where("studentUid", "==", user.uid));
-                    const snap = await getDocs(q);
-                    
-                    if (!snap.empty) {
-                        const studentData = snap.docs[0].data();
-                        document.getElementById('tutor-name').innerText = studentData.assignedTutor || "Not Assigned";
-                        
-                        // Load homework for this tutor + student
-                        await loadHomework(studentData.assignedTutor, user.displayName);
-                    } else {
-                        console.log("No student data found");
-                        document.getElementById('tutor-name').innerText = "Not Assigned";
-                        document.getElementById('homework-list').innerHTML = '<p class="text-gray-500">No student profile found.</p>';
-                    }
-                } catch (error) {
-                    console.error('Error loading user data:', error);
-                    document.getElementById('tutor-name').innerText = "Error loading data";
-                    document.getElementById('homework-list').innerHTML = '<p class="text-red-500">Error loading profile data.</p>';
-                }
+                currentUser = user;
+                await loadStudentProfile(user.uid);
             } else {
-                // No user signed in, redirect to signup
                 window.location.href = 'studentsignup.html';
             }
         });
 
-        // Load homework assignments
-        async function loadHomework(tutorEmail, studentName) {
-            const container = document.getElementById('homework-list');
-            
+        async function loadStudentProfile(uid) {
             try {
-                // Clear loading animation
-                container.innerHTML = '';
+                const q = query(collection(db, "students"), where("studentUid", "==", uid));
+                const snap = await getDocs(q);
                 
-                if (!tutorEmail || tutorEmail === "Not Assigned") {
-                    container.innerHTML = '<p class="text-gray-500">No tutor assigned yet.</p>';
-                    return;
+                if (!snap.empty) {
+                    const docSnap = snap.docs[0];
+                    studentProfile = { id: docSnap.id, ...docSnap.data() };
+                    assignedTutorEmail = studentProfile.assignedTutor;
+
+                    // Update UI
+                    document.getElementById('sidebar-name').innerText = studentProfile.studentName;
+                    document.getElementById('sidebar-meta').innerText = `${studentProfile.grade || 'Grade ?'} • ${studentProfile.country || 'Global'}`;
+                    document.getElementById('sidebar-initials').innerText = studentProfile.studentName.substring(0,2).toUpperCase();
+                    
+                    // Set Date
+                    document.getElementById('page-date').innerText = moment().format('dddd, MMMM Do YYYY');
+
+                    // Run Auto-Promote Logic
+                    await checkAndPromoteGrade();
+
+                    // Load Data
+                    loadDashboardStats();
+                    loadSchedule();
+                    loadCourses();
+                    loadAssignments();
+                    loadResults();
                 }
-
-                // Query homework collection
-                const homeworkQuery = query(
-                    collection(db, "homework"),
-                    where("studentName", "==", studentName),
-                    where("tutorEmail", "==", tutorEmail)
-                );
-                
-                const snapshot = await getDocs(homeworkQuery);
-                
-                if (snapshot.empty) {
-                    container.innerHTML = '<p class="text-gray-500">No assignments found.</p>';
-                    return;
-                }
-
-                // Display homework items
-                snapshot.forEach((doc) => {
-                    const hw = doc.data();
-                    const hwElement = document.createElement('div');
-                    hwElement.className = 'p-4 bg-gray-50 rounded-xl border border-gray-200';
-                    hwElement.innerHTML = `
-                        <h4 class="font-bold text-gray-800">${hw.subject || 'Assignment'}</h4>
-                        <p class="text-gray-600 mt-1">${hw.description || 'No description provided'}</p>
-                        <div class="flex justify-between items-center mt-3">
-                            <span class="text-sm text-gray-500">Due: ${hw.dueDate || 'Not specified'}</span>
-                            <span class="px-3 py-1 text-sm rounded-full ${hw.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
-                                ${hw.status || 'pending'}
-                            </span>
-                        </div>
-                    `;
-                    container.appendChild(hwElement);
-                });
-
-            } catch (error) {
-                console.error('Error loading homework:', error);
-                container.innerHTML = '<p class="text-red-500">Error loading assignments. Please try again.</p>';
+            } catch (e) {
+                console.error("Profile Load Error", e);
             }
+        }
+
+        // --- AUTOMATED GRADE PROMOTION ---
+        async function checkAndPromoteGrade() {
+            if (!studentProfile) return;
+            
+            const currentMonth = new Date().getMonth(); // 0-11
+            const country = (studentProfile.country || "").toLowerCase();
+            let shouldPromote = false;
+
+            // Logic: If USA/UK/Nigeria, end of session is typically July (Month 6) or August (Month 7)
+            // We check if we already promoted this year to avoid double promotion
+            const lastPromoted = studentProfile.lastPromotedYear || 0;
+            const currentYear = new Date().getFullYear();
+
+            if (lastPromoted < currentYear) {
+                if ((country.includes('usa') || country.includes('uk') || country.includes('nigeria')) && currentMonth >= 7) { 
+                    shouldPromote = true;
+                }
+            }
+
+            if (shouldPromote) {
+                // Logic to increment grade (e.g., "Year 4" -> "Year 5")
+                let currentGradeStr = studentProfile.grade || "";
+                let num = parseInt(currentGradeStr.replace(/\D/g, '')); // Extract number
+                if (!isNaN(num)) {
+                    let newGrade = currentGradeStr.replace(num, num + 1);
+                    
+                    // Update Firebase
+                    const studentRef = doc(db, "students", studentProfile.id);
+                    await updateDoc(studentRef, {
+                        grade: newGrade,
+                        lastPromotedYear: currentYear
+                    });
+                    
+                    alert(`🎉 Congratulations! You have been promoted to ${newGrade} for the new academic session.`);
+                    // Refresh local profile
+                    studentProfile.grade = newGrade;
+                    document.getElementById('sidebar-meta').innerText = `${newGrade} • ${studentProfile.country}`;
+                }
+            }
+        }
+
+        // --- DASHBOARD LOGIC ---
+        async function loadDashboardStats() {
+            if (!assignedTutorEmail) return;
+
+            // 1. Attendance (Based on Schedules count vs Homework activity)
+            // Fetch schedules for tutor
+            const schedQ = query(collection(db, "schedules"), where("tutorEmail", "==", assignedTutorEmail));
+            const schedSnap = await getDocs(schedQ);
+            let totalClasses = schedSnap.size; // Total potential classes
+            
+            // Fetch homework
+            const hwQ = query(collection(db, "homework_assignments"), where("studentName", "==", studentProfile.studentName));
+            const hwSnap = await getDocs(hwQ);
+            let totalHw = hwSnap.size;
+            let submittedHw = 0;
+            hwSnap.forEach(d => { if(d.data().status === 'submitted' || d.data().status === 'graded') submittedHw++; });
+
+            // Calculate Attendance Score (Weighted)
+            // If strictly class attendance isn't stored, we approximate using homework adherence
+            let attendancePct = totalHw > 0 ? Math.round((submittedHw / totalHw) * 100) : 100;
+            
+            document.getElementById('stat-attendance').innerText = `${attendancePct}%`;
+            document.getElementById('bar-attendance').style.width = `${attendancePct}%`;
+
+            // 2. Pending Tasks
+            let pending = totalHw - submittedHw;
+            document.getElementById('stat-pending').innerText = pending;
+
+            // 3. Avg Grade (From 'students' grade records or tutor_submissions)
+            // Looking for grade data. Assuming a 'grades' array or utilizing tutor_submissions
+            const gradeQ = query(collection(db, "tutor_submissions"), where("studentName", "==", studentProfile.studentName));
+            const gradeSnap = await getDocs(gradeQ);
+            let totalScore = 0;
+            let countScore = 0;
+            gradeSnap.forEach(d => {
+                let s = d.data().score;
+                if (s) { totalScore += parseInt(s); countScore++; }
+            });
+            let avg = countScore > 0 ? Math.round(totalScore / countScore) : 0;
+            document.getElementById('stat-grade').innerText = `${avg}%`;
+        }
+
+        // --- TIMEZONE & SCHEDULE ---
+        async function loadSchedule() {
+            if (!assignedTutorEmail) return;
+
+            const q = query(collection(db, "schedules"), where("tutorEmail", "==", assignedTutorEmail));
+            const snap = await getDocs(q);
+            const list = document.getElementById('schedule-list');
+            list.innerHTML = '';
+
+            let nextClass = null;
+            let now = moment();
+            
+            // Detect User Timezone
+            const userZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            document.getElementById('user-timezone').innerText = userZone;
+
+            // Process Schedules
+            let schedules = [];
+            snap.forEach(doc => schedules.push(doc.data()));
+
+            // Sort by date/time
+            // Assuming schedule doc has date and time fields. 
+            // We need to parse them.
+            
+            schedules.forEach(sch => {
+                // Assume tutor creates time in "Africa/Lagos"
+                // Format assumed: Date="2025-10-10", Time="14:00"
+                let dateStr = `${sch.date} ${sch.time}`; 
+                let tutorTime = moment.tz(dateStr, "YYYY-MM-DD HH:mm", "Africa/Lagos");
+                
+                // Convert to Student Zone
+                let localTime = tutorTime.clone().tz(userZone);
+
+                // Check for Next Class
+                if (tutorTime.isAfter(now)) {
+                    if (!nextClass || tutorTime.isBefore(nextClass.tutorTime)) {
+                        nextClass = { ...sch, tutorTime, localTime };
+                    }
+                }
+
+                // Render List Item
+                const item = document.createElement('div');
+                item.className = "flex items-start gap-4 pb-4 border-b border-gray-50 last:border-0";
+                item.innerHTML = `
+                    <div class="flex flex-col items-center justify-center bg-gray-50 rounded-lg h-12 w-12 text-gray-500">
+                        <span class="text-xs font-bold uppercase">${localTime.format('MMM')}</span>
+                        <span class="text-lg font-bold text-gray-800">${localTime.format('DD')}</span>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-bold text-gray-800">${sch.subject || 'Class Session'}</h4>
+                        <p class="text-xs text-gray-500 mt-1">${localTime.format('h:mm A')} (${userZone})</p>
+                        <a href="${sch.link || '#'}" target="_blank" class="inline-block mt-2 text-[10px] font-bold bg-brand-light text-brand-primary px-2 py-0.5 rounded hover:bg-brand-primary hover:text-white transition">Join Class</a>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+
+            // Update Next Class Banner
+            if (nextClass) {
+                document.getElementById('next-class-time').innerText = nextClass.localTime.format('h:mm A');
+                document.getElementById('next-class-local').innerText = `${nextClass.localTime.format('dddd, MMM Do')} (${userZone})`;
+            } else {
+                document.getElementById('next-class-time').innerText = "No upcoming classes";
+                document.getElementById('next-class-local').innerText = "";
+            }
+        }
+
+        // --- COURSES ---
+        async function loadCourses() {
+            const grid = document.getElementById('courses-grid');
+            grid.innerHTML = '';
+            
+            // Placeholder query - in production, filter by enrolled courses
+            // Since User asked to create collection, assume it might be empty
+            const q = query(collection(db, "courses")); 
+            const snap = await getDocs(q);
+
+            if (snap.empty) {
+                grid.innerHTML = `<div class="col-span-full p-8 text-center border-2 border-dashed border-gray-200 rounded-xl">
+                    <p class="text-gray-400">No courses uploaded yet. Materials will appear here.</p>
+                </div>`;
+                return;
+            }
+
+            snap.forEach(doc => {
+                const c = doc.data();
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all";
+                card.innerHTML = `
+                    <div class="h-32 bg-gray-200 relative">
+                        <img src="${c.thumbnail || 'https://via.placeholder.com/400x200?text=Course'}" class="w-full h-full object-cover">
+                    </div>
+                    <div class="p-6">
+                        <span class="text-xs font-bold text-brand-primary bg-brand-light px-2 py-1 rounded">${c.subject || 'General'}</span>
+                        <h3 class="font-bold text-lg text-gray-800 mt-2 mb-2">${c.title || 'Course Title'}</h3>
+                        <p class="text-xs text-gray-500 mb-4">${c.description || 'No description'}</p>
+                        <div class="flex gap-2">
+                            <a href="${c.materialLink || '#'}" target="_blank" class="flex-1 bg-brand-primary text-white py-2 rounded-lg text-sm font-medium text-center hover:bg-brand-dark transition-colors">View Materials</a>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // --- ASSIGNMENTS ---
+        async function loadAssignments() {
+            const list = document.getElementById('assignments-list');
+            list.innerHTML = '';
+
+            const q = query(collection(db, "homework_assignments"), where("studentName", "==", studentProfile.studentName));
+            const snap = await getDocs(q);
+
+            if (snap.empty) {
+                list.innerHTML = '<p class="p-6 text-gray-500">No assignments found.</p>';
+                return;
+            }
+
+            snap.forEach(doc => {
+                const hw = doc.data();
+                const isDone = hw.status === 'submitted' || hw.status === 'graded';
+                
+                const item = document.createElement('div');
+                item.className = "p-6 hover:bg-gray-50 transition-colors flex flex-col md:flex-row md:items-center justify-between group gap-4";
+                item.innerHTML = `
+                    <div class="flex items-center gap-4">
+                        <div class="h-10 w-10 rounded-lg ${isDone ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'} flex items-center justify-center">
+                            <i class="fas ${isDone ? 'fa-check-circle' : 'fa-file-alt'}"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-bold text-gray-800">${hw.title || 'Assignment'}</h4>
+                            <p class="text-xs text-gray-500">${hw.subject} • Due: ${hw.dueDate || 'N/A'}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        ${hw.fileLink ? `<a href="${hw.fileLink}" download class="text-xs bg-gray-100 text-gray-700 px-3 py-2 rounded hover:bg-gray-200"><i class="fas fa-download mr-1"></i> Download</a>` : ''}
+                        
+                        ${!isDone ? `
+                        <button onclick="alert('Open Editor Placeholder')" class="bg-white border border-brand-primary text-brand-primary px-4 py-2 rounded-lg text-xs font-bold shadow-sm hover:bg-brand-light">
+                            Do Now
+                        </button>
+                        <button class="bg-brand-primary text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm hover:bg-brand-dark">
+                            Upload <i class="fas fa-upload ml-1"></i>
+                        </button>` 
+                        : `<span class="text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full">Submitted</span>`}
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        // --- RESULTS ---
+        async function loadResults() {
+            const tbody = document.getElementById('results-table-body');
+            tbody.innerHTML = '';
+
+            const q = query(collection(db, "tutor_submissions"), where("studentName", "==", studentProfile.studentName));
+            const snap = await getDocs(q);
+
+            if (snap.empty) {
+                tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center">No results available yet.</td></tr>';
+                return;
+            }
+
+            snap.forEach(doc => {
+                const r = doc.data();
+                const row = document.createElement('tr');
+                row.className = "bg-white border-b hover:bg-gray-50";
+                row.innerHTML = `
+                    <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">${r.date || '-'}</td>
+                    <td class="px-6 py-4">${r.subject || 'Assessment'}</td>
+                    <td class="px-6 py-4 font-bold text-brand-primary">${r.score || 0}%</td>
+                    <td class="px-6 py-4">${r.grade || '-'}</td>
+                    <td class="px-6 py-4 text-xs italic">${r.feedback || 'No remarks'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // --- GAMES LOGIC ---
+        window.startGame = (type) => {
+            const container = document.getElementById('game-container');
+            const title = document.getElementById('game-title');
+            const content = document.getElementById('game-content');
+            
+            container.classList.remove('hidden');
+            content.innerHTML = '';
+            
+            // Check grade logic (mocked) - Ensure student is Grade 3+
+            // let gradeNum = parseInt(studentProfile.grade.replace(/\D/g,''));
+            // if(gradeNum < 3) { content.innerHTML = "<p>This game is for Grade 3 and above!</p>"; return; }
+
+            if(type === 'math') {
+                title.innerText = "Maths Sprint";
+                content.innerHTML = `
+                    <div class="text-center py-4">
+                        <p class="text-lg font-bold mb-4">What is 12 x 8?</p>
+                        <div class="grid grid-cols-2 gap-2 max-w-xs mx-auto">
+                            <button onclick="alert('Correct!')" class="p-2 bg-gray-100 rounded hover:bg-green-200">96</button>
+                            <button onclick="alert('Try Again')" class="p-2 bg-gray-100 rounded hover:bg-red-200">84</button>
+                            <button onclick="alert('Try Again')" class="p-2 bg-gray-100 rounded hover:bg-red-200">108</button>
+                            <button onclick="alert('Try Again')" class="p-2 bg-gray-100 rounded hover:bg-red-200">92</button>
+                        </div>
+                    </div>
+                `;
+            } else if (type === 'science') {
+                title.innerText = "Science Trivia";
+                content.innerHTML = `<p class="py-4">Question: What gas do plants absorb from the atmosphere?</p>
+                <input type="text" class="border p-2 rounded w-full mb-2" placeholder="Answer here...">
+                <button class="bg-brand-primary text-white px-4 py-2 rounded">Submit</button>`;
+            } else {
+                title.innerText = "Logic Master";
+                content.innerHTML = `<p class="py-4">Complete the sequence: 2, 4, 8, 16, ...</p>`;
+            }
+        }
+
+        window.closeGame = () => {
+            document.getElementById('game-container').classList.add('hidden');
+        }
+
+        window.shareLeaderboard = () => {
+            const element = document.getElementById('leaderboard-panel');
+            html2canvas(element).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'leaderboard.png';
+                link.href = canvas.toDataURL();
+                link.click();
+            });
         }
     </script>
 </body>
