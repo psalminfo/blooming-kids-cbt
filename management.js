@@ -913,13 +913,12 @@ function safeSearch(text, searchTerm) {
     return safeToString(text).toLowerCase().includes(safeToString(searchTerm).toLowerCase());
 }
 
-// Helper to format dates for badges
 function formatBadgeDate(dateString) {
     if (!dateString) return '';
     try {
         const d = new Date(dateString);
-        if (isNaN(d.getTime())) return ''; // Invalid date
-        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
     } catch (e) {
         return '';
     }
@@ -931,7 +930,7 @@ function searchStudentFromFirebase(student, searchTerm, tutors = []) {
     
     const searchLower = safeToString(searchTerm).toLowerCase();
     
-    // Check Status Logic for Search
+    // Status Logic for Search
     if (safeToString(searchTerm).toLowerCase() === 'break' && student.summerBreak === true) return true;
     if (safeToString(searchTerm).toLowerCase() === 'transitioning' && student.isTransitioning === true) return true;
 
@@ -1020,17 +1019,16 @@ async function renderManagementTutorView(container) {
         document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
         document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
         
-        // --- FIXED HISTORY BUTTON LOGIC ---
+        // --- SAFE HISTORY SELECTOR ---
         document.getElementById('view-tutor-history-directory-btn').addEventListener('click', async () => {
             if (!sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
                 alert("No tutor history available. Please refresh."); return;
             }
             
             const students = sessionCache.students || [];
-            // FILTER: Only show students who actually have history records to prevent crashing
+            // Only show students with history
             const studentsWithHistory = students.filter(s => 
-                sessionCache.tutorAssignments[s.id] && 
-                sessionCache.tutorAssignments[s.id].length > 0
+                sessionCache.tutorAssignments[s.id] && sessionCache.tutorAssignments[s.id].length > 0
             );
 
             if (studentsWithHistory.length === 0) {
@@ -1041,14 +1039,19 @@ async function renderManagementTutorView(container) {
             const studentOptions = studentsWithHistory.map(s => `<option value="${s.id}">${s.studentName}</option>`).join('');
             
             const modalHtml = `
-                <div id="select-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                    <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
+                <div id="select-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+                    <div class="relative p-8 bg-white w-full max-w-lg rounded-lg shadow-xl">
                         <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('select-student-modal')">&times;</button>
                         <h3 class="text-xl font-bold mb-4">View History</h3>
                         <form id="select-student-form">
-                            <div class="mb-4"><label class="block text-sm font-medium mb-2">Select Student</label>
-                            <select id="select-student" required class="w-full border rounded p-2"><option value="">Select...</option>${studentOptions}</select></div>
-                            <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 w-full">View</button>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-2">Select Student</label>
+                                <select id="select-student" required class="w-full border rounded-lg p-2 shadow-sm focus:ring-2 focus:ring-purple-500">
+                                    <option value="">Select...</option>
+                                    ${studentOptions}
+                                </select>
+                            </div>
+                            <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 w-full font-medium shadow">View Records</button>
                         </form>
                     </div>
                 </div>`;
@@ -1060,7 +1063,8 @@ async function renderManagementTutorView(container) {
                     e.preventDefault();
                     const sid = document.getElementById('select-student').value;
                     closeManagementModal('select-student-modal');
-                    if(window.viewStudentTutorHistory) window.viewStudentTutorHistory(sid);
+                    // CALL THE SAFE LOCAL FUNCTION
+                    renderHistoryModal(sid);
                 });
             }
         });
@@ -1080,7 +1084,6 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
         const directoryList = document.getElementById('directory-list');
         if (directoryList) directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data...</p>`;
         
-        // Fetch Data
         const [tutorsSnapshot, studentsSnapshot, tutorAssignmentsSnapshot] = await Promise.all([
             getDocs(query(collection(db, "tutors"), orderBy("name"))),
             getDocs(query(collection(db, "students"), orderBy("studentName"))),
@@ -1092,28 +1095,23 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
         const allTutors = tutorsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
         const activeTutors = allTutors.filter(t => !t.status || t.status === 'active');
         
-        // --- PROCESS STUDENTS WITH BOOLEANS ---
         const allStudents = studentsSnapshot.docs.map(doc => {
             const data = doc.data();
             return { 
                 ...data, 
                 id: doc.id,
-                // FORCE BOOLEAN CONVERSION
                 summerBreak: data.summerBreak === true,
                 isTransitioning: data.isTransitioning === true,
-                // Capture Dates
                 breakDate: data.breakDate || data.updatedAt,
                 transitionDate: data.transitionDate || data.updatedAt
             };
         });
         
-        // Permissive Filter: Only hide Archived/Deleted. Show everyone else.
         const nonArchivedStudents = allStudents.filter(s => {
             const st = (s.status || '').toLowerCase();
             return !st.includes('archived') && !st.includes('deleted');
         });
         
-        // Process assignments
         const tutorAssignments = {};
         tutorAssignmentsSnapshot.docs.forEach(doc => {
             const d = doc.data();
@@ -1123,12 +1121,11 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             }
         });
         
-        // Sort assignments
+        // Sort assignments newest first
         Object.keys(tutorAssignments).forEach(studentId => {
             tutorAssignments[studentId].sort((a, b) => new Date(b.assignedAt || 0) - new Date(a.assignedAt || 0));
         });
         
-        // Save to cache
         saveToLocalStorage('tutors', activeTutors);
         saveToLocalStorage('students', nonArchivedStudents); 
         sessionCache.tutorAssignments = tutorAssignments;
@@ -1168,51 +1165,39 @@ function renderDirectoryFromCache(searchTerm = '') {
     const filteredTutors = tutors.filter(tutor => {
         if (!tutor) return false;
         if (!searchTerm) return true;
-        
         const assignedStudents = studentsByTutor[tutor.email] || [];
-        const tutorMatch = safeSearch(tutor.name, searchTerm) || safeSearch(tutor.email, searchTerm);
-        const studentMatch = assignedStudents.some(student => searchStudentFromFirebase(student, searchTerm, tutors));
-        
-        return tutorMatch || studentMatch;
+        return safeSearch(tutor.name, searchTerm) || safeSearch(tutor.email, searchTerm) || 
+               assignedStudents.some(s => searchStudentFromFirebase(s, searchTerm, tutors));
     });
 
     if (searchTerm && filteredTutors.length === 0) {
         directoryList.innerHTML = `<p class="text-center py-10">No results found.</p>`; return;
     }
 
-    // --- CATEGORIZATION LOGIC ---
+    // --- CATEGORIZATION ---
     const getStudentCategory = (s) => {
-        // Priority 1: Transitioning Boolean
         if (s.isTransitioning === true) return 'transitioning';
-        
-        // Priority 2: Summer Break Boolean
         if (s.summerBreak === true) return 'break';
-        
-        // Priority 3: Fallback Status Text check
         const st = (s.status || '').toLowerCase();
         if (st.includes('break') || st.includes('suspended') || st.includes('inactive')) return 'break';
         if (st.includes('transition')) return 'transitioning';
-        
-        // Default
         return 'active';
     };
 
-    // Update Counters
     if(document.getElementById('tutor-count-badge')) document.getElementById('tutor-count-badge').textContent = tutors.length;
     if(document.getElementById('student-count-badge')) document.getElementById('student-count-badge').textContent = students.length;
     if(document.getElementById('history-count-badge')) document.getElementById('history-count-badge').textContent = Object.keys(tutorAssignments).length;
 
-    const canEditStudents = window.userData?.permissions?.actions?.canEditStudents === true;
-    const canDeleteStudents = window.userData?.permissions?.actions?.canDeleteStudents === true;
-    const showActionsColumn = canEditStudents || canDeleteStudents;
+    const canEdit = window.userData?.permissions?.actions?.canEditStudents === true;
+    const canDelete = window.userData?.permissions?.actions?.canDeleteStudents === true;
+    const showActions = canEdit || canDelete;
 
-    // --- RENDER CARDS ---
+    // --- RENDER ROWS ---
     directoryList.innerHTML = filteredTutors.map(tutor => {
         const assignedStudents = (studentsByTutor[tutor.email] || [])
-            .filter(student => !searchTerm || searchStudentFromFirebase(student, searchTerm, tutors) || safeSearch(tutor.name, searchTerm))
+            .filter(s => !searchTerm || searchStudentFromFirebase(s, searchTerm, tutors) || safeSearch(tutor.name, searchTerm))
             .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
 
-        // Calculate specific counts for THIS tutor
         const breakCount = assignedStudents.filter(s => getStudentCategory(s) === 'break').length;
         const transCount = assignedStudents.filter(s => getStudentCategory(s) === 'transitioning').length;
         const activeCount = assignedStudents.filter(s => getStudentCategory(s) === 'active').length;
@@ -1232,13 +1217,13 @@ function renderDirectoryFromCache(searchTerm = '') {
                 badge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">Active</span>`;
             }
             
-            // Safety Check: only show history button if records exist
+            // Safe history button
             const historyBtn = (tutorAssignments[student.id] && tutorAssignments[student.id].length > 0) ? 
                 `<button class="view-history-btn px-2 py-1 text-xs bg-purple-600 text-white rounded-full ml-1" data-student-id="${student.id}">History</button>` : '';
 
             const actions = `
-                ${canEditStudents ? `<button class="edit-student-btn px-2 py-1 text-xs bg-blue-600 text-white rounded-full" data-student-id="${student.id}">Edit</button>` : ''}
-                ${canDeleteStudents ? `<button class="delete-student-btn px-2 py-1 text-xs bg-red-600 text-white rounded-full ml-1" data-student-id="${student.id}">Delete</button>` : ''}
+                ${canEdit ? `<button class="edit-student-btn px-2 py-1 text-xs bg-blue-600 text-white rounded-full" data-student-id="${student.id}">Edit</button>` : ''}
+                ${canDelete ? `<button class="delete-student-btn px-2 py-1 text-xs bg-red-600 text-white rounded-full ml-1" data-student-id="${student.id}">Delete</button>` : ''}
                 ${historyBtn}
             `;
 
@@ -1251,7 +1236,7 @@ function renderDirectoryFromCache(searchTerm = '') {
                     <td class="px-4 py-3 align-middle">${Array.isArray(student.subjects)?student.subjects.join(', '):student.subjects}</td>
                     <td class="px-4 py-3 align-middle">${student.parentName||'-'}</td>
                     <td class="px-4 py-3 align-middle">${student.parentPhone||'-'}</td>
-                    ${showActionsColumn || historyBtn ? `<td class="px-4 py-3 align-middle">${actions}</td>` : ''}
+                    ${showActions || historyBtn ? `<td class="px-4 py-3 align-middle">${actions}</td>` : ''}
                 </tr>`;
         }).join('');
 
@@ -1275,7 +1260,7 @@ function renderDirectoryFromCache(searchTerm = '') {
                     <div class="bg-white">
                         ${assignedStudents.length > 0 ? `
                             <div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50"><tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fee</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grade</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Days</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Parent</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>${showActionsColumn?`<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>`:''}</tr></thead>
+                                <thead class="bg-gray-50"><tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fee</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grade</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Days</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Parent</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>${showActions?`<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>`:''}</tr></thead>
                                 <tbody class="divide-y divide-gray-200">${rows}</tbody>
                             </table></div>` 
                         : `<div class="p-8 text-center text-gray-500">No students assigned.</div>`}
@@ -1285,15 +1270,78 @@ function renderDirectoryFromCache(searchTerm = '') {
     }).join('');
 
     // Reattach Listeners
-    if (canEditStudents) document.querySelectorAll('.edit-student-btn').forEach(b => b.addEventListener('click', () => handleEditStudent(b.dataset.studentId)));
-    if (canDeleteStudents) document.querySelectorAll('.delete-student-btn').forEach(b => b.addEventListener('click', () => handleDeleteStudent(b.dataset.studentId)));
+    if (canEdit) document.querySelectorAll('.edit-student-btn').forEach(b => b.addEventListener('click', () => handleEditStudent(b.dataset.studentId)));
+    if (canDelete) document.querySelectorAll('.delete-student-btn').forEach(b => b.addEventListener('click', () => handleDeleteStudent(b.dataset.studentId)));
+    
+    // --- CONNECT HISTORY BUTTONS TO SAFE LOCAL FUNCTION ---
     document.querySelectorAll('.view-history-btn').forEach(b => b.addEventListener('click', () => {
-        if(window.viewStudentTutorHistory) window.viewStudentTutorHistory(b.dataset.studentId);
+        const sid = b.dataset.studentId;
+        renderHistoryModal(sid);
     }));
 }
 
 // ======================================================
-// REASSIGN MODAL DEFINITIONS (Global)
+// LOCAL HISTORY MODAL RENDERER (Safe & Peaceful)
+// ======================================================
+
+function renderHistoryModal(studentId) {
+    const historyData = sessionCache.tutorAssignments ? sessionCache.tutorAssignments[studentId] : null;
+    
+    if (!historyData || historyData.length === 0) {
+        alert("No history records found for this student.");
+        return;
+    }
+
+    const student = sessionCache.students.find(s => s.id === studentId);
+    const studentName = student ? student.studentName : "Student";
+
+    const rows = historyData.map(record => `
+        <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">${formatBadgeDate(record.assignedAt)}</td>
+            <td class="px-4 py-3 text-sm text-gray-500">${record.oldTutorName || 'None'}</td>
+            <td class="px-4 py-3 text-sm font-medium text-green-600">${record.newTutorName}</td>
+            <td class="px-4 py-3 text-sm text-gray-500">${record.reason || '-'}</td>
+            <td class="px-4 py-3 text-sm text-gray-400 text-xs">${record.assignedBy || 'System'}</td>
+        </tr>
+    `).join('');
+
+    const modalHtml = `
+        <div id="safe-history-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+            <div class="relative bg-white w-full max-w-3xl rounded-lg shadow-xl animate-fadeIn">
+                <div class="flex items-center justify-between p-6 border-b">
+                    <h3 class="text-xl font-bold text-gray-900">History: ${studentName}</h3>
+                    <button onclick="closeManagementModal('safe-history-modal')" class="text-gray-400 hover:text-gray-800 text-3xl font-bold">&times;</button>
+                </div>
+                <div class="p-0 overflow-hidden">
+                    <div class="max-h-[60vh] overflow-y-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50 sticky top-0">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Previous</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">New Tutor</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">By</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                ${rows}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="p-4 border-t bg-gray-50 flex justify-end">
+                    <button onclick="closeManagementModal('safe-history-modal')" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Close</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+// ======================================================
+// REASSIGN MODAL DEFINITIONS
 // ======================================================
 
 function isCacheValid(keys) {
@@ -1315,15 +1363,18 @@ function createReassignModalHtml(students, tutors) {
     const tOpts = tutors.map(t => `<option value="${t.email}">${t.name}</option>`).join('');
     return `
     <div id="reassign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white w-full max-w-lg rounded-lg shadow-xl p-6">
-            <h3 class="text-xl font-bold mb-4">Reassign Student</h3>
+        <div class="bg-white w-full max-w-lg rounded-lg shadow-xl p-6 animate-fadeIn">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-blue-700">Reassign Student</h3>
+                <button onclick="closeReassignModal()" class="text-gray-400 hover:text-gray-800 text-2xl">&times;</button>
+            </div>
             <form id="reassign-student-form">
-                <div class="mb-4"><label>Student</label><select id="reassign-student-id" class="w-full border p-2 rounded">${sOpts}</select></div>
-                <div class="mb-4"><label>New Tutor</label><select id="reassign-tutor-email" class="w-full border p-2 rounded">${tOpts}</select></div>
-                <div class="mb-4"><label>Reason</label><textarea id="reassign-reason" class="w-full border p-2 rounded"></textarea></div>
+                <div class="mb-4"><label class="block mb-1 font-medium">Student</label><select id="reassign-student-id" class="w-full border p-2 rounded">${sOpts}</select></div>
+                <div class="mb-4"><label class="block mb-1 font-medium">New Tutor</label><select id="reassign-tutor-email" class="w-full border p-2 rounded">${tOpts}</select></div>
+                <div class="mb-4"><label class="block mb-1 font-medium">Reason</label><textarea id="reassign-reason" class="w-full border p-2 rounded" rows="2"></textarea></div>
                 <div class="flex justify-end gap-2">
-                    <button type="button" onclick="closeReassignModal()" class="px-4 py-2 bg-gray-200 rounded">Cancel</button>
-                    <button type="submit" id="reassign-submit-btn" class="px-4 py-2 bg-blue-600 text-white rounded">Reassign</button>
+                    <button type="button" onclick="closeReassignModal()" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Cancel</button>
+                    <button type="submit" id="reassign-submit-btn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Reassign</button>
                 </div>
             </form>
         </div>
@@ -1356,7 +1407,7 @@ async function performReassignment(student, newTutor, reason, currentTutor) {
 
 function showReassignAlert(msg, type) {
     const d = document.createElement('div');
-    d.className = `fixed top-4 right-4 p-4 rounded text-white z-50 ${type==='error'?'bg-red-500':'bg-green-500'}`;
+    d.className = `fixed top-4 right-4 p-4 rounded text-white z-50 shadow-lg ${type==='error'?'bg-red-500':'bg-green-500'}`;
     d.textContent = msg; document.body.appendChild(d);
     setTimeout(() => d.remove(), 3000);
 }
@@ -1365,11 +1416,11 @@ function showReassignConfirmationDialog(title, message) {
     return new Promise((resolve) => {
         const dialogHtml = `
             <div id="reassign-confirm-dialog" class="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
-                <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
-                    <h3 class="text-lg font-bold mb-3">${title}</h3><div class="mb-6">${message}</div>
+                <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full animate-fadeIn">
+                    <h3 class="text-lg font-bold mb-3">${title}</h3><div class="mb-6 text-gray-700">${message}</div>
                     <div class="flex justify-end space-x-3">
-                        <button id="confirm-cancel" class="px-4 py-2 bg-gray-100 rounded">Cancel</button>
-                        <button id="confirm-ok" class="px-4 py-2 bg-blue-600 text-white rounded">Confirm</button>
+                        <button id="confirm-cancel" class="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200">Cancel</button>
+                        <button id="confirm-ok" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Confirm</button>
                     </div>
                 </div>
             </div>`;
@@ -1385,7 +1436,7 @@ function showEnhancedReassignStudentModal() {
     if (!validateReassignData(s, t)) return;
     document.body.insertAdjacentHTML('beforeend', createReassignModalHtml(s, t));
     
-    // Initialize simple select logic
+    // Initialize simple select logic (No complex search to keep it light and error-free)
     document.getElementById('reassign-student-form').onsubmit = async (e) => {
         e.preventDefault();
         const sid = document.getElementById('reassign-student-id').value;
@@ -1410,6 +1461,8 @@ function closeReassignModal() {
 window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
 window.closeReassignModal = closeReassignModal;
 window.closeManagementModal = (id) => { const m = document.getElementById(id); if(m) m.remove(); };
+// Explicitly expose safe history viewer if needed by other parts
+window.viewStudentTutorHistory = renderHistoryModal;
 
 
 // ======================================================
@@ -8485,6 +8538,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
