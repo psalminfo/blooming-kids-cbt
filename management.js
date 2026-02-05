@@ -1113,11 +1113,11 @@ async function renderManagementTutorView(container) {
     try {
         // Event Listeners
         document.getElementById('assign-student-btn').addEventListener('click', () => {
-            showEnhancedAssignStudentModal();
+            if (typeof window.showEnhancedAssignStudentModal === 'function') window.showEnhancedAssignStudentModal();
         });
 
         document.getElementById('reassign-student-btn').addEventListener('click', () => {
-            showEnhancedReassignStudentModal();
+            if (typeof window.showEnhancedReassignStudentModal === 'function') window.showEnhancedReassignStudentModal();
         });
 
         document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
@@ -1682,206 +1682,568 @@ function showEnhancedReassignStudentModal() {
 }
 
 // ======================================================
-// ENHANCED ASSIGN STUDENT MODAL (New Function)
+// ENHANCED ASSIGN STUDENT FEATURE (REPLACED)
 // ======================================================
 
-function showEnhancedAssignStudentModal() {
-    if (!isCacheValid(['tutors'])) { 
-        showReassignAlert("Refreshing tutor data...", 'info');
-        fetchAndRenderDirectory(true);
-        setTimeout(() => showEnhancedAssignStudentModal(), 1000);
-        return;
-    }
+/**
+ * Get cleaned tutor data with safety checks
+ */
+function getCleanTutors() {
+    const rawTutors = sessionCache.tutors || [];
     
-    const tutors = getCleanTutors();
+    return rawTutors
+        .filter(tutor => tutor && typeof tutor === 'object')
+        .map(tutor => ({
+            id: tutor.id || '',
+            name: tutor.name || 'Unnamed Tutor',
+            email: tutor.email || '',
+            phone: tutor.phone || '',
+            status: tutor.status || 'active',
+            subjects: Array.isArray(tutor.subjects) ? tutor.subjects : 
+                     (tutor.subjects ? [tutor.subjects] : []),
+            // Include all other properties safely
+            ...Object.keys(tutor).reduce((acc, key) => {
+                if (tutor[key] !== undefined && tutor[key] !== null) {
+                    acc[key] = tutor[key];
+                }
+                return acc;
+            }, {})
+        }))
+        .filter(tutor => 
+            !tutor.status || 
+            tutor.status === 'active'
+        );
+}
+
+/**
+ * Show assign student alert message
+ */
+function showAssignAlert(message, type = 'info') {
+    const alertTypes = {
+        success: 'bg-green-100 border-green-400 text-green-700',
+        error: 'bg-red-100 border-red-400 text-red-700',
+        warning: 'bg-yellow-100 border-yellow-400 text-yellow-700',
+        info: 'bg-blue-100 border-blue-400 text-blue-700'
+    };
     
-    if (!tutors.length) {
-        showReassignAlert("No active tutors available", 'warning');
-        return;
-    }
+    const alertClass = alertTypes[type] || alertTypes.info;
     
-    const modalHtml = `
-    <div id="assign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white w-full max-w-lg rounded-lg shadow-xl p-6">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-bold text-green-700">Assign New Student</h3>
-                <button onclick="closeAssignModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+    // Remove existing alerts
+    const existingAlerts = document.querySelectorAll('.assign-alert');
+    existingAlerts.forEach(alert => alert.remove());
+    
+    // Create new alert
+    const alertHtml = `
+        <div class="assign-alert fixed top-4 right-4 ${alertClass} border px-6 py-4 rounded-lg shadow-lg z-50 max-w-md animate-slideIn">
+            <div class="flex items-center">
+                <div class="py-1">${message}</div>
+                <button onclick="this.parentElement.parentElement.remove()" 
+                        class="ml-4 text-lg font-bold">&times;</button>
             </div>
-            <form id="assign-student-form">
-                <div class="mb-4">
-                    <label class="block text-sm font-medium mb-2 text-gray-700">Student Name *</label>
-                    <input type="text" 
-                           id="assign-student-name" 
-                           class="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
-                           placeholder="Enter student full name"
-                           required>
-                </div>
-                
-                <div class="mb-4">
-                    <label class="block text-sm font-medium mb-2 text-gray-700">Select Tutor *</label>
-                    ${createSearchableSelect(
-                        tutors.map(t => ({ 
-                            email: t.email, 
-                            name: t.name,
-                            subjects: t.subjects || []
-                        })), 
-                        "Type tutor name or email...", 
-                        "assign-tutor",
-                        true
-                    )}
-                </div>
-                
-                <div id="assign-tutor-info" class="mb-4 p-3 bg-green-50 rounded-md hidden">
-                    <div class="text-sm">
-                        <div class="font-medium" id="assign-selected-tutor-name"></div>
-                        <div class="text-gray-600" id="assign-selected-tutor-details"></div>
-                    </div>
-                </div>
-                
-                <div class="mb-6">
-                    <label class="block text-sm font-medium mb-2 text-gray-700">Initial Notes</label>
-                    <textarea id="assign-notes" 
-                              class="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
-                              rows="3" 
-                              placeholder="Enter any initial notes..."></textarea>
-                </div>
-                
-                <div class="flex justify-end gap-3">
-                    <button type="button" 
-                            onclick="closeAssignModal()" 
-                            class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
-                        Cancel
-                    </button>
-                    <button type="submit" 
-                            id="assign-submit-btn" 
-                            class="px-5 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                        Assign Student
-                    </button>
-                </div>
-            </form>
         </div>
-    </div>`;
+    `;
     
-    // Remove existing modal if any
-    const existingModal = document.getElementById('assign-student-modal');
-    if (existingModal) existingModal.remove();
+    document.body.insertAdjacentHTML('beforeend', alertHtml);
     
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
-    // Initialize searchable select
+    // Auto-remove after 5 seconds
     setTimeout(() => {
-        initializeSearchableSelect('assign-tutor');
+        const alert = document.querySelector('.assign-alert');
+        if (alert) {
+            alert.remove();
+        }
+    }, 5000);
+}
+
+/**
+ * Enhanced assign student modal
+ */
+async function showEnhancedAssignStudentModal() {
+    try {
+        console.log("Opening enhanced assign student modal...");
         
-        // Handle tutor selection change
-        document.getElementById('assign-tutor').addEventListener('change', function() {
-            const tutorEmail = this.value;
-            const tutor = tutors.find(t => t.email === tutorEmail);
-            const infoDiv = document.getElementById('assign-tutor-info');
-            const nameDiv = document.getElementById('assign-selected-tutor-name');
-            const detailsDiv = document.getElementById('assign-selected-tutor-details');
+        // Validate cache exists and is fresh
+        if (!sessionCache || !sessionCache.tutors || sessionCache.tutors.length === 0) {
+            console.log("Cache invalid, refreshing data...");
+            showAssignAlert("Refreshing tutor data...", 'info');
+            fetchAndRenderDirectory(true);
+            setTimeout(() => showEnhancedAssignStudentModal(), 1000);
+            return;
+        }
+        
+        // Get cleaned data with safety checks
+        const tutors = getCleanTutors();
+        
+        if (tutors.length === 0) {
+            showAssignAlert("No active tutors available. Please add tutors first.", 'warning');
+            return;
+        }
+        
+        // Create modal HTML
+        const modalHtml = createAssignModalHtml(tutors);
+        
+        // Remove existing modal if any
+        const existingModal = document.getElementById('assign-student-modal');
+        if (existingModal) existingModal.remove();
+        
+        // Inject modal into DOM
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Initialize modal functionality
+        initializeAssignModal(tutors);
+        
+    } catch (error) {
+        console.error("Error in enhanced assign modal:", error);
+        showAssignAlert(`Error: ${error.message}`, 'error');
+    }
+}
+
+/**
+ * Create assign modal HTML template
+ */
+function createAssignModalHtml(tutors) {
+    const tutorOptions = tutors.map(tutor => {
+        // Create comprehensive search text for tutors
+        const searchText = [
+            tutor.name || '',
+            tutor.email || '',
+            tutor.phone || '',
+            Array.isArray(tutor.subjects) ? tutor.subjects.join(' ') : (tutor.subjects || '')
+        ].join(' ').toLowerCase();
+        
+        return `
+            <option value="${tutor.email}" 
+                    data-tutor-name="${tutor.name || ''}"
+                    data-search-text="${searchText}">
+                ${tutor.name} (${tutor.email})
+            </option>
+        `;
+    }).join('');
+    
+    return `
+        <div id="assign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+            <div class="relative bg-white w-full max-w-2xl rounded-lg shadow-xl animate-fadeIn">
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between p-6 border-b">
+                    <div>
+                        <h3 class="text-xl font-bold text-green-700">Assign New Student</h3>
+                        <p class="text-sm text-gray-600 mt-1">Assign a new student to a tutor</p>
+                    </div>
+                    <button onclick="closeAssignModal()" 
+                            class="text-gray-400 hover:text-gray-800 text-2xl font-bold transition-colors">
+                        &times;
+                    </button>
+                </div>
+                
+                <!-- Modal Body -->
+                <div class="p-6">
+                    <form id="assign-student-form">
+                        <!-- Search Section -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Search Tutors
+                            </label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                    </svg>
+                                </div>
+                                <input type="search" 
+                                       id="assign-search-tutors" 
+                                       placeholder="Search by tutor name, email, phone, subject..." 
+                                       class="pl-10 w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all">
+                            </div>
+                            <p class="text-xs text-gray-500 mt-2">Search anywhere in tutor details</p>
+                        </div>
+                        
+                        <!-- Student Information -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Student Name <span class="text-red-500">*</span>
+                                </label>
+                                <input type="text" 
+                                       id="assign-student-name" 
+                                       class="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all" 
+                                       placeholder="Enter student full name"
+                                       required>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Grade Level
+                                </label>
+                                <input type="text" 
+                                       id="assign-student-grade" 
+                                       class="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all" 
+                                       placeholder="e.g., Grade 10, JSS 3">
+                            </div>
+                        </div>
+                        
+                        <!-- Tutor Selection -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Select Tutor <span class="text-red-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <select id="assign-tutor-email" 
+                                        required 
+                                        class="block w-full rounded-md border-gray-300 shadow-sm p-3 h-48 overflow-y-auto focus:ring-green-500 focus:border-green-500 transition-all"
+                                        size="8">
+                                    <option value="" disabled selected class="text-gray-500">Select a tutor...</option>
+                                    ${tutorOptions}
+                                </select>
+                                <div id="assign-tutor-count" class="absolute bottom-2 right-2 text-xs text-gray-500 bg-white px-2 py-1 rounded">
+                                    ${tutors.length} tutors
+                                </div>
+                            </div>
+                            <div id="selected-assign-tutor-info" class="mt-3 p-3 bg-green-50 rounded-md hidden">
+                                <p class="text-sm font-medium text-green-800" id="selected-assign-tutor-text"></p>
+                            </div>
+                        </div>
+                        
+                        <!-- Initial Notes -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Initial Notes
+                                <span class="text-gray-500 text-xs font-normal">(Optional)</span>
+                            </label>
+                            <textarea id="assign-notes" 
+                                      class="w-full rounded-md border-gray-300 shadow-sm p-3 focus:ring-green-500 focus:border-green-500 transition-all"
+                                      rows="3" 
+                                      placeholder="Enter any initial notes about this student..."
+                                      maxlength="500"></textarea>
+                            <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                <span>Add any relevant information for the tutor</span>
+                                <span id="assign-notes-chars">0/500</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="flex justify-end space-x-3 pt-4 border-t">
+                            <button type="button" 
+                                    onclick="closeAssignModal()" 
+                                    class="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium">
+                                Cancel
+                            </button>
+                            <button type="submit" 
+                                    id="assign-submit-btn"
+                                    class="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center disabled:opacity-50 disabled:cursor-not-allowed">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                </svg>
+                                Assign Student
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Enhanced search function that searches anywhere in text
+ */
+function enhancedSearchFilter(options, searchTerm, searchAttribute = 'data-search-text') {
+    if (!searchTerm.trim()) {
+        // Show all options when search is empty
+        options.forEach(option => {
+            if (option.value !== "") {
+                option.style.display = 'block';
+            }
+        });
+        return options.filter(opt => opt.value !== "" && opt.style.display !== 'none');
+    }
+    
+    const searchLower = searchTerm.toLowerCase();
+    
+    options.forEach(option => {
+        if (option.value === "") {
+            // Keep placeholder visible
+            option.style.display = 'block';
+        } else {
+            // Get search text from data attribute or option text
+            const searchText = option.getAttribute(searchAttribute) || 
+                             option.textContent.toLowerCase();
             
-            if (tutor) {
-                infoDiv.classList.remove('hidden');
-                nameDiv.textContent = tutor.name;
-                detailsDiv.innerHTML = `
-                    Email: ${tutor.email} | 
-                    Subjects: ${Array.isArray(tutor.subjects) ? tutor.subjects.join(', ') : tutor.subjects || 'N/A'}
-                `;
-            } else {
-                infoDiv.classList.add('hidden');
+            // Check if search term appears anywhere in the search text
+            const isMatch = searchText.includes(searchLower);
+            option.style.display = isMatch ? 'block' : 'none';
+        }
+    });
+    
+    return options.filter(opt => opt.value !== "" && opt.style.display !== 'none');
+}
+
+/**
+ * Initialize assign modal functionality
+ */
+function initializeAssignModal(tutors) {
+    // Get DOM elements
+    const tutorSearchInput = document.getElementById('assign-search-tutors');
+    const tutorSelect = document.getElementById('assign-tutor-email');
+    const studentNameInput = document.getElementById('assign-student-name');
+    const studentGradeInput = document.getElementById('assign-student-grade');
+    const notesTextarea = document.getElementById('assign-notes');
+    const form = document.getElementById('assign-student-form');
+    const tutorInfoDiv = document.getElementById('selected-assign-tutor-info');
+    
+    // Store original options for filtering
+    const originalTutorOptions = Array.from(tutorSelect.options);
+    
+    // Initialize character counter
+    if (notesTextarea) {
+        const charCounter = document.getElementById('assign-notes-chars');
+        notesTextarea.addEventListener('input', () => {
+            if (charCounter) {
+                charCounter.textContent = `${notesTextarea.value.length}/500`;
+            }
+        });
+    }
+    
+    // Initialize tutor search functionality
+    if (tutorSearchInput && tutorSelect) {
+        tutorSearchInput.addEventListener('input', function() {
+            const searchTerm = this.value.trim();
+            const visibleOptions = enhancedSearchFilter(originalTutorOptions, searchTerm, 'data-search-text');
+            
+            // Update tutor count
+            const countElement = document.getElementById('assign-tutor-count');
+            if (countElement) {
+                countElement.textContent = `${visibleOptions.length} tutors found`;
             }
         });
         
-        // Handle form submission
-        document.getElementById('assign-student-form').addEventListener('submit', async (e) => {
+        // Clear search when clicking X in search field
+        tutorSearchInput.addEventListener('search', function() {
+            if (this.value === '') {
+                const visibleOptions = enhancedSearchFilter(originalTutorOptions, '', 'data-search-text');
+                const countElement = document.getElementById('assign-tutor-count');
+                if (countElement) {
+                    countElement.textContent = `${visibleOptions.length} tutors`;
+                }
+            }
+        });
+    }
+    
+    // Show selected tutor info
+    if (tutorSelect) {
+        tutorSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption && selectedOption.value) {
+                const tutorName = selectedOption.getAttribute('data-tutor-name') || 'Selected tutor';
+                const tutorTextElement = document.getElementById('selected-assign-tutor-text');
+                if (tutorTextElement) {
+                    const tutor = tutors.find(t => t.email === selectedOption.value);
+                    if (tutor) {
+                        const subjects = Array.isArray(tutor.subjects) ? tutor.subjects.join(', ') : (tutor.subjects || 'N/A');
+                        tutorTextElement.textContent = `Tutor: ${tutorName} | Subjects: ${subjects}`;
+                    } else {
+                        tutorTextElement.textContent = `Tutor: ${tutorName}`;
+                    }
+                }
+                if (tutorInfoDiv) {
+                    tutorInfoDiv.classList.remove('hidden');
+                }
+            } else {
+                if (tutorInfoDiv) {
+                    tutorInfoDiv.classList.add('hidden');
+                }
+            }
+        });
+    }
+    
+    // Handle form submission
+    if (form) {
+        form.addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const studentName = document.getElementById('assign-student-name').value.trim();
-            const tutorEmail = document.getElementById('assign-tutor').value;
-            const notes = document.getElementById('assign-notes').value.trim();
+            const studentName = studentNameInput.value.trim();
+            const studentGrade = studentGradeInput.value.trim();
+            const tutorEmail = tutorSelect.value;
+            const notes = notesTextarea ? notesTextarea.value.trim() : '';
             
+            // Validation
             if (!studentName) {
-                showReassignAlert("Please enter student name", 'warning');
+                showAssignAlert("Please enter student name", 'warning');
                 return;
             }
             
             if (!tutorEmail) {
-                showReassignAlert("Please select a tutor", 'warning');
+                showAssignAlert("Please select a tutor", 'warning');
                 return;
             }
             
+            // Get selected tutor
             const tutor = tutors.find(t => t.email === tutorEmail);
             
-            if (!confirm(`Assign "${studentName}" to "${tutor.name}"?`)) {
+            if (!tutor) {
+                showAssignAlert("Selected tutor not found. Please refresh and try again.", 'error');
                 return;
             }
             
-            const btn = document.getElementById('assign-submit-btn');
-            const originalText = btn.textContent;
-            btn.textContent = "Creating...";
-            btn.disabled = true;
+            // Confirmation dialog
+            const confirmed = await showAssignConfirmationDialog(
+                `Assign Student`,
+                `Are you sure you want to assign <strong>${studentName}</strong> to <strong>${tutor.name}</strong>?`,
+                'info'
+            );
             
-            try {
-                const user = window.userData?.name || 'Admin';
-                const userEmail = window.userData?.email || 'admin@system';
-                
-                // Create student document
-                const studentRef = await addDoc(collection(db, "students"), {
-                    studentName,
-                    tutorEmail: tutor.email,
-                    tutorName: tutor.name,
-                    status: 'active',
-                    createdAt: new Date().toISOString(),
-                    createdBy: user,
-                    updatedAt: new Date().toISOString(),
-                    updatedBy: user,
-                    notes: notes || '',
-                    studentFee: 0, // Default fee
-                    grade: '', // Empty by default
-                    days: '', // Empty by default
-                    subjects: [], // Empty array by default
-                    parentName: '', // Empty by default
-                    parentPhone: '', // Empty by default
-                    parentEmail: '', // Empty by default
-                    summerBreak: false,
-                    isTransitioning: false
-                });
-                
-                // Create assignment history record
-                await addDoc(collection(db, "tutorAssignments"), {
-                    studentId: studentRef.id,
-                    studentName: studentName,
-                    oldTutorEmail: '', 
-                    oldTutorName: 'Unassigned',
-                    newTutorEmail: tutor.email, 
-                    newTutorName: tutor.name,
-                    reason: 'Initial assignment', 
-                    assignedBy: user, 
-                    assignedByEmail: userEmail,
-                    assignedAt: new Date().toISOString(), 
-                    timestamp: new Date().toISOString()
-                });
-                
-                showReassignAlert(`Successfully assigned ${studentName} to ${tutor.name}!`, 'success');
-                
-                setTimeout(() => { 
-                    closeAssignModal(); 
-                    fetchAndRenderDirectory(true); 
-                }, 1500);
-                
-            } catch (error) {
-                console.error("Assignment error:", error);
-                showReassignAlert("Error: " + error.message, 'error');
-                btn.textContent = originalText;
-                btn.disabled = false;
-            }
+            if (!confirmed) return;
+            
+            // Perform assignment
+            await performAssignment(studentName, studentGrade, tutor, notes);
         });
-    }, 100);
+    }
 }
 
+/**
+ * Perform the assignment operation
+ */
+async function performAssignment(studentName, studentGrade, tutor, notes) {
+    const submitBtn = document.getElementById('assign-submit-btn');
+    const originalBtnContent = submitBtn.innerHTML;
+    
+    try {
+        // Disable button and show loading
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `
+            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Creating...
+        `;
+        
+        // Get current user info
+        const currentUser = window.userData?.name || 'Admin';
+        const currentUserEmail = window.userData?.email || 'admin@system';
+        
+        // 1. Create student document
+        const studentData = {
+            studentName: studentName,
+            tutorEmail: tutor.email,
+            tutorName: tutor.name,
+            grade: studentGrade || '',
+            status: 'active',
+            studentFee: 0, // Default fee
+            days: '', // Empty by default
+            subjects: [], // Empty array by default
+            parentName: '', // Empty by default
+            parentPhone: '', // Empty by default
+            parentEmail: '', // Empty by default
+            address: '', // Empty by default
+            notes: notes || '',
+            createdAt: new Date().toISOString(),
+            createdBy: currentUser,
+            createdByEmail: currentUserEmail,
+            updatedAt: new Date().toISOString(),
+            updatedBy: currentUser,
+            updatedByEmail: currentUserEmail,
+            summerBreak: false,
+            isTransitioning: false
+        };
+        
+        const studentRef = await addDoc(collection(db, "students"), studentData);
+        console.log("Student document created with ID:", studentRef.id);
+        
+        // 2. Create assignment history record
+        const assignmentData = {
+            studentId: studentRef.id,
+            studentName: studentName,
+            oldTutorEmail: '', 
+            oldTutorName: 'Unassigned',
+            newTutorEmail: tutor.email, 
+            newTutorName: tutor.name,
+            reason: 'Initial assignment', 
+            assignedBy: currentUser,
+            assignedByEmail: currentUserEmail,
+            assignedAt: new Date().toISOString(),
+            timestamp: new Date().toISOString()
+        };
+        
+        await addDoc(collection(db, "tutorAssignments"), assignmentData);
+        console.log("Assignment history record created");
+        
+        // 3. Update local cache
+        if (sessionCache.students) {
+            sessionCache.students.push({
+                id: studentRef.id,
+                ...studentData
+            });
+            sessionCache._lastUpdate = Date.now();
+            saveToLocalStorage('students', sessionCache.students);
+        }
+        
+        // 4. Show success message
+        showAssignAlert(`✅ Successfully assigned "${studentName}" to ${tutor.name}!`, 'success');
+        
+        // 5. Close modal and refresh directory
+        setTimeout(() => {
+            closeAssignModal();
+            fetchAndRenderDirectory(true);
+        }, 1500);
+        
+    } catch (error) {
+        console.error("Assignment error:", error);
+        showAssignAlert(`❌ Failed to assign student: ${error.message}`, 'error');
+        
+        // Restore button
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnContent;
+    }
+}
+
+/**
+ * Show confirmation dialog for assign
+ */
+function showAssignConfirmationDialog(title, message, type = 'info') {
+    return new Promise((resolve) => {
+        const dialogHtml = `
+            <div id="assign-confirmation-dialog" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+                <div class="relative bg-white w-full max-w-md rounded-lg shadow-xl">
+                    <div class="p-6">
+                        <h3 class="text-lg font-bold mb-3">${title}</h3>
+                        <div class="mb-6">${message}</div>
+                        <div class="flex justify-end space-x-3">
+                            <button id="assign-confirm-cancel" 
+                                    class="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
+                                Cancel
+                            </button>
+                            <button id="assign-confirm-ok" 
+                                    class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                                Confirm Assignment
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', dialogHtml);
+        
+        document.getElementById('assign-confirm-cancel').addEventListener('click', () => {
+            document.getElementById('assign-confirmation-dialog').remove();
+            resolve(false);
+        });
+        
+        document.getElementById('assign-confirm-ok').addEventListener('click', () => {
+            document.getElementById('assign-confirmation-dialog').remove();
+            resolve(true);
+        });
+    });
+}
+
+/**
+ * Close assign modal
+ */
 function closeAssignModal() {
     const modal = document.getElementById('assign-student-modal');
-    if (modal) modal.remove();
+    if (modal) {
+        modal.classList.add('animate-fadeOut');
+        setTimeout(() => modal.remove(), 300);
+    }
 }
 
 function closeReassignModal() {
@@ -1889,7 +2251,7 @@ function closeReassignModal() {
     if (modal) modal.remove();
 }
 
-// EXPOSE GLOBALS
+// Export function to global scope
 window.showEnhancedAssignStudentModal = showEnhancedAssignStudentModal;
 window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
 window.closeAssignModal = closeAssignModal;
@@ -8972,6 +9334,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
