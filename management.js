@@ -897,6 +897,30 @@ window.refreshAllDashboardData = async function() {
 // UPDATED SUBSECTION 3.1: Tutor Directory Panel - GROUP ASSIGNMENTS & TRANSITION LOGIC
 // ======================================================
 
+// --- MODAL MANAGEMENT FUNCTIONS (DEFINED FIRST) ---
+
+function closeManagementModal(id) { 
+    const m = document.getElementById(id); 
+    if(m) m.remove(); 
+}
+
+function closeAssignModal() {
+    const modal = document.getElementById('assign-student-modal');
+    const previewModal = document.getElementById('assign-preview-modal');
+    if (modal) modal.remove();
+    if (previewModal) previewModal.remove();
+}
+
+function closeReassignModal() {
+    const modal = document.getElementById('reassign-student-modal');
+    if (modal) modal.remove();
+}
+
+function closePreviewModal() {
+    document.getElementById('assign-preview-modal').classList.add('hidden');
+    document.getElementById('assign-preview-modal').classList.remove('flex');
+}
+
 // --- ENHANCED HELPER FUNCTIONS ---
 
 function calculateAssignmentDuration(student, previousTutorEmail) {
@@ -949,30 +973,6 @@ function getTransitionStatus(student) {
             daysLeft: daysLeft
         };
     }
-}
-
-// --- MODAL MANAGEMENT FUNCTIONS (DEFINED FIRST) ---
-
-function closeAssignModal() {
-    const modal = document.getElementById('assign-student-modal');
-    const previewModal = document.getElementById('assign-preview-modal');
-    if (modal) modal.remove();
-    if (previewModal) previewModal.remove();
-}
-
-function closeReassignModal() {
-    const modal = document.getElementById('reassign-student-modal');
-    if (modal) modal.remove();
-}
-
-function closePreviewModal() {
-    document.getElementById('assign-preview-modal').classList.add('hidden');
-    document.getElementById('assign-preview-modal').classList.remove('flex');
-}
-
-function closeManagementModal(id) { 
-    const m = document.getElementById(id); 
-    if(m) m.remove(); 
 }
 
 // --- BATCH SELECTION FUNCTIONALITY ---
@@ -1154,7 +1154,8 @@ async function renderManagementTutorView(container) {
         
         document.getElementById('view-tutor-history-directory-btn').addEventListener('click', async () => {
             if (!sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
-                alert("No tutor history available. Please refresh."); return;
+                alert("No tutor history available. Please refresh."); 
+                return;
             }
             
             const students = sessionCache.students || [];
@@ -1485,7 +1486,7 @@ function renderDirectoryFromCache(searchTerm = '') {
                                         <tr>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-10"></th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fee</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray500 uppercase">Fee</th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Days</th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
@@ -2712,31 +2713,88 @@ function updateTutorInfo(tutor) {
     }
 }
 
-// --- GLOBAL EXPOSURE FOR NEW FUNCTIONS ---
+// --- VALIDATION FUNCTIONS ---
 
-window.showEnhancedAssignStudentModal = showEnhancedAssignStudentModal;
-window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
-window.closeAssignModal = closeAssignModal;
-window.closeReassignModal = closeReassignModal;
-window.closePreviewModal = closePreviewModal;
-window.previewAssignStudent = previewAssignStudent;
-window.submitAssignStudent = submitAssignStudent;
-window.submitBatchReassignment = submitBatchReassignment;
-window.submitSingleReassignment = submitSingleReassignment;
-window.performReassignment = performReassignment;
-window.markStudentsAsTransitioning = markStudentsAsTransitioning;
-window.confirmMarkAsTransitioning = confirmMarkAsTransitioning;
-window.toggleStudentSelection = toggleStudentSelection;
-window.selectAllStudents = selectAllStudents;
-window.clearSelections = clearSelections;
-window.areAllStudentsSelected = areAllStudentsSelected;
-window.updateBatchActionButtons = updateBatchActionButtons;
-window.updateSelectionCount = updateSelectionCount;
-window.calculateAssignmentDuration = calculateAssignmentDuration;
-window.canWriteReport = canWriteReport;
-window.getTransitionStatus = getTransitionStatus;
-window.enhancedSafeSearch = enhancedSafeSearch;
-window.closeManagementModal = closeManagementModal;
+function validateReassignData(students, tutors) {
+    if (!students.length || !tutors.length) { 
+        showReassignAlert("Missing student or tutor data. Please refresh.", 'warning'); 
+        return false; 
+    }
+    return true;
+}
+
+// --- GLOBAL EXPOSURE (SINGLE DECLARATIONS ONLY) ---
+
+if (typeof window.showEnhancedAssignStudentModal === 'undefined') {
+    window.showEnhancedAssignStudentModal = showEnhancedAssignStudentModal;
+}
+if (typeof window.showEnhancedReassignStudentModal === 'undefined') {
+    window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
+}
+if (typeof window.closeAssignModal === 'undefined') {
+    window.closeAssignModal = closeAssignModal;
+}
+if (typeof window.closeReassignModal === 'undefined') {
+    window.closeReassignModal = closeReassignModal;
+}
+if (typeof window.closePreviewModal === 'undefined') {
+    window.closePreviewModal = closePreviewModal;
+}
+if (typeof window.previewAssignStudent === 'undefined') {
+    window.previewAssignStudent = previewAssignStudent;
+}
+if (typeof window.submitAssignStudent === 'undefined') {
+    window.submitAssignStudent = submitAssignStudent;
+}
+if (typeof window.submitBatchReassignment === 'undefined') {
+    window.submitBatchReassignment = submitBatchReassignment;
+}
+if (typeof window.submitSingleReassignment === 'undefined') {
+    window.submitSingleReassignment = submitSingleReassignment;
+}
+if (typeof window.performReassignment === 'undefined') {
+    window.performReassignment = performReassignment;
+}
+if (typeof window.markStudentsAsTransitioning === 'undefined') {
+    window.markStudentsAsTransitioning = markStudentsAsTransitioning;
+}
+if (typeof window.confirmMarkAsTransitioning === 'undefined') {
+    window.confirmMarkAsTransitioning = confirmMarkAsTransitioning;
+}
+if (typeof window.toggleStudentSelection === 'undefined') {
+    window.toggleStudentSelection = toggleStudentSelection;
+}
+if (typeof window.selectAllStudents === 'undefined') {
+    window.selectAllStudents = selectAllStudents;
+}
+if (typeof window.clearSelections === 'undefined') {
+    window.clearSelections = clearSelections;
+}
+if (typeof window.areAllStudentsSelected === 'undefined') {
+    window.areAllStudentsSelected = areAllStudentsSelected;
+}
+if (typeof window.updateBatchActionButtons === 'undefined') {
+    window.updateBatchActionButtons = updateBatchActionButtons;
+}
+if (typeof window.updateSelectionCount === 'undefined') {
+    window.updateSelectionCount = updateSelectionCount;
+}
+if (typeof window.calculateAssignmentDuration === 'undefined') {
+    window.calculateAssignmentDuration = calculateAssignmentDuration;
+}
+if (typeof window.canWriteReport === 'undefined') {
+    window.canWriteReport = canWriteReport;
+}
+if (typeof window.getTransitionStatus === 'undefined') {
+    window.getTransitionStatus = getTransitionStatus;
+}
+if (typeof window.enhancedSafeSearch === 'undefined') {
+    window.enhancedSafeSearch = enhancedSafeSearch;
+}
+if (typeof window.closeManagementModal === 'undefined') {
+    window.closeManagementModal = closeManagementModal;
+}
+
 // ======================================================
 // SUBSECTION 3.2: Inactive Tutors Panel
 // ======================================================
@@ -9810,6 +9868,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
