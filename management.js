@@ -897,28 +897,38 @@ window.refreshAllDashboardData = async function() {
 // UPDATED SUBSECTION 3.1: Tutor Directory Panel - GROUP ASSIGNMENTS & TRANSITION LOGIC
 // ======================================================
 
-// --- MODAL MANAGEMENT FUNCTIONS (DEFINED FIRST) ---
-
-function closeManagementModal(id) { 
-    const m = document.getElementById(id); 
-    if(m) m.remove(); 
+// Check if functions already exist before declaring them
+if (typeof closeManagementModal === 'undefined') {
+    function closeManagementModal(id) { 
+        const m = document.getElementById(id); 
+        if(m) m.remove(); 
+    }
 }
 
-function closeAssignModal() {
-    const modal = document.getElementById('assign-student-modal');
-    const previewModal = document.getElementById('assign-preview-modal');
-    if (modal) modal.remove();
-    if (previewModal) previewModal.remove();
+if (typeof closeAssignModal === 'undefined') {
+    function closeAssignModal() {
+        const modal = document.getElementById('assign-student-modal');
+        const previewModal = document.getElementById('assign-preview-modal');
+        if (modal) modal.remove();
+        if (previewModal) previewModal.remove();
+    }
 }
 
-function closeReassignModal() {
-    const modal = document.getElementById('reassign-student-modal');
-    if (modal) modal.remove();
+if (typeof closeReassignModal === 'undefined') {
+    function closeReassignModal() {
+        const modal = document.getElementById('reassign-student-modal');
+        if (modal) modal.remove();
+    }
 }
 
-function closePreviewModal() {
-    document.getElementById('assign-preview-modal').classList.add('hidden');
-    document.getElementById('assign-preview-modal').classList.remove('flex');
+if (typeof closePreviewModal === 'undefined') {
+    function closePreviewModal() {
+        const previewModal = document.getElementById('assign-preview-modal');
+        if (previewModal) {
+            previewModal.classList.add('hidden');
+            previewModal.classList.remove('flex');
+        }
+    }
 }
 
 // --- ENHANCED HELPER FUNCTIONS ---
@@ -1405,7 +1415,6 @@ function renderDirectoryFromCache(searchTerm = '') {
         const rows = assignedStudents.map(student => {
             const category = getStudentCategory(student);
             let badge = '';
-            let tooltip = '';
             
             if (category === 'transitioning-pending') {
                 const dateStr = formatBadgeDate(student.transitionDate || student.updatedAt);
@@ -1486,7 +1495,7 @@ function renderDirectoryFromCache(searchTerm = '') {
                                         <tr>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-10"></th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray500 uppercase">Fee</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fee</th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Days</th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
@@ -1796,41 +1805,49 @@ function showEnhancedAssignStudentModal(studentIds = null) {
         initializeSearchableSelect('assign-tutor');
         
         // Handle tutor selection change
-        document.getElementById('assign-tutor').addEventListener('change', function() {
-            const tutorEmail = this.value;
-            const tutor = tutors.find(t => t.email === tutorEmail);
-            const infoDiv = document.getElementById('assign-tutor-info');
-            
-            if (infoDiv) {
-                const nameDiv = document.getElementById('assign-selected-tutor-name');
-                const detailsDiv = document.getElementById('assign-selected-tutor-details');
+        const tutorSelect = document.getElementById('assign-tutor');
+        if (tutorSelect) {
+            tutorSelect.addEventListener('change', function() {
+                const tutorEmail = this.value;
+                const tutor = tutors.find(t => t.email === tutorEmail);
+                const infoDiv = document.getElementById('assign-tutor-info');
                 
-                if (tutor) {
-                    infoDiv.classList.remove('hidden');
-                    nameDiv.textContent = tutor.name;
-                    let details = `Email: ${tutor.email}`;
-                    if (tutor.phone) details += ` | Phone: ${tutor.phone}`;
-                    if (tutor.qualification) details += ` | Qualification: ${tutor.qualification}`;
-                    if (tutor.subjects && Array.isArray(tutor.subjects) && tutor.subjects.length > 0) {
-                        details += ` | Subjects: ${tutor.subjects.join(', ')}`;
+                if (infoDiv) {
+                    const nameDiv = document.getElementById('assign-selected-tutor-name');
+                    const detailsDiv = document.getElementById('assign-selected-tutor-details');
+                    
+                    if (tutor) {
+                        infoDiv.classList.remove('hidden');
+                        if (nameDiv) nameDiv.textContent = tutor.name;
+                        if (detailsDiv) {
+                            let details = `Email: ${tutor.email}`;
+                            if (tutor.phone) details += ` | Phone: ${tutor.phone}`;
+                            if (tutor.qualification) details += ` | Qualification: ${tutor.qualification}`;
+                            if (tutor.subjects && Array.isArray(tutor.subjects) && tutor.subjects.length > 0) {
+                                details += ` | Subjects: ${tutor.subjects.join(', ')}`;
+                            }
+                            detailsDiv.innerHTML = details;
+                        }
+                    } else {
+                        infoDiv.classList.add('hidden');
                     }
-                    detailsDiv.innerHTML = details;
-                } else {
-                    infoDiv.classList.add('hidden');
                 }
-            }
-        });
+            });
+        }
         
         // Handle form submission
-        document.getElementById('assign-student-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            if (isBatch) {
-                await submitBatchAssignment(selectedStudents);
-            } else {
-                previewAssignStudent();
-            }
-        });
+        const assignForm = document.getElementById('assign-student-form');
+        if (assignForm) {
+            assignForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                if (isBatch) {
+                    await submitBatchAssignment(selectedStudents);
+                } else {
+                    previewAssignStudent();
+                }
+            });
+        }
         
         // Auto-format phone number
         const phoneInput = document.getElementById('assign-parent-phone');
@@ -1849,8 +1866,8 @@ function showEnhancedAssignStudentModal(studentIds = null) {
 // --- BATCH ASSIGNMENT FUNCTION ---
 
 async function submitBatchAssignment(students) {
-    const tutorEmail = document.getElementById('assign-tutor').value;
-    const reason = document.getElementById('assign-reason').value.trim();
+    const tutorEmail = document.getElementById('assign-tutor')?.value;
+    const reason = document.getElementById('assign-reason')?.value.trim();
     
     if (!tutorEmail) {
         showReassignAlert("Please select a tutor", 'warning');
@@ -1871,9 +1888,11 @@ async function submitBatchAssignment(students) {
     }
     
     const btn = document.getElementById('assign-submit-btn');
-    const originalText = btn.textContent;
-    btn.textContent = "Processing...";
-    btn.disabled = true;
+    const originalText = btn?.textContent || "Submit";
+    if (btn) {
+        btn.textContent = "Processing...";
+        btn.disabled = true;
+    }
     
     try {
         const user = window.userData?.name || 'Admin';
@@ -1938,7 +1957,7 @@ async function submitBatchAssignment(students) {
                 successCount++;
                 
                 // Show progress
-                if (successCount % 5 === 0 || successCount === students.length) {
+                if (btn && (successCount % 5 === 0 || successCount === students.length)) {
                     btn.textContent = `Processing... ${successCount}/${students.length}`;
                 }
                 
@@ -1966,8 +1985,10 @@ async function submitBatchAssignment(students) {
     } catch (error) {
         console.error("Batch assignment error:", error);
         showReassignAlert("Error in batch assignment: " + error.message, 'error');
-        btn.textContent = originalText;
-        btn.disabled = false;
+        if (btn) {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
     }
 }
 
@@ -2126,8 +2147,8 @@ function showEnhancedReassignStudentModal(studentIds = null) {
 // --- BATCH REASSIGNMENT FUNCTION ---
 
 async function submitBatchReassignment(students) {
-    const tutorEmail = document.getElementById('reassign-tutor').value;
-    const reason = document.getElementById('reassign-reason').value.trim();
+    const tutorEmail = document.getElementById('reassign-tutor')?.value;
+    const reason = document.getElementById('reassign-reason')?.value.trim();
     
     if (!tutorEmail) {
         showReassignAlert("Please select a tutor", 'warning');
@@ -2156,9 +2177,11 @@ async function submitBatchReassignment(students) {
     }
     
     const btn = document.getElementById('reassign-submit-btn');
-    const originalText = btn.textContent;
-    btn.textContent = "Processing...";
-    btn.disabled = true;
+    const originalText = btn?.textContent || "Submit";
+    if (btn) {
+        btn.textContent = "Processing...";
+        btn.disabled = true;
+    }
     
     try {
         const user = window.userData?.name || 'Admin';
@@ -2231,7 +2254,7 @@ async function submitBatchReassignment(students) {
                 successCount++;
                 
                 // Show progress
-                if (successCount % 5 === 0 || successCount === students.length) {
+                if (btn && (successCount % 5 === 0 || successCount === students.length)) {
                     btn.textContent = `Processing... ${successCount}/${students.length}`;
                 }
                 
@@ -2262,17 +2285,19 @@ async function submitBatchReassignment(students) {
     } catch (error) {
         console.error("Batch reassignment error:", error);
         showReassignAlert("Error in batch reassignment: " + error.message, 'error');
-        btn.textContent = originalText;
-        btn.disabled = false;
+        if (btn) {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
     }
 }
 
 // --- SINGLE REASSIGNMENT FUNCTION (UPDATED) ---
 
 async function submitSingleReassignment() {
-    const studentId = document.getElementById('reassign-student').value;
-    const tutorEmail = document.getElementById('reassign-tutor').value;
-    const reason = document.getElementById('reassign-reason').value.trim();
+    const studentId = document.getElementById('reassign-student')?.value;
+    const tutorEmail = document.getElementById('reassign-tutor')?.value;
+    const reason = document.getElementById('reassign-reason')?.value.trim();
     
     if (!studentId || !tutorEmail) {
         showReassignAlert("Please select both a student and a tutor", 'warning');
@@ -2289,7 +2314,7 @@ async function submitSingleReassignment() {
     
     const student = students.find(s => s.id === studentId);
     const newTutor = tutors.find(t => t.email === tutorEmail);
-    const currentTutor = tutors.find(t => t.email === student.tutorEmail);
+    const currentTutor = tutors.find(t => t.email === student?.tutorEmail);
     
     if (!student || !newTutor) {
         showReassignAlert("Student or tutor not found", 'error');
@@ -2319,9 +2344,11 @@ async function submitSingleReassignment() {
 
 async function performReassignment(student, newTutor, reason, currentTutor, shouldMarkTransitioning = false, previousDuration = 0) {
     const btn = document.getElementById('reassign-submit-btn');
-    const originalText = btn.textContent;
-    btn.textContent = "Processing..."; 
-    btn.disabled = true;
+    const originalText = btn?.textContent || "Submit";
+    if (btn) {
+        btn.textContent = "Processing..."; 
+        btn.disabled = true;
+    }
     
     try {
         const user = window.userData?.name || 'Admin';
@@ -2384,8 +2411,10 @@ async function performReassignment(student, newTutor, reason, currentTutor, shou
     } catch (e) {
         console.error("Reassignment error:", e);
         showReassignAlert("Error: " + e.message, 'error'); 
-        btn.textContent = originalText;
-        btn.disabled = false;
+        if (btn) {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
     }
 }
 
@@ -2447,7 +2476,7 @@ async function markStudentsAsTransitioning(studentIds) {
 }
 
 async function confirmMarkAsTransitioning(studentIds) {
-    const reason = document.getElementById('transition-reason').value.trim();
+    const reason = document.getElementById('transition-reason')?.value.trim();
     
     if (!reason) {
         showReassignAlert("Please enter a reason for transitioning", 'warning');
@@ -2503,20 +2532,20 @@ async function confirmMarkAsTransitioning(studentIds) {
 
 function previewAssignStudent() {
     // Get form values
-    const studentName = document.getElementById('assign-student-name').value.trim();
-    const grade = document.getElementById('assign-grade').value.trim();
-    const days = document.getElementById('assign-days').value.trim();
-    const studentFee = parseFloat(document.getElementById('assign-fee').value) || 0;
-    const parentName = document.getElementById('assign-parent-name').value.trim();
-    const parentPhone = document.getElementById('assign-parent-phone').value.trim();
-    const parentEmail = document.getElementById('assign-parent-email').value.trim();
-    const address = document.getElementById('assign-address').value.trim();
-    const school = document.getElementById('assign-school').value.trim();
-    const location = document.getElementById('assign-location').value.trim();
-    const subjects = document.getElementById('assign-subjects').value.trim();
-    const tutorEmail = document.getElementById('assign-tutor').value;
-    const status = document.getElementById('assign-status').value;
-    const notes = document.getElementById('assign-notes').value.trim();
+    const studentName = document.getElementById('assign-student-name')?.value.trim();
+    const grade = document.getElementById('assign-grade')?.value.trim();
+    const days = document.getElementById('assign-days')?.value.trim();
+    const studentFee = parseFloat(document.getElementById('assign-fee')?.value) || 0;
+    const parentName = document.getElementById('assign-parent-name')?.value.trim();
+    const parentPhone = document.getElementById('assign-parent-phone')?.value.trim();
+    const parentEmail = document.getElementById('assign-parent-email')?.value.trim();
+    const address = document.getElementById('assign-address')?.value.trim();
+    const school = document.getElementById('assign-school')?.value.trim();
+    const location = document.getElementById('assign-location')?.value.trim();
+    const subjects = document.getElementById('assign-subjects')?.value.trim();
+    const tutorEmail = document.getElementById('assign-tutor')?.value;
+    const status = document.getElementById('assign-status')?.value;
+    const notes = document.getElementById('assign-notes')?.value.trim();
     
     // Validate required fields
     if (!studentName) {
@@ -2555,7 +2584,7 @@ function previewAssignStudent() {
             <div>${tutor ? tutor.name : 'Not selected'} (${tutorEmail})</div>
             
             <div class="font-medium text-gray-700">Status:</div>
-            <div>${status.charAt(0).toUpperCase() + status.slice(1)}</div>
+            <div>${status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Active'}</div>
             
             <div class="font-medium text-gray-700">Parent Name:</div>
             <div>${parentName || 'Not specified'}</div>
@@ -2580,36 +2609,45 @@ function previewAssignStudent() {
         </div>
     `;
     
-    document.getElementById('preview-content').innerHTML = previewHTML;
-    document.getElementById('assign-preview-modal').classList.remove('hidden');
-    document.getElementById('assign-preview-modal').classList.add('flex');
+    const previewContent = document.getElementById('preview-content');
+    if (previewContent) {
+        previewContent.innerHTML = previewHTML;
+    }
+    
+    const previewModal = document.getElementById('assign-preview-modal');
+    if (previewModal) {
+        previewModal.classList.remove('hidden');
+        previewModal.classList.add('flex');
+    }
 }
 
 async function submitAssignStudent() {
     // Get form values
-    const studentName = document.getElementById('assign-student-name').value.trim();
-    const grade = document.getElementById('assign-grade').value.trim();
-    const days = document.getElementById('assign-days').value.trim();
-    const studentFee = parseFloat(document.getElementById('assign-fee').value) || 0;
-    const parentName = document.getElementById('assign-parent-name').value.trim();
-    const parentPhone = document.getElementById('assign-parent-phone').value.trim();
-    const parentEmail = document.getElementById('assign-parent-email').value.trim();
-    const address = document.getElementById('assign-address').value.trim();
-    const school = document.getElementById('assign-school').value.trim();
-    const location = document.getElementById('assign-location').value.trim();
-    const subjects = document.getElementById('assign-subjects').value.trim();
-    const tutorEmail = document.getElementById('assign-tutor').value;
-    const status = document.getElementById('assign-status').value;
-    const notes = document.getElementById('assign-notes').value.trim();
+    const studentName = document.getElementById('assign-student-name')?.value.trim();
+    const grade = document.getElementById('assign-grade')?.value.trim();
+    const days = document.getElementById('assign-days')?.value.trim();
+    const studentFee = parseFloat(document.getElementById('assign-fee')?.value) || 0;
+    const parentName = document.getElementById('assign-parent-name')?.value.trim();
+    const parentPhone = document.getElementById('assign-parent-phone')?.value.trim();
+    const parentEmail = document.getElementById('assign-parent-email')?.value.trim();
+    const address = document.getElementById('assign-address')?.value.trim();
+    const school = document.getElementById('assign-school')?.value.trim();
+    const location = document.getElementById('assign-location')?.value.trim();
+    const subjects = document.getElementById('assign-subjects')?.value.trim();
+    const tutorEmail = document.getElementById('assign-tutor')?.value;
+    const status = document.getElementById('assign-status')?.value || 'active';
+    const notes = document.getElementById('assign-notes')?.value.trim();
     
     // Get tutor info
     const tutors = getCleanTutors();
     const tutor = tutors.find(t => t.email === tutorEmail);
     
     const btn = document.getElementById('assign-submit-btn');
-    const originalText = btn.textContent;
-    btn.textContent = "Creating...";
-    btn.disabled = true;
+    const originalText = btn?.textContent || "Submit";
+    if (btn) {
+        btn.textContent = "Creating...";
+        btn.disabled = true;
+    }
     
     try {
         const user = window.userData?.name || 'Admin';
@@ -2620,19 +2658,19 @@ async function submitAssignStudent() {
         
         // Create student document
         const studentData = {
-            studentName,
+            studentName: studentName || '',
             grade: grade || '',
             days: days || '',
-            studentFee,
+            studentFee: studentFee || 0,
             parentName: parentName || '',
             parentPhone: parentPhone || '',
             parentEmail: parentEmail || '',
             address: address || '',
             school: school || '',
             location: location || '',
-            tutorEmail: tutor.email,
-            tutorName: tutor.name,
-            status,
+            tutorEmail: tutor?.email || '',
+            tutorName: tutor?.name || '',
+            status: status,
             notes: notes || '',
             subjects: subjectsArray,
             summerBreak: false,
@@ -2648,11 +2686,11 @@ async function submitAssignStudent() {
         // Create assignment history record
         await addDoc(collection(db, "tutorAssignments"), {
             studentId: studentRef.id,
-            studentName: studentName,
+            studentName: studentName || '',
             oldTutorEmail: '', 
             oldTutorName: 'Unassigned',
-            newTutorEmail: tutor.email, 
-            newTutorName: tutor.name,
+            newTutorEmail: tutor?.email || '', 
+            newTutorName: tutor?.name || '',
             reason: 'Initial assignment', 
             assignedBy: user, 
             assignedByEmail: userEmail,
@@ -2660,7 +2698,7 @@ async function submitAssignStudent() {
             timestamp: new Date().toISOString()
         });
         
-        showReassignAlert(`Successfully assigned ${studentName} to ${tutor.name}!`, 'success');
+        showReassignAlert(`Successfully assigned ${studentName} to ${tutor?.name || 'tutor'}!`, 'success');
         
         setTimeout(() => { 
             closePreviewModal();
@@ -2671,8 +2709,10 @@ async function submitAssignStudent() {
     } catch (error) {
         console.error("Assignment error:", error);
         showReassignAlert("Error: " + error.message, 'error');
-        btn.textContent = originalText;
-        btn.disabled = false;
+        if (btn) {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
     }
 }
 
@@ -2683,15 +2723,15 @@ function updateStudentInfo(student) {
     const nameDiv = document.getElementById('selected-student-name');
     const detailsDiv = document.getElementById('selected-student-details');
     
-    if (student) {
+    if (student && infoDiv && nameDiv && detailsDiv) {
         infoDiv.classList.remove('hidden');
-        nameDiv.textContent = student.studentName;
+        nameDiv.textContent = student.studentName || '';
         detailsDiv.innerHTML = `
             Grade: ${student.grade || 'N/A'} | 
             Fee: ₦${(student.studentFee || 0).toFixed(2)} | 
             Current Tutor: ${student.tutorName || 'Unassigned'}
         `;
-    } else {
+    } else if (infoDiv) {
         infoDiv.classList.add('hidden');
     }
 }
@@ -2701,14 +2741,14 @@ function updateTutorInfo(tutor) {
     const nameDiv = document.getElementById('selected-tutor-name');
     const detailsDiv = document.getElementById('selected-tutor-details');
     
-    if (tutor) {
+    if (tutor && infoDiv && nameDiv && detailsDiv) {
         infoDiv.classList.remove('hidden');
-        nameDiv.textContent = tutor.name;
+        nameDiv.textContent = tutor.name || '';
         detailsDiv.innerHTML = `
-            Email: ${tutor.email} | 
+            Email: ${tutor.email || 'N/A'} | 
             Subjects: ${Array.isArray(tutor.subjects) ? tutor.subjects.join(', ') : tutor.subjects || 'N/A'}
         `;
-    } else {
+    } else if (infoDiv) {
         infoDiv.classList.add('hidden');
     }
 }
@@ -2721,78 +2761,6 @@ function validateReassignData(students, tutors) {
         return false; 
     }
     return true;
-}
-
-// --- GLOBAL EXPOSURE (SINGLE DECLARATIONS ONLY) ---
-
-if (typeof window.showEnhancedAssignStudentModal === 'undefined') {
-    window.showEnhancedAssignStudentModal = showEnhancedAssignStudentModal;
-}
-if (typeof window.showEnhancedReassignStudentModal === 'undefined') {
-    window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
-}
-if (typeof window.closeAssignModal === 'undefined') {
-    window.closeAssignModal = closeAssignModal;
-}
-if (typeof window.closeReassignModal === 'undefined') {
-    window.closeReassignModal = closeReassignModal;
-}
-if (typeof window.closePreviewModal === 'undefined') {
-    window.closePreviewModal = closePreviewModal;
-}
-if (typeof window.previewAssignStudent === 'undefined') {
-    window.previewAssignStudent = previewAssignStudent;
-}
-if (typeof window.submitAssignStudent === 'undefined') {
-    window.submitAssignStudent = submitAssignStudent;
-}
-if (typeof window.submitBatchReassignment === 'undefined') {
-    window.submitBatchReassignment = submitBatchReassignment;
-}
-if (typeof window.submitSingleReassignment === 'undefined') {
-    window.submitSingleReassignment = submitSingleReassignment;
-}
-if (typeof window.performReassignment === 'undefined') {
-    window.performReassignment = performReassignment;
-}
-if (typeof window.markStudentsAsTransitioning === 'undefined') {
-    window.markStudentsAsTransitioning = markStudentsAsTransitioning;
-}
-if (typeof window.confirmMarkAsTransitioning === 'undefined') {
-    window.confirmMarkAsTransitioning = confirmMarkAsTransitioning;
-}
-if (typeof window.toggleStudentSelection === 'undefined') {
-    window.toggleStudentSelection = toggleStudentSelection;
-}
-if (typeof window.selectAllStudents === 'undefined') {
-    window.selectAllStudents = selectAllStudents;
-}
-if (typeof window.clearSelections === 'undefined') {
-    window.clearSelections = clearSelections;
-}
-if (typeof window.areAllStudentsSelected === 'undefined') {
-    window.areAllStudentsSelected = areAllStudentsSelected;
-}
-if (typeof window.updateBatchActionButtons === 'undefined') {
-    window.updateBatchActionButtons = updateBatchActionButtons;
-}
-if (typeof window.updateSelectionCount === 'undefined') {
-    window.updateSelectionCount = updateSelectionCount;
-}
-if (typeof window.calculateAssignmentDuration === 'undefined') {
-    window.calculateAssignmentDuration = calculateAssignmentDuration;
-}
-if (typeof window.canWriteReport === 'undefined') {
-    window.canWriteReport = canWriteReport;
-}
-if (typeof window.getTransitionStatus === 'undefined') {
-    window.getTransitionStatus = getTransitionStatus;
-}
-if (typeof window.enhancedSafeSearch === 'undefined') {
-    window.enhancedSafeSearch = enhancedSafeSearch;
-}
-if (typeof window.closeManagementModal === 'undefined') {
-    window.closeManagementModal = closeManagementModal;
 }
 
 // ======================================================
@@ -9868,6 +9836,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
