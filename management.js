@@ -894,202 +894,182 @@ window.refreshAllDashboardData = async function() {
 };
 
 // ======================================================
-// SUBSECTION 3.1: Tutor Directory Panel - BOOLEAN & DATE FIX
+// UPDATED SUBSECTION 3.1: Tutor Directory Panel - GROUP ASSIGNMENTS & TRANSITION LOGIC
 // ======================================================
 
-// --- HELPER FUNCTIONS ---
+// --- ENHANCED HELPER FUNCTIONS ---
 
-function safeToString(value) {
-    if (value === null || value === undefined) return '';
-    if (typeof value === 'object') {
-        try { return JSON.stringify(value); } catch (e) { return ''; }
-    }
-    return String(value);
+function calculateAssignmentDuration(student, previousTutorEmail) {
+    if (!student || !previousTutorEmail || !sessionCache.tutorAssignments) return 0;
+    
+    const assignments = sessionCache.tutorAssignments[student.id] || [];
+    
+    // Find the most recent assignment to the previous tutor
+    const previousAssignment = assignments
+        .filter(a => a.newTutorEmail === previousTutorEmail)
+        .sort((a, b) => new Date(b.assignedAt) - new Date(a.assignedAt))[0];
+    
+    if (!previousAssignment || !previousAssignment.assignedAt) return 0;
+    
+    const assignmentDate = new Date(previousAssignment.assignedAt);
+    const now = new Date();
+    const diffTime = Math.abs(now - assignmentDate);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays;
 }
 
-function safeSearch(text, searchTerm) {
-    if (!searchTerm || safeToString(searchTerm).trim() === '') return true;
-    if (!text) return false;
-    return safeToString(text).toLowerCase().includes(safeToString(searchTerm).toLowerCase());
+function canWriteReport(student) {
+    if (!student.isTransitioning) return true;
+    
+    if (!student.transitionDate) return false;
+    
+    const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
+    const transitionStart = new Date(student.transitionDate);
+    const now = new Date();
+    const weeksWithTutor = (now - transitionStart);
+    
+    return weeksWithTutor >= TWO_WEEKS_MS;
 }
 
-// Helper to format dates for badges
-function formatBadgeDate(dateString) {
-    if (!dateString) return '';
-    try {
-        const d = new Date(dateString);
-        if (isNaN(d.getTime())) return ''; // Invalid date
-        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-    } catch (e) {
-        return '';
+function getTransitionStatus(student) {
+    if (!student.isTransitioning) return { status: 'active', canReport: true };
+    
+    if (!student.transitionDate) return { status: 'transitioning-new', canReport: false };
+    
+    const daysInTransition = calculateAssignmentDuration(student, student.tutorEmail);
+    
+    if (daysInTransition >= 14) {
+        return { status: 'transitioning-eligible', canReport: true };
+    } else {
+        const daysLeft = 14 - daysInTransition;
+        return { 
+            status: 'transitioning-pending', 
+            canReport: false,
+            daysLeft: daysLeft
+        };
     }
 }
 
-function searchStudentFromFirebase(student, searchTerm, tutors = []) {
-    if (!student) return false;
-    if (!searchTerm || safeToString(searchTerm).trim() === '') return true;
-    
-    const searchLower = safeToString(searchTerm).toLowerCase();
-    
-    // Check Status Logic for Search
-    if (safeToString(searchTerm).toLowerCase() === 'break' && student.summerBreak === true) return true;
-    if (safeToString(searchTerm).toLowerCase() === 'transitioning' && student.isTransitioning === true) return true;
+// --- BATCH SELECTION FUNCTIONALITY ---
 
-    const studentFieldsToSearch = [
-        'studentName', 'grade', 'days', 'parentName', 'parentPhone', 
-        'parentEmail', 'address', 'status', 'tutorEmail', 'tutorName',
-        'createdBy', 'updatedBy', 'notes', 'school', 'location'
-    ];
-    
-    for (const field of studentFieldsToSearch) {
-        if (student[field] && safeSearch(student[field], searchTerm)) return true;
+let selectedStudents = new Set();
+
+function toggleStudentSelection(studentId, tutorEmail = null) {
+    if (selectedStudents.has(studentId)) {
+        selectedStudents.delete(studentId);
+    } else {
+        selectedStudents.add(studentId);
     }
     
-    if (student.studentFee !== undefined && student.studentFee !== null) {
-        if (safeToString(student.studentFee).includes(searchLower)) return true;
+    updateBatchActionButtons();
+    updateSelectionCount();
+}
+
+function selectAllStudents(tutorEmail) {
+    const tutors = sessionCache.tutors || [];
+    const students = sessionCache.students || [];
+    
+    const tutorStudents = students.filter(s => s.tutorEmail === tutorEmail);
+    
+    if (areAllStudentsSelected(tutorEmail)) {
+        // Deselect all
+        tutorStudents.forEach(s => selectedStudents.delete(s.id));
+    } else {
+        // Select all
+        tutorStudents.forEach(s => selectedStudents.add(s.id));
     }
     
-    if (student.subjects) {
-        if (Array.isArray(student.subjects)) {
-            for (const subject of student.subjects) {
-                if (safeSearch(subject, searchTerm)) return true;
-            }
+    updateBatchActionButtons();
+    updateSelectionCount();
+}
+
+function areAllStudentsSelected(tutorEmail) {
+    const tutors = sessionCache.tutors || [];
+    const students = sessionCache.students || [];
+    
+    const tutorStudents = students.filter(s => s.tutorEmail === tutorEmail);
+    return tutorStudents.length > 0 && tutorStudents.every(s => selectedStudents.has(s.id));
+}
+
+function updateSelectionCount() {
+    const countBadge = document.getElementById('selected-count-badge');
+    if (countBadge) {
+        countBadge.textContent = selectedStudents.size;
+        if (selectedStudents.size > 0) {
+            countBadge.classList.remove('hidden');
         } else {
-            if (safeSearch(student.subjects, searchTerm)) return true;
+            countBadge.classList.add('hidden');
         }
     }
-    
-    if (student.tutorEmail && tutors && tutors.length > 0) {
-        const tutor = tutors.find(t => t && t.email === student.tutorEmail);
-        if (tutor) {
-            const tutorFieldsToSearch = ['name', 'email', 'phone', 'qualification', 'subjects'];
-            for (const field of tutorFieldsToSearch) {
-                if (tutor[field] && safeSearch(tutor[field], searchTerm)) return true;
-            }
-        }
-    }
-    
-    return false;
 }
 
-// --- ENHANCED SELECT WITH SEARCH FUNCTIONALITY ---
-
-function createSearchableSelect(options, placeholder = "Select...", id = '', isTutor = false) {
-    // options should be array of objects with id/value and label
-    const uniqueOptions = [];
-    const seen = new Set();
+function updateBatchActionButtons() {
+    const assignBtn = document.getElementById('assign-selected-btn');
+    const reassignBtn = document.getElementById('reassign-selected-btn');
+    const transitionBtn = document.getElementById('transition-selected-btn');
     
-    options.forEach(opt => {
-        const key = isTutor ? opt.email : opt.id;
-        if (!seen.has(key)) {
-            seen.add(key);
-            uniqueOptions.push(opt);
-        }
-    });
+    const hasSelection = selectedStudents.size > 0;
     
-    return `
-        <div class="relative w-full">
-            <input type="text" 
-                   id="${id}-search" 
-                   placeholder="Type to search ${isTutor ? 'tutor' : 'student'}..." 
-                   class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                   autocomplete="off">
-            <select id="${id}" 
-                    class="hidden"
-                    ${isTutor ? 'data-is-tutor="true"' : ''}>
-                <option value="">${placeholder}</option>
-                ${uniqueOptions.map(opt => `
-                    <option value="${isTutor ? opt.email : opt.id}" 
-                            data-label="${isTutor ? opt.name : opt.studentName}">
-                        ${isTutor ? opt.name : opt.studentName} 
-                        ${isTutor && opt.email ? `(${opt.email})` : ''}
-                    </option>
-                `).join('')}
-            </select>
-            <div id="${id}-dropdown" 
-                 class="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg hidden max-h-60 overflow-y-auto">
-                ${uniqueOptions.map(opt => `
-                    <div class="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                         data-value="${isTutor ? opt.email : opt.id}"
-                         data-label="${isTutor ? opt.name : opt.studentName}">
-                        <div class="font-medium">${isTutor ? opt.name : opt.studentName}</div>
-                        ${isTutor && opt.email ? `<div class="text-xs text-gray-500">${opt.email}</div>` : ''}
-                        ${!isTutor && opt.grade ? `<div class="text-xs text-gray-500">Grade: ${opt.grade}</div>` : ''}
-                    </div>
-                `).join('')}
-            </div>
-        </div>`;
+    if (assignBtn) assignBtn.disabled = !hasSelection;
+    if (reassignBtn) reassignBtn.disabled = !hasSelection;
+    if (transitionBtn) transitionBtn.disabled = !hasSelection;
 }
 
-function initializeSearchableSelect(selectId) {
-    const searchInput = document.getElementById(`${selectId}-search`);
-    const dropdown = document.getElementById(`${selectId}-dropdown`);
-    const hiddenSelect = document.getElementById(selectId);
+function clearSelections() {
+    selectedStudents.clear();
+    updateBatchActionButtons();
+    updateSelectionCount();
     
-    if (!searchInput || !dropdown || !hiddenSelect) return;
-    
-    // Show dropdown on focus
-    searchInput.addEventListener('focus', () => {
-        dropdown.classList.remove('hidden');
+    // Uncheck all checkboxes
+    document.querySelectorAll('.student-checkbox').forEach(cb => {
+        cb.checked = false;
     });
     
-    // Filter options based on search
-    searchInput.addEventListener('input', (e) => {
-        const searchTerm = e.target.value.toLowerCase();
-        const items = dropdown.querySelectorAll('div[data-value]');
-        let hasVisible = false;
-        
-        items.forEach(item => {
-            const label = item.getAttribute('data-label').toLowerCase();
-            const email = item.querySelector('.text-xs')?.textContent.toLowerCase() || '';
-            const matches = label.includes(searchTerm) || email.includes(searchTerm);
-            
-            item.style.display = matches ? 'block' : 'none';
-            if (matches) hasVisible = true;
-        });
-        
-        dropdown.style.display = hasVisible ? 'block' : 'none';
-    });
-    
-    // Handle item selection
-    dropdown.addEventListener('click', (e) => {
-        const item = e.target.closest('div[data-value]');
-        if (item) {
-            const value = item.getAttribute('data-value');
-            const label = item.getAttribute('data-label');
-            
-            searchInput.value = label;
-            hiddenSelect.value = value;
-            
-            // Trigger change event on hidden select
-            hiddenSelect.dispatchEvent(new Event('change'));
-            dropdown.classList.add('hidden');
-        }
-    });
-    
-    // Close dropdown when clicking outside
-    document.addEventListener('click', (e) => {
-        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
-            dropdown.classList.add('hidden');
-        }
+    document.querySelectorAll('.select-all-checkbox').forEach(cb => {
+        cb.checked = false;
+        cb.indeterminate = false;
     });
 }
 
-// --- MAIN VIEW RENDERER ---
+// --- MAIN VIEW RENDERER (UPDATED FOR BATCH SELECTION) ---
 
 async function renderManagementTutorView(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
-                <h2 class="text-2xl font-bold text-green-700">Tutor & Student Directory</h2>
+                <div class="flex items-center gap-4">
+                    <h2 class="text-2xl font-bold text-green-700">Tutor & Student Directory</h2>
+                    <div class="relative">
+                        <span id="selected-count-badge" class="hidden absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
+                            0
+                        </span>
+                    </div>
+                </div>
                 <div class="flex items-center gap-4 flex-wrap">
                     <input type="search" id="directory-search" placeholder="Search Tutors, Students, Parents..." class="p-2 border rounded-md w-64">
                     <button id="assign-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Assign New Student</button>
-                    <button id="reassign-student-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Reassign Student</button>
-                    <button id="view-tutor-history-directory-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">View Tutor History</button>
+                    <button id="assign-selected-btn" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 disabled:opacity-50" disabled>Assign Selected</button>
+                    <button id="reassign-selected-btn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50" disabled>Reassign Selected</button>
+                    <button id="transition-selected-btn" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 disabled:opacity-50" disabled>Mark Selected as Transitioning</button>
+                    <button id="view-tutor-history-directory-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">View History</button>
                     <button id="refresh-directory-btn" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Refresh</button>
                 </div>
             </div>
+            
+            <div class="mb-4 p-3 bg-blue-50 rounded-md hidden" id="batch-actions-info">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <span id="selected-students-count">0</span> student(s) selected
+                        <button onclick="clearSelections()" class="ml-4 text-sm text-blue-600 hover:text-blue-800">Clear Selection</button>
+                    </div>
+                    <div class="space-x-2">
+                        <button id="quick-assign-btn" class="text-sm bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600">Quick Assign</button>
+                        <button id="quick-reassign-btn" class="text-sm bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">Quick Reassign</button>
+                    </div>
+                </div>
+            </div>
+            
             <div class="flex space-x-4 mb-4">
                 <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
                     <h4 class="font-bold text-green-800 text-sm">Active Tutors</h4>
@@ -1100,8 +1080,12 @@ async function renderManagementTutorView(container) {
                     <p id="student-count-badge" class="text-2xl font-extrabold">0</p>
                 </div>
                 <div class="bg-purple-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-purple-800 text-sm">History Records</h4>
-                    <p id="history-count-badge" class="text-2xl font-extrabold">0</p>
+                    <h4 class="font-bold text-purple-800 text-sm">Transitioning</h4>
+                    <p id="transition-count-badge" class="text-2xl font-extrabold">0</p>
+                </div>
+                <div class="bg-blue-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-blue-800 text-sm">Group Actions</h4>
+                    <p id="group-ready-badge" class="text-2xl font-extrabold">0</p>
                 </div>
             </div>
             <div id="directory-list" class="space-y-4">
@@ -1111,23 +1095,38 @@ async function renderManagementTutorView(container) {
     `;
     
     try {
-        // Event Listeners - ADD ASSIGN BUTTON LISTENER HERE
-        document.getElementById('assign-student-btn').addEventListener('click', () => {
-            if (typeof window.showEnhancedAssignStudentModal === 'function') {
-                window.showEnhancedAssignStudentModal();
-            } else {
-                console.error('Assign student modal function not found');
-                alert('Please refresh the page and try again.');
+        // Event Listeners for new batch buttons
+        document.getElementById('assign-selected-btn').addEventListener('click', () => {
+            if (selectedStudents.size > 0) {
+                showEnhancedAssignStudentModal(Array.from(selectedStudents));
             }
         });
 
-        document.getElementById('reassign-student-btn').addEventListener('click', () => {
-            if (typeof window.showEnhancedReassignStudentModal === 'function') window.showEnhancedReassignStudentModal();
+        document.getElementById('reassign-selected-btn').addEventListener('click', () => {
+            if (selectedStudents.size > 0) {
+                showEnhancedReassignStudentModal(Array.from(selectedStudents));
+            }
         });
 
-        document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
+        document.getElementById('transition-selected-btn').addEventListener('click', async () => {
+            if (selectedStudents.size > 0) {
+                await markStudentsAsTransitioning(Array.from(selectedStudents));
+            }
+        });
+
+        document.getElementById('assign-student-btn').addEventListener('click', () => {
+            showEnhancedAssignStudentModal();
+        });
+
+        document.getElementById('refresh-directory-btn').addEventListener('click', () => {
+            clearSelections();
+            fetchAndRenderDirectory(true);
+        });
         
-        document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
+        document.getElementById('directory-search').addEventListener('input', (e) => {
+            clearSelections();
+            renderDirectoryFromCache(e.target.value);
+        });
         
         document.getElementById('view-tutor-history-directory-btn').addEventListener('click', async () => {
             if (!sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
@@ -1136,7 +1135,6 @@ async function renderManagementTutorView(container) {
             
             const students = sessionCache.students || [];
             
-            // Create modal with searchable student selector
             const modalHtml = `
                 <div id="select-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
                     <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
@@ -1162,7 +1160,6 @@ async function renderManagementTutorView(container) {
             
             document.body.insertAdjacentHTML('beforeend', modalHtml);
             
-            // Initialize the searchable select
             setTimeout(() => {
                 initializeSearchableSelect('select-student');
                 
@@ -1181,16 +1178,23 @@ async function renderManagementTutorView(container) {
                 }
             }, 100);
         });
+        
+        // Initialize batch action info panel
+        updateBatchActionButtons();
+        
     } catch (e) { console.error(e); }
     
     fetchAndRenderDirectory();
 }
 
-// --- DATA FETCHING ---
+// --- UPDATED DATA FETCHING WITH TRANSITION COUNTS ---
 
 async function fetchAndRenderDirectory(forceRefresh = false) {
     if (forceRefresh) {
-        invalidateCache('tutors'); invalidateCache('students'); invalidateCache('tutorAssignments');
+        invalidateCache('tutors'); 
+        invalidateCache('students'); 
+        invalidateCache('tutorAssignments');
+        clearSelections();
     }
 
     try {
@@ -1209,22 +1213,24 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
         const allTutors = tutorsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
         const activeTutors = allTutors.filter(t => !t.status || t.status === 'active');
         
-        // --- PROCESS STUDENTS WITH BOOLEANS ---
+        // Process students with enhanced transition logic
         const allStudents = studentsSnapshot.docs.map(doc => {
             const data = doc.data();
+            const transitionStatus = getTransitionStatus(data);
+            
             return { 
                 ...data, 
                 id: doc.id,
-                // FORCE BOOLEAN CONVERSION
                 summerBreak: data.summerBreak === true,
                 isTransitioning: data.isTransitioning === true,
-                // Capture Dates
+                canWriteReport: transitionStatus.canReport,
+                transitionStatus: transitionStatus.status,
+                daysLeftInTransition: transitionStatus.daysLeft,
                 breakDate: data.breakDate || data.updatedAt,
                 transitionDate: data.transitionDate || data.updatedAt
             };
         });
         
-        // Permissive Filter: Only hide Archived/Deleted. Show everyone else.
         const nonArchivedStudents = allStudents.filter(s => {
             const st = (s.status || '').toLowerCase();
             return !st.includes('archived') && !st.includes('deleted');
@@ -1245,6 +1251,14 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             tutorAssignments[studentId].sort((a, b) => new Date(b.assignedAt || 0) - new Date(a.assignedAt || 0));
         });
         
+        // Calculate transition counts
+        const transitioningStudents = nonArchivedStudents.filter(s => s.isTransitioning);
+        const transitionCounts = {
+            total: transitioningStudents.length,
+            eligible: transitioningStudents.filter(s => s.canWriteReport).length,
+            pending: transitioningStudents.filter(s => !s.canWriteReport).length
+        };
+        
         // Save to cache
         saveToLocalStorage('tutors', activeTutors);
         saveToLocalStorage('students', nonArchivedStudents); 
@@ -1252,6 +1266,16 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
         sessionCache._lastUpdate = Date.now();
         
         renderDirectoryFromCache();
+        
+        // Update transition count badge
+        if (document.getElementById('transition-count-badge')) {
+            document.getElementById('transition-count-badge').textContent = transitionCounts.total;
+        }
+        
+        // Update group ready badge
+        if (document.getElementById('group-ready-badge')) {
+            document.getElementById('group-ready-badge').textContent = selectedStudents.size;
+        }
         
     } catch (error) {
         console.error(error);
@@ -1261,7 +1285,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
     }
 }
 
-// --- RENDER LOGIC ---
+// --- UPDATED RENDER LOGIC WITH CHECKBOXES ---
 
 function renderDirectoryFromCache(searchTerm = '') {
     const tutors = sessionCache.tutors || [];
@@ -1271,7 +1295,8 @@ function renderDirectoryFromCache(searchTerm = '') {
     
     if (!directoryList) return;
     if (tutors.length === 0 && students.length === 0) {
-        directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">No data found.</p>`; return;
+        directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">No data found.</p>`; 
+        return;
     }
 
     const studentsByTutor = {};
@@ -1294,23 +1319,25 @@ function renderDirectoryFromCache(searchTerm = '') {
     });
 
     if (searchTerm && filteredTutors.length === 0) {
-        directoryList.innerHTML = `<p class="text-center py-10">No results found.</p>`; return;
+        directoryList.innerHTML = `<p class="text-center py-10">No results found.</p>`; 
+        return;
     }
 
-    // --- CATEGORIZATION LOGIC (The "Bucket" Sorter) ---
+    // Get student category with enhanced transition status
     const getStudentCategory = (s) => {
-        // Priority 1: Transitioning Boolean
-        if (s.isTransitioning === true) return 'transitioning';
+        if (s.isTransitioning === true) {
+            if (s.canWriteReport) {
+                return 'transitioning-eligible';
+            } else {
+                return 'transitioning-pending';
+            }
+        }
         
-        // Priority 2: Summer Break Boolean
         if (s.summerBreak === true) return 'break';
         
-        // Priority 3: Fallback Status Text check
         const st = (s.status || '').toLowerCase();
         if (st.includes('break') || st.includes('suspended') || st.includes('inactive')) return 'break';
-        if (st.includes('transition')) return 'transitioning';
         
-        // Default
         return 'active';
     };
 
@@ -1323,25 +1350,44 @@ function renderDirectoryFromCache(searchTerm = '') {
     const canDeleteStudents = window.userData?.permissions?.actions?.canDeleteStudents === true;
     const showActionsColumn = canEditStudents || canDeleteStudents;
 
-    // --- RENDER CARDS ---
+    // Show/hide batch actions info panel
+    const batchInfoPanel = document.getElementById('batch-actions-info');
+    if (batchInfoPanel) {
+        if (selectedStudents.size > 0) {
+            batchInfoPanel.classList.remove('hidden');
+            document.getElementById('selected-students-count').textContent = selectedStudents.size;
+        } else {
+            batchInfoPanel.classList.add('hidden');
+        }
+    }
+
+    // Render cards
     directoryList.innerHTML = filteredTutors.map(tutor => {
         const assignedStudents = (studentsByTutor[tutor.email] || [])
             .filter(student => !searchTerm || searchStudentFromFirebase(student, searchTerm, tutors) || safeSearch(tutor.name, searchTerm))
             .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
 
-        // Calculate specific counts for THIS tutor
+        // Calculate counts for this tutor
         const breakCount = assignedStudents.filter(s => getStudentCategory(s) === 'break').length;
-        const transCount = assignedStudents.filter(s => getStudentCategory(s) === 'transitioning').length;
+        const transEligibleCount = assignedStudents.filter(s => getStudentCategory(s) === 'transitioning-eligible').length;
+        const transPendingCount = assignedStudents.filter(s => getStudentCategory(s) === 'transitioning-pending').length;
         const activeCount = assignedStudents.filter(s => getStudentCategory(s) === 'active').length;
         const totalCount = assignedStudents.length;
+        
+        const allSelected = areAllStudentsSelected(tutor.email);
+        const someSelected = assignedStudents.some(s => selectedStudents.has(s.id)) && !allSelected;
 
         const rows = assignedStudents.map(student => {
             const category = getStudentCategory(student);
             let badge = '';
+            let tooltip = '';
             
-            if (category === 'transitioning') {
+            if (category === 'transitioning-pending') {
                 const dateStr = formatBadgeDate(student.transitionDate || student.updatedAt);
-                badge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 ml-2">Transitioning ${dateStr ? `(since ${dateStr})` : ''}</span>`;
+                badge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 ml-2" title="Cannot write reports for ${student.daysLeftInTransition || 'some'} more days">⏳ Transitioning</span>`;
+            } else if (category === 'transitioning-eligible') {
+                const dateStr = formatBadgeDate(student.transitionDate || student.updatedAt);
+                badge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2" title="Can write reports">✓ Transitioning</span>`;
             } else if (category === 'break') {
                 const dateStr = formatBadgeDate(student.breakDate || student.updatedAt);
                 badge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 ml-2">On Break ${dateStr ? `(since ${dateStr})` : ''}</span>`;
@@ -1360,7 +1406,18 @@ function renderDirectoryFromCache(searchTerm = '') {
 
             return `
                 <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3 align-middle"><div class="flex items-center font-medium">${student.studentName} ${badge}</div></td>
+                    <td class="px-4 py-3 align-middle">
+                        <input type="checkbox" 
+                               class="student-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
+                               data-student-id="${student.id}"
+                               ${selectedStudents.has(student.id) ? 'checked' : ''}
+                               onchange="toggleStudentSelection('${student.id}', '${tutor.email}')">
+                    </td>
+                    <td class="px-4 py-3 align-middle">
+                        <div class="flex items-center font-medium">
+                            ${student.studentName} ${badge}
+                        </div>
+                    </td>
                     <td class="px-4 py-3 align-middle">₦${(student.studentFee||0).toFixed(2)}</td>
                     <td class="px-4 py-3 align-middle">${student.grade||'-'}</td>
                     <td class="px-4 py-3 align-middle">${student.days||'-'}</td>
@@ -1375,12 +1432,20 @@ function renderDirectoryFromCache(searchTerm = '') {
             <div class="border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden">
                 <details open>
                     <summary class="p-5 cursor-pointer flex justify-between bg-gradient-to-r from-gray-50 to-white border-b">
-                        <div>
-                            <h3 class="text-lg font-semibold text-green-700">${tutor.name} <span class="text-sm font-normal text-gray-500">(${tutor.email})</span></h3>
-                            <div class="mt-1 flex gap-2">
-                                <span class="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-800">${activeCount} Active</span>
-                                ${breakCount > 0 ? `<span class="px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-800">${breakCount} On Break</span>` : ''}
-                                ${transCount > 0 ? `<span class="px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-800">${transCount} Transitioning</span>` : ''}
+                        <div class="flex items-center space-x-3">
+                            <input type="checkbox" 
+                                   class="select-all-checkbox h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
+                                   ${allSelected ? 'checked' : ''}
+                                   ${someSelected ? 'indeterminate' : ''}
+                                   onchange="selectAllStudents('${tutor.email}')">
+                            <div>
+                                <h3 class="text-lg font-semibold text-green-700">${tutor.name} <span class="text-sm font-normal text-gray-500">(${tutor.email})</span></h3>
+                                <div class="mt-1 flex gap-2">
+                                    <span class="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-800">${activeCount} Active</span>
+                                    ${breakCount > 0 ? `<span class="px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-800">${breakCount} On Break</span>` : ''}
+                                    ${transEligibleCount > 0 ? `<span class="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-800 border border-green-300">${transEligibleCount} Transitioning ✓</span>` : ''}
+                                    ${transPendingCount > 0 ? `<span class="px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-800 border border-purple-300">${transPendingCount} Transitioning ⏳</span>` : ''}
+                                </div>
                             </div>
                         </div>
                         <div class="flex items-center space-x-2">
@@ -1390,10 +1455,24 @@ function renderDirectoryFromCache(searchTerm = '') {
                     </summary>
                     <div class="bg-white">
                         ${assignedStudents.length > 0 ? `
-                            <div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50"><tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fee</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grade</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Days</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Parent</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>${showActionsColumn?`<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>`:''}</tr></thead>
-                                <tbody class="divide-y divide-gray-200">${rows}</tbody>
-                            </table></div>` 
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-10"></th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fee</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Days</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Parent</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                                            ${showActionsColumn?`<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>`:''}
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200">${rows}</tbody>
+                                </table>
+                            </div>` 
                         : `<div class="p-8 text-center text-gray-500">No students assigned.</div>`}
                     </div>
                 </details>
@@ -1406,463 +1485,234 @@ function renderDirectoryFromCache(searchTerm = '') {
     document.querySelectorAll('.view-history-btn').forEach(b => b.addEventListener('click', () => {
         if(window.viewStudentTutorHistory) window.viewStudentTutorHistory(b.dataset.studentId);
     }));
-}
-
-// ======================================================
-// ENHANCED REASSIGN MODAL (With Searchable Selectors)
-// ======================================================
-
-function isCacheValid(keys) {
-    if (!sessionCache) return false;
-    for(let k of keys) if(!sessionCache[k] || !sessionCache[k].length) return false;
-    return (Date.now() - (sessionCache._lastUpdate||0)) < 300000;
-}
-
-function getCleanStudents() { 
-    return (sessionCache.students || [])
-        .filter(s => !s.status || !s.status.toLowerCase().includes('archived')); 
-}
-
-function getCleanTutors() { 
-    return (sessionCache.tutors || [])
-        .filter(t => !t.status || t.status === 'active'); 
-}
-
-function validateReassignData(students, tutors) {
-    if (!students.length || !tutors.length) { 
-        showReassignAlert("Missing student or tutor data. Please refresh.", 'warning'); 
-        return false; 
-    }
-    return true;
-}
-
-function createEnhancedReassignModalHtml(students, tutors) {
-    return `
-    <div id="reassign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white w-full max-w-lg rounded-lg shadow-xl p-6">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-bold text-blue-700">Reassign Student</h3>
-                <button onclick="closeReassignModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
-            </div>
-            <form id="reassign-student-form">
-                <div class="mb-4">
-                    <label class="block text-sm font-medium mb-2 text-gray-700">Select Student</label>
-                    ${createSearchableSelect(
-                        students.map(s => ({ 
-                            id: s.id, 
-                            studentName: s.studentName,
-                            grade: s.grade,
-                            currentTutor: s.tutorName || 'Unassigned'
-                        })), 
-                        "Type student name...", 
-                        "reassign-student"
-                    )}
-                </div>
-                
-                <div id="student-info" class="mb-4 p-3 bg-blue-50 rounded-md hidden">
-                    <div class="text-sm">
-                        <div class="font-medium" id="selected-student-name"></div>
-                        <div class="text-gray-600" id="selected-student-details"></div>
-                    </div>
-                </div>
-                
-                <div class="mb-4">
-                    <label class="block text-sm font-medium mb-2 text-gray-700">Select New Tutor</label>
-                    ${createSearchableSelect(
-                        tutors.map(t => ({ 
-                            email: t.email, 
-                            name: t.name,
-                            subjects: t.subjects || []
-                        })), 
-                        "Type tutor name or email...", 
-                        "reassign-tutor",
-                        true
-                    )}
-                </div>
-                
-                <div id="tutor-info" class="mb-4 p-3 bg-green-50 rounded-md hidden">
-                    <div class="text-sm">
-                        <div class="font-medium" id="selected-tutor-name"></div>
-                        <div class="text-gray-600" id="selected-tutor-details"></div>
-                    </div>
-                </div>
-                
-                <div class="mb-6">
-                    <label class="block text-sm font-medium mb-2 text-gray-700">Reason for Reassignment</label>
-                    <textarea id="reassign-reason" 
-                              class="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-                              rows="3" 
-                              placeholder="Enter reason for reassignment..."></textarea>
-                </div>
-                
-                <div class="flex justify-end gap-3">
-                    <button type="button" 
-                            onclick="closeReassignModal()" 
-                            class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
-                        Cancel
-                    </button>
-                    <button type="submit" 
-                            id="reassign-submit-btn" 
-                            class="px-5 py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                        Confirm Reassignment
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>`;
-}
-
-function updateStudentInfo(student) {
-    const infoDiv = document.getElementById('student-info');
-    const nameDiv = document.getElementById('selected-student-name');
-    const detailsDiv = document.getElementById('selected-student-details');
     
-    if (student) {
-        infoDiv.classList.remove('hidden');
-        nameDiv.textContent = student.studentName;
-        detailsDiv.innerHTML = `
-            Grade: ${student.grade || 'N/A'} | 
-            Fee: ₦${(student.studentFee || 0).toFixed(2)} | 
-            Current Tutor: ${student.tutorName || 'Unassigned'}
-        `;
-    } else {
-        infoDiv.classList.add('hidden');
-    }
+    // Update indeterminate checkboxes
+    document.querySelectorAll('.select-all-checkbox').forEach(cb => {
+        const tutorEmail = cb.closest('summary').querySelector('h3').textContent.match(/\(([^)]+)\)/)?.[1];
+        if (tutorEmail) {
+            const assignedStudents = studentsByTutor[tutorEmail] || [];
+            const someSelected = assignedStudents.some(s => selectedStudents.has(s.id));
+            const allSelected = assignedStudents.every(s => selectedStudents.has(s.id));
+            cb.indeterminate = someSelected && !allSelected;
+        }
+    });
 }
 
-function updateTutorInfo(tutor) {
-    const infoDiv = document.getElementById('tutor-info');
-    const nameDiv = document.getElementById('selected-tutor-name');
-    const detailsDiv = document.getElementById('selected-tutor-details');
-    
-    if (tutor) {
-        infoDiv.classList.remove('hidden');
-        nameDiv.textContent = tutor.name;
-        detailsDiv.innerHTML = `
-            Email: ${tutor.email} | 
-            Subjects: ${Array.isArray(tutor.subjects) ? tutor.subjects.join(', ') : tutor.subjects || 'N/A'}
-        `;
-    } else {
-        infoDiv.classList.add('hidden');
-    }
-}
+// --- BATCH ASSIGNMENT MODAL ---
 
-async function performReassignment(student, newTutor, reason, currentTutor) {
-    const btn = document.getElementById('reassign-submit-btn');
-    const originalText = btn.textContent;
-    btn.textContent = "Processing..."; 
-    btn.disabled = true;
-    
-    try {
-        const user = window.userData?.name || 'Admin';
-        const userEmail = window.userData?.email || 'admin@system';
-        
-        // 1. Create assignment history record
-        await addDoc(collection(db, "tutorAssignments"), {
-            studentId: student.id, 
-            studentName: student.studentName,
-            oldTutorEmail: student.tutorEmail || '', 
-            oldTutorName: currentTutor?.name || 'Unassigned',
-            newTutorEmail: newTutor.email, 
-            newTutorName: newTutor.name,
-            reason, 
-            assignedBy: user, 
-            assignedByEmail: userEmail,
-            assignedAt: new Date().toISOString(), 
-            timestamp: new Date().toISOString()
-        });
-        
-        // 2. Update student record
-        await updateDoc(doc(db, "students", student.id), {
-            tutorEmail: newTutor.email, 
-            tutorName: newTutor.name,
-            updatedAt: new Date().toISOString(), 
-            updatedBy: user
-        });
-        
-        // 3. Show success
-        showReassignAlert(`Successfully reassigned ${student.studentName} to ${newTutor.name}!`, 'success');
-        
-        // 4. Refresh and close
-        setTimeout(() => { 
-            closeReassignModal(); 
-            fetchAndRenderDirectory(true); 
-        }, 1500);
-        
-    } catch (e) {
-        console.error("Reassignment error:", e);
-        showReassignAlert("Error: " + e.message, 'error'); 
-        btn.textContent = originalText;
-        btn.disabled = false;
-    }
-}
-
-function showReassignAlert(msg, type) {
-    // Remove any existing alerts
-    document.querySelectorAll('.reassign-alert').forEach(el => el.remove());
-    
-    const alert = document.createElement('div');
-    alert.className = `fixed top-4 right-4 p-4 rounded-md shadow-lg z-50 reassign-alert ${
-        type === 'error' ? 'bg-red-500' : 
-        type === 'warning' ? 'bg-yellow-500' : 
-        'bg-green-500'
-    } text-white`;
-    alert.textContent = msg; 
-    document.body.appendChild(alert);
-    
-    setTimeout(() => alert.remove(), 4000);
-}
-
-function showEnhancedReassignStudentModal() {
-    if (!isCacheValid(['students', 'tutors'])) { 
-        showReassignAlert("Refreshing data...", 'info');
-        fetchAndRenderDirectory(true);
-        setTimeout(() => showEnhancedReassignStudentModal(), 1000);
-        return;
-    }
-    
-    const students = getCleanStudents();
-    const tutors = getCleanTutors();
-    
-    if (!validateReassignData(students, tutors)) return;
-    
-    // Remove existing modal if any
-    closeReassignModal();
-    
-    document.body.insertAdjacentHTML('beforeend', createEnhancedReassignModalHtml(students, tutors));
-    
-    // Initialize searchable selects
-    setTimeout(() => {
-        initializeSearchableSelect('reassign-student');
-        initializeSearchableSelect('reassign-tutor');
-        
-        // Handle student selection change
-        document.getElementById('reassign-student').addEventListener('change', function() {
-            const studentId = this.value;
-            const student = students.find(s => s.id === studentId);
-            updateStudentInfo(student);
-        });
-        
-        // Handle tutor selection change
-        document.getElementById('reassign-tutor').addEventListener('change', function() {
-            const tutorEmail = this.value;
-            const tutor = tutors.find(t => t.email === tutorEmail);
-            updateTutorInfo(tutor);
-        });
-        
-        // Handle form submission
-        document.getElementById('reassign-student-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const studentId = document.getElementById('reassign-student').value;
-            const tutorEmail = document.getElementById('reassign-tutor').value;
-            const reason = document.getElementById('reassign-reason').value.trim();
-            
-            if (!studentId || !tutorEmail) {
-                showReassignAlert("Please select both a student and a tutor", 'warning');
-                return;
-            }
-            
-            if (!reason) {
-                showReassignAlert("Please enter a reason for reassignment", 'warning');
-                return;
-            }
-            
-            const student = students.find(s => s.id === studentId);
-            const newTutor = tutors.find(t => t.email === tutorEmail);
-            const currentTutor = tutors.find(t => t.email === student.tutorEmail);
-            
-            // Check if trying to reassign to same tutor
-            if (student.tutorEmail === tutorEmail) {
-                showReassignAlert("Student is already assigned to this tutor", 'warning');
-                return;
-            }
-            
-            // Confirmation dialog
-            if (confirm(`Reassign ${student.studentName} from "${currentTutor?.name || 'Unassigned'}" to "${newTutor.name}"?`)) {
-                await performReassignment(student, newTutor, reason, currentTutor);
-            }
-        });
-    }, 100);
-}
-
-function closeReassignModal() {
-    const modal = document.getElementById('reassign-student-modal');
-    if (modal) modal.remove();
-}
-
-// ======================================================
-// ENHANCED ASSIGN STUDENT MODAL (New Feature)
-// ======================================================
-
-function showEnhancedAssignStudentModal() {
+function showEnhancedAssignStudentModal(studentIds = null) {
     if (!isCacheValid(['tutors'])) { 
         showReassignAlert("Refreshing tutor data...", 'info');
         fetchAndRenderDirectory(true);
-        setTimeout(() => showEnhancedAssignStudentModal(), 1000);
+        setTimeout(() => showEnhancedAssignStudentModal(studentIds), 1000);
         return;
     }
     
     const tutors = getCleanTutors();
+    const students = getCleanStudents();
     
     if (!tutors.length) {
         showReassignAlert("No active tutors available", 'warning');
         return;
     }
     
+    const isBatch = Array.isArray(studentIds) && studentIds.length > 0;
+    const selectedStudents = isBatch ? students.filter(s => studentIds.includes(s.id)) : [];
+    
     const modalHtml = `
     <div id="assign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
         <div class="bg-white w-full max-w-4xl rounded-lg shadow-xl p-6 my-8">
             <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-bold text-green-700">Assign New Student</h3>
+                <div>
+                    <h3 class="text-xl font-bold text-green-700">${isBatch ? 'Assign Selected Students' : 'Assign New Student'}</h3>
+                    ${isBatch ? `<p class="text-sm text-gray-600 mt-1">${selectedStudents.length} student(s) selected</p>` : ''}
+                </div>
                 <button onclick="closeAssignModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
             </div>
+            
+            ${isBatch ? `
+                <div class="mb-6 p-4 bg-blue-50 rounded-lg">
+                    <h4 class="font-medium text-blue-800 mb-2">Selected Students:</h4>
+                    <div class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                        ${selectedStudents.map(s => `
+                            <div class="text-sm p-2 bg-white rounded border">
+                                ${s.studentName} (${s.grade || 'No grade'}) - ${s.tutorName || 'Unassigned'}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+            
             <form id="assign-student-form" class="space-y-4">
-                <!-- Basic Information -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium mb-2 text-gray-700">Student Name *</label>
-                        <input type="text" 
-                               id="assign-student-name" 
-                               class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
-                               placeholder="Enter student full name"
-                               required>
+                ${!isBatch ? `
+                    <!-- Only show student creation fields for single assignment -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2 text-gray-700">Student Name *</label>
+                            <input type="text" 
+                                   id="assign-student-name" 
+                                   class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                                   placeholder="Enter student full name"
+                                   required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2 text-gray-700">Grade</label>
+                            <input type="text" 
+                                   id="assign-grade" 
+                                   class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                                   placeholder="e.g., Grade 10">
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-2 text-gray-700">Grade</label>
-                        <input type="text" 
-                               id="assign-grade" 
-                               class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
-                               placeholder="e.g., Grade 10">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2 text-gray-700">Days</label>
+                            <input type="text" 
+                                   id="assign-days" 
+                                   class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                                   placeholder="e.g., Monday, Wednesday, Friday">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2 text-gray-700">Monthly Fee (₦) *</label>
+                            <input type="number" 
+                                   id="assign-fee" 
+                                   class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                                   placeholder="0.00"
+                                   step="0.01"
+                                   min="0"
+                                   required>
+                        </div>
                     </div>
-                </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium mb-2 text-gray-700">Days</label>
-                        <input type="text" 
-                               id="assign-days" 
-                               class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
-                               placeholder="e.g., Monday, Wednesday, Friday">
+                    
+                    <div class="border-t pt-4">
+                        <h4 class="font-medium text-gray-700 mb-3">Parent Information</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2 text-gray-700">Parent Name</label>
+                                <input type="text" 
+                                       id="assign-parent-name" 
+                                       class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                                       placeholder="Parent full name">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2 text-gray-700">Parent Phone</label>
+                                <input type="tel" 
+                                       id="assign-parent-phone" 
+                                       class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                                       placeholder="080XXXXXXXXX">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2 text-gray-700">Parent Email</label>
+                                <input type="email" 
+                                       id="assign-parent-email" 
+                                       class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                                       placeholder="parent@example.com">
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-2 text-gray-700">Monthly Fee (₦) *</label>
-                        <input type="number" 
-                               id="assign-fee" 
-                               class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
-                               placeholder="0.00"
-                               step="0.01"
-                               min="0"
-                               required>
-                    </div>
-                </div>
-                
-                <!-- Parent Information -->
-                <div class="border-t pt-4">
-                    <h4 class="font-medium text-gray-700 mb-3">Parent Information</h4>
+                    
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label class="block text-sm font-medium mb-2 text-gray-700">Parent Name</label>
+                            <label class="block text-sm font-medium mb-2 text-gray-700">School</label>
                             <input type="text" 
-                                   id="assign-parent-name" 
+                                   id="assign-school" 
                                    class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
-                                   placeholder="Parent full name">
+                                   placeholder="School name">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium mb-2 text-gray-700">Parent Phone</label>
-                            <input type="tel" 
-                                   id="assign-parent-phone" 
+                            <label class="block text-sm font-medium mb-2 text-gray-700">Location</label>
+                            <input type="text" 
+                                   id="assign-location" 
                                    class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
-                                   placeholder="080XXXXXXXXX">
+                                   placeholder="City/Area">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium mb-2 text-gray-700">Parent Email</label>
-                            <input type="email" 
-                                   id="assign-parent-email" 
+                            <label class="block text-sm font-medium mb-2 text-gray-700">Address</label>
+                            <input type="text" 
+                                   id="assign-address" 
                                    class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
-                                   placeholder="parent@example.com">
+                                   placeholder="Full address">
                         </div>
                     </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2 text-gray-700">Subjects</label>
+                            <input type="text" 
+                                   id="assign-subjects" 
+                                   class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                                   placeholder="e.g., Mathematics, Physics (comma separated)">
+                        </div>
+                ` : ''}
+                
+                <div class="${!isBatch ? '' : 'col-span-2'}">
+                    <label class="block text-sm font-medium mb-2 text-gray-700">Select Tutor *</label>
+                    ${createSearchableSelect(
+                        tutors.map(t => ({ 
+                            email: t.email, 
+                            name: t.name,
+                            subjects: t.subjects || [],
+                            phone: t.phone || '',
+                            qualification: t.qualification || ''
+                        })), 
+                        "Type tutor name or email...", 
+                        "assign-tutor",
+                        true
+                    )}
                 </div>
                 
-                <!-- School Information -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium mb-2 text-gray-700">School</label>
-                        <input type="text" 
-                               id="assign-school" 
-                               class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
-                               placeholder="School name">
+                ${!isBatch ? `
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-2 text-gray-700">Location</label>
-                        <input type="text" 
-                               id="assign-location" 
-                               class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
-                               placeholder="City/Area">
+                    
+                    <div id="assign-tutor-info" class="p-3 bg-green-50 rounded-md hidden">
+                        <div class="text-sm">
+                            <div class="font-medium" id="assign-selected-tutor-name"></div>
+                            <div class="text-gray-600" id="assign-selected-tutor-details"></div>
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-2 text-gray-700">Address</label>
-                        <input type="text" 
-                               id="assign-address" 
-                               class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
-                               placeholder="Full address">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2 text-gray-700">Status</label>
+                            <select id="assign-status" 
+                                    class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                                <option value="active">Active</option>
+                                <option value="pending">Pending</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="break">On Break</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2 text-gray-700">${isBatch ? 'Batch Notes' : 'Initial Notes'}</label>
+                            <textarea id="assign-notes" 
+                                      class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                                      rows="3" 
+                                      placeholder="${isBatch ? 'Enter notes for this batch assignment...' : 'Enter any initial notes...'}"></textarea>
+                        </div>
                     </div>
-                </div>
-                
-                <!-- Subjects & Tutor -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium mb-2 text-gray-700">Subjects</label>
-                        <input type="text" 
-                               id="assign-subjects" 
-                               class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
-                               placeholder="e.g., Mathematics, Physics (comma separated)">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-2 text-gray-700">Select Tutor *</label>
-                        ${createSearchableSelect(
-                            tutors.map(t => ({ 
-                                email: t.email, 
-                                name: t.name,
-                                subjects: t.subjects || [],
-                                phone: t.phone || '',
-                                qualification: t.qualification || ''
-                            })), 
-                            "Type tutor name or email...", 
-                            "assign-tutor",
-                            true
-                        )}
-                    </div>
-                </div>
-                
-                <div id="assign-tutor-info" class="p-3 bg-green-50 rounded-md hidden">
-                    <div class="text-sm">
-                        <div class="font-medium" id="assign-selected-tutor-name"></div>
-                        <div class="text-gray-600" id="assign-selected-tutor-details"></div>
-                    </div>
-                </div>
-                
-                <!-- Status & Notes -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium mb-2 text-gray-700">Status</label>
-                        <select id="assign-status" 
-                                class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
-                            <option value="active">Active</option>
-                            <option value="pending">Pending</option>
-                            <option value="inactive">Inactive</option>
-                            <option value="break">On Break</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-2 text-gray-700">Initial Notes</label>
-                        <textarea id="assign-notes" 
-                                  class="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                ` : `
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium mb-2 text-gray-700">Reason for Batch Assignment</label>
+                        <textarea id="assign-reason" 
+                                  class="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" 
                                   rows="3" 
-                                  placeholder="Enter any initial notes..."></textarea>
+                                  placeholder="Enter reason for assigning these students..."></textarea>
                     </div>
-                </div>
+                    
+                    <div class="p-4 bg-yellow-50 rounded-md">
+                        <div class="flex items-start">
+                            <svg class="w-5 h-5 text-yellow-600 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                            </svg>
+                            <div class="text-sm text-yellow-700">
+                                <p class="font-medium">Batch Assignment Notice:</p>
+                                <p class="mt-1">This will assign ${selectedStudents.length} student(s) to the selected tutor. 
+                                Students who were with their previous tutor for less than 2 weeks will be marked as "transitioning" 
+                                and won't be able to write reports until they complete 2 weeks with the new tutor.</p>
+                            </div>
+                        </div>
+                    </div>
+                `}
                 
                 <!-- Form Actions -->
                 <div class="flex justify-end gap-3 pt-4 border-t">
@@ -1871,41 +1721,45 @@ function showEnhancedAssignStudentModal() {
                             class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
                         Cancel
                     </button>
-                    <button type="button"
-                            onclick="previewAssignStudent()"
-                            class="px-5 py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
-                        Preview
-                    </button>
+                    ${!isBatch ? `
+                        <button type="button"
+                                onclick="previewAssignStudent()"
+                                class="px-5 py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                            Preview
+                        </button>
+                    ` : ''}
                     <button type="submit" 
                             id="assign-submit-btn" 
                             class="px-5 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                        Assign Student
+                        ${isBatch ? `Assign ${selectedStudents.length} Student(s)` : 'Assign Student'}
                     </button>
                 </div>
             </form>
         </div>
     </div>
     
-    <!-- Preview Modal -->
-    <div id="assign-preview-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center p-4 z-[60]">
-        <div class="bg-white w-full max-w-2xl rounded-lg shadow-xl p-6">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-bold text-blue-700">Preview Student Assignment</h3>
-                <button onclick="closePreviewModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
-            </div>
-            <div id="preview-content" class="space-y-3 text-sm"></div>
-            <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
-                <button onclick="closePreviewModal()"
-                        class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
-                    Back to Edit
-                </button>
-                <button onclick="submitAssignStudent()"
-                        class="px-5 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
-                    Confirm & Assign
-                </button>
+    ${!isBatch ? `
+        <!-- Preview Modal (only for single assignment) -->
+        <div id="assign-preview-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center p-4 z-[60]">
+            <div class="bg-white w-full max-w-2xl rounded-lg shadow-xl p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-blue-700">Preview Student Assignment</h3>
+                    <button onclick="closePreviewModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                <div id="preview-content" class="space-y-3 text-sm"></div>
+                <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
+                    <button onclick="closePreviewModal()"
+                            class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
+                        Back to Edit
+                    </button>
+                    <button onclick="submitAssignStudent()"
+                            class="px-5 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+                        Confirm & Assign
+                    </button>
+                </div>
             </div>
         </div>
-    </div>`;
+    ` : ''}`;
     
     // Remove existing modal if any
     const existingModal = document.getElementById('assign-student-modal');
@@ -1913,7 +1767,6 @@ function showEnhancedAssignStudentModal() {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
-    // Initialize searchable select
     setTimeout(() => {
         initializeSearchableSelect('assign-tutor');
         
@@ -1922,28 +1775,36 @@ function showEnhancedAssignStudentModal() {
             const tutorEmail = this.value;
             const tutor = tutors.find(t => t.email === tutorEmail);
             const infoDiv = document.getElementById('assign-tutor-info');
-            const nameDiv = document.getElementById('assign-selected-tutor-name');
-            const detailsDiv = document.getElementById('assign-selected-tutor-details');
             
-            if (tutor) {
-                infoDiv.classList.remove('hidden');
-                nameDiv.textContent = tutor.name;
-                let details = `Email: ${tutor.email}`;
-                if (tutor.phone) details += ` | Phone: ${tutor.phone}`;
-                if (tutor.qualification) details += ` | Qualification: ${tutor.qualification}`;
-                if (tutor.subjects && Array.isArray(tutor.subjects) && tutor.subjects.length > 0) {
-                    details += ` | Subjects: ${tutor.subjects.join(', ')}`;
+            if (infoDiv) {
+                const nameDiv = document.getElementById('assign-selected-tutor-name');
+                const detailsDiv = document.getElementById('assign-selected-tutor-details');
+                
+                if (tutor) {
+                    infoDiv.classList.remove('hidden');
+                    nameDiv.textContent = tutor.name;
+                    let details = `Email: ${tutor.email}`;
+                    if (tutor.phone) details += ` | Phone: ${tutor.phone}`;
+                    if (tutor.qualification) details += ` | Qualification: ${tutor.qualification}`;
+                    if (tutor.subjects && Array.isArray(tutor.subjects) && tutor.subjects.length > 0) {
+                        details += ` | Subjects: ${tutor.subjects.join(', ')}`;
+                    }
+                    detailsDiv.innerHTML = details;
+                } else {
+                    infoDiv.classList.add('hidden');
                 }
-                detailsDiv.innerHTML = details;
-            } else {
-                infoDiv.classList.add('hidden');
             }
         });
         
         // Handle form submission
         document.getElementById('assign-student-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            previewAssignStudent();
+            
+            if (isBatch) {
+                await submitBatchAssignment(selectedStudents);
+            } else {
+                previewAssignStudent();
+            }
         });
         
         // Auto-format phone number
@@ -1960,268 +1821,683 @@ function showEnhancedAssignStudentModal() {
     }, 100);
 }
 
-function previewAssignStudent() {
-    // Get form values
-    const studentName = document.getElementById('assign-student-name').value.trim();
-    const grade = document.getElementById('assign-grade').value.trim();
-    const days = document.getElementById('assign-days').value.trim();
-    const studentFee = parseFloat(document.getElementById('assign-fee').value) || 0;
-    const parentName = document.getElementById('assign-parent-name').value.trim();
-    const parentPhone = document.getElementById('assign-parent-phone').value.trim();
-    const parentEmail = document.getElementById('assign-parent-email').value.trim();
-    const address = document.getElementById('assign-address').value.trim();
-    const school = document.getElementById('assign-school').value.trim();
-    const location = document.getElementById('assign-location').value.trim();
-    const subjects = document.getElementById('assign-subjects').value.trim();
+// --- BATCH ASSIGNMENT FUNCTION ---
+
+async function submitBatchAssignment(students) {
     const tutorEmail = document.getElementById('assign-tutor').value;
-    const status = document.getElementById('assign-status').value;
-    const notes = document.getElementById('assign-notes').value.trim();
-    
-    // Validate required fields
-    if (!studentName) {
-        showReassignAlert("Please enter student name", 'warning');
-        return;
-    }
+    const reason = document.getElementById('assign-reason').value.trim();
     
     if (!tutorEmail) {
         showReassignAlert("Please select a tutor", 'warning');
         return;
     }
     
-    // Get tutor info
+    if (!reason) {
+        showReassignAlert("Please enter a reason for batch assignment", 'warning');
+        return;
+    }
+    
     const tutors = getCleanTutors();
     const tutor = tutors.find(t => t.email === tutorEmail);
     
-    // Build preview HTML
-    const previewHTML = `
-        <div class="grid grid-cols-2 gap-3">
-            <div class="font-medium text-gray-700">Student Name:</div>
-            <div>${studentName}</div>
-            
-            <div class="font-medium text-gray-700">Grade:</div>
-            <div>${grade || 'Not specified'}</div>
-            
-            <div class="font-medium text-gray-700">Days:</div>
-            <div>${days || 'Not specified'}</div>
-            
-            <div class="font-medium text-gray-700">Monthly Fee:</div>
-            <div>₦${studentFee.toFixed(2)}</div>
-            
-            <div class="font-medium text-gray-700">Subjects:</div>
-            <div>${subjects || 'Not specified'}</div>
-            
-            <div class="font-medium text-gray-700">Assigned Tutor:</div>
-            <div>${tutor ? tutor.name : 'Not selected'} (${tutorEmail})</div>
-            
-            <div class="font-medium text-gray-700">Status:</div>
-            <div>${status.charAt(0).toUpperCase() + status.slice(1)}</div>
-            
-            <div class="font-medium text-gray-700">Parent Name:</div>
-            <div>${parentName || 'Not specified'}</div>
-            
-            <div class="font-medium text-gray-700">Parent Phone:</div>
-            <div>${parentPhone || 'Not specified'}</div>
-            
-            <div class="font-medium text-gray-700">Parent Email:</div>
-            <div>${parentEmail || 'Not specified'}</div>
-            
-            <div class="font-medium text-gray-700">School:</div>
-            <div>${school || 'Not specified'}</div>
-            
-            <div class="font-medium text-gray-700">Location:</div>
-            <div>${location || 'Not specified'}</div>
-            
-            <div class="font-medium text-gray-700">Address:</div>
-            <div>${address || 'Not specified'}</div>
-            
-            <div class="font-medium text-gray-700">Notes:</div>
-            <div>${notes || 'None'}</div>
-        </div>
-    `;
-    
-    document.getElementById('preview-content').innerHTML = previewHTML;
-    document.getElementById('assign-preview-modal').classList.remove('hidden');
-    document.getElementById('assign-preview-modal').classList.add('flex');
-}
-
-function closePreviewModal() {
-    document.getElementById('assign-preview-modal').classList.add('hidden');
-    document.getElementById('assign-preview-modal').classList.remove('flex');
-}
-
-async function submitAssignStudent() {
-    // Get form values
-    const studentName = document.getElementById('assign-student-name').value.trim();
-    const grade = document.getElementById('assign-grade').value.trim();
-    const days = document.getElementById('assign-days').value.trim();
-    const studentFee = parseFloat(document.getElementById('assign-fee').value) || 0;
-    const parentName = document.getElementById('assign-parent-name').value.trim();
-    const parentPhone = document.getElementById('assign-parent-phone').value.trim();
-    const parentEmail = document.getElementById('assign-parent-email').value.trim();
-    const address = document.getElementById('assign-address').value.trim();
-    const school = document.getElementById('assign-school').value.trim();
-    const location = document.getElementById('assign-location').value.trim();
-    const subjects = document.getElementById('assign-subjects').value.trim();
-    const tutorEmail = document.getElementById('assign-tutor').value;
-    const status = document.getElementById('assign-status').value;
-    const notes = document.getElementById('assign-notes').value.trim();
-    
-    // Get tutor info
-    const tutors = getCleanTutors();
-    const tutor = tutors.find(t => t.email === tutorEmail);
+    if (!tutor) {
+        showReassignAlert("Selected tutor not found", 'error');
+        return;
+    }
     
     const btn = document.getElementById('assign-submit-btn');
     const originalText = btn.textContent;
-    btn.textContent = "Creating...";
+    btn.textContent = "Processing...";
     btn.disabled = true;
     
     try {
         const user = window.userData?.name || 'Admin';
         const userEmail = window.userData?.email || 'admin@system';
         
-        // Prepare subjects array
-        const subjectsArray = subjects ? subjects.split(',').map(s => s.trim()).filter(s => s) : [];
+        // Batch ID for grouping these assignments
+        const batchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
-        // Create student document
-        const studentData = {
-            studentName,
-            grade: grade || '',
-            days: days || '',
-            studentFee,
-            parentName: parentName || '',
-            parentPhone: parentPhone || '',
-            parentEmail: parentEmail || '',
-            address: address || '',
-            school: school || '',
-            location: location || '',
-            tutorEmail: tutor.email,
-            tutorName: tutor.name,
-            status,
-            notes: notes || '',
-            subjects: subjectsArray,
-            summerBreak: false,
-            isTransitioning: false,
-            createdAt: new Date().toISOString(),
-            createdBy: user,
-            updatedAt: new Date().toISOString(),
-            updatedBy: user
-        };
+        let successCount = 0;
+        let errorCount = 0;
         
-        const studentRef = await addDoc(collection(db, "students"), studentData);
+        // Process each student in the batch
+        for (const student of students) {
+            try {
+                // Calculate if student should be marked as transitioning
+                const previousTutorEmail = student.tutorEmail;
+                const assignmentDuration = calculateAssignmentDuration(student, previousTutorEmail);
+                const shouldMarkTransitioning = assignmentDuration > 0 && assignmentDuration < 14;
+                
+                // Prepare student update data
+                const studentData = {
+                    tutorEmail: tutor.email,
+                    tutorName: tutor.name,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: user
+                };
+                
+                // Add transitioning logic
+                if (shouldMarkTransitioning) {
+                    studentData.isTransitioning = true;
+                    studentData.transitionDate = new Date().toISOString();
+                    studentData.transitionReason = `Reassigned after ${assignmentDuration} days with previous tutor`;
+                } else if (student.isTransitioning) {
+                    // Clear transitioning if with previous tutor for 2+ weeks
+                    studentData.isTransitioning = false;
+                    studentData.transitionDate = null;
+                }
+                
+                // Update student record
+                await updateDoc(doc(db, "students", student.id), studentData);
+                
+                // Create assignment history record
+                await addDoc(collection(db, "tutorAssignments"), {
+                    studentId: student.id,
+                    studentName: student.studentName,
+                    oldTutorEmail: previousTutorEmail || '',
+                    oldTutorName: student.tutorName || 'Unassigned',
+                    newTutorEmail: tutor.email,
+                    newTutorName: tutor.name,
+                    reason: reason,
+                    assignedBy: user,
+                    assignedByEmail: userEmail,
+                    assignedAt: new Date().toISOString(),
+                    timestamp: new Date().toISOString(),
+                    assignmentType: 'batch',
+                    batchId: batchId,
+                    batchSize: students.length,
+                    transitioningApplied: shouldMarkTransitioning,
+                    previousDurationDays: assignmentDuration
+                });
+                
+                successCount++;
+                
+                // Show progress
+                if (successCount % 5 === 0 || successCount === students.length) {
+                    btn.textContent = `Processing... ${successCount}/${students.length}`;
+                }
+                
+            } catch (error) {
+                console.error(`Error processing student ${student.id}:`, error);
+                errorCount++;
+            }
+        }
         
-        // Create assignment history record
-        await addDoc(collection(db, "tutorAssignments"), {
-            studentId: studentRef.id,
-            studentName: studentName,
-            oldTutorEmail: '', 
-            oldTutorName: 'Unassigned',
-            newTutorEmail: tutor.email, 
-            newTutorName: tutor.name,
-            reason: 'Initial assignment', 
-            assignedBy: user, 
-            assignedByEmail: userEmail,
-            assignedAt: new Date().toISOString(), 
-            timestamp: new Date().toISOString()
-        });
+        // Show results
+        let message = `Batch assignment completed: ${successCount} successful, ${errorCount} failed`;
+        if (successCount > 0) {
+            message += `. ${students.length} student(s) assigned to ${tutor.name}`;
+        }
         
-        showReassignAlert(`Successfully assigned ${studentName} to ${tutor.name}!`, 'success');
+        showReassignAlert(message, successCount > 0 ? 'success' : 'error');
         
-        setTimeout(() => { 
-            closePreviewModal();
-            closeAssignModal(); 
-            fetchAndRenderDirectory(true); 
-        }, 1500);
+        // Clear selections and refresh
+        setTimeout(() => {
+            clearSelections();
+            closeAssignModal();
+            fetchAndRenderDirectory(true);
+        }, 2000);
         
     } catch (error) {
-        console.error("Assignment error:", error);
-        showReassignAlert("Error: " + error.message, 'error');
+        console.error("Batch assignment error:", error);
+        showReassignAlert("Error in batch assignment: " + error.message, 'error');
         btn.textContent = originalText;
         btn.disabled = false;
     }
 }
 
-function closeAssignModal() {
-    const modal = document.getElementById('assign-student-modal');
-    const previewModal = document.getElementById('assign-preview-modal');
-    if (modal) modal.remove();
-    if (previewModal) previewModal.remove();
-}
+// --- BATCH REASSIGNMENT MODAL ---
 
-// ======================================================
-// ENHANCED HELPER FUNCTIONS FOR SEARCH
-// ======================================================
-
-// Enhanced safeSearch function for cross-referencing
-function enhancedSafeSearch(student, searchTerm, tutors = []) {
-    if (!searchTerm || safeToString(searchTerm).trim() === '') return true;
-    if (!student) return false;
-    
-    const searchLower = safeToString(searchTerm).toLowerCase();
-    
-    // Search across all student fields
-    const studentFields = [
-        'studentName', 'grade', 'days', 'studentFee', 'parentName', 
-        'parentPhone', 'parentEmail', 'address', 'school', 'location',
-        'tutorName', 'tutorEmail', 'status', 'notes'
-    ];
-    
-    for (const field of studentFields) {
-        if (student[field] && safeToString(student[field]).toLowerCase().includes(searchLower)) {
-            return true;
-        }
+function showEnhancedReassignStudentModal(studentIds = null) {
+    if (!isCacheValid(['students', 'tutors'])) { 
+        showReassignAlert("Refreshing data...", 'info');
+        fetchAndRenderDirectory(true);
+        setTimeout(() => showEnhancedReassignStudentModal(studentIds), 1000);
+        return;
     }
     
-    // Search in subjects
-    if (student.subjects) {
-        if (Array.isArray(student.subjects)) {
-            for (const subject of student.subjects) {
-                if (safeToString(subject).toLowerCase().includes(searchLower)) return true;
-            }
-        } else if (safeToString(student.subjects).toLowerCase().includes(searchLower)) {
-            return true;
-        }
-    }
+    const students = getCleanStudents();
+    const tutors = getCleanTutors();
     
-    // Cross-reference tutor data
-    if (student.tutorEmail && tutors && tutors.length > 0) {
-        const tutor = tutors.find(t => t && t.email === student.tutorEmail);
-        if (tutor) {
-            const tutorFields = ['name', 'email', 'phone', 'qualification'];
-            for (const field of tutorFields) {
-                if (tutor[field] && safeToString(tutor[field]).toLowerCase().includes(searchLower)) {
-                    return true;
-                }
-            }
+    if (!validateReassignData(students, tutors)) return;
+    
+    const isBatch = Array.isArray(studentIds) && studentIds.length > 0;
+    const selectedStudents = isBatch ? students.filter(s => studentIds.includes(s.id)) : [];
+    
+    const modalHtml = `
+    <div id="reassign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white w-full max-w-lg rounded-lg shadow-xl p-6">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h3 class="text-xl font-bold text-blue-700">${isBatch ? 'Reassign Selected Students' : 'Reassign Student'}</h3>
+                    ${isBatch ? `<p class="text-sm text-gray-600 mt-1">${selectedStudents.length} student(s) selected</p>` : ''}
+                </div>
+                <button onclick="closeReassignModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
             
-            // Search in tutor subjects
-            if (tutor.subjects) {
-                if (Array.isArray(tutor.subjects)) {
-                    for (const subject of tutor.subjects) {
-                        if (safeToString(subject).toLowerCase().includes(searchLower)) return true;
-                    }
-                } else if (safeToString(tutor.subjects).toLowerCase().includes(searchLower)) {
-                    return true;
-                }
-            }
+            ${isBatch ? `
+                <div class="mb-6 p-4 bg-blue-50 rounded-lg">
+                    <h4 class="font-medium text-blue-800 mb-2">Selected Students:</h4>
+                    <div class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                        ${selectedStudents.map(s => `
+                            <div class="text-sm p-2 bg-white rounded border">
+                                ${s.studentName} (${s.grade || 'No grade'})<br>
+                                <span class="text-xs text-gray-500">Current: ${s.tutorName || 'Unassigned'}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : `
+                <form id="reassign-student-form">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2 text-gray-700">Select Student</label>
+                        ${createSearchableSelect(
+                            students.map(s => ({ 
+                                id: s.id, 
+                                studentName: s.studentName,
+                                grade: s.grade,
+                                currentTutor: s.tutorName || 'Unassigned'
+                            })), 
+                            "Type student name...", 
+                            "reassign-student"
+                        )}
+                    </div>
+                    
+                    <div id="student-info" class="mb-4 p-3 bg-blue-50 rounded-md hidden">
+                        <div class="text-sm">
+                            <div class="font-medium" id="selected-student-name"></div>
+                            <div class="text-gray-600" id="selected-student-details"></div>
+                        </div>
+                    </div>
+                </form>
+            `}
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-2 text-gray-700">Select New Tutor</label>
+                ${createSearchableSelect(
+                    tutors.map(t => ({ 
+                        email: t.email, 
+                        name: t.name,
+                        subjects: t.subjects || []
+                    })), 
+                    "Type tutor name or email...", 
+                    "reassign-tutor",
+                    true
+                )}
+            </div>
+            
+            <div id="tutor-info" class="mb-4 p-3 bg-green-50 rounded-md hidden">
+                <div class="text-sm">
+                    <div class="font-medium" id="selected-tutor-name"></div>
+                    <div class="text-gray-600" id="selected-tutor-details"></div>
+                </div>
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-gray-700">Reason for ${isBatch ? 'Batch ' : ''}Reassignment</label>
+                <textarea id="reassign-reason" 
+                          class="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                          rows="3" 
+                          placeholder="Enter reason for reassignment..."></textarea>
+            </div>
+            
+            ${isBatch ? `
+                <div class="p-4 bg-yellow-50 rounded-md mb-6">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-yellow-600 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                        <div class="text-sm text-yellow-700">
+                            <p class="font-medium">Batch Reassignment Notice:</p>
+                            <p class="mt-1">This will reassign ${selectedStudents.length} student(s) to the selected tutor. 
+                            Students who were with their previous tutor for less than 2 weeks will be marked as "transitioning" 
+                            and won't be able to write reports until they complete 2 weeks with the new tutor.</p>
+                        </div>
+                    </div>
+                </div>
+            ` : ''}
+            
+            <div class="flex justify-end gap-3">
+                <button type="button" 
+                        onclick="closeReassignModal()" 
+                        class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
+                    Cancel
+                </button>
+                <button type="button" 
+                        onclick="${isBatch ? 'submitBatchReassignment(selectedStudents)' : 'submitSingleReassignment()'}"
+                        id="reassign-submit-btn" 
+                        class="px-5 py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    ${isBatch ? `Reassign ${selectedStudents.length} Student(s)` : 'Confirm Reassignment'}
+                </button>
+            </div>
+        </div>
+    </div>`;
+    
+    closeReassignModal();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    setTimeout(() => {
+        if (!isBatch) {
+            initializeSearchableSelect('reassign-student');
+            
+            document.getElementById('reassign-student').addEventListener('change', function() {
+                const studentId = this.value;
+                const student = students.find(s => s.id === studentId);
+                updateStudentInfo(student);
+            });
+        }
+        
+        initializeSearchableSelect('reassign-tutor');
+        
+        document.getElementById('reassign-tutor').addEventListener('change', function() {
+            const tutorEmail = this.value;
+            const tutor = tutors.find(t => t.email === tutorEmail);
+            updateTutorInfo(tutor);
+        });
+        
+    }, 100);
+}
+
+// --- BATCH REASSIGNMENT FUNCTION ---
+
+async function submitBatchReassignment(students) {
+    const tutorEmail = document.getElementById('reassign-tutor').value;
+    const reason = document.getElementById('reassign-reason').value.trim();
+    
+    if (!tutorEmail) {
+        showReassignAlert("Please select a tutor", 'warning');
+        return;
+    }
+    
+    if (!reason) {
+        showReassignAlert("Please enter a reason for reassignment", 'warning');
+        return;
+    }
+    
+    const tutors = getCleanTutors();
+    const newTutor = tutors.find(t => t.email === tutorEmail);
+    
+    if (!newTutor) {
+        showReassignAlert("Selected tutor not found", 'error');
+        return;
+    }
+    
+    // Check if any student is already assigned to this tutor
+    const alreadyAssigned = students.filter(s => s.tutorEmail === tutorEmail);
+    if (alreadyAssigned.length > 0) {
+        if (!confirm(`${alreadyAssigned.length} student(s) are already assigned to ${newTutor.name}. Continue anyway?`)) {
+            return;
         }
     }
     
-    return false;
+    const btn = document.getElementById('reassign-submit-btn');
+    const originalText = btn.textContent;
+    btn.textContent = "Processing...";
+    btn.disabled = true;
+    
+    try {
+        const user = window.userData?.name || 'Admin';
+        const userEmail = window.userData?.email || 'admin@system';
+        
+        // Batch ID for grouping these reassignments
+        const batchId = `reassign_batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        let successCount = 0;
+        let errorCount = 0;
+        let transitioningCount = 0;
+        
+        // Process each student in the batch
+        for (const student of students) {
+            try {
+                if (student.tutorEmail === tutorEmail) {
+                    console.log(`Skipping ${student.studentName} - already assigned to ${newTutor.name}`);
+                    continue;
+                }
+                
+                const currentTutor = tutors.find(t => t.email === student.tutorEmail);
+                
+                // Calculate if student should be marked as transitioning
+                const assignmentDuration = calculateAssignmentDuration(student, student.tutorEmail);
+                const shouldMarkTransitioning = assignmentDuration > 0 && assignmentDuration < 14;
+                
+                // Prepare student update data
+                const studentData = {
+                    tutorEmail: newTutor.email,
+                    tutorName: newTutor.name,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: user
+                };
+                
+                // Add transitioning logic
+                if (shouldMarkTransitioning) {
+                    studentData.isTransitioning = true;
+                    studentData.transitionDate = new Date().toISOString();
+                    studentData.transitionReason = `Reassigned after ${assignmentDuration} days with previous tutor`;
+                    transitioningCount++;
+                } else if (student.isTransitioning) {
+                    // Clear transitioning if with previous tutor for 2+ weeks
+                    studentData.isTransitioning = false;
+                    studentData.transitionDate = null;
+                }
+                
+                // Update student record
+                await updateDoc(doc(db, "students", student.id), studentData);
+                
+                // Create assignment history record
+                await addDoc(collection(db, "tutorAssignments"), {
+                    studentId: student.id,
+                    studentName: student.studentName,
+                    oldTutorEmail: student.tutorEmail || '',
+                    oldTutorName: currentTutor?.name || 'Unassigned',
+                    newTutorEmail: newTutor.email,
+                    newTutorName: newTutor.name,
+                    reason: reason,
+                    assignedBy: user,
+                    assignedByEmail: userEmail,
+                    assignedAt: new Date().toISOString(),
+                    timestamp: new Date().toISOString(),
+                    assignmentType: 'batch',
+                    batchId: batchId,
+                    batchSize: students.length,
+                    transitioningApplied: shouldMarkTransitioning,
+                    previousDurationDays: assignmentDuration
+                });
+                
+                successCount++;
+                
+                // Show progress
+                if (successCount % 5 === 0 || successCount === students.length) {
+                    btn.textContent = `Processing... ${successCount}/${students.length}`;
+                }
+                
+            } catch (error) {
+                console.error(`Error processing student ${student.id}:`, error);
+                errorCount++;
+            }
+        }
+        
+        // Show results
+        let message = `Batch reassignment completed: ${successCount} successful, ${errorCount} failed`;
+        if (successCount > 0) {
+            message += `. ${successCount} student(s) reassigned to ${newTutor.name}`;
+            if (transitioningCount > 0) {
+                message += ` (${transitioningCount} marked as transitioning)`;
+            }
+        }
+        
+        showReassignAlert(message, successCount > 0 ? 'success' : 'error');
+        
+        // Clear selections and refresh
+        setTimeout(() => {
+            clearSelections();
+            closeReassignModal();
+            fetchAndRenderDirectory(true);
+        }, 2000);
+        
+    } catch (error) {
+        console.error("Batch reassignment error:", error);
+        showReassignAlert("Error in batch reassignment: " + error.message, 'error');
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
 }
 
-// ======================================================
-// GLOBAL EXPOSURE
-// ======================================================
+// --- SINGLE REASSIGNMENT FUNCTION (UPDATED) ---
 
-// Add these to your existing global exposure section
+async function submitSingleReassignment() {
+    const studentId = document.getElementById('reassign-student').value;
+    const tutorEmail = document.getElementById('reassign-tutor').value;
+    const reason = document.getElementById('reassign-reason').value.trim();
+    
+    if (!studentId || !tutorEmail) {
+        showReassignAlert("Please select both a student and a tutor", 'warning');
+        return;
+    }
+    
+    if (!reason) {
+        showReassignAlert("Please enter a reason for reassignment", 'warning');
+        return;
+    }
+    
+    const students = getCleanStudents();
+    const tutors = getCleanTutors();
+    
+    const student = students.find(s => s.id === studentId);
+    const newTutor = tutors.find(t => t.email === tutorEmail);
+    const currentTutor = tutors.find(t => t.email === student.tutorEmail);
+    
+    if (!student || !newTutor) {
+        showReassignAlert("Student or tutor not found", 'error');
+        return;
+    }
+    
+    // Check if trying to reassign to same tutor
+    if (student.tutorEmail === tutorEmail) {
+        showReassignAlert("Student is already assigned to this tutor", 'warning');
+        return;
+    }
+    
+    // Calculate assignment duration for transitioning logic
+    const assignmentDuration = calculateAssignmentDuration(student, student.tutorEmail);
+    const shouldMarkTransitioning = assignmentDuration > 0 && assignmentDuration < 14;
+    
+    if (shouldMarkTransitioning) {
+        if (!confirm(`This student was with ${currentTutor?.name || 'previous tutor'} for only ${assignmentDuration} days. They will be marked as "transitioning" and won't be able to write reports for ${14 - assignmentDuration} more days. Continue?`)) {
+            return;
+        }
+    }
+    
+    await performReassignment(student, newTutor, reason, currentTutor, shouldMarkTransitioning, assignmentDuration);
+}
+
+// --- UPDATED PERFORM REASSIGNMENT WITH TRANSITION LOGIC ---
+
+async function performReassignment(student, newTutor, reason, currentTutor, shouldMarkTransitioning = false, previousDuration = 0) {
+    const btn = document.getElementById('reassign-submit-btn');
+    const originalText = btn.textContent;
+    btn.textContent = "Processing..."; 
+    btn.disabled = true;
+    
+    try {
+        const user = window.userData?.name || 'Admin';
+        const userEmail = window.userData?.email || 'admin@system';
+        
+        // Prepare student update data
+        const studentData = {
+            tutorEmail: newTutor.email, 
+            tutorName: newTutor.name,
+            updatedAt: new Date().toISOString(), 
+            updatedBy: user
+        };
+        
+        // Add transitioning logic if needed
+        if (shouldMarkTransitioning) {
+            studentData.isTransitioning = true;
+            studentData.transitionDate = new Date().toISOString();
+            studentData.transitionReason = `Reassigned after ${previousDuration} days with previous tutor`;
+        } else if (student.isTransitioning) {
+            // Clear transitioning if with previous tutor for 2+ weeks
+            studentData.isTransitioning = false;
+            studentData.transitionDate = null;
+        }
+        
+        // 1. Update student record
+        await updateDoc(doc(db, "students", student.id), studentData);
+        
+        // 2. Create assignment history record
+        await addDoc(collection(db, "tutorAssignments"), {
+            studentId: student.id, 
+            studentName: student.studentName,
+            oldTutorEmail: student.tutorEmail || '', 
+            oldTutorName: currentTutor?.name || 'Unassigned',
+            newTutorEmail: newTutor.email, 
+            newTutorName: newTutor.name,
+            reason, 
+            assignedBy: user, 
+            assignedByEmail: userEmail,
+            assignedAt: new Date().toISOString(), 
+            timestamp: new Date().toISOString(),
+            transitioningApplied: shouldMarkTransitioning,
+            previousDurationDays: previousDuration
+        });
+        
+        // 3. Show success with transition notice if applicable
+        let message = `Successfully reassigned ${student.studentName} to ${newTutor.name}!`;
+        if (shouldMarkTransitioning) {
+            message += ` Student marked as transitioning (cannot write reports for ${14 - previousDuration} more days).`;
+        }
+        
+        showReassignAlert(message, 'success');
+        
+        // 4. Refresh and close
+        setTimeout(() => { 
+            closeReassignModal(); 
+            clearSelections();
+            fetchAndRenderDirectory(true); 
+        }, 1500);
+        
+    } catch (e) {
+        console.error("Reassignment error:", e);
+        showReassignAlert("Error: " + e.message, 'error'); 
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+// --- MARK STUDENTS AS TRANSITIONING ---
+
+async function markStudentsAsTransitioning(studentIds) {
+    if (!studentIds || studentIds.length === 0) {
+        showReassignAlert("No students selected", 'warning');
+        return;
+    }
+    
+    const students = getCleanStudents();
+    const selectedStudents = students.filter(s => studentIds.includes(s.id));
+    
+    if (selectedStudents.length === 0) {
+        showReassignAlert("Selected students not found", 'error');
+        return;
+    }
+    
+    // Create modal for transition reason
+    const modalHtml = `
+    <div id="transition-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white w-full max-w-md rounded-lg shadow-xl p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-purple-700">Mark as Transitioning</h3>
+                <button onclick="document.getElementById('transition-modal').remove()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div class="mb-6">
+                <p class="text-sm text-gray-600 mb-4">You are marking ${selectedStudents.length} student(s) as transitioning. They won't be able to write reports until they complete 2 weeks with their current tutor.</p>
+                <div class="max-h-40 overflow-y-auto mb-4">
+                    ${selectedStudents.map(s => `
+                        <div class="text-sm p-2 bg-gray-50 rounded mb-1">
+                            ${s.studentName} (Current: ${s.tutorName || 'Unassigned'})
+                        </div>
+                    `).join('')}
+                </div>
+                <label class="block text-sm font-medium mb-2 text-gray-700">Reason for Transitioning</label>
+                <textarea id="transition-reason" 
+                          class="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
+                          rows="3" 
+                          placeholder="Enter reason for marking as transitioning..."></textarea>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button type="button" 
+                        onclick="document.getElementById('transition-modal').remove()" 
+                        class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
+                    Cancel
+                </button>
+                <button type="button" 
+                        onclick="confirmMarkAsTransitioning(${JSON.stringify(studentIds)})"
+                        class="px-5 py-2.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors">
+                    Mark as Transitioning
+                </button>
+            </div>
+        </div>
+    </div>`;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+async function confirmMarkAsTransitioning(studentIds) {
+    const reason = document.getElementById('transition-reason').value.trim();
+    
+    if (!reason) {
+        showReassignAlert("Please enter a reason for transitioning", 'warning');
+        return;
+    }
+    
+    const students = getCleanStudents();
+    const selectedStudents = students.filter(s => studentIds.includes(s.id));
+    
+    try {
+        const user = window.userData?.name || 'Admin';
+        
+        let successCount = 0;
+        let errorCount = 0;
+        
+        for (const student of selectedStudents) {
+            try {
+                await updateDoc(doc(db, "students", student.id), {
+                    isTransitioning: true,
+                    transitionDate: new Date().toISOString(),
+                    transitionReason: reason,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: user
+                });
+                
+                successCount++;
+            } catch (error) {
+                console.error(`Error marking student ${student.id} as transitioning:`, error);
+                errorCount++;
+            }
+        }
+        
+        // Show results
+        let message = `Transitioning status updated: ${successCount} successful, ${errorCount} failed`;
+        showReassignAlert(message, successCount > 0 ? 'success' : 'error');
+        
+        // Clear selections and refresh
+        setTimeout(() => {
+            const modal = document.getElementById('transition-modal');
+            if (modal) modal.remove();
+            
+            clearSelections();
+            fetchAndRenderDirectory(true);
+        }, 1500);
+        
+    } catch (error) {
+        console.error("Error marking as transitioning:", error);
+        showReassignAlert("Error: " + error.message, 'error');
+    }
+}
+
+// --- GLOBAL EXPOSURE FOR NEW FUNCTIONS ---
+
 window.showEnhancedAssignStudentModal = showEnhancedAssignStudentModal;
-window.closeAssignModal = closeAssignModal;
-window.previewAssignStudent = previewAssignStudent;
-window.closePreviewModal = closePreviewModal;
-window.submitAssignStudent = submitAssignStudent;
-window.enhancedSafeSearch = enhancedSafeSearch;
 window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
+window.closeAssignModal = closeAssignModal;
 window.closeReassignModal = closeReassignModal;
+window.closePreviewModal = closePreviewModal;
+window.previewAssignStudent = previewAssignStudent;
+window.submitAssignStudent = submitAssignStudent;
+window.submitBatchReassignment = submitBatchReassignment;
+window.submitSingleReassignment = submitSingleReassignment;
+window.performReassignment = performReassignment;
+window.markStudentsAsTransitioning = markStudentsAsTransitioning;
+window.confirmMarkAsTransitioning = confirmMarkAsTransitioning;
+window.toggleStudentSelection = toggleStudentSelection;
+window.selectAllStudents = selectAllStudents;
+window.clearSelections = clearSelections;
+window.areAllStudentsSelected = areAllStudentsSelected;
+window.updateBatchActionButtons = updateBatchActionButtons;
+window.updateSelectionCount = updateSelectionCount;
+window.calculateAssignmentDuration = calculateAssignmentDuration;
+window.canWriteReport = canWriteReport;
+window.getTransitionStatus = getTransitionStatus;
+window.enhancedSafeSearch = enhancedSafeSearch;
 window.closeManagementModal = (id) => { 
     const m = document.getElementById(id); 
     if(m) m.remove(); 
@@ -9300,6 +9576,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
