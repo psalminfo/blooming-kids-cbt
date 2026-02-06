@@ -1084,6 +1084,7 @@ async function renderManagementTutorView(container) {
                 <h2 class="text-2xl font-bold text-green-700">Tutor & Student Directory</h2>
                 <div class="flex items-center gap-4 flex-wrap">
                     <input type="search" id="directory-search" placeholder="Search Tutors, Students, Parents..." class="p-2 border rounded-md w-64">
+                    <button id="assign-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Assign New Student</button>
                     <button id="reassign-student-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Reassign Student</button>
                     <button id="view-tutor-history-directory-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">View Tutor History</button>
                     <button id="refresh-directory-btn" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Refresh</button>
@@ -1110,7 +1111,16 @@ async function renderManagementTutorView(container) {
     `;
     
     try {
-        // Event Listeners
+        // Event Listeners - ADD ASSIGN BUTTON LISTENER HERE
+        document.getElementById('assign-student-btn').addEventListener('click', () => {
+            if (typeof window.showEnhancedAssignStudentModal === 'function') {
+                window.showEnhancedAssignStudentModal();
+            } else {
+                console.error('Assign student modal function not found');
+                alert('Please refresh the page and try again.');
+            }
+        });
+
         document.getElementById('reassign-student-btn').addEventListener('click', () => {
             if (typeof window.showEnhancedReassignStudentModal === 'function') window.showEnhancedReassignStudentModal();
         });
@@ -1681,14 +1691,6 @@ function closeReassignModal() {
     if (modal) modal.remove();
 }
 
-// EXPOSE GLOBALS
-window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
-window.closeReassignModal = closeReassignModal;
-window.closeManagementModal = (id) => { 
-    const m = document.getElementById(id); 
-    if(m) m.remove(); 
-};
-
 // ======================================================
 // ENHANCED ASSIGN STUDENT MODAL (New Feature)
 // ======================================================
@@ -2208,67 +2210,6 @@ function enhancedSafeSearch(student, searchTerm, tutors = []) {
 }
 
 // ======================================================
-// UPDATE MAIN VIEW WITH ASSIGN BUTTON
-// ======================================================
-
-// Update the renderManagementTutorView function to include the Assign button
-// (This is just to show how it should be integrated - you'll need to replace your existing function)
-
-async function renderManagementTutorViewWithAssign(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
-                <h2 class="text-2xl font-bold text-green-700">Tutor & Student Directory</h2>
-                <div class="flex items-center gap-4 flex-wrap">
-                    <input type="search" id="directory-search" placeholder="Search Tutors, Students, Parents..." class="p-2 border rounded-md w-64">
-                    <button id="assign-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Assign New Student</button>
-                    <button id="reassign-student-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Reassign Student</button>
-                    <button id="view-tutor-history-directory-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">View Tutor History</button>
-                    <button id="refresh-directory-btn" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Refresh</button>
-                </div>
-            </div>
-            <div class="flex space-x-4 mb-4">
-                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-green-800 text-sm">Active Tutors</h4>
-                    <p id="tutor-count-badge" class="text-2xl font-extrabold">0</p>
-                </div>
-                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-yellow-800 text-sm">Active Students</h4>
-                    <p id="student-count-badge" class="text-2xl font-extrabold">0</p>
-                </div>
-                <div class="bg-purple-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-purple-800 text-sm">History Records</h4>
-                    <p id="history-count-badge" class="text-2xl font-extrabold">0</p>
-                </div>
-            </div>
-            <div id="directory-list" class="space-y-4">
-                <p class="text-center text-gray-500 py-10">Loading directory...</p>
-            </div>
-        </div>
-    `;
-    
-    try {
-        // Event Listeners
-        document.getElementById('assign-student-btn').addEventListener('click', () => {
-            if (typeof window.showEnhancedAssignStudentModal === 'function') window.showEnhancedAssignStudentModal();
-        });
-
-        document.getElementById('reassign-student-btn').addEventListener('click', () => {
-            if (typeof window.showEnhancedReassignStudentModal === 'function') window.showEnhancedReassignStudentModal();
-        });
-
-        document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
-        
-        document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
-        
-        // ... rest of your existing event listeners ...
-        
-    } catch (e) { console.error(e); }
-    
-    fetchAndRenderDirectory();
-}
-
-// ======================================================
 // GLOBAL EXPOSURE
 // ======================================================
 
@@ -2279,6 +2220,12 @@ window.previewAssignStudent = previewAssignStudent;
 window.closePreviewModal = closePreviewModal;
 window.submitAssignStudent = submitAssignStudent;
 window.enhancedSafeSearch = enhancedSafeSearch;
+window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
+window.closeReassignModal = closeReassignModal;
+window.closeManagementModal = (id) => { 
+    const m = document.getElementById(id); 
+    if(m) m.remove(); 
+};
 
 // ======================================================
 // SUBSECTION 3.2: Inactive Tutors Panel
@@ -9353,6 +9300,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
