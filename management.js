@@ -951,6 +951,30 @@ function getTransitionStatus(student) {
     }
 }
 
+// --- MODAL MANAGEMENT FUNCTIONS (DEFINED FIRST) ---
+
+function closeAssignModal() {
+    const modal = document.getElementById('assign-student-modal');
+    const previewModal = document.getElementById('assign-preview-modal');
+    if (modal) modal.remove();
+    if (previewModal) previewModal.remove();
+}
+
+function closeReassignModal() {
+    const modal = document.getElementById('reassign-student-modal');
+    if (modal) modal.remove();
+}
+
+function closePreviewModal() {
+    document.getElementById('assign-preview-modal').classList.add('hidden');
+    document.getElementById('assign-preview-modal').classList.remove('flex');
+}
+
+function closeManagementModal(id) { 
+    const m = document.getElementById(id); 
+    if(m) m.remove(); 
+}
+
 // --- BATCH SELECTION FUNCTIONALITY ---
 
 let selectedStudents = new Set();
@@ -2474,6 +2498,220 @@ async function confirmMarkAsTransitioning(studentIds) {
     }
 }
 
+// --- PREVIEW AND SUBMIT FUNCTIONS FOR SINGLE ASSIGNMENT ---
+
+function previewAssignStudent() {
+    // Get form values
+    const studentName = document.getElementById('assign-student-name').value.trim();
+    const grade = document.getElementById('assign-grade').value.trim();
+    const days = document.getElementById('assign-days').value.trim();
+    const studentFee = parseFloat(document.getElementById('assign-fee').value) || 0;
+    const parentName = document.getElementById('assign-parent-name').value.trim();
+    const parentPhone = document.getElementById('assign-parent-phone').value.trim();
+    const parentEmail = document.getElementById('assign-parent-email').value.trim();
+    const address = document.getElementById('assign-address').value.trim();
+    const school = document.getElementById('assign-school').value.trim();
+    const location = document.getElementById('assign-location').value.trim();
+    const subjects = document.getElementById('assign-subjects').value.trim();
+    const tutorEmail = document.getElementById('assign-tutor').value;
+    const status = document.getElementById('assign-status').value;
+    const notes = document.getElementById('assign-notes').value.trim();
+    
+    // Validate required fields
+    if (!studentName) {
+        showReassignAlert("Please enter student name", 'warning');
+        return;
+    }
+    
+    if (!tutorEmail) {
+        showReassignAlert("Please select a tutor", 'warning');
+        return;
+    }
+    
+    // Get tutor info
+    const tutors = getCleanTutors();
+    const tutor = tutors.find(t => t.email === tutorEmail);
+    
+    // Build preview HTML
+    const previewHTML = `
+        <div class="grid grid-cols-2 gap-3">
+            <div class="font-medium text-gray-700">Student Name:</div>
+            <div>${studentName}</div>
+            
+            <div class="font-medium text-gray-700">Grade:</div>
+            <div>${grade || 'Not specified'}</div>
+            
+            <div class="font-medium text-gray-700">Days:</div>
+            <div>${days || 'Not specified'}</div>
+            
+            <div class="font-medium text-gray-700">Monthly Fee:</div>
+            <div>₦${studentFee.toFixed(2)}</div>
+            
+            <div class="font-medium text-gray-700">Subjects:</div>
+            <div>${subjects || 'Not specified'}</div>
+            
+            <div class="font-medium text-gray-700">Assigned Tutor:</div>
+            <div>${tutor ? tutor.name : 'Not selected'} (${tutorEmail})</div>
+            
+            <div class="font-medium text-gray-700">Status:</div>
+            <div>${status.charAt(0).toUpperCase() + status.slice(1)}</div>
+            
+            <div class="font-medium text-gray-700">Parent Name:</div>
+            <div>${parentName || 'Not specified'}</div>
+            
+            <div class="font-medium text-gray-700">Parent Phone:</div>
+            <div>${parentPhone || 'Not specified'}</div>
+            
+            <div class="font-medium text-gray-700">Parent Email:</div>
+            <div>${parentEmail || 'Not specified'}</div>
+            
+            <div class="font-medium text-gray-700">School:</div>
+            <div>${school || 'Not specified'}</div>
+            
+            <div class="font-medium text-gray-700">Location:</div>
+            <div>${location || 'Not specified'}</div>
+            
+            <div class="font-medium text-gray-700">Address:</div>
+            <div>${address || 'Not specified'}</div>
+            
+            <div class="font-medium text-gray-700">Notes:</div>
+            <div>${notes || 'None'}</div>
+        </div>
+    `;
+    
+    document.getElementById('preview-content').innerHTML = previewHTML;
+    document.getElementById('assign-preview-modal').classList.remove('hidden');
+    document.getElementById('assign-preview-modal').classList.add('flex');
+}
+
+async function submitAssignStudent() {
+    // Get form values
+    const studentName = document.getElementById('assign-student-name').value.trim();
+    const grade = document.getElementById('assign-grade').value.trim();
+    const days = document.getElementById('assign-days').value.trim();
+    const studentFee = parseFloat(document.getElementById('assign-fee').value) || 0;
+    const parentName = document.getElementById('assign-parent-name').value.trim();
+    const parentPhone = document.getElementById('assign-parent-phone').value.trim();
+    const parentEmail = document.getElementById('assign-parent-email').value.trim();
+    const address = document.getElementById('assign-address').value.trim();
+    const school = document.getElementById('assign-school').value.trim();
+    const location = document.getElementById('assign-location').value.trim();
+    const subjects = document.getElementById('assign-subjects').value.trim();
+    const tutorEmail = document.getElementById('assign-tutor').value;
+    const status = document.getElementById('assign-status').value;
+    const notes = document.getElementById('assign-notes').value.trim();
+    
+    // Get tutor info
+    const tutors = getCleanTutors();
+    const tutor = tutors.find(t => t.email === tutorEmail);
+    
+    const btn = document.getElementById('assign-submit-btn');
+    const originalText = btn.textContent;
+    btn.textContent = "Creating...";
+    btn.disabled = true;
+    
+    try {
+        const user = window.userData?.name || 'Admin';
+        const userEmail = window.userData?.email || 'admin@system';
+        
+        // Prepare subjects array
+        const subjectsArray = subjects ? subjects.split(',').map(s => s.trim()).filter(s => s) : [];
+        
+        // Create student document
+        const studentData = {
+            studentName,
+            grade: grade || '',
+            days: days || '',
+            studentFee,
+            parentName: parentName || '',
+            parentPhone: parentPhone || '',
+            parentEmail: parentEmail || '',
+            address: address || '',
+            school: school || '',
+            location: location || '',
+            tutorEmail: tutor.email,
+            tutorName: tutor.name,
+            status,
+            notes: notes || '',
+            subjects: subjectsArray,
+            summerBreak: false,
+            isTransitioning: false,
+            createdAt: new Date().toISOString(),
+            createdBy: user,
+            updatedAt: new Date().toISOString(),
+            updatedBy: user
+        };
+        
+        const studentRef = await addDoc(collection(db, "students"), studentData);
+        
+        // Create assignment history record
+        await addDoc(collection(db, "tutorAssignments"), {
+            studentId: studentRef.id,
+            studentName: studentName,
+            oldTutorEmail: '', 
+            oldTutorName: 'Unassigned',
+            newTutorEmail: tutor.email, 
+            newTutorName: tutor.name,
+            reason: 'Initial assignment', 
+            assignedBy: user, 
+            assignedByEmail: userEmail,
+            assignedAt: new Date().toISOString(), 
+            timestamp: new Date().toISOString()
+        });
+        
+        showReassignAlert(`Successfully assigned ${studentName} to ${tutor.name}!`, 'success');
+        
+        setTimeout(() => { 
+            closePreviewModal();
+            closeAssignModal(); 
+            fetchAndRenderDirectory(true); 
+        }, 1500);
+        
+    } catch (error) {
+        console.error("Assignment error:", error);
+        showReassignAlert("Error: " + error.message, 'error');
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+// --- STUDENT INFO FUNCTIONS ---
+
+function updateStudentInfo(student) {
+    const infoDiv = document.getElementById('student-info');
+    const nameDiv = document.getElementById('selected-student-name');
+    const detailsDiv = document.getElementById('selected-student-details');
+    
+    if (student) {
+        infoDiv.classList.remove('hidden');
+        nameDiv.textContent = student.studentName;
+        detailsDiv.innerHTML = `
+            Grade: ${student.grade || 'N/A'} | 
+            Fee: ₦${(student.studentFee || 0).toFixed(2)} | 
+            Current Tutor: ${student.tutorName || 'Unassigned'}
+        `;
+    } else {
+        infoDiv.classList.add('hidden');
+    }
+}
+
+function updateTutorInfo(tutor) {
+    const infoDiv = document.getElementById('tutor-info');
+    const nameDiv = document.getElementById('selected-tutor-name');
+    const detailsDiv = document.getElementById('selected-tutor-details');
+    
+    if (tutor) {
+        infoDiv.classList.remove('hidden');
+        nameDiv.textContent = tutor.name;
+        detailsDiv.innerHTML = `
+            Email: ${tutor.email} | 
+            Subjects: ${Array.isArray(tutor.subjects) ? tutor.subjects.join(', ') : tutor.subjects || 'N/A'}
+        `;
+    } else {
+        infoDiv.classList.add('hidden');
+    }
+}
+
 // --- GLOBAL EXPOSURE FOR NEW FUNCTIONS ---
 
 window.showEnhancedAssignStudentModal = showEnhancedAssignStudentModal;
@@ -2498,11 +2736,7 @@ window.calculateAssignmentDuration = calculateAssignmentDuration;
 window.canWriteReport = canWriteReport;
 window.getTransitionStatus = getTransitionStatus;
 window.enhancedSafeSearch = enhancedSafeSearch;
-window.closeManagementModal = (id) => { 
-    const m = document.getElementById(id); 
-    if(m) m.remove(); 
-};
-
+window.closeManagementModal = closeManagementModal;
 // ======================================================
 // SUBSECTION 3.2: Inactive Tutors Panel
 // ======================================================
@@ -9576,6 +9810,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
