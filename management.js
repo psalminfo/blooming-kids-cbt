@@ -951,6 +951,202 @@ window.refreshAllDashboardData = async function() {
 // SUBSECTION 3.1: Tutor Directory Panel - ENHANCED WITH TRANSITION & GROUP CLASSES
 // ======================================================
 
+// --- ORIGINAL HELPER FUNCTIONS (REQUIRED) ---
+
+function safeToString(value) {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'object') {
+        try { return JSON.stringify(value); } catch (e) { return ''; }
+    }
+    return String(value);
+}
+
+function safeSearch(text, searchTerm) {
+    if (!searchTerm || safeToString(searchTerm).trim() === '') return true;
+    if (!text) return false;
+    return safeToString(text).toLowerCase().includes(safeToString(searchTerm).toLowerCase());
+}
+
+// Helper to format dates for badges
+function formatBadgeDate(dateString) {
+    if (!dateString) return '';
+    try {
+        const d = new Date(dateString);
+        if (isNaN(d.getTime())) return ''; // Invalid date
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    } catch (e) {
+        return '';
+    }
+}
+
+function searchStudentFromFirebase(student, searchTerm, tutors = []) {
+    if (!student) return false;
+    if (!searchTerm || safeToString(searchTerm).trim() === '') return true;
+    
+    const searchLower = safeToString(searchTerm).toLowerCase();
+    
+    // Check Status Logic for Search
+    if (safeToString(searchTerm).toLowerCase() === 'break' && student.summerBreak === true) return true;
+    if (safeToString(searchTerm).toLowerCase() === 'transitioning' && student.isTransitioning === true) return true;
+
+    const studentFieldsToSearch = [
+        'studentName', 'grade', 'days', 'parentName', 'parentPhone', 
+        'parentEmail', 'address', 'status', 'tutorEmail', 'tutorName',
+        'createdBy', 'updatedBy', 'notes', 'school', 'location'
+    ];
+    
+    for (const field of studentFieldsToSearch) {
+        if (student[field] && safeSearch(student[field], searchTerm)) return true;
+    }
+    
+    if (student.studentFee !== undefined && student.studentFee !== null) {
+        if (safeToString(student.studentFee).includes(searchLower)) return true;
+    }
+    
+    if (student.subjects) {
+        if (Array.isArray(student.subjects)) {
+            for (const subject of student.subjects) {
+                if (safeSearch(subject, searchTerm)) return true;
+            }
+        } else {
+            if (safeSearch(student.subjects, searchTerm)) return true;
+        }
+    }
+    
+    if (student.tutorEmail && tutors && tutors.length > 0) {
+        const tutor = tutors.find(t => t && t.email === student.tutorEmail);
+        if (tutor) {
+            const tutorFieldsToSearch = ['name', 'email', 'phone', 'qualification', 'subjects'];
+            for (const field of tutorFieldsToSearch) {
+                if (tutor[field] && safeSearch(tutor[field], searchTerm)) return true;
+            }
+        }
+    }
+    
+    return false;
+}
+
+// --- ENHANCED SELECT WITH SEARCH FUNCTIONALITY ---
+
+function createSearchableSelect(options, placeholder = "Select...", id = '', isTutor = false) {
+    // options should be array of objects with id/value and label
+    const uniqueOptions = [];
+    const seen = new Set();
+    
+    options.forEach(opt => {
+        const key = isTutor ? opt.email : opt.id;
+        if (!seen.has(key)) {
+            seen.add(key);
+            uniqueOptions.push(opt);
+        }
+    });
+    
+    return `
+        <div class="relative w-full">
+            <input type="text" 
+                   id="${id}-search" 
+                   placeholder="Type to search ${isTutor ? 'tutor' : 'student'}..." 
+                   class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   autocomplete="off">
+            <select id="${id}" 
+                    class="hidden"
+                    ${isTutor ? 'data-is-tutor="true"' : ''}>
+                <option value="">${placeholder}</option>
+                ${uniqueOptions.map(opt => `
+                    <option value="${isTutor ? opt.email : opt.id}" 
+                            data-label="${isTutor ? opt.name : opt.studentName}">
+                        ${isTutor ? opt.name : opt.studentName} 
+                        ${isTutor && opt.email ? `(${opt.email})` : ''}
+                    </option>
+                `).join('')}
+            </select>
+            <div id="${id}-dropdown" 
+                 class="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg hidden max-h-60 overflow-y-auto">
+                ${uniqueOptions.map(opt => `
+                    <div class="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                         data-value="${isTutor ? opt.email : opt.id}"
+                         data-label="${isTutor ? opt.name : opt.studentName}">
+                        <div class="font-medium">${isTutor ? opt.name : opt.studentName}</div>
+                        ${isTutor && opt.email ? `<div class="text-xs text-gray-500">${opt.email}</div>` : ''}
+                        ${!isTutor && opt.grade ? `<div class="text-xs text-gray-500">Grade: ${opt.grade}</div>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        </div>`;
+}
+
+function initializeSearchableSelect(selectId) {
+    const searchInput = document.getElementById(`${selectId}-search`);
+    const dropdown = document.getElementById(`${selectId}-dropdown`);
+    const hiddenSelect = document.getElementById(selectId);
+    
+    if (!searchInput || !dropdown || !hiddenSelect) return;
+    
+    // Show dropdown on focus
+    searchInput.addEventListener('focus', () => {
+        dropdown.classList.remove('hidden');
+    });
+    
+    // Filter options based on search
+    searchInput.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        const items = dropdown.querySelectorAll('div[data-value]');
+        let hasVisible = false;
+        
+        items.forEach(item => {
+            const label = item.getAttribute('data-label').toLowerCase();
+            const email = item.querySelector('.text-xs')?.textContent.toLowerCase() || '';
+            const matches = label.includes(searchTerm) || email.includes(searchTerm);
+            
+            item.style.display = matches ? 'block' : 'none';
+            if (matches) hasVisible = true;
+        });
+        
+        dropdown.style.display = hasVisible ? 'block' : 'none';
+    });
+    
+    // Handle item selection
+    dropdown.addEventListener('click', (e) => {
+        const item = e.target.closest('div[data-value]');
+        if (item) {
+            const value = item.getAttribute('data-value');
+            const label = item.getAttribute('data-label');
+            
+            searchInput.value = label;
+            hiddenSelect.value = value;
+            
+            // Trigger change event on hidden select
+            hiddenSelect.dispatchEvent(new Event('change'));
+            dropdown.classList.add('hidden');
+        }
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.classList.add('hidden');
+        }
+    });
+}
+
+// --- CACHE MANAGEMENT FUNCTIONS ---
+
+function isCacheValid(keys) {
+    if (!sessionCache) return false;
+    for(let k of keys) if(!sessionCache[k] || !sessionCache[k].length) return false;
+    return (Date.now() - (sessionCache._lastUpdate||0)) < 300000;
+}
+
+function getCleanStudents() { 
+    return (sessionCache.students || [])
+        .filter(s => !s.status || !s.status.toLowerCase().includes('archived')); 
+}
+
+function getCleanTutors() { 
+    return (sessionCache.tutors || [])
+        .filter(t => !t.status || t.status === 'active'); 
+}
+
 // --- ENHANCED HELPER FUNCTIONS ---
 
 function calculateTransitionDuration(startDate) {
@@ -1180,12 +1376,9 @@ window.showAssignNewStudentModal = function() {
         </div>
     `;
     
-    // Remove existing modal if any
     window.closeManagementModal('assign-new-student-modal');
-    
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
-    // Add form submission handler
     document.getElementById('assign-new-student-form').addEventListener('submit', handleAssignNewStudent);
 }
 
@@ -1252,7 +1445,6 @@ async function handleAssignNewStudent(e) {
             createdBy: user,
             updatedAt: timestamp,
             updatedBy: user,
-            // New fields for enhanced system
             primaryTutorEmail: tutorEmail,
             tutorType: 'primary',
             enrollmentType: 'individual'
@@ -9733,6 +9925,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
