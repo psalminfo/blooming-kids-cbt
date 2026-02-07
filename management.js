@@ -1026,10 +1026,6 @@ function searchStudentFromFirebase(student, searchTerm, tutors = []) {
     return false;
 }
 
-function safeMap(array, callback) {
-    if (!Array.isArray(array)) return [];
-    return array.map(callback);
-
 // --- ENHANCED SELECT WITH SEARCH FUNCTIONALITY ---
 
 function createSearchableSelect(options, placeholder = "Select...", id = '', isTutor = false) {
@@ -6535,7 +6531,7 @@ window.downloadEnrollmentInvoice = async function(enrollmentId) {
         // Prepare tutor information for invoice
         let tutorInfoHTML = '';
         if (tutorAssignments.length > 0) {
-            tutorInfoHTML = tutorsafeMap(assignment => {
+            tutorInfoHTML = tutorAssignments.map(assignment => {
                 let tutorDetails = '';
                 if (assignment.tutorName) {
                     tutorDetails += `<p><strong>${assignment.studentName}:</strong> ${assignment.tutorName}`;
@@ -8532,7 +8528,7 @@ function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
         return;
     }
 
-    const tutorHistoryHTML = (studentHistory.tutorHistory || []).map((assignment, index) => {
+    const tutorHistoryHTML = studentHistory.tutorHistory.map((assignment, index) => {
         const assignedDate = assignment.assignedDate?.toDate?.() || new Date();
         const isCurrent = assignment.isCurrent ? '<span class="ml-2 bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Current</span>' : '';
         
@@ -9344,4 +9340,3 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
-
