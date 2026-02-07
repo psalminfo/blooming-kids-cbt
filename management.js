@@ -8528,7 +8528,7 @@ function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
         return;
     }
 
-    const tutorHistoryHTML = studentHistory.tutorHistory.map((assignment, index) => {
+    const tutorHistoryHTML = (studentHistory.tutorHistory || []).map((assignment, index) => {
         const assignedDate = assignment.assignedDate?.toDate?.() || new Date();
         const isCurrent = assignment.isCurrent ? '<span class="ml-2 bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Current</span>' : '';
         
@@ -9340,33 +9340,3 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
