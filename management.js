@@ -1029,13 +1029,12 @@ function searchStudentFromFirebase(student, searchTerm, tutors = []) {
 // --- ENHANCED SELECT WITH SEARCH FUNCTIONALITY ---
 
 function createSearchableSelect(options, placeholder = "Select...", id = '', isTutor = false) {
-    // options should be array of objects with id/value and label
     const uniqueOptions = [];
     const seen = new Set();
     
     options.forEach(opt => {
-        const key = isTutor ? opt.email : opt.id;
-        if (!seen.has(key)) {
+        const key = isTutor ? opt.email : (opt.id || opt.value);
+        if (key && !seen.has(key)) {
             seen.add(key);
             uniqueOptions.push(opt);
         }
@@ -1053,10 +1052,11 @@ function createSearchableSelect(options, placeholder = "Select...", id = '', isT
                     ${isTutor ? 'data-is-tutor="true"' : ''}>
                 <option value="">${placeholder}</option>
                 ${uniqueOptions.map(opt => `
-                    <option value="${isTutor ? opt.email : opt.id}" 
-                            data-label="${isTutor ? opt.name : opt.studentName}">
-                        ${isTutor ? opt.name : opt.studentName} 
+                    <option value="${isTutor ? opt.email : (opt.id || opt.value)}" 
+                            data-label="${isTutor ? opt.name : (opt.studentName || opt.label)}">
+                        ${isTutor ? opt.name : (opt.studentName || opt.label)} 
                         ${isTutor && opt.email ? `(${opt.email})` : ''}
+                        ${!isTutor && opt.grade ? ` - Grade: ${opt.grade}` : ''}
                     </option>
                 `).join('')}
             </select>
@@ -1064,9 +1064,9 @@ function createSearchableSelect(options, placeholder = "Select...", id = '', isT
                  class="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg hidden max-h-60 overflow-y-auto">
                 ${uniqueOptions.map(opt => `
                     <div class="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                         data-value="${isTutor ? opt.email : opt.id}"
-                         data-label="${isTutor ? opt.name : opt.studentName}">
-                        <div class="font-medium">${isTutor ? opt.name : opt.studentName}</div>
+                         data-value="${isTutor ? opt.email : (opt.id || opt.value)}"
+                         data-label="${isTutor ? opt.name : (opt.studentName || opt.label)}">
+                        <div class="font-medium">${isTutor ? opt.name : (opt.studentName || opt.label)}</div>
                         ${isTutor && opt.email ? `<div class="text-xs text-gray-500">${opt.email}</div>` : ''}
                         ${!isTutor && opt.grade ? `<div class="text-xs text-gray-500">Grade: ${opt.grade}</div>` : ''}
                     </div>
@@ -1082,12 +1082,10 @@ function initializeSearchableSelect(selectId) {
     
     if (!searchInput || !dropdown || !hiddenSelect) return;
     
-    // Show dropdown on focus
     searchInput.addEventListener('focus', () => {
         dropdown.classList.remove('hidden');
     });
     
-    // Filter options based on search
     searchInput.addEventListener('input', (e) => {
         const searchTerm = e.target.value.toLowerCase();
         const items = dropdown.querySelectorAll('div[data-value]');
@@ -1095,8 +1093,8 @@ function initializeSearchableSelect(selectId) {
         
         items.forEach(item => {
             const label = item.getAttribute('data-label').toLowerCase();
-            const email = item.querySelector('.text-xs')?.textContent.toLowerCase() || '';
-            const matches = label.includes(searchTerm) || email.includes(searchTerm);
+            const details = item.querySelector('.text-xs')?.textContent.toLowerCase() || '';
+            const matches = label.includes(searchTerm) || details.includes(searchTerm);
             
             item.style.display = matches ? 'block' : 'none';
             if (matches) hasVisible = true;
@@ -1105,7 +1103,6 @@ function initializeSearchableSelect(selectId) {
         dropdown.style.display = hasVisible ? 'block' : 'none';
     });
     
-    // Handle item selection
     dropdown.addEventListener('click', (e) => {
         const item = e.target.closest('div[data-value]');
         if (item) {
@@ -1115,13 +1112,11 @@ function initializeSearchableSelect(selectId) {
             searchInput.value = label;
             hiddenSelect.value = value;
             
-            // Trigger change event on hidden select
             hiddenSelect.dispatchEvent(new Event('change'));
             dropdown.classList.add('hidden');
         }
     });
     
-    // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
         if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
             dropdown.classList.add('hidden');
@@ -1522,7 +1517,7 @@ async function renderManagementTutorView(container) {
             
             <!-- Quick Filter Tabs -->
             <div class="flex space-x-2 mb-4 border-b">
-                <button class="filter-tab px-4 py-2 font-medium border-b-2 border-transparent hover:text-blue-600" data-filter="all">All Students</button>
+                <button class="filter-tab px-4 py-2 font-medium border-b-2 border-blue-600 text-blue-600" data-filter="all">All Students</button>
                 <button class="filter-tab px-4 py-2 font-medium border-b-2 border-transparent hover:text-orange-600" data-filter="transitional">In Transition</button>
                 <button class="filter-tab px-4 py-2 font-medium border-b-2 border-transparent hover:text-indigo-600" data-filter="group">Group Classes</button>
                 <button class="filter-tab px-4 py-2 font-medium border-b-2 border-transparent hover:text-yellow-600" data-filter="break">On Break</button>
@@ -1705,7 +1700,14 @@ async function fetchAndRenderEnhancedDirectory(forceRefresh = false) {
     }
 }
 
-// --- ENHANCED RENDER LOGIC ---
+// --- ENHANCED RENDER LOGIC WITH FILTERING ---
+
+let currentFilter = 'all';
+
+function applyStudentFilter(filterType) {
+    currentFilter = filterType;
+    renderEnhancedDirectoryFromCache(document.getElementById('directory-search')?.value || '');
+}
 
 function renderEnhancedDirectoryFromCache(searchTerm = '') {
     const tutors = sessionCache.tutors || [];
@@ -1720,24 +1722,54 @@ function renderEnhancedDirectoryFromCache(searchTerm = '') {
         return;
     }
 
+    // Calculate statistics
+    const allStudents = students;
     const transitionalStudents = students.filter(s => s.tutorType === 'transitional');
     const groupStudents = students.filter(s => s.enrollmentType === 'group' || (s.groupIds && s.groupIds.length > 0));
     const breakStudents = students.filter(s => s.summerBreak === true || (s.status || '').toLowerCase().includes('break'));
+    const activeStudents = students.filter(s => 
+        !s.summerBreak && 
+        s.tutorType === 'primary' && 
+        s.enrollmentType === 'individual' &&
+        (!s.status || !s.status.toLowerCase().includes('break'))
+    );
     
+    // Update counters
     document.getElementById('tutor-count-badge').textContent = tutors.length;
-    document.getElementById('student-count-badge').textContent = students.length;
+    document.getElementById('student-count-badge').textContent = allStudents.length;
     document.getElementById('transition-count-badge').textContent = transitionalStudents.length;
     document.getElementById('group-count-badge').textContent = groups.length;
 
+    // Get students by tutor for display
     const studentsByTutor = {};
-    students.forEach(s => {
+    allStudents.forEach(s => {
         if (s.tutorEmail) {
             if (!studentsByTutor[s.tutorEmail]) studentsByTutor[s.tutorEmail] = [];
             studentsByTutor[s.tutorEmail].push(s);
         }
     });
 
-    const filteredTutors = tutors.filter(tutor => {
+    // Apply filters
+    let filteredTutors = tutors;
+    if (currentFilter !== 'all') {
+        filteredTutors = tutors.filter(tutor => {
+            const assignedStudents = studentsByTutor[tutor.email] || [];
+            
+            switch(currentFilter) {
+                case 'transitional':
+                    return assignedStudents.some(s => s.tutorType === 'transitional');
+                case 'group':
+                    return assignedStudents.some(s => s.enrollmentType === 'group' || (s.groupIds && s.groupIds.length > 0));
+                case 'break':
+                    return assignedStudents.some(s => s.summerBreak === true || (s.status || '').toLowerCase().includes('break'));
+                default:
+                    return true;
+            }
+        });
+    }
+
+    // Apply search filter
+    filteredTutors = filteredTutors.filter(tutor => {
         if (!tutor) return false;
         if (!searchTerm) return true;
         
@@ -1748,8 +1780,8 @@ function renderEnhancedDirectoryFromCache(searchTerm = '') {
         return tutorMatch || studentMatch;
     });
 
-    if (searchTerm && filteredTutors.length === 0) {
-        directoryList.innerHTML = `<p class="text-center py-10">No results found.</p>`; 
+    if (filteredTutors.length === 0) {
+        directoryList.innerHTML = `<p class="text-center py-10">No ${currentFilter !== 'all' ? currentFilter + ' ' : ''}results found.</p>`; 
         return;
     }
 
@@ -1758,40 +1790,63 @@ function renderEnhancedDirectoryFromCache(searchTerm = '') {
     const showActionsColumn = canEditStudents || canDeleteStudents;
 
     directoryList.innerHTML = filteredTutors.map(tutor => {
-        const assignedStudents = (studentsByTutor[tutor.email] || [])
+        let assignedStudents = (studentsByTutor[tutor.email] || [])
             .filter(student => !searchTerm || searchStudentFromFirebase(student, searchTerm, tutors) || safeSearch(tutor.name, searchTerm))
             .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
 
-        const primaryCount = assignedStudents.filter(s => s.tutorType === 'primary' && s.tutorEmail === tutor.email).length;
+        // Apply current filter to assigned students
+        if (currentFilter !== 'all') {
+            assignedStudents = assignedStudents.filter(student => {
+                switch(currentFilter) {
+                    case 'transitional':
+                        return student.tutorType === 'transitional';
+                    case 'group':
+                        return student.enrollmentType === 'group' || (student.groupIds && student.groupIds.length > 0);
+                    case 'break':
+                        return student.summerBreak === true || (student.status || '').toLowerCase().includes('break');
+                    default:
+                        return true;
+                }
+            });
+        }
+
+        // Calculate counts for this tutor
+        const primaryCount = assignedStudents.filter(s => s.tutorType === 'primary' && s.tutorEmail === tutor.email && s.enrollmentType === 'individual').length;
         const transitionalCount = assignedStudents.filter(s => s.tutorType === 'transitional' && s.tutorEmail === tutor.email).length;
-        const groupCount = assignedStudents.filter(s => s.enrollmentType === 'group').length;
+        const groupCount = assignedStudents.filter(s => s.enrollmentType === 'group' || (s.groupIds && s.groupIds.length > 0)).length;
         const breakCount = assignedStudents.filter(s => s.summerBreak === true).length;
         const totalCount = assignedStudents.length;
 
         const rows = assignedStudents.map(student => {
             let badges = '';
             
+            // Primary/Transition badge
             if (student.tutorType === 'transitional') {
                 badges += getTransitionBadge(student);
             }
             
+            // Group badge
             if (student.enrollmentType === 'group' || (student.groupIds && student.groupIds.length > 0)) {
                 badges += getGroupBadge(student.groupIds);
             }
             
+            // Break badge
             if (student.summerBreak === true) {
                 const dateStr = formatBadgeDate(student.breakDate || student.updatedAt);
                 badges += `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 ml-2">On Break ${dateStr ? `(since ${dateStr})` : ''}</span>`;
             }
             
-            if (!badges && student.status !== 'inactive') {
+            // Default active badge if none of the above
+            if (!badges && student.status !== 'inactive' && student.tutorType === 'primary' && student.enrollmentType === 'individual') {
                 badges += `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">Active</span>`;
             }
             
+            // History button
             const studentHistory = tutorAssignments[student.id] || [];
             const historyBtn = studentHistory.length > 0 ? 
                 `<button class="view-history-btn px-2 py-1 text-xs bg-purple-600 text-white rounded-full ml-1" data-student-id="${student.id}">History</button>` : '';
 
+            // Enhanced actions
             const actions = `
                 ${canEditStudents ? `<button class="edit-student-btn px-2 py-1 text-xs bg-blue-600 text-white rounded-full" data-student-id="${student.id}">Edit</button>` : ''}
                 ${canEditStudents && student.tutorType === 'transitional' ? `<button class="end-transition-btn px-2 py-1 text-xs bg-green-600 text-white rounded-full ml-1" data-student-id="${student.id}">End Transition</button>` : ''}
@@ -1807,7 +1862,9 @@ function renderEnhancedDirectoryFromCache(searchTerm = '') {
                             ${badges}
                         </div>
                         ${student.tutorType === 'transitional' && student.primaryTutorEmail !== student.tutorEmail ? 
-                            `<div class="text-xs text-gray-500 mt-1">Primary: ${student.primaryTutorEmail}</div>` : ''}
+                            `<div class="text-xs text-gray-500 mt-1">Primary: ${student.primaryTutorName || student.primaryTutorEmail}</div>` : ''}
+                        ${student.enrollmentType === 'group' && student.groupIds && student.groupIds.length > 0 ? 
+                            `<div class="text-xs text-gray-500 mt-1">Group Student</div>` : ''}
                     </td>
                     <td class="px-4 py-3 align-middle">₦${(student.studentFee||0).toFixed(2)}</td>
                     <td class="px-4 py-3 align-middle">${student.grade||'-'}</td>
@@ -1828,7 +1885,7 @@ function renderEnhancedDirectoryFromCache(searchTerm = '') {
                                 <span class="text-sm font-normal text-gray-500">(${tutor.email})</span>
                             </h3>
                             <div class="mt-1 flex gap-2 flex-wrap">
-                                <span class="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-800">${primaryCount} Primary</span>
+                                ${primaryCount > 0 ? `<span class="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-800">${primaryCount} Primary</span>` : ''}
                                 ${transitionalCount > 0 ? `<span class="px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-800">${transitionalCount} Transitional</span>` : ''}
                                 ${groupCount > 0 ? `<span class="px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-800">${groupCount} Group</span>` : ''}
                                 ${breakCount > 0 ? `<span class="px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-800">${breakCount} On Break</span>` : ''}
@@ -1860,7 +1917,7 @@ function renderEnhancedDirectoryFromCache(searchTerm = '') {
                                     <tbody class="divide-y divide-gray-200">${rows}</tbody>
                                 </table>
                             </div>` 
-                        : `<div class="p-8 text-center text-gray-500">No students assigned.</div>`}
+                        : `<div class="p-8 text-center text-gray-500">No ${currentFilter !== 'all' ? currentFilter + ' ' : ''}students assigned.</div>`}
                     </div>
                 </details>
             </div>`;
@@ -1909,7 +1966,17 @@ window.showTransitionStudentModal = function() {
         return;
     }
     
-    const primaryStudents = students.filter(s => s.tutorType === 'primary');
+    // Filter students who are currently primary (not already in transition) and not in groups
+    const primaryStudents = students.filter(s => 
+        s.tutorType === 'primary' && 
+        s.enrollmentType === 'individual' &&
+        !s.summerBreak
+    );
+    
+    if (primaryStudents.length === 0) {
+        showAlert("No primary students available for transition", 'warning');
+        return;
+    }
     
     const modalHtml = `
     <div id="transition-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -2128,6 +2195,7 @@ window.showTransitionStudentModal = function() {
             const student = students.find(s => s.id === studentId);
             const newTutor = tutors.find(t => t.email === tutorEmail);
             
+            // Check if trying to transition to same tutor
             if (student.tutorEmail === tutorEmail) {
                 showAlert("Student is already assigned to this tutor", 'warning');
                 return;
@@ -2142,6 +2210,7 @@ window.showTransitionStudentModal = function() {
                 expectedReturnDate = new Date(customDate);
             }
             
+            // Confirmation
             const confirmMessage = `Start transition for ${student.studentName}?\n\n` +
                 `From: ${student.tutorName || 'Unassigned'}\n` +
                 `To: ${newTutor.name}\n` +
@@ -2227,15 +2296,18 @@ window.showGroupClassesManagementModal = function() {
     
     const modalHtml = `
     <div id="group-management-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white w-full max-w-6xl rounded-lg shadow-xl p-6">
+        <div class="bg-white w-full max-w-6xl rounded-lg shadow-xl p-6 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-6">
                 <h3 class="text-xl font-bold text-indigo-700">Manage Group Classes</h3>
                 <button onclick="window.closeGroupManagementModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
             </div>
             
-            <div class="mb-6">
+            <div class="mb-6 flex gap-4">
                 <button id="create-group-btn" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
                     + Create New Group Class
+                </button>
+                <button id="refresh-groups-btn" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">
+                    ↻ Refresh
                 </button>
             </div>
             
@@ -2244,7 +2316,7 @@ window.showGroupClassesManagementModal = function() {
                     <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                         <div class="flex justify-between items-start mb-3">
                             <h4 class="font-bold text-indigo-600">${group.groupName}</h4>
-                            <span class="px-2 py-1 text-xs bg-indigo-100 text-indigo-800 rounded-full">
+                            <span class="px-2 py-1 text-xs ${(group.enrolledStudents?.length || 0) >= (group.capacity || 0) ? 'bg-red-100 text-red-800' : 'bg-indigo-100 text-indigo-800'} rounded-full">
                                 ${group.enrolledStudents?.length || 0}/${group.capacity || 0}
                             </span>
                         </div>
@@ -2270,6 +2342,9 @@ window.showGroupClassesManagementModal = function() {
                                 <button class="view-group-btn text-xs bg-indigo-600 text-white px-3 py-1 rounded" data-group-id="${group.id}">
                                     View
                                 </button>
+                                <button class="add-student-group-btn text-xs bg-green-600 text-white px-3 py-1 rounded" data-group-id="${group.id}">
+                                    Add Student
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -2284,22 +2359,33 @@ window.showGroupClassesManagementModal = function() {
     
     setTimeout(() => {
         document.getElementById('create-group-btn').addEventListener('click', () => {
-            if (typeof window.showCreateGroupClassModal === 'function') window.showCreateGroupClassModal();
+            window.showCreateGroupClassModal();
+        });
+        
+        document.getElementById('refresh-groups-btn').addEventListener('click', () => {
+            fetchAndRenderEnhancedDirectory(true);
+            window.closeGroupManagementModal();
+            setTimeout(() => window.showGroupClassesManagementModal(), 500);
         });
         
         document.querySelectorAll('.edit-group-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const groupId = btn.dataset.groupId;
-                // Implement edit functionality
-                console.log("Edit group:", groupId);
+                window.showEditGroupClassModal(groupId);
             });
         });
         
         document.querySelectorAll('.view-group-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const groupId = btn.dataset.groupId;
-                // Implement view functionality
-                console.log("View group:", groupId);
+                window.showViewGroupClassModal(groupId);
+            });
+        });
+        
+        document.querySelectorAll('.add-student-group-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const groupId = btn.dataset.groupId;
+                window.showAddStudentToGroupModal(groupId);
             });
         });
     }, 100);
@@ -2309,9 +2395,15 @@ window.showCreateGroupClassModal = function() {
     const tutors = sessionCache.tutors || [];
     const students = sessionCache.students || [];
     
+    // Get students not already in groups
+    const availableStudents = students.filter(s => 
+        s.enrollmentType !== 'group' && 
+        (!s.groupIds || s.groupIds.length === 0)
+    );
+    
     const modalHtml = `
     <div id="create-group-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white w-full max-w-4xl rounded-lg shadow-xl p-6">
+        <div class="bg-white w-full max-w-4xl rounded-lg shadow-xl p-6 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-6">
                 <h3 class="text-xl font-bold text-indigo-700">Create New Group Class</h3>
                 <button onclick="window.closeCreateGroupModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
@@ -2357,8 +2449,8 @@ window.showCreateGroupClassModal = function() {
                         <div class="mb-4">
                             <label class="block text-sm font-medium mb-2 text-gray-700">Capacity *</label>
                             <input type="number" id="group-capacity" class="w-full border border-gray-300 p-3 rounded-md" 
-                                   min="2" max="10" value="5" required>
-                            <p class="text-xs text-gray-500 mt-1">Maximum number of students (2-10)</p>
+                                   min="2" max="20" value="5" required>
+                            <p class="text-xs text-gray-500 mt-1">Maximum number of students (2-20)</p>
                         </div>
                         
                         <div class="mb-4">
@@ -2383,20 +2475,34 @@ window.showCreateGroupClassModal = function() {
                 
                 <div class="mb-6">
                     <label class="block text-sm font-medium mb-2 text-gray-700">Add Students to Group</label>
-                    <p class="text-xs text-gray-500 mb-3">You can add students now or later</p>
+                    <p class="text-xs text-gray-500 mb-3">Select students to add to this group class</p>
                     
-                    <div class="border border-gray-300 rounded-md p-4 max-h-60 overflow-y-auto">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            ${students.filter(s => s.enrollmentType !== 'group').map(student => `
-                                <label class="flex items-center p-2 border rounded-md cursor-pointer hover:bg-gray-50">
-                                    <input type="checkbox" name="group-students" value="${student.id}" class="mr-2">
-                                    <div>
-                                        <div class="font-medium">${student.studentName}</div>
-                                        <div class="text-xs text-gray-500">${student.grade || 'No grade'} | Current: ${student.tutorName || 'Unassigned'}</div>
-                                    </div>
-                                </label>
-                            `).join('')}
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2 text-gray-700">Search Students</label>
+                        ${createSearchableSelect(
+                            availableStudents.map(s => ({ 
+                                id: s.id, 
+                                studentName: s.studentName,
+                                grade: s.grade,
+                                currentTutor: s.tutorName || 'Unassigned'
+                            })), 
+                            "Type student name to search...", 
+                            "group-student-select"
+                        )}
+                    </div>
+                    
+                    <div class="mb-4">
+                        <button type="button" id="add-selected-student" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">
+                            + Add Selected Student
+                        </button>
+                    </div>
+                    
+                    <div class="border border-gray-300 rounded-md p-4">
+                        <h4 class="font-medium mb-3">Selected Students</h4>
+                        <div id="selected-students-list" class="space-y-2 max-h-40 overflow-y-auto">
+                            <p class="text-gray-500 text-sm">No students selected yet</p>
                         </div>
+                        <div id="selected-students-count" class="text-xs text-gray-500 mt-2">0 students selected</div>
                     </div>
                 </div>
                 
@@ -2421,6 +2527,54 @@ window.showCreateGroupClassModal = function() {
     
     setTimeout(() => {
         initializeSearchableSelect('group-tutor');
+        initializeSearchableSelect('group-student-select');
+        
+        const selectedStudents = new Set();
+        const selectedStudentsList = document.getElementById('selected-students-list');
+        const selectedStudentsCount = document.getElementById('selected-students-count');
+        
+        function updateSelectedStudentsDisplay() {
+            if (selectedStudents.size === 0) {
+                selectedStudentsList.innerHTML = '<p class="text-gray-500 text-sm">No students selected yet</p>';
+            } else {
+                selectedStudentsList.innerHTML = Array.from(selectedStudents).map(studentId => {
+                    const student = availableStudents.find(s => s.id === studentId);
+                    if (!student) return '';
+                    return `
+                        <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                            <div>
+                                <div class="font-medium">${student.studentName}</div>
+                                <div class="text-xs text-gray-500">${student.grade || 'No grade'} | Current: ${student.tutorName || 'Unassigned'}</div>
+                            </div>
+                            <button type="button" class="remove-student-btn text-red-600 hover:text-red-800 text-xs" data-student-id="${studentId}">
+                                Remove
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+            }
+            selectedStudentsCount.textContent = `${selectedStudents.size} students selected`;
+        }
+        
+        // Add selected student
+        document.getElementById('add-selected-student').addEventListener('click', () => {
+            const studentId = document.getElementById('group-student-select').value;
+            if (studentId && !selectedStudents.has(studentId)) {
+                selectedStudents.add(studentId);
+                updateSelectedStudentsDisplay();
+                document.getElementById('group-student-select').value = '';
+                document.getElementById('group-student-select-search').value = '';
+            }
+        });
+        
+        // Remove student
+        selectedStudentsList.addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-student-btn')) {
+                const studentId = e.target.dataset.studentId;
+                selectedStudents.delete(studentId);
+                updateSelectedStudentsDisplay();
+            }
+        });
         
         document.getElementById('create-group-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -2434,8 +2588,10 @@ window.showCreateGroupClassModal = function() {
             const location = document.getElementById('group-location').value.trim();
             const description = document.getElementById('group-description').value.trim();
             
-            const selectedStudents = Array.from(document.querySelectorAll('input[name="group-students"]:checked'))
-                .map(cb => cb.value);
+            if (selectedStudents.size === 0) {
+                showAlert("Please add at least one student to the group", 'warning');
+                return;
+            }
             
             if (!groupName || !subject || !tutorEmail || !schedule) {
                 showAlert("Please fill all required fields", 'warning');
@@ -2448,7 +2604,12 @@ window.showCreateGroupClassModal = function() {
                 return;
             }
             
-            if (!confirm(`Create group class "${groupName}" with ${selectedStudents.length} students?`)) {
+            if (selectedStudents.size > capacity) {
+                showAlert(`Number of selected students (${selectedStudents.size}) exceeds group capacity (${capacity})`, 'warning');
+                return;
+            }
+            
+            if (!confirm(`Create group class "${groupName}" with ${selectedStudents.size} students?`)) {
                 return;
             }
             
@@ -2462,8 +2623,8 @@ window.showCreateGroupClassModal = function() {
                 const userEmail = window.userData?.email || 'admin@system';
                 const timestamp = new Date().toISOString();
                 
-                const enrolledStudents = selectedStudents.map(studentId => {
-                    const student = students.find(s => s.id === studentId);
+                const enrolledStudents = Array.from(selectedStudents).map(studentId => {
+                    const student = availableStudents.find(s => s.id === studentId);
                     return {
                         studentId,
                         studentName: student.studentName,
@@ -2494,12 +2655,15 @@ window.showCreateGroupClassModal = function() {
                 const groupRef = await addDoc(collection(db, "groupClasses"), groupData);
                 console.log("Group created with ID:", groupRef.id);
                 
-                const updatePromises = selectedStudents.map(async (studentId) => {
-                    const student = students.find(s => s.id === studentId);
+                // Update student records for enrolled students
+                const updatePromises = Array.from(selectedStudents).map(async (studentId) => {
+                    const student = availableStudents.find(s => s.id === studentId);
                     await updateDoc(doc(db, "students", studentId), {
                         enrollmentType: 'group',
                         groupIds: firebase.firestore.FieldValue.arrayUnion(groupRef.id),
                         groupTutors: firebase.firestore.FieldValue.arrayUnion(tutor.email),
+                        tutorEmail: tutor.email,
+                        tutorName: tutor.name,
                         updatedAt: timestamp,
                         updatedBy: user
                     });
@@ -2588,11 +2752,6 @@ window.handleEndTransition = async function(studentId) {
     }
 }
 
-function applyStudentFilter(filterType) {
-    console.log("Applying filter:", filterType);
-    // Implement filtering logic here
-}
-
 function showAlert(msg, type) {
     document.querySelectorAll('.custom-alert').forEach(el => el.remove());
     
@@ -2642,6 +2801,25 @@ window.closeManagementModal = function(id) {
     const m = document.getElementById(id); 
     if(m) m.remove(); 
 };
+
+// ======================================================
+// STUB FUNCTIONS (TO BE IMPLEMENTED)
+// ======================================================
+
+window.showEditGroupClassModal = function(groupId) {
+    console.log("Edit group modal for:", groupId);
+    alert("Edit group functionality coming soon!");
+}
+
+window.showViewGroupClassModal = function(groupId) {
+    console.log("View group modal for:", groupId);
+    alert("View group functionality coming soon!");
+}
+
+window.showAddStudentToGroupModal = function(groupId) {
+    console.log("Add student to group:", groupId);
+    alert("Add student to group functionality coming soon!");
+}
 
 // ======================================================
 // KEEP EXISTING GLOBAL FUNCTIONS
@@ -9925,6 +10103,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
