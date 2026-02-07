@@ -8522,122 +8522,289 @@ async function fetchTutorAssignmentHistory() {
 }
 
 function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
-    // FIX: tutorAssignments is the entire object, not the student's specific history
-    // Get the specific student's history from the object
+    // Get all history records for this student
     const studentHistory = tutorAssignments[studentId] || [];
     
-    if (!studentHistory || studentHistory.length === 0) {
-        alert("No tutor history found for this student.");
-        return;
-    }
+    // Sort history by date (newest first)
+    const sortedHistory = [...studentHistory].sort((a, b) => {
+        const dateA = new Date(a.assignedAt || a.timestamp || 0);
+        const dateB = new Date(b.assignedAt || b.timestamp || 0);
+        return dateB - dateA; // Newest first
+    });
 
-    // FIX: studentHistory is already the array, not an object with tutorHistory property
-    const tutorHistoryHTML = studentHistory.map((assignment, index) => {
-        const assignedDate = assignment.assignedAt ? new Date(assignment.assignedAt) : 
-                           assignment.timestamp ? new Date(assignment.timestamp) : 
-                           assignment.assignedDate?.toDate?.() || new Date();
+    // Create a comprehensive timeline that includes ALL events
+    const allEvents = [];
+    
+    // 1. Add registration event (from studentData)
+    if (studentData.createdAt) {
+        allEvents.push({
+            type: 'REGISTRATION',
+            date: studentData.createdAt,
+            title: 'Student Registered',
+            description: `Registered by ${studentData.createdBy || 'System'}`,
+            details: `Student ${studentData.studentName} was added to the system.`,
+            user: studentData.createdBy || 'System'
+        });
+    }
+    
+    // 2. Add all tutor assignment events
+    sortedHistory.forEach((assignment, index) => {
+        const isInitialAssignment = assignment.oldTutorEmail === '' && assignment.oldTutorName === 'Unassigned';
         
-        // Determine if it's current assignment
-        const isCurrent = (assignment.newTutorEmail === studentData.tutorEmail) ? 
-            '<span class="ml-2 bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Current</span>' : '';
+        allEvents.push({
+            type: 'TUTOR_ASSIGNMENT',
+            date: assignment.assignedAt || assignment.timestamp,
+            title: isInitialAssignment ? 'Initial Tutor Assignment' : 'Tutor Reassignment',
+            description: isInitialAssignment ? 
+                `Assigned to ${assignment.newTutorName}` : 
+                `Reassigned from ${assignment.oldTutorName || 'Unassigned'} to ${assignment.newTutorName}`,
+            details: assignment.reason ? `Reason: ${assignment.reason}` : '',
+            user: assignment.assignedBy || 'System',
+            tutorName: assignment.newTutorName,
+            oldTutorName: assignment.oldTutorName
+        });
+    });
+    
+    // 3. Add student information updates
+    if (studentData.updatedAt && studentData.updatedBy) {
+        allEvents.push({
+            type: 'INFO_UPDATE',
+            date: studentData.updatedAt,
+            title: 'Information Updated',
+            description: `Last updated by ${studentData.updatedBy}`,
+            details: 'Student details were modified',
+            user: studentData.updatedBy
+        });
+    }
+    
+    // 4. Add any status changes
+    if (studentData.isTransitioning) {
+        allEvents.push({
+            type: 'STATUS_CHANGE',
+            date: studentData.transitionDate || studentData.updatedAt || studentData.createdAt,
+            title: 'Status: Transitioning',
+            description: 'Student marked as transitioning',
+            details: studentData.transitionNotes || '',
+            user: studentData.updatedBy || 'System'
+        });
+    }
+    
+    if (studentData.summerBreak) {
+        allEvents.push({
+            type: 'STATUS_CHANGE',
+            date: studentData.breakDate || studentData.updatedAt || studentData.createdAt,
+            title: 'Status: On Break',
+            description: 'Student marked as on summer break',
+            details: studentData.breakNotes || '',
+            user: studentData.updatedBy || 'System'
+        });
+    }
+    
+    // Sort all events by date (newest first)
+    allEvents.sort((a, b) => {
+        const dateA = new Date(a.date || 0);
+        const dateB = new Date(b.date || 0);
+        return dateB - dateA; // Newest first
+    });
+
+    // Create timeline HTML
+    const timelineHTML = allEvents.map((event, index) => {
+        const eventDate = event.date ? new Date(event.date) : new Date();
+        const formattedDate = eventDate.toLocaleDateString('en-GB', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        });
+        const formattedTime = eventDate.toLocaleTimeString('en-GB', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        // Determine icon and color based on event type
+        let icon = '📝';
+        let bgColor = 'bg-blue-50';
+        let borderColor = 'border-blue-200';
+        
+        switch(event.type) {
+            case 'REGISTRATION':
+                icon = '👤';
+                bgColor = 'bg-green-50';
+                borderColor = 'border-green-200';
+                break;
+            case 'TUTOR_ASSIGNMENT':
+                icon = '👨‍🏫';
+                bgColor = 'bg-purple-50';
+                borderColor = 'border-purple-200';
+                break;
+            case 'STATUS_CHANGE':
+                icon = '🔄';
+                bgColor = 'bg-yellow-50';
+                borderColor = 'border-yellow-200';
+                break;
+            case 'INFO_UPDATE':
+                icon = '✏️';
+                bgColor = 'bg-gray-50';
+                borderColor = 'border-gray-200';
+                break;
+        }
+        
+        return `
+            <div class="mb-4 ${bgColor} ${borderColor} border-l-4 p-4 rounded-r-lg">
+                <div class="flex items-start">
+                    <div class="mr-3 text-xl">${icon}</div>
+                    <div class="flex-1">
+                        <div class="flex justify-between items-start">
+                            <h4 class="font-bold text-gray-800">${event.title}</h4>
+                            <span class="text-sm text-gray-500">${formattedDate} ${formattedTime}</span>
+                        </div>
+                        <p class="text-gray-600 mt-1">${event.description}</p>
+                        ${event.details ? `<p class="text-gray-500 text-sm mt-1">${event.details}</p>` : ''}
+                        <div class="mt-2 text-sm text-gray-500">
+                            <span class="font-medium">By:</span> ${event.user}
+                            ${event.tutorName ? `<span class="ml-4 font-medium">Tutor:</span> ${event.tutorName}` : ''}
+                            ${event.oldTutorName && event.oldTutorName !== 'Unassigned' ? 
+                                `<span class="ml-4 font-medium">Previous:</span> ${event.oldTutorName}` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Create detailed tutor assignment table
+    const tutorAssignmentHTML = sortedHistory.map((assignment, index) => {
+        const assignedDate = assignment.assignedAt ? new Date(assignment.assignedAt) : 
+                           assignment.timestamp ? new Date(assignment.timestamp) : new Date();
+        
+        const isCurrent = (assignment.newTutorEmail === studentData.tutorEmail);
         
         return `
             <tr class="hover:bg-gray-50">
-                <td class="px-4 py-3">${index + 1}</td>
-                <td class="px-4 py-3 font-medium">${assignment.newTutorName || assignment.newTutorEmail || 'Unassigned'}</td>
+                <td class="px-4 py-3">${sortedHistory.length - index}</td>
+                <td class="px-4 py-3 font-medium">
+                    ${assignment.oldTutorName || 'Unassigned'} → ${assignment.newTutorName || 'Unassigned'}
+                </td>
                 <td class="px-4 py-3">${assignment.newTutorEmail || 'N/A'}</td>
                 <td class="px-4 py-3">${assignedDate.toLocaleDateString()}</td>
-                <td class="px-4 py-3">${assignment.assignedBy || assignment.assignedByEmail || 'System'}</td>
-                <td class="px-4 py-3">${isCurrent}</td>
+                <td class="px-4 py-3">${assignment.assignedBy || 'System'}</td>
+                <td class="px-4 py-3">${assignment.reason || 'N/A'}</td>
+                <td class="px-4 py-3">
+                    ${isCurrent ? '<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Current</span>' : ''}
+                </td>
             </tr>
         `;
     }).join('');
 
-    // FIX: Grade history needs to be handled differently - using student updates
-    // For now, we'll create a simple grade history from student data
-    let gradeHistoryHTML = '';
-    if (studentData.grade) {
-        gradeHistoryHTML = `
-            <tr class="hover:bg-gray-50">
-                <td class="px-4 py-3">1</td>
-                <td class="px-4 py-3 font-medium">${studentData.grade}</td>
-                <td class="px-4 py-3">${studentData.updatedAt ? new Date(studentData.updatedAt).toLocaleDateString() : 'N/A'}</td>
-                <td class="px-4 py-3">${studentData.updatedBy || 'System'}</td>
-            </tr>
-        `;
-    } else {
-        gradeHistoryHTML = `
-            <tr class="hover:bg-gray-50">
-                <td class="px-4 py-3 text-center text-gray-500" colspan="4">No grade history available</td>
-            </tr>
-        `;
-    }
-
     const modalHtml = `
-        <div id="tutorHistoryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div class="relative p-8 bg-white w-full max-w-6xl rounded-lg shadow-2xl">
+        <div id="tutorHistoryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+            <div class="relative p-8 bg-white w-full max-w-6xl rounded-lg shadow-2xl max-h-[90vh] overflow-y-auto">
                 <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('tutorHistoryModal')">&times;</button>
-                <h3 class="text-2xl font-bold mb-4 text-blue-700">Tutor & Grade History for ${studentData.studentName}</h3>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div class="bg-blue-50 p-4 rounded-lg">
+                <div class="mb-6">
+                    <h3 class="text-2xl font-bold text-blue-700">Complete History for ${studentData.studentName}</h3>
+                    <p class="text-gray-600 mt-1">Student ID: ${studentId}</p>
+                </div>
+                
+                <!-- Current Information Summary -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
                         <h4 class="font-bold text-lg mb-2 text-blue-800">Current Information</h4>
-                        <p><strong>Tutor:</strong> ${studentData.tutorName || studentData.tutorEmail || 'Unassigned'}</p>
-                        <p><strong>Grade:</strong> ${studentData.grade || 'N/A'}</p>
-                        <p><strong>Subjects:</strong> ${Array.isArray(studentData.subjects) ? studentData.subjects.join(', ') : studentData.subjects || 'N/A'}</p>
-                        <p><strong>Days/Week:</strong> ${studentData.days || 'N/A'}</p>
+                        <div class="space-y-2">
+                            <p><strong>Tutor:</strong> ${studentData.tutorName || studentData.tutorEmail || 'Unassigned'}</p>
+                            <p><strong>Grade:</strong> ${studentData.grade || 'N/A'}</p>
+                            <p><strong>Subjects:</strong> ${Array.isArray(studentData.subjects) ? studentData.subjects.join(', ') : studentData.subjects || 'N/A'}</p>
+                            <p><strong>Days/Week:</strong> ${studentData.days || 'N/A'}</p>
+                            <p><strong>Status:</strong> ${studentData.isTransitioning ? 'Transitioning' : studentData.summerBreak ? 'On Break' : 'Active'}</p>
+                        </div>
                     </div>
-                    <div class="bg-green-50 p-4 rounded-lg">
-                        <h4 class="font-bold text-lg mb-2 text-green-800">Parent Information</h4>
-                        <p><strong>Parent:</strong> ${studentData.parentName || 'N/A'}</p>
-                        <p><strong>Phone:</strong> ${studentData.parentPhone || 'N/A'}</p>
-                        <p><strong>Email:</strong> ${studentData.parentEmail || 'N/A'}</p>
-                        <p><strong>Fee:</strong> ₦${(studentData.studentFee || 0).toLocaleString()}</p>
+                    
+                    <div class="bg-green-50 p-4 rounded-lg border border-green-100">
+                        <h4 class="font-bold text-lg mb-2 text-green-800">Registration & Contact</h4>
+                        <div class="space-y-2">
+                            <p><strong>Registered:</strong> ${studentData.createdAt ? new Date(studentData.createdAt).toLocaleDateString() : 'N/A'}</p>
+                            <p><strong>Registered By:</strong> ${studentData.createdBy || 'System'}</p>
+                            <p><strong>Last Updated:</strong> ${studentData.updatedAt ? new Date(studentData.updatedAt).toLocaleDateString() : 'N/A'}</p>
+                            <p><strong>Updated By:</strong> ${studentData.updatedBy || 'System'}</p>
+                            <p><strong>Parent:</strong> ${studentData.parentName || 'N/A'}</p>
+                            <p><strong>Phone:</strong> ${studentData.parentPhone || 'N/A'}</p>
+                            <p><strong>Fee:</strong> ₦${(studentData.studentFee || 0).toLocaleString()}</p>
+                        </div>
                     </div>
                 </div>
                 
+                <!-- Complete Timeline -->
                 <div class="mb-8">
-                    <h4 class="text-xl font-bold mb-4 text-gray-800">Tutor Assignment History</h4>
+                    <h4 class="text-xl font-bold mb-4 text-gray-800 flex items-center">
+                        <span class="mr-2">📅</span> Complete Activity Timeline
+                    </h4>
+                    ${allEvents.length > 0 ? 
+                        `<div class="max-h-96 overflow-y-auto pr-2">${timelineHTML}</div>` :
+                        `<div class="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
+                            <p class="text-lg">No history records found</p>
+                            <p class="text-sm mt-1">This student has no recorded activity yet</p>
+                        </div>`
+                    }
+                </div>
+                
+                <!-- Detailed Tutor Assignment History -->
+                <div class="mb-8">
+                    <h4 class="text-xl font-bold mb-4 text-gray-800 flex items-center">
+                        <span class="mr-2">👨‍🏫</span> Detailed Tutor Assignment History
+                    </h4>
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tutor Name</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tutor Email</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Assigned Date</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tutor Change</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">New Tutor Email</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Assigned By</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
                                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
-                                ${tutorHistoryHTML || '<tr><td colspan="6" class="px-4 py-3 text-center text-gray-500">No tutor history available</td></tr>'}
+                                ${tutorAssignmentHTML || 
+                                    `<tr>
+                                        <td colspan="7" class="px-4 py-6 text-center text-gray-500">
+                                            No tutor assignment history available
+                                        </td>
+                                    </tr>`
+                                }
                             </tbody>
                         </table>
                     </div>
                 </div>
                 
-                <div>
-                    <h4 class="text-xl font-bold mb-4 text-gray-800">Grade Progression History</h4>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Changed Date</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Changed By</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                ${gradeHistoryHTML}
-                            </tbody>
-                        </table>
+                <!-- Summary Statistics -->
+                <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                    <h4 class="font-bold text-lg mb-2 text-gray-800">History Summary</h4>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-blue-600">${allEvents.length}</div>
+                            <div class="text-sm text-gray-600">Total Events</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-purple-600">${sortedHistory.length}</div>
+                            <div class="text-sm text-gray-600">Tutor Assignments</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-green-600">${studentData.createdAt ? '✓' : '0'}</div>
+                            <div class="text-sm text-gray-600">Registration</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-yellow-600">${studentData.updatedAt ? '✓' : '0'}</div>
+                            <div class="text-sm text-gray-600">Updates</div>
+                        </div>
                     </div>
                 </div>
                 
                 <div class="flex justify-end mt-6 pt-6 border-t">
-                    <button onclick="closeManagementModal('tutorHistoryModal')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">Close</button>
+                    <button onclick="closeManagementModal('tutorHistoryModal')" 
+                            class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition-colors">
+                        Close History
+                    </button>
                 </div>
             </div>
         </div>
@@ -8656,7 +8823,6 @@ window.viewStudentTutorHistory = function(studentId) {
         return;
     }
     
-    // Pass the entire tutorAssignments object, not just the student's history
     showTutorHistoryModal(studentId, student, tutorAssignments);
 };
 
@@ -9357,4 +9523,5 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
