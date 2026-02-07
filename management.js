@@ -1674,7 +1674,9 @@ function renderDirectoryFromCache(searchTerm = '') {
                 badge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">Active</span>`;
             }
             
-            const historyBtn = tutorAssignments[student.id] ? 
+            // FIXED: Added null check for tutorAssignments
+            const studentHistory = tutorAssignments[student.id] || [];
+            const historyBtn = studentHistory.length > 0 ? 
                 `<button class="view-history-btn px-2 py-1 text-xs bg-purple-600 text-white rounded-full ml-1" data-student-id="${student.id}">History</button>` : '';
 
             const actions = `
@@ -2207,6 +2209,41 @@ function showEnhancedAssignStudentModal() {
             }
         });
     }, 100);
+}
+
+// ======================================================
+// FIXED: VIEW STUDENT TUTOR HISTORY FUNCTION
+// ======================================================
+
+window.viewStudentTutorHistory = async function(studentId) {
+    try {
+        // Get the student from cache
+        const students = sessionCache.students || [];
+        const student = students.find(s => s.id === studentId);
+        
+        if (!student) {
+            alert("Student not found in cache. Please refresh.");
+            return;
+        }
+        
+        // Get tutor assignments for this student
+        const tutorAssignments = sessionCache.tutorAssignments || {};
+        const studentHistory = tutorAssignments[studentId] || [];
+        
+        console.log(`Viewing history for student: ${student.studentName}`);
+        console.log(`Found ${studentHistory.length} history records`);
+        
+        // Call the modal function with safe data
+        if (typeof window.showTutorHistoryModal === 'function') {
+            // Ensure we pass a valid array even if empty
+            window.showTutorHistoryModal(studentId, student.studentName, studentHistory);
+        } else {
+            alert("History modal function not available. Please refresh the page.");
+        }
+    } catch (error) {
+        console.error("Error viewing student tutor history:", error);
+        alert(`Error loading history: ${error.message}`);
+    }
 }
 
 function closeAssignModal() {
@@ -9303,6 +9340,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
