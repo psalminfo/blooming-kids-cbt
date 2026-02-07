@@ -1026,6 +1026,10 @@ function searchStudentFromFirebase(student, searchTerm, tutors = []) {
     return false;
 }
 
+function safeMap(array, callback) {
+    if (!Array.isArray(array)) return [];
+    return array.map(callback);
+
 // --- ENHANCED SELECT WITH SEARCH FUNCTIONALITY ---
 
 function createSearchableSelect(options, placeholder = "Select...", id = '', isTutor = false) {
@@ -6531,7 +6535,7 @@ window.downloadEnrollmentInvoice = async function(enrollmentId) {
         // Prepare tutor information for invoice
         let tutorInfoHTML = '';
         if (tutorAssignments.length > 0) {
-            tutorInfoHTML = tutorAssignments.map(assignment => {
+            tutorInfoHTML = tutorsafeMap(assignment => {
                 let tutorDetails = '';
                 if (assignment.tutorName) {
                     tutorDetails += `<p><strong>${assignment.studentName}:</strong> ${assignment.tutorName}`;
@@ -9340,3 +9344,4 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
