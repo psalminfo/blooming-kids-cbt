@@ -8522,40 +8522,56 @@ async function fetchTutorAssignmentHistory() {
 }
 
 function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
-    const studentHistory = tutorAssignments[studentId];
-    if (!studentHistory) {
+    // FIX: tutorAssignments is the entire object, not the student's specific history
+    // Get the specific student's history from the object
+    const studentHistory = tutorAssignments[studentId] || [];
+    
+    if (!studentHistory || studentHistory.length === 0) {
         alert("No tutor history found for this student.");
         return;
     }
 
-    const tutorHistoryHTML = studentHistory.tutorHistory.map((assignment, index) => {
-        const assignedDate = assignment.assignedDate?.toDate?.() || new Date();
-        const isCurrent = assignment.isCurrent ? '<span class="ml-2 bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Current</span>' : '';
+    // FIX: studentHistory is already the array, not an object with tutorHistory property
+    const tutorHistoryHTML = studentHistory.map((assignment, index) => {
+        const assignedDate = assignment.assignedAt ? new Date(assignment.assignedAt) : 
+                           assignment.timestamp ? new Date(assignment.timestamp) : 
+                           assignment.assignedDate?.toDate?.() || new Date();
+        
+        // Determine if it's current assignment
+        const isCurrent = (assignment.newTutorEmail === studentData.tutorEmail) ? 
+            '<span class="ml-2 bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Current</span>' : '';
         
         return `
             <tr class="hover:bg-gray-50">
                 <td class="px-4 py-3">${index + 1}</td>
-                <td class="px-4 py-3 font-medium">${assignment.tutorName || assignment.tutorEmail}</td>
-                <td class="px-4 py-3">${assignment.tutorEmail}</td>
+                <td class="px-4 py-3 font-medium">${assignment.newTutorName || assignment.newTutorEmail || 'Unassigned'}</td>
+                <td class="px-4 py-3">${assignment.newTutorEmail || 'N/A'}</td>
                 <td class="px-4 py-3">${assignedDate.toLocaleDateString()}</td>
-                <td class="px-4 py-3">${assignment.assignedBy || 'System'}</td>
+                <td class="px-4 py-3">${assignment.assignedBy || assignment.assignedByEmail || 'System'}</td>
                 <td class="px-4 py-3">${isCurrent}</td>
             </tr>
         `;
     }).join('');
 
-    const gradeHistoryHTML = studentHistory.gradeHistory.map((gradeChange, index) => {
-        const changedDate = gradeChange.changedDate?.toDate?.() || new Date();
-        
-        return `
+    // FIX: Grade history needs to be handled differently - using student updates
+    // For now, we'll create a simple grade history from student data
+    let gradeHistoryHTML = '';
+    if (studentData.grade) {
+        gradeHistoryHTML = `
             <tr class="hover:bg-gray-50">
-                <td class="px-4 py-3">${index + 1}</td>
-                <td class="px-4 py-3 font-medium">${gradeChange.grade}</td>
-                <td class="px-4 py-3">${changedDate.toLocaleDateString()}</td>
-                <td class="px-4 py-3">${gradeChange.changedBy || 'System'}</td>
+                <td class="px-4 py-3">1</td>
+                <td class="px-4 py-3 font-medium">${studentData.grade}</td>
+                <td class="px-4 py-3">${studentData.updatedAt ? new Date(studentData.updatedAt).toLocaleDateString() : 'N/A'}</td>
+                <td class="px-4 py-3">${studentData.updatedBy || 'System'}</td>
             </tr>
         `;
-    }).join('');
+    } else {
+        gradeHistoryHTML = `
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 text-center text-gray-500" colspan="4">No grade history available</td>
+            </tr>
+        `;
+    }
 
     const modalHtml = `
         <div id="tutorHistoryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
@@ -8566,7 +8582,7 @@ function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div class="bg-blue-50 p-4 rounded-lg">
                         <h4 class="font-bold text-lg mb-2 text-blue-800">Current Information</h4>
-                        <p><strong>Tutor:</strong> ${studentData.tutorName || studentData.tutorEmail}</p>
+                        <p><strong>Tutor:</strong> ${studentData.tutorName || studentData.tutorEmail || 'Unassigned'}</p>
                         <p><strong>Grade:</strong> ${studentData.grade || 'N/A'}</p>
                         <p><strong>Subjects:</strong> ${Array.isArray(studentData.subjects) ? studentData.subjects.join(', ') : studentData.subjects || 'N/A'}</p>
                         <p><strong>Days/Week:</strong> ${studentData.days || 'N/A'}</p>
@@ -8595,7 +8611,7 @@ function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
-                                ${tutorHistoryHTML}
+                                ${tutorHistoryHTML || '<tr><td colspan="6" class="px-4 py-3 text-center text-gray-500">No tutor history available</td></tr>'}
                             </tbody>
                         </table>
                     </div>
@@ -8640,6 +8656,7 @@ window.viewStudentTutorHistory = function(studentId) {
         return;
     }
     
+    // Pass the entire tutorAssignments object, not just the student's history
     showTutorHistoryModal(studentId, student, tutorAssignments);
 };
 
@@ -9340,3 +9357,4 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
