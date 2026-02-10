@@ -590,6 +590,42 @@ function escapeHtml(unsafe) {
 }
 
 /**
+ * Safely get options array from question object
+ */
+function getQuestionOptions(question) {
+    if (!question || !question.options) {
+        return [];
+    }
+    
+    // If options is already an array, return it
+    if (Array.isArray(question.options)) {
+        return question.options;
+    }
+    
+    // If options is a string, try to parse it as JSON or split by commas
+    if (typeof question.options === 'string') {
+        try {
+            // Try to parse as JSON
+            const parsed = JSON.parse(question.options);
+            if (Array.isArray(parsed)) {
+                return parsed;
+            }
+        } catch (e) {
+            // If JSON parsing fails, try splitting by commas
+            console.log("Options was a string, attempting to split by commas:", question.options);
+            return question.options.split(',').map(opt => opt.trim()).filter(opt => opt.length > 0);
+        }
+    }
+    
+    // If options is an object, convert to array of values
+    if (typeof question.options === 'object' && question.options !== null && !Array.isArray(question.options)) {
+        return Object.values(question.options).filter(opt => opt !== null && opt !== undefined);
+    }
+    
+    return [];
+}
+
+/**
  * Displays creative writing section
  */
 function displayCreativeWriting(question) {
@@ -715,16 +751,20 @@ function displayMCQQuestions(questions, passagesMap = {}) {
         // Display questions for this passage with continuous numbering
         passageQuestions.forEach(q => {
             const questionElement = createQuestionElement(q, globalQuestionIndex);
-            container.appendChild(questionElement);
-            globalQuestionIndex++; // Increment for next question
+            if (questionElement) {
+                container.appendChild(questionElement);
+                globalQuestionIndex++; // Increment for next question
+            }
         });
     });
     
     // Display questions without passages AFTER passage questions
     questionsWithoutPassage.forEach(q => {
         const questionElement = createQuestionElement(q, globalQuestionIndex);
-        container.appendChild(questionElement);
-        globalQuestionIndex++; // Increment for next question
+        if (questionElement) {
+            container.appendChild(questionElement);
+            globalQuestionIndex++; // Increment for next question
+        }
     });
 }
 
@@ -732,9 +772,15 @@ function displayMCQQuestions(questions, passagesMap = {}) {
  * Creates a question element with optimized images and answer tracking
  */
 function createQuestionElement(q, displayIndex) {
+    // Validate the question object
+    if (!q || typeof q !== 'object') {
+        console.error('Invalid question object:', q);
+        return null;
+    }
+    
     const questionElement = document.createElement('div');
     questionElement.className = 'bg-white p-4 border rounded-lg shadow-sm question-block mt-4';
-    questionElement.setAttribute('data-question-id', q.id);
+    questionElement.setAttribute('data-question-id', q.id || `question-${displayIndex}`);
     
     // Optimize the image URL
     const optimizedImageUrl = q.imageUrl ? optimizeImageUrl(q.imageUrl) : null;
@@ -742,82 +788,100 @@ function createQuestionElement(q, displayIndex) {
     const showImageAfter = optimizedImageUrl && q.image_position === 'after';
     
     const safeQuestionText = escapeHtml(q.question || '');
-    const safeOptions = (q.options || []).map(opt => escapeHtml(opt));
     
-    // Determine if this is a multiple choice or text input question
-    const hasOptions = safeOptions && safeOptions.length > 0;
+    // Safely get options using the new helper function
+    const questionOptions = getQuestionOptions(q);
+    const hasOptions = questionOptions && questionOptions.length > 0;
     const answerType = hasOptions ? 'multiple-choice' : 'text-answer';
     
-    questionElement.innerHTML = `
-        ${showImageBefore ? `
-            <div class="image-container mb-3">
-                <img src="${optimizedImageUrl}" 
-                     class="max-w-full h-auto rounded-lg border cursor-pointer hover:opacity-90 transition-opacity"
-                     alt="Question image"
-                     onclick="window.open('${q.imageUrl}', '_blank')"/>
-                <p class="text-xs text-gray-500 text-center mt-1">Click image to view full size</p>
-            </div>
-        ` : ''}
-        
-        <p class="font-semibold mb-3 question-text text-gray-800">
-            ${displayIndex}. ${safeQuestionText}
-            <span class="answer-type-label">${hasOptions ? 'Multiple Choice' : 'Text Answer'}</span>
-        </p>
-        
-        ${showImageAfter ? `
-            <div class="image-container mt-3">
-                <img src="${optimizedImageUrl}" 
-                     class="max-w-full h-auto rounded-lg border cursor-pointer hover:opacity-90 transition-opacity"
-                     alt="Question image"
-                     onclick="window.open('${q.imageUrl}', '_blank')"/>
-                <p class="text-xs text-gray-500 text-center mt-1">Click image to view full size</p>
-            </div>
-        ` : ''}
-        
-        <div class="mt-3 space-y-2">
-            ${hasOptions ? 
-                safeOptions.map(opt => `
-                    <label class="flex items-center py-2 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors duration-150">
-                        <input type="radio" name="q${q.id}" value="${opt}" class="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500"> 
-                        <span class="text-gray-700">${opt}</span>
-                    </label>
-                `).join('') 
-                : 
-                `
-                <div class="text-answer-container">
-                    <textarea 
-                        id="text-answer-${q.id}" 
-                        class="text-answer-input" 
-                        placeholder="Type your answer here..."
-                        rows="3"
-                    ></textarea>
-                    <p class="text-xs text-gray-500 mt-1">Type your answer in the box above</p>
+    // Escape options for display
+    const safeOptions = questionOptions.map(opt => escapeHtml(opt));
+    
+    try {
+        questionElement.innerHTML = `
+            ${showImageBefore ? `
+                <div class="image-container mb-3">
+                    <img src="${optimizedImageUrl}" 
+                         class="max-w-full h-auto rounded-lg border cursor-pointer hover:opacity-90 transition-opacity"
+                         alt="Question image"
+                         onclick="window.open('${q.imageUrl}', '_blank')"/>
+                    <p class="text-xs text-gray-500 text-center mt-1">Click image to view full size</p>
                 </div>
-                `
+            ` : ''}
+            
+            <p class="font-semibold mb-3 question-text text-gray-800">
+                ${displayIndex}. ${safeQuestionText}
+                <span class="answer-type-label">${hasOptions ? 'Multiple Choice' : 'Text Answer'}</span>
+            </p>
+            
+            ${showImageAfter ? `
+                <div class="image-container mt-3">
+                    <img src="${optimizedImageUrl}" 
+                         class="max-w-full h-auto rounded-lg border cursor-pointer hover:opacity-90 transition-opacity"
+                         alt="Question image"
+                         onclick="window.open('${q.imageUrl}', '_blank')"/>
+                    <p class="text-xs text-gray-500 text-center mt-1">Click image to view full size</p>
+                </div>
+            ` : ''}
+            
+            <div class="mt-3 space-y-2">
+                ${hasOptions ? 
+                    safeOptions.map(opt => `
+                        <label class="flex items-center py-2 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors duration-150">
+                            <input type="radio" name="q${q.id || displayIndex}" value="${opt}" class="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500"> 
+                            <span class="text-gray-700">${opt}</span>
+                        </label>
+                    `).join('') 
+                    : 
+                    `
+                    <div class="text-answer-container">
+                        <textarea 
+                            id="text-answer-${q.id || displayIndex}" 
+                            class="text-answer-input" 
+                            placeholder="Type your answer here..."
+                            rows="3"
+                        ></textarea>
+                        <p class="text-xs text-gray-500 mt-1">Type your answer in the box above</p>
+                    </div>
+                    `
+                }
+            </div>
+        `;
+        
+        // Add event listeners based on question type
+        if (hasOptions) {
+            // Multiple choice: radio button event listeners
+            const radioInputs = questionElement.querySelectorAll(`input[name="q${q.id || displayIndex}"]`);
+            radioInputs.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    saveAnswer(q.id || displayIndex, e.target.value);
+                });
+            });
+        } else {
+            // Text answer: input event listener with debouncing
+            const textInput = questionElement.querySelector(`#text-answer-${q.id || displayIndex}`);
+            if (textInput) {
+                textInput.addEventListener('input', (e) => {
+                    saveTextAnswer(q.id || displayIndex, e.target.value);
+                });
             }
-        </div>
-    `;
-    
-    // Add event listeners based on question type
-    if (hasOptions) {
-        // Multiple choice: radio button event listeners
-        const radioInputs = questionElement.querySelectorAll(`input[name="q${q.id}"]`);
-        radioInputs.forEach(radio => {
-            radio.addEventListener('change', (e) => {
-                saveAnswer(q.id, e.target.value);
-            });
-        });
-    } else {
-        // Text answer: input event listener with debouncing
-        const textInput = questionElement.querySelector(`#text-answer-${q.id}`);
-        if (textInput) {
-            textInput.addEventListener('input', (e) => {
-                saveTextAnswer(q.id, e.target.value);
-            });
         }
+        
+        return questionElement;
+    } catch (error) {
+        console.error('Error creating question element:', error, q);
+        // Create a fallback question element
+        const fallbackElement = document.createElement('div');
+        fallbackElement.className = 'bg-white p-4 border rounded-lg shadow-sm question-block mt-4 border-red-300';
+        fallbackElement.innerHTML = `
+            <p class="font-semibold mb-3 text-gray-800">
+                ${displayIndex}. ${safeQuestionText}
+                <span class="answer-type-label">Error loading question</span>
+            </p>
+            <p class="text-red-500 text-sm">There was an error displaying this question. Please try refreshing the page.</p>
+        `;
+        return fallbackElement;
     }
-    
-    return questionElement;
 }
 
 // Clear session storage when test is fully completed
