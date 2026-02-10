@@ -1162,39 +1162,14 @@ function createDatePicker(id, value = '') {
                class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">`;
 }
 
-// --- MODAL CLOSURE FUNCTIONS (Defined First) ---
+// --- MODAL CLOSURE UTILITIES ---
 
-function closeReassignModal() {
-    const modal = document.getElementById('reassign-student-modal');
-    if (modal) modal.remove();
-}
+// Single declaration of modal closure utilities
+// Note: These functions are only declared once in the entire file
 
-function closeTransitionModal() {
-    const modal = document.getElementById('transition-student-modal');
-    if (modal) modal.remove();
-}
-
-function closeGroupClassModal() {
-    const modal = document.getElementById('group-class-modal');
-    if (modal) modal.remove();
-}
-
-function closeManageTransitionModal() {
-    const modal = document.getElementById('manage-transition-modal');
-    if (modal) modal.remove();
-}
-
-function closeAssignModal() {
-    const modal = document.getElementById('assign-student-modal');
-    if (modal) modal.remove();
-}
-
-function closeManagementModal(id) {
-    const modal = document.getElementById(id);
-    if (modal) modal.remove();
-}
-
-// --- MAIN VIEW RENDERER (Updated) ---
+// ======================================================
+// MAIN VIEW RENDERER (Updated)
+// ======================================================
 
 async function renderManagementTutorView(container) {
     container.innerHTML = `
@@ -1273,7 +1248,7 @@ async function renderManagementTutorView(container) {
             const modalHtml = `
                 <div id="select-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
                     <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
-                        <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('select-student-modal')">&times;</button>
+                        <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="document.getElementById('select-student-modal').remove()">&times;</button>
                         <h3 class="text-xl font-bold mb-4">View History</h3>
                         <form id="select-student-form">
                             <div class="mb-4">
@@ -1307,7 +1282,7 @@ async function renderManagementTutorView(container) {
                             alert("Please select a student");
                             return;
                         }
-                        closeManagementModal('select-student-modal');
+                        document.getElementById('select-student-modal').remove();
                         if(window.viewStudentTutorHistory) window.viewStudentTutorHistory(sid);
                     });
                 }
@@ -1336,7 +1311,7 @@ function showTransitionStudentModal() {
             <div class="bg-white w-full max-w-lg rounded-lg shadow-xl p-6">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-xl font-bold text-orange-700">Transition Student (Temporary)</h3>
-                    <button onclick="closeTransitionModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                    <button onclick="document.getElementById('transition-student-modal').remove()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
                 </div>
                 
                 <form id="transition-student-form">
@@ -1402,7 +1377,7 @@ function showTransitionStudentModal() {
                     
                     <div class="flex justify-end gap-3">
                         <button type="button" 
-                                onclick="closeTransitionModal()" 
+                                onclick="document.getElementById('transition-student-modal').remove()" 
                                 class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">
                             Cancel
                         </button>
@@ -1417,7 +1392,10 @@ function showTransitionStudentModal() {
         </div>
     `;
     
-    closeTransitionModal();
+    // Remove existing modal if any
+    const existingModal = document.getElementById('transition-student-modal');
+    if (existingModal) existingModal.remove();
+    
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
     // Initialize date for 2 weeks from now
@@ -1545,7 +1523,7 @@ async function performTransition(student, newTutor, startDate, endDate, reason, 
         
         // 4. Refresh and close
         setTimeout(() => {
-            closeTransitionModal();
+            document.getElementById('transition-student-modal').remove();
             fetchAndRenderDirectory(true);
         }, 1000);
         
@@ -1575,7 +1553,7 @@ function showCreateGroupClassModal() {
             <div class="bg-white w-full max-w-4xl rounded-lg shadow-xl p-6">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-xl font-bold text-indigo-700">Create Group Class</h3>
-                    <button onclick="closeGroupClassModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                    <button onclick="document.getElementById('group-class-modal').remove()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
                 </div>
                 
                 <form id="group-class-form">
@@ -1670,7 +1648,7 @@ function showCreateGroupClassModal() {
                     
                     <div class="flex justify-end gap-3">
                         <button type="button" 
-                                onclick="closeGroupClassModal()" 
+                                onclick="document.getElementById('group-class-modal').remove()" 
                                 class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">
                             Cancel
                         </button>
@@ -1685,7 +1663,10 @@ function showCreateGroupClassModal() {
         </div>
     `;
     
-    closeGroupClassModal();
+    // Remove existing modal if any
+    const existingModal = document.getElementById('group-class-modal');
+    if (existingModal) existingModal.remove();
+    
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
     setTimeout(() => {
@@ -1844,7 +1825,7 @@ async function createGroupClass(groupName, tutor, subject, schedule, notes, stud
         
         // 4. Refresh and close
         setTimeout(() => {
-            closeGroupClassModal();
+            document.getElementById('group-class-modal').remove();
             fetchAndRenderDirectory(true);
         }, 1000);
         
@@ -1867,14 +1848,15 @@ function showEnhancedReassignStudentModal() {
     if (!validateReassignData(students, tutors)) return;
     
     // Remove existing modal if any
-    closeReassignModal();
+    const existingModal = document.getElementById('reassign-student-modal');
+    if (existingModal) existingModal.remove();
     
     const modalHtml = `
         <div id="reassign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div class="bg-white w-full max-w-lg rounded-lg shadow-xl p-6">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-xl font-bold text-blue-700">Reassign / Transition Student</h3>
-                    <button onclick="closeReassignModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                    <button onclick="document.getElementById('reassign-student-modal').remove()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
                 </div>
                 
                 <div class="mb-4">
@@ -1962,7 +1944,7 @@ function showEnhancedReassignStudentModal() {
                     
                     <div class="flex justify-end gap-3">
                         <button type="button" 
-                                onclick="closeReassignModal()" 
+                                onclick="document.getElementById('reassign-student-modal').remove()" 
                                 class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">
                             Cancel
                         </button>
@@ -2093,7 +2075,7 @@ function showEnhancedReassignStudentModal() {
         });
         
         // Helper functions for student/tutor info
-        window.updateStudentInfo = function(student) {
+        function updateStudentInfo(student) {
             const infoDiv = document.getElementById('student-info');
             const nameDiv = document.getElementById('selected-student-name');
             const detailsDiv = document.getElementById('selected-student-details');
@@ -2110,9 +2092,9 @@ function showEnhancedReassignStudentModal() {
             } else {
                 infoDiv.classList.add('hidden');
             }
-        };
+        }
         
-        window.updateTutorInfo = function(tutor) {
+        function updateTutorInfo(tutor) {
             const infoDiv = document.getElementById('tutor-info');
             const nameDiv = document.getElementById('selected-tutor-name');
             const detailsDiv = document.getElementById('selected-tutor-details');
@@ -2127,7 +2109,7 @@ function showEnhancedReassignStudentModal() {
             } else {
                 infoDiv.classList.add('hidden');
             }
-        };
+        }
     }, 100);
 }
 
@@ -2169,7 +2151,7 @@ async function performReassignment(student, newTutor, reason, currentTutor) {
         
         // 4. Refresh and close
         setTimeout(() => { 
-            closeReassignModal(); 
+            document.getElementById('reassign-student-modal').remove(); 
             fetchAndRenderDirectory(true); 
         }, 1500);
         
@@ -2199,7 +2181,7 @@ function showManageTransitionModal(studentId) {
             <div class="bg-white w-full max-w-md rounded-lg shadow-xl p-6">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-xl font-bold text-orange-700">Manage Transition</h3>
-                    <button onclick="closeManageTransitionModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                    <button onclick="document.getElementById('manage-transition-modal').remove()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
                 </div>
                 
                 <div class="mb-4 p-3 bg-orange-50 rounded-md">
@@ -2258,7 +2240,7 @@ function showManageTransitionModal(studentId) {
                     
                     <div class="flex justify-end gap-3 mt-6">
                         <button type="button" 
-                                onclick="closeManageTransitionModal()" 
+                                onclick="document.getElementById('manage-transition-modal').remove()" 
                                 class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">
                             Cancel
                         </button>
@@ -2273,7 +2255,10 @@ function showManageTransitionModal(studentId) {
         </div>
     `;
     
-    closeManageTransitionModal();
+    // Remove existing modal if any
+    const existingModal = document.getElementById('manage-transition-modal');
+    if (existingModal) existingModal.remove();
+    
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
     setTimeout(() => {
@@ -2423,7 +2408,7 @@ function showManageTransitionModal(studentId) {
                 
                 // Refresh and close
                 setTimeout(() => {
-                    closeManageTransitionModal();
+                    document.getElementById('manage-transition-modal').remove();
                     fetchAndRenderDirectory(true);
                 }, 1000);
                 
@@ -2792,38 +2777,6 @@ window.showTransitionStudentModal = showTransitionStudentModal;
 window.showCreateGroupClassModal = showCreateGroupClassModal;
 window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
 window.showManageTransitionModal = showManageTransitionModal;
-window.closeReassignModal = closeReassignModal;
-window.closeTransitionModal = closeTransitionModal;
-window.closeGroupClassModal = closeGroupClassModal;
-window.closeManageTransitionModal = closeManageTransitionModal;
-window.closeAssignModal = closeAssignModal;
-window.closeManagementModal = closeManagementModal;
-
-// Keep existing functions from original code
-window.showAssignNewStudentModal = showAssignNewStudentModal;
-window.viewStudentTutorHistory = async function(studentId) {
-    try {
-        const students = sessionCache.students || [];
-        const student = students.find(s => s.id === studentId);
-        
-        if (!student) {
-            alert("Student not found in cache. Please refresh.");
-            return;
-        }
-        
-        const tutorAssignments = sessionCache.tutorAssignments || {};
-        const studentHistory = tutorAssignments[studentId] || [];
-        
-        if (typeof window.showTutorHistoryModal === 'function') {
-            window.showTutorHistoryModal(studentId, student.studentName, studentHistory);
-        } else {
-            alert("History modal function not available.");
-        }
-    } catch (error) {
-        console.error("Error viewing student tutor history:", error);
-        alert(`Error loading history: ${error.message}`);
-    }
-};
 
 // ======================================================
 // SUBSECTION 3.2: Inactive Tutors Panel
@@ -10081,6 +10034,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
