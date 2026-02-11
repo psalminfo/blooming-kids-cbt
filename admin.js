@@ -1,3 +1,5 @@
+[file name]: admin.js
+[file content begin]
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc, setDoc, deleteDoc, orderBy, writeBatch, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -1557,9 +1559,12 @@ async function renderTutorManagementPanel(container) {
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Student Fees (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-fees-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-fees-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Edit/Delete (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="edit-delete-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="edit-delete-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 
-                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Direct Student Add (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Direct Student Add (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Transition Button:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-transition-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-transition-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Preschool-2 Add/Transition:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="preschool-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="preschool-add-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                
+                <!-- NEW TOGGLE: Enable Add Transitioning Button -->
+                <label class="flex items-center col-span-1"><span class="text-gray-700 font-semibold mr-4">Enable Add Transitioning:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="add-transitioning-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="add-transitioning-status-label" class="ml-3 text-sm font-medium"></span></label></label>
             </div>
         </div>
         
@@ -1610,7 +1615,8 @@ function setupTutorManagementListeners() {
                 'showEditDeleteButtons': 'edit-delete', 
                 'bypassPendingApproval': 'bypass-approval',
                 'showTransitionButton': 'show-transition',
-                'preschoolAddTransition': 'preschool-add'
+                'preschoolAddTransition': 'preschool-add',
+                'enableAddTransitioning': 'add-transitioning' // NEW: Add this mapping
             };
 
             for (const key in toggleMap) {
@@ -1636,6 +1642,9 @@ function setupTutorManagementListeners() {
     document.getElementById('bypass-approval-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { bypassPendingApproval: e.target.checked }));
     document.getElementById('show-transition-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { showTransitionButton: e.target.checked }));
     document.getElementById('preschool-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { preschoolAddTransition: e.target.checked }));
+    
+    // NEW: Add listener for add-transitioning toggle
+    document.getElementById('add-transitioning-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { enableAddTransitioning: e.target.checked }));
     
     // UI Interaction Listeners
     document.getElementById('tutor-select').addEventListener('change', e => {
@@ -2791,3 +2800,108 @@ if (typeof window.saveAs === 'undefined') {
         document.body.removeChild(link);
     };
 }
+
+// ========================================================
+// DOCUMENT INITIALIZATION SCRIPT (Safe to add anywhere)
+// ========================================================
+
+// This ensures global_settings document exists for all branches
+// Runs once when admin panel loads, safe to add to any branch
+async function initializeGlobalSettings() {
+    try {
+        const settingsDocRef = doc(db, "settings", "global_settings");
+        const docSnap = await getDoc(settingsDocRef);
+        
+        if (!docSnap.exists()) {
+            // Document doesn't exist - create it with default values
+            await setDoc(settingsDocRef, {
+                isReportEnabled: true,          // Default: reports enabled
+                isTutorAddEnabled: true,        // Default: tutors can add students
+                isSummerBreakEnabled: false,    // Default: summer break disabled
+                showStudentFees: true,          // Default: show fees
+                showEditDeleteButtons: true,    // Default: show edit/delete
+                bypassPendingApproval: false,   // Default: require approval
+                showTransitionButton: true,     // Default: show transition button
+                preschoolAddTransition: true,   // Default: allow preschool add/transition
+                enableAddTransitioning: true,   // NEW: Default: enable add transitioning button (true = enabled)
+                lastUpdated: Timestamp.now(),   // Track when created/updated
+                createdAt: Timestamp.now()      // Track creation time
+            });
+            
+            console.log("✅ Created global_settings document with default values");
+            
+            // Also patch any existing toggle event listeners to use setDoc instead of updateDoc
+            patchToggleListeners();
+        } else {
+            console.log("✅ global_settings document already exists");
+            
+            // NEW: Check if enableAddTransitioning field exists, if not, add it with default value
+            if (docSnap.data().enableAddTransitioning === undefined) {
+                await updateDoc(settingsDocRef, { 
+                    enableAddTransitioning: true 
+                });
+                console.log("✅ Added enableAddTransitioning field to existing global_settings document");
+            }
+        }
+    } catch (error) {
+        console.error("⚠️ Error initializing global_settings:", error);
+    }
+}
+
+// Safely patch toggle event listeners to use setDoc instead of updateDoc
+// This prevents the "No document to update" error
+function patchToggleListeners() {
+    // Wait a moment for DOM to be ready
+    setTimeout(() => {
+        const settingsDocRef = doc(db, "settings", "global_settings");
+        
+        // Helper function to patch a single toggle
+        const patchToggle = (toggleId, fieldName) => {
+            const toggle = document.getElementById(toggleId);
+            if (toggle) {
+                // Remove existing listeners (if any)
+                const newToggle = toggle.cloneNode(true);
+                toggle.parentNode.replaceChild(newToggle, toggle);
+                
+                // Add new listener with setDoc (merge: true)
+                newToggle.addEventListener('change', e => {
+                    setDoc(settingsDocRef, { [fieldName]: e.target.checked }, { merge: true })
+                        .catch(error => console.error(`Error updating ${fieldName}:`, error));
+                });
+            }
+        };
+        
+        // Patch all toggle switches
+        patchToggle('report-toggle', 'isReportEnabled');
+        patchToggle('tutor-add-toggle', 'isTutorAddEnabled');
+        patchToggle('summer-break-toggle', 'isSummerBreakEnabled');
+        patchToggle('show-fees-toggle', 'showStudentFees');
+        patchToggle('edit-delete-toggle', 'showEditDeleteButtons');
+        patchToggle('bypass-approval-toggle', 'bypassPendingApproval');
+        patchToggle('show-transition-toggle', 'showTransitionButton');
+        patchToggle('preschool-add-toggle', 'preschoolAddTransition');
+        patchToggle('add-transitioning-toggle', 'enableAddTransitioning'); // NEW: Patch the new toggle
+        
+        console.log("✅ Toggle listeners patched to use setDoc with merge");
+    }, 1000); // Wait 1 second for DOM
+}
+
+// Run initialization when auth state changes (safest place)
+onAuthStateChanged(auth, async (user) => {
+    if (user && user.email === ADMIN_EMAIL) {
+        // Initialize global_settings for any branch
+        await initializeGlobalSettings();
+    }
+});
+
+// Also run initialization on page load as backup
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeGlobalSettings);
+} else {
+    initializeGlobalSettings();
+}
+
+// ========================================================
+// END OF SAFE INITIALIZATION SCRIPT
+// ========================================================
+[file content end]
