@@ -1763,14 +1763,338 @@ async function performTransition(student, newTutor, startDate, endDate, reason, 
 }
 
 // ======================================================
-// GLOBAL EXPORTS
+// FEATURE 2: CREATE GROUP CLASS MODAL (COMPLETE)
 // ======================================================
 
-window.showTransitionStudentModal = showTransitionStudentModal;
-window.showCreateGroupClassModal = showCreateGroupClassModal; // Add this line
-window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
-window.showManageTransitionModal = showManageTransitionModal;
-window.viewStudentCompleteHistory = viewStudentCompleteHistory;
+function showCreateGroupClassModal() {
+    const students = getCleanStudents();
+    const tutors = getCleanTutors();
+    
+    if (tutors.length === 0) {
+        alert("No tutors available. Please refresh.");
+        return;
+    }
+    
+    const modalHtml = `
+        <div id="group-class-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div class="bg-white w-full max-w-4xl rounded-lg shadow-xl p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-indigo-700">Create Group Class</h3>
+                    <button onclick="document.getElementById('group-class-modal').remove()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                
+                <form id="group-class-form">
+                    <div class="grid grid-cols-2 gap-6">
+                        <!-- Left Column -->
+                        <div>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-2 text-gray-700">Group Name *</label>
+                                <input type="text" 
+                                       id="group-name" 
+                                       class="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                       placeholder="E.g., Advanced Math Group, SAT Prep Class"
+                                       required>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-2 text-gray-700">Tutor *</label>
+                                ${createSearchableSelect(
+                                    tutors.map(t => ({ 
+                                        email: t.email, 
+                                        name: t.name,
+                                        employmentDate: t.employmentDate
+                                    })), 
+                                    "Select tutor...", 
+                                    "group-tutor",
+                                    true,
+                                    true
+                                )}
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-2 text-gray-700">Subject *</label>
+                                <input type="text" 
+                                       id="group-subject" 
+                                       class="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                       placeholder="E.g., Mathematics, English Literature"
+                                       required>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-2 text-gray-700">Schedule</label>
+                                <input type="text" 
+                                       id="group-schedule" 
+                                       class="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                       placeholder="E.g., Mon & Wed 4-6PM, Sat 10AM-12PM">
+                            </div>
+                        </div>
+                        
+                        <!-- Right Column -->
+                        <div>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-2 text-gray-700">Select Students *</label>
+                                <div class="border border-gray-300 rounded-md p-3 max-h-60 overflow-y-auto">
+                                    ${students.map(student => `
+                                        <div class="flex items-center mb-2 p-2 hover:bg-gray-50 rounded">
+                                            <input type="checkbox" 
+                                                   id="student-${student.id}" 
+                                                   value="${student.id}" 
+                                                   class="mr-3 group-student-checkbox">
+                                            <label for="student-${student.id}" class="flex-1 cursor-pointer">
+                                                <div class="font-medium">${student.studentName}</div>
+                                                <div class="text-xs text-gray-500">
+                                                    Grade: ${student.grade || 'N/A'} | 
+                                                    Current Tutor: ${student.tutorName || 'N/A'} |
+                                                    Parent: ${student.parentName || 'N/A'}
+                                                    ${student.groupId ? ' <span class="text-blue-600">(Already in group)</span>' : ''}
+                                                    ${student.isTransitioning ? ' <span class="text-orange-600">(Transitioning)</span>' : ''}
+                                                </div>
+                                            </label>
+                                            <input type="number" 
+                                                   min="0" 
+                                                   step="0.01"
+                                                   placeholder="₦ Fee"
+                                                   class="ml-2 w-24 p-1 border rounded text-sm hidden group-fee-input"
+                                                   data-student-id="${student.id}">
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">
+                                    ✅ Students can belong to multiple groups<br>
+                                    👥 Students from different parents can join the same group
+                                </p>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-2 text-gray-700">Total Group Fee</label>
+                                <div class="text-lg font-bold text-indigo-700" id="total-group-fee">₦0.00</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium mb-2 text-gray-700">Group Notes</label>
+                        <textarea id="group-notes" 
+                                  class="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" 
+                                  rows="2" 
+                                  placeholder="Any additional information about this group..."></textarea>
+                    </div>
+                    
+                    <div class="flex justify-end gap-3">
+                        <button type="button" 
+                                onclick="document.getElementById('group-class-modal').remove()" 
+                                class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">
+                            Cancel
+                        </button>
+                        <button type="submit" 
+                                id="group-submit-btn" 
+                                class="px-5 py-2.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                            Create Group Class
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('group-class-modal');
+    if (existingModal) existingModal.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    setTimeout(() => {
+        initializeSearchableSelect('group-tutor');
+        
+        // Show fee input when student is selected
+        document.querySelectorAll('.group-student-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const feeInput = document.querySelector(`.group-fee-input[data-student-id="${this.value}"]`);
+                if (this.checked) {
+                    feeInput.classList.remove('hidden');
+                    feeInput.required = true;
+                } else {
+                    feeInput.classList.add('hidden');
+                    feeInput.required = false;
+                    feeInput.value = '';
+                }
+                calculateTotalGroupFee();
+            });
+        });
+        
+        // Calculate total fee on fee input change
+        document.querySelectorAll('.group-fee-input').forEach(input => {
+            input.addEventListener('input', calculateTotalGroupFee);
+        });
+        
+        // Form submission
+        document.getElementById('group-class-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const groupName = document.getElementById('group-name').value.trim();
+            const tutorEmail = document.getElementById('group-tutor').value;
+            const subject = document.getElementById('group-subject').value.trim();
+            const schedule = document.getElementById('group-schedule').value.trim();
+            const notes = document.getElementById('group-notes').value.trim();
+            
+            const selectedCheckboxes = document.querySelectorAll('.group-student-checkbox:checked');
+            
+            if (!groupName || !tutorEmail || !subject) {
+                alert("Please fill all required fields");
+                return;
+            }
+            
+            if (selectedCheckboxes.length === 0) {
+                alert("Please select at least one student");
+                return;
+            }
+            
+            // Validate all selected students have fees
+            let allFeesValid = true;
+            const studentFees = [];
+            
+            selectedCheckboxes.forEach(cb => {
+                const feeInput = document.querySelector(`.group-fee-input[data-student-id="${cb.value}"]`);
+                const fee = parseFloat(feeInput.value) || 0;
+                if (fee <= 0) {
+                    alert(`Please enter a valid fee for ${cb.parentElement.querySelector('.font-medium').textContent}`);
+                    allFeesValid = false;
+                }
+                studentFees.push({
+                    studentId: cb.value,
+                    fee: fee
+                });
+            });
+            
+            if (!allFeesValid) return;
+            
+            const tutor = tutors.find(t => t.email === tutorEmail);
+            
+            if (confirm(`Create group "${groupName}" with ${selectedCheckboxes.length} students under ${tutor.name}?\n\nNote: Students can be from different parents/families.`)) {
+                await createGroupClass(groupName, tutor, subject, schedule, notes, studentFees);
+            }
+        });
+    }, 100);
+}
+
+function calculateTotalGroupFee() {
+    let total = 0;
+    document.querySelectorAll('.group-fee-input').forEach(input => {
+        if (!input.classList.contains('hidden')) {
+            total += parseFloat(input.value) || 0;
+        }
+    });
+    const totalElement = document.getElementById('total-group-fee');
+    if (totalElement) {
+        totalElement.textContent = `₦${total.toFixed(2)}`;
+    }
+}
+
+async function createGroupClass(groupName, tutor, subject, schedule, notes, studentFees) {
+    const btn = document.getElementById('group-submit-btn');
+    btn.textContent = "Creating...";
+    btn.disabled = true;
+    
+    try {
+        const user = window.userData?.name || 'Admin';
+        const userEmail = window.userData?.email || 'admin@system';
+        const timestamp = new Date().toISOString();
+        
+        // 1. Create group document
+        const groupRef = await addDoc(collection(db, "groupClasses"), {
+            groupName: groupName,
+            tutorEmail: tutor.email,
+            tutorName: tutor.name,
+            subject: subject,
+            schedule: schedule,
+            notes: notes,
+            studentCount: studentFees.length,
+            totalFee: studentFees.reduce((sum, sf) => sum + sf.fee, 0),
+            createdAt: timestamp,
+            createdBy: user,
+            status: 'active'
+        });
+        
+        console.log("Group created with ID:", groupRef.id);
+        
+        // 2. Update each student with group info and create history records
+        const updatePromises = studentFees.map(async (sf) => {
+            const studentDoc = await getDoc(doc(db, "students", sf.studentId));
+            if (studentDoc.exists()) {
+                const studentData = studentDoc.data();
+                const currentGroups = studentData.groups || [];
+                
+                // Add to student's groups array
+                await updateDoc(doc(db, "students", sf.studentId), {
+                    groups: [...currentGroups, {
+                        groupId: groupRef.id,
+                        groupName: groupName,
+                        tutorEmail: tutor.email,
+                        tutorName: tutor.name,
+                        subject: subject,
+                        schedule: schedule,
+                        groupFee: sf.fee,
+                        joinedAt: timestamp
+                    }],
+                    // Also store for quick filtering
+                    groupId: groupRef.id,
+                    groupName: groupName,
+                    updatedAt: timestamp,
+                    updatedBy: user
+                });
+                
+                // Create fee record for this student in the group
+                await addDoc(collection(db, "groupStudentFees"), {
+                    groupId: groupRef.id,
+                    groupName: groupName,
+                    studentId: sf.studentId,
+                    studentName: studentData.studentName,
+                    fee: sf.fee,
+                    createdAt: timestamp,
+                    createdBy: user
+                });
+                
+                // Create student history record for group enrollment
+                await addDoc(collection(db, "studentHistory"), {
+                    studentId: sf.studentId,
+                    studentName: studentData.studentName,
+                    actionType: 'group_enrollment',
+                    description: `Enrolled in group class: ${groupName}`,
+                    details: {
+                        groupId: groupRef.id,
+                        groupName: groupName,
+                        tutorName: tutor.name,
+                        tutorEmail: tutor.email,
+                        subject: subject,
+                        schedule: schedule,
+                        fee: sf.fee
+                    },
+                    performedBy: user,
+                    performedByEmail: userEmail,
+                    timestamp: timestamp,
+                    date: new Date().toISOString().split('T')[0]
+                });
+            }
+        });
+        
+        await Promise.all(updatePromises);
+        
+        // 3. Show success
+        alert(`✅ Group "${groupName}" created successfully with ${studentFees.length} students!\n\nStudents can be from different parents - this is perfectly fine for group classes.`);
+        
+        // 4. Refresh and close
+        setTimeout(() => {
+            document.getElementById('group-class-modal').remove();
+            fetchAndRenderDirectory(true);
+        }, 1000);
+        
+    } catch (error) {
+        console.error("Group creation error:", error);
+        alert(`Error: ${error.message}`);
+        btn.textContent = "Create Group Class";
+        btn.disabled = false;
+    }
+}
 
 // ======================================================
 // ENHANCED REASSIGN STUDENT MODAL (with Transition Option)
@@ -10247,24 +10571,3 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
