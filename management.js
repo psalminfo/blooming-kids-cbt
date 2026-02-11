@@ -2997,6 +2997,32 @@ window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
 window.showManageTransitionModal = showManageTransitionModal;
 
 // ======================================================
+// AUTO-FIX: Transition Student Button Visibility
+// ======================================================
+(function fixTransitionButton() {
+    // Immediate attempt
+    const fixBtn = (btn) => {
+        if (btn && btn.classList.contains('bg-orange-300')) {
+            btn.classList.remove('bg-orange-300');
+            btn.classList.add('bg-orange-600', 'text-white', 'px-4', 'py-2', 'rounded', 'hover:bg-orange-700', 'z-10');
+            console.log('✅ Transition button fixed (class replaced).');
+        }
+    };
+    const btn = document.getElementById('transition-student-btn');
+    if (btn) { fixBtn(btn); }
+
+    // Watch for dynamically added button (if rendered later)
+    const observer = new MutationObserver((mutations) => {
+        const btn = document.getElementById('transition-student-btn');
+        if (btn) {
+            fixBtn(btn);
+            observer.disconnect(); // done
+        }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+})();
+
+// ======================================================
 // SUBSECTION 3.2: Inactive Tutors Panel
 // ======================================================
 
@@ -10252,6 +10278,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
