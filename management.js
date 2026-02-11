@@ -1212,7 +1212,7 @@ async function logStudentEvent(studentId, eventType, changes = {}, description =
 }
 
 // ======================================================
-// MAIN VIEW RENDERER (Updated with separate student counts)
+// MAIN VIEW RENDERER (Updated with visible orange button)
 // ======================================================
 
 async function renderManagementTutorView(container) {
@@ -1223,7 +1223,8 @@ async function renderManagementTutorView(container) {
                 <div class="flex items-center gap-4 flex-wrap">
                     <input type="search" id="directory-search" placeholder="Search Tutors, Students, Parents..." class="p-2 border rounded-md w-64">
                     <button id="assign-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Assign New Student</button>
-                    <button id="transition-student-btn" class="bg-orange-300 text-white px-4 py-2 rounded hover:bg-orange-700">Transition Student</button>
+                    <!-- FIXED: bg-orange-600 (not bg-orange-300) and added z-10 for safety -->
+                    <button id="transition-student-btn" class="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700 z-10">Transition Student</button>
                     <button id="create-group-class-btn" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">Create Group Class</button>
                     <button id="reassign-student-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Reassign Student</button>
                     <button id="view-tutor-history-directory-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">View Tutor History</button>
@@ -1336,7 +1337,6 @@ async function renderManagementTutorView(container) {
                             return;
                         }
                         document.getElementById('select-student-modal').remove();
-                        // Assume window.viewStudentTutorHistory is defined elsewhere (will show tutor assignments + new events if implemented)
                         if(window.viewStudentTutorHistory) window.viewStudentTutorHistory(sid);
                     });
                 }
@@ -1450,7 +1450,7 @@ function showTransitionStudentModal() {
                         </button>
                         <button type="submit" 
                                 id="transition-submit-btn" 
-                                class="px-5 py-2.5 bg-orange-300 text-white rounded-md hover:bg-orange-700">
+                                class="px-5 py-2.5 bg-orange-600 text-white rounded-md hover:bg-orange-700">
                             Start Transition
                         </button>
                     </div>
@@ -2141,15 +2141,15 @@ function showEnhancedReassignStudentModal() {
                 permanentBtn.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
                 permanentBtn.classList.add('bg-gray-300', 'text-gray-800', 'border-gray-400');
                 temporaryBtn.classList.remove('bg-gray-300', 'text-gray-800', 'border-gray-400');
-                temporaryBtn.classList.add('bg-orange-300', 'text-white', 'border-orange-600');
+                temporaryBtn.classList.add('bg-orange-600', 'text-white', 'border-orange-600');
                 permanentFields.classList.add('hidden');
                 temporaryFields.classList.remove('hidden');
                 submitBtn.textContent = "Confirm Transition";
-                submitBtn.className = "px-5 py-2.5 bg-orange-300 text-white rounded-md hover:bg-orange-700";
+                submitBtn.className = "px-5 py-2.5 bg-orange-600 text-white rounded-md hover:bg-orange-700";
             } else {
                 permanentBtn.classList.remove('bg-gray-300', 'text-gray-800', 'border-gray-400');
                 permanentBtn.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
-                temporaryBtn.classList.remove('bg-orange-300', 'text-white', 'border-orange-600');
+                temporaryBtn.classList.remove('bg-orange-600', 'text-white', 'border-orange-600');
                 temporaryBtn.classList.add('bg-gray-300', 'text-gray-800', 'border-gray-400');
                 permanentFields.classList.remove('hidden');
                 temporaryFields.classList.add('hidden');
@@ -2443,7 +2443,7 @@ function showManageTransitionModal(studentId) {
                         </button>
                         <button type="submit" 
                                 id="manage-transition-submit" 
-                                class="px-5 py-2.5 bg-orange-300 text-white rounded-md hover:bg-orange-700">
+                                class="px-5 py-2.5 bg-orange-600 text-white rounded-md hover:bg-orange-700">
                             Apply Changes
                         </button>
                     </div>
@@ -2874,7 +2874,7 @@ function renderDirectoryFromCache(searchTerm = '') {
                 ${canEditStudents ? `<button class="edit-student-btn px-2 py-1 text-xs bg-blue-600 text-white rounded-full" data-student-id="${student.id}">Edit</button>` : ''}
                 ${canDeleteStudents ? `<button class="delete-student-btn px-2 py-1 text-xs bg-red-600 text-white rounded-full ml-1" data-student-id="${student.id}">Delete</button>` : ''}
                 ${historyBtn}
-                <button class="manage-transition-btn px-2 py-1 text-xs bg-orange-300 text-white rounded-full ml-1" data-student-id="${student.id}">Manage</button>
+                <button class="manage-transition-btn px-2 py-1 text-xs bg-orange-600 text-white rounded-full ml-1" data-student-id="${student.id}">Manage</button>
             `;
 
             return `
@@ -10252,6 +10252,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
