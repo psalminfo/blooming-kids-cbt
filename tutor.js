@@ -956,6 +956,8 @@ let isSummerBreakEnabled = false;
 let isBypassApprovalEnabled = false;
 let showStudentFees = false;
 let showEditDeleteButtons = false;
+let isTransitionAddEnabled = true;     
+let isPreschoolAddEnabled = true; 
 
 // Pay Scheme Configuration
 const PAY_SCHEMES = {
@@ -5136,18 +5138,8 @@ function triggerConfetti() {
 // <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
 /*******************************************************************************
- * SECTION 14: ADMIN SETTINGS LISTENER (UPDATED)
+ * SECTION 14: ADMIN SETTINGS LISTENER (UPDATED – NO REDECLARATION)
  ******************************************************************************/
-
-// --- Global flags for all admin-controlled features ---
-let isSubmissionEnabled = false;
-let isTutorAddEnabled = false;
-let isSummerBreakEnabled = false;
-let isBypassApprovalEnabled = false;
-let showStudentFees = false;
-let showEditDeleteButtons = false;
-let isTransitionAddEnabled = false;      // ← NEW: showTransitionButton
-let isPreschoolAddEnabled = false;      // ← NEW: preschoolAddTransition
 
 // Listen for changes to admin settings
 const settingsDocRef = doc(db, "settings", "global_settings");
@@ -5155,7 +5147,7 @@ onSnapshot(settingsDocRef, (docSnap) => {
     if (docSnap.exists()) {
         const data = docSnap.data();
         
-        // Existing flags
+        // ✅ Existing flags – assign, do NOT redeclare
         isSubmissionEnabled     = data.isReportEnabled          ?? false;
         isTutorAddEnabled       = data.isTutorAddEnabled        ?? false;
         isSummerBreakEnabled    = data.isSummerBreakEnabled     ?? false;
@@ -5163,18 +5155,19 @@ onSnapshot(settingsDocRef, (docSnap) => {
         showStudentFees         = data.showStudentFees          ?? false;
         showEditDeleteButtons   = data.showEditDeleteButtons    ?? false;
         
-        // 🆕 NEW FLAGS – now stored and ready to use
-        isTransitionAddEnabled  = data.showTransitionButton     ?? true;  // default true
-        isPreschoolAddEnabled   = data.preschoolAddTransition   ?? true;  // default true
+        // 🆕 NEW FLAGS – you MUST declare these ONCE at the top of the file
+        //    (see instructions below)
+        isTransitionAddEnabled  = data.showTransitionButton     ?? true;
+        isPreschoolAddEnabled   = data.preschoolAddTransition   ?? true;
 
-        // If the student database is currently visible, re‑render it
-        // so that the UI reflects the latest settings immediately.
+        // Re‑render student database if it's currently visible
         const mainContent = document.getElementById('mainContent');
         if (mainContent && mainContent.querySelector('#student-list-view')) {
             renderStudentDatabase(mainContent, window.tutorData);
         }
     }
 });
+
 
 /*******************************************************************************
  * SECTION 15: MAIN APP INITIALIZATION (UPDATED)
@@ -5526,5 +5519,6 @@ inboxObserver.observe(document.body, { childList: true, subtree: true });
 // EXPOSE FUNCTIONS TO WINDOW (REQUIRED FOR HTML ONCLICK)
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
+
 
 
