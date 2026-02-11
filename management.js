@@ -1913,7 +1913,7 @@ async function createGroupClass(groupName, tutor, subject, schedule, notes, stud
 }
 
 // ======================================================
-// ENHANCED REASSIGN STUDENT MODAL (with flexible duration)
+// ENHANCED REASSIGN STUDENT MODAL (with flexible duration + visible button + reason)
 // ======================================================
 
 function showEnhancedReassignStudentModal() {
@@ -1937,12 +1937,12 @@ function showEnhancedReassignStudentModal() {
                     <div class="flex space-x-2 mb-3">
                         <button type="button" 
                                 id="reassign-type-permanent" 
-                                class="flex-1 py-2 px-4 border rounded-md font-medium bg-blue-600 text-white">
+                                class="flex-1 py-2 px-4 border rounded-md font-medium bg-blue-600 text-white border-blue-600">
                             Permanent Reassignment
                         </button>
                         <button type="button" 
                                 id="reassign-type-temporary" 
-                                class="flex-1 py-2 px-4 border rounded-md font-medium bg-gray-200 text-gray-700">
+                                class="flex-1 py-2 px-4 border rounded-md font-medium bg-gray-300 text-gray-800 border-gray-400">
                             Temporary Transition
                         </button>
                     </div>
@@ -1994,16 +1994,59 @@ function showEnhancedReassignStudentModal() {
                         </div>
                         
                         <div class="mb-6">
-                            <label class="block text-sm font-medium mb-2 text-gray-700">Reason for Reassignment</label>
+                            <label class="block text-sm font-medium mb-2 text-gray-700">Reason for Reassignment *</label>
                             <textarea id="reassign-reason" 
                                       class="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
                                       rows="3" 
-                                      placeholder="Enter reason for permanent reassignment..."></textarea>
+                                      placeholder="Enter reason for permanent reassignment..."
+                                      required></textarea>
                         </div>
                     </div>
                     
-                    <!-- Temporary Transition Fields (flexible duration) -->
+                    <!-- Temporary Transition Fields (flexible duration + reason) -->
                     <div id="temporary-fields" class="hidden">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2 text-gray-700">Select Student</label>
+                            ${createSearchableSelect(
+                                students.map(s => ({ 
+                                    id: s.id, 
+                                    studentName: s.studentName,
+                                    grade: s.grade,
+                                    currentTutor: s.tutorName
+                                })), 
+                                "Type student name...", 
+                                "reassign-student-temp"
+                            )}
+                        </div>
+                        
+                        <div id="student-info-temp" class="mb-4 p-3 bg-blue-50 rounded-md hidden">
+                            <div class="text-sm">
+                                <div class="font-medium" id="selected-student-name-temp"></div>
+                                <div class="text-gray-600" id="selected-student-details-temp"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2 text-gray-700">Temporary Tutor *</label>
+                            ${createSearchableSelect(
+                                tutors.map(t => ({ 
+                                    email: t.email, 
+                                    name: t.name,
+                                    employmentDate: t.employmentDate
+                                })), 
+                                "Type tutor name...", 
+                                "reassign-tutor-temp",
+                                true
+                            )}
+                        </div>
+                        
+                        <div id="tutor-info-temp" class="mb-4 p-3 bg-green-50 rounded-md hidden">
+                            <div class="text-sm">
+                                <div class="font-medium" id="selected-tutor-name-temp"></div>
+                                <div class="text-gray-600" id="selected-tutor-details-temp"></div>
+                            </div>
+                        </div>
+                        
                         <div class="mb-4">
                             <label class="block text-sm font-medium mb-2 text-gray-700">Transition Duration *</label>
                             <select id="transition-duration-reassign" 
@@ -2016,6 +2059,7 @@ function showEnhancedReassignStudentModal() {
                                 <option value="28">4 weeks</option>
                             </select>
                         </div>
+                        
                         <div class="mb-4">
                             <label class="block text-sm font-medium mb-2 text-gray-700">End Date (auto-calculated)</label>
                             <input type="text" 
@@ -2023,6 +2067,16 @@ function showEnhancedReassignStudentModal() {
                                    class="w-full p-2 bg-gray-100 border rounded-md text-gray-700" 
                                    readonly>
                         </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2 text-gray-700">Reason for Transition *</label>
+                            <textarea id="transition-reason-temp" 
+                                      class="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500" 
+                                      rows="3" 
+                                      placeholder="E.g., Main tutor on leave, vacation, etc."
+                                      required></textarea>
+                        </div>
+                        
                         <div class="mb-4">
                             <label class="flex items-center">
                                 <input type="checkbox" id="allow-reporting-reassign" class="mr-2" checked>
@@ -2051,8 +2105,11 @@ function showEnhancedReassignStudentModal() {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
     setTimeout(() => {
+        // Initialize both sets of searchable selects
         initializeSearchableSelect('reassign-student');
         initializeSearchableSelect('reassign-tutor');
+        initializeSearchableSelect('reassign-student-temp');
+        initializeSearchableSelect('reassign-tutor-temp');
         
         // Hidden start date for temporary transition
         const startDateHtml = `<input type="date" id="transition-start-date-reassign" value="${new Date().toISOString().split('T')[0]}" class="hidden">`;
@@ -2081,19 +2138,19 @@ function showEnhancedReassignStudentModal() {
         
         function setActiveType(isTemporary) {
             if (isTemporary) {
-                permanentBtn.classList.remove('bg-blue-600', 'text-white');
-                permanentBtn.classList.add('bg-gray-200', 'text-gray-700');
-                temporaryBtn.classList.remove('bg-gray-200', 'text-gray-700');
-                temporaryBtn.classList.add('bg-orange-600', 'text-white');
+                permanentBtn.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
+                permanentBtn.classList.add('bg-gray-300', 'text-gray-800', 'border-gray-400');
+                temporaryBtn.classList.remove('bg-gray-300', 'text-gray-800', 'border-gray-400');
+                temporaryBtn.classList.add('bg-orange-600', 'text-white', 'border-orange-600');
                 permanentFields.classList.add('hidden');
                 temporaryFields.classList.remove('hidden');
                 submitBtn.textContent = "Confirm Transition";
                 submitBtn.className = "px-5 py-2.5 bg-orange-600 text-white rounded-md hover:bg-orange-700";
             } else {
-                permanentBtn.classList.remove('bg-gray-200', 'text-gray-700');
-                permanentBtn.classList.add('bg-blue-600', 'text-white');
-                temporaryBtn.classList.remove('bg-orange-600', 'text-white');
-                temporaryBtn.classList.add('bg-gray-200', 'text-gray-700');
+                permanentBtn.classList.remove('bg-gray-300', 'text-gray-800', 'border-gray-400');
+                permanentBtn.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
+                temporaryBtn.classList.remove('bg-orange-600', 'text-white', 'border-orange-600');
+                temporaryBtn.classList.add('bg-gray-300', 'text-gray-800', 'border-gray-400');
                 permanentFields.classList.remove('hidden');
                 temporaryFields.classList.add('hidden');
                 submitBtn.textContent = "Confirm Reassignment";
@@ -2104,48 +2161,59 @@ function showEnhancedReassignStudentModal() {
         permanentBtn.addEventListener('click', () => setActiveType(false));
         temporaryBtn.addEventListener('click', () => setActiveType(true));
         
+        // Student selection handlers (permanent)
         document.getElementById('reassign-student').addEventListener('change', function() {
             const studentId = this.value;
             const student = students.find(s => s.id === studentId);
-            updateStudentInfo(student);
+            updateStudentInfo(student, '');
         });
         
+        // Tutor selection handlers (permanent)
         document.getElementById('reassign-tutor').addEventListener('change', function() {
             const tutorEmail = this.value;
             const tutor = tutors.find(t => t.email === tutorEmail);
-            updateTutorInfo(tutor);
+            updateTutorInfo(tutor, '');
         });
         
+        // Student selection handlers (temporary)
+        document.getElementById('reassign-student-temp').addEventListener('change', function() {
+            const studentId = this.value;
+            const student = students.find(s => s.id === studentId);
+            updateStudentInfo(student, '-temp');
+        });
+        
+        // Tutor selection handlers (temporary)
+        document.getElementById('reassign-tutor-temp').addEventListener('change', function() {
+            const tutorEmail = this.value;
+            const tutor = tutors.find(t => t.email === tutorEmail);
+            updateTutorInfo(tutor, '-temp');
+        });
+        
+        // Form submission handler
         document.getElementById('reassign-student-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const isTemporary = !temporaryFields.classList.contains('hidden');
-            const studentId = document.getElementById('reassign-student').value;
-            const tutorEmail = document.getElementById('reassign-tutor').value;
-            const reason = document.getElementById('reassign-reason').value.trim();
-            
-            if (!studentId || !tutorEmail) {
-                alert("Please select both a student and a tutor");
-                return;
-            }
-            
-            const student = students.find(s => s.id === studentId);
-            const newTutor = tutors.find(t => t.email === tutorEmail);
-            const currentTutor = tutors.find(t => t.email === student.tutorEmail);
-            
-            if (student.tutorEmail === tutorEmail) {
-                alert("Student is already assigned to this tutor");
-                return;
-            }
             
             if (isTemporary) {
+                const studentId = document.getElementById('reassign-student-temp').value;
+                const tutorEmail = document.getElementById('reassign-tutor-temp').value;
+                const reason = document.getElementById('transition-reason-temp').value.trim();
                 const endDate = document.getElementById('transition-end-date-reassign-display').value;
                 const durationDays = parseInt(document.getElementById('transition-duration-reassign').value, 10);
                 const allowReporting = document.getElementById('allow-reporting-reassign').checked;
                 const startDate = document.getElementById('transition-start-date-reassign').value;
                 
-                if (!endDate) {
-                    alert("Please select a valid duration");
+                if (!studentId || !tutorEmail || !reason) {
+                    alert("Please select student, tutor and provide a reason");
+                    return;
+                }
+                
+                const student = students.find(s => s.id === studentId);
+                const newTutor = tutors.find(t => t.email === tutorEmail);
+                
+                if (student.tutorEmail === tutorEmail) {
+                    alert("Student is already assigned to this tutor");
                     return;
                 }
                 
@@ -2161,8 +2229,21 @@ function showEnhancedReassignStudentModal() {
                     );
                 }
             } else {
-                if (!reason) {
-                    alert("Please enter a reason for reassignment");
+                const studentId = document.getElementById('reassign-student').value;
+                const tutorEmail = document.getElementById('reassign-tutor').value;
+                const reason = document.getElementById('reassign-reason').value.trim();
+                
+                if (!studentId || !tutorEmail || !reason) {
+                    alert("Please select student, tutor and enter a reason");
+                    return;
+                }
+                
+                const student = students.find(s => s.id === studentId);
+                const newTutor = tutors.find(t => t.email === tutorEmail);
+                const currentTutor = tutors.find(t => t.email === student.tutorEmail);
+                
+                if (student.tutorEmail === tutorEmail) {
+                    alert("Student is already assigned to this tutor");
                     return;
                 }
                 
@@ -2172,10 +2253,11 @@ function showEnhancedReassignStudentModal() {
             }
         });
         
-        function updateStudentInfo(student) {
-            const infoDiv = document.getElementById('student-info');
-            const nameDiv = document.getElementById('selected-student-name');
-            const detailsDiv = document.getElementById('selected-student-details');
+        // Helper functions for student/tutor info display
+        function updateStudentInfo(student, suffix) {
+            const infoDiv = document.getElementById(`student-info${suffix}`);
+            const nameDiv = document.getElementById(`selected-student-name${suffix}`);
+            const detailsDiv = document.getElementById(`selected-student-details${suffix}`);
             
             if (student) {
                 infoDiv.classList.remove('hidden');
@@ -2191,10 +2273,10 @@ function showEnhancedReassignStudentModal() {
             }
         }
         
-        function updateTutorInfo(tutor) {
-            const infoDiv = document.getElementById('tutor-info');
-            const nameDiv = document.getElementById('selected-tutor-name');
-            const detailsDiv = document.getElementById('selected-tutor-details');
+        function updateTutorInfo(tutor, suffix) {
+            const infoDiv = document.getElementById(`tutor-info${suffix}`);
+            const nameDiv = document.getElementById(`selected-tutor-name${suffix}`);
+            const detailsDiv = document.getElementById(`selected-tutor-details${suffix}`);
             
             if (tutor) {
                 infoDiv.classList.remove('hidden');
@@ -10170,6 +10252,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
