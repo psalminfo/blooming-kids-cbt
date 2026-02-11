@@ -218,11 +218,13 @@ async function renderAdminPanel(container) {
             <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md"><h3 class="font-bold text-blue-800">Students Per Tutor</h3><select id="studentsPerTutorSelect" class="w-full mt-1 p-2 border rounded"></select></div>
         </div>
         
+        <!-- Bulk Question Upload Section -->
         <div class="bg-white p-6 rounded-lg shadow-md mb-6 border-2 border-purple-200">
             <h2 class="text-2xl font-bold text-purple-700 mb-4">Bulk Question Upload</h2>
             <p class="text-sm text-gray-600 mb-4">Upload multiple questions at once using JSON format. The system will help you add images after uploading question data.</p>
             
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Upload Section -->
                 <div class="space-y-4">
                     <div>
                         <label class="block font-semibold text-gray-700 mb-2">1. Upload Question JSON</label>
@@ -253,6 +255,7 @@ async function renderAdminPanel(container) {
                     </button>
                 </div>
                 
+                <!-- Template & Instructions -->
                 <div class="bg-purple-50 p-4 rounded-lg">
                     <h3 class="font-semibold text-purple-800 mb-2">JSON Template & Instructions</h3>
                     <div class="text-sm space-y-2">
@@ -285,10 +288,12 @@ async function renderAdminPanel(container) {
                 </div>
             </div>
             
+            <!-- Image Upload Section (Initially Hidden) -->
             <div id="bulk-image-upload-section" class="mt-6 p-4 border rounded-lg bg-blue-50" style="display: none;">
                 <h3 class="text-xl font-semibold text-blue-700 mb-4">2. Upload Images for Questions</h3>
                 <div id="image-upload-list" class="space-y-3 mb-4">
-                    </div>
+                    <!-- Dynamic image upload fields will appear here -->
+                </div>
                 <div class="flex space-x-4">
                     <button id="bulk-image-select-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
                         Select Multiple Images
@@ -302,6 +307,7 @@ async function renderAdminPanel(container) {
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Single Question Form -->
             <div class="bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold text-green-700 mb-4">Add Single Question</h2>
                 <form id="addQuestionForm">
@@ -321,6 +327,7 @@ async function renderAdminPanel(container) {
                 </form>
             </div>
             
+            <!-- Student Reports Section -->
             <div class="bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold text-green-700 mb-4">View Student Reports</h2>
                 <label for="studentDropdown" class="block text-gray-700">Select Student</label>
@@ -687,6 +694,7 @@ async function renderContentManagerPanel(container) {
             <div id="manager-workspace" style="display:none;">
                  <h3 class="text-gray-800 font-bold mb-4 text-lg" id="loaded-file-name"></h3>
                 
+                <!-- Single Passage Editing Section -->
                 <div class="mb-8 p-4 border rounded-md">
                     <h4 class="text-xl font-semibold mb-2">2. Edit Incomplete Passages (Single)</h4>
                     <select id="passage-select" class="w-full p-2 border rounded mt-1 mb-2"></select>
@@ -694,6 +702,7 @@ async function renderContentManagerPanel(container) {
                     <button id="update-passage-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Save Passage to Firestore</button>
                 </div>
                 
+                <!-- Bulk Passage Upload Section -->
                 <div class="p-4 border rounded-md mb-6 bg-purple-50">
                     <h4 class="text-xl font-semibold mb-2">3. Bulk ELA Passage Upload</h4>
                     <p class="text-sm text-gray-600 mb-4">
@@ -731,6 +740,7 @@ async function renderContentManagerPanel(container) {
                     <div id="bulk-passage-json-upload-status" class="mt-2 text-sm"></div>
                 </div>
                 
+                <!-- Single Image Upload Section -->
                 <div class="p-4 border rounded-md mb-6">
                     <h4 class="text-xl font-semibold mb-2">4. Add Missing Images (Single)</h4>
                     <select id="image-select" class="w-full p-2 border rounded mt-1 mb-2"></select>
@@ -743,6 +753,7 @@ async function renderContentManagerPanel(container) {
                     <button id="update-image-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Upload & Save Image to Firestore</button>
                 </div>
 
+                <!-- Bulk Image Upload Section -->
                 <div class="p-4 border rounded-md bg-blue-50">
                     <h4 class="text-xl font-semibold mb-2">5. Bulk Image Upload (One-to-One Matching)</h4>
                     <p class="text-sm text-gray-600 mb-4">
@@ -1549,8 +1560,6 @@ async function renderTutorManagementPanel(container) {
                  <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Direct Student Add (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Transition Button:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-transition-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-transition-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Preschool-2 Add/Transition:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="preschool-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="preschool-add-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Add Transitioning:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="transitioning-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="transitioning-status-label" class="ml-3 text-sm font-medium"></span></label></label>
             </div>
         </div>
         
@@ -1601,8 +1610,7 @@ function setupTutorManagementListeners() {
                 'showEditDeleteButtons': 'edit-delete', 
                 'bypassPendingApproval': 'bypass-approval',
                 'showTransitionButton': 'show-transition',
-                'preschoolAddTransition': 'preschool-add',
-                'isTransitioningEnabled': 'transitioning' // New mapping
+                'preschoolAddTransition': 'preschool-add'
             };
 
             for (const key in toggleMap) {
@@ -1628,7 +1636,6 @@ function setupTutorManagementListeners() {
     document.getElementById('bypass-approval-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { bypassPendingApproval: e.target.checked }));
     document.getElementById('show-transition-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { showTransitionButton: e.target.checked }));
     document.getElementById('preschool-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { preschoolAddTransition: e.target.checked }));
-    document.getElementById('transitioning-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isTransitioningEnabled: e.target.checked })); // New listener
     
     // UI Interaction Listeners
     document.getElementById('tutor-select').addEventListener('change', e => {
@@ -2211,6 +2218,7 @@ async function renderSummerBreakPanel(container) {
                 </div>
             </div>
             
+            <!-- Search Bar -->
             <div class="mb-6">
                 <label for="break-student-search" class="block text-sm font-medium text-gray-700 mb-2">
                     Search Students by Name, Tutor, or Grade:
@@ -2238,10 +2246,12 @@ async function renderSummerBreakPanel(container) {
                 </div>
             </div>
             
+            <!-- Student List -->
             <div id="break-students-list" class="space-y-4">
                 <p class="text-gray-500 text-center">Loading students...</p>
             </div>
             
+            <!-- No Results Message -->
             <div id="no-break-results" class="hidden text-center p-8 border-2 border-dashed border-gray-300 rounded-lg">
                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -2431,4 +2441,415 @@ function handleBreakStudentSearch(e) {
 }
 
 function clearBreakStudentSearch() {
-    document.getElementById('break-
+    document.getElementById('break-student-search').value = '';
+    renderBreakStudentsFromCache();
+}
+
+// ##################################################################
+// # SECTION 7: STAFF PANEL (OPTIMIZED)
+// ##################################################################
+async function renderStaffPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-green-700">Staff Management</h2>
+                <button id="refresh-staff-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+            
+             </div>
+            <p class="text-sm text-gray-600 mb-4">Assign a role to apply default permissions, then click "Manage Permissions" to customize.</p>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium uppercase">Name</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Email</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Assign Role</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Actions</th></tr></thead><tbody id="staff-table-body" class="bg-white divide-y divide-gray-200"><p>Loading staff...</p></tbody></table>
+          
+             </div>
+        </div>
+    `;
+    document.getElementById('refresh-staff-btn').addEventListener('click', () => fetchAndRenderStaff(true));
+    fetchAndRenderStaff();
+}
+
+async function fetchAndRenderStaff(forceRefresh = false) {
+    if (forceRefresh) invalidateCache('staff');
+    try {
+        if (!sessionCache.staff) {
+            document.getElementById('staff-table-body').innerHTML = `<tr><td colspan="4" class="text-center p-4">Fetching staff data...</td></tr>`;
+            const snapshot = await getDocs(collection(db, "staff"));
+            saveToLocalStorage('staff', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }
+        renderStaffFromCache();
+    } catch(error) {
+        console.error("Error fetching staff:", error);
+        document.getElementById('staff-table-body').innerHTML = `<tr><td colspan="4" class="text-center p-4 text-red-500">Failed to load staff data.</td></tr>`;
+    }
+}
+
+function renderStaffFromCache() {
+    const tableBody = document.getElementById('staff-table-body');
+    const staffList = sessionCache.staff || [];
+    const ROLE_PERMISSIONS = {
+        pending: {}, tutor: {}, manager: {}, director: {}, admin: {}
+    };
+    tableBody.innerHTML = staffList.map(staff => {
+        const optionsHTML = Object.keys(ROLE_PERMISSIONS).map(role => `<option value="${role}" ${staff.role === role ? 'selected' : ''}>${capitalize(role)}</option>`).join('');
+        return `
+            <tr>
+                <td class="px-6 py-4 font-medium">${staff.name}</td><td class="px-6 py-4">${staff.email}</td>
+                <td class="px-6 py-4"><select data-email="${staff.email}" data-original-role="${staff.role}" class="role-select p-2 border rounded bg-white">${optionsHTML}</select></td>
+        
+                 <td class="px-6 py-4"><button data-id="${staff.id}" class="manage-permissions-btn bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Manage Permissions</button></td>
+            </tr>
+        `;
+    }).join('');
+    document.querySelectorAll('.role-select').forEach(select => {
+        select.addEventListener('change', async (e) => {
+            if (confirm(`Change role to "${capitalize(e.target.value)}"? This will apply default permissions.`)) {
+                await updateStaffPermissions(e.target.dataset.email, e.target.value);
+            } else {
+                e.target.value = e.target.dataset.originalRole;
+            }
+        });
+    });
+    document.querySelectorAll('.manage-permissions-btn').forEach(button => {
+        button.addEventListener('click', (e) => openPermissionsModal(e.target.dataset.id));
+    });
+}
+
+async function openPermissionsModal(staffId) {
+    const staffDoc = await getDoc(doc(db, "staff", staffId));
+    if (!staffDoc.exists()) return alert("Staff member not found.");
+    const staffData = staffDoc.data();
+    const permissions = staffData.permissions || { tabs: {}, actions: {} };
+    const modalHTML = `
+        <div id="permissions-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg shadow-xl p-8 max-w-lg w-full">
+                <h3 class="text-2xl font-bold mb-4">Edit Permissions for ${staffData.name}</h3><p class="text-sm text-gray-500 mb-4">Current Role: <span class="font-semibold">${capitalize(staffData.role)}</span></p>
+                <div class="space-y-4">
+                    <div class="border-t pt-4">
+                        <h4 class="font-semibold mb-2">Tab Visibility:</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="flex items-center"><input type="checkbox" id="p-viewTutorManagement" class="mr-2" ${permissions.tabs?.viewTutorManagement ? 'checked' : ''}> Tutor & Student List</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewPayAdvice" class="mr-2" ${permissions.tabs?.viewPayAdvice ? 'checked' : ''}> Pay Advice</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewTutorReports" class="mr-2" ${permissions.tabs?.viewTutorReports ? 'checked' : ''}> Tutor Reports</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewSummerBreak" class="mr-2" ${permissions.tabs?.viewSummerBreak ? 'checked' : ''}> Summer Break</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewPendingApprovals" class="mr-2" ${permissions.tabs?.viewPendingApprovals ? 'checked' : ''}> Pending Approvals</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewStaffManagement" class="mr-2" ${permissions.tabs?.viewStaffManagement ? 'checked' : ''}> Staff Management</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewParentFeedback" class="mr-2" ${permissions.tabs?.viewParentFeedback ? 'checked' : ''}> Parent Feedback</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewEnrollments" class="mr-2" ${permissions.tabs?.viewEnrollments ? 'checked' : ''}> Enrollments</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewInactiveTutors" class="mr-2" ${permissions.tabs?.viewInactiveTutors ? 'checked' : ''}> Inactive Tutors</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewArchivedStudents" class="mr-2" ${permissions.tabs?.viewArchivedStudents ? 'checked' : ''}> Archived Students</label>
+                        </div>
+                    </div>
+                    <div class="border-t pt-4">
+                        <h4 class="font-semibold mb-2">Specific Actions:</h4>
+                        <label class="flex items-center"><input type="checkbox" id="p-canDownloadReports" class="mr-2" ${permissions.actions?.canDownloadReports ? 'checked' : ''}> Can Download Reports</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canExportPayAdvice" class="mr-2" ${permissions.actions?.canExportPayAdvice ? 'checked' : ''}> Can Export Pay Advice</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canEndSummerBreak" class="mr-2" ${permissions.actions?.canEndSummerBreak ? 'checked' : ''}> Can End Summer Break</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canEditStudents" class="mr-2" ${permissions.actions?.canEditStudents ? 'checked' : ''}> Can Edit Students</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canDeleteStudents" class="mr-2" ${permissions.actions?.canDeleteStudents ? 'checked' : ''}> Can Delete Students</label>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-4 mt-6">
+                    <button id="cancel-permissions" class="bg-gray-300 px-4 py-2 rounded">Cancel</button>
+                    <button id="save-permissions" class="bg-green-600 text-white px-4 py-2 rounded">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    const closeModal = () => document.getElementById('permissions-modal').remove();
+    document.getElementById('cancel-permissions').addEventListener('click', closeModal);
+    document.getElementById('save-permissions').addEventListener('click', async () => {
+        const newPermissions = {
+            tabs: { 
+                viewTutorManagement: document.getElementById('p-viewTutorManagement').checked, 
+                viewPayAdvice: document.getElementById('p-viewPayAdvice').checked, 
+                viewTutorReports: document.getElementById('p-viewTutorReports').checked, 
+                viewSummerBreak: document.getElementById('p-viewSummerBreak').checked, 
+                viewPendingApprovals: document.getElementById('p-viewPendingApprovals').checked, 
+                viewStaffManagement: document.getElementById('p-viewStaffManagement').checked, 
+                viewParentFeedback: document.getElementById('p-viewParentFeedback').checked,
+                viewEnrollments: document.getElementById('p-viewEnrollments').checked,
+                viewInactiveTutors: document.getElementById('p-viewInactiveTutors').checked,
+                viewArchivedStudents: document.getElementById('p-viewArchivedStudents').checked
+            },
+            actions: { 
+                canDownloadReports: document.getElementById('p-canDownloadReports').checked, 
+                canExportPayAdvice: document.getElementById('p-canExportPayAdvice').checked, 
+                canEndSummerBreak: document.getElementById('p-canEndSummerBreak').checked, 
+                canEditStudents: document.getElementById('p-canEditStudents').checked, 
+                canDeleteStudents: document.getElementById('p-canDeleteStudents').checked 
+            }
+        };
+        await updateDoc(doc(db, "staff", staffId), { permissions: newPermissions });
+        alert("Custom permissions saved successfully!");
+        invalidateCache('staff');
+        fetchAndRenderStaff();
+        closeModal();
+    });
+}
+
+// ##################################################################
+// # SECTION 8: PENDING APPROVALS
+// ##################################################################
+async function renderPendingApprovalsPanel(container) {
+    container.innerHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">Pending Approvals</h2><div id="pending-list" class="space-y-4"></div>`;
+    const pendingListContainer = document.getElementById('pending-list');
+    pendingListContainer.innerHTML = `<p class="text-gray-500">Loading pending accounts...</p>`;
+    try {
+        const tutorsQuery = query(collection(db, "tutors"), where("status", "==", "pending"));
+        const studentsQuery = query(collection(db, "students"), where("approvalStatus", "==", "pending"));
+        const [tutorsSnap, studentsSnap] = await Promise.all([getDocs(tutorsQuery), getDocs(studentsQuery)]);
+        let pendingHTML = '';
+        tutorsSnap.forEach(doc => { const tutor = doc.data(); pendingHTML += `<div class="bg-white p-4 rounded-lg shadow-sm border border-yellow-200"><p class="font-semibold">${tutor.name} (Tutor)</p><p class="text-gray-600 text-sm">${tutor.email}</p><div class="mt-2 space-x-2"><button class="approve-btn bg-green-500 text-white px-3 py-1 rounded" data-id="${doc.id}" data-type="tutor">Approve</button><button class="reject-btn bg-red-500 text-white px-3 py-1 rounded" data-id="${doc.id}" data-type="tutor">Reject</button></div></div>`; });
+        studentsSnap.forEach(doc => { const student = doc.data(); pendingHTML += `<div class="bg-white p-4 rounded-lg shadow-sm border border-yellow-200"><p class="font-semibold">${student.studentName} (Student - Grade ${student.grade})</p><p class="text-gray-600 text-sm">Parent: ${student.parentName}</p><div class="mt-2 space-x-2"><button class="approve-btn bg-green-500 text-white px-3 py-1 rounded" data-id="${doc.id}" data-type="student">Approve</button><button class="reject-btn bg-red-500 text-white px-3 py-1 rounded" data-id="${doc.id}" data-type="student">Reject</button></div></div>`; });
+        pendingListContainer.innerHTML = pendingHTML || `<p class="text-gray-500">No pending accounts to review.</p>`;
+        document.querySelectorAll('.approve-btn').forEach(btn => btn.addEventListener('click', () => handleApproval(btn.dataset.id, btn.dataset.type, 'approved')));
+        document.querySelectorAll('.reject-btn').forEach(btn => btn.addEventListener('click', () => handleApproval(btn.dataset.id, btn.dataset.type, 'rejected')));
+    } catch (error) {
+        console.error("Error loading pending approvals:", error);
+        pendingListContainer.innerHTML = `<p class="text-red-500">Failed to load pending approvals.</p>`;
+    }
+}
+
+async function handleApproval(id, type, status) {
+    const collectionName = type === 'tutor' ? 'tutors' : 'students';
+    const docRef = doc(db, collectionName, id);
+    await updateDoc(docRef, { [type === 'tutor' ? 'status' : 'approvalStatus']: status });
+    alert(`${capitalize(type)} ${status} successfully.`);
+    // Invalidate caches since a tutor/student was added/removed from circulation
+    if (type === 'tutor') invalidateCache('tutors');
+    if (type === 'student') invalidateCache('students');
+    renderPendingApprovalsPanel(document.getElementById('main-content'));
+}
+
+// ##################################################################
+// # MAIN APP INITIALIZATION
+// ##################################################################
+onAuthStateChanged(auth, async (user) => {
+    const mainContent = document.getElementById('main-content');
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (user && user.email === ADMIN_EMAIL) {
+        mainContent.innerHTML = '';
+        const navItems = {
+            navDashboard: renderAdminPanel, 
+            navContent: renderContentManagerPanel, 
+            navTutorManagement: renderTutorManagementPanel,
+            navPayAdvice: renderPayAdvicePanel, 
+            navTutorReports: renderTutorReportsPanel, 
+            navSummerBreak: renderSummerBreakPanel,
+            navStaff: renderStaffPanel, 
+            navPendingApprovals: renderPendingApprovalsPanel
+        };
+        const setActiveNav = (activeId) => Object.keys(navItems).forEach(id => {
+            document.getElementById(id)?.classList.toggle('active', id === activeId);
+        });
+        Object.entries(navItems).forEach(([id, renderFn]) => {
+            const navElement = document.getElementById(id);
+            if (navElement) {
+                navElement.addEventListener('click', () => { 
+                    setActiveNav(id); 
+                    renderFn(mainContent); 
+                });
+            }
+        });
+        setActiveNav('navDashboard');
+        renderAdminPanel(mainContent);
+        logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "admin-auth.html"));
+    } else {
+        mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">You do not have permission to view this page.</p>`;
+        logoutBtn.classList.add('hidden');
+    }
+});
+
+// Helper functions for dashboard
+async function ensureDashboardData() {
+    if (!sessionCache.tutors || !sessionCache.students) {
+        try {
+            if (!sessionCache.tutors) {
+                const tutorsSnapshot = await getDocs(collection(db, "tutors"));
+                const tutorsData = {};
+                tutorsSnapshot.forEach(doc => {
+                    tutorsData[doc.id] = { id: doc.id, ...doc.data() };
+                });
+                saveToLocalStorage('tutors', tutorsData);
+            }
+            if (!sessionCache.students) {
+                const studentsSnapshot = await getDocs(collection(db, "students"));
+                saveToLocalStorage('students', studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            }
+        } catch (error) {
+            console.error("Error loading dashboard data:", error);
+        }
+    }
+}
+
+function loadCountersFromCache() {
+    document.getElementById('totalStudentsCount').textContent = sessionCache.students ? sessionCache.students.length : 0;
+    document.getElementById('totalTutorsCount').textContent = sessionCache.tutors ? Object.keys(sessionCache.tutors).length : 0;
+    
+    // Populate students per tutor dropdown
+    const select = document.getElementById('studentsPerTutorSelect');
+    if (select) {
+        select.innerHTML = '<option value="">All Tutors</option>';
+        if (sessionCache.tutors) {
+            Object.values(sessionCache.tutors).forEach(tutor => {
+                const studentCount = sessionCache.students ? 
+                    sessionCache.students.filter(s => s.tutorEmail === tutor.email).length : 0;
+                const option = document.createElement('option');
+                option.value = tutor.id;
+                option.textContent = `${tutor.name} (${studentCount} students)`;
+                select.appendChild(option);
+            });
+        }
+    }
+}
+
+function loadStudentDropdown() {
+    const select = document.getElementById('studentDropdown');
+    if (select) {
+        select.innerHTML = '<option value="">Select a student</option>';
+        if (sessionCache.students) {
+            sessionCache.students.forEach(student => {
+                const option = document.createElement('option');
+                option.value = student.id;
+                option.textContent = `${student.studentName} (Grade ${student.grade})`;
+                select.appendChild(option);
+            });
+        }
+    }
+}
+
+async function loadAndRenderReport(studentId) {
+    const reportContent = document.getElementById('reportContent');
+    if (!studentId) {
+        reportContent.innerHTML = '<p class="text-gray-500">Please select a student to view their report.</p>';
+        return;
+    }
+    
+    reportContent.innerHTML = '<p class="text-gray-500">Loading report...</p>';
+    
+    try {
+        // Fetch reports for this student
+        const reportsQuery = query(
+            collection(db, "tutor_submissions"),
+            where("studentId", "==", studentId),
+            orderBy("submittedAt", "desc")
+        );
+        const reportsSnapshot = await getDocs(reportsQuery);
+        
+        if (reportsSnapshot.empty) {
+            reportContent.innerHTML = '<p class="text-gray-500">No reports found for this student.</p>';
+            return;
+        }
+        
+        const reports = reportsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // Get student info
+        const student = sessionCache.students?.find(s => s.id === studentId);
+        const studentName = student ? student.studentName : 'Unknown Student';
+        
+        reportContent.innerHTML = `
+            <div class="bg-white p-4 rounded-lg shadow-sm">
+                <h3 class="text-lg font-semibold mb-2">Reports for ${studentName}</h3>
+                <div class="space-y-3">
+                    ${reports.map(report => `
+                        <div class="border rounded p-3">
+                            <div class="flex justify-between items-center mb-2">
+                                <h4 class="font-medium">${report.tutorName || 'Tutor'}</h4>
+                                <span class="text-sm text-gray-500">
+                                    ${new Date(report.submittedAt.seconds * 1000).toLocaleDateString()}
+                                </span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-2">${report.introduction?.substring(0, 100)}...</p>
+                            <button onclick="viewFullReport('${report.id}')" class="text-blue-600 hover:text-blue-800 text-sm">
+                                View Full Report
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error("Error loading report:", error);
+        reportContent.innerHTML = '<p class="text-red-500">Error loading report.</p>';
+    }
+}
+
+// Add missing function
+async function viewFullReport(reportId) {
+    // This would open a modal or new page with the full report
+    alert(`Would open full report ${reportId}`);
+}
+
+// Fix: Add missing function declaration for saveAs if not already defined
+if (typeof window.saveAs === 'undefined') {
+    window.saveAs = function(blob, filename) {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+}
+
+// ========================================================
+// ADD TRANSITIONING TOGGLE INJECTOR
+// ========================================================
+(function() {
+    const SETTINGS_DOC_ID = "global_settings";
+    const FIELD_NAME = "showTransitionButton"; // Matches your existing field name
+
+    /**
+     * Injects the toggle into the UI and attaches listeners
+     */
+    function injectTransitionToggle() {
+        const settingsGrid = document.querySelector('#main-content .grid-cols-1.md\\:grid-cols-2.lg\\:grid-cols-3');
+        if (!settingsGrid || document.getElementById('transition-toggle-container')) return;
+
+        const container = document.createElement('label');
+        container.id = 'transition-toggle-container';
+        container.className = 'flex items-center';
+        container.innerHTML = `
+            <span class="text-gray-700 font-semibold mr-4">Add Transitioning:</span>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="transitioning-toggle-input" class="sr-only peer">
+                <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                <span id="transitioning-status-label-new" class="ml-3 text-sm font-medium">Disabled</span>
+            </label>
+        `;
+
+        settingsGrid.appendChild(container);
+
+        const input = document.getElementById('transitioning-toggle-input');
+        const label = document.getElementById('transitioning-status-label-new');
+        const settingsDocRef = doc(db, "settings", SETTINGS_DOC_ID);
+
+        // Sync UI with current database state
+        getDoc(settingsDocRef).then(docSnap => {
+            if (docSnap.exists() && docSnap.data()[FIELD_NAME]) {
+                input.checked = true;
+                label.textContent = 'Enabled';
+            }
+        });
+
+        // Handle Toggle Changes
+        input.addEventListener('change', async (e) => {
+            const isChecked = e.target.checked;
+            label.textContent = isChecked ? 'Enabled' : 'Disabled';
+            try {
+                await setDoc(settingsDocRef, { [FIELD_NAME]: isChecked }, { merge: true });
+            } catch (error) {
+                console.error("Error updating transition toggle:", error);
+            }
+        });
+    }
+
+    // Monitor for the Tutor Management Panel being rendered
+    const observer = new MutationObserver((mutations) => {
+        if (document.querySelector('#main-content h2')?.textContent.includes('Global Settings')) {
+            injectTransitionToggle();
+        }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+})();
