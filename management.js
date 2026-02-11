@@ -2997,54 +2997,71 @@ window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
 window.showManageTransitionModal = showManageTransitionModal;
 
 // ======================================================
-// ULTIMATE FIX: Force Transition Student Button to Show
+// ULTIMATE FIX: Force ALL Transition Buttons to Show
 // ======================================================
-(function forceTransitionButtonVisibility() {
-    const FORCE_COLOR = '#ea580c'; // Tailwind orange-600
-    const HOVER_COLOR = '#c2410c';  // Tailwind orange-700
+(function forceAllOrangeButtons() {
+    const ORANGE = '#ea580c';  // bg-orange-600
+    const ORANGE_HOVER = '#c2410c'; // bg-orange-700
+    const BLUE = '#2563eb';    // bg-blue-600
+    const BLUE_HOVER = '#1d4ed8'; // bg-blue-700
 
-    function applyFix(btn) {
+    function forceButtonStyle(btn, bgColor, hoverColor) {
         if (!btn) return;
-        
-        // 1. Remove problematic classes
-        btn.classList.remove('bg-orange-300');
-        
-        // 2. Add safe Tailwind classes (if they exist in your build)
-        btn.classList.add('bg-orange-600', 'text-white', 'px-4', 'py-2', 'rounded', 'z-10');
-        
-        // 3. FORCE inline styles (guaranteed to work)
-        btn.style.backgroundColor = FORCE_COLOR;
+        // Remove problematic classes
+        btn.classList.remove('bg-orange-300', 'bg-gray-200', 'text-gray-700');
+        // Add safe classes (optional)
+        btn.classList.add('text-white', 'px-4', 'py-2', 'rounded', 'z-10');
+        // FORCE inline styles (guaranteed)
+        btn.style.backgroundColor = bgColor;
         btn.style.color = 'white';
-        btn.style.padding = '0.5rem 1rem'; // px-4 py-2
-        btn.style.borderRadius = '0.25rem'; // rounded
-        btn.style.zIndex = '10';
-        
-        // 4. Add hover effect via inline style
-        btn.onmouseenter = () => btn.style.backgroundColor = HOVER_COLOR;
-        btn.onmouseleave = () => btn.style.backgroundColor = FORCE_COLOR;
-        
-        console.log('✅ Transition button forced to orange (inline styles).');
+        btn.style.padding = '0.5rem 1rem';
+        btn.style.borderRadius = '0.25rem';
+        btn.style.border = 'none';
+        btn.style.cursor = 'pointer';
+        // Hover effect
+        btn.onmouseenter = () => btn.style.backgroundColor = hoverColor;
+        btn.onmouseleave = () => btn.style.backgroundColor = bgColor;
     }
 
-    // Immediate attempt
-    const btn = document.getElementById('transition-student-btn');
-    if (btn) applyFix(btn);
+    function fixAllButtons() {
+        // 1. Start Transition button (Transition modal)
+        const startBtn = document.getElementById('transition-submit-btn');
+        if (startBtn) forceButtonStyle(startBtn, ORANGE, ORANGE_HOVER);
 
-    // Persistent observer – reapplies fix every time the button is added/removed
-    const observer = new MutationObserver(() => {
-        const btn = document.getElementById('transition-student-btn');
-        if (btn) applyFix(btn);
-    });
+        // 2. Confirm Transition button (Reassign modal – when in temporary mode)
+        const confirmBtn = document.getElementById('reassign-submit-btn');
+        if (confirmBtn && confirmBtn.textContent.includes('Confirm Transition')) {
+            forceButtonStyle(confirmBtn, ORANGE, ORANGE_HOVER);
+        }
+
+        // 3. Apply Changes button (Manage Transition modal)
+        const manageBtn = document.getElementById('manage-transition-submit');
+        if (manageBtn) forceButtonStyle(manageBtn, ORANGE, ORANGE_HOVER);
+
+        // 4. Any other button with orange background classes
+        document.querySelectorAll('button.bg-orange-600, button.bg-orange-500, button[id*="transition"], button[id*="Transition"]')
+            .forEach(btn => forceButtonStyle(btn, ORANGE, ORANGE_HOVER));
+    }
+
+    // Run immediately and after each DOM change
+    fixAllButtons();
+    const observer = new MutationObserver(fixAllButtons);
     observer.observe(document.body, { childList: true, subtree: true });
 
-    // Also watch for style/class changes that might override
+    // Also watch for class/style changes that might override
     const styleObserver = new MutationObserver((mutations) => {
         mutations.forEach((m) => {
-            if (m.target.id === 'transition-student-btn' || m.target.querySelector?.('#transition-student-btn')) {
-                const btn = document.getElementById('transition-student-btn');
-                if (btn && btn.style.backgroundColor !== FORCE_COLOR) {
-                    btn.style.backgroundColor = FORCE_COLOR;
-                    btn.style.color = 'white';
+            const btn = m.target;
+            if (btn.nodeType === 1 && btn.tagName === 'BUTTON') {
+                if (btn.id === 'transition-submit-btn' || 
+                    btn.id === 'reassign-submit-btn' || 
+                    btn.id === 'manage-transition-submit' ||
+                    btn.textContent.includes('Transition') ||
+                    btn.textContent.includes('Start') ||
+                    btn.textContent.includes('Confirm')) {
+                    if (btn.style.backgroundColor !== ORANGE && btn.style.backgroundColor !== BLUE) {
+                        forceButtonStyle(btn, ORANGE, ORANGE_HOVER);
+                    }
                 }
             }
         });
@@ -10308,6 +10325,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
