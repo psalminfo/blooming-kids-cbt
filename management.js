@@ -1003,7 +1003,6 @@ function calculateTransitioningStatus(student) {
     const now = new Date();
     const daysLeft = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
     
-    // Calculate total transitioning days
     const startDate = new Date(student.transitionStartDate || student.updatedAt);
     const totalDays = Math.ceil((now - startDate) / (1000 * 60 * 60 * 24));
     
@@ -1015,7 +1014,6 @@ function calculateTransitioningStatus(student) {
     };
 }
 
-// Define getStudentCategory function early to fix hoisting issue
 function getStudentCategory(s) {
     if (!s) return 'unknown';
     if (s.isTransitioning) return 'transitioning';
@@ -1035,7 +1033,6 @@ function searchStudentFromFirebase(student, searchTerm, tutors = []) {
     
     const searchLower = safeToString(searchTerm).toLowerCase();
     
-    // Enhanced status search
     const transitioningStatus = calculateTransitioningStatus(student);
     if (searchLower === 'break' && student.summerBreak === true) return true;
     if (searchLower === 'transitioning' && transitioningStatus.isTransitioning) return true;
@@ -1100,7 +1097,6 @@ function createSearchableSelect(options, placeholder = "Select...", id = '', isT
                    placeholder="Type to search ${isTutor ? 'tutor' : 'student'}..." 
                    class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                    autocomplete="off">
-            <!-- NO required attribute on hidden select to avoid form validation errors -->
             <select id="${id}" 
                     class="hidden">
                 <option value="">${placeholder}</option>
@@ -1145,7 +1141,6 @@ function initializeSearchableSelect(selectId) {
     
     if (!searchInput || !dropdown || !hiddenSelect) return;
     
-    // Clear and show dropdown on focus
     searchInput.addEventListener('focus', () => {
         dropdown.classList.remove('hidden');
         searchInput.value = '';
@@ -1187,7 +1182,6 @@ function initializeSearchableSelect(selectId) {
             searchInput.value = employment ? `${label} (${calculateEmploymentDuration(employment)})` : label;
             hiddenSelect.value = value;
             
-            // Trigger change event
             const event = new Event('change');
             hiddenSelect.dispatchEvent(event);
             
@@ -1295,7 +1289,6 @@ async function renderManagementTutorView(container) {
     `;
     
     try {
-        // Event Listeners
         document.getElementById('assign-student-btn').addEventListener('click', () => {
             if (typeof showAssignNewStudentModal === 'function') {
                 showAssignNewStudentModal();
@@ -1314,7 +1307,7 @@ async function renderManagementTutorView(container) {
         });
         
         document.getElementById('view-student-history-btn').addEventListener('click', async () => {
-            const students = sessionCache.students || [];
+            const students = getCleanStudents();
             
             const modalHtml = `
                 <div id="select-student-history-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
@@ -1361,10 +1354,299 @@ async function renderManagementTutorView(container) {
         });
     } catch (e) { 
         console.error("Error setting up event listeners:", e);
-        alert("Error setting up directory. Please refresh the page.");
     }
     
     fetchAndRenderDirectory();
+}
+
+// ======================================================
+// SHOW MANAGE TRANSITION MODAL - ADDED TO FIX REFERENCE ERROR
+// ======================================================
+
+async function showManageTransitionModal(studentId) {
+    const students = getCleanStudents();
+    const tutors = getCleanTutors();
+    const student = students.find(s => s.id === studentId);
+    
+    if (!student || !student.isTransitioning) {
+        alert("This student is not currently in transition.");
+        return;
+    }
+    
+    const modalHtml = `
+        <div id="manage-transition-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div class="bg-white w-full max-w-lg rounded-lg shadow-xl p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-orange-700">Manage Transition: ${student.studentName}</h3>
+                    <button onclick="document.getElementById('manage-transition-modal').remove()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                
+                <div class="mb-6 p-4 bg-orange-50 rounded-md">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <div class="text-sm text-gray-600">Current Tutor</div>
+                            <div class="font-medium">${student.tutorName}</div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600">Original Tutor</div>
+                            <div class="font-medium">${student.originalTutorName || 'N/A'}</div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600">Start Date</div>
+                            <div class="font-medium">${formatBadgeDate(student.transitionStartDate)}</div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600">End Date</div>
+                            <div class="font-medium">${formatBadgeDate(student.transitionEndDate)}</div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600">Days Left</div>
+                            <div class="font-medium">${student.transitionDaysLeft || 0} days</div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600">Reports Allowed</div>
+                            <div class="font-medium">${student.allowReportsDuringTransition ? 'Yes' : 'No'}</div>
+                        </div>
+                    </div>
+                    ${student.transitionReason ? `
+                        <div class="mt-2">
+                            <div class="text-sm text-gray-600">Reason</div>
+                            <div class="text-sm">${student.transitionReason}</div>
+                        </div>
+                    ` : ''}
+                </div>
+                
+                <form id="manage-transition-form">
+                    <div class="space-y-4">
+                        <div class="border-t pt-4">
+                            <h4 class="font-medium mb-3">Transition Actions</h4>
+                            
+                            <button type="button" 
+                                    id="extend-transition-btn"
+                                    class="w-full mb-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                                Extend Transition Period
+                            </button>
+                            
+                            <button type="button" 
+                                    id="end-transition-early-btn"
+                                    class="w-full mb-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                                End Transition Early (Return to Original Tutor)
+                            </button>
+                            
+                            <button type="button" 
+                                    id="make-permanent-btn"
+                                    class="w-full px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700">
+                                Make Current Tutor Permanent
+                            </button>
+                        </div>
+                        
+                        <div id="extend-fields" class="hidden mt-4 p-4 border rounded-md">
+                            <label class="block text-sm font-medium mb-2">New End Date</label>
+                            <input type="date" 
+                                   id="new-end-date" 
+                                   class="w-full p-2 border rounded-md"
+                                   min="${new Date().toISOString().split('T')[0]}"
+                                   value="${student.transitionEndDate}">
+                            <div class="mt-3 flex justify-end">
+                                <button type="button" 
+                                        id="confirm-extend-btn"
+                                        class="px-4 py-2 bg-blue-600 text-white rounded-md">
+                                    Confirm Extension
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+                
+                <div class="mt-6 flex justify-end">
+                    <button type="button" 
+                            onclick="document.getElementById('manage-transition-modal').remove()" 
+                            class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Set up event listeners
+    document.getElementById('extend-transition-btn').addEventListener('click', () => {
+        document.getElementById('extend-fields').classList.remove('hidden');
+    });
+    
+    document.getElementById('confirm-extend-btn').addEventListener('click', async () => {
+        const newEndDate = document.getElementById('new-end-date').value;
+        if (!newEndDate) {
+            alert("Please select a new end date");
+            return;
+        }
+        await extendTransition(student, newEndDate);
+    });
+    
+    document.getElementById('end-transition-early-btn').addEventListener('click', async () => {
+        if (confirm(`End transition for ${student.studentName} and return to ${student.originalTutorName}?`)) {
+            await endTransitionEarly(student);
+        }
+    });
+    
+    document.getElementById('make-permanent-btn').addEventListener('click', async () => {
+        if (confirm(`Make ${student.tutorName} the permanent tutor for ${student.studentName}?`)) {
+            await makeTransitionPermanent(student);
+        }
+    });
+}
+
+async function extendTransition(student, newEndDate) {
+    try {
+        const user = window.userData?.name || 'Admin';
+        const userEmail = window.userData?.email || 'admin@system';
+        const timestamp = new Date().toISOString();
+        
+        // Update student record
+        await updateDoc(doc(db, "students", student.id), {
+            transitionEndDate: newEndDate,
+            updatedAt: timestamp,
+            updatedBy: user
+        });
+        
+        // Record in history
+        await recordStudentHistory(student.id, 'transition_extended', {
+            studentName: student.studentName,
+            previousEndDate: student.transitionEndDate,
+            newEndDate: newEndDate,
+            tutor: student.tutorName
+        }, user, userEmail);
+        
+        alert(`✅ Transition extended until ${formatBadgeDate(newEndDate)}`);
+        document.getElementById('manage-transition-modal').remove();
+        fetchAndRenderDirectory(true);
+        
+    } catch (error) {
+        console.error("Error extending transition:", error);
+        alert(`Error: ${error.message}`);
+    }
+}
+
+async function endTransitionEarly(student) {
+    try {
+        const user = window.userData?.name || 'Admin';
+        const userEmail = window.userData?.email || 'admin@system';
+        const timestamp = new Date().toISOString();
+        
+        // Update student record - revert to original tutor
+        await updateDoc(doc(db, "students", student.id), {
+            tutorEmail: student.originalTutorEmail,
+            tutorName: student.originalTutorName,
+            isTransitioning: false,
+            transitionEndDate: null,
+            transitionStartDate: null,
+            transitionReason: null,
+            allowReportsDuringTransition: null,
+            originalTutorEmail: null,
+            originalTutorName: null,
+            updatedAt: timestamp,
+            updatedBy: user
+        });
+        
+        // Update transition record
+        const transitionsQuery = query(
+            collection(db, "tutorTransitions"),
+            where("studentId", "==", student.id),
+            where("status", "==", "active")
+        );
+        const transitionSnapshot = await getDocs(transitionsQuery);
+        transitionSnapshot.forEach(async (doc) => {
+            await updateDoc(doc.ref, {
+                status: 'ended_early',
+                endedAt: timestamp,
+                endedBy: user
+            });
+        });
+        
+        // Record in history
+        await recordStudentHistory(student.id, 'transition_ended', {
+            studentName: student.studentName,
+            originalTutor: student.originalTutorName,
+            temporaryTutor: student.tutorName,
+            reason: 'Ended early by admin'
+        }, user, userEmail);
+        
+        alert(`✅ Transition ended. Student returned to ${student.originalTutorName}`);
+        document.getElementById('manage-transition-modal').remove();
+        fetchAndRenderDirectory(true);
+        
+    } catch (error) {
+        console.error("Error ending transition:", error);
+        alert(`Error: ${error.message}`);
+    }
+}
+
+async function makeTransitionPermanent(student) {
+    try {
+        const user = window.userData?.name || 'Admin';
+        const userEmail = window.userData?.email || 'admin@system';
+        const timestamp = new Date().toISOString();
+        
+        // Update student record - make current tutor permanent
+        await updateDoc(doc(db, "students", student.id), {
+            isTransitioning: false,
+            transitionEndDate: null,
+            transitionStartDate: null,
+            transitionReason: null,
+            allowReportsDuringTransition: null,
+            originalTutorEmail: null,
+            originalTutorName: null,
+            updatedAt: timestamp,
+            updatedBy: user
+        });
+        
+        // Update transition record
+        const transitionsQuery = query(
+            collection(db, "tutorTransitions"),
+            where("studentId", "==", student.id),
+            where("status", "==", "active")
+        );
+        const transitionSnapshot = await getDocs(transitionsQuery);
+        transitionSnapshot.forEach(async (doc) => {
+            await updateDoc(doc.ref, {
+                status: 'made_permanent',
+                endedAt: timestamp,
+                endedBy: user
+            });
+        });
+        
+        // Create reassignment record
+        await addDoc(collection(db, "tutorAssignments"), {
+            studentId: student.id,
+            studentName: student.studentName,
+            oldTutorEmail: student.originalTutorEmail,
+            oldTutorName: student.originalTutorName,
+            newTutorEmail: student.tutorEmail,
+            newTutorName: student.tutorName,
+            reason: 'Transition made permanent',
+            assignedBy: user,
+            assignedByEmail: userEmail,
+            assignedAt: timestamp,
+            timestamp: timestamp
+        });
+        
+        // Record in history
+        await recordStudentHistory(student.id, 'transition_made_permanent', {
+            studentName: student.studentName,
+            newPermanentTutor: student.tutorName,
+            previousTutor: student.originalTutorName
+        }, user, userEmail);
+        
+        alert(`✅ ${student.tutorName} is now the permanent tutor for ${student.studentName}`);
+        document.getElementById('manage-transition-modal').remove();
+        fetchAndRenderDirectory(true);
+        
+    } catch (error) {
+        console.error("Error making transition permanent:", error);
+        alert(`Error: ${error.message}`);
+    }
 }
 
 // ======================================================
@@ -1480,13 +1762,11 @@ function showEnhancedTransitionStudentModal() {
         </div>
     `;
     
-    // Remove existing modal if any
     const existingModal = document.getElementById('transition-student-modal');
     if (existingModal) existingModal.remove();
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
-    // Set default end date to 2 weeks from now
     const endDateInput = document.getElementById('transition-end-date');
     const twoWeeksFromNow = new Date();
     twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
@@ -1499,7 +1779,6 @@ function showEnhancedTransitionStudentModal() {
         initializeSearchableSelect('transition-student');
         initializeSearchableSelect('transition-tutor');
         
-        // Show current tutor info when student selected
         document.getElementById('transition-student').addEventListener('change', function() {
             const studentId = this.value;
             const student = students.find(s => s.id === studentId);
@@ -1512,7 +1791,6 @@ function showEnhancedTransitionStudentModal() {
             }
         });
         
-        // Calculate duration when dates change
         function calculateDuration() {
             const startDate = document.getElementById('transition-start-date').value;
             const endDate = document.getElementById('transition-end-date').value;
@@ -1549,7 +1827,6 @@ function showEnhancedTransitionStudentModal() {
         document.getElementById('transition-start-date').addEventListener('change', calculateDuration);
         document.getElementById('transition-end-date').addEventListener('change', calculateDuration);
         
-        // Form submission
         document.getElementById('transition-student-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -1573,13 +1850,11 @@ function showEnhancedTransitionStudentModal() {
                 return;
             }
             
-            // Check if trying to transition to same tutor
             if (student.tutorEmail === tutorEmail) {
                 alert("Student is already with this tutor");
                 return;
             }
             
-            // Calculate days difference
             const start = new Date(startDate);
             const end = new Date(endDate);
             const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
@@ -1608,7 +1883,6 @@ async function performEnhancedTransition(student, newTutor, startDate, endDate, 
         const userEmail = window.userData?.email || 'admin@system';
         const timestamp = new Date().toISOString();
         
-        // 1. Update student record with transitioning info
         await updateDoc(doc(db, "students", student.id), {
             originalTutorEmail: student.tutorEmail,
             originalTutorName: student.tutorName,
@@ -1623,7 +1897,6 @@ async function performEnhancedTransition(student, newTutor, startDate, endDate, 
             updatedBy: user
         });
         
-        // 2. Create transition record
         await addDoc(collection(db, "tutorTransitions"), {
             studentId: student.id,
             studentName: student.studentName,
@@ -1641,7 +1914,6 @@ async function performEnhancedTransition(student, newTutor, startDate, endDate, 
             status: 'active'
         });
         
-        // 3. Record in student history
         await recordStudentHistory(student.id, 'transition_start', {
             studentName: student.studentName,
             fromTutor: student.tutorName,
@@ -1653,10 +1925,8 @@ async function performEnhancedTransition(student, newTutor, startDate, endDate, 
             allowReports: allowReporting
         }, user, userEmail);
         
-        // 4. Show success
         alert(`✅ ${student.studentName} is now transitioning to ${newTutor.name} until ${endDate}`);
         
-        // 5. Refresh and close
         setTimeout(() => {
             document.getElementById('transition-student-modal').remove();
             fetchAndRenderDirectory(true);
@@ -1701,7 +1971,6 @@ function showCreateGroupClassModal() {
                 
                 <form id="group-class-form">
                     <div class="grid grid-cols-2 gap-6">
-                        <!-- Left Column -->
                         <div>
                             <div class="mb-4">
                                 <label class="block text-sm font-medium mb-2 text-gray-700">Group Name *</label>
@@ -1744,7 +2013,6 @@ function showCreateGroupClassModal() {
                             </div>
                         </div>
                         
-                        <!-- Right Column -->
                         <div>
                             <div class="mb-4">
                                 <label class="block text-sm font-medium mb-2 text-gray-700">Select Students *</label>
@@ -1808,7 +2076,6 @@ function showCreateGroupClassModal() {
         </div>
     `;
     
-    // Remove existing modal if any
     const existingModal = document.getElementById('group-class-modal');
     if (existingModal) existingModal.remove();
     
@@ -1817,7 +2084,6 @@ function showCreateGroupClassModal() {
     setTimeout(() => {
         initializeSearchableSelect('group-tutor');
         
-        // Show fee input when student is selected
         document.querySelectorAll('.group-student-checkbox').forEach(checkbox => {
             checkbox.addEventListener('change', function() {
                 const feeInput = document.querySelector(`.group-fee-input[data-student-id="${this.value}"]`);
@@ -1841,12 +2107,10 @@ function showCreateGroupClassModal() {
             document.getElementById('total-group-fee').textContent = `₦${total.toFixed(2)}`;
         }
         
-        // Calculate total fee on fee input change
         document.querySelectorAll('.group-fee-input').forEach(input => {
             input.addEventListener('input', calculateTotalGroupFee);
         });
         
-        // Form submission
         document.getElementById('group-class-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -1868,7 +2132,6 @@ function showCreateGroupClassModal() {
                 return;
             }
             
-            // Validate all selected students have fees
             let allFeesValid = true;
             const studentFees = [];
             
@@ -1908,7 +2171,6 @@ async function createEnhancedGroupClass(groupName, tutor, subject, schedule, not
         const userEmail = window.userData?.email || 'admin@system';
         const timestamp = new Date().toISOString();
         
-        // 1. Create group document
         const groupRef = await addDoc(collection(db, "groupClasses"), {
             groupName: groupName,
             tutorEmail: tutor.email,
@@ -1925,14 +2187,12 @@ async function createEnhancedGroupClass(groupName, tutor, subject, schedule, not
         
         console.log("Group created with ID:", groupRef.id);
         
-        // 2. Update each student with group info and record history
         for (const sf of studentFees) {
             const studentDoc = await getDoc(doc(db, "students", sf.studentId));
             if (studentDoc.exists()) {
                 const studentData = studentDoc.data();
                 const currentGroups = studentData.groups || [];
                 
-                // Add to student's groups array
                 await updateDoc(doc(db, "students", sf.studentId), {
                     groups: [...currentGroups, {
                         groupId: groupRef.id,
@@ -1950,7 +2210,6 @@ async function createEnhancedGroupClass(groupName, tutor, subject, schedule, not
                     updatedBy: user
                 });
                 
-                // Create fee record for this student in the group
                 await addDoc(collection(db, "groupStudentFees"), {
                     groupId: groupRef.id,
                     groupName: groupName,
@@ -1961,7 +2220,6 @@ async function createEnhancedGroupClass(groupName, tutor, subject, schedule, not
                     createdBy: user
                 });
                 
-                // Record in student history
                 await recordStudentHistory(sf.studentId, 'group_enrollment', {
                     studentName: studentData.studentName,
                     groupName: groupName,
@@ -1974,10 +2232,8 @@ async function createEnhancedGroupClass(groupName, tutor, subject, schedule, not
             }
         }
         
-        // 3. Show success
         alert(`✅ Group "${groupName}" created successfully with ${studentFees.length} students!`);
         
-        // 4. Refresh and close
         setTimeout(() => {
             document.getElementById('group-class-modal').remove();
             fetchAndRenderDirectory(true);
@@ -2003,7 +2259,6 @@ function showEnhancedReassignStudentModal() {
     
     if (!validateReassignData(students, tutors)) return;
     
-    // Remove existing modal if any
     const existingModal = document.getElementById('reassign-student-modal');
     if (existingModal) existingModal.remove();
     
@@ -2122,7 +2377,6 @@ function showEnhancedReassignStudentModal() {
         initializeSearchableSelect('reassign-student');
         initializeSearchableSelect('reassign-tutor');
         
-        // Set default end date for transition
         const endDateInput = document.getElementById('transition-end-date-reassign');
         const twoWeeksFromNow = new Date();
         twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
@@ -2131,7 +2385,6 @@ function showEnhancedReassignStudentModal() {
             endDateInput.min = new Date().toISOString().split('T')[0];
         }
         
-        // Toggle between permanent and temporary reassignment
         const permanentBtn = document.getElementById('reassign-type-permanent');
         const temporaryBtn = document.getElementById('reassign-type-temporary');
         const permanentFields = document.getElementById('permanent-fields');
@@ -2163,7 +2416,6 @@ function showEnhancedReassignStudentModal() {
         permanentBtn.addEventListener('click', () => setActiveType(false));
         temporaryBtn.addEventListener('click', () => setActiveType(true));
         
-        // Student selection handler
         document.getElementById('reassign-student').addEventListener('change', function() {
             const studentId = this.value;
             const student = students.find(s => s.id === studentId);
@@ -2185,7 +2437,6 @@ function showEnhancedReassignStudentModal() {
             }
         });
         
-        // Tutor selection handler
         document.getElementById('reassign-tutor').addEventListener('change', function() {
             const tutorEmail = this.value;
             const tutor = tutors.find(t => t.email === tutorEmail);
@@ -2206,7 +2457,6 @@ function showEnhancedReassignStudentModal() {
             }
         });
         
-        // Form submission handler
         document.getElementById('reassign-student-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -2274,7 +2524,6 @@ async function performEnhancedReassignment(student, newTutor, reason, currentTut
         const user = window.userData?.name || 'Admin';
         const userEmail = window.userData?.email || 'admin@system';
         
-        // 1. Create assignment history record
         await addDoc(collection(db, "tutorAssignments"), {
             studentId: student.id, 
             studentName: student.studentName,
@@ -2289,7 +2538,6 @@ async function performEnhancedReassignment(student, newTutor, reason, currentTut
             timestamp: new Date().toISOString()
         });
         
-        // 2. Update student record
         await updateDoc(doc(db, "students", student.id), {
             tutorEmail: newTutor.email, 
             tutorName: newTutor.name,
@@ -2297,7 +2545,6 @@ async function performEnhancedReassignment(student, newTutor, reason, currentTut
             updatedBy: user
         });
         
-        // 3. Record in enhanced student history
         await recordStudentHistory(student.id, 'reassignment', {
             studentName: student.studentName,
             fromTutor: currentTutor?.name || 'Unassigned',
@@ -2306,10 +2553,8 @@ async function performEnhancedReassignment(student, newTutor, reason, currentTut
             type: 'permanent'
         }, user, userEmail);
         
-        // 4. Show success
         alert(`✅ Successfully reassigned ${student.studentName} to ${newTutor.name}!`);
         
-        // 5. Refresh and close
         setTimeout(() => { 
             document.getElementById('reassign-student-modal').remove(); 
             fetchAndRenderDirectory(true); 
@@ -2331,7 +2576,7 @@ async function performEnhancedReassignment(student, newTutor, reason, currentTut
 
 async function showEnhancedStudentHistory(studentId) {
     try {
-        const students = sessionCache.students || [];
+        const students = getCleanStudents();
         const student = students.find(s => s.id === studentId);
         
         if (!student) {
@@ -2339,7 +2584,6 @@ async function showEnhancedStudentHistory(studentId) {
             return;
         }
         
-        // Create modal
         const modalHtml = `
             <div id="enhanced-student-history-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
                 <div class="relative mx-auto my-8 p-6 bg-white rounded-lg shadow-xl max-w-4xl w-full">
@@ -2356,7 +2600,7 @@ async function showEnhancedStudentHistory(studentId) {
                         </div>
                     </div>
                     
-                    <div class="overflow-y-auto max-h-[70vh]">
+                    <div id="history-container" class="overflow-y-auto max-h-[70vh]">
                         <div class="text-center py-10 text-gray-500">
                             Loading history...
                         </div>
@@ -2367,7 +2611,6 @@ async function showEnhancedStudentHistory(studentId) {
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         
-        // Fetch history data
         const historyQuery = query(
             collection(db, "studentHistory"),
             where("studentId", "==", studentId),
@@ -2377,11 +2620,9 @@ async function showEnhancedStudentHistory(studentId) {
         const historySnapshot = await getDocs(historyQuery);
         const historyRecords = historySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
         
-        // Also fetch tutor assignments
         const tutorAssignments = sessionCache.tutorAssignments || {};
         const assignmentHistory = tutorAssignments[studentId] || [];
         
-        // Combine and sort all records by timestamp
         const allRecords = [
             ...historyRecords,
             ...assignmentHistory.map(a => ({
@@ -2399,8 +2640,7 @@ async function showEnhancedStudentHistory(studentId) {
             }))
         ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         
-        // Update modal with history
-        const historyContainer = document.querySelector('#enhanced-student-history-modal .overflow-y-auto');
+        const historyContainer = document.getElementById('history-container');
         if (historyContainer) {
             if (allRecords.length > 0) {
                 historyContainer.innerHTML = `
@@ -2447,6 +2687,8 @@ function getHistoryBorderColor(actionType) {
         'tutor_reassignment': 'border-blue-500',
         'transition_start': 'border-orange-500',
         'transition_end': 'border-green-500',
+        'transition_extended': 'border-yellow-500',
+        'transition_made_permanent': 'border-purple-500',
         'group_enrollment': 'border-indigo-500',
         'status_change': 'border-yellow-500',
         'fee_change': 'border-purple-500',
@@ -2461,6 +2703,8 @@ function getHistoryActionTitle(actionType) {
         'tutor_reassignment': '📋 Tutor Reassignment',
         'transition_start': '⏳ Transition Started',
         'transition_end': '✅ Transition Ended',
+        'transition_extended': '📅 Transition Extended',
+        'transition_made_permanent': '🔒 Made Permanent',
         'group_enrollment': '👥 Group Enrollment',
         'status_change': '🔄 Status Change',
         'fee_change': '💰 Fee Change',
@@ -2492,6 +2736,16 @@ function renderHistoryDetails(record) {
             return `
                 Returned to: <span class="font-medium">${details.originalTutor || 'Original tutor'}</span>
                 ${details.reason ? `<br>Reason: ${details.reason}` : ''}
+            `;
+        case 'transition_extended':
+            return `
+                Extended until: <span class="font-medium">${formatBadgeDate(details.newEndDate)}</span>
+                <br>Previous end date: ${formatBadgeDate(details.previousEndDate)}
+            `;
+        case 'transition_made_permanent':
+            return `
+                Made <span class="font-medium">${details.newPermanentTutor}</span> permanent tutor
+                <br>Previous tutor: ${details.previousTutor}
             `;
         case 'group_enrollment':
             return `
@@ -2542,7 +2796,6 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data...</p>`;
         }
         
-        // Fetch all data in parallel
         const [
             tutorsSnapshot, 
             studentsSnapshot, 
@@ -2562,12 +2815,10 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
         const allTutors = tutorsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
         const activeTutors = allTutors.filter(t => !t.status || t.status === 'active');
         
-        // Process students with enhanced fields
         const allStudents = studentsSnapshot.docs.map(doc => {
             const data = doc.data();
             const transitioningStatus = calculateTransitioningStatus(data);
             
-            // Use the getStudentCategory function
             const category = getStudentCategory({
                 ...data,
                 isTransitioning: transitioningStatus.isTransitioning,
@@ -2589,19 +2840,16 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             };
         });
         
-        // Filter out archived/deleted
         const nonArchivedStudents = allStudents.filter(s => {
             const st = (s.status || '').toLowerCase();
             return !st.includes('archived') && !st.includes('deleted');
         });
         
-        // Count students by category
         const activeStudents = nonArchivedStudents.filter(s => s.studentCategory === 'active');
         const breakStudents = nonArchivedStudents.filter(s => s.studentCategory === 'break');
         const transitioningStudents = nonArchivedStudents.filter(s => s.studentCategory === 'transitioning');
         const groupStudents = nonArchivedStudents.filter(s => s.studentCategory === 'group');
         
-        // Process assignments
         const tutorAssignments = {};
         tutorAssignmentsSnapshot.docs.forEach(doc => {
             const d = doc.data();
@@ -2611,18 +2859,14 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             }
         });
         
-        // Process transitions
         const activeTransitions = transitionsSnapshot.docs
             .map(doc => ({ ...doc.data(), id: doc.id }))
             .filter(t => t.status === 'active');
         
-        // Process groups
         const groupClasses = groupsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
         
-        // Calculate unique groups count
         const groupCount = new Set(nonArchivedStudents.filter(s => s.groupId).map(s => s.groupId)).size;
         
-        // Save to cache
         saveToLocalStorage('tutors', activeTutors);
         saveToLocalStorage('students', nonArchivedStudents);
         saveToLocalStorage('groupClasses', groupClasses);
@@ -2630,7 +2874,6 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
         sessionCache.tutorTransitions = activeTransitions;
         sessionCache._lastUpdate = Date.now();
         
-        // Update counters
         if (document.getElementById('tutor-count-badge')) {
             document.getElementById('tutor-count-badge').textContent = activeTutors.length;
         }
@@ -2670,8 +2913,8 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
 // ======================================================
 
 function renderEnhancedDirectoryFromCache(searchTerm = '') {
-    const tutors = sessionCache.tutors || [];
-    const students = sessionCache.students || [];
+    const tutors = getCleanTutors();
+    const students = getCleanStudents();
     const tutorAssignments = sessionCache.tutorAssignments || {};
     const directoryList = document.getElementById('directory-list');
     
@@ -2716,7 +2959,6 @@ function renderEnhancedDirectoryFromCache(searchTerm = '') {
             .filter(student => !searchTerm || searchStudentFromFirebase(student, searchTerm, tutors))
             .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
 
-        // Calculate counts by category using studentCategory
         const activeCount = assignedStudents.filter(s => s.studentCategory === 'active').length;
         const breakCount = assignedStudents.filter(s => s.studentCategory === 'break').length;
         const transCount = assignedStudents.filter(s => s.studentCategory === 'transitioning').length;
@@ -2834,7 +3076,6 @@ function renderEnhancedDirectoryFromCache(searchTerm = '') {
             </div>`;
     }).join('');
 
-    // Reattach event listeners
     if (canEditStudents) {
         document.querySelectorAll('.edit-student-btn').forEach(b => {
             b.addEventListener('click', (e) => {
@@ -2866,9 +3107,7 @@ function renderEnhancedDirectoryFromCache(searchTerm = '') {
     document.querySelectorAll('.manage-transition-btn').forEach(b => {
         b.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (typeof showManageTransitionModal === 'function') {
-                showManageTransitionModal(b.dataset.studentId);
-            }
+            showManageTransitionModal(b.dataset.studentId);
         });
     });
 }
@@ -2895,6 +3134,20 @@ function validateReassignData(students, tutors) {
     return true;
 }
 
+function saveToLocalStorage(key, data) {
+    try {
+        sessionCache[key] = data;
+        localStorage.setItem(`tms_${key}`, JSON.stringify(data));
+    } catch (e) {
+        console.error(`Error saving to localStorage: ${key}`, e);
+    }
+}
+
+function invalidateCache(key) {
+    sessionCache[key] = null;
+    localStorage.removeItem(`tms_${key}`);
+}
+
 // ======================================================
 // GLOBAL EXPORTS
 // ======================================================
@@ -2904,6 +3157,8 @@ window.showCreateGroupClassModal = showCreateGroupClassModal;
 window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
 window.showEnhancedStudentHistory = showEnhancedStudentHistory;
 window.showManageTransitionModal = showManageTransitionModal;
+window.renderManagementTutorView = renderManagementTutorView;
+window.fetchAndRenderDirectory = fetchAndRenderDirectory;
 
 // Update existing function references
 window.showTransitionStudentModal = showEnhancedTransitionStudentModal;
@@ -10166,6 +10421,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
