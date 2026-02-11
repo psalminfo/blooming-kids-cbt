@@ -1229,7 +1229,7 @@ async function recordStudentHistory(studentId, actionType, details, userId, user
 
 // --- CACHE UTILITIES ---
 
-const sessionCache = window.sessionCache || {};
+window.sessionCache = window.sessionCache || {};
 
 function getCleanStudents() { 
     return (sessionCache.students || []).filter(s => !s.status || !s.status.toLowerCase().includes('archived')); 
@@ -10336,6 +10336,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
