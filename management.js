@@ -954,7 +954,7 @@ window.refreshAllDashboardData = async function() {
 // ======================================================
 
 // --- GLOBAL DEPENDENCIES (assume Firestore is initialised) ---
-const { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, where, getDoc } = firebaseFirestore;
+// Firebase Firestore functions - assume db is already defined globally const { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, where, getDoc } = firebaseFirestore;
 
 // --- CACHE & UTILITIES (unchanged except new fields) ---
 const sessionCache = { tutors: [], students: [], tutorAssignments: {}, tutorTransitions: [], groupClasses: [], _lastUpdate: 0 };
@@ -9473,5 +9473,6 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
