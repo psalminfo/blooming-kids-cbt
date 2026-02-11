@@ -42,7 +42,7 @@ style.textContent = `
         padding: 0.75rem 1rem;
         border-radius: var(--radius);
         font-weight: 500;
-        transition: all 0.2s ease;
+        : all 0.2s ease;
         cursor: pointer;
         display: flex;
         align-items: center;
@@ -70,7 +70,7 @@ style.textContent = `
         font-weight: 500;
         font-size: 0.875rem;
         line-height: 1.25rem;
-        transition: all 0.2s ease;
+        : all 0.2s ease;
         border: none;
         cursor: pointer;
         gap: 0.5rem;
@@ -123,7 +123,7 @@ style.textContent = `
         border-radius: var(--radius-lg);
         box-shadow: var(--shadow);
         border: 1px solid var(--border-color);
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        : transform 0.2s ease, box-shadow 0.2s ease;
     }
 
     .card:hover {
@@ -233,7 +233,7 @@ style.textContent = `
         padding: 0.75rem 1rem;
         border: 1px solid var(--border-color);
         border-radius: var(--radius);
-        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        : border-color 0.2s ease, box-shadow 0.2s ease;
         font-size: 1rem;
     }
 
@@ -380,8 +380,8 @@ style.textContent = `
         flex-wrap: wrap;
     }
 
-    /* Add Transitioning Button Styling */
-    #add-transitioning-btn {
+    /* Add ing Button Styling */
+    #add-ing-btn {
         display: block !important;
         background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
         color: white !important;
@@ -391,11 +391,11 @@ style.textContent = `
         cursor: pointer !important;
         margin: 0.25rem !important;
         font-weight: 500 !important;
-        transition: all 0.2s ease !important;
+        : all 0.2s ease !important;
         box-shadow: var(--shadow) !important;
     }
 
-    #add-transitioning-btn:hover {
+    #add-ing-btn:hover {
         transform: translateY(-2px) !important;
         box-shadow: var(--shadow-lg) !important;
         background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
@@ -411,7 +411,7 @@ style.textContent = `
         cursor: pointer !important;
         margin: 0.25rem !important;
         font-weight: 500 !important;
-        transition: all 0.2s ease !important;
+        : all 0.2s ease !important;
         box-shadow: var(--shadow) !important;
         display: inline-flex !important;
         align-items: center !important;
@@ -434,7 +434,7 @@ style.textContent = `
         cursor: pointer !important;
         margin: 0.25rem !important;
         font-weight: 500 !important;
-        transition: all 0.2s ease !important;
+        : all 0.2s ease !important;
         box-shadow: var(--shadow) !important;
         display: inline-flex !important;
         align-items: center !important;
@@ -545,7 +545,7 @@ style.textContent = `
         border: 1px solid var(--border-color);
         border-radius: var(--radius);
         padding: 1rem;
-        transition: all 0.2s ease;
+        : all 0.2s ease;
     }
 
     .student-action-card:hover {
@@ -569,7 +569,7 @@ style.textContent = `
         border-radius: var(--radius);
         font-size: 0.75rem;
         cursor: pointer;
-        transition: all 0.2s ease;
+        : all 0.2s ease;
     }
 
     .edit-schedule-btn:hover {
@@ -582,7 +582,7 @@ style.textContent = `
         border-radius: var(--radius);
         padding: 1.5rem;
         text-align: center;
-        transition: all 0.2s ease;
+        : all 0.2s ease;
         cursor: pointer;
     }
 
@@ -777,7 +777,7 @@ style.textContent = `
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        transition: background-color 0.2s ease;
+        : background-color 0.2s ease;
     }
 
     .send-message-btn:hover {
@@ -796,7 +796,7 @@ style.textContent = `
         border-radius: var(--radius);
         padding: 1rem;
         cursor: pointer;
-        transition: all 0.2s ease;
+        : all 0.2s ease;
         text-align: center;
     }
 
@@ -851,7 +851,7 @@ style.textContent = `
         padding: 1rem;
         border-bottom: 1px solid var(--border-color);
         cursor: pointer;
-        transition: background-color 0.2s ease;
+        : background-color 0.2s ease;
     }
 
     .conversation-item:hover {
@@ -956,6 +956,8 @@ let isSummerBreakEnabled = false;
 let isBypassApprovalEnabled = false;
 let showStudentFees = false;
 let showEditDeleteButtons = false;
+let isTransitionAddEnabled = true;     
+let isPreschoolAddEnabled = true; 
 
 // Pay Scheme Configuration
 const PAY_SCHEMES = {
@@ -1910,7 +1912,7 @@ class ScheduleManager {
         const colors = type === 'error' ? 'bg-red-100 text-red-800' : 
                        type === 'success' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800';
         
-        alert.className = `fixed top-4 right-4 z-[2000] p-4 rounded shadow-lg font-medium transform transition-all duration-300 translate-x-full ${colors}`;
+        alert.className = `fixed top-4 right-4 z-[2000] p-4 rounded shadow-lg font-medium transform -all duration-300 translate-x-full ${colors}`;
         alert.textContent = msg;
         document.body.appendChild(alert);
 
@@ -1933,7 +1935,7 @@ class ScheduleManager {
             .remove-row-btn { position: absolute; top: -8px; right: -8px; background: #ef4444; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; font-size: 12px; }
             @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
             /* Utility Classes matching your previous setup */
-            .btn { display: inline-flex; align-items: center; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 500; transition: 0.2s; cursor: pointer; border: 1px solid transparent; }
+            .btn { display: inline-flex; align-items: center; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 500; : 0.2s; cursor: pointer; border: 1px solid transparent; }
             .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
             .btn-primary { background: #3b82f6; color: white; } .btn-primary:hover { background: #2563eb; }
             .btn-success { background: #10b981; color: white; } .btn-success:hover { background: #059669; }
@@ -4071,6 +4073,9 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
  * UPDATED: 
  * 1. Tutors only see approved students (no pending students)
  * 2. Recall button tracks request status and prevents duplicate requests
+ * 3. 🆕 Full "Add Student" section is hidden when isTutorAddEnabled == false
+ * 4. 🆕 "Add Transitioning" button respects isTransitionAddEnabled
+ * 5. 🆕 Preschool/Kindergarten grade options respect isPreschoolAddEnabled
  ******************************************************************************/
 
 // --- Helper function to check recall request status ---
@@ -4096,11 +4101,21 @@ async function checkRecallRequestStatus(studentId) {
 
 // --- Form Helper (Specific to this section) ---
 function getNewStudentFormFields() {
-    const gradeOptions = `
-        <option value="">Select Grade</option>
-        <option value="Preschool">Preschool</option>
-        <option value="Kindergarten">Kindergarten</option>
-        ${Array.from({ length: 12 }, (_, i) => `<option value="Grade ${i + 1}">Grade ${i + 1}</option>`).join('')}
+    // 🆕 Grade options – conditionally include Preschool/Kindergarten
+    let gradeOptions = `<option value="">Select Grade</option>`;
+    
+    if (isPreschoolAddEnabled) {
+        gradeOptions += `
+            <option value="Preschool">Preschool</option>
+            <option value="Kindergarten">Kindergarten</option>
+        `;
+    }
+    
+    for (let i = 1; i <= 12; i++) {
+        gradeOptions += `<option value="Grade ${i}">Grade ${i}</option>`;
+    }
+    
+    gradeOptions += `
         <option value="Pre-College">Pre-College</option>
         <option value="College">College</option>
         <option value="Adults">Adults</option>
@@ -4155,12 +4170,26 @@ function getNewStudentFormFields() {
 
 // --- Edit Student Modal (Isolated) ---
 function showEditStudentModal(student) {
-    let gradeOptions = `<option value="">Select Grade</option><option value="Preschool" ${student.grade === 'Preschool' ? 'selected' : ''}>Preschool</option><option value="Kindergarten" ${student.grade === 'Kindergarten' ? 'selected' : ''}>Kindergarten</option>`;
+    // 🆕 Grade options – conditionally include Preschool/Kindergarten
+    let gradeOptions = `<option value="">Select Grade</option>`;
+    
+    if (isPreschoolAddEnabled) {
+        gradeOptions += `
+            <option value="Preschool" ${student.grade === 'Preschool' ? 'selected' : ''}>Preschool</option>
+            <option value="Kindergarten" ${student.grade === 'Kindergarten' ? 'selected' : ''}>Kindergarten</option>
+        `;
+    }
+    
     for (let i = 1; i <= 12; i++) {
         const gradeValue = `Grade ${i}`;
         gradeOptions += `<option value="${gradeValue}" ${student.grade === gradeValue ? 'selected' : ''}>${gradeValue}</option>`;
     }
-    gradeOptions += `<option value="Pre-College" ${student.grade === 'Pre-College' ? 'selected' : ''}>Pre-College</option><option value="College" ${student.grade === 'College' ? 'selected' : ''}>College</option><option value="Adults" ${student.grade === 'Adults' ? 'selected' : ''}>Adults</option>`;
+    
+    gradeOptions += `
+        <option value="Pre-College" ${student.grade === 'Pre-College' ? 'selected' : ''}>Pre-College</option>
+        <option value="College" ${student.grade === 'College' ? 'selected' : ''}>College</option>
+        <option value="Adults" ${student.grade === 'Adults' ? 'selected' : ''}>Adults</option>
+    `;
     
     let daysOptions = '<option value="">Select Days per Week</option>';
     for (let i = 1; i <= 7; i++) {
@@ -4267,7 +4296,7 @@ async function renderStudentDatabase(container, tutor) {
     // Load Reports
     let savedReports = await loadReportsFromFirestore(tutor.email);
     
-    // NEW: Add toggle state for showing total fees
+    // 🆕 Add toggle state for showing total fees
     const showFeesToggleKey = `showFeesToggle_${tutor.email}`;
     const showFeesToggle = localStorage.getItem(showFeesToggleKey) === 'true';
     
@@ -4328,7 +4357,7 @@ async function renderStudentDatabase(container, tutor) {
 
     const studentsCount = students.length;
 
-    // --- RENDER UI (Updated with new features) ---
+    // --- RENDER UI (UPDATED) ---
     function renderUI() {
         let studentsHTML = `
             <div class="flex justify-between items-center mb-4">
@@ -4345,13 +4374,19 @@ async function renderStudentDatabase(container, tutor) {
                 </div>
             </div>`;
         
-        studentsHTML += `
-            <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
-                <h3 class="font-bold text-lg mb-2">Add a New Student</h3>
-                <div class="space-y-2">${getNewStudentFormFields()}</div>
-                <div class="flex space-x-2 mt-3">`;
-        if (isTutorAddEnabled) { studentsHTML += `<button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Student</button>`; }
-        studentsHTML += `<button id="add-transitioning-btn" class="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700">Add Transitioning</button></div></div>`;
+        // 🆕 NEW: Conditionally show the entire "Add a New Student" section
+        if (isTutorAddEnabled) {
+            studentsHTML += `
+                <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
+                    <h3 class="font-bold text-lg mb-2">Add a New Student</h3>
+                    <div class="space-y-2">${getNewStudentFormFields()}</div>
+                    <div class="flex space-x-2 mt-3">
+                        <button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Student</button>
+                        ${isTransitionAddEnabled ? `<button id="add-transitioning-btn" class="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700">Add Transitioning</button>` : ''}
+                    </div>
+                </div>`;
+        }
+        
         studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEnabled ? 'text-green-600' : 'text-red-500'}">${isSubmissionEnabled ? 'Enabled' : 'Disabled'}</strong> by the admin.</p>`;
 
         if (studentsCount === 0) {
@@ -4378,21 +4413,17 @@ async function renderStudentDatabase(container, tutor) {
                     const transIndicator = student.isTransitioning ? `<span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full ml-2">Transitioning</span>` : '';
                     statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>${transIndicator}`;
                     
-                    // NEW BREAK/RECALL LOGIC with status checking
+                    // BREAK/RECALL LOGIC with status checking
                     if (isSummerBreakEnabled) {
-                        // Check recall status for each student
                         const recallStatus = window.recallStatusCache ? window.recallStatusCache[student.id] : null;
                         
                         if (student.summerBreak) {
                             // Student is on break - show appropriate recall button/status
-                          // CORRECT:
-if (recallStatus === 'pending') {
-    actionsHTML += `<span class="bg-purple-200 text-purple-800 px-3 py-1 rounded text-sm">Recall Requested</span>`;
-} else {
-    // NO "Recalled ✓" state - after approval, student is NOT on break anymore
-    // So they won't even reach this code block
-    actionsHTML += `<button class="recall-from-break-btn bg-purple-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Recall</button>`;
-}
+                            if (recallStatus === 'pending') {
+                                actionsHTML += `<span class="bg-purple-200 text-purple-800 px-3 py-1 rounded text-sm">Recall Requested</span>`;
+                            } else {
+                                actionsHTML += `<button class="recall-from-break-btn bg-purple-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Recall</button>`;
+                            }
                         } else {
                             // Student is active - show Break button
                             actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Break</button>`;
@@ -4621,11 +4652,13 @@ if (recallStatus === 'pending') {
             });
         }
         
-        // Add transitioning student
+        // 🆕 Add transitioning student – button may not exist if hidden, so we check
         const transitionBtn = document.getElementById('add-transitioning-btn');
-        if(transitionBtn) transitionBtn.addEventListener('click', () => {
-            if(confirm("Add Transitioning Student?")) addTransitioningStudent();
-        });
+        if (transitionBtn) {
+            transitionBtn.addEventListener('click', () => {
+                if(confirm("Add Transitioning Student?")) addTransitioningStudent();
+            });
+        }
 
         // Add regular student
         const studentBtn = document.getElementById('add-student-btn');
@@ -4770,6 +4803,12 @@ if (recallStatus === 'pending') {
         });
 
         async function addTransitioningStudent() {
+            // 🆕 Guard – button should be hidden, but double‑check
+            if (!isTransitionAddEnabled) {
+                showCustomAlert('Adding transitioning students is currently disabled by admin.');
+                return;
+            }
+            
             const parentName = document.getElementById('new-parent-name').value.trim();
             const parentPhone = document.getElementById('new-parent-phone').value.trim();
             const studentName = document.getElementById('new-student-name').value.trim();
@@ -5099,7 +5138,7 @@ function triggerConfetti() {
 // <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
 /*******************************************************************************
- * SECTION 14: ADMIN SETTINGS LISTENER
+ * SECTION 14: ADMIN SETTINGS LISTENER (UPDATED – NO REDECLARATION)
  ******************************************************************************/
 
 // Listen for changes to admin settings
@@ -5107,19 +5146,28 @@ const settingsDocRef = doc(db, "settings", "global_settings");
 onSnapshot(settingsDocRef, (docSnap) => {
     if (docSnap.exists()) {
         const data = docSnap.data();
-        isSubmissionEnabled = data.isReportEnabled;
-        isTutorAddEnabled = data.isTutorAddEnabled;
-        isSummerBreakEnabled = data.isSummerBreakEnabled;
-        isBypassApprovalEnabled = data.bypassPendingApproval;
-        showStudentFees = data.showStudentFees;
-        showEditDeleteButtons = data.showEditDeleteButtons;
+        
+        // ✅ Existing flags – assign, do NOT redeclare
+        isSubmissionEnabled     = data.isReportEnabled          ?? false;
+        isTutorAddEnabled       = data.isTutorAddEnabled        ?? false;
+        isSummerBreakEnabled    = data.isSummerBreakEnabled     ?? false;
+        isBypassApprovalEnabled = data.bypassPendingApproval    ?? false;
+        showStudentFees         = data.showStudentFees          ?? false;
+        showEditDeleteButtons   = data.showEditDeleteButtons    ?? false;
+        
+        // 🆕 NEW FLAGS – you MUST declare these ONCE at the top of the file
+        //    (see instructions below)
+        isTransitionAddEnabled  = data.showTransitionButton     ?? true;
+        isPreschoolAddEnabled   = data.preschoolAddTransition   ?? true;
 
+        // Re‑render student database if it's currently visible
         const mainContent = document.getElementById('mainContent');
-        if (mainContent.querySelector('#student-list-view')) {
+        if (mainContent && mainContent.querySelector('#student-list-view')) {
             renderStudentDatabase(mainContent, window.tutorData);
         }
     }
 });
+
 
 /*******************************************************************************
  * SECTION 15: MAIN APP INITIALIZATION (UPDATED)
@@ -5259,9 +5307,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 /*******************************************************************************
  * SECTION 16: GOOGLE CLASSROOM GRADING INTERFACE (FINAL)
+ * UPDATES:
+ *   - Fixed "Cannot read properties of undefined (reading 'seconds')" error.
+ *   - Inbox now auto‑clears on the 4th day of the month – tutors only see
+ *     submissions from the current month that are on/after the 4th.
  ******************************************************************************/
 
-// 1. INJECT GRADING STYLES
+// ==========================================
+// 1. INJECT GRADING STYLES (unchanged)
+// ==========================================
 (function injectGradingStyles() {
     if(document.getElementById('gc-grading-styles')) return;
     const style = document.createElement('style');
@@ -5304,7 +5358,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.head.appendChild(style);
 })();
 
-// 2. LOGIC: FETCH HOMEWORK INBOX
+// ==========================================
+// 2. HELPER: Homework Cutoff Date (4th of current month)
+// ==========================================
+/**
+ * Returns the cutoff date: 4th day of current month at 00:00:00.
+ * Submissions BEFORE this date are hidden from the inbox.
+ */
+function getHomeworkCutoffDate() {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 4, 0, 0, 0);
+}
+
+// ==========================================
+// 3. LOAD HOMEWORK INBOX (with auto‑clear & safe date handling)
+// ==========================================
 async function loadHomeworkInbox(tutorEmail) {
     const container = document.getElementById('homework-inbox-container');
     if (!container) return;
@@ -5312,38 +5380,64 @@ async function loadHomeworkInbox(tutorEmail) {
 
     try {
         // Query by Tutor Name OR Email to be safe
-        let q = query(collection(db, "homework_assignments"), 
-            where("tutorName", "==", window.tutorData.name), 
-            where("status", "==", "submitted"));
-            
+        let q = query(
+            collection(db, "homework_assignments"),
+            where("tutorName", "==", window.tutorData.name),
+            where("status", "==", "submitted")
+        );
         let snapshot = await getDocs(q);
-        
-        if (snapshot.empty) {
-             // Fallback query using email
-             q = query(collection(db, "homework_assignments"), 
-                where("tutorEmail", "==", tutorEmail), 
-                where("status", "==", "submitted"));
-             snapshot = await getDocs(q);
-        }
 
         if (snapshot.empty) {
-            container.innerHTML = `<div class="text-center py-6"><div class="text-3xl mb-2">🎉</div><p class="text-gray-500 text-sm">No pending homework!</p></div>`;
+            // Fallback query using email
+            q = query(
+                collection(db, "homework_assignments"),
+                where("tutorEmail", "==", tutorEmail),
+                where("status", "==", "submitted")
+            );
+            snapshot = await getDocs(q);
+        }
+
+        // ---------- AUTO‑CLEAR LOGIC (4th day of month) ----------
+        const cutoffDate = getHomeworkCutoffDate();
+        const visibleSubmissions = snapshot.docs.filter(doc => {
+            const data = doc.data();
+            const submitted = data.submittedAt;
+            if (!submitted || typeof submitted.seconds !== 'number') return false;
+            const submittedDate = new Date(submitted.seconds * 1000);
+            return submittedDate >= cutoffDate;
+        });
+        // ---------------------------------------------------------
+
+        if (visibleSubmissions.length === 0) {
+            container.innerHTML = `<div class="text-center py-6">
+                <div class="text-3xl mb-2">🎉</div>
+                <p class="text-gray-500 text-sm">No pending homework from this month.</p>
+            </div>`;
             return;
         }
 
         let html = '<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">';
-        snapshot.forEach(doc => {
+        visibleSubmissions.forEach(doc => {
             const data = doc.data();
-            const date = data.submittedAt ? new Date(data.submittedAt.seconds * 1000).toLocaleDateString() : 'Unknown';
-            const isLate = data.dueDate && new Date(data.dueDate) < new Date(data.submittedAt.seconds * 1000);
             
+            // ✅ SAFE date formatting
+            const submitted = data.submittedAt;
+            let date = 'Unknown';
+            if (submitted && typeof submitted.seconds === 'number') {
+                date = new Date(submitted.seconds * 1000).toLocaleDateString();
+            }
+
+            const isLate = data.dueDate && new Date(data.dueDate) < new Date(submitted?.seconds * 1000 || 0);
+
             html += `
                 <div class="gc-inbox-item" onclick="openGradingModal('${doc.id}')">
                     <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">${data.studentName.charAt(0)}</div>
+                        <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                            ${data.studentName?.charAt(0) || '?'}
+                        </div>
                         <div>
-                            <div class="font-medium text-gray-800">${data.studentName}</div>
-                            <div class="text-xs text-gray-500">${data.title}</div>
+                            <div class="font-medium text-gray-800">${data.studentName || 'Unknown'}</div>
+                            <div class="text-xs text-gray-500">${data.title || 'Untitled'}</div>
                         </div>
                     </div>
                     <div class="text-right">
@@ -5363,7 +5457,9 @@ async function loadHomeworkInbox(tutorEmail) {
     }
 }
 
-// 3. LOGIC: OPEN GRADING MODAL
+// ==========================================
+// 4. OPEN GRADING MODAL (unchanged – safe)
+// ==========================================
 async function openGradingModal(homeworkId) {
     let hwData;
     try {
@@ -5449,7 +5545,9 @@ async function openGradingModal(homeworkId) {
     };
 }
 
-// 4. DASHBOARD WIDGET INJECTOR
+// ==========================================
+// 5. DASHBOARD WIDGET INJECTOR (unchanged)
+// ==========================================
 const inboxObserver = new MutationObserver(() => {
     const hero = document.querySelector('.hero-section');
     if (hero && !document.getElementById('homework-inbox-section')) {
@@ -5468,8 +5566,12 @@ const inboxObserver = new MutationObserver(() => {
     }
 });
 inboxObserver.observe(document.body, { childList: true, subtree: true });
-// EXPOSE FUNCTIONS TO WINDOW (REQUIRED FOR HTML ONCLICK)
+
+// ==========================================
+// 6. EXPOSE FUNCTIONS TO WINDOW (for onclick handlers)
+// ==========================================
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
+
 
 
