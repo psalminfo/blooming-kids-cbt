@@ -1763,10 +1763,14 @@ async function performTransition(student, newTutor, startDate, endDate, reason, 
 }
 
 // ======================================================
-// FEATURE 2: CREATE GROUP CLASS MODAL (No Changes Needed)
+// GLOBAL EXPORTS
 // ======================================================
 
-// [Keep the existing showCreateGroupClassModal function as is - it already supports students from different parents]
+window.showTransitionStudentModal = showTransitionStudentModal;
+window.showCreateGroupClassModal = showCreateGroupClassModal; // Add this line
+window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
+window.showManageTransitionModal = showManageTransitionModal;
+window.viewStudentCompleteHistory = viewStudentCompleteHistory;
 
 // ======================================================
 // ENHANCED REASSIGN STUDENT MODAL (with Transition Option)
@@ -10243,6 +10247,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
