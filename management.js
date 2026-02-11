@@ -2997,29 +2997,59 @@ window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
 window.showManageTransitionModal = showManageTransitionModal;
 
 // ======================================================
-// AUTO-FIX: Transition Student Button Visibility
+// ULTIMATE FIX: Force Transition Student Button to Show
 // ======================================================
-(function fixTransitionButton() {
-    // Immediate attempt
-    const fixBtn = (btn) => {
-        if (btn && btn.classList.contains('bg-orange-300')) {
-            btn.classList.remove('bg-orange-300');
-            btn.classList.add('bg-orange-600', 'text-white', 'px-4', 'py-2', 'rounded', 'hover:bg-orange-700', 'z-10');
-            console.log('✅ Transition button fixed (class replaced).');
-        }
-    };
-    const btn = document.getElementById('transition-student-btn');
-    if (btn) { fixBtn(btn); }
+(function forceTransitionButtonVisibility() {
+    const FORCE_COLOR = '#ea580c'; // Tailwind orange-600
+    const HOVER_COLOR = '#c2410c';  // Tailwind orange-700
 
-    // Watch for dynamically added button (if rendered later)
-    const observer = new MutationObserver((mutations) => {
+    function applyFix(btn) {
+        if (!btn) return;
+        
+        // 1. Remove problematic classes
+        btn.classList.remove('bg-orange-300');
+        
+        // 2. Add safe Tailwind classes (if they exist in your build)
+        btn.classList.add('bg-orange-600', 'text-white', 'px-4', 'py-2', 'rounded', 'z-10');
+        
+        // 3. FORCE inline styles (guaranteed to work)
+        btn.style.backgroundColor = FORCE_COLOR;
+        btn.style.color = 'white';
+        btn.style.padding = '0.5rem 1rem'; // px-4 py-2
+        btn.style.borderRadius = '0.25rem'; // rounded
+        btn.style.zIndex = '10';
+        
+        // 4. Add hover effect via inline style
+        btn.onmouseenter = () => btn.style.backgroundColor = HOVER_COLOR;
+        btn.onmouseleave = () => btn.style.backgroundColor = FORCE_COLOR;
+        
+        console.log('✅ Transition button forced to orange (inline styles).');
+    }
+
+    // Immediate attempt
+    const btn = document.getElementById('transition-student-btn');
+    if (btn) applyFix(btn);
+
+    // Persistent observer – reapplies fix every time the button is added/removed
+    const observer = new MutationObserver(() => {
         const btn = document.getElementById('transition-student-btn');
-        if (btn) {
-            fixBtn(btn);
-            observer.disconnect(); // done
-        }
+        if (btn) applyFix(btn);
     });
     observer.observe(document.body, { childList: true, subtree: true });
+
+    // Also watch for style/class changes that might override
+    const styleObserver = new MutationObserver((mutations) => {
+        mutations.forEach((m) => {
+            if (m.target.id === 'transition-student-btn' || m.target.querySelector?.('#transition-student-btn')) {
+                const btn = document.getElementById('transition-student-btn');
+                if (btn && btn.style.backgroundColor !== FORCE_COLOR) {
+                    btn.style.backgroundColor = FORCE_COLOR;
+                    btn.style.color = 'white';
+                }
+            }
+        });
+    });
+    styleObserver.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['style', 'class'] });
 })();
 
 // ======================================================
@@ -10278,6 +10308,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
