@@ -1,5 +1,3 @@
-[file name]: admin.js
-[file content begin]
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc, setDoc, deleteDoc, orderBy, writeBatch, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -2904,4 +2902,3 @@ if (document.readyState === 'loading') {
 // ========================================================
 // END OF SAFE INITIALIZATION SCRIPT
 // ========================================================
-[file content end]
