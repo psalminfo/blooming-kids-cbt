@@ -5307,9 +5307,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 /*******************************************************************************
  * SECTION 16: GOOGLE CLASSROOM GRADING INTERFACE (FINAL)
+ * UPDATES:
+ *   - Fixed "Cannot read properties of undefined (reading 'seconds')" error.
+ *   - Inbox now auto‑clears on the 4th day of the month – tutors only see
+ *     submissions from the current month that are on/after the 4th.
  ******************************************************************************/
 
-// 1. INJECT GRADING STYLES
+// ==========================================
+// 1. INJECT GRADING STYLES (unchanged)
+// ==========================================
 (function injectGradingStyles() {
     if(document.getElementById('gc-grading-styles')) return;
     const style = document.createElement('style');
@@ -5352,7 +5358,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.head.appendChild(style);
 })();
 
-// 2. LOGIC: FETCH HOMEWORK INBOX
+// ==========================================
+// 2. HELPER: Homework Cutoff Date (4th of current month)
+// ==========================================
+/**
+ * Returns the cutoff date: 4th day of current month at 00:00:00.
+ * Submissions BEFORE this date are hidden from the inbox.
+ */
+function getHomeworkCutoffDate() {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 4, 0, 0, 0);
+}
+
+// ==========================================
+// 3. LOAD HOMEWORK INBOX (with auto‑clear & safe date handling)
+// ==========================================
 async function loadHomeworkInbox(tutorEmail) {
     const container = document.getElementById('homework-inbox-container');
     if (!container) return;
@@ -5360,38 +5380,64 @@ async function loadHomeworkInbox(tutorEmail) {
 
     try {
         // Query by Tutor Name OR Email to be safe
-        let q = query(collection(db, "homework_assignments"), 
-            where("tutorName", "==", window.tutorData.name), 
-            where("status", "==", "submitted"));
-            
+        let q = query(
+            collection(db, "homework_assignments"),
+            where("tutorName", "==", window.tutorData.name),
+            where("status", "==", "submitted")
+        );
         let snapshot = await getDocs(q);
-        
-        if (snapshot.empty) {
-             // Fallback query using email
-             q = query(collection(db, "homework_assignments"), 
-                where("tutorEmail", "==", tutorEmail), 
-                where("status", "==", "submitted"));
-             snapshot = await getDocs(q);
-        }
 
         if (snapshot.empty) {
-            container.innerHTML = `<div class="text-center py-6"><div class="text-3xl mb-2">🎉</div><p class="text-gray-500 text-sm">No pending homework!</p></div>`;
+            // Fallback query using email
+            q = query(
+                collection(db, "homework_assignments"),
+                where("tutorEmail", "==", tutorEmail),
+                where("status", "==", "submitted")
+            );
+            snapshot = await getDocs(q);
+        }
+
+        // ---------- AUTO‑CLEAR LOGIC (4th day of month) ----------
+        const cutoffDate = getHomeworkCutoffDate();
+        const visibleSubmissions = snapshot.docs.filter(doc => {
+            const data = doc.data();
+            const submitted = data.submittedAt;
+            if (!submitted || typeof submitted.seconds !== 'number') return false;
+            const submittedDate = new Date(submitted.seconds * 1000);
+            return submittedDate >= cutoffDate;
+        });
+        // ---------------------------------------------------------
+
+        if (visibleSubmissions.length === 0) {
+            container.innerHTML = `<div class="text-center py-6">
+                <div class="text-3xl mb-2">🎉</div>
+                <p class="text-gray-500 text-sm">No pending homework from this month.</p>
+            </div>`;
             return;
         }
 
         let html = '<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">';
-        snapshot.forEach(doc => {
+        visibleSubmissions.forEach(doc => {
             const data = doc.data();
-            const date = data.submittedAt ? new Date(data.submittedAt.seconds * 1000).toLocaleDateString() : 'Unknown';
-            const isLate = data.dueDate && new Date(data.dueDate) < new Date(data.submittedAt.seconds * 1000);
             
+            // ✅ SAFE date formatting
+            const submitted = data.submittedAt;
+            let date = 'Unknown';
+            if (submitted && typeof submitted.seconds === 'number') {
+                date = new Date(submitted.seconds * 1000).toLocaleDateString();
+            }
+
+            const isLate = data.dueDate && new Date(data.dueDate) < new Date(submitted?.seconds * 1000 || 0);
+
             html += `
                 <div class="gc-inbox-item" onclick="openGradingModal('${doc.id}')">
                     <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">${data.studentName.charAt(0)}</div>
+                        <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                            ${data.studentName?.charAt(0) || '?'}
+                        </div>
                         <div>
-                            <div class="font-medium text-gray-800">${data.studentName}</div>
-                            <div class="text-xs text-gray-500">${data.title}</div>
+                            <div class="font-medium text-gray-800">${data.studentName || 'Unknown'}</div>
+                            <div class="text-xs text-gray-500">${data.title || 'Untitled'}</div>
                         </div>
                     </div>
                     <div class="text-right">
@@ -5411,7 +5457,9 @@ async function loadHomeworkInbox(tutorEmail) {
     }
 }
 
-// 3. LOGIC: OPEN GRADING MODAL
+// ==========================================
+// 4. OPEN GRADING MODAL (unchanged – safe)
+// ==========================================
 async function openGradingModal(homeworkId) {
     let hwData;
     try {
@@ -5497,7 +5545,9 @@ async function openGradingModal(homeworkId) {
     };
 }
 
-// 4. DASHBOARD WIDGET INJECTOR
+// ==========================================
+// 5. DASHBOARD WIDGET INJECTOR (unchanged)
+// ==========================================
 const inboxObserver = new MutationObserver(() => {
     const hero = document.querySelector('.hero-section');
     if (hero && !document.getElementById('homework-inbox-section')) {
@@ -5516,9 +5566,13 @@ const inboxObserver = new MutationObserver(() => {
     }
 });
 inboxObserver.observe(document.body, { childList: true, subtree: true });
-// EXPOSE FUNCTIONS TO WINDOW (REQUIRED FOR HTML ONCLICK)
+
+// ==========================================
+// 6. EXPOSE FUNCTIONS TO WINDOW (for onclick handlers)
+// ==========================================
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
+
 
 
 
