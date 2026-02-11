@@ -1003,6 +1003,7 @@ function calculateTransitioningStatus(student) {
     const now = new Date();
     const daysLeft = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
     
+    // Calculate total transitioning days
     const startDate = new Date(student.transitionStartDate || student.updatedAt);
     const totalDays = Math.ceil((now - startDate) / (1000 * 60 * 60 * 24));
     
@@ -1014,6 +1015,7 @@ function calculateTransitioningStatus(student) {
     };
 }
 
+// Define getStudentCategory function early to fix hoisting issue
 function getStudentCategory(s) {
     if (!s) return 'unknown';
     if (s.isTransitioning) return 'transitioning';
@@ -1033,6 +1035,7 @@ function searchStudentFromFirebase(student, searchTerm, tutors = []) {
     
     const searchLower = safeToString(searchTerm).toLowerCase();
     
+    // Enhanced status search
     const transitioningStatus = calculateTransitioningStatus(student);
     if (searchLower === 'break' && student.summerBreak === true) return true;
     if (searchLower === 'transitioning' && transitioningStatus.isTransitioning) return true;
@@ -1097,6 +1100,7 @@ function createSearchableSelect(options, placeholder = "Select...", id = '', isT
                    placeholder="Type to search ${isTutor ? 'tutor' : 'student'}..." 
                    class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                    autocomplete="off">
+            <!-- NO required attribute on hidden select to avoid form validation errors -->
             <select id="${id}" 
                     class="hidden">
                 <option value="">${placeholder}</option>
@@ -1141,6 +1145,7 @@ function initializeSearchableSelect(selectId) {
     
     if (!searchInput || !dropdown || !hiddenSelect) return;
     
+    // Clear and show dropdown on focus
     searchInput.addEventListener('focus', () => {
         dropdown.classList.remove('hidden');
         searchInput.value = '';
@@ -1182,6 +1187,7 @@ function initializeSearchableSelect(selectId) {
             searchInput.value = employment ? `${label} (${calculateEmploymentDuration(employment)})` : label;
             hiddenSelect.value = value;
             
+            // Trigger change event
             const event = new Event('change');
             hiddenSelect.dispatchEvent(event);
             
@@ -1289,6 +1295,7 @@ async function renderManagementTutorView(container) {
     `;
     
     try {
+        // Event Listeners
         document.getElementById('assign-student-btn').addEventListener('click', () => {
             if (typeof showAssignNewStudentModal === 'function') {
                 showAssignNewStudentModal();
@@ -1307,7 +1314,7 @@ async function renderManagementTutorView(container) {
         });
         
         document.getElementById('view-student-history-btn').addEventListener('click', async () => {
-            const students = getCleanStudents();
+            const students = sessionCache.students || [];
             
             const modalHtml = `
                 <div id="select-student-history-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
@@ -1354,6 +1361,7 @@ async function renderManagementTutorView(container) {
         });
     } catch (e) { 
         console.error("Error setting up event listeners:", e);
+        alert("Error setting up directory. Please refresh the page.");
     }
     
     fetchAndRenderDirectory();
@@ -1504,14 +1512,12 @@ async function extendTransition(student, newEndDate) {
         const userEmail = window.userData?.email || 'admin@system';
         const timestamp = new Date().toISOString();
         
-        // Update student record
         await updateDoc(doc(db, "students", student.id), {
             transitionEndDate: newEndDate,
             updatedAt: timestamp,
             updatedBy: user
         });
         
-        // Record in history
         await recordStudentHistory(student.id, 'transition_extended', {
             studentName: student.studentName,
             previousEndDate: student.transitionEndDate,
@@ -1535,7 +1541,6 @@ async function endTransitionEarly(student) {
         const userEmail = window.userData?.email || 'admin@system';
         const timestamp = new Date().toISOString();
         
-        // Update student record - revert to original tutor
         await updateDoc(doc(db, "students", student.id), {
             tutorEmail: student.originalTutorEmail,
             tutorName: student.originalTutorName,
@@ -1550,7 +1555,6 @@ async function endTransitionEarly(student) {
             updatedBy: user
         });
         
-        // Update transition record
         const transitionsQuery = query(
             collection(db, "tutorTransitions"),
             where("studentId", "==", student.id),
@@ -1565,8 +1569,7 @@ async function endTransitionEarly(student) {
             });
         });
         
-        // Record in history
-        await recordStudentHistory(student.id, 'transition_ended', {
+        await recordStudentHistory(student.id, 'transition_end', {
             studentName: student.studentName,
             originalTutor: student.originalTutorName,
             temporaryTutor: student.tutorName,
@@ -1589,7 +1592,6 @@ async function makeTransitionPermanent(student) {
         const userEmail = window.userData?.email || 'admin@system';
         const timestamp = new Date().toISOString();
         
-        // Update student record - make current tutor permanent
         await updateDoc(doc(db, "students", student.id), {
             isTransitioning: false,
             transitionEndDate: null,
@@ -1602,7 +1604,6 @@ async function makeTransitionPermanent(student) {
             updatedBy: user
         });
         
-        // Update transition record
         const transitionsQuery = query(
             collection(db, "tutorTransitions"),
             where("studentId", "==", student.id),
@@ -1617,7 +1618,6 @@ async function makeTransitionPermanent(student) {
             });
         });
         
-        // Create reassignment record
         await addDoc(collection(db, "tutorAssignments"), {
             studentId: student.id,
             studentName: student.studentName,
@@ -1632,7 +1632,6 @@ async function makeTransitionPermanent(student) {
             timestamp: timestamp
         });
         
-        // Record in history
         await recordStudentHistory(student.id, 'transition_made_permanent', {
             studentName: student.studentName,
             newPermanentTutor: student.tutorName,
@@ -1762,11 +1761,13 @@ function showEnhancedTransitionStudentModal() {
         </div>
     `;
     
+    // Remove existing modal if any
     const existingModal = document.getElementById('transition-student-modal');
     if (existingModal) existingModal.remove();
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
+    // Set default end date to 2 weeks from now
     const endDateInput = document.getElementById('transition-end-date');
     const twoWeeksFromNow = new Date();
     twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
@@ -1779,6 +1780,7 @@ function showEnhancedTransitionStudentModal() {
         initializeSearchableSelect('transition-student');
         initializeSearchableSelect('transition-tutor');
         
+        // Show current tutor info when student selected
         document.getElementById('transition-student').addEventListener('change', function() {
             const studentId = this.value;
             const student = students.find(s => s.id === studentId);
@@ -1791,6 +1793,7 @@ function showEnhancedTransitionStudentModal() {
             }
         });
         
+        // Calculate duration when dates change
         function calculateDuration() {
             const startDate = document.getElementById('transition-start-date').value;
             const endDate = document.getElementById('transition-end-date').value;
@@ -1827,6 +1830,7 @@ function showEnhancedTransitionStudentModal() {
         document.getElementById('transition-start-date').addEventListener('change', calculateDuration);
         document.getElementById('transition-end-date').addEventListener('change', calculateDuration);
         
+        // Form submission
         document.getElementById('transition-student-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -1850,11 +1854,13 @@ function showEnhancedTransitionStudentModal() {
                 return;
             }
             
+            // Check if trying to transition to same tutor
             if (student.tutorEmail === tutorEmail) {
                 alert("Student is already with this tutor");
                 return;
             }
             
+            // Calculate days difference
             const start = new Date(startDate);
             const end = new Date(endDate);
             const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
@@ -1883,6 +1889,7 @@ async function performEnhancedTransition(student, newTutor, startDate, endDate, 
         const userEmail = window.userData?.email || 'admin@system';
         const timestamp = new Date().toISOString();
         
+        // 1. Update student record with transitioning info
         await updateDoc(doc(db, "students", student.id), {
             originalTutorEmail: student.tutorEmail,
             originalTutorName: student.tutorName,
@@ -1897,6 +1904,7 @@ async function performEnhancedTransition(student, newTutor, startDate, endDate, 
             updatedBy: user
         });
         
+        // 2. Create transition record
         await addDoc(collection(db, "tutorTransitions"), {
             studentId: student.id,
             studentName: student.studentName,
@@ -1914,6 +1922,7 @@ async function performEnhancedTransition(student, newTutor, startDate, endDate, 
             status: 'active'
         });
         
+        // 3. Record in student history
         await recordStudentHistory(student.id, 'transition_start', {
             studentName: student.studentName,
             fromTutor: student.tutorName,
@@ -1925,8 +1934,10 @@ async function performEnhancedTransition(student, newTutor, startDate, endDate, 
             allowReports: allowReporting
         }, user, userEmail);
         
+        // 4. Show success
         alert(`✅ ${student.studentName} is now transitioning to ${newTutor.name} until ${endDate}`);
         
+        // 5. Refresh and close
         setTimeout(() => {
             document.getElementById('transition-student-modal').remove();
             fetchAndRenderDirectory(true);
@@ -1971,6 +1982,7 @@ function showCreateGroupClassModal() {
                 
                 <form id="group-class-form">
                     <div class="grid grid-cols-2 gap-6">
+                        <!-- Left Column -->
                         <div>
                             <div class="mb-4">
                                 <label class="block text-sm font-medium mb-2 text-gray-700">Group Name *</label>
@@ -2013,6 +2025,7 @@ function showCreateGroupClassModal() {
                             </div>
                         </div>
                         
+                        <!-- Right Column -->
                         <div>
                             <div class="mb-4">
                                 <label class="block text-sm font-medium mb-2 text-gray-700">Select Students *</label>
@@ -2076,6 +2089,7 @@ function showCreateGroupClassModal() {
         </div>
     `;
     
+    // Remove existing modal if any
     const existingModal = document.getElementById('group-class-modal');
     if (existingModal) existingModal.remove();
     
@@ -2084,6 +2098,7 @@ function showCreateGroupClassModal() {
     setTimeout(() => {
         initializeSearchableSelect('group-tutor');
         
+        // Show fee input when student is selected
         document.querySelectorAll('.group-student-checkbox').forEach(checkbox => {
             checkbox.addEventListener('change', function() {
                 const feeInput = document.querySelector(`.group-fee-input[data-student-id="${this.value}"]`);
@@ -2107,10 +2122,12 @@ function showCreateGroupClassModal() {
             document.getElementById('total-group-fee').textContent = `₦${total.toFixed(2)}`;
         }
         
+        // Calculate total fee on fee input change
         document.querySelectorAll('.group-fee-input').forEach(input => {
             input.addEventListener('input', calculateTotalGroupFee);
         });
         
+        // Form submission
         document.getElementById('group-class-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -2132,6 +2149,7 @@ function showCreateGroupClassModal() {
                 return;
             }
             
+            // Validate all selected students have fees
             let allFeesValid = true;
             const studentFees = [];
             
@@ -2171,6 +2189,7 @@ async function createEnhancedGroupClass(groupName, tutor, subject, schedule, not
         const userEmail = window.userData?.email || 'admin@system';
         const timestamp = new Date().toISOString();
         
+        // 1. Create group document
         const groupRef = await addDoc(collection(db, "groupClasses"), {
             groupName: groupName,
             tutorEmail: tutor.email,
@@ -2187,12 +2206,14 @@ async function createEnhancedGroupClass(groupName, tutor, subject, schedule, not
         
         console.log("Group created with ID:", groupRef.id);
         
+        // 2. Update each student with group info and record history
         for (const sf of studentFees) {
             const studentDoc = await getDoc(doc(db, "students", sf.studentId));
             if (studentDoc.exists()) {
                 const studentData = studentDoc.data();
                 const currentGroups = studentData.groups || [];
                 
+                // Add to student's groups array
                 await updateDoc(doc(db, "students", sf.studentId), {
                     groups: [...currentGroups, {
                         groupId: groupRef.id,
@@ -2210,6 +2231,7 @@ async function createEnhancedGroupClass(groupName, tutor, subject, schedule, not
                     updatedBy: user
                 });
                 
+                // Create fee record for this student in the group
                 await addDoc(collection(db, "groupStudentFees"), {
                     groupId: groupRef.id,
                     groupName: groupName,
@@ -2220,6 +2242,7 @@ async function createEnhancedGroupClass(groupName, tutor, subject, schedule, not
                     createdBy: user
                 });
                 
+                // Record in student history
                 await recordStudentHistory(sf.studentId, 'group_enrollment', {
                     studentName: studentData.studentName,
                     groupName: groupName,
@@ -2232,8 +2255,10 @@ async function createEnhancedGroupClass(groupName, tutor, subject, schedule, not
             }
         }
         
+        // 3. Show success
         alert(`✅ Group "${groupName}" created successfully with ${studentFees.length} students!`);
         
+        // 4. Refresh and close
         setTimeout(() => {
             document.getElementById('group-class-modal').remove();
             fetchAndRenderDirectory(true);
@@ -2259,6 +2284,7 @@ function showEnhancedReassignStudentModal() {
     
     if (!validateReassignData(students, tutors)) return;
     
+    // Remove existing modal if any
     const existingModal = document.getElementById('reassign-student-modal');
     if (existingModal) existingModal.remove();
     
@@ -2377,6 +2403,7 @@ function showEnhancedReassignStudentModal() {
         initializeSearchableSelect('reassign-student');
         initializeSearchableSelect('reassign-tutor');
         
+        // Set default end date for transition
         const endDateInput = document.getElementById('transition-end-date-reassign');
         const twoWeeksFromNow = new Date();
         twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
@@ -2385,6 +2412,7 @@ function showEnhancedReassignStudentModal() {
             endDateInput.min = new Date().toISOString().split('T')[0];
         }
         
+        // Toggle between permanent and temporary reassignment
         const permanentBtn = document.getElementById('reassign-type-permanent');
         const temporaryBtn = document.getElementById('reassign-type-temporary');
         const permanentFields = document.getElementById('permanent-fields');
@@ -2416,6 +2444,7 @@ function showEnhancedReassignStudentModal() {
         permanentBtn.addEventListener('click', () => setActiveType(false));
         temporaryBtn.addEventListener('click', () => setActiveType(true));
         
+        // Student selection handler
         document.getElementById('reassign-student').addEventListener('change', function() {
             const studentId = this.value;
             const student = students.find(s => s.id === studentId);
@@ -2437,6 +2466,7 @@ function showEnhancedReassignStudentModal() {
             }
         });
         
+        // Tutor selection handler
         document.getElementById('reassign-tutor').addEventListener('change', function() {
             const tutorEmail = this.value;
             const tutor = tutors.find(t => t.email === tutorEmail);
@@ -2457,6 +2487,7 @@ function showEnhancedReassignStudentModal() {
             }
         });
         
+        // Form submission handler
         document.getElementById('reassign-student-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -2524,6 +2555,7 @@ async function performEnhancedReassignment(student, newTutor, reason, currentTut
         const user = window.userData?.name || 'Admin';
         const userEmail = window.userData?.email || 'admin@system';
         
+        // 1. Create assignment history record
         await addDoc(collection(db, "tutorAssignments"), {
             studentId: student.id, 
             studentName: student.studentName,
@@ -2538,6 +2570,7 @@ async function performEnhancedReassignment(student, newTutor, reason, currentTut
             timestamp: new Date().toISOString()
         });
         
+        // 2. Update student record
         await updateDoc(doc(db, "students", student.id), {
             tutorEmail: newTutor.email, 
             tutorName: newTutor.name,
@@ -2545,6 +2578,7 @@ async function performEnhancedReassignment(student, newTutor, reason, currentTut
             updatedBy: user
         });
         
+        // 3. Record in enhanced student history
         await recordStudentHistory(student.id, 'reassignment', {
             studentName: student.studentName,
             fromTutor: currentTutor?.name || 'Unassigned',
@@ -2553,8 +2587,10 @@ async function performEnhancedReassignment(student, newTutor, reason, currentTut
             type: 'permanent'
         }, user, userEmail);
         
+        // 4. Show success
         alert(`✅ Successfully reassigned ${student.studentName} to ${newTutor.name}!`);
         
+        // 5. Refresh and close
         setTimeout(() => { 
             document.getElementById('reassign-student-modal').remove(); 
             fetchAndRenderDirectory(true); 
@@ -2576,7 +2612,7 @@ async function performEnhancedReassignment(student, newTutor, reason, currentTut
 
 async function showEnhancedStudentHistory(studentId) {
     try {
-        const students = getCleanStudents();
+        const students = sessionCache.students || [];
         const student = students.find(s => s.id === studentId);
         
         if (!student) {
@@ -2584,6 +2620,7 @@ async function showEnhancedStudentHistory(studentId) {
             return;
         }
         
+        // Create modal
         const modalHtml = `
             <div id="enhanced-student-history-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
                 <div class="relative mx-auto my-8 p-6 bg-white rounded-lg shadow-xl max-w-4xl w-full">
@@ -2600,7 +2637,7 @@ async function showEnhancedStudentHistory(studentId) {
                         </div>
                     </div>
                     
-                    <div id="history-container" class="overflow-y-auto max-h-[70vh]">
+                    <div class="overflow-y-auto max-h-[70vh]">
                         <div class="text-center py-10 text-gray-500">
                             Loading history...
                         </div>
@@ -2611,6 +2648,7 @@ async function showEnhancedStudentHistory(studentId) {
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         
+        // Fetch history data
         const historyQuery = query(
             collection(db, "studentHistory"),
             where("studentId", "==", studentId),
@@ -2620,9 +2658,11 @@ async function showEnhancedStudentHistory(studentId) {
         const historySnapshot = await getDocs(historyQuery);
         const historyRecords = historySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
         
+        // Also fetch tutor assignments
         const tutorAssignments = sessionCache.tutorAssignments || {};
         const assignmentHistory = tutorAssignments[studentId] || [];
         
+        // Combine and sort all records by timestamp
         const allRecords = [
             ...historyRecords,
             ...assignmentHistory.map(a => ({
@@ -2640,7 +2680,8 @@ async function showEnhancedStudentHistory(studentId) {
             }))
         ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         
-        const historyContainer = document.getElementById('history-container');
+        // Update modal with history
+        const historyContainer = document.querySelector('#enhanced-student-history-modal .overflow-y-auto');
         if (historyContainer) {
             if (allRecords.length > 0) {
                 historyContainer.innerHTML = `
@@ -2687,8 +2728,6 @@ function getHistoryBorderColor(actionType) {
         'tutor_reassignment': 'border-blue-500',
         'transition_start': 'border-orange-500',
         'transition_end': 'border-green-500',
-        'transition_extended': 'border-yellow-500',
-        'transition_made_permanent': 'border-purple-500',
         'group_enrollment': 'border-indigo-500',
         'status_change': 'border-yellow-500',
         'fee_change': 'border-purple-500',
@@ -2703,8 +2742,6 @@ function getHistoryActionTitle(actionType) {
         'tutor_reassignment': '📋 Tutor Reassignment',
         'transition_start': '⏳ Transition Started',
         'transition_end': '✅ Transition Ended',
-        'transition_extended': '📅 Transition Extended',
-        'transition_made_permanent': '🔒 Made Permanent',
         'group_enrollment': '👥 Group Enrollment',
         'status_change': '🔄 Status Change',
         'fee_change': '💰 Fee Change',
@@ -2736,16 +2773,6 @@ function renderHistoryDetails(record) {
             return `
                 Returned to: <span class="font-medium">${details.originalTutor || 'Original tutor'}</span>
                 ${details.reason ? `<br>Reason: ${details.reason}` : ''}
-            `;
-        case 'transition_extended':
-            return `
-                Extended until: <span class="font-medium">${formatBadgeDate(details.newEndDate)}</span>
-                <br>Previous end date: ${formatBadgeDate(details.previousEndDate)}
-            `;
-        case 'transition_made_permanent':
-            return `
-                Made <span class="font-medium">${details.newPermanentTutor}</span> permanent tutor
-                <br>Previous tutor: ${details.previousTutor}
             `;
         case 'group_enrollment':
             return `
@@ -2796,6 +2823,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data...</p>`;
         }
         
+        // Fetch all data in parallel
         const [
             tutorsSnapshot, 
             studentsSnapshot, 
@@ -2815,10 +2843,12 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
         const allTutors = tutorsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
         const activeTutors = allTutors.filter(t => !t.status || t.status === 'active');
         
+        // Process students with enhanced fields
         const allStudents = studentsSnapshot.docs.map(doc => {
             const data = doc.data();
             const transitioningStatus = calculateTransitioningStatus(data);
             
+            // Use the getStudentCategory function
             const category = getStudentCategory({
                 ...data,
                 isTransitioning: transitioningStatus.isTransitioning,
@@ -2840,16 +2870,19 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             };
         });
         
+        // Filter out archived/deleted
         const nonArchivedStudents = allStudents.filter(s => {
             const st = (s.status || '').toLowerCase();
             return !st.includes('archived') && !st.includes('deleted');
         });
         
+        // Count students by category
         const activeStudents = nonArchivedStudents.filter(s => s.studentCategory === 'active');
         const breakStudents = nonArchivedStudents.filter(s => s.studentCategory === 'break');
         const transitioningStudents = nonArchivedStudents.filter(s => s.studentCategory === 'transitioning');
         const groupStudents = nonArchivedStudents.filter(s => s.studentCategory === 'group');
         
+        // Process assignments
         const tutorAssignments = {};
         tutorAssignmentsSnapshot.docs.forEach(doc => {
             const d = doc.data();
@@ -2859,14 +2892,18 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             }
         });
         
+        // Process transitions
         const activeTransitions = transitionsSnapshot.docs
             .map(doc => ({ ...doc.data(), id: doc.id }))
             .filter(t => t.status === 'active');
         
+        // Process groups
         const groupClasses = groupsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
         
+        // Calculate unique groups count
         const groupCount = new Set(nonArchivedStudents.filter(s => s.groupId).map(s => s.groupId)).size;
         
+        // Save to cache
         saveToLocalStorage('tutors', activeTutors);
         saveToLocalStorage('students', nonArchivedStudents);
         saveToLocalStorage('groupClasses', groupClasses);
@@ -2874,6 +2911,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
         sessionCache.tutorTransitions = activeTransitions;
         sessionCache._lastUpdate = Date.now();
         
+        // Update counters
         if (document.getElementById('tutor-count-badge')) {
             document.getElementById('tutor-count-badge').textContent = activeTutors.length;
         }
@@ -2913,8 +2951,8 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
 // ======================================================
 
 function renderEnhancedDirectoryFromCache(searchTerm = '') {
-    const tutors = getCleanTutors();
-    const students = getCleanStudents();
+    const tutors = sessionCache.tutors || [];
+    const students = sessionCache.students || [];
     const tutorAssignments = sessionCache.tutorAssignments || {};
     const directoryList = document.getElementById('directory-list');
     
@@ -2959,6 +2997,7 @@ function renderEnhancedDirectoryFromCache(searchTerm = '') {
             .filter(student => !searchTerm || searchStudentFromFirebase(student, searchTerm, tutors))
             .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
 
+        // Calculate counts by category using studentCategory
         const activeCount = assignedStudents.filter(s => s.studentCategory === 'active').length;
         const breakCount = assignedStudents.filter(s => s.studentCategory === 'break').length;
         const transCount = assignedStudents.filter(s => s.studentCategory === 'transitioning').length;
@@ -3076,6 +3115,7 @@ function renderEnhancedDirectoryFromCache(searchTerm = '') {
             </div>`;
     }).join('');
 
+    // Reattach event listeners
     if (canEditStudents) {
         document.querySelectorAll('.edit-student-btn').forEach(b => {
             b.addEventListener('click', (e) => {
@@ -3157,13 +3197,10 @@ window.showCreateGroupClassModal = showCreateGroupClassModal;
 window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
 window.showEnhancedStudentHistory = showEnhancedStudentHistory;
 window.showManageTransitionModal = showManageTransitionModal;
-window.renderManagementTutorView = renderManagementTutorView;
-window.fetchAndRenderDirectory = fetchAndRenderDirectory;
 
 // Update existing function references
 window.showTransitionStudentModal = showEnhancedTransitionStudentModal;
 window.viewStudentTutorHistory = showEnhancedStudentHistory;
-
 
 // ======================================================
 // SUBSECTION 3.2: Inactive Tutors Panel
@@ -10421,6 +10458,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
