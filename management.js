@@ -1464,6 +1464,80 @@ window.closeManagementModal = (id) => { const m = document.getElementById(id); i
 // Explicitly expose safe history viewer if needed by other parts
 window.viewStudentTutorHistory = renderHistoryModal;
 
+// ======================================================
+// SAFE FIX: Force All Orange Buttons (No Recursion, No Hang)
+// ======================================================
+(function safeFixOrangeButtons() {
+    const ORANGE = '#ea580c';
+    const ORANGE_HOVER = '#c2410c';
+
+    // Apply inline styles to a button – safe to call multiple times
+    function fixButton(btn) {
+        if (!btn || btn.dataset.fixed === 'true') return;
+        btn.style.backgroundColor = ORANGE;
+        btn.style.color = 'white';
+        btn.style.padding = '0.5rem 1rem';
+        btn.style.borderRadius = '0.25rem';
+        btn.style.border = 'none';
+        btn.style.cursor = 'pointer';
+        btn.onmouseenter = () => btn.style.backgroundColor = ORANGE_HOVER;
+        btn.onmouseleave = () => btn.style.backgroundColor = ORANGE;
+        btn.dataset.fixed = 'true'; // mark as fixed to avoid repeated work
+    }
+
+    // List of button IDs that need fixing
+    const BUTTON_IDS = [
+        'transition-submit-btn',
+        'reassign-submit-btn',
+        'manage-transition-submit'
+    ];
+
+    // Fix buttons that already exist
+    BUTTON_IDS.forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) fixButton(btn);
+    });
+
+    // One-time observer – watches only for new buttons being added
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach(mutation => {
+            mutation.addedNodes.forEach(node => {
+                if (node.nodeType === 1) { // element
+                    BUTTON_IDS.forEach(id => {
+                        // Direct match
+                        if (node.id === id) fixButton(node);
+                        // Search inside added node
+                        const btn = node.querySelector?.('#' + id);
+                        if (btn) fixButton(btn);
+                    });
+                }
+            });
+        });
+    });
+
+    // Start observing – only childList, no attributes, no subtree if not needed
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Also patch the modal functions to apply fix right after they insert HTML
+    const patchModalFunction = (funcName, buttonId) => {
+        const original = window[funcName];
+        if (typeof original === 'function') {
+            window[funcName] = function(...args) {
+                const result = original.apply(this, args);
+                setTimeout(() => {
+                    const btn = document.getElementById(buttonId);
+                    if (btn) fixButton(btn);
+                }, 50); // slight delay to ensure modal is rendered
+                return result;
+            };
+        }
+    };
+
+    patchModalFunction('showTransitionStudentModal', 'transition-submit-btn');
+    patchModalFunction('showEnhancedReassignStudentModal', 'reassign-submit-btn');
+    patchModalFunction('showManageTransitionModal', 'manage-transition-submit');
+})();
+
 
 // ======================================================
 // SUBSECTION 3.2: Inactive Tutors Panel
@@ -8538,6 +8612,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
