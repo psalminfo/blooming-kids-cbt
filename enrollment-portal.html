@@ -4283,80 +4283,120 @@
             }
              });
         </script>
- <!-- ============================================================================
-     ENROLLMENT-TO-PORTAL AUTO-SIGNUP – COMPLETE FIXED VERSION
+<!-- ============================================================================
+     ENROLLMENT-TO-PORTAL AUTO-SIGNUP – WITH ENVIRONMENT DETECTION
      ============================================================================ -->
 <script>
 // ============================================================================
-// 🚀 ENROLLMENT-TO-PORTAL AUTO-SIGNUP – ALL ERRORS FIXED
+// 🚀 ENROLLMENT-TO-PORTAL AUTO-SIGNUP – ENVIRONMENT AWARE
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// 1. GITHUB BRANCH DETECTION – FIXED TO WORK WITH ALL URL FORMATS
+// 1. ENVIRONMENT DETECTION – Netlify, GitHub, Local, Custom
 // ----------------------------------------------------------------------------
-(function detectGitHubBranch() {
+(function detectEnvironment() {
     try {
-        // Check if we're on GitHub
-        if (window.location.hostname.includes('github')) {
-            console.log('🌿 GitHub environment detected');
-            
-            // Try multiple methods to get branch name
-            let branch = null;
-            
-            // Method 1: From raw URL path
-            if (window.location.pathname.includes('/raw/')) {
-                const parts = window.location.pathname.split('/raw/');
-                if (parts.length > 1) {
-                    branch = parts[1].split('/')[0];
+        const hostname = window.location.hostname;
+        const url = window.location.href;
+        
+        // Store environment info globally
+        window.__BKH_ENV = {
+            hostname: hostname,
+            url: url,
+            isNetlify: hostname.includes('netlify.app'),
+            isGitHub: hostname.includes('github') || url.includes('raw.githubusercontent'),
+            isLocal: hostname === 'localhost' || hostname === '127.0.0.1',
+            isCustom: !hostname.includes('netlify.app') && !hostname.includes('github') && hostname !== 'localhost' && hostname !== '127.0.0.1',
+            branch: 'main' // default
+        };
+
+        // Detect Netlify branch from URL
+        if (window.__BKH_ENV.isNetlify) {
+            // Netlify deploy previews have branch in URL
+            if (url.includes('deploy-preview-')) {
+                const previewMatch = url.match(/deploy-preview-(\d+)/);
+                if (previewMatch) {
+                    window.__BKH_ENV.branch = `deploy-preview-${previewMatch[1]}`;
+                }
+            } else if (url.includes('--')) {
+                // Netlify branch subdomains: branch--site.netlify.app
+                const branchMatch = hostname.match(/^([^\.]+)--/);
+                if (branchMatch) {
+                    window.__BKH_ENV.branch = branchMatch[1];
                 }
             }
-            
-            // Method 2: From blob URL
-            if (!branch && window.location.pathname.includes('/blob/')) {
-                const parts = window.location.pathname.split('/blob/');
+            console.log('🌿 Netlify detected, branch:', window.__BKH_ENV.branch);
+        }
+        // Detect GitHub branch
+        else if (window.__BKH_ENV.isGitHub) {
+            if (url.includes('/raw/')) {
+                const parts = url.split('/raw/');
                 if (parts.length > 1) {
-                    branch = parts[1].split('/')[0];
+                    window.__BKH_ENV.branch = parts[1].split('/')[0];
+                }
+            } else if (url.includes('/blob/')) {
+                const parts = url.split('/blob/');
+                if (parts.length > 1) {
+                    window.__BKH_ENV.branch = parts[1].split('/')[0];
                 }
             }
-            
-            // Method 3: From query parameter
-            if (!branch) {
-                const urlParams = new URLSearchParams(window.location.search);
-                branch = urlParams.get('branch');
-            }
-            
-            // Default to main if no branch detected
-            branch = branch || 'main';
-            
-            console.log('🌿 Detected GitHub branch:', branch);
-            window.__BKH_BRANCH = branch;
-            
-            // Override config loader with branch
-            if (typeof window.loadFirebaseConfig === 'function') {
-                const originalLoad = window.loadFirebaseConfig;
-                window.loadFirebaseConfig = async function() {
-                    try {
-                        const url = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/${branch}/firebaseConfig.js`;
-                        console.log('📥 Loading Firebase config from:', url);
-                        const response = await fetch(url);
-                        const configText = await response.text();
-                        const configMatch = configText.match(/firebaseConfig\s*=\s*({[\s\S]*?});/);
-                        if (configMatch && configMatch[1]) {
-                            const config = eval('(' + configMatch[1] + ')');
-                            window.firebaseConfig = config;
-                            return config;
+            console.log('🌿 GitHub detected, branch:', window.__BKH_ENV.branch);
+        }
+        // Local development
+        else if (window.__BKH_ENV.isLocal) {
+            window.__BKH_ENV.branch = 'local';
+            console.log('🌿 Local development detected');
+        }
+        // Custom domain
+        else {
+            window.__BKH_ENV.branch = 'production';
+            console.log('🌿 Custom domain detected:', hostname);
+        }
+
+        // Override Firebase config loader with environment
+        if (typeof window.loadFirebaseConfig === 'function') {
+            const originalLoad = window.loadFirebaseConfig;
+            window.loadFirebaseConfig = async function() {
+                try {
+                    let config;
+                    
+                    // For Netlify and custom domains, try to load from current origin first
+                    if (window.__BKH_ENV.isNetlify || window.__BKH_ENV.isCustom) {
+                        try {
+                            const response = await fetch('/firebaseConfig.js');
+                            const configText = await response.text();
+                            const configMatch = configText.match(/firebaseConfig\s*=\s*({[\s\S]*?});/);
+                            if (configMatch && configMatch[1]) {
+                                config = eval('(' + configMatch[1] + ')');
+                                window.firebaseConfig = config;
+                                return config;
+                            }
+                        } catch (e) {
+                            console.log('📥 Local config not found, trying GitHub...');
                         }
-                    } catch (e) {
-                        console.warn('Branch config failed, using main', e);
-                        return originalLoad();
                     }
-                };
-            }
-        } else {
-            console.log('🌿 Not on GitHub, using default config');
+                    
+                    // Fallback to GitHub with detected branch
+                    const branch = window.__BKH_ENV.branch === 'production' ? 'main' : window.__BKH_ENV.branch;
+                    const url = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/${branch}/firebaseConfig.js`;
+                    console.log('📥 Loading Firebase config from:', url);
+                    
+                    const response = await fetch(url);
+                    const configText = await response.text();
+                    const configMatch = configText.match(/firebaseConfig\s*=\s*({[\s\S]*?});/);
+                    if (configMatch && configMatch[1]) {
+                        config = eval('(' + configMatch[1] + ')');
+                        window.firebaseConfig = config;
+                        return config;
+                    }
+                } catch (e) {
+                    console.warn('Config load failed, using fallback', e);
+                    return originalLoad();
+                }
+            };
         }
     } catch (e) {
-        console.warn('Branch detection error:', e);
+        console.warn('Environment detection error:', e);
     }
 })();
 
@@ -4585,7 +4625,8 @@ if (typeof EnrollmentApp !== 'undefined' && EnrollmentApp.prototype) {
             parentEmail: email,
             status: 'pending',
             createdAt: new Date().toISOString(),
-            source: 'enrollment-portal'
+            source: 'enrollment-portal',
+            environment: window.__BKH_ENV || { hostname: window.location.hostname }
         };
         
         if (this.db) {
@@ -4625,6 +4666,7 @@ if (typeof EnrollmentApp !== 'undefined' && EnrollmentApp.prototype) {
     // --- Open Parent Portal ---
     EnrollmentApp.prototype.openParentPortal = function() {
         try {
+            // Use relative path - works in all environments
             window.open('parent.html', '_blank');
         } catch (e) {
             console.warn('Could not open parent portal:', e);
@@ -4724,7 +4766,7 @@ if (typeof EnrollmentApp !== 'undefined' && EnrollmentApp.prototype) {
     };
 
     console.log('✅ ENROLLMENT-TO-PORTAL AUTO-SIGNUP INSTALLED SUCCESSFULLY');
-    console.log('🌿 Branch detection: ' + (window.__BKH_BRANCH || 'main'));
+    console.log('🌿 Environment:', window.__BKH_ENV || { hostname: window.location.hostname });
     console.log('✅ preloadStudentSelections: FIXED');
     console.log('👉 All errors prevented');
 }
