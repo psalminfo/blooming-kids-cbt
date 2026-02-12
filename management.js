@@ -1465,76 +1465,80 @@ window.closeManagementModal = (id) => { const m = document.getElementById(id); i
 window.viewStudentTutorHistory = renderHistoryModal;
 
 // ======================================================
-// ULTIMATE FIX: Force ALL Transition Buttons to Show
+// PERMANENT FIX: Force Orange Buttons to Show (No Observers)
 // ======================================================
-(function forceAllOrangeButtons() {
-    const ORANGE = '#ea580c';  // bg-orange-600
-    const ORANGE_HOVER = '#c2410c'; // bg-orange-700
-    const BLUE = '#2563eb';    // bg-blue-600
-    const BLUE_HOVER = '#1d4ed8'; // bg-blue-700
+(function patchModalFunctions() {
+    const ORANGE = '#ea580c';
+    const ORANGE_HOVER = '#c2410c';
 
-    function forceButtonStyle(btn, bgColor, hoverColor) {
+    // Style applicator – sets inline styles and hover effect
+    function makeButtonOrange(btn) {
         if (!btn) return;
-        // Remove problematic classes
-        btn.classList.remove('bg-orange-300', 'bg-gray-200', 'text-gray-700');
-        // Add safe classes (optional)
-        btn.classList.add('text-white', 'px-4', 'py-2', 'rounded', 'z-10');
-        // FORCE inline styles (guaranteed)
-        btn.style.backgroundColor = bgColor;
+        btn.style.backgroundColor = ORANGE;
         btn.style.color = 'white';
         btn.style.padding = '0.5rem 1rem';
         btn.style.borderRadius = '0.25rem';
         btn.style.border = 'none';
         btn.style.cursor = 'pointer';
-        // Hover effect
-        btn.onmouseenter = () => btn.style.backgroundColor = hoverColor;
-        btn.onmouseleave = () => btn.style.backgroundColor = bgColor;
+        btn.onmouseenter = () => btn.style.backgroundColor = ORANGE_HOVER;
+        btn.onmouseleave = () => btn.style.backgroundColor = ORANGE;
+        btn.dataset.fixed = 'true';
     }
 
-    function fixAllButtons() {
-        // 1. Start Transition button (Transition modal)
-        const startBtn = document.getElementById('transition-submit-btn');
-        if (startBtn) forceButtonStyle(startBtn, ORANGE, ORANGE_HOVER);
-
-        // 2. Confirm Transition button (Reassign modal – when in temporary mode)
-        const confirmBtn = document.getElementById('reassign-submit-btn');
-        if (confirmBtn && confirmBtn.textContent.includes('Confirm Transition')) {
-            forceButtonStyle(confirmBtn, ORANGE, ORANGE_HOVER);
-        }
-
-        // 3. Apply Changes button (Manage Transition modal)
-        const manageBtn = document.getElementById('manage-transition-submit');
-        if (manageBtn) forceButtonStyle(manageBtn, ORANGE, ORANGE_HOVER);
-
-        // 4. Any other button with orange background classes
-        document.querySelectorAll('button.bg-orange-600, button.bg-orange-500, button[id*="transition"], button[id*="Transition"]')
-            .forEach(btn => forceButtonStyle(btn, ORANGE, ORANGE_HOVER));
+    // Patch showTransitionStudentModal
+    const originalTransition = window.showTransitionStudentModal;
+    if (typeof originalTransition === 'function') {
+        window.showTransitionStudentModal = function(...args) {
+            const result = originalTransition.apply(this, args);
+            setTimeout(() => {
+                const btn = document.getElementById('transition-submit-btn');
+                if (btn && !btn.dataset.fixed) makeButtonOrange(btn);
+            }, 50);
+            return result;
+        };
+        console.log('✅ Patched: showTransitionStudentModal');
     }
 
-    // Run immediately and after each DOM change
-    fixAllButtons();
-    const observer = new MutationObserver(fixAllButtons);
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    // Also watch for class/style changes that might override
-    const styleObserver = new MutationObserver((mutations) => {
-        mutations.forEach((m) => {
-            const btn = m.target;
-            if (btn.nodeType === 1 && btn.tagName === 'BUTTON') {
-                if (btn.id === 'transition-submit-btn' || 
-                    btn.id === 'reassign-submit-btn' || 
-                    btn.id === 'manage-transition-submit' ||
-                    btn.textContent.includes('Transition') ||
-                    btn.textContent.includes('Start') ||
-                    btn.textContent.includes('Confirm')) {
-                    if (btn.style.backgroundColor !== ORANGE && btn.style.backgroundColor !== BLUE) {
-                        forceButtonStyle(btn, ORANGE, ORANGE_HOVER);
+    // Patch showEnhancedReassignStudentModal
+    const originalReassign = window.showEnhancedReassignStudentModal;
+    if (typeof originalReassign === 'function') {
+        window.showEnhancedReassignStudentModal = function(...args) {
+            const result = originalReassign.apply(this, args);
+            setTimeout(() => {
+                // Button might be either "Confirm Reassignment" or "Confirm Transition"
+                const btn = document.getElementById('reassign-submit-btn');
+                if (btn && !btn.dataset.fixed) {
+                    // Force orange only if the button text indicates "Transition"
+                    if (btn.textContent.includes('Confirm Transition')) {
+                        makeButtonOrange(btn);
+                    } else {
+                        // For permanent reassignment, keep blue (we don't touch it)
+                        btn.style.backgroundColor = '#2563eb'; // blue-600
+                        btn.style.color = 'white';
+                        btn.onmouseenter = () => btn.style.backgroundColor = '#1d4ed8';
+                        btn.onmouseleave = () => btn.style.backgroundColor = '#2563eb';
+                        btn.dataset.fixed = 'true';
                     }
                 }
-            }
-        });
-    });
-    styleObserver.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['style', 'class'] });
+            }, 50);
+            return result;
+        };
+        console.log('✅ Patched: showEnhancedReassignStudentModal');
+    }
+
+    // Patch showManageTransitionModal
+    const originalManage = window.showManageTransitionModal;
+    if (typeof originalManage === 'function') {
+        window.showManageTransitionModal = function(...args) {
+            const result = originalManage.apply(this, args);
+            setTimeout(() => {
+                const btn = document.getElementById('manage-transition-submit');
+                if (btn && !btn.dataset.fixed) makeButtonOrange(btn);
+            }, 50);
+            return result;
+        };
+        console.log('✅ Patched: showManageTransitionModal');
+    }
 })();
 
 // ======================================================
@@ -8610,6 +8614,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
