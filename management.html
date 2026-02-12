@@ -1106,5 +1106,119 @@
     </main>
     
     <script type="module" src="management.js"></script>
+    <!-- EMERGENCY BUTTON FIX - ALWAYS WORKS -->
+<style>
+    /* Force ALL buttons with these classes to be visible */
+    button.bg-orange-600,
+    button[id*="transition"],
+    button[id*="submit"],
+    button[id*="reassign"] {
+        background-color: #ea580c !important;
+        color: white !important;
+        border: none !important;
+    }
+    
+    /* Specific overrides for each button ID */
+    #transition-submit-btn,
+    #reassign-submit-btn,
+    #manage-transition-submit {
+        background-color: #ea580c !important;
+        color: white !important;
+        border: none !important;
+        padding: 0.5rem 1rem !important;
+        border-radius: 0.25rem !important;
+    }
+    
+    /* Blue buttons - keep them blue */
+    #assign-student-btn,
+    #create-group-class-btn,
+    #reassign-student-btn:not([style*="orange"]) {
+        background-color: #2563eb !important;
+        color: white !important;
+    }
+    
+    /* Green buttons */
+    #assign-student-btn {
+        background-color: #16a34a !important;
+    }
+    
+    /* Hover effects */
+    #transition-submit-btn:hover,
+    #reassign-submit-btn:hover,
+    #manage-transition-submit:hover {
+        background-color: #c2410c !important;
+    }
+</style>
+
+<script>
+// EMERGENCY FIX - RUNS EVERY TIME A MODAL OPENS
+(function emergencyButtonFix() {
+    // Colors
+    const ORANGE = '#ea580c';
+    const ORANGE_HOVER = '#c2410c';
+    const BLUE = '#2563eb';
+    const BLUE_HOVER = '#1d4ed8';
+    const GREEN = '#16a34a';
+    const GREEN_HOVER = '#15803d';
+    
+    // Function to fix any button
+    function fixButton(btn) {
+        if (!btn) return;
+        
+        // Orange buttons (transition related)
+        if (btn.id === 'transition-submit-btn' || 
+            btn.id === 'reassign-submit-btn' || 
+            btn.id === 'manage-transition-submit' ||
+            btn.textContent.includes('Start Transition') ||
+            btn.textContent.includes('Confirm Transition') ||
+            btn.textContent.includes('Apply Changes')) {
+            
+            btn.style.setProperty('background-color', ORANGE, 'important');
+            btn.style.setProperty('color', 'white', 'important');
+            btn.style.setProperty('border', 'none', 'important');
+            btn.style.setProperty('padding', '0.5rem 1rem', 'important');
+            btn.style.setProperty('border-radius', '0.25rem', 'important');
+            
+            // Hover
+            btn.onmouseenter = () => btn.style.setProperty('background-color', ORANGE_HOVER, 'important');
+            btn.onmouseleave = () => btn.style.setProperty('background-color', ORANGE, 'important');
+            
+            console.log('✅ Fixed orange button:', btn.id || btn.textContent.trim());
+        }
+        
+        // Blue buttons (reassign permanent)
+        if (btn.id === 'reassign-student-btn' && btn.textContent.includes('Confirm Reassignment')) {
+            btn.style.setProperty('background-color', BLUE, 'important');
+            btn.style.setProperty('color', 'white', 'important');
+            btn.onmouseenter = () => btn.style.setProperty('background-color', BLUE_HOVER, 'important');
+            btn.onmouseleave = () => btn.style.setProperty('background-color', BLUE, 'important');
+        }
+    }
+    
+    // Fix buttons that already exist
+    document.querySelectorAll('button').forEach(fixButton);
+    
+    // Watch for new buttons (modals opening)
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            mutation.addedNodes.forEach(function(node) {
+                if (node.nodeType === 1) { // Element
+                    if (node.tagName === 'BUTTON') {
+                        fixButton(node);
+                    }
+                    // Check inside the added node for buttons
+                    node.querySelectorAll && node.querySelectorAll('button').forEach(fixButton);
+                }
+            });
+        });
+    });
+    
+    // Start observing
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    console.log('🚀 Emergency button fix activated - all buttons will now be visible!');
+})();
+</script>
 </body>
 </html>
+
