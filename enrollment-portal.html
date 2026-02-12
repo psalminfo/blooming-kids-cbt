@@ -4281,6 +4281,334 @@
                 // Initialize with empty config (will use localStorage)
                 window.enrollmentApp = new EnrollmentApp();
             }
+            // ============================================================================
+// 🚀 NEW: ENROLLMENT-TO-PORTAL AUTO-SIGNUP & BRANCH DETECTION
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// 1. DYNAMIC BRANCH DETECTION (GitHub Raw URL)
+//    Identifies which branch this HTML is served from (e.g., main, dev)
+//    and uses the same branch to load firebaseConfig.js
+// ----------------------------------------------------------------------------
+(function detectGitHubBranch() {
+    // Only run if the page is served from raw.githubusercontent.com
+    if (window.location.hostname.includes('raw.githubusercontent.com')) {
+        const pathParts = window.location.pathname.split('/');
+        // Typical raw URL: /username/repo/branch/path/file.html
+        // branch is at index 3
+        if (pathParts.length >= 4) {
+            const branch = pathParts[3];
+            console.log(`🌿 Detected GitHub branch: ${branch}`);
+            // Override the original loadFirebaseConfig function to use this branch
+            const originalLoad = window.loadFirebaseConfig;
+            window.loadFirebaseConfig = async function() {
+                try {
+                    const url = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/${branch}/firebaseConfig.js`;
+                    const response = await fetch(url);
+                    const configText = await response.text();
+                    const configMatch = configText.match(/firebaseConfig\s*=\s*({[\s\S]*?});/);
+                    if (configMatch && configMatch[1]) {
+                        const config = eval('(' + configMatch[1] + ')');
+                        window.firebaseConfig = config;
+                        return config;
+                    }
+                } catch (e) {
+                    console.warn('Branch‑specific config failed, falling back to main', e);
+                    return originalLoad();
+                }
+            };
+        }
+    }
+})();
+
+// ----------------------------------------------------------------------------
+// 2. ENHANCEMENTS TO EnrollmentApp CLASS
+//    Add these methods inside the EnrollmentApp class definition.
+//    You can paste them anywhere inside the class (e.g., before initializeState)
+// ----------------------------------------------------------------------------
+
+/**
+ * Generates a cryptographically strong random password (never displayed).
+ * @returns {string} 16‑character password with upper, lower, numbers, symbols.
+ */
+generateRandomPassword() {
+    const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*_+-=';
+    const randomValues = new Uint32Array(16);
+    crypto.getRandomValues(randomValues);
+    let password = '';
+    for (let i = 0; i < 16; i++) {
+        password += charset[randomValues[i] % charset.length];
+    }
+    return password;
+}
+
+/**
+ * Attempts to create a Firebase Auth account for the parent.
+ * On success: signs in, saves parent profile, sends password reset email.
+ * On email‑already‑exists: triggers the existing‑email flow.
+ * @param {string} email - Parent's email
+ * @param {object} parentData - Parent profile data from the form
+ * @returns {Promise<object>} { success, uid, isNew }
+ */
+async autoCreateParentAccount(email, parentData) {
+    if (!this.db) {
+        console.warn('Firebase unavailable – skipping auto‑account creation');
+        return { success: false, isNew: false, uid: null };
+    }
+
+    // 1. Generate a temporary password (never stored or shown)
+    const tempPassword = this.generateRandomPassword();
+
+    try {
+        // 2. Create the user in Firebase Auth
+        const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, tempPassword);
+        const user = userCredential.user;
+        console.log(`✅ Parent Auth account created: ${user.uid}`);
+
+        // 3. Immediately send password reset email so parent can set their own password
+        await firebase.auth().sendPasswordResetEmail(email);
+        console.log(`📧 Password reset email sent to ${email}`);
+
+        // 4. Save parent profile to Firestore (parent_users collection)
+        const profileData = {
+            uid: user.uid,
+            email: user.email,
+            phone: parentData.phone,
+            normalizedPhone: parentData.normalizedPhone || parentData.phone,
+            parentName: parentData.name || 'Parent',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            referralCode: parentData.referralCode || null,
+            autoCreated: true,      // mark as created via enrollment
+            passwordResetSent: true,
+            lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        await this.db.collection('parent_users').doc(user.uid).set(profileData);
+        console.log(`💾 Parent profile saved to Firestore`);
+
+        // 5. Store the parent UID in the current application data for later use
+        if (this.appData) {
+            this.appData.parentUid = user.uid;
+        }
+
+        return { success: true, isNew: true, uid: user.uid };
+
+    } catch (error) {
+        // --- EMAIL ALREADY EXISTS ---
+        if (error.code === 'auth/email-already-in-use') {
+            console.log(`ℹ️ Email ${email} already registered – switching to existing‑account flow`);
+            return { success: false, isNew: false, uid: null, emailExists: true };
+        }
+        // Other errors (network, etc.)
+        console.error('Auto‑account creation failed:', error);
+        this.showAlert(`Account creation failed: ${error.message}. You can still save and continue.`, 'warning');
+        return { success: false, isNew: false, uid: null, error: error.message };
+    }
+}
+
+/**
+ * Handles the case where the parent's email already exists.
+ * Sends a password reset email and saves the enrollment as pending.
+ * @param {string} email - Parent's email
+ * @param {object} enrollmentData - Full enrollment data from collectFormData()
+ */
+async handleExistingEmail(email, enrollmentData) {
+    if (!this.db) {
+        this.showAlert('Email already registered. Please sign in to complete enrollment.', 'info');
+        return;
+    }
+
+    // 1. Send password reset email
+    try {
+        await firebase.auth().sendPasswordResetEmail(email);
+        console.log(`📧 Password reset email sent to existing user: ${email}`);
+    } catch (resetError) {
+        console.error('Failed to send password reset:', resetError);
+        // Continue anyway – we still save pending enrollment
+    }
+
+    // 2. Save enrollment as "pending" (linked by email, not UID)
+    const pendingId = `PENDING_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const pendingData = {
+        ...enrollmentData,
+        id: pendingId,
+        parentEmail: email,
+        status: 'pending',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        source: 'enrollment-portal',
+        emailExists: true
+    };
+
+    try {
+        await this.db.collection('pending_enrollments').doc(pendingId).set(pendingData);
+        console.log(`💾 Pending enrollment saved with ID: ${pendingId}`);
+
+        // Also store in localStorage as backup
+        localStorage.setItem('pendingEnrollment_' + pendingId, JSON.stringify(pendingData));
+    } catch (saveError) {
+        console.error('Failed to save pending enrollment:', saveError);
+        // Fallback to localStorage only
+        localStorage.setItem('pendingEnrollment_' + pendingId, JSON.stringify(pendingData));
+    }
+
+    // 3. Show friendly, non‑technical message
+    this.showAlert(`
+        <div style="text-align: left;">
+            <strong>📬 Account already exists</strong><br>
+            We noticed you already have a Blooming Kids House account.<br>
+            We've sent a password reset link to <strong>${email}</strong>.<br>
+            After setting your password, log in to view your invoice and track your child's progress.
+        </div>
+    `, 'info', 15000); // longer display time
+
+    // 4. Add a prominent button to open the parent portal login page
+    const alertArea = document.getElementById('alert-area');
+    const buttonDiv = document.createElement('div');
+    buttonDiv.style.marginTop = '15px';
+    buttonDiv.innerHTML = `
+        <button id="gotoPortalBtn" 
+                class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all"
+                onclick="window.open('parent.html', '_blank')">
+            🚪 Go to Parent Portal
+        </button>
+    `;
+    alertArea.appendChild(buttonDiv);
+}
+
+/**
+ * Opens the parent portal in a new tab.
+ * Because the user is already signed in (new account) or will sign in (existing),
+ * the portal will show the dashboard automatically if a session exists.
+ */
+openParentPortal() {
+    // Use relative path – adjust if your portal is at a different URL
+    const portalUrl = 'parent.html';
+    window.open(portalUrl, '_blank');
+    console.log('🖥️ Parent portal opened in new tab');
+}
+
+/**
+ * Saves enrollment data as pending for later linking (used when email already exists).
+ * @param {object} enrollmentData 
+ */
+async savePendingEnrollment(enrollmentData) {
+    // Already implemented inside handleExistingEmail
+    // This method is kept for clarity but not needed separately.
+}
+
+// ----------------------------------------------------------------------------
+// 3. ENHANCED submitEnrollment() – replaces the original method
+//    Copy and paste this entire method over your existing submitEnrollment.
+// ----------------------------------------------------------------------------
+
+async submitEnrollment() {
+    // --- Step 1: Validate form ---
+    if(!this.validateForm()) {
+        this.showAlert("Please fix all errors before submitting. Make sure all time selections are completed.", "danger");
+        return;
+    }
+
+    const btn = document.getElementById('submit-enrollment');
+    btn.innerHTML = '<div class="spinner"></div> Processing...';
+    btn.disabled = true;
+
+    // --- Step 2: Save progress first (original behaviour) ---
+    const saveResult = await this.saveProgress();
+    if (!saveResult.success) {
+        btn.innerHTML = '<i class="fas fa-lock"></i> Proceed to Secure Payment';
+        btn.disabled = false;
+        this.showAlert("Failed to save enrollment. Please try again.", "danger");
+        return;
+    }
+
+    // --- Step 3: Collect all form data (including parent info) ---
+    const enrollmentData = this.collectFormData();
+    const parentEmail = enrollmentData.parent?.email;
+    const parentPhone = enrollmentData.parent?.phone;
+    const parentName = enrollmentData.parent?.name;
+
+    // If no email, we cannot create account – fallback to old flow
+    if (!parentEmail) {
+        this.showAlert("Parent email is required to create your portal account.", "warning");
+        // Still show invoice and proceed
+        this.showInvoice();
+        btn.innerHTML = 'Success!';
+        this.showAlert("Enrollment Submitted Successfully!", "success");
+        this.sendEmailNotifications(enrollmentData);
+        return;
+    }
+
+    // --- Step 4: Attempt auto‑creation of parent portal account ---
+    const parentData = {
+        name: parentName,
+        email: parentEmail,
+        phone: parentPhone,
+        normalizedPhone: parentPhone, // adjust if you have separate normalized field
+        referralCode: enrollmentData.referral?.code
+    };
+
+    const authResult = await this.autoCreateParentAccount(parentEmail, parentData);
+
+    // --- Step 5: Handle the result ---
+    if (authResult.success && authResult.isNew) {
+        // 🎉 NEW ACCOUNT CREATED
+        console.log('✅ New parent account created, UID:', authResult.uid);
+
+        // Update the saved enrollment with the parent UID
+        if (this.db && authResult.uid) {
+            try {
+                await this.db.collection('enrollments').doc(this.currentApplicationId).update({
+                    parentUid: authResult.uid,
+                    autoCreatedAccount: true
+                });
+            } catch (updateError) {
+                console.warn('Could not update enrollment with parentUid:', updateError);
+            }
+        }
+
+        // Show success message (includes password reset info)
+        this.showAlert(`
+            <div style="text-align: left;">
+                <strong>✅ Account created successfully!</strong><br>
+                You are now signed in. We've sent a password reset email to <strong>${parentEmail}</strong>.<br>
+                Please check your inbox (and spam) to set your password for future logins.
+            </div>
+        `, 'success', 10000);
+
+        // Open parent portal – it will load already logged in!
+        this.openParentPortal();
+
+    } else if (authResult.emailExists) {
+        // 📧 EMAIL ALREADY REGISTERED – run the existing‑account flow
+        await this.handleExistingEmail(parentEmail, enrollmentData);
+        // Do not open portal automatically; user clicks the button
+    } else {
+        // ⚠️ Other failure (network, etc.) – but enrollment is saved
+        this.showAlert("Your enrollment is saved. You can create your portal account later from the login page.", "info");
+    }
+
+    // --- Step 6: Original post‑save actions (invoice, email, etc.) ---
+    setTimeout(() => {
+        this.showAlert("Enrollment Submitted Successfully!", "success");
+        btn.innerHTML = 'Success!';
+        
+        // Show the invoice (original behaviour)
+        this.showInvoice();
+        
+        // Send email notifications (original)
+        this.sendEmailNotifications(enrollmentData);
+    }, 1000);
+}
+
+// ----------------------------------------------------------------------------
+// 4. PATCH: Ensure parent portal can link pending enrollments after login
+//    This is added to the parent portal JS (parent.js) – not required here.
+//    For completeness, we leave a note.
+// ----------------------------------------------------------------------------
+// ✅ Remember: In parent.html, after a user logs in, you should query
+//    'pending_enrollments' where parentEmail == user.email and link them.
+//    This is already covered in the plan and can be added later.
+// ----------------------------------------------------------------------------
         });
     </script>
 </body>
