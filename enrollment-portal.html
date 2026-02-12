@@ -4281,8 +4281,10 @@
                 // Initialize with empty config (will use localStorage)
                 window.enrollmentApp = new EnrollmentApp();
             }
-            <!-- ============================================================================
-     ENROLLMENT-TO-PORTAL AUTO-SIGNUP SYSTEM – FULLY WORKING
+             });
+        </script>
+    <!-- ============================================================================
+     ENROLLMENT-TO-PORTAL AUTO-SIGNUP – CORRECTLY PLACED (NO ERRORS)
      ============================================================================ -->
 <script>
 // ============================================================================
@@ -4297,13 +4299,13 @@
         const pathParts = window.location.pathname.split('/');
         if (pathParts.length >= 5) {
             const branch = pathParts[3];
-            console.log(`🌿 Detected GitHub branch: ${branch}`);
+            console.log('🌿 Detected GitHub branch:', branch);
             window.__BKH_BRANCH = branch;
             
             const originalLoad = window.loadFirebaseConfig;
             window.loadFirebaseConfig = async function() {
                 try {
-                    const url = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/${branch}/firebaseConfig.js`;
+                    const url = 'https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/' + branch + '/firebaseConfig.js';
                     const response = await fetch(url);
                     const configText = await response.text();
                     const configMatch = configText.match(/firebaseConfig\s*=\s*({[\s\S]*?});/);
@@ -4324,31 +4326,35 @@
 // ----------------------------------------------------------------------------
 // 2. SAFELY PATCH EnrollmentApp PROTOTYPE – NO SYNTAX ERRORS
 // ----------------------------------------------------------------------------
-if (typeof EnrollmentApp !== 'undefined') {
+if (typeof EnrollmentApp !== 'undefined' && EnrollmentApp.prototype) {
     
     // --- Generate Random Password ---
     EnrollmentApp.prototype.generateRandomPassword = function() {
-        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*_+-=';
-        const vals = new Uint32Array(16);
+        var chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*_+-=';
+        var vals = new Uint32Array(16);
         crypto.getRandomValues(vals);
-        let pwd = '';
-        for (let i = 0; i < 16; i++) pwd += chars[vals[i] % chars.length];
+        var pwd = '';
+        for (var i = 0; i < 16; i++) {
+            pwd += chars[vals[i] % chars.length];
+        }
         return pwd;
     };
 
     // --- Auto Create Parent Account ---
     EnrollmentApp.prototype.autoCreateParentAccount = async function(email, parentData) {
-        if (!this.db) return { success: false, isNew: false, uid: null };
+        if (!this.db) {
+            return { success: false, isNew: false, uid: null };
+        }
         
-        const tempPassword = this.generateRandomPassword();
+        var tempPassword = this.generateRandomPassword();
         
         try {
-            const userCred = await firebase.auth().createUserWithEmailAndPassword(email, tempPassword);
-            const user = userCred.user;
+            var userCred = await firebase.auth().createUserWithEmailAndPassword(email, tempPassword);
+            var user = userCred.user;
             
             await firebase.auth().sendPasswordResetEmail(email);
             
-            const profile = {
+            var profile = {
                 uid: user.uid,
                 email: user.email,
                 phone: parentData.phone || '',
@@ -4362,7 +4368,9 @@ if (typeof EnrollmentApp !== 'undefined') {
             
             await this.db.collection('parent_users').doc(user.uid).set(profile);
             
-            if (this.appData) this.appData.parentUid = user.uid;
+            if (this.appData) {
+                this.appData.parentUid = user.uid;
+            }
             
             return { success: true, isNew: true, uid: user.uid };
             
@@ -4379,10 +4387,12 @@ if (typeof EnrollmentApp !== 'undefined') {
     EnrollmentApp.prototype.handleExistingEmail = async function(email, enrollmentData) {
         try {
             await firebase.auth().sendPasswordResetEmail(email);
-        } catch (e) { console.error('Reset email error:', e); }
+        } catch (e) {
+            console.error('Reset email error:', e);
+        }
         
-        const pendingId = 'PENDING_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
-        const pendingData = {
+        var pendingId = 'PENDING_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+        var pendingData = {
             ...enrollmentData,
             id: pendingId,
             parentEmail: email,
@@ -4401,27 +4411,25 @@ if (typeof EnrollmentApp !== 'undefined') {
             localStorage.setItem('pendingEnrollment_' + pendingId, JSON.stringify(pendingData));
         }
         
-        const alertDiv = document.createElement('div');
+        var alertDiv = document.createElement('div');
         alertDiv.className = 'alert alert-info';
         alertDiv.style.marginBottom = '15px';
-        alertDiv.innerHTML = `
-            <div style="text-align: left; padding: 5px;">
-                <strong style="font-size: 16px;">📬 Welcome back!</strong><br>
-                <p style="margin: 8px 0;">An account with <strong>${email}</strong> already exists.</p>
-                <p style="margin: 8px 0;">We've sent a password reset link to your email.</p>
-                <p style="margin: 8px 0 15px 0;">After setting your password, log in to view your invoice.</p>
-                <button onclick="window.open('parent.html', '_blank')" 
-                        style="background: #2E8B57; color: white; border: none; padding: 10px 20px; 
-                               border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px;">
-                    🚪 Go to Parent Portal
-                </button>
-            </div>
-        `;
+        alertDiv.innerHTML = 
+            '<div style="text-align: left; padding: 5px;">' +
+            '<strong style="font-size: 16px;">📬 Welcome back!</strong><br>' +
+            '<p style="margin: 8px 0;">An account with <strong>' + email + '</strong> already exists.</p>' +
+            '<p style="margin: 8px 0;">We\'ve sent a password reset link to your email.</p>' +
+            '<p style="margin: 8px 0 15px 0;">After setting your password, log in to view your invoice.</p>' +
+            '<button onclick="window.open(\'parent.html\', \'_blank\')" ' +
+            'style="background: #2E8B57; color: white; border: none; padding: 10px 20px; ' +
+            'border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px;">' +
+            '🚪 Go to Parent Portal</button>' +
+            '</div>';
         
-        const alertArea = document.getElementById('alert-area');
+        var alertArea = document.getElementById('alert-area');
         if (alertArea) {
             alertArea.prepend(alertDiv);
-            setTimeout(() => alertDiv.remove(), 20000);
+            setTimeout(function() { alertDiv.remove(); }, 20000);
         }
     };
 
@@ -4431,17 +4439,19 @@ if (typeof EnrollmentApp !== 'undefined') {
     };
 
     // --- OVERRIDE submitEnrollment – COMPLETE REPLACEMENT ---
+    var originalSubmit = EnrollmentApp.prototype.submitEnrollment;
+    
     EnrollmentApp.prototype.submitEnrollment = async function() {
         if (!this.validateForm()) {
             this.showAlert('Please fix all errors before submitting.', 'danger');
             return;
         }
 
-        const btn = document.getElementById('submit-enrollment');
+        var btn = document.getElementById('submit-enrollment');
         btn.innerHTML = '<div class="spinner"></div> Processing...';
         btn.disabled = true;
 
-        const saveResult = await this.saveProgress();
+        var saveResult = await this.saveProgress();
         if (!saveResult.success) {
             btn.innerHTML = '<i class="fas fa-lock"></i> Proceed to Secure Payment';
             btn.disabled = false;
@@ -4449,10 +4459,10 @@ if (typeof EnrollmentApp !== 'undefined') {
             return;
         }
 
-        const data = this.collectFormData();
-        const parentEmail = data.parent?.email;
-        const parentPhone = data.parent?.phone;
-        const parentName = data.parent?.name;
+        var data = this.collectFormData();
+        var parentEmail = data.parent ? data.parent.email : null;
+        var parentPhone = data.parent ? data.parent.phone : null;
+        var parentName = data.parent ? data.parent.name : null;
 
         if (!parentEmail) {
             this.showInvoice();
@@ -4462,34 +4472,35 @@ if (typeof EnrollmentApp !== 'undefined') {
             return;
         }
 
-        const parentData = {
+        var parentData = {
             name: parentName,
             email: parentEmail,
             phone: parentPhone,
-            referralCode: data.referral?.code
+            referralCode: data.referral ? data.referral.code : null
         };
 
-        const authResult = await this.autoCreateParentAccount(parentEmail, parentData);
+        var authResult = await this.autoCreateParentAccount(parentEmail, parentData);
 
         if (authResult.success && authResult.isNew) {
             // NEW ACCOUNT
-            if (this.db && authResult.uid) {
+            if (this.db && authResult.uid && this.currentApplicationId) {
                 try {
                     await this.db.collection('enrollments').doc(this.currentApplicationId).update({
                         parentUid: authResult.uid,
                         autoCreatedAccount: true
                     });
-                } catch (e) {}
+                } catch (e) {
+                    console.warn('Could not update enrollment with parentUid:', e);
+                }
             }
             
-            this.showAlert(`
-                <div style="text-align: left; padding: 5px;">
-                    <strong style="font-size: 16px; color: #155724;">✅ Account created successfully!</strong><br>
-                    <p style="margin: 8px 0;">You are now signed in.</p>
-                    <p style="margin: 8px 0;">Check your email <strong>${parentEmail}</strong> to set your password.</p>
-                    <p style="margin: 8px 0;">Your parent portal is opening now...</p>
-                </div>
-            `, 'success', 15000);
+            this.showAlert(
+                '<div style="text-align: left; padding: 5px;">' +
+                '<strong style="font-size: 16px; color: #155724;">✅ Account created successfully!</strong><br>' +
+                '<p style="margin: 8px 0;">You are now signed in.</p>' +
+                '<p style="margin: 8px 0;">Check your email <strong>' + parentEmail + '</strong> to set your password.</p>' +
+                '<p style="margin: 8px 0;">Your parent portal is opening now...</p>' +
+                '</div>', 'success', 15000);
             
             this.openParentPortal();
             
@@ -4499,12 +4510,14 @@ if (typeof EnrollmentApp !== 'undefined') {
         }
 
         // ALWAYS show invoice and complete
-        setTimeout(() => {
-            this.showAlert('Enrollment Submitted Successfully!', 'success');
-            btn.innerHTML = 'Success!';
-            this.showInvoice();
-            this.sendEmailNotifications(data);
-        }, 1000);
+        setTimeout(function(app) {
+            return function() {
+                app.showAlert('Enrollment Submitted Successfully!', 'success');
+                btn.innerHTML = 'Success!';
+                app.showInvoice();
+                app.sendEmailNotifications(data);
+            };
+        }(this), 1000);
     };
 
     console.log('✅ ENROLLMENT-TO-PORTAL AUTO-SIGNUP INSTALLED SUCCESSFULLY');
