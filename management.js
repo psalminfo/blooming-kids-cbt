@@ -1465,77 +1465,76 @@ window.closeManagementModal = (id) => { const m = document.getElementById(id); i
 window.viewStudentTutorHistory = renderHistoryModal;
 
 // ======================================================
-// SAFE FIX: Force All Orange Buttons (No Recursion, No Hang)
+// ULTIMATE FIX: Force ALL Transition Buttons to Show
 // ======================================================
-(function safeFixOrangeButtons() {
-    const ORANGE = '#ea580c';
-    const ORANGE_HOVER = '#c2410c';
+(function forceAllOrangeButtons() {
+    const ORANGE = '#ea580c';  // bg-orange-600
+    const ORANGE_HOVER = '#c2410c'; // bg-orange-700
+    const BLUE = '#2563eb';    // bg-blue-600
+    const BLUE_HOVER = '#1d4ed8'; // bg-blue-700
 
-    // Apply inline styles to a button – safe to call multiple times
-    function fixButton(btn) {
-        if (!btn || btn.dataset.fixed === 'true') return;
-        btn.style.backgroundColor = ORANGE;
+    function forceButtonStyle(btn, bgColor, hoverColor) {
+        if (!btn) return;
+        // Remove problematic classes
+        btn.classList.remove('bg-orange-300', 'bg-gray-200', 'text-gray-700');
+        // Add safe classes (optional)
+        btn.classList.add('text-white', 'px-4', 'py-2', 'rounded', 'z-10');
+        // FORCE inline styles (guaranteed)
+        btn.style.backgroundColor = bgColor;
         btn.style.color = 'white';
         btn.style.padding = '0.5rem 1rem';
         btn.style.borderRadius = '0.25rem';
         btn.style.border = 'none';
         btn.style.cursor = 'pointer';
-        btn.onmouseenter = () => btn.style.backgroundColor = ORANGE_HOVER;
-        btn.onmouseleave = () => btn.style.backgroundColor = ORANGE;
-        btn.dataset.fixed = 'true'; // mark as fixed to avoid repeated work
+        // Hover effect
+        btn.onmouseenter = () => btn.style.backgroundColor = hoverColor;
+        btn.onmouseleave = () => btn.style.backgroundColor = bgColor;
     }
 
-    // List of button IDs that need fixing
-    const BUTTON_IDS = [
-        'transition-submit-btn',
-        'reassign-submit-btn',
-        'manage-transition-submit'
-    ];
+    function fixAllButtons() {
+        // 1. Start Transition button (Transition modal)
+        const startBtn = document.getElementById('transition-submit-btn');
+        if (startBtn) forceButtonStyle(startBtn, ORANGE, ORANGE_HOVER);
 
-    // Fix buttons that already exist
-    BUTTON_IDS.forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) fixButton(btn);
-    });
+        // 2. Confirm Transition button (Reassign modal – when in temporary mode)
+        const confirmBtn = document.getElementById('reassign-submit-btn');
+        if (confirmBtn && confirmBtn.textContent.includes('Confirm Transition')) {
+            forceButtonStyle(confirmBtn, ORANGE, ORANGE_HOVER);
+        }
 
-    // One-time observer – watches only for new buttons being added
-    const observer = new MutationObserver((mutations) => {
-        mutations.forEach(mutation => {
-            mutation.addedNodes.forEach(node => {
-                if (node.nodeType === 1) { // element
-                    BUTTON_IDS.forEach(id => {
-                        // Direct match
-                        if (node.id === id) fixButton(node);
-                        // Search inside added node
-                        const btn = node.querySelector?.('#' + id);
-                        if (btn) fixButton(btn);
-                    });
-                }
-            });
-        });
-    });
+        // 3. Apply Changes button (Manage Transition modal)
+        const manageBtn = document.getElementById('manage-transition-submit');
+        if (manageBtn) forceButtonStyle(manageBtn, ORANGE, ORANGE_HOVER);
 
-    // Start observing – only childList, no attributes, no subtree if not needed
+        // 4. Any other button with orange background classes
+        document.querySelectorAll('button.bg-orange-600, button.bg-orange-500, button[id*="transition"], button[id*="Transition"]')
+            .forEach(btn => forceButtonStyle(btn, ORANGE, ORANGE_HOVER));
+    }
+
+    // Run immediately and after each DOM change
+    fixAllButtons();
+    const observer = new MutationObserver(fixAllButtons);
     observer.observe(document.body, { childList: true, subtree: true });
 
-    // Also patch the modal functions to apply fix right after they insert HTML
-    const patchModalFunction = (funcName, buttonId) => {
-        const original = window[funcName];
-        if (typeof original === 'function') {
-            window[funcName] = function(...args) {
-                const result = original.apply(this, args);
-                setTimeout(() => {
-                    const btn = document.getElementById(buttonId);
-                    if (btn) fixButton(btn);
-                }, 50); // slight delay to ensure modal is rendered
-                return result;
-            };
-        }
-    };
-
-    patchModalFunction('showTransitionStudentModal', 'transition-submit-btn');
-    patchModalFunction('showEnhancedReassignStudentModal', 'reassign-submit-btn');
-    patchModalFunction('showManageTransitionModal', 'manage-transition-submit');
+    // Also watch for class/style changes that might override
+    const styleObserver = new MutationObserver((mutations) => {
+        mutations.forEach((m) => {
+            const btn = m.target;
+            if (btn.nodeType === 1 && btn.tagName === 'BUTTON') {
+                if (btn.id === 'transition-submit-btn' || 
+                    btn.id === 'reassign-submit-btn' || 
+                    btn.id === 'manage-transition-submit' ||
+                    btn.textContent.includes('Transition') ||
+                    btn.textContent.includes('Start') ||
+                    btn.textContent.includes('Confirm')) {
+                    if (btn.style.backgroundColor !== ORANGE && btn.style.backgroundColor !== BLUE) {
+                        forceButtonStyle(btn, ORANGE, ORANGE_HOVER);
+                    }
+                }
+            }
+        });
+    });
+    styleObserver.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['style', 'class'] });
 })();
 
 // ======================================================
@@ -8611,6 +8610,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
