@@ -2535,6 +2535,19 @@ class EnrollmentApp {
                 document.getElementById('temp-password').textContent = portalResult.password;
                 document.getElementById('temp-password-container').style.display = 'block';
                 this.showAlert(`Your temporary password is: ${portalResult.password}. Please save it.`, 'success');
+                
+                // Also display referral code
+                if (portalResult.referralCode) {
+                    const referralContainer = document.createElement('div');
+                    referralContainer.id = 'referral-code-container';
+                    referralContainer.className = 'mt-4 p-4 bg-green-50 border border-green-200 rounded-lg';
+                    referralContainer.innerHTML = `
+                        <p class="font-semibold text-green-800">Your Referral Code:</p>
+                        <p class="text-2xl font-mono text-green-600 bg-white p-2 rounded border border-green-300 select-all">${portalResult.referralCode}</p>
+                        <p class="text-sm text-green-700 mt-2">Share this code with other parents to earn ₦5,000!</p>
+                    `;
+                    document.getElementById('temp-password-container').after(referralContainer);
+                }
             } else if (portalResult && !portalResult.isNew) {
                 // Existing account linked – user may need to log in
                 this.showAlert('Your existing parent account has been linked. You can log in with your email.', 'info');
@@ -2547,10 +2560,10 @@ class EnrollmentApp {
                 this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
             }, 2000);
 
-            // Redirect prompt after another 2 seconds
+            // Open parent portal in a new tab after 2 seconds
             setTimeout(() => {
-                if (confirm("Your enrollment is complete! Would you like to go to the parent portal now?")) {
-                    window.location.href = "parent.html"; // Change to actual parent portal URL
+                if (confirm("Your enrollment is complete! Would you like to open the parent portal now?")) {
+                    window.open("parent.html", "_blank"); // Opens in new tab
                 }
             }, 2000);
 
@@ -2574,6 +2587,31 @@ class EnrollmentApp {
                 btn.classList.remove('copied');
             }, 2000);
         });
+    }
+
+    // ==============================================
+    // REFERRAL CODE GENERATION (MISSING FUNCTION)
+    // ==============================================
+    async generateReferralCode() {
+        const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const prefix = 'BKH';
+        let code;
+        let isUnique = false;
+
+        while (!isUnique) {
+            let suffix = '';
+            for (let i = 0; i < 6; i++) {
+                suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            code = prefix + suffix;
+
+            // Check if code already exists in parent_users
+            const snapshot = await this.db.collection('parent_users').where('referralCode', '==', code).limit(1).get();
+            if (snapshot.empty) {
+                isUnique = true;
+            }
+        }
+        return code;
     }
 
     // ==============================================
@@ -2620,6 +2658,7 @@ class EnrollmentApp {
                     );
                     return { isNew: false, uid: parentUid };
                 } else {
+                    // This should not happen if fetchSignInMethodsForEmail returned true, but handle gracefully
                     this.showAlert(
                         'An account with this email already exists, but we could not link it. Please contact support.',
                         'warning'
@@ -2636,6 +2675,9 @@ class EnrollmentApp {
                 // Keep user signed in (do NOT sign out)
                 // Do NOT send password reset email – we will show the password to the user
 
+                // Generate a unique referral code
+                const newReferralCode = await this.generateReferralCode();
+
                 // Store in parent_users collection
                 await this.db.collection('parent_users').doc(user.uid).set({
                     email: parentEmail,
@@ -2643,7 +2685,7 @@ class EnrollmentApp {
                     normalizedPhone: parentPhone,
                     parentName: parentName,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    referralCode: referralCode,
+                    referralCode: newReferralCode,
                     referralEarnings: 0,
                     uid: user.uid
                 });
@@ -2658,7 +2700,7 @@ class EnrollmentApp {
                     '✅ Parent portal account created! You are now logged in.',
                     'success'
                 );
-                return { isNew: true, uid: user.uid, password: randomPassword };
+                return { isNew: true, uid: user.uid, password: randomPassword, referralCode: newReferralCode };
             }
         } catch (error) {
             console.error('Error setting up parent portal account:', error);
