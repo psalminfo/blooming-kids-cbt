@@ -948,7 +948,7 @@ window.refreshAllDashboardData = async function() {
 };
 
 // ======================================================
-// SUBSECTION 3.1: Tutor Directory Panel - ENHANCED (COMPLETE & ERROR-FREE)
+// SUBSECTION 3.1: Tutor Directory Panel - ENHANCED (COMPLETE & ERROR-FIXED)
 // ======================================================
 
 // --- HELPER FUNCTIONS (Updated) ---
@@ -1174,7 +1174,7 @@ function initializeSearchableSelect(selectId) {
     });
 }
 
-// --- DATE PICKER UTILITY (kept for other uses, but transition now uses duration dropdown) ---
+// --- DATE PICKER UTILITY ---
 
 function createDatePicker(id, value = '') {
     const today = new Date().toISOString().split('T')[0];
@@ -1189,7 +1189,7 @@ function createDatePicker(id, value = '') {
                class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">`;
 }
 
-// --- NEW: Student Event Logger (Comprehensive History) ---
+// --- Student Event Logger (Comprehensive History) ---
 async function logStudentEvent(studentId, eventType, changes = {}, description = '', metadata = {}) {
     if (!studentId) return;
     try {
@@ -1613,7 +1613,7 @@ async function performTransition(student, newTutor, startDate, endDate, reason, 
 }
 
 // ======================================================
-// FEATURE 2: CREATE GROUP CLASS MODAL (unchanged, already multi-parent)
+// FEATURE 2: CREATE GROUP CLASS MODAL (UPDATED with parent details)
 // ======================================================
 
 function showCreateGroupClassModal() {
@@ -1835,6 +1835,27 @@ async function createGroupClass(groupName, tutor, subject, schedule, notes, stud
         const user = window.userData?.name || 'Admin';
         const timestamp = new Date().toISOString();
         
+        // Collect parent details for each student
+        const parentDetails = [];
+        const studentIds = [];
+        const studentNames = [];
+        
+        for (const sf of studentFees) {
+            const studentDoc = await getDoc(doc(db, "students", sf.studentId));
+            if (studentDoc.exists()) {
+                const studentData = studentDoc.data();
+                studentIds.push(sf.studentId);
+                studentNames.push(studentData.studentName);
+                parentDetails.push({
+                    studentId: sf.studentId,
+                    studentName: studentData.studentName,
+                    parentName: studentData.parentName || 'N/A',
+                    parentEmail: studentData.parentEmail || 'N/A',
+                    parentPhone: studentData.parentPhone || 'N/A'
+                });
+            }
+        }
+        
         const groupRef = await addDoc(collection(db, "groupClasses"), {
             groupName: groupName,
             tutorEmail: tutor.email,
@@ -1846,7 +1867,10 @@ async function createGroupClass(groupName, tutor, subject, schedule, notes, stud
             totalFee: studentFees.reduce((sum, sf) => sum + sf.fee, 0),
             createdAt: timestamp,
             createdBy: user,
-            status: 'active'
+            status: 'active',
+            studentIds: studentIds,
+            studentNames: studentNames,
+            parentDetails: parentDetails  // Store all parent info
         });
         
         console.log("Group created with ID:", groupRef.id);
@@ -2050,7 +2074,8 @@ function showEnhancedReassignStudentModal() {
                         <div class="mb-4">
                             <label class="block text-sm font-medium mb-2 text-gray-700">Transition Duration *</label>
                             <select id="transition-duration-reassign" 
-                                    class="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
+                                    class="w-full border border-gray-300 p-3 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                                    required>
                                 <option value="1">1 day</option>
                                 <option value="3">3 days</option>
                                 <option value="7">1 week</option>
@@ -2115,6 +2140,10 @@ function showEnhancedReassignStudentModal() {
         const startDateHtml = `<input type="date" id="transition-start-date-reassign" value="${new Date().toISOString().split('T')[0]}" class="hidden">`;
         document.querySelector('#temporary-fields').insertAdjacentHTML('afterbegin', startDateHtml);
         
+        // Initially, temporary fields are hidden, so disable their required attributes
+        document.getElementById('transition-reason-temp').required = false;
+        document.getElementById('transition-duration-reassign').required = false;
+        
         function updateTemporaryEndDate() {
             const startDateStr = document.getElementById('transition-start-date-reassign').value;
             if (!startDateStr) return;
@@ -2146,6 +2175,10 @@ function showEnhancedReassignStudentModal() {
                 temporaryFields.classList.remove('hidden');
                 submitBtn.textContent = "Confirm Transition";
                 submitBtn.className = "px-5 py-2.5 bg-orange-600 text-white rounded-md hover:bg-orange-700";
+                
+                // Enable required on temporary fields
+                document.getElementById('transition-reason-temp').required = true;
+                document.getElementById('transition-duration-reassign').required = true;
             } else {
                 permanentBtn.classList.remove('bg-gray-300', 'text-gray-800', 'border-gray-400');
                 permanentBtn.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
@@ -2155,6 +2188,10 @@ function showEnhancedReassignStudentModal() {
                 temporaryFields.classList.add('hidden');
                 submitBtn.textContent = "Confirm Reassignment";
                 submitBtn.className = "px-5 py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700";
+                
+                // Disable required on temporary fields
+                document.getElementById('transition-reason-temp').required = false;
+                document.getElementById('transition-duration-reassign').required = false;
             }
         }
         
@@ -2995,7 +3032,6 @@ window.showTransitionStudentModal = showTransitionStudentModal;
 window.showCreateGroupClassModal = showCreateGroupClassModal;
 window.showEnhancedReassignStudentModal = showEnhancedReassignStudentModal;
 window.showManageTransitionModal = showManageTransitionModal;
-
 
 
 // ======================================================
@@ -10254,6 +10290,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
