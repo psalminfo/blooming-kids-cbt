@@ -412,9 +412,16 @@ class EnrollmentApp {
         this.updateSummary();
     }
     
+    /**
+     * Preload saved selections into a student div.
+     * @param {HTMLElement} studentDiv - The student entry container.
+     * @param {Object} data - The saved student data.
+     */
     preloadStudentSelections(studentDiv, data) {
         if (!data) return;
-        
+
+        const studentId = studentDiv.dataset.studentId; // Get the student ID
+
         // Pre-select preferred tutor
         if (data.preferredTutor) {
             const tutorOption = studentDiv.querySelector(`.tutor-option[data-tutor="${data.preferredTutor}"]`);
@@ -422,7 +429,7 @@ class EnrollmentApp {
                 tutorOption.classList.add('selected');
             }
         }
-        
+
         // Pre-select academic sessions
         if (data.academicSessions) {
             const sessionOption = studentDiv.querySelector(`.session-option[data-sessions="${data.academicSessions}"]`);
@@ -430,7 +437,7 @@ class EnrollmentApp {
                 sessionOption.classList.add('selected');
             }
         }
-        
+
         // Pre-select academic subjects
         if (data.selectedSubjects && data.selectedSubjects.length > 0) {
             data.selectedSubjects.forEach(subject => {
@@ -440,21 +447,24 @@ class EnrollmentApp {
                 }
             });
         }
-        
-        // Pre-select academic days and time
+
+        // Pre-select academic days
         if (data.academicDays && data.academicDays.length > 0) {
             data.academicDays.forEach(day => {
                 const dayBtn = studentDiv.querySelector(`.academic-day-btn[data-day="${day}"]`);
                 if (dayBtn) dayBtn.classList.add('selected');
             });
         }
-        
+
+        // Pre-select academic time (using student-specific IDs)
         if (data.academicTime) {
             const [startHour, endHour] = data.academicTime.split(':');
-            studentDiv.querySelector('#academic-start-hour').value = startHour;
-            studentDiv.querySelector('#academic-end-hour').value = endHour;
+            const startSelect = studentDiv.querySelector(`#academic-start-hour-${studentId}`);
+            const endSelect = studentDiv.querySelector(`#academic-end-hour-${studentId}`);
+            if (startSelect) startSelect.value = startHour;
+            if (endSelect) endSelect.value = endHour;
         }
-        
+
         // Pre-select extracurricular activities
         if (data.extracurriculars && data.extracurriculars.length > 0) {
             data.extracurriculars.forEach(activity => {
@@ -477,17 +487,19 @@ class EnrollmentApp {
                             if (dayBtn) dayBtn.classList.add('selected');
                         });
                     }
-                    // Set time
+                    // Set time (using student and activity IDs)
                     if (activity.time) {
                         const [startHour, endHour] = activity.time.split(':');
-                        card.querySelector('#extracurricular-start-hour').value = startHour;
-                        card.querySelector('#extracurricular-end-hour').value = endHour;
+                        const startSelect = studentDiv.querySelector(`#extracurricular-start-hour-${studentId}-${activity.id}`);
+                        const endSelect = studentDiv.querySelector(`#extracurricular-end-hour-${studentId}-${activity.id}`);
+                        if (startSelect) startSelect.value = startHour;
+                        if (endSelect) endSelect.value = endHour;
                     }
                 }
             });
         }
-        
-        // Pre-load test prep hours
+
+        // Pre-load test prep
         if (data.testPrep && data.testPrep.length > 0) {
             data.testPrep.forEach(test => {
                 const card = studentDiv.querySelector(`.test-prep-card[data-test-id="${test.id}"]`);
@@ -504,11 +516,13 @@ class EnrollmentApp {
                             if (dayBtn) dayBtn.classList.add('selected');
                         });
                     }
-                    // Set time
+                    // Set time (using student and test IDs)
                     if (test.time) {
                         const [startHour, endHour] = test.time.split(':');
-                        card.querySelector('#test-prep-start-hour').value = startHour;
-                        card.querySelector('#test-prep-end-hour').value = endHour;
+                        const startSelect = studentDiv.querySelector(`#test-prep-start-hour-${studentId}-${test.id}`);
+                        const endSelect = studentDiv.querySelector(`#test-prep-end-hour-${studentId}-${test.id}`);
+                        if (startSelect) startSelect.value = startHour;
+                        if (endSelect) endSelect.value = endHour;
                     }
                 }
             });
