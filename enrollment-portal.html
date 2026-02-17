@@ -6,10 +6,13 @@
     <title>Blooming Kids House - Enrollment Portal</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Firebase SDKs -->
+    <!-- Firebase SDKs (compatibility version) -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    
+    <!-- Your modular Firebase config (sets window.firebaseConfig) -->
+    <script type="module" src="firebaseConfig.js"></script>
     
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -1698,78 +1701,10 @@
         // ENROLLMENT PORTAL - UPDATED VERSION
         // ==============================================
 
-        // First, load Firebase config from GitHub
-      async function loadFirebaseConfig() {
-    try {
-        // FIRST: Try to load local config (Netlify/localhost)
-        try {
-            const localResponse = await fetch('/firebaseConfig.js');
-            if (localResponse.ok) {
-                const configText = await localResponse.text();
-                const configMatch = configText.match(/firebaseConfig\s*=\s*({[\s\S]*?});/);
-                if (configMatch && configMatch[1]) {
-                    const config = eval('(' + configMatch[1] + ')');
-                    window.firebaseConfig = config;
-                    console.log('✅ Loaded LOCAL Firebase config');
-                    return config;
-                }
-            }
-        } catch (e) {
-            console.log('📥 No local config found, trying GitHub...');
-        }
-
-        // SECOND: Try to load from GitHub with branch detection
-        let branch = 'main';
-        
-        // Detect branch from URL if on GitHub
-        if (window.location.hostname.includes('github')) {
-            if (window.location.pathname.includes('/raw/')) {
-                const parts = window.location.pathname.split('/raw/');
-                if (parts.length > 1) {
-                    branch = parts[1].split('/')[0];
-                }
-            } else if (window.location.pathname.includes('/blob/')) {
-                const parts = window.location.pathname.split('/blob/');
-                if (parts.length > 1) {
-                    branch = parts[1].split('/')[0];
-                }
-            }
-        }
-        
-        // For Netlify, always use local config (already handled above)
-        // If we got here, we're on GitHub - use detected branch
-        const url = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/${branch}/firebaseConfig.js`;
-        console.log(`📥 Loading Firebase config from: ${url}`);
-        
-        const response = await fetch(url);
-        const configText = await response.text();
-        const configMatch = configText.match(/firebaseConfig\s*=\s*({[\s\S]*?});/);
-        
-        if (configMatch && configMatch[1]) {
-            const config = eval('(' + configMatch[1] + ')');
-            window.firebaseConfig = config;
-            console.log(`✅ Loaded GitHub Firebase config from branch: ${branch}`);
-            return config;
-        } else {
-            throw new Error('Could not parse Firebase config');
-        }
-    } catch (error) {
-        console.error('❌ Failed to load Firebase config:', error);
-        return {
-            apiKey: "",
-            authDomain: "",
-            projectId: "",
-            storageBucket: "",
-            messagingSenderId: "",
-            appId: ""
-        };
-    }
-}
-
         // CONFIGURATION - UPDATED WITH CORRECT FEES FROM IMAGES
         const CONFIG = {
-            // Firebase Configuration - Loaded from external file
-            FIREBASE_CONFIG: null, // Will be set after loading
+            // Firebase Configuration - Will be set from window.firebaseConfig
+            FIREBASE_CONFIG: null, // Will be set in constructor
             
             // Academic Subjects
             ACADEMIC_SUBJECTS: [
@@ -4308,19 +4243,17 @@
         // ==============================================
         // INITIALIZE APPLICATION
         // ==============================================
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                // Load Firebase config from GitHub
-                const firebaseConfig = await loadFirebaseConfig();
-                
-                // Initialize the application with the loaded config
-                window.enrollmentApp = new EnrollmentApp(firebaseConfig);
-            } catch (error) {
-                console.error("Failed to load Firebase config:", error);
-                // Initialize with empty config (will use localStorage)
-                window.enrollmentApp = new EnrollmentApp();
+        document.addEventListener('DOMContentLoaded', () => {
+            // firebaseConfig is already set by the module script (firebaseConfig.js)
+            if (window.firebaseConfig) {
+                window.enrollmentApp = new EnrollmentApp(window.firebaseConfig);
+            } else {
+                console.error('Firebase config not loaded. Make sure firebaseConfig.js is present and loaded as a module.');
+                // Optionally show a user-friendly message
+                document.getElementById('alert-area').innerHTML = 
+                    '<div class="alert alert-danger">Configuration error. Please contact support.</div>';
             }
-             });
+        });
         </script>
 </body>
 </html>
