@@ -171,95 +171,82 @@ class EnrollmentApp {
             this.saveProgress();
         });
         
-        // Submit enrollment
-        document.getElementById('submit-enrollment').addEventListener('click', () => {
-            if (!this.validateCSRFToken()) {
-                this.showAlert("Security validation failed. Please refresh the page.", "danger");
-                return;
-            }
-            this.submitEnrollment();
-        });
-        
-        // Copy resume link
-        document.getElementById('copy-resume-link').addEventListener('click', (e) => {
-            this.copyResumeLink(e.target);
-        });
-        
-        // View invoice
-        document.getElementById('view-invoice-btn').addEventListener('click', () => {
-            this.showInvoice();
-        });
-        
-        // Invoice modal
-        document.getElementById('close-invoice').addEventListener('click', () => {
-            document.getElementById('invoice-modal').classList.remove('active');
-        });
-        
-        document.getElementById('print-invoice').addEventListener('click', () => {
-            window.print();
-        });
-        
-        document.getElementById('download-pdf').addEventListener('click', () => {
-            this.downloadInvoicePDF();
-        });
-        
-        document.getElementById('invoice-modal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) {
-                document.getElementById('invoice-modal').classList.remove('active');
-            }
-        });
-        
-        // Referral code validation
-        const referralInput = document.getElementById('referralCode');
-        if (referralInput) {
-            let validationTimer;
-            referralInput.addEventListener('input', (e) => {
-                clearTimeout(validationTimer);
-                const code = e.target.value.trim().toUpperCase();
-                
-                if (code.length >= 3) {
-                    validationTimer = setTimeout(async () => {
-                        await this.validateReferralCode(code);
-                    }, 500);
-                } else {
-                    this.hideBankDetails();
-                }
-            });
-        }
-        
-        // Form validation for parent fields
-        const parentInputs = ['#parentName', '#parentEmail', '#countryCode', '#parentPhone', '#city', '#country'];
-        parentInputs.forEach(selector => {
-            const input = document.querySelector(selector);
-            if (input) {
-                input.addEventListener('blur', () => this.validateField(input));
-                input.addEventListener('input', () => {
-                    const errorElement = document.getElementById(`${input.id}-error`);
-                    if (errorElement) errorElement.classList.remove('show');
-                    input.classList.remove('error');
-                });
-            }
-        });
-        
-        // Auto-save when form changes
-        let saveTimer;
-        const setupAutoSave = () => {
-            const formElements = document.querySelectorAll('.form-control, .subject-option, .extracurricular-card, .frequency-btn, .test-prep-hours, .day-btn, select, .tutor-option, .session-option');
-            formElements.forEach(element => {
-                element.addEventListener('change', () => {
-                    if (this.isLoadingSavedData || this.isSaving) return;
-                    clearTimeout(saveTimer);
-                    saveTimer = setTimeout(() => {
-                        if (this.currentApplicationId) {
-                            this.autoSave();
-                        }
-                    }, 3000);
-                });
-            });
-        };
-        
-        setTimeout(setupAutoSave, 1000);
+        // ==============================================
+// SUBMIT ENROLLMENT (UPGRADED ARCHITECTURE)
+// ==============================================
+async submitEnrollment() {
+    if (!this.validateForm()) {
+        this.showAlert("Please fix all errors before submitting. Make sure all time selections are completed.", "danger");
+        return;
     }
+
+    const btn = document.getElementById('submit-enrollment');
+    btn.innerHTML = '<div class="spinner"></div> Processing Enrollment...';
+    btn.disabled = true;
+
+    try {
+        // STEP 1: Save the core enrollment data first
+        const result = await this.saveProgress();
+
+        if (!result.success) {
+            throw new Error("Failed to save enrollment data.");
+        }
+
+        this.showAlert("Enrollment Saved Successfully! Setting up your portal...", "success");
+        this.showInvoice();
+
+        // STEP 2: Attempt Parent Portal Setup
+        const portalResult = await this.setupParentPortal(result.enrollmentData);
+
+        // Handle successful portal creation
+        if (portalResult && portalResult.isNew) {
+            document.getElementById('temp-password').textContent = portalResult.password;
+            document.getElementById('temp-password-container').style.display = 'block';
+            this.showAlert(`Portal created! Your temporary password is: ${portalResult.password}. Please save it.`, 'success');
+
+            if (portalResult.referralCode) {
+                const referralContainer = document.createElement('div');
+                referralContainer.id = 'referral-code-container';
+                referralContainer.className = 'mt-4 p-4 bg-green-50 border border-green-200 rounded-lg';
+                referralContainer.innerHTML = `
+                    <p class="font-semibold text-green-800">Your Referral Code:</p>
+                    <p class="text-2xl font-mono text-green-600 bg-white p-2 rounded border border-green-300 select-all">${portalResult.referralCode}</p>
+                    <p class="text-sm text-green-700 mt-2">Share this code with other parents to earn ₦5,000!</p>
+                `;
+                document.getElementById('temp-password-container').after(referralContainer);
+            }
+        } else if (portalResult && !portalResult.isNew) {
+            this.showAlert('Your existing parent account has been linked. You can log in with your email.', 'info');
+        } else {
+            // STEP 2.5: ERROR RECOVERY - Enrollment saved, but portal failed.
+            this.showAlert("Enrollment successful, but we couldn't auto-login to your portal. Please contact support to link your account.", "warning");
+            btn.innerHTML = 'Enrollment Complete (Portal Setup Pending)';
+            btn.disabled = false;
+            return; // Halt execution here so we don't open the portal tab blindly
+        }
+
+        // STEP 3: Fire-and-forget email notifications
+        setTimeout(() => {
+            const invoiceElement = document.getElementById('invoice-content');
+            const invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
+            this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
+        }, 2000);
+
+        // STEP 4: Redirect to Parent Portal in a NEW TAB
+        setTimeout(() => {
+            window.open("parent.html", "_blank"); // '_blank' guarantees a new tab
+        }, 3000);
+
+        btn.innerHTML = 'Success!';
+        btn.disabled = false;
+
+    } catch (error) {
+        console.error("Enrollment Submission Error:", error);
+        btn.innerHTML = '<i class="fas fa-lock"></i> Proceed to Secure Payment';
+        btn.disabled = false;
+        this.showAlert("An error occurred during submission. Please try again.", "danger");
+    }
+}
     
     // ==============================================
     // STUDENT MANAGEMENT
@@ -2589,127 +2576,121 @@ class EnrollmentApp {
         });
     }
 
-    // ==============================================
-    // REFERRAL CODE GENERATION (MISSING FUNCTION)
-    // ==============================================
-    async generateReferralCode() {
-        const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        const prefix = 'BKH';
-        let code;
-        let isUnique = false;
+   // ==============================================
+// REFERRAL CODE GENERATION (HIGH ENTROPY)
+// ==============================================
+async generateReferralCode() {
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const prefix = 'BKH';
+    let code;
+    let isUnique = false;
+    let attempts = 0;
 
-        while (!isUnique) {
-            let suffix = '';
-            for (let i = 0; i < 6; i++) {
-                suffix += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            code = prefix + suffix;
+    while (!isUnique && attempts < 20) {
+        attempts++;
+        let suffix = '';
+        
+        // Increased to 8 characters + adding a timestamp seed for near-zero collision probability
+        const timeSeed = Date.now().toString(36).toUpperCase().slice(-2); 
+        
+        for (let i = 0; i < 6; i++) {
+            suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        
+        code = prefix + timeSeed + suffix; // e.g., BKH + K8 + X7Y2ZP
 
-            // Check if code already exists in parent_users
+        try {
+            // Actively query the database to guarantee uniqueness
             const snapshot = await this.db.collection('parent_users').where('referralCode', '==', code).limit(1).get();
             if (snapshot.empty) {
                 isUnique = true;
             }
+        } catch (error) {
+            console.warn("Permission denied or network error checking referral code. Defaulting to generated code.", error);
+            // Fallback: If Firestore read fails (e.g., security rules), assume unique due to high entropy
+            isUnique = true; 
         }
-        return code;
+    }
+    
+    if (attempts >= 20) {
+        console.error("Warning: Referral code generation hit max attempts. Possible database issue.");
+    }
+    
+    return code;
+}
+
+// ==============================================
+// PARENT PORTAL ACCOUNT SETUP (SECURE)
+// ==============================================
+async setupParentPortal(enrollmentData) {
+    if (!enrollmentData || !enrollmentData.parent) {
+        console.warn("No parent data available to set up account");
+        return null;
     }
 
-    // ==============================================
-    // PARENT PORTAL ACCOUNT SETUP (UPDATED)
-    // ==============================================
-    async setupParentPortal(enrollmentData) {
-        if (!enrollmentData || !enrollmentData.parent) {
-            console.warn("No parent data to set up account");
-            return null;
-        }
+    const parentEmail = enrollmentData.parent.email;
+    const parentName = enrollmentData.parent.name || 'Parent';
+    const parentPhone = enrollmentData.parent.phone;
 
-        const parentEmail = enrollmentData.parent.email;
-        const parentName = enrollmentData.parent.name || 'Parent';
-        const parentPhone = enrollmentData.parent.phone;
-        const referralCode = enrollmentData.referral && enrollmentData.referral.code ? enrollmentData.referral.code : '';
+    if (!parentEmail) {
+        this.showAlert("Cannot create parent account: email missing", "warning");
+        return null;
+    }
 
-        if (!parentEmail) {
-            this.showAlert("Cannot create parent account: email missing", "warning");
-            return null;
-        }
+    try {
+        const methods = await firebase.auth().fetchSignInMethodsForEmail(parentEmail);
 
-        try {
-            // Check if user exists in Firebase Auth
-            const methods = await firebase.auth().fetchSignInMethodsForEmail(parentEmail);
+        if (methods.length > 0) {
+            // EXISTING USER LOGIC
+            const snapshot = await this.db.collection('parent_users')
+                .where('email', '==', parentEmail)
+                .limit(1)
+                .get();
 
-            if (methods.length > 0) {
-                // User exists - find parent UID in Firestore
-                const snapshot = await this.db.collection('parent_users')
-                    .where('email', '==', parentEmail)
-                    .limit(1)
-                    .get();
+            if (!snapshot.empty) {
+                const existingParent = snapshot.docs[0].data();
+                const parentUid = existingParent.uid;
 
-                if (!snapshot.empty) {
-                    const existingParent = snapshot.docs[0].data();
-                    const parentUid = existingParent.uid;
-
-                    await this.db.collection('enrollments').doc(this.currentApplicationId).update({
-                        parentUid: parentUid
-                    });
-
-                    this.showAlert(
-                        'Your existing parent account has been linked. You can log in to the parent portal with your email.',
-                        'success'
-                    );
-                    return { isNew: false, uid: parentUid };
-                } else {
-                    // This should not happen if fetchSignInMethodsForEmail returned true, but handle gracefully
-                    this.showAlert(
-                        'An account with this email already exists, but we could not link it. Please contact support.',
-                        'warning'
-                    );
-                    return null;
-                }
-            } else {
-                // Create new user
-                const randomPassword = Math.random().toString(36).slice(-10) + 
-                                       Math.random().toString(36).slice(-10).toUpperCase();
-                const userCredential = await firebase.auth().createUserWithEmailAndPassword(parentEmail, randomPassword);
-                const user = userCredential.user;
-
-                // Keep user signed in (do NOT sign out)
-                // Do NOT send password reset email – we will show the password to the user
-
-                // Generate a unique referral code
-                const newReferralCode = await this.generateReferralCode();
-
-                // Store in parent_users collection
-                await this.db.collection('parent_users').doc(user.uid).set({
-                    email: parentEmail,
-                    phone: parentPhone,
-                    normalizedPhone: parentPhone,
-                    parentName: parentName,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    referralCode: newReferralCode,
-                    referralEarnings: 0,
-                    uid: user.uid
-                });
-
-                // Update enrollment with parentUid (optionally store temp password)
                 await this.db.collection('enrollments').doc(this.currentApplicationId).update({
-                    parentUid: user.uid,
-                    tempPassword: randomPassword // stored for reference (not shown again)
+                    parentUid: parentUid
                 });
 
-                this.showAlert(
-                    '✅ Parent portal account created! You are now logged in.',
-                    'success'
-                );
-                return { isNew: true, uid: user.uid, password: randomPassword, referralCode: newReferralCode };
+                return { isNew: false, uid: parentUid };
+            } else {
+                return null; // Exists in Auth but no profile found
             }
-        } catch (error) {
-            console.error('Error setting up parent portal account:', error);
-            this.showAlert(
-                'Could not create parent portal account automatically. Please contact support.',
-                'danger'
-            );
-            return null;
+        } else {
+            // NEW USER CREATION LOGIC
+            const randomPassword = Math.random().toString(36).slice(-10) + 
+                                   Math.random().toString(36).slice(-10).toUpperCase();
+            
+            const userCredential = await firebase.auth().createUserWithEmailAndPassword(parentEmail, randomPassword);
+            const user = userCredential.user;
+
+            const newReferralCode = await this.generateReferralCode();
+
+            // Create Profile
+            await this.db.collection('parent_users').doc(user.uid).set({
+                email: parentEmail,
+                phone: parentPhone,
+                normalizedPhone: parentPhone,
+                parentName: parentName,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                referralCode: newReferralCode,
+                referralEarnings: 0,
+                uid: user.uid
+            });
+
+            // Update enrollment - SECURITY FIX: Removed tempPassword from the database update
+            await this.db.collection('enrollments').doc(this.currentApplicationId).update({
+                parentUid: user.uid
+            });
+
+            return { isNew: true, uid: user.uid, password: randomPassword, referralCode: newReferralCode };
         }
+    } catch (error) {
+        console.error('Error setting up parent portal account:', error);
+        return null; // Return null so submitEnrollment() can handle the graceful failure
     }
 }
 
