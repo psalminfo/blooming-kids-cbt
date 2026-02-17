@@ -8999,96 +8999,7 @@ function showEditStudentModal(studentId, studentData, collectionName) {
     });
 }
 
-function showAssignStudentModal() {
-    const tutors = sessionCache.tutors || [];
-    const activeTutors = tutors.filter(tutor => 
-        !tutor.status || tutor.status === 'active'
-    );
-    
-    if (activeTutors.length === 0) {
-        alert("No active tutors available. Please refresh the directory and try again.");
-        return;
-    }
-
-    const tutorOptions = activeTutors
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map(tutor => `<option value='${JSON.stringify({email: tutor.email, name: tutor.name})}'>${tutor.name} (${tutor.email})</option>`)
-        .join('');
-
-    const modalHtml = `
-        <div id="assign-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
-                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('assign-modal')">&times;</button>
-                <h3 class="text-xl font-bold mb-4">Assign New Student</h3>
-                <form id="assign-student-form">
-                    <div class="mb-2">
-                        <label class="block text-sm font-medium">Assign to Tutor</label>
-                        <select id="assign-tutor" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-                            <option value="" disabled selected>Select a tutor...</option>
-                            ${tutorOptions}
-                        </select>
-                    </div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Student Name</label><input type="text" id="assign-studentName" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Student Grade</label><input type="text" id="assign-grade" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Days/Week</label><input type="text" id="assign-days" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Subjects (comma-separated)</label><input type="text" id="assign-subjects" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Parent Name</label><input type="text" id="assign-parentName" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Parent Phone</label><input type="text" id="assign-parentPhone" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Student Fee (₦)</label><input type="number" id="assign-studentFee" required value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="flex justify-end mt-4">
-                        <button type="button" onclick="closeManagementModal('assign-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Assign Student</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    document.getElementById('assign-student-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const form = e.target;
-        const selectedTutorData = JSON.parse(form.elements['assign-tutor'].value);
-
-        const newStudentData = {
-            studentName: form.elements['assign-studentName'].value,
-            grade: form.elements['assign-grade'].value,
-            days: form.elements['assign-days'].value,
-            subjects: form.elements['assign-subjects'].value.split(',').map(s => s.trim()).filter(s => s),
-            parentName: form.elements['assign-parentName'].value,
-            parentPhone: form.elements['assign-parentPhone'].value,
-            studentFee: Number(form.elements['assign-studentFee'].value) || 0,
-            tutorEmail: selectedTutorData.email,
-            tutorName: selectedTutorData.name,
-            status: 'approved',
-            summerBreak: false,
-            createdAt: Timestamp.now(),
-            tutorHistory: [{
-                tutorEmail: selectedTutorData.email,
-                tutorName: selectedTutorData.name,
-                assignedDate: Timestamp.now(),
-                assignedBy: window.userData?.email || 'management',
-                isCurrent: true
-            }],
-            gradeHistory: [{
-                grade: form.elements['assign-grade'].value,
-                changedDate: Timestamp.now(),
-                changedBy: window.userData?.email || 'management'
-            }]
-        };
-
-        try {
-            await addDoc(collection(db, "students"), newStudentData);
-            alert(`Student "${newStudentData.studentName}" assigned successfully to ${newStudentData.tutorName}!`);
-            closeManagementModal('assign-modal');
-            invalidateCache('students');
-            invalidateCache('tutorAssignments');
-            renderManagementTutorView(document.getElementById('main-content'));
-        } catch (error) {
-            console.error("Error assigning student: ", error);
-            alert("Failed to assign student. Check the console for details.");
-        }
-    });
-}
+// showAssignStudentModal is now defined in Section 3.1 (with parent email & createdBy)
 
 function showReassignStudentModal() {
     const tutors = sessionCache.tutors || [];
@@ -10387,3 +10298,4 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
