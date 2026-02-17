@@ -1,10 +1,11 @@
-// firebaseConfig.js - UPDATED & FUTURE-PROOF
+// firebaseConfig.js - MODULAR VERSION with global config
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { getStorage } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-storage.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
-// --- 1. PRODUCTION CONFIG (Live Site) ---
+// PRODUCTION CONFIG
 const mainConfig = {
     apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
     authDomain: "bloomingkidsassessment.firebaseapp.com",
@@ -14,7 +15,7 @@ const mainConfig = {
     appId: "1:238975054977:web:87c70b4db044998a204980"
 };
 
-// --- 2. DEVELOPMENT CONFIG (Your New Dev Project) ---
+// DEVELOPMENT CONFIG
 const devConfig = {
     apiKey: "AIzaSyAu36oLPNsk0TPKVIwCzEHe9oOtJ7cZQXA",
     authDomain: "blooming-kids-dev.firebaseapp.com",
@@ -24,7 +25,7 @@ const devConfig = {
     appId: "1:336022609689:web:ad5a0a74dcac011f21ef88"
 };
 
-// --- 3. THE SMART SWITCH ---
+// ENVIRONMENT DETECTION
 const hostname = window.location.hostname;
 const isDevelopment = 
     hostname === "localhost" || 
@@ -33,7 +34,10 @@ const isDevelopment =
 
 const firebaseConfig = isDevelopment ? devConfig : mainConfig;
 
-// --- 4. INITIALIZE & EXPORT ---
+// 🔽 NEW: Expose the config globally for the HTML (compat SDK)
+window.firebaseConfig = firebaseConfig;
+
+// INITIALIZE MODULAR SERVICES
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
