@@ -4192,7 +4192,7 @@
                 setTimeout(() => status.classList.remove('show'), 3000);
             }
 
-           async submitEnrollment() {
+          async submitEnrollment() {
     if (!this.validateForm()) {
         this.showAlert("Please fix all errors before submitting. Make sure all time selections are completed.", "danger");
         return;
@@ -4206,32 +4206,34 @@
     const result = await this.saveProgress();
 
     if (result.success) {
-        setTimeout(() => {
-            this.showAlert("Enrollment Submitted Successfully!", "success");
-            btn.innerHTML = 'Success!';
+        // Show success message
+        this.showAlert("Enrollment Submitted Successfully!", "success");
+        
+        // Show the invoice
+        this.showInvoice();
 
-            // Show the invoice
-            this.showInvoice();
+        // Set up parent portal account (fire and forget - don't await)
+        this.setupParentPortal(result.enrollmentData).catch(function(err) {
+            console.error("Background parent portal setup error:", err);
+        });
 
-            // Set up parent portal account (fire and forget)
-            this.setupParentPortal(result.enrollmentData).catch(err => {
-                console.error("Background parent portal setup error:", err);
-            });
+        // Send invoice email notification
+        setTimeout(function() {
+            var invoiceElement = document.getElementById('invoice-content');
+            var invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
+            this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
+        }.bind(this), 2000);
 
-            // Send invoice email notification
-            setTimeout(() => {
-                const invoiceContent = document.getElementById('invoice-content')?.innerHTML || "";
-                this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
-            }, 2000);
+        // Redirect prompt after another 2 seconds
+        setTimeout(function() {
+            if (confirm("Your enrollment is complete! Would you like to go to the parent portal now?")) {
+                window.location.href = "parent.html"; // Change to actual parent portal URL
+            }
+        }, 2000);
 
-            // Redirect prompt after another 2 seconds
-            setTimeout(() => {
-                if (confirm("Your enrollment is complete! Would you like to go to the parent portal now?")) {
-                    window.location.href = "parent.html"; // Change to actual parent portal URL
-                }
-            }, 2000);
-
-        }, 1000);
+        btn.innerHTML = 'Success!';
+        btn.disabled = false;
+        
     } else {
         btn.innerHTML = '<i class="fas fa-lock"></i> Proceed to Secure Payment';
         btn.disabled = false;
