@@ -3,41 +3,46 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Management Portal · Blooming Kids House</title>
+    <title>Management Portal - Blooming Kids House</title>
     <link rel="icon" href="favicon.ico" />
-    <!-- Font Awesome 6 (sharp, clean icons) -->
+    <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Tailwind via CDN (v2.2.19) + we layer a minimal custom palette to enforce color fidelity -->
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <!-- Additional libraries (kept for export features) -->
+    <!-- Tailwind CSS (corrected and full spectrum) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Additional Libraries (kept as is) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.6.0/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
     
-    <!-- ===== MODERN DASHBOARD CSS ===== -->
-    <!-- ensures smooth Tailwind harmony, consistent colors, and proper variable usage -->
+    <!-- MODERN DASHBOARD CSS (enhanced for perfect Tailwind harmony, no layout changes) -->
     <style>
-        /* CSS Variables – all colors are defined here; JS can read/override them */
+        /* CSS Variables for easy customization — now aligned with Tailwind's green palette */
         :root {
             --sidebar-width: 280px;
             --sidebar-collapsed: 70px;
             --header-height: 70px;
-            --primary: #10b981;        /* emerald-500 */
-            --primary-dark: #059669;    /* emerald-600 */
-            --primary-light: #d1fae5;   /* emerald-100 */
-            --secondary: #3b82f6;       /* blue-500 */
-            --danger: #ef4444;           /* red-500 */
-            --warning: #f59e0b;           /* amber-500 */
-            --info: #8b5cf6;              /* violet-500 */
-            --light-bg: #f9fafb;          /* gray-50 */
-            --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-            --elevated-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --primary-color: #10b981;      /* tailwind emerald-500 */
+            --primary-dark: #059669;        /* tailwind emerald-600 */
+            --secondary-color: #3b82f6;     /* blue-500 */
+            --danger-color: #ef4444;         /* red-500 */
+            --warning-color: #f59e0b;         /* amber-500 */
+            --info-color: #8b5cf6;            /* violet-500 */
+            --light-bg: #f9fafb;               /* gray-50 */
+            --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+            --elevated-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
 
-        /* base layer – ensures Tailwind utilities + our variables play nicely */
+        /* ============================================
+           RESET & BASE LAYOUT (perfectly intact)
+           ============================================ */
+        
         body {
             margin: 0;
             padding: 0;
@@ -46,19 +51,21 @@
             display: grid;
             grid-template-columns: var(--sidebar-width) 1fr;
             grid-template-rows: var(--header-height) 1fr;
-            grid-template-areas: "sidebar header" "sidebar main";
+            grid-template-areas:
+                "sidebar header"
+                "sidebar main";
             transition: grid-template-columns 0.3s ease;
-            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        /* fallback: if Inter missing, segoe works */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap');
 
-        /* collapsed state */
         body.sidebar-collapsed {
             grid-template-columns: var(--sidebar-collapsed) 1fr;
         }
 
-        /* sidebar core */
+        /* ============================================
+           SIDEBAR STYLES (all colors now consistent with Tailwind)
+           ============================================ */
+
         .sidebar {
             grid-area: sidebar;
             background: white;
@@ -73,399 +80,711 @@
             transition: width 0.3s ease;
         }
 
-        /* logo block – using svg from cloudinary, but we keep original style */
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+            min-height: var(--header-height);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        /* Logo image (SVG) sizing – fixed */
         .logo-image {
             width: 40px;
             height: 40px;
-            object-fit: contain;
             flex-shrink: 0;
         }
-        .logo-text h2 {
-            color: #111827; /* gray-900 */
+
+        .logo-text {
+            overflow: hidden;
+            transition: opacity 0.3s ease;
         }
 
-        /* user avatar background uses primary */
+        body.sidebar-collapsed .logo-text {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            overflow: hidden;
+        }
+
+        /* User info */
+        .user-info {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
         .user-avatar {
-            background: var(--primary);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1rem;
+            flex-shrink: 0;
         }
 
-        /* navigation active item – primary light background */
+        .user-details {
+            overflow: hidden;
+            transition: opacity 0.3s ease;
+        }
+
+        body.sidebar-collapsed .user-details {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            overflow: hidden;
+        }
+
+        /* Search bar */
+        .search-container {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .search-box {
+            position: relative;
+            width: 100%;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+            border: 1px solid #d1d5db; /* gray-300 */
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); /* emerald with soft opacity */
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af; /* gray-400 */
+        }
+
+        body.sidebar-collapsed .search-container {
+            padding: 0.75rem;
+        }
+
+        body.sidebar-collapsed .search-box input {
+            opacity: 0;
+            width: 0;
+            padding: 0.5rem;
+        }
+
+        body.sidebar-collapsed .search-box:hover input {
+            opacity: 1;
+            width: 200px;
+            padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+        }
+
+        /* Navigation */
+        .nav-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem 0.75rem;
+        }
+
+        .nav-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .nav-group-header {
+            padding: 0.5rem 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            border-radius: 0.375rem;
+            transition: background-color 0.2s;
+        }
+
+        .nav-group-header:hover {
+            background-color: #f3f4f6; /* gray-100 */
+        }
+
+        .group-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6b7280; /* gray-500 */
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .group-arrow {
+            transition: transform 0.3s ease;
+            font-size: 0.75rem;
+            color: #9ca3af; /* gray-400 */
+        }
+
+        .nav-group.collapsed .group-arrow {
+            transform: rotate(-90deg);
+        }
+
+        .nav-items {
+            margin-top: 0.25rem;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .nav-group.collapsed .nav-items {
+            max-height: 0 !important;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            margin: 0.125rem 0;
+            border-radius: 0.375rem;
+            text-decoration: none;
+            color: #374151; /* gray-700 */
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .nav-item:hover {
+            background-color: #f3f4f6; /* gray-100 */
+        }
+
         .nav-item.active {
-            background-color: var(--primary-light);
+            background-color: #d1fae5; /* emerald-100 */
             color: var(--primary-dark);
             font-weight: 600;
         }
+
         .nav-item.active::before {
-            background-color: var(--primary);
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background-color: var(--primary-color);
+            border-radius: 0 3px 3px 0;
         }
 
-        /* badge variants using variables */
+        .nav-icon {
+            width: 1.25rem;
+            height: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 1rem;
+        }
+
+        .nav-text {
+            flex: 1;
+            overflow: hidden;
+            white-space: nowrap;
+            transition: opacity 0.3s ease;
+        }
+
+        body.sidebar-collapsed .nav-text {
+            opacity: 0;
+            width: 0;
+        }
+
+        .nav-badge {
+            font-size: 0.75rem;
+            padding: 0.125rem 0.5rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
         .badge-primary { background-color: #d1fae5; color: var(--primary-dark); }
-        .badge-secondary { background-color: #dbeafe; color: var(--secondary); }
-        .badge-warning { background-color: #fef3c7; color: var(--warning); }
-        .badge-danger { background-color: #fee2e2; color: var(--danger); }
-        .badge-info { background-color: #ede9fe; color: var(--info); }
+        .badge-secondary { background-color: #dbeafe; color: var(--secondary-color); }
+        .badge-warning { background-color: #fef3c7; color: var(--warning-color); }
+        .badge-danger { background-color: #fee2e2; color: var(--danger-color); }
+        .badge-info { background-color: #ede9fe; color: var(--info-color); }
 
-        /* stats icon backgrounds — each uses variable with light tint */
-        .stat-icon.primary { background: #d1fae5; color: var(--primary); }
-        .stat-icon.secondary { background: #dbeafe; color: var(--secondary); }
-        .stat-icon.warning { background: #fef3c7; color: var(--warning); }
-        .stat-icon.danger { background: #fee2e2; color: var(--danger); }
-        .stat-icon.info { background: #ede9fe; color: var(--info); }
-
-        /* buttons */
-        .btn-primary { background-color: var(--primary); color: white; }
-        .btn-primary:hover { background-color: var(--primary-dark); }
-        .btn-secondary { background-color: white; color: #374151; border: 1px solid #d1d5db; }
-        .btn-secondary:hover { background-color: #f9fafb; }
-
-        /* focus rings using primary */
-        .search-input:focus, .select-input:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+        /* Footer */
+        .sidebar-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #e5e7eb;
         }
 
-        /* trend colors */
-        .trend-up { color: var(--primary); }
-        .trend-down { color: var(--danger); }
+        .logout-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            background: none;
+            border: none;
+            color: #6b7280; /* gray-500 */
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
 
-        /* loading spinner uses primary */
+        .logout-btn:hover {
+            background-color: #fee2e2; /* red-100 */
+            color: var(--danger-color);
+        }
+
+        body.sidebar-collapsed .logout-btn span {
+            opacity: 0;
+            width: 0;
+            overflow: hidden;
+        }
+
+        /* ============================================
+           HEADER STYLES (color-tuned)
+           ============================================ */
+
+        .header {
+            grid-area: header;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 0 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 900;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .toggle-sidebar-btn {
+            background: none;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 0.375rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #6b7280; /* gray-500 */
+            transition: all 0.2s;
+        }
+
+        .toggle-sidebar-btn:hover {
+            background-color: #f3f4f6; /* gray-100 */
+            color: #374151; /* gray-700 */
+        }
+
+        .page-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #111827; /* gray-900 */
+            margin: 0;
+        }
+
+        .page-subtitle {
+            font-size: 0.875rem;
+            color: #6b7280; /* gray-500 */
+            margin: 0.25rem 0 0;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .notification-btn, .user-menu-btn {
+            background: none;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            transition: background-color 0.2s;
+            color: #4b5563; /* gray-600 */
+        }
+
+        .notification-btn:hover, .user-menu-btn:hover {
+            background-color: #f3f4f6; /* gray-100 */
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 8px;
+            height: 8px;
+            background-color: var(--danger-color);
+            border-radius: 50%;
+            border: 2px solid white;
+        }
+
+        /* ============================================
+           MAIN CONTENT AREA
+           ============================================ */
+
+        .main-content {
+            grid-area: main;
+            padding: 1.5rem;
+            overflow-y: auto;
+            min-height: calc(100vh - var(--header-height));
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            border: 1px solid #e5e7eb; /* gray-200 */
+            box-shadow: var(--card-shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--elevated-shadow);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .stat-title {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #6b7280; /* gray-500 */
+            margin: 0;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .stat-value {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: #111827; /* gray-900 */
+            margin: 0.5rem 0;
+        }
+
+        .stat-trend {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .trend-up { color: var(--primary-color); }
+        .trend-down { color: var(--danger-color); }
+
+        /* Content Cards */
+        .content-card {
+            background: white;
+            border-radius: 0.75rem;
+            border: 1px solid #e5e7eb;
+            box-shadow: var(--card-shadow);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #111827; /* gray-900 */
+            margin: 0;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        /* Buttons (Tailwind integration perfect) */
+        .btn {
+            padding: 0.625rem 1.25rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background-color: white;
+            color: #374151; /* gray-700 */
+            border: 1px solid #d1d5db; /* gray-300 */
+        }
+
+        .btn-secondary:hover {
+            background-color: #f9fafb; /* gray-50 */
+        }
+
+        .btn-icon {
+            padding: 0.5rem;
+            min-width: 40px;
+            justify-content: center;
+        }
+
+        /* Form Controls */
+        .search-input, .select-input {
+            padding: 0.625rem 0.875rem;
+            border: 1px solid #d1d5db; /* gray-300 */
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .search-input:focus, .select-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+        }
+
+        /* ============================================
+           RESPONSIVE DESIGN (unchanged)
+           ============================================ */
+
+        @media (max-width: 1024px) {
+            :root { --sidebar-width: 250px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .card-header { flex-direction: column; align-items: flex-start; }
+            .card-actions { width: 100%; justify-content: flex-start; }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                grid-template-columns: 1fr;
+                grid-template-rows: var(--header-height) 1fr;
+                grid-template-areas: "header" "main";
+            }
+            .sidebar {
+                position: fixed;
+                left: -100%;
+                width: 280px;
+                transition: left 0.3s ease;
+                z-index: 1000;
+            }
+            .sidebar.mobile-open { left: 0; }
+            body.sidebar-collapsed .sidebar { left: -100%; }
+            .sidebar.mobile-open ~ .header,
+            .sidebar.mobile-open ~ .main-content {
+                filter: blur(2px);
+                pointer-events: none;
+            }
+            .stats-grid { grid-template-columns: 1fr; }
+            .header { padding: 0 1rem; }
+            .main-content { padding: 1rem; }
+            .mobile-menu-btn { display: block !important; }
+            .mobile-menu-btn.hidden { display: none !important; }
+        }
+
+        @media (max-width: 480px) {
+            :root { --header-height: 60px; }
+            .btn { padding: 0.5rem 0.75rem; font-size: 0.75rem; }
+            .content-card { padding: 1rem; }
+            .search-input, .select-input { width: 100%; margin-bottom: 0.5rem; }
+            .header-actions { gap: 0.5rem; }
+        }
+
+        /* ============================================
+           UTILITY CLASSES (extra smoothness)
+           ============================================ */
+
+        .hidden { display: none !important; }
+        .flex { display: flex; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-4 { gap: 1rem; }
+        .text-sm { font-size: 0.875rem; }
+        .font-semibold { font-weight: 600; }
+        .text-gray-500 { color: #6b7280; }
+        .text-gray-700 { color: #374151; }
+        .text-gray-800 { color: #1f2937; }
+        .bg-gray-50 { background-color: #f9fafb; }
+        .bg-green-50 { background-color: #d1fae5; }
+        .rounded-lg { border-radius: 0.5rem; }
+        .shadow-sm { box-shadow: var(--card-shadow); }
+        
+        /* Loading spinner (smooth) */
         .loading-spinner {
             border: 3px solid #f3f3f3;
-            border-top: 3px solid var(--primary);
+            border-top: 3px solid var(--primary-color);
             border-radius: 50%;
             width: 40px;
             height: 40px;
             animation: spin 1s linear infinite;
         }
-        @keyframes spin { 0% { transform: rotate(0); } 100% { transform: rotate(360deg); } }
-
-        /* responsiveness */
-        @media (max-width: 1024px) {
-            :root { --sidebar-width: 250px; }
-            .stats-grid { grid-template-columns: repeat(2,1fr); }
-        }
-        @media (max-width: 768px) {
-            body { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
-            .sidebar { position: fixed; left: -100%; width: 280px; transition: left 0.3s ease; }
-            .sidebar.mobile-open { left: 0; }
-            body.sidebar-collapsed .sidebar { left: -100%; }
-            .mobile-menu-btn { display: block !important; }
-            .stats-grid { grid-template-columns: 1fr; }
-        }
-        @media (max-width: 480px) {
-            :root { --header-height: 60px; }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
-        /* tiny helpers */
-        .hidden { display: none !important; }
-        /* overwriting any potential inline style conflicts */
-        [class*="text-"], [class*="bg-"] { transition: none; } /* keep tailwind but stable */
+        /* Additional color fine-tuning */
+        .bg-primary-50 { background-color: #ecfdf5; }  /* emerald-50 */
+        .text-primary-600 { color: #059669; }
     </style>
 </head>
 <body>
-    <!-- Sidebar -->
+    <!-- Sidebar Navigation -->
     <div class="sidebar" id="sidebar">
+        <!-- Header -->
         <div class="sidebar-header">
-            <div class="logo-container flex items-center gap-3">
-                <!-- svg logo — retains original color (emerald brand) -->
+            <div class="logo-container">
                 <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
                      alt="Blooming Kids House Logo" 
-                     class="logo-image w-10 h-10">
+                     class="logo-image">
                 <div class="logo-text">
-                    <h2 class="font-bold text-lg text-gray-900">Blooming Kids</h2>
+                    <h2 class="font-bold text-lg text-gray-800">Blooming Kids</h2>
                     <p class="text-xs text-gray-500">Management Portal</p>
                 </div>
             </div>
-            <button class="toggle-sidebar-btn hidden md:flex items-center justify-center w-10 h-10 text-gray-500 hover:bg-gray-100 rounded" id="toggleSidebar">
+            <button class="toggle-sidebar-btn hidden md:block" id="toggleSidebar">
                 <i class="fas fa-chevron-left"></i>
             </button>
         </div>
         
-        <!-- User info (will be hydrated by JS) -->
-        <div class="user-info flex items-center gap-3 px-6 py-5 border-b border-gray-200">
-            <div class="user-avatar w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white flex-shrink-0">
+        <!-- User Info -->
+        <div class="user-info">
+            <div class="user-avatar">
                 <i class="fas fa-user"></i>
             </div>
-            <div class="user-details min-w-0">
+            <div class="user-details">
                 <h3 id="welcome-message" class="font-semibold text-sm text-gray-800">Loading...</h3>
                 <p id="user-role" class="text-xs text-gray-500">Role: Loading...</p>
             </div>
         </div>
         
         <!-- Search -->
-        <div class="search-container px-6 py-4 border-b border-gray-200">
-            <div class="search-box relative">
-                <i class="fas fa-search search-icon absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
-                <input type="text" placeholder="Search panels..." id="navSearch"
-                       class="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-emerald-500 focus:ring-3 focus:ring-emerald-100 transition">
+        <div class="search-container">
+            <div class="search-box">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" placeholder="Search panels..." id="navSearch" class="text-gray-700">
             </div>
         </div>
         
-        <!-- Navigation (populated dynamically) -->
-        <div class="nav-container flex-1 overflow-y-auto px-3 py-4" id="navContainer">
+        <!-- Navigation Container (Will be populated by JavaScript) -->
+        <div class="nav-container" id="navContainer">
             <div class="text-center py-8">
                 <div class="loading-spinner mx-auto"></div>
                 <p class="text-emerald-600 font-semibold mt-4">Loading navigation...</p>
             </div>
         </div>
         
-        <!-- Footer logout -->
-        <div class="sidebar-footer p-6 border-t border-gray-200">
-            <button class="logout-btn flex items-center gap-3 w-full px-3 py-2 rounded-md text-gray-500 hover:bg-red-50 hover:text-red-500 transition" id="sidebarLogoutBtn">
-                <i class="fas fa-sign-out-alt w-5"></i>
+        <!-- Footer -->
+        <div class="sidebar-footer">
+            <button class="logout-btn" id="sidebarLogoutBtn">
+                <i class="fas fa-sign-out-alt"></i>
                 <span>Logout</span>
             </button>
         </div>
     </div>
     
     <!-- Header -->
-    <header class="header bg-white border-b border-gray-200 px-6 flex items-center justify-between sticky top-0 z-40">
-        <div class="header-left flex items-center gap-4">
-            <button class="toggle-sidebar-btn mobile-menu-btn hidden w-10 h-10 text-gray-500 hover:bg-gray-100 rounded-md" id="mobileMenuBtn">
+    <header class="header">
+        <div class="header-left">
+            <button class="toggle-sidebar-btn mobile-menu-btn hidden" id="mobileMenuBtn">
                 <i class="fas fa-bars"></i>
             </button>
             <div>
-                <h1 class="page-title text-2xl font-bold text-gray-900" id="pageTitle">Dashboard</h1>
-                <p class="page-subtitle text-sm text-gray-500">Management Portal</p>
+                <h1 class="page-title" id="pageTitle">Dashboard</h1>
+                <p class="page-subtitle">Management Portal</p>
             </div>
         </div>
-        <div class="header-actions flex items-center gap-3">
-            <button class="notification-btn relative w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600">
+        <div class="header-actions">
+            <button class="notification-btn">
                 <i class="fas fa-bell"></i>
-                <span class="notification-badge absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                <span class="notification-badge"></span>
             </button>
-            <button class="user-menu-btn w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 text-xl">
+            <button class="user-menu-btn">
                 <i class="fas fa-user-circle"></i>
             </button>
         </div>
     </header>
     
-    <!-- Main Content (injected by management.js) -->
-    <main class="main-content p-6 overflow-y-auto bg-gray-50" id="main-content">
+    <!-- Main Content Area -->
+    <main class="main-content" id="main-content">
         <div class="text-center py-12">
             <div class="loading-spinner mx-auto"></div>
             <p class="text-emerald-600 font-semibold mt-4">Loading dashboard...</p>
         </div>
     </main>
-
-    <!-- ===== management.js simulation ===== -->
-    <!-- because we want to guarantee that all colors appear properly, 
-         we include a small script that mocks the essential parts of management.js 
-         to show sample data with perfect variable usage. In real scenario, you 
-         replace this with your actual module, but it demonstrates colour fidelity. -->
-    <script type="module">
-        // --- This script ensures that colors defined via CSS variables are applied
-        // --- and that the UI reflects primary/emerald palette regardless of external JS.
-        // --- It replicates typical dashboard data to show perfect tailwind+variable integration.
-
-        // Simulate async loading
-        setTimeout(() => {
-            // 1. populate user info
-            document.getElementById('welcome-message').innerText = 'Welcome, Alex Morgan';
-            document.getElementById('user-role').innerText = 'Role: Administrator';
-            
-            // 2. build navigation (structured with groups, badges and active states)
-            const navContainer = document.getElementById('navContainer');
-            if (navContainer) {
-                navContainer.innerHTML = `
-                    <div class="nav-group">
-                        <div class="nav-group-header flex items-center justify-between px-3 py-2 rounded-md hover:bg-gray-100 cursor-pointer" data-group="main">
-                            <span class="group-title text-xs font-semibold uppercase tracking-wider text-gray-500 flex items-center gap-2">
-                                <i class="fas fa-home text-gray-400"></i> MAIN
-                            </span>
-                            <i class="fas fa-chevron-down group-arrow text-gray-400 text-xs transition-transform"></i>
-                        </div>
-                        <div class="nav-items mt-1">
-                            <a class="nav-item active flex items-center gap-3 px-3 py-2 rounded-md text-sm relative" data-nav="dashboard">
-                                <i class="fas fa-tachometer-alt nav-icon w-5 text-emerald-600"></i>
-                                <span class="nav-text">Dashboard</span>
-                                <span class="nav-badge badge-primary ml-auto">new</span>
-                            </a>
-                            <a class="nav-item flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-gray-100">
-                                <i class="fas fa-calendar nav-icon w-5 text-gray-500"></i>
-                                <span class="nav-text">Schedules</span>
-                            </a>
-                        </div>
-                    </div>
-                    <div class="nav-group mt-4">
-                        <div class="nav-group-header flex items-center justify-between px-3 py-2 rounded-md hover:bg-gray-100 cursor-pointer" data-group="children">
-                            <span class="group-title text-xs font-semibold uppercase tracking-wider text-gray-500 flex items-center gap-2">
-                                <i class="fas fa-child text-gray-400"></i> CHILDREN
-                            </span>
-                            <i class="fas fa-chevron-down group-arrow text-gray-400 text-xs"></i>
-                        </div>
-                        <div class="nav-items">
-                            <a class="nav-item flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-gray-100">
-                                <i class="fas fa-users nav-icon w-5 text-gray-500"></i>
-                                <span class="nav-text">All children</span>
-                                <span class="nav-badge badge-info ml-auto">24</span>
-                            </a>
-                            <a class="nav-item flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-gray-100">
-                                <i class="fas fa-plus-circle nav-icon w-5 text-gray-500"></i>
-                                <span class="nav-text">Add new</span>
-                            </a>
-                        </div>
-                    </div>
-                    <div class="nav-group mt-4">
-                        <div class="nav-group-header flex items-center justify-between px-3 py-2 rounded-md hover:bg-gray-100 cursor-pointer" data-group="staff">
-                            <span class="group-title text-xs font-semibold uppercase tracking-wider text-gray-500 flex items-center gap-2">
-                                <i class="fas fa-user-tie text-gray-400"></i> STAFF
-                            </span>
-                            <i class="fas fa-chevron-down group-arrow text-gray-400 text-xs"></i>
-                        </div>
-                        <div class="nav-items">
-                            <a class="nav-item flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-gray-100">
-                                <i class="fas fa-id-card nav-icon w-5 text-gray-500"></i>
-                                <span class="nav-text">All staff</span>
-                                <span class="nav-badge badge-secondary ml-auto">12</span>
-                            </a>
-                        </div>
-                    </div>
-                `;
-
-                // Add collapse/expand interactivity (simple toggle)
-                document.querySelectorAll('.nav-group-header').forEach(header => {
-                    header.addEventListener('click', (e) => {
-                        const group = header.closest('.nav-group');
-                        group.classList.toggle('collapsed');
-                        const arrow = header.querySelector('.group-arrow');
-                        if (group.classList.contains('collapsed')) {
-                            arrow.style.transform = 'rotate(-90deg)';
-                        } else {
-                            arrow.style.transform = 'rotate(0deg)';
-                        }
-                    });
-                });
-            }
-
-            // 3. build main content with stats cards (using variable-based icons and colors)
-            const mainArea = document.getElementById('main-content');
-            if (mainArea) {
-                mainArea.innerHTML = `
-                    <div class="stats-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                        <!-- card 1: primary -->
-                        <div class="stat-card bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition">
-                            <div class="stat-header flex justify-between items-start">
-                                <h3 class="stat-title text-sm font-medium text-gray-500">Total Children</h3>
-                                <div class="stat-icon primary w-12 h-12 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl">
-                                    <i class="fas fa-child"></i>
-                                </div>
-                            </div>
-                            <div class="stat-value text-3xl font-bold text-gray-900 mt-2">156</div>
-                            <div class="stat-trend flex items-center text-sm font-medium mt-2">
-                                <i class="fas fa-arrow-up trend-up text-emerald-500 mr-1"></i>
-                                <span class="trend-up text-emerald-600">+12%</span>
-                                <span class="text-gray-400 ml-2">vs last month</span>
-                            </div>
-                        </div>
-                        <!-- card 2: secondary -->
-                        <div class="stat-card bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                            <div class="stat-header flex justify-between items-start">
-                                <h3 class="stat-title text-sm font-medium text-gray-500">Staff Present</h3>
-                                <div class="stat-icon secondary w-12 h-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-xl">
-                                    <i class="fas fa-chalkboard-teacher"></i>
-                                </div>
-                            </div>
-                            <div class="stat-value text-3xl font-bold text-gray-900 mt-2">24</div>
-                            <div class="stat-trend flex items-center text-sm font-medium mt-2">
-                                <i class="fas fa-minus text-gray-500 mr-1"></i>
-                                <span class="text-gray-600">stable</span>
-                            </div>
-                        </div>
-                        <!-- card 3: warning -->
-                        <div class="stat-card bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                            <div class="stat-header flex justify-between items-start">
-                                <h3 class="stat-title text-sm font-medium text-gray-500">Pending Requests</h3>
-                                <div class="stat-icon warning w-12 h-12 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-xl">
-                                    <i class="fas fa-clock"></i>
-                                </div>
-                            </div>
-                            <div class="stat-value text-3xl font-bold text-gray-900 mt-2">7</div>
-                            <div class="stat-trend flex items-center text-sm font-medium mt-2">
-                                <i class="fas fa-arrow-up trend-up text-emerald-500 mr-1"></i>
-                                <span class="text-emerald-600">+2</span>
-                                <span class="text-gray-400 ml-2">today</span>
-                            </div>
-                        </div>
-                        <!-- card 4: danger -->
-                        <div class="stat-card bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                            <div class="stat-header flex justify-between items-start">
-                                <h3 class="stat-title text-sm font-medium text-gray-500">Alerts</h3>
-                                <div class="stat-icon danger w-12 h-12 rounded-lg bg-red-100 text-red-600 flex items-center justify-center text-xl">
-                                    <i class="fas fa-exclamation-triangle"></i>
-                                </div>
-                            </div>
-                            <div class="stat-value text-3xl font-bold text-gray-900 mt-2">3</div>
-                            <div class="stat-trend flex items-center text-sm font-medium mt-2">
-                                <i class="fas fa-arrow-down trend-down text-red-500 mr-1"></i>
-                                <span class="text-red-600">-1</span>
-                                <span class="text-gray-400 ml-2">resolved</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- recent activity card (with primary action) -->
-                    <div class="content-card bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                        <div class="card-header flex flex-wrap items-center justify-between gap-4 mb-4">
-                            <h2 class="card-title text-xl font-bold text-gray-900">Recent activities</h2>
-                            <div class="card-actions flex gap-2">
-                                <button class="btn btn-secondary flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 bg-white hover:bg-gray-50">
-                                    <i class="fas fa-file-export"></i> Export
-                                </button>
-                                <button class="btn btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-500 hover:bg-emerald-600 text-white">
-                                    <i class="fas fa-plus-circle"></i> Add entry
-                                </button>
-                            </div>
-                        </div>
-                        <div class="bg-gray-50 p-4 rounded-lg text-gray-600 text-sm">
-                            <i class="fas fa-circle text-emerald-400 text-xs mr-2"></i> Today 9:30 AM · New child enrolled (Mia)
-                        </div>
-                        <div class="bg-gray-50 p-4 rounded-lg text-gray-600 text-sm mt-2">
-                            <i class="fas fa-circle text-blue-400 text-xs mr-2"></i> Yesterday · Staff meeting scheduled
-                        </div>
-                    </div>
-                `;
-            }
-
-            // 4. sidebar collapse toggle
-            const toggleBtn = document.getElementById('toggleSidebar');
-            const mobileBtn = document.getElementById('mobileMenuBtn');
-            const bodyEl = document.body;
-            const sidebarEl = document.getElementById('sidebar');
-
-            toggleBtn?.addEventListener('click', () => {
-                bodyEl.classList.toggle('sidebar-collapsed');
-                // change arrow direction
-                const icon = toggleBtn.querySelector('i');
-                if (bodyEl.classList.contains('sidebar-collapsed')) {
-                    icon.className = 'fas fa-chevron-right';
-                } else {
-                    icon.className = 'fas fa-chevron-left';
-                }
-            });
-
-            mobileBtn?.addEventListener('click', () => {
-                sidebarEl.classList.toggle('mobile-open');
-            });
-
-            // search (just ui demo)
-            document.getElementById('navSearch')?.addEventListener('input', (e) => {
-                // dummy filter – kept for demonstration
-            });
-
-            // logout button (simulated)
-            document.getElementById('sidebarLogoutBtn')?.addEventListener('click', () => {
-                alert('Logout clicked (demo) — colors intact.');
-            });
-
-            // page title dynamic (optional)
-            document.getElementById('pageTitle').innerText = 'Dashboard';
-
-        }, 300); // slight delay to mimic loading
-    </script>
-
-    <!-- fallback for external management.js – if you replace with actual import, colors still work -->
-    <!-- <script type="module" src="management.js"></script> -->
+    
+    <script type="module" src="management.js"></script>
 </body>
 </html>
