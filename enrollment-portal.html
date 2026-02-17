@@ -1060,6 +1060,23 @@
             background: var(--success);
         }
 
+        /* NEW: Temporary Password Display */
+        #temp-password-container {
+            margin-top: 15px;
+            padding: 10px;
+            background: #E8F5E9;
+            border: 1px solid #A5D6A7;
+            border-radius: 6px;
+            display: none;
+        }
+        #temp-password {
+            font-weight: 700;
+            font-family: monospace;
+            background: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
         /* Footer */
         .footer {
             text-align: center;
@@ -1575,6 +1592,11 @@
                         <p>Your enrollment has been saved. You can return within 7 days to complete it.</p>
                         <p><strong>Application ID:</strong> <span id="saved-app-id"></span></p>
                         <p><strong>Resume Link:</strong> <span id="resume-link"></span></p>
+                        <!-- Temporary Password Display (hidden initially) -->
+                        <div id="temp-password-container">
+                            <p><strong>Your temporary password:</strong> <span id="temp-password"></span></p>
+                            <p>Please save this password. You can change it in the parent portal.</p>
+                        </div>
                         <div class="resume-link-actions">
                             <button class="copy-btn" id="copy-resume-link">
                                 <i class="fas fa-copy"></i> Copy Link
