@@ -4205,27 +4205,32 @@
                 // Save first, then proceed to payment
                 const result = await this.saveProgress();
                     
-                if (result.success) {
-                    setTimeout(() => {
-                        this.showAlert("Enrollment Submitted Successfully! Redirecting to payment...", "success");
-                        btn.innerHTML = 'Success!';
-                        
-                        // Show the invoice
-                        this.showInvoice();
-                        
-                        // Send invoice email notification
-                        setTimeout(() => {
-                            const invoiceContent = document.getElementById('invoice-content')?.innerHTML || "";
-                            this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
-                        }, 2000);
-                        
-                    }, 1000);
-                } else {
-                    btn.innerHTML = '<i class="fas fa-lock"></i> Proceed to Secure Payment';
-                    btn.disabled = false;
-                    this.showAlert("Failed to save enrollment. Please try again.", "danger");
-                }
-            }
+               if (result.success) {
+    // Show success message and invoice
+    this.showAlert("Enrollment Submitted Successfully!", "success");
+    this.showInvoice();
+
+    // Set up parent portal account (fire and forget – don't await to avoid blocking UI)
+    this.setupParentPortal(result.enrollmentData).catch(err => {
+        console.error("Background parent portal setup error:", err);
+    });
+
+    // Send invoice email notification
+    setTimeout(() => {
+        const invoiceContent = document.getElementById('invoice-content')?.innerHTML || "";
+        this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
+    }, 2000);
+
+    // Optionally redirect after a few seconds
+    setTimeout(() => {
+        if (confirm("Your enrollment is complete! Would you like to go to the parent portal now?")) {
+            window.location.href = "parent.html"; // or your actual parent portal URL
+        }
+    }, 3000);
+
+    btn.innerHTML = 'Success!';
+    btn.disabled = false;
+}
 
             copyResumeLink(btn) {
                 const text = document.getElementById('resume-link').textContent;
@@ -4240,6 +4245,102 @@
             }
         }
 
+        // ==============================================
+// PARENT PORTAL ACCOUNT SETUP
+// ==============================================
+async setupParentPortal(enrollmentData) {
+    if (!enrollmentData || !enrollmentData.parent) {
+        console.warn("No parent data to set up account");
+        return;
+    }
+
+    const parentEmail = enrollmentData.parent.email;
+    const parentName = enrollmentData.parent.name || 'Parent';
+    const parentPhone = enrollmentData.parent.phone; // already normalized
+    const referralCode = enrollmentData.referral?.code || '';
+
+    if (!parentEmail) {
+        this.showAlert("Cannot create parent account: email missing", "warning");
+        return;
+    }
+
+    try {
+        // 1. Check if a user with this email already exists in Firebase Auth
+        const methods = await firebase.auth().fetchSignInMethodsForEmail(parentEmail);
+
+        if (methods.length > 0) {
+            // User exists – find the parent UID from Firestore
+            const snapshot = await this.db.collection('parent_users')
+                .where('email', '==', parentEmail)
+                .limit(1)
+                .get();
+
+            if (!snapshot.empty) {
+                const existingParent = snapshot.docs[0].data();
+                const parentUid = existingParent.uid;
+
+                // Link this enrollment to the existing parent
+                await this.db.collection('enrollments').doc(this.currentApplicationId).update({
+                    parentUid: parentUid
+                });
+
+                this.showAlert(
+                    'Your existing parent account has been linked. You can log in to the parent portal with your email.',
+                    'success'
+                );
+            } else {
+                console.warn('User exists in Auth but not in parent_users');
+                this.showAlert(
+                    'An account with this email already exists, but we could not link it. Please contact support.',
+                    'warning'
+                );
+            }
+        } else {
+            // 2. Create a new Firebase Auth user with a random password
+            const randomPassword = Math.random().toString(36).slice(-10) + 
+                                   Math.random().toString(36).slice(-10).toUpperCase();
+            const userCredential = await firebase.auth().createUserWithEmailAndPassword(parentEmail, randomPassword);
+            const user = userCredential.user;
+
+            // Immediately sign out so the enrollment page stays anonymous
+            await firebase.auth().signOut();
+
+            // 3. Send a password reset email so the parent can set their own password
+            await firebase.auth().sendPasswordResetEmail(parentEmail);
+
+            // 4. Create the parent_users document
+            await this.db.collection('parent_users').doc(user.uid).set({
+                email: parentEmail,
+                phone: parentPhone,
+                normalizedPhone: parentPhone,
+                parentName: parentName,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                referralCode: referralCode,
+                referralEarnings: 0,
+                uid: user.uid
+            });
+
+            // 5. Link the enrollment to this new parent UID
+            await this.db.collection('enrollments').doc(this.currentApplicationId).update({
+                parentUid: user.uid
+            });
+
+            this.showAlert(
+                '✅ Parent portal account created! Check your email to set your password, then log in.',
+                'success'
+            );
+        }
+    } catch (error) {
+        console.error('Error setting up parent portal account:', error);
+        this.showAlert(
+            'Could not create parent portal account automatically. Please contact support to set up your account.',
+            'danger'
+        );
+    }
+}
+
+        
+        
         // ==============================================
         // INITIALIZE APPLICATION
         // ==============================================
