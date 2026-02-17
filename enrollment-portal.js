@@ -2527,20 +2527,28 @@ class EnrollmentApp {
             // Show the invoice
             this.showInvoice();
 
-            // Set up parent portal account (fire and forget - don't await)
-            this.setupParentPortal(result.enrollmentData).catch(function(err) {
-                console.error("Background parent portal setup error:", err);
-            });
+            // Set up parent portal account and get result
+            const portalResult = await this.setupParentPortal(result.enrollmentData);
+            
+            // If a new account was created with a temporary password, display it
+            if (portalResult && portalResult.isNew && portalResult.password) {
+                document.getElementById('temp-password').textContent = portalResult.password;
+                document.getElementById('temp-password-container').style.display = 'block';
+                this.showAlert(`Your temporary password is: ${portalResult.password}. Please save it.`, 'success');
+            } else if (portalResult && !portalResult.isNew) {
+                // Existing account linked – user may need to log in
+                this.showAlert('Your existing parent account has been linked. You can log in with your email.', 'info');
+            }
 
-            // Send invoice email notification
-            setTimeout(function() {
-                var invoiceElement = document.getElementById('invoice-content');
-                var invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
+            // Send invoice email notification (fire and forget)
+            setTimeout(() => {
+                const invoiceElement = document.getElementById('invoice-content');
+                const invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
                 this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
-            }.bind(this), 2000);
+            }, 2000);
 
             // Redirect prompt after another 2 seconds
-            setTimeout(function() {
+            setTimeout(() => {
                 if (confirm("Your enrollment is complete! Would you like to go to the parent portal now?")) {
                     window.location.href = "parent.html"; // Change to actual parent portal URL
                 }
@@ -2569,12 +2577,12 @@ class EnrollmentApp {
     }
 
     // ==============================================
-    // PARENT PORTAL ACCOUNT SETUP (NEW METHOD)
+    // PARENT PORTAL ACCOUNT SETUP (UPDATED)
     // ==============================================
     async setupParentPortal(enrollmentData) {
         if (!enrollmentData || !enrollmentData.parent) {
             console.warn("No parent data to set up account");
-            return;
+            return null;
         }
 
         const parentEmail = enrollmentData.parent.email;
@@ -2584,15 +2592,15 @@ class EnrollmentApp {
 
         if (!parentEmail) {
             this.showAlert("Cannot create parent account: email missing", "warning");
-            return;
+            return null;
         }
 
         try {
-            // Check if user exists
+            // Check if user exists in Firebase Auth
             const methods = await firebase.auth().fetchSignInMethodsForEmail(parentEmail);
 
             if (methods.length > 0) {
-                // User exists - find parent UID
+                // User exists - find parent UID in Firestore
                 const snapshot = await this.db.collection('parent_users')
                     .where('email', '==', parentEmail)
                     .limit(1)
@@ -2610,11 +2618,13 @@ class EnrollmentApp {
                         'Your existing parent account has been linked. You can log in to the parent portal with your email.',
                         'success'
                     );
+                    return { isNew: false, uid: parentUid };
                 } else {
                     this.showAlert(
                         'An account with this email already exists, but we could not link it. Please contact support.',
                         'warning'
                     );
+                    return null;
                 }
             } else {
                 // Create new user
@@ -2623,9 +2633,10 @@ class EnrollmentApp {
                 const userCredential = await firebase.auth().createUserWithEmailAndPassword(parentEmail, randomPassword);
                 const user = userCredential.user;
 
-                await firebase.auth().signOut();
-                await firebase.auth().sendPasswordResetEmail(parentEmail);
+                // Keep user signed in (do NOT sign out)
+                // Do NOT send password reset email – we will show the password to the user
 
+                // Store in parent_users collection
                 await this.db.collection('parent_users').doc(user.uid).set({
                     email: parentEmail,
                     phone: parentPhone,
@@ -2637,14 +2648,17 @@ class EnrollmentApp {
                     uid: user.uid
                 });
 
+                // Update enrollment with parentUid (optionally store temp password)
                 await this.db.collection('enrollments').doc(this.currentApplicationId).update({
-                    parentUid: user.uid
+                    parentUid: user.uid,
+                    tempPassword: randomPassword // stored for reference (not shown again)
                 });
 
                 this.showAlert(
-                    '✅ Parent portal account created! Check your email to set your password, then log in.',
+                    '✅ Parent portal account created! You are now logged in.',
                     'success'
                 );
+                return { isNew: true, uid: user.uid, password: randomPassword };
             }
         } catch (error) {
             console.error('Error setting up parent portal account:', error);
@@ -2652,6 +2666,7 @@ class EnrollmentApp {
                 'Could not create parent portal account automatically. Please contact support.',
                 'danger'
             );
+            return null;
         }
     }
 }
