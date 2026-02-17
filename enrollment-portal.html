@@ -4192,44 +4192,51 @@
                 setTimeout(() => status.classList.remove('show'), 3000);
             }
 
-            async submitEnrollment() {
-                if(!this.validateForm()) {
-                    this.showAlert("Please fix all errors before submitting. Make sure all time selections are completed.", "danger");
-                    return;
+           async submitEnrollment() {
+    if (!this.validateForm()) {
+        this.showAlert("Please fix all errors before submitting. Make sure all time selections are completed.", "danger");
+        return;
+    }
+
+    const btn = document.getElementById('submit-enrollment');
+    btn.innerHTML = '<div class="spinner"></div> Processing...';
+    btn.disabled = true;
+
+    // Save first, then proceed to portal setup
+    const result = await this.saveProgress();
+
+    if (result.success) {
+        setTimeout(() => {
+            this.showAlert("Enrollment Submitted Successfully!", "success");
+            btn.innerHTML = 'Success!';
+
+            // Show the invoice
+            this.showInvoice();
+
+            // Set up parent portal account (fire and forget)
+            this.setupParentPortal(result.enrollmentData).catch(err => {
+                console.error("Background parent portal setup error:", err);
+            });
+
+            // Send invoice email notification
+            setTimeout(() => {
+                const invoiceContent = document.getElementById('invoice-content')?.innerHTML || "";
+                this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
+            }, 2000);
+
+            // Redirect prompt after another 2 seconds
+            setTimeout(() => {
+                if (confirm("Your enrollment is complete! Would you like to go to the parent portal now?")) {
+                    window.location.href = "parent.html"; // Change to actual parent portal URL
                 }
-                
-                const btn = document.getElementById('submit-enrollment');
-                btn.innerHTML = '<div class="spinner"></div> Processing...';
-                btn.disabled = true;
-                
-                // Save first, then proceed to payment
-                const result = await this.saveProgress();
-                    
-               if (result.success) {
-    // Show success message and invoice
-    this.showAlert("Enrollment Submitted Successfully!", "success");
-    this.showInvoice();
+            }, 2000);
 
-    // Set up parent portal account (fire and forget – don't await to avoid blocking UI)
-    this.setupParentPortal(result.enrollmentData).catch(err => {
-        console.error("Background parent portal setup error:", err);
-    });
-
-    // Send invoice email notification
-    setTimeout(() => {
-        const invoiceContent = document.getElementById('invoice-content')?.innerHTML || "";
-        this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
-    }, 2000);
-
-    // Optionally redirect after a few seconds
-    setTimeout(() => {
-        if (confirm("Your enrollment is complete! Would you like to go to the parent portal now?")) {
-            window.location.href = "parent.html"; // or your actual parent portal URL
-        }
-    }, 3000);
-
-    btn.innerHTML = 'Success!';
-    btn.disabled = false;
+        }, 1000);
+    } else {
+        btn.innerHTML = '<i class="fas fa-lock"></i> Proceed to Secure Payment';
+        btn.disabled = false;
+        this.showAlert("Failed to save enrollment. Please try again.", "danger");
+    }
 }
 
             copyResumeLink(btn) {
@@ -4245,7 +4252,7 @@
             }
         }
 
-        // ==============================================
+// ==============================================
 // PARENT PORTAL ACCOUNT SETUP
 // ==============================================
 async setupParentPortal(enrollmentData) {
@@ -4257,7 +4264,7 @@ async setupParentPortal(enrollmentData) {
     const parentEmail = enrollmentData.parent.email;
     const parentName = enrollmentData.parent.name || 'Parent';
     const parentPhone = enrollmentData.parent.phone; // already normalized
-    const referralCode = enrollmentData.referral?.code || '';
+    const referralCode = enrollmentData.referral && enrollmentData.referral.code ? enrollmentData.referral.code : '';
 
     if (!parentEmail) {
         this.showAlert("Cannot create parent account: email missing", "warning");
@@ -4265,7 +4272,7 @@ async setupParentPortal(enrollmentData) {
     }
 
     try {
-        // 1. Check if a user with this email already exists in Firebase Auth
+        // 1. Check if a user with this email already exists
         const methods = await firebase.auth().fetchSignInMethodsForEmail(parentEmail);
 
         if (methods.length > 0) {
@@ -4297,7 +4304,7 @@ async setupParentPortal(enrollmentData) {
             }
         } else {
             // 2. Create a new Firebase Auth user with a random password
-            const randomPassword = Math.random().toString(36).slice(-10) + 
+            const randomPassword = Math.random().toString(36).slice(-10) +
                                    Math.random().toString(36).slice(-10).toUpperCase();
             const userCredential = await firebase.auth().createUserWithEmailAndPassword(parentEmail, randomPassword);
             const user = userCredential.user;
@@ -4305,7 +4312,7 @@ async setupParentPortal(enrollmentData) {
             // Immediately sign out so the enrollment page stays anonymous
             await firebase.auth().signOut();
 
-            // 3. Send a password reset email so the parent can set their own password
+            // 3. Send a password reset email
             await firebase.auth().sendPasswordResetEmail(parentEmail);
 
             // 4. Create the parent_users document
@@ -4338,9 +4345,7 @@ async setupParentPortal(enrollmentData) {
         );
     }
 }
-
-        
-        
+  
         // ==============================================
         // INITIALIZE APPLICATION
         // ==============================================
