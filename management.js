@@ -1273,7 +1273,7 @@ async function renderManagementTutorView(container) {
     try {
         // Event Listeners for new buttons
         document.getElementById('assign-student-btn').addEventListener('click', () => {
-            showAssignNewStudentModal();
+            showAssignStudentModal();
         });
 
         document.getElementById('transition-student-btn').addEventListener('click', () => {
@@ -10254,6 +10254,7 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
 
