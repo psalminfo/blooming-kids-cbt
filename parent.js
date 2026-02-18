@@ -5756,4 +5756,4 @@ console.log("✅ SINGLE FIX APPLIED: Double registration & email linking resolve
 
 // ============================================================================
 // END OF PARENT.JS - PRODUCTION READY
-// ============================================================================ what is wrong with this code file
+// ============================================================================
