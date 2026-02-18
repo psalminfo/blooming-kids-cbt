@@ -138,7 +138,7 @@
             transition: var(--transition);
             box-shadow: 0 8px 20px -10px rgba(0,0,0,0.1);
             color: inherit;
-            cursor: pointer;
+            cursor: pointer;  /* Make cards clickable */
         }
 
         .stat-card:hover {
@@ -542,6 +542,144 @@
                 document.getElementById('networkWarning').classList.remove('hidden');
             });
         })();
+    </script>
+
+    <!-- New module script for stat card clicks (does not modify tutor.js) -->
+    <script type="module">
+        import { db } from './firebaseConfig.js';
+        import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+        // Wait for tutorData to be set by tutor.js
+        function waitForTutorData(callback) {
+            if (window.tutorData) {
+                callback();
+            } else {
+                setTimeout(() => waitForTutorData(callback), 100);
+            }
+        }
+
+        waitForTutorData(() => {
+            const tutor = window.tutorData;
+
+            // ----- Total Students Card -----
+            document.getElementById('totalStudentsCard').addEventListener('click', async () => {
+                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const snapshot = await getDocs(q);
+                const students = snapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter(s => !['archived','graduated','transferred'].includes(s.status));
+
+                // Build modal HTML
+                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="studentListModal">
+                    <div class="relative bg-white p-6 rounded-lg shadow-xl w-full max-w-4xl mx-auto">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold">My Students (${students.length})</h3>
+                            <button class="text-2xl font-bold close-modal">&times;</button>
+                        </div>
+                        <div class="overflow-auto max-h-96">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Added</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">`;
+
+                students.forEach(s => {
+                    let type = 'Regular';
+                    if (s.isTransitioning) type = 'Transitioning';
+                    else if (s.groupClass) type = 'Group Class';
+                    // Use createdAt if available, otherwise show N/A
+                    const added = s.createdAt ? new Date(s.createdAt.seconds * 1000).toLocaleDateString() : 'N/A';
+                    html += `<tr>
+                        <td class="px-4 py-2 whitespace-nowrap">${escapeHtml(s.studentName)}</td>
+                        <td class="px-4 py-2 whitespace-nowrap">${escapeHtml(s.grade)}</td>
+                        <td class="px-4 py-2 whitespace-nowrap">${escapeHtml(type)}</td>
+                        <td class="px-4 py-2 whitespace-nowrap">${escapeHtml(added)}</td>
+                    </tr>`;
+                });
+
+                html += `</tbody></table></div></div></div>`;
+
+                const modalDiv = document.createElement('div');
+                modalDiv.innerHTML = html;
+                const modal = modalDiv.firstElementChild;
+                document.body.appendChild(modal);
+
+                // Close button
+                modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
+                // Click outside to close
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) modal.remove();
+                });
+            });
+
+            // ----- Today's Classes Card -----
+            document.getElementById('todayClassesCard').addEventListener('click', async () => {
+                const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' }); // e.g., "Monday"
+                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const snapshot = await getDocs(q);
+                const students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                const todayClasses = [];
+                students.forEach(s => {
+                    if (s.schedule && Array.isArray(s.schedule)) {
+                        s.schedule.forEach(slot => {
+                            if (slot.day === todayName) {
+                                todayClasses.push({
+                                    student: s.studentName,
+                                    time: `${slot.start} - ${slot.end}`
+                                });
+                            }
+                        });
+                    }
+                });
+
+                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="todayClassesModal">
+                    <div class="relative bg-white p-6 rounded-lg shadow-xl w-full max-w-lg mx-auto">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold">Today's Classes (${todayName})</h3>
+                            <button class="text-2xl font-bold close-modal">&times;</button>
+                        </div>
+                        <div class="overflow-auto max-h-96">`;
+
+                if (todayClasses.length === 0) {
+                    html += '<p class="text-gray-500">No classes scheduled today.</p>';
+                } else {
+                    html += '<ul class="list-disc pl-5 space-y-2">';
+                    todayClasses.forEach(c => {
+                        html += `<li><strong>${escapeHtml(c.student)}</strong> at ${escapeHtml(c.time)}</li>`;
+                    });
+                    html += '</ul>';
+                }
+
+                html += `</div></div></div>`;
+
+                const modalDiv = document.createElement('div');
+                modalDiv.innerHTML = html;
+                const modal = modalDiv.firstElementChild;
+                document.body.appendChild(modal);
+
+                modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) modal.remove();
+                });
+            });
+        });
+
+        // Simple escape function for safety
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return String(unsafe)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
     </script>
 </body>
 </html>
