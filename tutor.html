@@ -72,7 +72,7 @@
             border-color: var(--border-dark);
         }
 
-        /* floating orbs (more subtle) */
+        /* floating orbs */
         .orb {
             position: absolute;
             border-radius: 50%;
@@ -107,7 +107,7 @@
         }
         .avatar-circle:hover { transform: scale(1.05) rotate(3deg); }
 
-        /* date badge */
+        /* date chip */
         .date-chip {
             background: rgba(255,255,255,0.3);
             backdrop-filter: blur(8px);
@@ -119,7 +119,7 @@
             color: inherit;
         }
 
-        /* stat cards */
+        /* stat cards (clickable) */
         .stat-card-modern {
             background: rgba(255,255,255,0.2);
             backdrop-filter: blur(8px);
@@ -132,6 +132,7 @@
             display: flex;
             align-items: center;
             gap: 1rem;
+            cursor: pointer;
         }
         .stat-card-modern:hover {
             background: rgba(255,255,255,0.35);
@@ -227,7 +228,7 @@
             box-shadow: 0 8px 18px var(--accent-glow);
         }
 
-        /* floating messaging (keep original class names, restyle) */
+        /* floating messaging (original class names, restyled) */
         .floating-messaging-btn, .floating-inbox-btn {
             position: fixed;
             right: 24px;
@@ -310,6 +311,32 @@
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
         #networkWarning, #networkErrorOverlay { z-index: 9999; }
+
+        /* modal for stat clicks (simple placeholder) */
+        .stat-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .stat-modal-content {
+            background: white;
+            border-radius: 2rem;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.3);
+        }
+        body.dark .stat-modal-content {
+            background: #1e293b;
+            color: #f8fafc;
+        }
     </style>
 </head>
 <body>
@@ -368,34 +395,30 @@
                 </div>
             </div>
 
-            <!-- stat cards (keep IDs for JS updates) -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10 relative z-20">
-                <div class="stat-card-modern" id="statTotalStudents">
+            <!-- stat cards (clickable) -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 relative z-20">
+                <!-- Total Students card -->
+                <div class="stat-card-modern" id="statTotalStudentsCard" onclick="showStudentList()">
                     <div class="stat-icon-modern"><i class="fas fa-users"></i></div>
                     <div>
                         <p class="text-xs opacity-70">Total students</p>
-                        <p class="text-2xl font-bold" id="staticTotalStudents">128</p>
+                        <p class="text-2xl font-bold" id="staticTotalStudents">0</p>
                     </div>
                 </div>
-                <div class="stat-card-modern" id="statTodayClasses">
+                <!-- Today's Classes card -->
+                <div class="stat-card-modern" id="statTodayClassesCard" onclick="showTodayClasses()">
                     <div class="stat-icon-modern" style="background: linear-gradient(145deg, #fbbf24, #d97706);"><i class="fas fa-clock"></i></div>
                     <div>
                         <p class="text-xs opacity-70">Today's classes</p>
-                        <p class="text-2xl font-bold" id="staticTodayClasses">8</p>
+                        <p class="text-2xl font-bold" id="staticTodayClasses">0</p>
                     </div>
                 </div>
-                <div class="stat-card-modern" id="statPendingReports">
-                    <div class="stat-icon-modern" style="background: linear-gradient(145deg, #3b82f6, #1e3a8a);"><i class="fas fa-book-open"></i></div>
-                    <div>
-                        <p class="text-xs opacity-70">Pending reports</p>
-                        <p class="text-2xl font-bold" id="staticPendingReports">3</p>
-                    </div>
-                </div>
-                <div class="stat-card-modern" id="statAchievements">
+                <!-- Achievements card (optional) -->
+                <div class="stat-card-modern" id="statAchievementsCard">
                     <div class="stat-icon-modern" style="background: linear-gradient(145deg, #ec4899, #831843);"><i class="fas fa-star"></i></div>
                     <div>
                         <p class="text-xs opacity-70">Achievements</p>
-                        <p class="text-2xl font-bold" id="staticAchievements">12</p>
+                        <p class="text-2xl font-bold" id="staticAchievements">0</p>
                     </div>
                 </div>
             </div>
@@ -403,13 +426,14 @@
             <!-- gamification widget (required) -->
             <div id="performance-widget" class="mb-8 relative z-20"></div>
 
-            <!-- navigation pills (IDs required) -->
+            <!-- navigation pills with new tabs -->
             <nav class="relative z-20 mb-8 overflow-x-auto hide-scrollbar">
                 <div class="nav-pill-wrapper">
                     <button id="navDashboard" class="nav-tab-modern active"><i class="fas fa-columns"></i>Dashboard</button>
                     <button id="navStudentDatabase" class="nav-tab-modern"><i class="fas fa-users"></i>Student Database</button>
                     <button id="navAutoStudents" class="nav-tab-modern"><i class="fas fa-user-plus"></i>Auto‑Registered</button>
-                    <button class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule</button>
+                    <button id="navAcademic" class="nav-tab-modern"><i class="fas fa-book-open"></i>Academic</button>
+                    <button id="navSchedule" class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule</button>
                 </div>
             </nav>
 
@@ -447,6 +471,13 @@
                 <button onclick="window.location.reload()" class="btn-modern btn-primary w-full">Try Again</button>
                 <button onclick="checkConnectivity()" class="btn-modern border border-gray-300 dark:border-gray-600 w-full">Check Connection</button>
             </div>
+        </div>
+    </div>
+
+    <!-- placeholder modal for stat clicks (will be replaced by JS) -->
+    <div id="statModal" class="stat-modal hidden" onclick="if(event.target===this) closeStatModal()">
+        <div class="stat-modal-content" id="statModalContent">
+            <!-- content will be injected by JS -->
         </div>
     </div>
 
@@ -519,6 +550,24 @@
             window.addEventListener('offline', () => {
                 document.getElementById('networkWarning').classList.remove('hidden');
             });
+
+            // Placeholder functions for stat clicks (to be implemented in tutor.js)
+            window.showStudentList = function() {
+                // This will be overridden by tutor.js with real data
+                const modal = document.getElementById('statModal');
+                const content = document.getElementById('statModalContent');
+                content.innerHTML = '<h2 class="text-xl font-bold mb-4">Students</h2><p class="text-gray-500">Loading...</p>';
+                modal.classList.remove('hidden');
+            };
+            window.showTodayClasses = function() {
+                const modal = document.getElementById('statModal');
+                const content = document.getElementById('statModalContent');
+                content.innerHTML = '<h2 class="text-xl font-bold mb-4">Today\'s Classes</h2><p class="text-gray-500">Loading...</p>';
+                modal.classList.remove('hidden');
+            };
+            window.closeStatModal = function() {
+                document.getElementById('statModal').classList.add('hidden');
+            };
         })();
     </script>
 </body>
