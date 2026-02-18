@@ -6979,114 +6979,11 @@ async function approveEnrollmentWithDetails(enrollmentId) {
         const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
         const enrollmentData = enrollmentDoc.data();
 
-        const studentAssignments = [];
-        const errors = [];
-
         const tutors = sessionCache.tutors || [];
-
-        enrollmentData.students.forEach((student, studentIndex) => {
-            const academicTutorId = document.getElementById(`selected-tutor-${studentIndex}`)?.value;
-            if (!academicTutorId) {
-                errors.push(`Please select an academic tutor for student: ${student.name}`);
-                return;
-            }
-
-            const academicTutor = tutors.find(t => t.id === academicTutorId || t.email === academicTutorId);
-            if (!academicTutor) {
-                errors.push(`Invalid tutor selected for student: ${student.name}`);
-                return;
-            }
-
-            const extracurricularTutors = [];
-            if (student.extracurriculars) {
-                student.extracurriculars.forEach((activity, ecIndex) => {
-                    const ecTutorId = document.getElementById(`selected-ec-tutor-${studentIndex}-${ecIndex}`)?.value;
-                    if (ecTutorId) {
-                        const ecTutor = tutors.find(t => t.id === ecTutorId || t.email === ecTutorId);
-                        if (ecTutor) {
-                            extracurricularTutors.push({
-                                activity: activity.name,
-                                tutorId: ecTutor.id,
-                                tutorName: ecTutor.name,
-                                tutorEmail: ecTutor.email,
-                                assignedDate: Timestamp.now(),
-                                frequency: activity.frequency
-                            });
-                        } else {
-                            extracurricularTutors.push({
-                                activity: activity.name,
-                                tutorId: null,
-                                tutorName: null,
-                                tutorEmail: null,
-                                assignedDate: null,
-                                frequency: activity.frequency
-                            });
-                        }
-                    } else {
-                        // No tutor selected for this extracurricular activity
-                        extracurricularTutors.push({
-                            activity: activity.name,
-                            tutorId: null,
-                            tutorName: null,
-                            tutorEmail: null,
-                            assignedDate: null,
-                            frequency: activity.frequency
-                        });
-                    }
-                });
-            }
-
-            const subjectTutors = [];
-            if (student.selectedSubjects) {
-                student.selectedSubjects.forEach((subject, subIndex) => {
-                    const subTutorId = document.getElementById(`selected-sub-tutor-${studentIndex}-${subIndex}`)?.value;
-                    if (subTutorId) {
-                        const subTutor = tutors.find(t => t.id === subTutorId || t.email === subTutorId);
-                        if (subTutor) {
-                            subjectTutors.push({
-                                subject: subject,
-                                tutorId: subTutor.id,
-                                tutorName: subTutor.name,
-                                tutorEmail: subTutor.email,
-                                assignedDate: Timestamp.now()
-                            });
-                        }
-                    }
-                });
-            }
-
-            studentAssignments.push({
-                studentName: student.name,
-                studentId: `student_${enrollmentId}_${studentIndex}_${Date.now()}`,
-                academicTutor: {
-                    tutorId: academicTutor.id,
-                    tutorName: academicTutor.name,
-                    tutorEmail: academicTutor.email
-                },
-                extracurricularTutors,
-                subjectTutors,
-                grade: student.grade,
-                subjects: student.selectedSubjects || [],
-                extracurriculars: student.extracurriculars || [],
-                academicDays,
-                academicTime,
-                studentFee: Math.round(finalFee / enrollmentData.students.length),
-                enrollmentId
-            });
-        });
-
-        if (errors.length > 0) {
-            alert(errors.join('\n'));
-            return;
-        }
-
-        if (studentAssignments.length === 0) {
-            alert("Please assign tutors to all students.");
-            return;
-        }
 
         const batch = writeBatch(db);
 
+        // Update enrollment status
         batch.update(doc(db, "enrollments", enrollmentId), {
             status: enrollmentStatus,
             payment: {
@@ -7105,320 +7002,129 @@ async function approveEnrollmentWithDetails(enrollmentId) {
             lastUpdated: Timestamp.now()
         });
 
-        studentAssignments.forEach(student => {
-            const studentRef = doc(collection(db, "students"));
-            const studentData = {
-                name: student.studentName,
-                enrollmentId,
+        // Process each student
+        enrollmentData.students.forEach((student, studentIndex) => {
+            // --- Academic Tutor ---
+            const academicTutorId = document.getElementById(`selected-tutor-${studentIndex}`)?.value;
+            if (!academicTutorId) {
+                // Academic tutor is required; if missing, show error and abort
+                throw new Error(`Please select an academic tutor for student: ${student.name}`);
+            }
+            const academicTutor = tutors.find(t => t.id === academicTutorId || t.email === academicTutorId);
+            if (!academicTutor) {
+                throw new Error(`Invalid tutor selected for student: ${student.name}`);
+            }
+
+            // Create a pending record for the academic tutor
+            const pendingAcademicRef = doc(collection(db, "pending_students"));
+            batch.set(pendingAcademicRef, {
+                studentName: student.name,
+                tutorId: academicTutor.id,
+                tutorName: academicTutor.name,
+                tutorEmail: academicTutor.email,
+                grade: student.grade,
+                subjects: student.selectedSubjects || [],
+                academicDays: academicDays,
+                academicTime: academicTime,
                 parentName: enrollmentData.parent?.name,
                 parentPhone: enrollmentData.parent?.phone,
                 parentEmail: enrollmentData.parent?.email,
-                parentAddress: enrollmentData.parent?.address,
-                grade: student.grade,
-                academicDays: student.academicDays,
-                academicTime: student.academicTime,
-                subjects: student.subjects,
-                extracurriculars: student.extracurriculars,
-                testPrep: enrollmentData.students?.find(s => s.name === student.studentName)?.testPrep || [],
-                preferredTutor: enrollmentData.students?.find(s => s.name === student.studentName)?.preferredTutor || '',
-                additionalNotes: enrollmentData.students?.find(s => s.name === student.studentName)?.additionalNotes || '',
-
-                tutorId: student.academicTutor.tutorId,
-                tutorName: student.academicTutor.tutorName,
-                tutorEmail: student.academicTutor.tutorEmail,
-                assignedDate: Timestamp.now(),
-
-                extracurricularTutors: student.extracurricularTutors,
-                subjectTutors: student.subjectTutors,
-
-                status: 'active',
-                createdAt: Timestamp.now(),
-                updatedAt: Timestamp.now(),
-
-                startDate: enrollmentData.students?.find(s => s.name === student.studentName)?.startDate || '',
-                actualGrade: enrollmentData.students?.find(s => s.name === student.studentName)?.actualGrade || '',
-                dob: enrollmentData.students?.find(s => s.name === student.studentName)?.dob || '',
-                gender: enrollmentData.students?.find(s => s.name === student.studentName)?.gender || '',
-
-                studentFee: student.studentFee,
-                paymentStatus: 'pending'
-            };
-
-            batch.set(studentRef, studentData);
-
-            const pendingRef = doc(collection(db, "pending_students"));
-            batch.set(pendingRef, {
-                studentName: student.studentName,
-                tutorName: student.academicTutor.tutorName,
-                tutorEmail: student.academicTutor.tutorEmail,
-                grade: student.grade,
-                subjects: student.subjects,
-                academicDays: student.academicDays,
-                academicTime: student.academicTime,
-                parentName: enrollmentData.parent?.name,
-                parentPhone: enrollmentData.parent?.phone,
-                parentEmail: enrollmentData.parent?.email,
-                enrollmentId,
-                status: 'pending',
+                enrollmentId: enrollmentId,
+                type: 'academic',
+                status: 'pending',        // 'pending' means awaiting tutor acceptance
                 createdAt: Timestamp.now(),
                 source: 'enrollment_approval',
-                note: 'Enrollment approved and tutor assigned'
+                note: 'Academic tutoring assignment awaiting your acceptance'
             });
+
+            // --- Extracurricular Tutors (each activity separately) ---
+            if (student.extracurriculars && student.extracurriculars.length > 0) {
+                student.extracurriculars.forEach((activity, ecIndex) => {
+                    const ecTutorId = document.getElementById(`selected-ec-tutor-${studentIndex}-${ecIndex}`)?.value;
+                    if (ecTutorId) {
+                        const ecTutor = tutors.find(t => t.id === ecTutorId || t.email === ecTutorId);
+                        if (ecTutor) {
+                            const pendingEcRef = doc(collection(db, "pending_students"));
+                            batch.set(pendingEcRef, {
+                                studentName: student.name,
+                                tutorId: ecTutor.id,
+                                tutorName: ecTutor.name,
+                                tutorEmail: ecTutor.email,
+                                activity: activity.name,
+                                frequency: activity.frequency,
+                                grade: student.grade,
+                                parentName: enrollmentData.parent?.name,
+                                parentPhone: enrollmentData.parent?.phone,
+                                parentEmail: enrollmentData.parent?.email,
+                                enrollmentId: enrollmentId,
+                                type: 'extracurricular',
+                                status: 'pending',
+                                createdAt: Timestamp.now(),
+                                source: 'enrollment_approval',
+                                note: 'Extracurricular activity assignment awaiting your acceptance'
+                            });
+                        }
+                    }
+                });
+            }
+
+            // --- Subject Tutors (each subject separately) ---
+            if (student.selectedSubjects && student.selectedSubjects.length > 0) {
+                student.selectedSubjects.forEach((subject, subIndex) => {
+                    const subTutorId = document.getElementById(`selected-sub-tutor-${studentIndex}-${subIndex}`)?.value;
+                    if (subTutorId) {
+                        const subTutor = tutors.find(t => t.id === subTutorId || t.email === subTutorId);
+                        if (subTutor) {
+                            const pendingSubRef = doc(collection(db, "pending_students"));
+                            batch.set(pendingSubRef, {
+                                studentName: student.name,
+                                tutorId: subTutor.id,
+                                tutorName: subTutor.name,
+                                tutorEmail: subTutor.email,
+                                subject: subject,
+                                grade: student.grade,
+                                parentName: enrollmentData.parent?.name,
+                                parentPhone: enrollmentData.parent?.phone,
+                                parentEmail: enrollmentData.parent?.email,
+                                enrollmentId: enrollmentId,
+                                type: 'subject',
+                                status: 'pending',
+                                createdAt: Timestamp.now(),
+                                source: 'enrollment_approval',
+                                note: 'Subject-specific tutoring assignment awaiting your acceptance'
+                            });
+                        }
+                    }
+                });
+            }
         });
 
         await batch.commit();
 
-        alert("Enrollment approved successfully! Students and tutor assignments have been created.");
+        alert("Enrollment approved! Tutor assignments are now pending acceptance in the Tutors Portal.");
 
         closeManagementModal('approveEnrollmentModal');
+
+        // Clear relevant caches
         delete sessionCache.enrollments;
         delete sessionCache.pendingStudents;
-        delete sessionCache.students;
+        // No need to delete students cache because we didn't create any students
 
+        // Refresh the view
         const currentNavId = document.querySelector('.nav-item.active')?.dataset.navId;
         const mainContent = document.getElementById('main-content');
         if (currentNavId && allNavItems[currentNavId] && mainContent) {
             allNavItems[currentNavId].fn(mainContent);
         } else {
-            // fallback: just re-render the enrollments panel
             const container = document.getElementById('main-content');
             if (container) await renderEnrollmentsPanel(container);
         }
 
     } catch (error) {
         console.error("Error approving enrollment:", error);
-        alert("Failed to approve enrollment. Please try again.");
+        alert("Failed to approve enrollment: " + error.message);
     }
 }
-
-window.deleteEnrollment = async function (enrollmentId) {
-    if (!confirm("Are you sure you want to delete this enrollment? This action cannot be undone.")) {
-        return;
-    }
-
-    try {
-        await deleteDoc(doc(db, "enrollments", enrollmentId));
-        alert("Enrollment deleted successfully!");
-
-        delete sessionCache.enrollments;
-        renderEnrollmentsFromCache(document.getElementById('enrollments-search')?.value || '');
-    } catch (error) {
-        console.error("Error deleting enrollment:", error);
-        alert("Failed to delete enrollment. Please try again.");
-    }
-};
-
-window.downloadEnrollmentInvoice = async function (enrollmentId) {
-    if (!checkLibraries(['html2canvas'])) return;
-
-    try {
-        const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
-        if (!enrollmentDoc.exists()) {
-            alert("Enrollment not found!");
-            return;
-        }
-
-        const enrollment = enrollmentDoc.data();
-        const invoiceDate = safeParseDate(enrollment.approvedAt || enrollment.createdAt || Date.now());
-        const invoiceNumber = `INV-${enrollmentId.substring(0, 8).toUpperCase()}`;
-        const firstStudent = enrollment.students?.[0] || {};
-        const academicDays = firstStudent.academicDays || enrollment.academicDays || 'Not specified';
-        const academicTime = firstStudent.academicTime || enrollment.academicTime || 'Not specified';
-
-        const studentNames = enrollment.students?.map(s => s.name) || [];
-        const tutorAssignments = await checkTutorAssignments(enrollmentId, studentNames);
-
-        let tutorInfoHTML = '';
-        if (tutorAssignments.length > 0) {
-            tutorInfoHTML = tutorAssignments.map(assignment => {
-                let details = '';
-                if (assignment.tutorName) {
-                    details += `<p><strong>${assignment.studentName}:</strong> ${assignment.tutorName}`;
-                    if (assignment.extracurricularTutors?.length) {
-                        details += ` (Extracurricular: ${assignment.extracurricularTutors.map(ec => `${ec.activity}: ${ec.tutorName}`).join(', ')})`;
-                    }
-                    if (assignment.subjectTutors?.length) {
-                        details += ` (Subjects: ${assignment.subjectTutors.map(sub => `${sub.subject}: ${sub.tutorName}`).join(', ')})`;
-                    }
-                    details += `</p>`;
-                }
-                return details;
-            }).join('');
-        }
-
-        const invoiceHTML = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <title>Invoice ${invoiceNumber}</title>
-                <style>
-                    body { font-family: Arial, sans-serif; margin: 40px; }
-                    .invoice-container { max-width: 800px; margin: 0 auto; border: 1px solid #ddd; padding: 30px; }
-                    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #4CAF50; padding-bottom: 20px; }
-                    .company-name { font-size: 28px; font-weight: bold; color: #4CAF50; margin-bottom: 5px; }
-                    .invoice-title { font-size: 24px; margin: 10px 0; }
-                    .invoice-info { display: flex; justify-content: space-between; margin: 20px 0; }
-                    .section { margin: 20px 0; }
-                    .section-title { font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px; }
-                    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                    th { background-color: #f2f2f2; }
-                    .total-row { font-weight: bold; background-color: #f9f9f9; }
-                    .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; }
-                    .tutor-info { background-color: #f0f8ff; padding: 10px; border-radius: 5px; margin: 10px 0; }
-                </style>
-            </head>
-            <body>
-                <div class="invoice-container">
-                    <div class="header">
-                        <div class="company-name">Blooming Kids House</div>
-                        <div class="invoice-title">INVOICE</div>
-                        <div>Invoice #: ${invoiceNumber}</div>
-                        <div>Date: ${invoiceDate ? invoiceDate.toLocaleDateString() : ''}</div>
-                    </div>
-                    
-                    <div class="invoice-info">
-                        <div>
-                            <strong>Bill To:</strong><br>
-                            ${enrollment.parent?.name || ''}<br>
-                            ${enrollment.parent?.email || ''}<br>
-                            ${enrollment.parent?.phone || ''}
-                        </div>
-                        <div>
-                            <strong>Invoice Details:</strong><br>
-                            Status: ${enrollment.status || 'Completed'}<br>
-                            Approved By: ${enrollment.payment?.approvedBy || window.userData?.name || 'Management'}<br>
-                            Payment Method: ${enrollment.payment?.method || 'Not specified'}<br>
-                            Schedule: ${academicDays} • ${academicTime}
-                        </div>
-                    </div>
-                    
-                    ${tutorInfoHTML ? `
-                    <div class="section">
-                        <div class="section-title">Assigned Tutors</div>
-                        <div class="tutor-info">
-                            ${tutorInfoHTML}
-                        </div>
-                    </div>
-                    ` : ''}
-                    
-                    <div class="section">
-                        <div class="section-title">Student Details</div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Student Name</th>
-                                    <th>Actual Grade</th>
-                                    <th>Subjects</th>
-                                    <th>Extracurricular</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${enrollment.students ? enrollment.students.map(student => `
-                                    <tr>
-                                        <td>${student.name || ''}</td>
-                                        <td>${student.actualGrade || ''}</td>
-                                        <td>${student.selectedSubjects ? student.selectedSubjects.join(', ') : ''}</td>
-                                        <td>${student.extracurriculars ? student.extracurriculars.map(e => `${e.name} (${e.frequency})`).join(', ') : ''}</td>
-                                    </tr>
-                                `).join('') : '<tr><td colspan="4">No student information</td></tr>'}
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <div class="section">
-                        <div class="section-title">Fee Breakdown</div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Description</th>
-                                    <th>Amount (₦)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Academic Fees</td>
-                                    <td>${parseFeeValue(enrollment.summary?.academicFee).toLocaleString()}</td>
-                                </tr>
-                                <tr>
-                                    <td>Extracurricular Activities</td>
-                                    <td>${parseFeeValue(enrollment.summary?.extracurricularFee).toLocaleString()}</td>
-                                </tr>
-                                <tr>
-                                    <td>Test Preparation</td>
-                                    <td>${parseFeeValue(enrollment.summary?.testPrepFee).toLocaleString()}</td>
-                                </tr>
-                                <tr>
-                                    <td>Discount</td>
-                                    <td>-${parseFeeValue(enrollment.summary?.discountAmount).toLocaleString()}</td>
-                                </tr>
-                                <tr class="total-row">
-                                    <td><strong>TOTAL</strong></td>
-                                    <td><strong>₦${parseFeeValue(enrollment.summary?.totalFee).toLocaleString()}</strong></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <div class="section">
-                        <div class="section-title">Payment Information</div>
-                        <p>Payment Status: <strong>${enrollment.status === 'payment_received' ? 'PAID' : 'PENDING'}</strong></p>
-                        ${enrollment.payment?.reference ? `<p>Reference: ${enrollment.payment.reference}</p>` : ''}
-                        ${enrollment.payment?.date ? `<p>Payment Date: ${formatDate(enrollment.payment.date)}</p>` : ''}
-                    </div>
-                    
-                    <div class="footer">
-                        <p>Thank you for choosing Blooming Kids House!</p>
-                        <p>For inquiries, contact: info@bloomingkidshouse.com | 0707 896 1070 | 0902 914 7024</p>
-                        <p>This is a computer-generated invoice. No signature required.</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-        `;
-
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.left = '-9999px';
-        iframe.style.top = '0';
-        iframe.style.width = '800px';
-        iframe.style.height = '1200px';
-        document.body.appendChild(iframe);
-
-        iframe.onload = () => {
-            html2canvas(iframe.contentDocument.body).then(canvas => {
-                const imgData = canvas.toDataURL('image/jpeg', 0.95);
-                const link = document.createElement('a');
-                link.href = imgData;
-                link.download = `Invoice_${invoiceNumber}.jpg`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                document.body.removeChild(iframe);
-            }).catch(error => {
-                console.error("Error generating invoice image:", error);
-                alert("Failed to generate invoice image. Please try again.");
-                document.body.removeChild(iframe);
-            });
-        };
-
-        iframe.contentDocument.open();
-        iframe.contentDocument.write(invoiceHTML);
-        iframe.contentDocument.close();
-
-    } catch (error) {
-        console.error("Error downloading invoice:", error);
-        alert("Failed to download invoice. Please try again.");
-    }
-};
-
-// Export functions that might be called from HTML
-window.closeManagementModal = function (modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) modal.remove();
-};
-
 
 // ======================================================
 // SUBSECTION 5.3: Pending Approvals Panel (UPDATED)
@@ -10131,5 +9837,6 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
