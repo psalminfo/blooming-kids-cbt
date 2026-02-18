@@ -4465,3 +4465,5 @@ window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
 window.showDailyTopicModal = showDailyTopicModal;
 window.showHomeworkModal = showHomeworkModal;
+window.showScheduleCalendarModal = showScheduleCalendarModal
+
