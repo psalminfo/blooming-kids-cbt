@@ -4463,3 +4463,5 @@ inboxObserver.observe(document.body, { childList: true, subtree: true });
 // ==========================================
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
+window.showDailyTopicModal = showDailyTopicModal;
+window.showHomeworkModal = showHomeworkModal;
