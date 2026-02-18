@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+    <!-- Additional styles for floating buttons & gamification (originally in tutor.js) -->
     <style>
         * {
             margin: 0;
@@ -46,6 +47,7 @@
             position: relative;
         }
 
+        /* Animated mesh overlay */
         body::before {
             content: '';
             position: fixed;
@@ -67,6 +69,7 @@
             opacity: 0.6;
         }
 
+        /* Glass panel — super refined */
         .glass-panel {
             background: var(--surface);
             backdrop-filter: blur(var(--blur)) saturate(180%);
@@ -83,6 +86,7 @@
             box-shadow: var(--shadow-hover), 0 0 0 1px rgba(255,255,255,0.2) inset;
         }
 
+        /* Floating orbs */
         .orb {
             position: absolute;
             border-radius: 50%;
@@ -100,6 +104,7 @@
             100% { transform: translate(30px, 30px) scale(1.1); }
         }
 
+        /* Avatar */
         .avatar-modern {
             width: 48px;
             height: 48px;
@@ -129,6 +134,7 @@
             color: inherit;
         }
 
+        /* Stat cards */
         .stat-card {
             background: rgba(255,255,255,0.2);
             backdrop-filter: blur(8px);
@@ -138,7 +144,6 @@
             transition: var(--transition);
             box-shadow: 0 8px 20px -10px rgba(0,0,0,0.1);
             color: inherit;
-            cursor: pointer;
         }
 
         .stat-card:hover {
@@ -165,6 +170,7 @@
             box-shadow: 0 6px 14px var(--primary-glow);
         }
 
+        /* Nav pills */
         .nav-pill-container {
             background: rgba(0,0,0,0.05);
             border-radius: 3rem;
@@ -207,6 +213,7 @@
             color: var(--primary-soft);
         }
 
+        /* Buttons */
         .btn-modern {
             display: inline-flex;
             align-items: center;
@@ -248,6 +255,7 @@
             box-shadow: 0 8px 20px var(--accent-glow);
         }
 
+        /* Floating messaging buttons (originally from tutor.js) */
         .floating-messaging-btn, .floating-inbox-btn {
             position: fixed;
             right: 20px;
@@ -273,6 +281,9 @@
             transform: scale(1.1);
             box-shadow: 0 15px 30px rgba(0,0,0,0.3);
         }
+        .floating-btn-text {
+            display: none;
+        }
         .unread-badge {
             position: absolute;
             top: -5px;
@@ -287,80 +298,73 @@
             text-align: center;
             border: 2px solid white;
         }
+        @media (max-width: 640px) {
+            .floating-messaging-btn, .floating-inbox-btn { width: 50px; height: 50px; font-size: 1.5rem; }
+        }
 
-        .student-list-item {
+        /* Skeleton loader */
+        .skeleton-loader {
+            background: rgba(255,255,255,0.2);
+            border-radius: 2rem;
+            padding: 2rem;
+            backdrop-filter: blur(4px);
+            border: 1px dashed rgba(255,255,255,0.4);
+        }
+
+        .pulse-ring {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: rgba(46, 204, 113, 0.3);
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding: 12px;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-            transition: all 0.2s;
-        }
-        .student-list-item:hover {
-            background: rgba(46, 204, 113, 0.05);
-        }
-        .student-badge {
-            font-size: 11px;
-            padding: 3px 8px;
-            border-radius: 20px;
-            font-weight: 600;
-        }
-        .badge-transitioning { background: #fbbf24; color: #78350f; }
-        .badge-group { background: #3b82f6; color: white; }
-        .badge-full { background: #1e8b4c; color: white; }
-
-        .class-item {
-            padding: 12px;
-            border-left: 3px solid var(--primary);
-            background: rgba(255,255,255,0.3);
-            margin-bottom: 8px;
-            border-radius: 12px;
+            justify-content: center;
+            position: relative;
         }
 
+        .pulse-ring::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 2px solid rgba(46, 204, 113, 0.6);
+            animation: pulse 1.8s infinite;
+        }
+
+        @keyframes pulse { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.8); opacity: 0; } }
+
+        .text-gradient {
+            background: linear-gradient(145deg, var(--primary), #0f6b37);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+        }
+
+        /* misc */
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
         #networkWarning, #networkErrorOverlay { z-index: 9999; }
-
-        .modal-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.5);
-            backdrop-filter: blur(8px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-        .modal-content {
-            background: white;
-            border-radius: 2rem;
-            padding: 2rem;
-            max-width: 500px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-        body.dark .modal-content {
-            background: #1e293b;
-            color: white;
-        }
     </style>
 </head>
 <body class="antialiased">
 
+    <!-- floating orbs -->
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
 
+    <!-- network warning (original) -->
     <div id="networkWarning" class="fixed top-0 left-0 right-0 bg-yellow-100/80 backdrop-blur-md border-b border-yellow-400 text-yellow-800 px-4 py-3 text-center hidden shadow-lg z-50">
         <span id="warningMessage" class="font-medium">You appear to be offline.</span>
         <button onclick="hideNetworkWarning()" class="ml-4 text-yellow-800 hover:text-yellow-900 font-bold text-xl">&times;</button>
     </div>
 
     <div class="min-h-screen p-3 md:p-6 lg:p-8 flex justify-center items-start relative">
+
         <div class="glass-panel w-full max-w-7xl p-5 md:p-8 lg:p-10 relative overflow-hidden">
 
-            <!-- Header -->
+            <!-- Header with avatar and date -->
             <div class="relative z-20 flex flex-wrap items-center justify-between gap-4 mb-6">
                 <div class="flex items-center gap-3 sm:gap-4">
                     <div class="relative group">
@@ -378,6 +382,7 @@
                 </div>
 
                 <div class="flex items-center gap-2 sm:gap-3">
+                    <!-- live date -->
                     <div class="badge-date hidden sm:flex items-center gap-2">
                         <i class="far fa-calendar-alt text-green-600 dark:text-green-400"></i>
                         <span id="currentDate"></span>
@@ -395,57 +400,59 @@
                         <i class="fas fa-sign-out-alt"></i><span class="hidden sm:inline">Logout</span>
                     </button>
 
-                    <div class="avatar-modern hidden md:flex" id="avatarInitial">T</div>
+                    <div class="avatar-modern hidden md:flex">T</div>
                 </div>
             </div>
 
-            <!-- STAT CARDS - All clickable -->
+            <!-- STAT CARDS (static design, will coexist with dynamic data) -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8 relative z-20">
-                <div class="stat-card flex items-center gap-3" id="totalStudentsCard">
+                <div class="stat-card flex items-center gap-3">
                     <div class="stat-icon"><i class="fas fa-users"></i></div>
                     <div>
                         <p class="text-xs opacity-70">Total students</p>
-                        <p class="text-2xl font-bold" id="totalStudentsCount">0</p>
+                        <p class="text-2xl font-bold" id="staticTotalStudents">128</p>
                     </div>
                 </div>
-                <div class="stat-card flex items-center gap-3" id="todayClassesCard">
+                <div class="stat-card flex items-center gap-3">
                     <div class="stat-icon" style="background: linear-gradient(145deg, #fbbf24, #d97706);"><i class="fas fa-clock"></i></div>
                     <div>
                         <p class="text-xs opacity-70">Today's classes</p>
-                        <p class="text-2xl font-bold" id="todayClassesCount">0</p>
+                        <p class="text-2xl font-bold" id="staticTodayClasses">8</p>
                     </div>
                 </div>
-                <div class="stat-card flex items-center gap-3" id="academicsCard">
+                <div class="stat-card flex items-center gap-3">
                     <div class="stat-icon" style="background: linear-gradient(145deg, #3b82f6, #1e3a8a);"><i class="fas fa-book-open"></i></div>
                     <div>
-                        <p class="text-xs opacity-70">Pending homework</p>
-                        <p class="text-2xl font-bold" id="pendingHomeworkCount">0</p>
+                        <p class="text-xs opacity-70">Pending reports</p>
+                        <p class="text-2xl font-bold" id="staticPendingReports">3</p>
                     </div>
                 </div>
-                <div class="stat-card flex items-center gap-3" id="achievementsCard">
-                    <div class="stat-icon" style="background: linear-gradient(145deg, #ec4899, #831843);"><i class="fas fa-trophy"></i></div>
+                <div class="stat-card flex items-center gap-3">
+                    <div class="stat-icon" style="background: linear-gradient(145deg, #ec4899, #831843);"><i class="fas fa-star"></i></div>
                     <div>
                         <p class="text-xs opacity-70">Achievements</p>
-                        <p class="text-2xl font-bold" id="achievementsCount">0</p>
+                        <p class="text-2xl font-bold" id="staticAchievements">12</p>
                     </div>
                 </div>
             </div>
 
-            <!-- Gamification widget -->
+            <!-- Gamification widget (required by tutor.js) -->
             <div id="performance-widget" class="mb-6 relative z-20"></div>
 
-            <!-- navigation pills with all required tabs -->
+            <!-- navigation pills with all required IDs -->
             <nav class="relative z-20 mb-8 overflow-x-auto hide-scrollbar">
                 <div class="nav-pill-container">
                     <button id="navDashboard" class="nav-tab-modern active"><i class="fas fa-columns"></i>Dashboard</button>
-                    <button id="navStudentDatabase" class="nav-tab-modern"><i class="fas fa-users"></i>Students</button>
-                    <button id="navScheduleManagement" class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule</button>
-                    <button id="navAcademics" class="nav-tab-modern"><i class="fas fa-graduation-cap"></i>Academics</button>
+                    <button id="navStudentDatabase" class="nav-tab-modern"><i class="fas fa-users"></i>Student Database</button>
+                    <button id="navAutoStudents" class="nav-tab-modern"><i class="fas fa-user-plus"></i>Auto‑Registered</button>
+                    <!-- extra decorative tab (no id, just for looks) -->
+                    <button class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule</button>
                 </div>
             </nav>
 
-            <!-- MAIN CONTENT -->
+            <!-- MAIN CONTENT (JS will populate) -->
             <main id="mainContent" class="relative z-20 min-h-[400px] transition-all duration-500">
+                <!-- Elegant loading state (will be replaced by JS) -->
                 <div class="skeleton-loader flex flex-col items-center justify-center gap-6 py-12">
                     <div class="pulse-ring">
                         <i class="fas fa-leaf text-3xl text-green-600"></i>
@@ -458,12 +465,14 @@
                 </div>
             </main>
 
+            <!-- subtle footer -->
             <div class="relative z-20 mt-8 text-xs text-center opacity-40 flex items-center justify-center gap-2">
                 <i class="fas fa-shield-alt text-green-500"></i> End-to-end encrypted · Blooming Kids Care v2.0
             </div>
         </div>
     </div>
 
+    <!-- network error overlay (original) -->
     <div id="networkErrorOverlay" class="fixed inset-0 bg-gray-900/80 backdrop-blur-xl z-50 hidden flex-col items-center justify-center p-4">
         <div class="bg-white/90 dark:bg-gray-800/90 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-white/30">
             <div class="w-20 h-20 bg-yellow-100/80 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -478,13 +487,17 @@
         </div>
     </div>
 
+    <!-- scripts: Firebase 12+ is imported via module; canvas-confetti & html2canvas -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <!-- IMPORTANT: firebaseConfig.js must exist and export auth, db using modular SDK v12+ -->
     <script type="module" src="tutor.js"></script>
+    <!-- games.js (if any) -->
+    <script src="games.js"></script>
 
     <script>
         (function() {
-            // Set today's date
+            // set today's date
             const dateEl = document.getElementById('currentDate');
             if (dateEl) {
                 const now = new Date();
@@ -520,7 +533,7 @@
                 setTheme(body.classList.contains('dark') ? 'light' : 'dark');
             });
 
-            // Network functions
+            // Network monitor (original functions exposed globally)
             window.hideNetworkWarning = function() {
                 document.getElementById('networkWarning').classList.add('hidden');
             };
@@ -543,42 +556,6 @@
             window.addEventListener('online', () => { hideNetworkWarning(); hideNetworkError(); });
             window.addEventListener('offline', () => {
                 document.getElementById('networkWarning').classList.remove('hidden');
-            });
-
-            // Override navigation to use our custom tabs
-            window.originalRenderFunctions = {
-                dashboard: null,
-                studentDb: null,
-                scheduleMgmt: null,
-                academics: null
-            };
-
-            // These will be populated by tutor.js when it loads
-            window.tabNavigation = {
-                showDashboard: null,
-                showStudentDatabase: null,
-                showScheduleManagement: null,
-                showAcademics: null
-            };
-
-            // Wait for tutor.js to load and then set up our tab handlers
-            setTimeout(function checkForTutorData() {
-                if (window.tutorData) {
-                    updateAvatarInitial();
-                }
-                setTimeout(checkForTutorData, 500);
-            }, 500);
-
-            function updateAvatarInitial() {
-                const avatarEl = document.getElementById('avatarInitial');
-                if (avatarEl && window.tutorData && window.tutorData.name) {
-                    avatarEl.innerText = window.tutorData.name.charAt(0).toUpperCase();
-                }
-            }
-
-            // Listen for custom event from tutor.js when data is loaded
-            document.addEventListener('tutorDataLoaded', function(e) {
-                updateAvatarInitial();
             });
         })();
     </script>
