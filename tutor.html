@@ -337,16 +337,13 @@
         .student-list-item { border-bottom: 1px solid rgba(0,0,0,0.05); padding: 0.75rem 0; }
         .student-list-item:last-child { border-bottom: none; }
 
-        /* Old style cards for tab content */
-        .old-card {
-            background: white;
-            border-radius: 0.75rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        /* Academic view cards */
+        .academic-card {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(8px);
+            border-radius: 1.5rem;
             padding: 1.5rem;
-        }
-        .dark .old-card {
-            background: #1f2937;
-            color: #f1f5f9;
+            border: 1px solid var(--border-light);
         }
     </style>
 </head>
@@ -355,6 +352,7 @@
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
 
+    <!-- network warning (shown offline) -->
     <div id="networkWarning" class="fixed top-0 left-0 right-0 bg-yellow-100/80 backdrop-blur-md border-b border-yellow-400 text-yellow-800 px-4 py-3 text-center hidden shadow-lg z-50">
         <span id="warningMessage" class="font-medium">You appear to be offline.</span>
         <button onclick="hideNetworkWarning()" class="ml-4 text-yellow-800 hover:text-yellow-900 font-bold text-xl">&times;</button>
@@ -363,7 +361,7 @@
     <div class="min-h-screen p-3 md:p-6 lg:p-8 flex justify-center items-start relative">
         <div class="glass-panel w-full max-w-7xl p-5 md:p-8 lg:p-10 relative overflow-hidden">
 
-            <!-- Header -->
+            <!-- Header with dynamic tutor name -->
             <div class="relative z-20 flex flex-wrap items-center justify-between gap-4 mb-6">
                 <div class="flex items-center gap-3 sm:gap-4">
                     <div class="relative group">
@@ -402,7 +400,7 @@
                 </div>
             </div>
 
-            <!-- STAT CARDS (clickable, data-driven) -->
+            <!-- Interactive stat cards -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8 relative z-20">
                 <div class="stat-card flex items-center gap-3" id="totalStudentsCard">
                     <div class="stat-icon"><i class="fas fa-users"></i></div>
@@ -434,10 +432,10 @@
                 </div>
             </div>
 
-            <!-- Gamification widget (hidden by default, used for score) -->
+            <!-- Gamification widget placeholder (used by tutor.js) -->
             <div id="performance-widget" class="hidden"></div>
 
-            <!-- navigation pills with NEW tabs -->
+            <!-- navigation pills (4 tabs, active class managed by JS) -->
             <nav class="relative z-20 mb-8 overflow-x-auto hide-scrollbar">
                 <div class="nav-pill-container">
                     <button id="navDashboard" class="nav-tab-modern active"><i class="fas fa-columns"></i>Dashboard</button>
@@ -447,9 +445,9 @@
                 </div>
             </nav>
 
-            <!-- MAIN CONTENT (populated by JS) -->
+            <!-- MAIN CONTENT (populated by tutor.js and our custom module) -->
             <main id="mainContent" class="relative z-20 min-h-[400px] transition-all duration-500">
-                <!-- Loading state (will be replaced) -->
+                <!-- loading state (will be replaced) -->
                 <div class="skeleton-loader flex flex-col items-center justify-center gap-6 py-12">
                     <div class="pulse-ring">
                         <i class="fas fa-leaf text-3xl text-green-600"></i>
@@ -484,84 +482,81 @@
         </div>
     </div>
 
-    <!-- scripts -->
+    <!-- scripts (removed old firebase 8, using modular imports via tutor.js) -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-    <!-- firebaseConfig.js must exist and export auth, db -->
+
+    <!-- main tutor logic (must be present) -->
     <script type="module" src="tutor.js"></script>
+    <!-- games.js (optional, kept for compatibility) -->
     <script src="games.js"></script>
 
-    <script>
-        (function() {
-            // set today's date
-            const dateEl = document.getElementById('currentDate');
-            if (dateEl) {
-                const now = new Date();
-                dateEl.innerText = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            }
-
-            // DARK MODE
-            const body = document.body;
-            const toggle = document.getElementById('modeToggle');
-            const icon = document.getElementById('modeIcon');
-            const modeKey = 'tutor_theme';
-
-            function setTheme(theme) {
-                if (theme === 'dark') {
-                    body.classList.add('dark');
-                    icon.classList.remove('fa-moon');
-                    icon.classList.add('fa-sun');
-                    localStorage.setItem(modeKey, 'dark');
-                } else {
-                    body.classList.remove('dark');
-                    icon.classList.remove('fa-sun');
-                    icon.classList.add('fa-moon');
-                    localStorage.setItem(modeKey, 'light');
-                }
-            }
-
-            const saved = localStorage.getItem(modeKey);
-            if (saved) setTheme(saved);
-            else if (window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
-            else setTheme('light');
-
-            toggle.addEventListener('click', () => {
-                setTheme(body.classList.contains('dark') ? 'light' : 'dark');
-            });
-
-            // Network monitor
-            window.hideNetworkWarning = function() {
-                document.getElementById('networkWarning').classList.add('hidden');
-            };
-            window.hideNetworkError = function() {
-                document.getElementById('networkErrorOverlay').classList.add('hidden');
-            };
-            window.showNetworkError = function(msg) {
-                const overlay = document.getElementById('networkErrorOverlay');
-                if (msg) document.getElementById('errorMessage').innerText = msg;
-                overlay.classList.remove('hidden');
-            };
-            window.checkConnectivity = function() {
-                if (navigator.onLine) {
-                    hideNetworkError();
-                    hideNetworkWarning();
-                } else {
-                    showNetworkError('Still offline. Please check your internet settings.');
-                }
-            };
-            window.addEventListener('online', () => { hideNetworkWarning(); hideNetworkError(); });
-            window.addEventListener('offline', () => {
-                document.getElementById('networkWarning').classList.remove('hidden');
-            });
-        })();
-    </script>
-
-    <!-- Main module script for data fetching, counter updates, and tab content -->
+    <!-- inline module for date, dark mode, network, and additional tab handlers -->
     <script type="module">
         import { db } from './firebaseConfig.js';
         import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
-        // Wait for tutorData to be set by tutor.js
+        // --- DOM elements update ---
+        const dateEl = document.getElementById('currentDate');
+        if (dateEl) {
+            const now = new Date();
+            dateEl.innerText = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        // --- Dark mode ---
+        const body = document.body;
+        const toggle = document.getElementById('modeToggle');
+        const icon = document.getElementById('modeIcon');
+        const modeKey = 'tutor_theme';
+
+        function setTheme(theme) {
+            if (theme === 'dark') {
+                body.classList.add('dark');
+                icon.classList.remove('fa-moon');
+                icon.classList.add('fa-sun');
+                localStorage.setItem(modeKey, 'dark');
+            } else {
+                body.classList.remove('dark');
+                icon.classList.remove('fa-sun');
+                icon.classList.add('fa-moon');
+                localStorage.setItem(modeKey, 'light');
+            }
+        }
+        const saved = localStorage.getItem(modeKey);
+        if (saved) setTheme(saved);
+        else if (window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+        else setTheme('light');
+
+        toggle.addEventListener('click', () => {
+            setTheme(body.classList.contains('dark') ? 'light' : 'dark');
+        });
+
+        // --- Network monitor functions (global) ---
+        window.hideNetworkWarning = function() {
+            document.getElementById('networkWarning').classList.add('hidden');
+        };
+        window.hideNetworkError = function() {
+            document.getElementById('networkErrorOverlay').classList.add('hidden');
+        };
+        window.showNetworkError = function(msg) {
+            const overlay = document.getElementById('networkErrorOverlay');
+            if (msg) document.getElementById('errorMessage').innerText = msg;
+            overlay.classList.remove('hidden');
+        };
+        window.checkConnectivity = function() {
+            if (navigator.onLine) {
+                hideNetworkError();
+                hideNetworkWarning();
+            } else {
+                showNetworkError('Still offline. Please check your internet settings.');
+            }
+        };
+        window.addEventListener('online', () => { hideNetworkWarning(); hideNetworkError(); });
+        window.addEventListener('offline', () => {
+            document.getElementById('networkWarning').classList.remove('hidden');
+        });
+
+        // --- Wait for tutorData (set by tutor.js) ---
         function waitForTutorData(callback) {
             if (window.tutorData) {
                 callback();
@@ -570,489 +565,8 @@
             }
         }
 
-        // Function to update all counters
-        async function updateAllCounters(tutor) {
-            try {
-                // Get all students for this tutor
-                const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-                const studentsSnapshot = await getDocs(studentsQuery);
-                
-                // Filter out inactive students for total count
-                const allStudents = studentsSnapshot.docs
-                    .map(doc => ({ id: doc.id, ...doc.data() }))
-                    .filter(s => !['archived', 'graduated', 'transferred'].includes(s.status));
-                
-                // Update total students count
-                document.getElementById('totalStudentsCount').textContent = allStudents.length;
-
-                // Calculate today's classes
-                const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-                let todayClassesCount = 0;
-                
-                allStudents.forEach(s => {
-                    if (s.schedule && Array.isArray(s.schedule)) {
-                        s.schedule.forEach(slot => {
-                            if (slot.day === todayName) {
-                                todayClassesCount++;
-                            }
-                        });
-                    }
-                });
-                
-                document.getElementById('todayClassesCount').textContent = todayClassesCount;
-
-                // Calculate pending reports (students without reports in last 7 days)
-                const oneWeekAgo = new Date();
-                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-                
-                let pendingReports = 0;
-                for (const student of allStudents) {
-                    if (!student.lastReportDate) {
-                        pendingReports++;
-                        continue;
-                    }
-                    
-                    // Check if last report date is older than 7 days
-                    const lastReport = student.lastReportDate?.toDate?.() || new Date(student.lastReportDate);
-                    if (lastReport < oneWeekAgo) {
-                        pendingReports++;
-                    }
-                }
-                
-                document.getElementById('pendingReportsCount').textContent = pendingReports;
-
-                // Calculate performance score (placeholder logic - can be customized)
-                const totalPossible = allStudents.length * 100;
-                let earnedScore = 0;
-                
-                allStudents.forEach(s => {
-                    // Base score from attendance
-                    if (s.attendanceRate) {
-                        earnedScore += s.attendanceRate;
-                    } else {
-                        earnedScore += 85; // Default score
-                    }
-                    
-                    // Bonus for completed reports
-                    if (s.lastReportDate) {
-                        const reportDate = s.lastReportDate?.toDate?.() || new Date(s.lastReportDate);
-                        const daysSinceReport = Math.floor((new Date() - reportDate) / (1000 * 60 * 60 * 24));
-                        if (daysSinceReport < 7) earnedScore += 15;
-                    }
-                });
-                
-                const performanceScore = allStudents.length > 0 
-                    ? Math.round((earnedScore / (allStudents.length * 100)) * 100)
-                    : 100;
-                
-                document.getElementById('performanceScore').textContent = performanceScore;
-
-            } catch (error) {
-                console.error("Error updating counters:", error);
-            }
-        }
-
-        // Set up real-time counter updates (every 5 minutes)
-        function startCounterUpdates(tutor) {
-            // Initial update
-            updateAllCounters(tutor);
-            
-            // Update every 5 minutes
-            setInterval(() => updateAllCounters(tutor), 300000);
-            
-            // Also update when window gains focus
-            window.addEventListener('focus', () => updateAllCounters(tutor));
-        }
-
-        // --- Tab switching logic ---
-        function showTab(tabId) {
-            // Update active class on nav buttons
-            document.querySelectorAll('.nav-tab-modern').forEach(btn => btn.classList.remove('active'));
-            document.getElementById(`nav${tabId}`).classList.add('active');
-
-            const mainContent = document.getElementById('mainContent');
-            
-            // Show different content based on tab
-            if (tabId === 'Dashboard') {
-                // Keep the skeleton loader (dashboard content will be loaded by tutor.js)
-                mainContent.innerHTML = `<div class="skeleton-loader flex flex-col items-center justify-center gap-6 py-12">
-                    <div class="pulse-ring">
-                        <i class="fas fa-leaf text-3xl text-green-600"></i>
-                    </div>
-                    <p class="text-lg font-medium text-gray-700 dark:text-gray-200 animate-pulse">Loading secure portal...</p>
-                    <div class="flex gap-2">
-                        <div class="w-20 h-2 bg-green-200/50 rounded-full animate-pulse"></div>
-                        <div class="w-12 h-2 bg-green-300/50 rounded-full animate-pulse delay-75"></div>
-                    </div>
-                </div>`;
-            } else if (tabId === 'StudentDatabase') {
-                mainContent.innerHTML = `<div class="old-card">
-                    <h2 class="text-2xl font-bold mb-4">Student Database</h2>
-                    <p class="text-gray-600 dark:text-gray-300">This section will list all students with search and filter options (old style).</p>
-                    <!-- You can later replace with the exact table from old tutor.html -->
-                </div>`;
-            } else if (tabId === 'Academic') {
-                // Academic tab: Homework Inbox, Today's Topic, Assign Homework
-                mainContent.innerHTML = `
-                    <div class="space-y-6">
-                        <!-- Homework Inbox -->
-                        <div class="old-card">
-                            <h3 class="text-xl font-bold mb-4 flex items-center"><i class="fas fa-inbox mr-2 text-green-600"></i>Homework Inbox</h3>
-                            <div class="space-y-3">
-                                <div class="border-b pb-2 flex justify-between items-center">
-                                    <div><span class="font-semibold">Math - Algebra</span><br><span class="text-sm text-gray-500">Due: Tomorrow</span></div>
-                                    <span class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs">Pending</span>
-                                </div>
-                                <div class="border-b pb-2 flex justify-between items-center">
-                                    <div><span class="font-semibold">English - Essay</span><br><span class="text-sm text-gray-500">Due: Friday</span></div>
-                                    <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs">Submitted</span>
-                                </div>
-                                <div class="border-b pb-2 flex justify-between items-center">
-                                    <div><span class="font-semibold">Science - Experiment</span><br><span class="text-sm text-gray-500">Due: Next Monday</span></div>
-                                    <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs">Overdue</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Today's Topic -->
-                        <div class="old-card">
-                            <h3 class="text-xl font-bold mb-4 flex items-center"><i class="fas fa-chalkboard-teacher mr-2 text-green-600"></i>Today's Topic</h3>
-                            <p class="text-lg"><span class="font-semibold">Grade 5:</span> Introduction to Fractions</p>
-                            <p class="text-lg mt-2"><span class="font-semibold">Grade 3:</span> Reading Comprehension - "The Garden"</p>
-                        </div>
-
-                        <!-- Assign Homework -->
-                        <div class="old-card">
-                            <h3 class="text-xl font-bold mb-4 flex items-center"><i class="fas fa-pencil-alt mr-2 text-green-600"></i>Assign Homework</h3>
-                            <form class="space-y-4">
-                                <div>
-                                    <label class="block text-sm font-medium mb-1">Student</label>
-                                    <select class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
-                                        <option>John Doe (Grade 5)</option>
-                                        <option>Jane Smith (Grade 3)</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium mb-1">Title</label>
-                                    <input type="text" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium mb-1">Due Date</label>
-                                    <input type="date" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium mb-1">Description</label>
-                                    <textarea class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" rows="3"></textarea>
-                                </div>
-                                <button type="button" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Assign Homework</button>
-                            </form>
-                        </div>
-                    </div>
-                `;
-            } else if (tabId === 'ScheduleManagement') {
-                // Schedule Management tab
-                mainContent.innerHTML = `
-                    <div class="old-card">
-                        <h3 class="text-xl font-bold mb-4 flex items-center"><i class="fas fa-calendar-alt mr-2 text-green-600"></i>Schedule Management</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <h4 class="font-semibold mb-2">Monday</h4>
-                                <ul class="list-disc pl-5 space-y-1">
-                                    <li>9:00 AM - Math (John)</li>
-                                    <li>10:30 AM - English (Jane)</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <h4 class="font-semibold mb-2">Tuesday</h4>
-                                <ul class="list-disc pl-5 space-y-1">
-                                    <li>9:00 AM - Science (John)</li>
-                                    <li>11:00 AM - Art (Jane)</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <h4 class="font-semibold mb-2">Wednesday</h4>
-                                <ul class="list-disc pl-5 space-y-1">
-                                    <li>9:00 AM - Math (John)</li>
-                                    <li>10:30 AM - Reading (Jane)</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <h4 class="font-semibold mb-2">Thursday</h4>
-                                <ul class="list-disc pl-5 space-y-1">
-                                    <li>9:00 AM - Science (John)</li>
-                                    <li>11:00 AM - Music (Jane)</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <h4 class="font-semibold mb-2">Friday</h4>
-                                <ul class="list-disc pl-5 space-y-1">
-                                    <li>9:00 AM - Math (John)</li>
-                                    <li>10:30 AM - PE (Jane)</li>
-                                </ul>
-                            </div>
-                        </div>
-                        <div class="mt-6">
-                            <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"><i class="fas fa-plus mr-2"></i>Add Schedule</button>
-                        </div>
-                    </div>
-                `;
-            }
-        }
-
-        // Wait for tutor data and set up tabs
-        waitForTutorData(() => {
-            const tutor = window.tutorData;
-            
-            // Update tutor name in header
-            if (tutor.name) {
-                document.querySelector('.text-gradient').textContent = tutor.name.split(' ')[0];
-                document.querySelector('.avatar-modern').textContent = tutor.name.charAt(0);
-            }
-            
-            // Start counter updates
-            startCounterUpdates(tutor);
-
-            // ----- Total Students Card Click (from original) -----
-            document.getElementById('totalStudentsCard').addEventListener('click', async () => {
-                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-                const snapshot = await getDocs(q);
-                const students = snapshot.docs
-                    .map(doc => ({ id: doc.id, ...doc.data() }))
-                    .filter(s => !['archived','graduated','transferred'].includes(s.status));
-
-                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="studentListModal">
-                    <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-4xl mx-auto">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">My Students (${students.length})</h3>
-                            <button class="text-2xl font-bold close-modal text-gray-700 dark:text-gray-300">&times;</button>
-                        </div>
-                        <div class="overflow-auto max-h-96">
-                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                <thead class="bg-gray-50 dark:bg-gray-700">
-                                    <tr>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Name</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Grade</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Type</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Added</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">`;
-
-                students.forEach(s => {
-                    let type = 'Regular';
-                    if (s.isTransitioning) type = 'Transitioning';
-                    else if (s.groupClass) type = 'Group Class';
-                    
-                    const added = s.createdAt ? new Date(s.createdAt.seconds * 1000).toLocaleDateString() : 'N/A';
-                    html += `<tr>
-                        <td class="px-4 py-2 whitespace-nowrap text-gray-900 dark:text-white">${escapeHtml(s.studentName)}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-gray-900 dark:text-white">${escapeHtml(s.grade)}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-gray-900 dark:text-white">${escapeHtml(type)}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-gray-900 dark:text-white">${escapeHtml(added)}</td>
-                    </tr>`;
-                });
-
-                html += `</tbody></table></div></div></div>`;
-
-                const modalDiv = document.createElement('div');
-                modalDiv.innerHTML = html;
-                const modal = modalDiv.firstElementChild;
-                document.body.appendChild(modal);
-
-                modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
-                modal.addEventListener('click', (e) => {
-                    if (e.target === modal) modal.remove();
-                });
-            });
-
-            // ----- Today's Classes Card Click -----
-            document.getElementById('todayClassesCard').addEventListener('click', async () => {
-                const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-                const snapshot = await getDocs(q);
-                const students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-                const todayClasses = [];
-                students.forEach(s => {
-                    if (s.schedule && Array.isArray(s.schedule)) {
-                        s.schedule.forEach(slot => {
-                            if (slot.day === todayName) {
-                                todayClasses.push({
-                                    student: s.studentName,
-                                    time: `${slot.start} - ${slot.end}`,
-                                    subject: slot.subject || 'General',
-                                    room: slot.room || 'Not specified'
-                                });
-                            }
-                        });
-                    }
-                });
-
-                // Sort classes by time
-                todayClasses.sort((a, b) => {
-                    const timeA = a.time.split(' - ')[0];
-                    const timeB = b.time.split(' - ')[0];
-                    return timeA.localeCompare(timeB);
-                });
-
-                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="todayClassesModal">
-                    <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-lg mx-auto">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">Today's Classes (${todayName})</h3>
-                            <button class="text-2xl font-bold close-modal text-gray-700 dark:text-gray-300">&times;</button>
-                        </div>
-                        <div class="overflow-auto max-h-96">`;
-
-                if (todayClasses.length === 0) {
-                    html += '<p class="text-gray-500 dark:text-gray-400">No classes scheduled for today.</p>';
-                } else {
-                    html += '<div class="space-y-3">';
-                    todayClasses.forEach(c => {
-                        html += `<div class="border-l-4 border-green-500 pl-4 py-2 bg-gray-50 dark:bg-gray-700 rounded-r-lg">
-                            <p class="font-semibold text-gray-900 dark:text-white">${escapeHtml(c.student)}</p>
-                            <p class="text-sm text-gray-600 dark:text-gray-300"><i class="far fa-clock mr-2"></i>${escapeHtml(c.time)}</p>
-                            <p class="text-sm text-gray-600 dark:text-gray-300"><i class="fas fa-book mr-2"></i>${escapeHtml(c.subject)}</p>
-                            <p class="text-sm text-gray-600 dark:text-gray-300"><i class="fas fa-door-open mr-2"></i>${escapeHtml(c.room)}</p>
-                        </div>`;
-                    });
-                    html += '</div>';
-                }
-
-                html += `</div></div></div>`;
-
-                const modalDiv = document.createElement('div');
-                modalDiv.innerHTML = html;
-                const modal = modalDiv.firstElementChild;
-                document.body.appendChild(modal);
-
-                modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
-                modal.addEventListener('click', (e) => {
-                    if (e.target === modal) modal.remove();
-                });
-            });
-
-            // ----- Pending Reports Card Click -----
-            document.getElementById('pendingReportsCard').addEventListener('click', async () => {
-                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-                const snapshot = await getDocs(q);
-                const students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                
-                const oneWeekAgo = new Date();
-                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-                
-                const pendingStudents = [];
-                for (const student of students) {
-                    if (!student.lastReportDate) {
-                        pendingStudents.push({ ...student, daysOverdue: 'No reports yet' });
-                        continue;
-                    }
-                    
-                    const lastReport = student.lastReportDate?.toDate?.() || new Date(student.lastReportDate);
-                    const daysSinceReport = Math.floor((new Date() - lastReport) / (1000 * 60 * 60 * 24));
-                    
-                    if (daysSinceReport > 7) {
-                        pendingStudents.push({ 
-                            ...student, 
-                            daysOverdue: `${daysSinceReport} days overdue` 
-                        });
-                    }
-                }
-
-                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="pendingReportsModal">
-                    <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-2xl mx-auto">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">Pending Reports (${pendingStudents.length})</h3>
-                            <button class="text-2xl font-bold close-modal text-gray-700 dark:text-gray-300">&times;</button>
-                        </div>
-                        <div class="overflow-auto max-h-96">`;
-
-                if (pendingStudents.length === 0) {
-                    html += '<p class="text-green-600 dark:text-green-400">All reports are up to date! 🎉</p>';
-                } else {
-                    html += '<div class="space-y-2">';
-                    pendingStudents.forEach(s => {
-                        const statusClass = s.daysOverdue.includes('No reports') ? 'text-yellow-600' : 'text-red-600';
-                        html += `<div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                            <p class="font-semibold text-gray-900 dark:text-white">${escapeHtml(s.studentName)}</p>
-                            <p class="text-sm ${statusClass}">${escapeHtml(s.daysOverdue)}</p>
-                            <button class="mt-2 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400" onclick="generateReport('${s.id}')">
-                                <i class="fas fa-plus-circle mr-1"></i>Create Report
-                            </button>
-                        </div>`;
-                    });
-                    html += '</div>';
-                }
-
-                html += `</div></div></div>`;
-
-                const modalDiv = document.createElement('div');
-                modalDiv.innerHTML = html;
-                const modal = modalDiv.firstElementChild;
-                document.body.appendChild(modal);
-
-                modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
-                modal.addEventListener('click', (e) => {
-                    if (e.target === modal) modal.remove();
-                });
-            });
-
-            // ----- Performance Score Card Click -----
-            document.getElementById('achievementsCard').addEventListener('click', () => {
-                const performance = document.getElementById('performanceScore').textContent;
-                
-                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="performanceModal">
-                    <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md mx-auto">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">Performance Score</h3>
-                            <button class="text-2xl font-bold close-modal text-gray-700 dark:text-gray-300">&times;</button>
-                        </div>
-                        <div class="text-center">
-                            <div class="w-32 h-32 mx-auto mb-4 relative">
-                                <svg class="w-full h-full" viewBox="0 0 100 100">
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#e5e7eb" stroke-width="10"/>
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#10b981" stroke-width="10" 
-                                        stroke-dasharray="${2 * Math.PI * 45}" 
-                                        stroke-dashoffset="${2 * Math.PI * 45 * (1 - performance/100)}"
-                                        stroke-linecap="round"
-                                        transform="rotate(-90 50 50)"/>
-                                </svg>
-                                <div class="absolute inset-0 flex items-center justify-center">
-                                    <span class="text-3xl font-bold text-gray-900 dark:text-white">${performance}</span>
-                                </div>
-                            </div>
-                            <p class="text-gray-600 dark:text-gray-300 mb-2">Overall performance rating</p>
-                            <div class="text-left space-y-2 mt-4">
-                                <p class="text-sm"><i class="fas fa-check-circle text-green-500 mr-2"></i>Attendance: Excellent</p>
-                                <p class="text-sm"><i class="fas fa-check-circle text-green-500 mr-2"></i>Reports: Up to date</p>
-                                <p class="text-sm"><i class="fas fa-check-circle text-green-500 mr-2"></i>Student engagement: High</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-
-                const modalDiv = document.createElement('div');
-                modalDiv.innerHTML = html;
-                const modal = modalDiv.firstElementChild;
-                document.body.appendChild(modal);
-
-                modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
-                modal.addEventListener('click', (e) => {
-                    if (e.target === modal) modal.remove();
-                });
-            });
-
-            // Tab click handlers
-            document.getElementById('navDashboard').addEventListener('click', () => showTab('Dashboard'));
-            document.getElementById('navStudentDatabase').addEventListener('click', () => showTab('StudentDatabase'));
-            document.getElementById('navAcademic').addEventListener('click', () => showTab('Academic'));
-            document.getElementById('navScheduleManagement').addEventListener('click', () => showTab('ScheduleManagement'));
-
-            // Initially show Dashboard tab content (skeleton loader)
-            showTab('Dashboard');
-        });
-
-        // Simple escape function for safety
-        function escapeHtml(unsafe) {
+        // --- Helper escape (for modals) ---
+        window.escapeHtml = function(unsafe) {
             if (!unsafe) return '';
             return String(unsafe)
                 .replace(/&/g, "&amp;")
@@ -1060,12 +574,216 @@
                 .replace(/>/g, "&gt;")
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;");
+        };
+
+        // --- Update stat counters (realistic data) ---
+        async function updateAllCounters(tutor) {
+            try {
+                const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const studentsSnapshot = await getDocs(studentsQuery);
+                const allStudents = studentsSnapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter(s => !['archived','graduated','transferred'].includes(s.status));
+
+                document.getElementById('totalStudentsCount').textContent = allStudents.length;
+
+                const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                let todayClasses = 0;
+                allStudents.forEach(s => {
+                    if (s.schedule && Array.isArray(s.schedule)) {
+                        s.schedule.forEach(slot => { if (slot.day === todayName) todayClasses++; });
+                    }
+                });
+                document.getElementById('todayClassesCount').textContent = todayClasses;
+
+                const oneWeekAgo = new Date(); oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                let pending = 0;
+                allStudents.forEach(s => {
+                    if (!s.lastReportDate) { pending++; return; }
+                    const last = s.lastReportDate?.toDate?.() || new Date(s.lastReportDate);
+                    if (last < oneWeekAgo) pending++;
+                });
+                document.getElementById('pendingReportsCount').textContent = pending;
+
+                let earned = 0;
+                allStudents.forEach(s => earned += s.attendanceRate || 85);
+                const perf = allStudents.length ? Math.round((earned / (allStudents.length * 100)) * 100) : 100;
+                document.getElementById('performanceScore').textContent = perf;
+            } catch (e) { console.warn("Counter update failed", e); }
         }
 
-        // Placeholder function for report generation
-        window.generateReport = function(studentId) {
-            alert('Report generation feature coming soon! Student ID: ' + studentId);
-        };
+        // --- Academic view (custom, uses homework inbox and daily mood) ---
+        function renderAcademicView() {
+            const main = document.getElementById('mainContent');
+            main.innerHTML = `
+                <div class="space-y-6">
+                    <h2 class="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                        <i class="fas fa-graduation-cap text-green-600"></i> Academic Overview
+                    </h2>
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div class="academic-card">
+                            <h3 class="text-lg font-semibold mb-3 flex items-center gap-2"><i class="fas fa-pencil-alt text-blue-500"></i> Recent homework</h3>
+                            <div id="academic-homework-container" class="min-h-[200px]">
+                                <div class="text-gray-500 animate-pulse">Loading submissions...</div>
+                            </div>
+                        </div>
+                        <div class="academic-card">
+                            <h3 class="text-lg font-semibold mb-3 flex items-center gap-2"><i class="fas fa-lightbulb text-yellow-500"></i> Daily topics (this month)</h3>
+                            <div id="academic-topics-container" class="min-h-[200px]">
+                                <div class="text-gray-500 animate-pulse">Loading topics...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // load homework inbox into the left container
+            if (window.loadHomeworkInbox && window.tutorData) {
+                // create a temporary container copy
+                const hwContainer = document.getElementById('academic-homework-container');
+                hwContainer.innerHTML = ''; // clear
+                // we call the existing inbox loader but redirect its output
+                const original = window.loadHomeworkInbox;
+                window.loadHomeworkInbox = function(email) {
+                    // original function expects to fill #homework-inbox-container, so we temporarily replace it
+                    const fakeContainer = document.createElement('div');
+                    fakeContainer.id = 'homework-inbox-container';
+                    hwContainer.appendChild(fakeContainer);
+                    original(email);
+                    // restore original after a short delay (to avoid conflict)
+                    setTimeout(() => { window.loadHomeworkInbox = original; }, 500);
+                };
+                window.loadHomeworkInbox(window.tutorData.email);
+            } else {
+                document.getElementById('academic-homework-container').innerHTML = '<p class="text-gray-400">Homework module unavailable</p>';
+            }
+
+            // load recent daily topics (simplified, just show last 3)
+            if (window.tutorData) {
+                import('./firebaseConfig.js').then(() => {
+                    const q = query(collection(db, "daily_topics"), where("tutorEmail", "==", window.tutorData.email));
+                    getDocs(q).then(snap => {
+                        const topics = snap.docs.map(d => d.data()).sort((a,b)=> (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)).slice(0,5);
+                        const container = document.getElementById('academic-topics-container');
+                        if (!topics.length) {
+                            container.innerHTML = '<p class="text-gray-400">No topics recorded this month.</p>';
+                        } else {
+                            container.innerHTML = topics.map(t => `
+                                <div class="mb-2 pb-2 border-b border-white/20">
+                                    <div class="font-medium">${escapeHtml(t.studentName)}</div>
+                                    <div class="text-sm truncate">${escapeHtml(t.topics.substring(0,60))}</div>
+                                    <div class="text-xs text-gray-500">${new Date(t.createdAt?.seconds*1000).toLocaleDateString()}</div>
+                                </div>
+                            `).join('');
+                        }
+                    });
+                });
+            }
+        }
+
+        // --- Activate navigation tab and manage active class ---
+        function setActiveTab(activeId) {
+            document.querySelectorAll('.nav-tab-modern').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.getElementById(activeId);
+            if (activeBtn) activeBtn.classList.add('active');
+        }
+
+        // --- Wait for tutor and attach everything ---
+        waitForTutorData(() => {
+            const tutor = window.tutorData;
+            // update header
+            if (tutor.name) {
+                document.querySelector('.text-gradient').textContent = tutor.name.split(' ')[0];
+                document.querySelector('.avatar-modern').textContent = tutor.name.charAt(0);
+            }
+            // start counter updates
+            updateAllCounters(tutor);
+            setInterval(() => updateAllCounters(tutor), 300000);
+            window.addEventListener('focus', () => updateAllCounters(tutor));
+
+            // --- Stat card click handlers (rich modals) ---
+            document.getElementById('totalStudentsCard').addEventListener('click', async () => {
+                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const snap = await getDocs(q);
+                const students = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !['archived','graduated','transferred'].includes(s.status));
+                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto flex items-center justify-center z-50" id="modal"><div class="bg-white dark:bg-gray-800 p-6 rounded-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-auto"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">My Students (${students.length})</h3><button class="text-2xl close-modal">&times;</button></div><table class="min-w-full"><thead><tr><th>Name</th><th>Grade</th><th>Type</th></tr></thead><tbody>`;
+                students.forEach(s => {
+                    let type = 'Regular';
+                    if (s.isTransitioning) type = 'Transitioning';
+                    else if (s.groupClass) type = 'Group';
+                    html += `<tr><td class="py-2">${escapeHtml(s.studentName)}</td><td>${escapeHtml(s.grade)}</td><td>${type}</td></tr>`;
+                });
+                html += `</tbody></table></div></div>`;
+                const modal = document.createElement('div'); modal.innerHTML = html; document.body.appendChild(modal.firstElementChild);
+                modal.querySelector('.close-modal')?.addEventListener('click',()=> modal.remove());
+            });
+
+            document.getElementById('todayClassesCard').addEventListener('click', async () => {
+                const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const snap = await getDocs(q);
+                const classes = [];
+                snap.forEach(doc => {
+                    const s = doc.data();
+                    if (s.schedule) s.schedule.forEach(slot => { if (slot.day === today) classes.push({ student: s.studentName, time: slot.start+'-'+slot.end }); });
+                });
+                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50"><div class="bg-white dark:bg-gray-800 p-6 rounded-xl max-w-lg w-full"><h3 class="text-xl font-bold mb-4">Today's classes (${today})</h3>`;
+                if (!classes.length) html += '<p>No classes today</p>';
+                else classes.forEach(c => html += `<div class="border-b py-2">${escapeHtml(c.student)} — ${escapeHtml(c.time)}</div>`);
+                html += `<button class="mt-4 btn-modern close-modal">Close</button></div></div>`;
+                const modal = document.createElement('div'); modal.innerHTML = html; document.body.appendChild(modal.firstElementChild);
+                modal.querySelector('.close-modal').addEventListener('click',()=> modal.remove());
+            });
+
+            document.getElementById('pendingReportsCard').addEventListener('click', async () => {
+                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const snap = await getDocs(q);
+                const pending = [];
+                snap.forEach(doc => {
+                    const s = doc.data();
+                    if (!s.lastReportDate) pending.push(s.studentName);
+                });
+                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50"><div class="bg-white dark:bg-gray-800 p-6 rounded-xl max-w-md w-full"><h3 class="text-xl font-bold mb-4">Pending reports</h3>`;
+                if (!pending.length) html += '<p>All caught up 🎉</p>';
+                else pending.forEach(name => html += `<div class="py-1">• ${escapeHtml(name)}</div>`);
+                html += `<button class="mt-4 btn-modern close-modal">Close</button></div></div>`;
+                const modal = document.createElement('div'); modal.innerHTML = html; document.body.appendChild(modal.firstElementChild);
+                modal.querySelector('.close-modal').addEventListener('click',()=> modal.remove());
+            });
+
+            document.getElementById('achievementsCard').addEventListener('click', () => {
+                const score = document.getElementById('performanceScore').textContent;
+                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50"><div class="bg-white dark:bg-gray-800 p-6 rounded-xl max-w-sm w-full text-center"><h3 class="text-xl font-bold mb-4">Performance</h3><div class="w-32 h-32 mx-auto relative"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="none" stroke="#e5e7eb" stroke-width="10"/><circle cx="50" cy="50" r="45" fill="none" stroke="#10b981" stroke-width="10" stroke-dasharray="${2*Math.PI*45}" stroke-dashoffset="${2*Math.PI*45*(1-score/100)}" stroke-linecap="round" transform="rotate(-90 50 50)"/></svg><div class="absolute inset-0 flex items-center justify-center text-3xl font-bold">${score}</div></div><p class="mt-4 text-gray-600 dark:text-gray-300">Overall rating</p><button class="mt-4 btn-modern close-modal">Close</button></div></div>`;
+                const modal = document.createElement('div'); modal.innerHTML = html; document.body.appendChild(modal.firstElementChild);
+                modal.querySelector('.close-modal').addEventListener('click',()=> modal.remove());
+            });
+
+            // --- Navigation tab handlers (including new ones) ---
+            // Dashboard and StudentDatabase are already handled by tutor.js listeners, but we also manage active class
+            document.getElementById('navDashboard').addEventListener('click', () => {
+                setActiveTab('navDashboard');
+                // tutor.js will fill content
+            });
+            document.getElementById('navStudentDatabase').addEventListener('click', () => {
+                setActiveTab('navStudentDatabase');
+                // tutor.js renderStudentDatabase called automatically
+            });
+            document.getElementById('navAcademic').addEventListener('click', () => {
+                setActiveTab('navAcademic');
+                renderAcademicView();
+            });
+            document.getElementById('navScheduleManagement').addEventListener('click', () => {
+                setActiveTab('navScheduleManagement');
+                if (window.scheduleManager) {
+                    window.scheduleManager.openManualManager();
+                } else {
+                    alert('Schedule manager is initializing, please try again in a moment.');
+                }
+            });
+
+            // Ensure active tab matches when tutor.js changes it (override their updateActiveTab? we just sync on our clicks)
+            // Also, if tutor.js calls updateActiveTab, it only knows two tabs. We'll leave as is; our clicks will override class.
+        });
     </script>
 </body>
 </html>
