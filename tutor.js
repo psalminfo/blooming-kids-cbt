@@ -1,4 +1,3 @@
-
 /*******************************************************************************
  * SECTION 1: IMPORTS & INITIAL SETUP
  * GitHub: https://github.com/psalminfo/blooming-kids-cbt/blob/main/tutor.js
@@ -11,932 +10,9 @@ import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-f
 
 
 /*******************************************************************************
- * SECTION 2: STYLES & CSS
+ * SECTION 2: STYLES & CSS (REMOVED – MOVED TO HTML)
  ******************************************************************************/
 
-const style = document.createElement('style');
-style.textContent = `
-    /* Modern UI Styles */
-    :root {
-        --primary-color: #10b981;
-        --primary-dark: #059669;
-        --primary-light: #d1fae5;
-        --secondary-color: #6366f1;
-        --danger-color: #ef4444;
-        --warning-color: #f59e0b;
-        --info-color: #3b82f6;
-        --dark-color: #1f2937;
-        --light-color: #f9fafb;
-        --border-color: #e5e7eb;
-        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        --radius-sm: 0.375rem;
-        --radius: 0.5rem;
-        --radius-lg: 0.75rem;
-        --success-color: #10b981;
-    }
-
-    /* Active Tab Styling */
-    .nav-tab {
-        padding: 0.75rem 1rem;
-        border-radius: var(--radius);
-        font-weight: 500;
-        : all 0.2s ease;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        color: var(--dark-color);
-    }
-
-    .nav-tab:hover {
-        background-color: var(--light-color);
-    }
-
-    .nav-tab.active {
-        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
-        color: white;
-        box-shadow: var(--shadow);
-    }
-
-    /* Enhanced Button Styles */
-    .btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.625rem 1.25rem;
-        border-radius: var(--radius);
-        font-weight: 500;
-        font-size: 0.875rem;
-        line-height: 1.25rem;
-        : all 0.2s ease;
-        border: none;
-        cursor: pointer;
-        gap: 0.5rem;
-    }
-
-    .btn-primary {
-        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
-        color: white;
-        box-shadow: var(--shadow);
-    }
-
-    .btn-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-lg);
-    }
-
-    .btn-secondary {
-        background-color: white;
-        color: var(--dark-color);
-        border: 1px solid var(--border-color);
-    }
-
-    .btn-secondary:hover {
-        background-color: var(--light-color);
-    }
-
-    .btn-danger {
-        background-color: var(--danger-color);
-        color: white;
-    }
-
-    .btn-warning {
-        background-color: var(--warning-color);
-        color: white;
-    }
-
-    .btn-info {
-        background-color: var(--info-color);
-        color: white;
-    }
-
-    .btn-sm {
-        padding: 0.375rem 0.75rem;
-        font-size: 0.75rem;
-    }
-
-    /* Card Styles */
-    .card {
-        background: white;
-        border-radius: var(--radius-lg);
-        box-shadow: var(--shadow);
-        border: 1px solid var(--border-color);
-        : transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .card:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-lg);
-    }
-
-    .card-header {
-        padding: 1.5rem 1.5rem 1rem;
-        border-bottom: 1px solid var(--border-color);
-    }
-
-    .card-body {
-        padding: 1.5rem;
-    }
-
-    .card-footer {
-        padding: 1rem 1.5rem;
-        border-top: 1px solid var(--border-color);
-        background-color: var(--light-color);
-        border-bottom-left-radius: var(--radius-lg);
-        border-bottom-right-radius: var(--radius-lg);
-    }
-
-    /* Badge Styles */
-    .badge {
-        display: inline-flex;
-        align-items: center;
-        padding: 0.25rem 0.75rem;
-        border-radius: 9999px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        line-height: 1;
-    }
-
-    .badge-success {
-        background-color: var(--primary-light);
-        color: var(--primary-dark);
-    }
-
-    .badge-warning {
-        background-color: #fef3c7;
-        color: #92400e;
-    }
-
-    .badge-danger {
-        background-color: #fee2e2;
-        color: #991b1b;
-    }
-
-    .badge-info {
-        background-color: #dbeafe;
-        color: #1e40af;
-    }
-
-    .badge-secondary {
-        background-color: #e5e7eb;
-        color: #4b5563;
-    }
-
-    /* Table Styles */
-    .table-container {
-        overflow-x: auto;
-        border-radius: var(--radius);
-        box-shadow: var(--shadow-sm);
-    }
-
-    .table {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-    }
-
-    .table th {
-        background-color: var(--light-color);
-        padding: 1rem;
-        font-weight: 600;
-        text-align: left;
-        color: var(--dark-color);
-        border-bottom: 2px solid var(--border-color);
-    }
-
-    .table td {
-        padding: 1rem;
-        border-bottom: 1px solid var(--border-color);
-        vertical-align: middle;
-    }
-
-    .table tr:hover {
-        background-color: var(--light-color);
-    }
-
-    /* Form Styles - ENHANCED WIDTH */
-    .form-group {
-        margin-bottom: 1.25rem;
-    }
-
-    .form-label {
-        display: block;
-        margin-bottom: 0.5rem;
-        font-weight: 500;
-        color: var(--dark-color);
-    }
-
-    .form-input {
-        width: 100%;
-        padding: 0.75rem 1rem;
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius);
-        : border-color 0.2s ease, box-shadow 0.2s ease;
-        font-size: 1rem;
-    }
-
-    .form-input:focus {
-        outline: none;
-        border-color: var(--primary-color);
-        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
-    }
-
-    .form-textarea {
-        min-height: 120px;
-        resize: vertical;
-        padding: 0.75rem 1rem;
-        font-size: 1rem;
-    }
-
-    /* Modal Enhancements - WIDER MODALS */
-    .modal-overlay {
-        position: fixed;
-        inset: 0;
-        background-color: rgba(0, 0, 0, 0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 50;
-        padding: 1rem;
-        animation: fadeIn 0.2s ease;
-    }
-
-    .modal-content {
-        background: white;
-        border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-lg);
-        width: 100%;
-        max-width: 48rem;
-        max-height: 90vh;
-        overflow-y: auto;
-        animation: slideIn 0.3s ease;
-    }
-
-    .modal-header {
-        padding: 1.5rem 1.5rem 1rem;
-        border-bottom: 1px solid var(--border-color);
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-    }
-
-    .modal-title {
-        font-size: 1.25rem;
-        font-weight: 600;
-        color: var(--dark-color);
-    }
-
-    .modal-body {
-        padding: 1.5rem;
-    }
-
-    .modal-footer {
-        padding: 1rem 1.5rem;
-        border-top: 1px solid var(--border-color);
-        display: flex;
-        justify-content: flex-end;
-        gap: 0.75rem;
-    }
-
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-
-    @keyframes slideIn {
-        from { transform: translateY(-1rem); opacity: 0; }
-        to { transform: translateY(0); opacity: 1; }
-    }
-
-    /* Loading Spinner */
-    .spinner {
-        animation: spin 1s linear infinite;
-        width: 1.5rem;
-        height: 1.5rem;
-        border: 2px solid var(--border-color);
-        border-top-color: var(--primary-color);
-        border-radius: 50%;
-    }
-
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-
-    /* Hero Section */
-    .hero-section {
-        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
-        border-radius: var(--radius-lg);
-        color: white;
-        padding: 2rem;
-        margin-bottom: 2rem;
-    }
-
-    .hero-title {
-        font-size: 1.875rem;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
-    }
-
-    .hero-subtitle {
-        opacity: 0.9;
-        font-size: 1.125rem;
-    }
-
-    /* Dashboard Grid */
-    .dashboard-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 1.5rem;
-        margin-bottom: 2rem;
-    }
-
-    /* Status Indicators */
-    .status-dot {
-        display: inline-block;
-        width: 0.75rem;
-        height: 0.75rem;
-        border-radius: 50%;
-        margin-right: 0.5rem;
-    }
-
-    .status-dot-success {
-        background-color: var(--primary-color);
-    }
-
-    .status-dot-warning {
-        background-color: var(--warning-color);
-    }
-
-    .status-dot-danger {
-        background-color: var(--danger-color);
-    }
-
-    /* Action Buttons Container */
-    .action-buttons {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-    }
-
-    /* Add ing Button Styling */
-    #add-ing-btn {
-        display: block !important;
-        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
-        color: white !important;
-        padding: 0.625rem 1.25rem !important;
-        border-radius: var(--radius) !important;
-        border: none !important;
-        cursor: pointer !important;
-        margin: 0.25rem !important;
-        font-weight: 500 !important;
-        : all 0.2s ease !important;
-        box-shadow: var(--shadow) !important;
-    }
-
-    #add-ing-btn:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: var(--shadow-lg) !important;
-        background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
-    }
-
-    /* Messaging Button Styling */
-    .messaging-btn {
-        background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%) !important;
-        color: white !important;
-        padding: 0.625rem 1.25rem !important;
-        border-radius: var(--radius) !important;
-        border: none !important;
-        cursor: pointer !important;
-        margin: 0.25rem !important;
-        font-weight: 500 !important;
-        : all 0.2s ease !important;
-        box-shadow: var(--shadow) !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        gap: 0.5rem !important;
-    }
-
-    .messaging-btn:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: var(--shadow-lg) !important;
-        background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%) !important;
-    }
-
-    /* Inbox Button Styling */
-    .inbox-btn {
-        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important;
-        color: white !important;
-        padding: 0.625rem 1.25rem !important;
-        border-radius: var(--radius) !important;
-        border: none !important;
-        cursor: pointer !important;
-        margin: 0.25rem !important;
-        font-weight: 500 !important;
-        : all 0.2s ease !important;
-        box-shadow: var(--shadow) !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        gap: 0.5rem !important;
-        position: relative;
-    }
-
-    .inbox-btn:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: var(--shadow-lg) !important;
-        background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%) !important;
-    }
-
-    .inbox-badge {
-        position: absolute;
-        top: -5px;
-        right: -5px;
-        background-color: #ef4444;
-        color: white;
-        border-radius: 50%;
-        width: 20px;
-        height: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.7rem;
-        font-weight: bold;
-    }
-
-    /* Responsive Design */
-    @media (max-width: 768px) {
-        .hero-section {
-            padding: 1.5rem;
-        }
-        
-        .hero-title {
-            font-size: 1.5rem;
-        }
-        
-        .dashboard-grid {
-            grid-template-columns: 1fr;
-        }
-        
-        .action-buttons {
-            flex-direction: column;
-        }
-        
-        .action-buttons .btn {
-            width: 100%;
-        }
-        
-        .modal-content {
-            max-width: 95%;
-        }
-    }
-
-    /* Calendar View Styles */
-    .calendar-view {
-        display: grid;
-        grid-template-columns: repeat(7, 1fr);
-        gap: 0.5rem;
-        margin-bottom: 1rem;
-    }
-
-    .calendar-day {
-        background: var(--light-color);
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius);
-        padding: 0.75rem;
-        min-height: 100px;
-    }
-
-    .calendar-day-header {
-        font-weight: 600;
-        font-size: 0.875rem;
-        color: var(--dark-color);
-        margin-bottom: 0.5rem;
-        padding-bottom: 0.25rem;
-        border-bottom: 1px solid var(--border-color);
-    }
-
-    .calendar-event {
-        background: white;
-        border-left: 3px solid var(--primary-color);
-        padding: 0.375rem;
-        margin-bottom: 0.25rem;
-        font-size: 0.75rem;
-        border-radius: var(--radius-sm);
-        box-shadow: var(--shadow-sm);
-    }
-
-    .calendar-event-time {
-        font-size: 0.7rem;
-        color: var(--dark-color);
-        opacity: 0.8;
-    }
-
-    /* Student Actions Container */
-    .student-actions-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1rem;
-        margin-top: 1.5rem;
-        margin-bottom: 2rem;
-    }
-
-    .student-action-card {
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius);
-        padding: 1rem;
-        : all 0.2s ease;
-    }
-
-    .student-action-card:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow);
-    }
-
-    /* Wider report textareas */
-    .report-textarea {
-        min-height: 150px;
-        font-size: 1.05rem;
-        line-height: 1.5;
-    }
-
-    /* Edit Schedule Button */
-    .edit-schedule-btn {
-        background-color: var(--info-color);
-        color: white;
-        border: none;
-        padding: 0.375rem 0.75rem;
-        border-radius: var(--radius);
-        font-size: 0.75rem;
-        cursor: pointer;
-        : all 0.2s ease;
-    }
-
-    .edit-schedule-btn:hover {
-        background-color: #2563eb;
-    }
-
-    /* File Upload Styles */
-    .file-upload-container {
-        border: 2px dashed var(--border-color);
-        border-radius: var(--radius);
-        padding: 1.5rem;
-        text-align: center;
-        : all 0.2s ease;
-        cursor: pointer;
-    }
-
-    .file-upload-container:hover {
-        border-color: var(--primary-color);
-        background-color: var(--primary-light);
-    }
-
-    .file-upload-label {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        cursor: pointer;
-    }
-
-    .file-upload-icon {
-        font-size: 2rem;
-        margin-bottom: 0.5rem;
-        color: var(--primary-color);
-    }
-
-    .file-preview {
-        margin-top: 1rem;
-        padding: 0.75rem;
-        background-color: var(--light-color);
-        border-radius: var(--radius);
-    }
-
-    .file-name {
-        font-size: 0.875rem;
-        color: var(--dark-color);
-        margin-bottom: 0.25rem;
-    }
-
-    .file-size {
-        font-size: 0.75rem;
-        color: var(--dark-color);
-        opacity: 0.7;
-    }
-
-    /* Email Settings Section */
-    .email-settings {
-        background-color: var(--light-color);
-        border-radius: var(--radius);
-        padding: 1rem;
-        margin-top: 1rem;
-    }
-
-    .email-preview {
-        background-color: white;
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius-sm);
-        padding: 1rem;
-        margin-top: 1rem;
-        font-size: 0.875rem;
-        line-height: 1.5;
-    }
-
-    .email-preview-header {
-        border-bottom: 1px solid var(--border-color);
-        padding-bottom: 0.5rem;
-        margin-bottom: 1rem;
-    }
-
-    /* Messaging Modal Styles - WhatsApp-like UI */
-    .whatsapp-chat-container {
-        display: flex;
-        flex-direction: column;
-        height: 500px;
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius);
-        overflow: hidden;
-    }
-
-    .chat-header {
-        background: linear-gradient(135deg, #128c7e 0%, #075e54 100%);
-        color: white;
-        padding: 1rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-
-    .chat-header-info {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-    }
-
-    .chat-avatar {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background-color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.2rem;
-        color: #128c7e;
-    }
-
-    .chat-header-text h4 {
-        margin: 0;
-        font-weight: 600;
-    }
-
-    .chat-header-text p {
-        margin: 0;
-        font-size: 0.8rem;
-        opacity: 0.9;
-    }
-
-    .chat-messages {
-        flex: 1;
-        padding: 1rem;
-        overflow-y: auto;
-        background-color: #e5ddd5;
-        background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23a8a8a8' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
-    }
-
-    .message-bubble {
-        max-width: 70%;
-        padding: 0.5rem 0.75rem;
-        border-radius: 1rem;
-        margin-bottom: 0.5rem;
-        position: relative;
-        word-wrap: break-word;
-    }
-
-    .message-bubble.sent {
-        background-color: #dcf8c6;
-        align-self: flex-end;
-        margin-left: auto;
-        border-bottom-right-radius: 0.25rem;
-    }
-
-    .message-bubble.received {
-        background-color: white;
-        align-self: flex-start;
-        margin-right: auto;
-        border-bottom-left-radius: 0.25rem;
-    }
-
-    .message-content {
-        font-size: 0.9rem;
-        line-height: 1.4;
-    }
-
-    .message-time {
-        font-size: 0.7rem;
-        color: #666;
-        text-align: right;
-        margin-top: 0.25rem;
-    }
-
-    .message-sender {
-        font-weight: 600;
-        font-size: 0.8rem;
-        margin-bottom: 0.25rem;
-        color: #333;
-    }
-
-    .chat-input-area {
-        padding: 0.75rem;
-        background-color: white;
-        border-top: 1px solid var(--border-color);
-        display: flex;
-        gap: 0.5rem;
-    }
-
-    .chat-input {
-        flex: 1;
-        padding: 0.5rem 1rem;
-        border: 1px solid var(--border-color);
-        border-radius: 2rem;
-        font-size: 0.9rem;
-    }
-
-    .chat-input:focus {
-        outline: none;
-        border-color: #128c7e;
-    }
-
-    .send-message-btn {
-        background-color: #128c7e;
-        color: white;
-        border: none;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        : background-color 0.2s ease;
-    }
-
-    .send-message-btn:hover {
-        background-color: #075e54;
-    }
-
-    .message-recipient-options {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 1rem;
-        margin: 1.5rem 0;
-    }
-
-    .recipient-option {
-        border: 2px solid var(--border-color);
-        border-radius: var(--radius);
-        padding: 1rem;
-        cursor: pointer;
-        : all 0.2s ease;
-        text-align: center;
-    }
-
-    .recipient-option:hover {
-        border-color: var(--primary-color);
-        background-color: var(--primary-light);
-    }
-
-    .recipient-option.selected {
-        border-color: var(--primary-color);
-        background-color: var(--primary-light);
-        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
-    }
-
-    .recipient-option input[type="checkbox"] {
-        margin-right: 0.5rem;
-    }
-
-    .recipient-label {
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-    }
-
-    /* Inbox Modal Styles */
-    .inbox-container {
-        display: flex;
-        height: 600px;
-    }
-
-    .conversations-sidebar {
-        width: 300px;
-        border-right: 1px solid var(--border-color);
-        display: flex;
-        flex-direction: column;
-    }
-
-    .conversations-header {
-        padding: 1rem;
-        border-bottom: 1px solid var(--border-color);
-        font-weight: 600;
-    }
-
-    .conversations-list {
-        flex: 1;
-        overflow-y: auto;
-    }
-
-    .conversation-item {
-        padding: 1rem;
-        border-bottom: 1px solid var(--border-color);
-        cursor: pointer;
-        : background-color 0.2s ease;
-    }
-
-    .conversation-item:hover {
-        background-color: var(--light-color);
-    }
-
-    .conversation-item.active {
-        background-color: var(--primary-light);
-        border-left: 3px solid var(--primary-color);
-    }
-
-    .conversation-info {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-    }
-
-    .conversation-avatar {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background-color: var(--primary-color);
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 600;
-    }
-
-    .conversation-details {
-        flex: 1;
-    }
-
-    .conversation-title {
-        font-weight: 600;
-        margin: 0;
-        display: flex;
-        justify-content: space-between;
-    }
-
-    .conversation-preview {
-        font-size: 0.85rem;
-        color: #666;
-        margin: 0.25rem 0 0 0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .conversation-time {
-        font-size: 0.75rem;
-        color: #999;
-    }
-
-    .conversation-unread {
-        background-color: var(--primary-color);
-        color: white;
-        border-radius: 50%;
-        width: 20px;
-        height: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.7rem;
-        font-weight: 600;
-    }
-
-    .chat-main {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-    }
-
-    /* New message indicator */
-    .new-message-indicator {
-        background-color: #ef4444;
-        color: white;
-        border-radius: 50%;
-        width: 8px;
-        height: 8px;
-        display: inline-block;
-        margin-left: 0.5rem;
-    }
-`;
-document.head.appendChild(style);
 
 /*******************************************************************************
  * SECTION 3: CONFIGURATION & CONSTANTS
@@ -1097,6 +173,17 @@ TIME_SLOTS.sort((a, b) => {
 /*******************************************************************************
  * SECTION 4: UTILITY FUNCTIONS
  ******************************************************************************/
+
+// ----- ESCAPE HTML (XSS PROTECTION) -----
+function escapeHtml(unsafe) {
+    if (unsafe === undefined || unsafe === null) return '';
+    return String(unsafe)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
 // Phone Number Normalization Function
 function normalizePhoneNumber(phone) {
@@ -1260,7 +347,7 @@ function getEarliestClass(scheduleByDay) {
         scheduleByDay[day].forEach(event => {
             if (event.start < earliestTime) {
                 earliestTime = event.start;
-                earliestInfo = `${formatScheduleTime(event.start)} (${event.student} - ${day})`;
+                earliestInfo = `${formatScheduleTime(event.start)} (${escapeHtml(event.student)} - ${escapeHtml(day)})`;
             }
         });
     });
@@ -1332,7 +419,7 @@ function showCustomAlert(message) {
     alertModal.innerHTML = `
         <div class="modal-content max-w-sm">
             <div class="modal-body">
-                <p class="mb-4 text-center">${message}</p>
+                <p class="mb-4 text-center">${escapeHtml(message)}</p>
                 <div class="flex justify-center">
                     <button id="alert-ok-btn" class="btn btn-primary">OK</button>
                 </div>
@@ -1462,7 +549,7 @@ function showEmploymentDatePopup(tutor) {
                     <p class="text-sm text-gray-600 mb-4">Please provide your employment start date to help us calculate your payments accurately.</p>
                     <div class="form-group">
                         <label class="form-label">Month & Year of Employment</label>
-                        <input type="month" id="employment-date" class="form-input" max="${new Date().toISOString().slice(0, 7)}">
+                        <input type="month" id="employment-date" class="form-input" max="${escapeHtml(new Date().toISOString().slice(0, 7))}">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1583,7 +670,7 @@ class ScheduleManager {
         this.TIME_SLOTS = this.generateTimeSlots();
         this.DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         
-        this.injectStyles();
+        // Styles are now in HTML, no injection needed
     }
 
     // --- INITIALIZATION ---
@@ -1698,23 +785,23 @@ class ScheduleManager {
         this.abortController = new AbortController();
         const signal = { signal: this.abortController.signal };
 
-        // Construct HTML
+        // Construct HTML (escape student name)
         const html = `
             <div class="modal-overlay" id="schedule-modal">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h3 class="modal-title">📅 Schedule Management</h3>
                         <div class="flex items-center gap-2">
-                            <span class="badge badge-info">${remaining} in queue</span>
+                            <span class="badge badge-info">${escapeHtml(remaining)} in queue</span>
                             <button class="btn btn-sm btn-ghost close-trigger">✕</button>
                         </div>
                     </div>
                     
                     <div class="modal-body">
                         <div class="student-info">
-                            <h4 class="font-semibold text-blue-800">${this.activeStudent.studentName}</h4>
+                            <h4 class="font-semibold text-blue-800">${escapeHtml(this.activeStudent.studentName)}</h4>
                             <p class="text-sm text-blue-600">
-                                ${this.activeStudent.grade || 'No Grade'} • ${this.activeStudent.subjects?.join(', ') || 'No Subjects'}
+                                ${escapeHtml(this.activeStudent.grade || 'No Grade')} • ${escapeHtml(this.activeStudent.subjects?.join(', ') || 'No Subjects')}
                             </p>
                         </div>
                         
@@ -1788,19 +875,19 @@ class ScheduleManager {
                 <div class="flex flex-col">
                     <label class="text-xs font-medium mb-1">Day</label>
                     <select class="select select-bordered select-sm day-select">
-                        ${this.DAYS.map(d => `<option value="${d}" ${d === day ? 'selected' : ''}>${d}</option>`).join('')}
+                        ${this.DAYS.map(d => `<option value="${escapeHtml(d)}" ${d === day ? 'selected' : ''}>${escapeHtml(d)}</option>`).join('')}
                     </select>
                 </div>
                 <div class="flex flex-col">
                     <label class="text-xs font-medium mb-1">Start</label>
                     <select class="select select-bordered select-sm start-select">
-                        ${this.TIME_SLOTS.map(s => `<option value="${s.value}" ${s.value === start ? 'selected' : ''}>${s.label}</option>`).join('')}
+                        ${this.TIME_SLOTS.map(s => `<option value="${escapeHtml(s.value)}" ${s.value === start ? 'selected' : ''}>${escapeHtml(s.label)}</option>`).join('')}
                     </select>
                 </div>
                 <div class="flex flex-col">
                     <label class="text-xs font-medium mb-1">End</label>
                     <select class="select select-bordered select-sm end-select">
-                        ${this.TIME_SLOTS.map(s => `<option value="${s.value}" ${s.value === end ? 'selected' : ''}>${s.label}</option>`).join('')}
+                        ${this.TIME_SLOTS.map(s => `<option value="${escapeHtml(s.value)}" ${s.value === end ? 'selected' : ''}>${escapeHtml(s.label)}</option>`).join('')}
                     </select>
                 </div>
             </div>
@@ -1837,73 +924,73 @@ class ScheduleManager {
     }
 
     async save(moveToNext) {
-    const rows = this.popup.querySelectorAll('.time-slot-row');
-    const schedule = [];
-    let isValid = true;
+        const rows = this.popup.querySelectorAll('.time-slot-row');
+        const schedule = [];
+        let isValid = true;
 
-    rows.forEach(row => {
-        const day = row.querySelector('.day-select').value;
-        const start = row.querySelector('.start-select').value;
-        const end = row.querySelector('.end-select').value;
+        rows.forEach(row => {
+            const day = row.querySelector('.day-select').value;
+            const start = row.querySelector('.start-select').value;
+            const end = row.querySelector('.end-select').value;
 
-        if (start === end) {
-            this.showAlert('Start and End time cannot be the same', 'error');
-            isValid = false;
-        }
-        schedule.push({ day, start, end });
-    });
-
-    if (!isValid) return;
-
-    try {
-        const { updateDoc, doc, setDoc } = this.methods;
-        
-        // 1. Update Student Record
-        const studentRef = doc(this.db, "students", this.activeStudent.id);
-        await updateDoc(studentRef, { schedule });
-
-        // 2. Update/Create Schedule Document
-        const scheduleRef = doc(this.db, "schedules", `sched_${this.activeStudent.id}`);
-        await setDoc(scheduleRef, {
-            studentId: this.activeStudent.id,
-            studentName: this.activeStudent.studentName,
-            tutorEmail: this.tutor.email,
-            schedule,
-            updatedAt: new Date()
-        }, { merge: true });
-
-        this.showAlert('✅ Schedule Saved!', 'success');
-        
-        if (moveToNext) this.next(true);
-        else this.closeModal();
-
-    } catch (error) {
-        console.error(error);
-        this.showAlert('Save failed. Check console.', 'error');
-    }
-}
-
-   async deleteSchedule() {
-    if (!confirm(`Delete schedule for ${this.activeStudent.studentName}?`)) return;
-
-    try {
-        const { updateDoc, doc, deleteDoc } = this.methods;
-        
-        // Remove schedule field from student
-        await updateDoc(doc(this.db, "students", this.activeStudent.id), { 
-            schedule: []  // Set to empty array instead of deleting field
+            if (start === end) {
+                this.showAlert('Start and End time cannot be the same', 'error');
+                isValid = false;
+            }
+            schedule.push({ day, start, end });
         });
-        
-        // Delete the schedule document
-        await deleteDoc(doc(this.db, "schedules", `sched_${this.activeStudent.id}`));
 
-        this.showAlert('Schedule Deleted', 'success');
-        this.next(false); // Move next but don't mark as "scheduled"
-    } catch (error) {
-        console.error("Delete error:", error);
-        this.showAlert('Delete failed', 'error');
+        if (!isValid) return;
+
+        try {
+            const { updateDoc, doc, setDoc } = this.methods;
+            
+            // 1. Update Student Record
+            const studentRef = doc(this.db, "students", this.activeStudent.id);
+            await updateDoc(studentRef, { schedule });
+
+            // 2. Update/Create Schedule Document
+            const scheduleRef = doc(this.db, "schedules", `sched_${this.activeStudent.id}`);
+            await setDoc(scheduleRef, {
+                studentId: this.activeStudent.id,
+                studentName: this.activeStudent.studentName,
+                tutorEmail: this.tutor.email,
+                schedule,
+                updatedAt: new Date()
+            }, { merge: true });
+
+            this.showAlert('✅ Schedule Saved!', 'success');
+            
+            if (moveToNext) this.next(true);
+            else this.closeModal();
+
+        } catch (error) {
+            console.error(error);
+            this.showAlert('Save failed. Check console.', 'error');
+        }
     }
-}
+
+    async deleteSchedule() {
+        if (!confirm(`Delete schedule for ${escapeHtml(this.activeStudent.studentName)}?`)) return;
+
+        try {
+            const { updateDoc, doc, deleteDoc } = this.methods;
+            
+            // Remove schedule field from student
+            await updateDoc(doc(this.db, "students", this.activeStudent.id), { 
+                schedule: []  // Set to empty array instead of deleting field
+            });
+            
+            // Delete the schedule document
+            await deleteDoc(doc(this.db, "schedules", `sched_${this.activeStudent.id}`));
+
+            this.showAlert('Schedule Deleted', 'success');
+            this.next(false); // Move next but don't mark as "scheduled"
+        } catch (error) {
+            console.error("Delete error:", error);
+            this.showAlert('Delete failed', 'error');
+        }
+    }
 
     // --- UTILITIES ---
 
@@ -1921,35 +1008,6 @@ class ScheduleManager {
             alert.classList.add('translate-x-full');
             setTimeout(() => alert.remove(), 300);
         }, 3000);
-    }
-
-    injectStyles() {
-        if (document.getElementById('schedule-manager-css')) return;
-        const css = `
-            .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(2px); }
-            .modal-content { background: white; width: 95%; max-width: 550px; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden; animation: slideUp 0.3s ease-out; }
-            .modal-header { padding: 1rem 1.5rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; background: #f9fafb; }
-            .modal-body { padding: 1.5rem; max-height: 70vh; overflow-y: auto; }
-            .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; gap: 0.5rem; background: #f9fafb; }
-            .time-slot-row { position: relative; padding: 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 0.75rem; }
-            .remove-row-btn { position: absolute; top: -8px; right: -8px; background: #ef4444; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; font-size: 12px; }
-            @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-            /* Utility Classes matching your previous setup */
-            .btn { display: inline-flex; align-items: center; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 500; : 0.2s; cursor: pointer; border: 1px solid transparent; }
-            .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
-            .btn-primary { background: #3b82f6; color: white; } .btn-primary:hover { background: #2563eb; }
-            .btn-success { background: #10b981; color: white; } .btn-success:hover { background: #059669; }
-            .btn-danger { background: #ef4444; color: white; } .btn-danger:hover { background: #dc2626; }
-            .btn-ghost { color: #6b7280; background: transparent; } .btn-ghost:hover { background: #f3f4f6; }
-            .btn-outline { border: 1px dashed #cbd5e1; color: #3b82f6; background: white; } .btn-outline:hover { border-color: #3b82f6; background: #eff6ff; }
-            .select { width: 100%; border-radius: 6px; border-color: #d1d5db; padding: 0.5rem; }
-            .grid { display: grid; } .gap-3 { gap: 0.75rem; } .grid-cols-1 { grid-template-columns: 1fr; }
-            @media(min-width: 768px) { .md\\:grid-cols-3 { grid-template-columns: repeat(3, 1fr); } }
-        `;
-        const style = document.createElement('style');
-        style.id = 'schedule-manager-css';
-        style.textContent = css;
-        document.head.appendChild(style);
     }
 }
 
@@ -2020,12 +1078,12 @@ function showDailyTopicModal(student) {
         <div class="modal-overlay">
             <div class="modal-content max-w-lg">
                 <div class="modal-header">
-                    <h3 class="modal-title">📚 Daily Topic: ${student.studentName}</h3>
+                    <h3 class="modal-title">📚 Daily Topic: ${escapeHtml(student.studentName)}</h3>
                 </div>
                 <div class="modal-body">
                     <div id="topic-history-container" class="mb-5 bg-blue-50 p-3 rounded-lg border border-blue-100 hidden">
                         <div class="flex justify-between items-center mb-2">
-                            <h5 class="font-bold text-blue-800 text-sm">📅 Topics Covered in ${monthName}</h5>
+                            <h5 class="font-bold text-blue-800 text-sm">📅 Topics Covered in ${escapeHtml(monthName)}</h5>
                             <span id="topic-count-badge" class="bg-blue-200 text-blue-800 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
                         </div>
                         <div id="topic-history" class="topic-history text-sm text-gray-700 max-h-60 overflow-y-auto custom-scrollbar">
@@ -2041,12 +1099,12 @@ function showDailyTopicModal(student) {
                     </div>
                     <div class="mt-2 text-xs text-gray-500 flex justify-between">
                         <span>One topic per line recommended.</span>
-                        <span>Date: ${localDateString}</span>
+                        <span>Date: ${escapeHtml(localDateString)}</span>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button id="cancel-topic-btn" class="btn btn-secondary">Close</button>
-                    <button id="save-topic-btn" class="btn btn-primary" data-student-id="${student.id}">Save Topic</button>
+                    <button id="save-topic-btn" class="btn btn-primary" data-student-id="${escapeHtml(student.id)}">Save Topic</button>
                 </div>
             </div>
         </div>
@@ -2174,15 +1232,15 @@ async function loadDailyTopicHistory(studentId) {
                 count++;
                 html += `<li class="flex flex-col border-b border-blue-100 last:border-0 pb-2">
                     <div class="flex justify-between w-full">
-                        <div class="flex-1 mr-2"><span class="font-bold text-blue-600 text-xs">${d.parsedDate.toLocaleDateString(undefined,{month:'short',day:'numeric'})}: </span>
-                        <span id="text-${d.id}" class="text-sm">${d.topics}</span>
-                        <div id="input-container-${d.id}" class="hidden"><textarea id="input-${d.id}" class="w-full text-sm border rounded p-1" rows="2"></textarea></div></div>
+                        <div class="flex-1 mr-2"><span class="font-bold text-blue-600 text-xs">${escapeHtml(d.parsedDate.toLocaleDateString(undefined,{month:'short',day:'numeric'}))}: </span>
+                        <span id="text-${escapeHtml(d.id)}" class="text-sm">${escapeHtml(d.topics)}</span>
+                        <div id="input-container-${escapeHtml(d.id)}" class="hidden"><textarea id="input-${escapeHtml(d.id)}" class="w-full text-sm border rounded p-1" rows="2"></textarea></div></div>
                         <div class="flex space-x-1">
-                            <button id="btn-edit-${d.id}" data-action="edit" data-id="${d.id}" class="text-gray-400 hover:text-blue-600">✏️</button>
-                            <button id="btn-delete-${d.id}" data-action="delete" data-id="${d.id}" class="text-gray-400 hover:text-red-600">🗑️</button>
-                            <div id="action-btns-${d.id}" class="hidden flex space-x-1">
-                                <button data-action="save" data-id="${d.id}" class="text-green-600">✅</button>
-                                <button data-action="cancel" data-id="${d.id}" class="text-red-500">❌</button>
+                            <button id="btn-edit-${escapeHtml(d.id)}" data-action="edit" data-id="${escapeHtml(d.id)}" class="text-gray-400 hover:text-blue-600">✏️</button>
+                            <button id="btn-delete-${escapeHtml(d.id)}" data-action="delete" data-id="${escapeHtml(d.id)}" class="text-gray-400 hover:text-red-600">🗑️</button>
+                            <div id="action-btns-${escapeHtml(d.id)}" class="hidden flex space-x-1">
+                                <button data-action="save" data-id="${escapeHtml(d.id)}" class="text-green-600">✅</button>
+                                <button data-action="cancel" data-id="${escapeHtml(d.id)}" class="text-red-500">❌</button>
                             </div>
                         </div>
                     </div></li>`;
@@ -2257,11 +1315,11 @@ function showHomeworkModal(student) {
     const modalHTML = `
         <div class="modal-overlay">
             <div class="modal-content max-w-2xl">
-                <div class="modal-header"><h3 class="modal-title">📝 Assign Homework for ${student.studentName}</h3></div>
+                <div class="modal-header"><h3 class="modal-title">📝 Assign Homework for ${escapeHtml(student.studentName)}</h3></div>
                 <div class="modal-body">
                     <div class="form-group"><label class="form-label">Title *</label><input type="text" id="hw-title" class="form-input" required></div>
                     <div class="form-group"><label class="form-label">Description *</label><textarea id="hw-description" class="form-input form-textarea" required></textarea></div>
-                    <div class="form-group"><label class="form-label">Due Date *</label><input type="date" id="hw-due-date" class="form-input" max="${maxDate}" required></div>
+                    <div class="form-group"><label class="form-label">Due Date *</label><input type="date" id="hw-due-date" class="form-input" max="${escapeHtml(maxDate)}" required></div>
                     <div class="form-group"><label class="form-label">Files (Max 5)</label>
                         <div class="file-upload-container"><input type="file" id="hw-file" class="hidden" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt">
                         <label for="hw-file" class="file-upload-label"><span class="text-primary-color">Click to upload files</span></label>
@@ -2271,9 +1329,9 @@ function showHomeworkModal(student) {
                     <div class="email-settings bg-blue-50 p-3 rounded mt-2 border border-blue-100">
                         <label class="flex items-center space-x-2 mb-2"><input type="checkbox" id="hw-reminder" class="rounded" checked><span class="font-bold text-blue-900">Notify Parent via Email</span></label>
                         <div class="grid grid-cols-2 gap-2 text-xs text-gray-700">
-                            <div><span class="font-semibold">Parent:</span> <span id="display-parent-name">${currentParentName}</span></div>
-                            <div><span class="font-semibold">Phone:</span> ${parentPhone}</div>
-                            <div class="col-span-2"><span class="font-semibold">Email:</span> <span id="display-parent-email">${currentParentEmail}</span></div>
+                            <div><span class="font-semibold">Parent:</span> <span id="display-parent-name">${escapeHtml(currentParentName)}</span></div>
+                            <div><span class="font-semibold">Phone:</span> ${escapeHtml(parentPhone)}</div>
+                            <div class="col-span-2"><span class="font-semibold">Email:</span> <span id="display-parent-email">${escapeHtml(currentParentEmail)}</span></div>
                         </div>
                         <div id="new-data-badge" class="hidden mt-2 text-xs text-green-600 font-bold">✨ New parent details found! Will be saved to student profile.</div>
                     </div>
@@ -2331,7 +1389,7 @@ function showHomeworkModal(student) {
         selectedFiles.forEach((f, i) => {
             const li = document.createElement('li');
             li.className = "flex justify-between bg-white p-1 mb-1 border rounded text-sm";
-            li.innerHTML = `<span>${f.name}</span><span class="text-red-500 cursor-pointer remove-file-btn" data-index="${i}">✕</span>`;
+            li.innerHTML = `<span>${escapeHtml(f.name)}</span><span class="text-red-500 cursor-pointer remove-file-btn" data-index="${i}">✕</span>`;
             fileListUl.appendChild(li);
         });
         
@@ -2502,7 +1560,7 @@ let unsubUnreadListener = null;
 
 function msgEscapeHtml(text) {
     if (!text) return '';
-    return text
+    return String(text)
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
@@ -2545,10 +1603,9 @@ function initializeFloatingMessagingButton() {
     document.body.appendChild(btnFloatingMsg);
     document.body.appendChild(btnFloatingInbox);
     
-    // 5. Inject CSS
-    injectMessagingStyles();
+    // Styles are now in HTML, no injection needed
     
-    // 6. Start Listener
+    // 5. Start Listener
     if (window.tutorData && window.tutorData.id) {
         initializeUnreadListener();
     } else {
@@ -2690,7 +1747,7 @@ async function msgLoadRecipients(type, container) {
             container.innerHTML = `
                 <select id="sel-recipient" class="form-input">
                     <option value="">Select Parent...</option>
-                    ${students.map(s => `<option value="${s.parentPhone}" data-name="${s.parentName}">${s.parentName} (${s.studentName})</option>`).join('')}
+                    ${students.map(s => `<option value="${escapeHtml(s.parentPhone)}" data-name="${escapeHtml(s.parentName)}">${escapeHtml(s.parentName)} (${escapeHtml(s.studentName)})</option>`).join('')}
                 </select>
             `;
         } else if (type === 'group') {
@@ -2698,8 +1755,8 @@ async function msgLoadRecipients(type, container) {
                 <div class="checklist-box">
                     ${students.map(s => `
                         <label class="checklist-item">
-                            <input type="checkbox" class="chk-recipient" value="${s.parentPhone}" data-name="${s.parentName}">
-                            <span>${s.parentName} <small>(${s.studentName})</small></span>
+                            <input type="checkbox" class="chk-recipient" value="${escapeHtml(s.parentPhone)}" data-name="${escapeHtml(s.parentName)}">
+                            <span>${escapeHtml(s.parentName)} <small>(${escapeHtml(s.studentName)})</small></span>
                         </label>
                     `).join('')}
                 </div>
@@ -2710,7 +1767,7 @@ async function msgLoadRecipients(type, container) {
             container.innerHTML = `<div class="info-box">Sending to Management/Admin.</div>`;
         }
     } catch (e) {
-        container.innerHTML = `<div class="error-box">Error loading students: ${e.message}</div>`;
+        container.innerHTML = `<div class="error-box">Error loading students: ${escapeHtml(e.message)}</div>`;
     }
 }
 
@@ -2899,15 +1956,15 @@ function msgRenderInboxList(conversations, container, modal, tutorId) {
         const el = document.createElement('div');
         el.className = `inbox-item ${isUnread ? 'unread' : ''}`;
         el.innerHTML = `
-            <div class="avatar">${otherName.charAt(0)}</div>
+            <div class="avatar">${escapeHtml(otherName.charAt(0))}</div>
             <div class="info">
-                <div class="name">${msgEscapeHtml(otherName)}</div>
+                <div class="name">${escapeHtml(otherName)}</div>
                 <div class="preview">
-                    ${conv.lastSenderId === tutorId ? 'You: ' : ''}${msgEscapeHtml(conv.lastMessage || '')}
+                    ${conv.lastSenderId === tutorId ? 'You: ' : ''}${escapeHtml(conv.lastMessage || '')}
                 </div>
             </div>
             <div class="meta">
-                <div class="time">${msgFormatTime(conv.lastMessageTimestamp)}</div>
+                <div class="time">${escapeHtml(msgFormatTime(conv.lastMessageTimestamp))}</div>
                 ${isUnread ? `<div class="badge">${conv.unreadCount}</div>` : ''}
             </div>
         `;
@@ -2946,9 +2003,9 @@ function msgLoadChat(convId, name, modal, tutorId) {
             const bubble = document.createElement('div');
             bubble.className = `chat-bubble ${isMe ? 'me' : 'them'}`;
             bubble.innerHTML = `
-                ${msg.subject ? `<strong>${msgEscapeHtml(msg.subject)}</strong><br>` : ''}
-                ${msgEscapeHtml(msg.content)}
-                <div class="timestamp">${msgFormatTime(msg.createdAt)}</div>
+                ${msg.subject ? `<strong>${escapeHtml(msg.subject)}</strong><br>` : ''}
+                ${escapeHtml(msg.content)}
+                <div class="timestamp">${escapeHtml(msgFormatTime(msg.createdAt))}</div>
             `;
             msgContainer.appendChild(bubble);
         });
@@ -2993,118 +2050,7 @@ function msgLoadChat(convId, name, modal, tutorId) {
     input.onkeypress = (e) => { if (e.key === 'Enter') newBtn.click(); };
 }
 
-// --- CSS STYLES ---
-
-function injectMessagingStyles() {
-    if (document.getElementById('msg-styles')) return;
-    const style = document.createElement('style');
-    style.id = 'msg-styles';
-    style.textContent = `
-        /* --- Floating Buttons --- */
-        .floating-messaging-btn, .floating-inbox-btn {
-            position: fixed; bottom: 20px; right: 20px;
-            background: linear-gradient(135deg, #6366f1, #4f46e5);
-            color: white; border: none; border-radius: 50px;
-            padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 9999; font-weight: bold;
-        }
-        .floating-inbox-btn { right: 140px; background: linear-gradient(135deg, #10b981, #059669); }
-        .unread-badge {
-            background: red; color: white; border-radius: 50%; width: 20px; height: 20px;
-            font-size: 10px; display: flex; align-items: center; justify-content: center;
-            position: absolute; top: -5px; right: -5px; border: 2px solid white;
-        }
-
-        /* --- Modals --- */
-        .modal-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.5); 
-            display: flex; justify-content: center; align-items: center; z-index: 10000;
-        }
-        .modal-content {
-            background: white; border-radius: 12px; width: 90%; max-width: 800px;
-            max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); position: relative;
-        }
-        .modal-header {
-            padding: 15px; border-bottom: 1px solid #eee; display: flex; 
-            justify-content: space-between; align-items: center; background: #f9fafb;
-        }
-        .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
-        .modal-footer { padding: 15px; background: #f9fafb; display: flex; justify-content: flex-end; gap: 10px; }
-        
-        .close-modal-absolute { 
-            position: absolute; top: 10px; right: 10px; font-size: 30px; 
-            background: rgba(255,255,255,0.8); border: none; cursor: pointer; color: #333; z-index: 50;
-            width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-        }
-        
-        /* --- Inputs --- */
-        .form-input { 
-            width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; 
-            margin-bottom: 10px; font-size: 14px;
-        }
-        .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: 500; }
-        .btn-primary { background: #4f46e5; color: white; }
-        .btn-secondary { background: #e5e7eb; color: #374151; }
-        .btn:disabled { opacity: 0.7; cursor: not-allowed; }
-        
-        /* --- Messaging Specific --- */
-        .message-type-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
-        .type-option { 
-            border: 2px solid #eee; border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; 
-            transition: 0.2s;
-        }
-        .type-option:hover, .type-option.selected { border-color: #4f46e5; background: #eef2ff; }
-        .type-option .icon { font-size: 24px; margin-bottom: 5px; }
-        
-        /* --- Inbox Specific --- */
-        .inbox-container { display: flex; height: 600px; max-height: 80vh; }
-        .inbox-list-col { width: 35%; border-right: 1px solid #eee; display: flex; flex-direction: column; }
-        .inbox-chat-col { width: 65%; display: flex; flex-direction: column; background: #f3f4f6; }
-        
-        .inbox-list { overflow-y: auto; flex: 1; }
-        .inbox-item { 
-            padding: 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer; display: flex; gap: 10px; 
-            align-items: center; transition: 0.2s;
-        }
-        .inbox-item:hover { background: #f9fafb; }
-        .inbox-item.unread { background: #eff6ff; }
-        .inbox-item .avatar { 
-            width: 40px; height: 40px; background: #ddd; border-radius: 50%; 
-            display: flex; align-items: center; justify-content: center; font-weight: bold; color: white;
-            background: linear-gradient(135deg, #a78bfa, #8b5cf6);
-        }
-        .inbox-item .info { flex: 1; overflow: hidden; }
-        .inbox-item .name { font-weight: 600; font-size: 14px; }
-        .inbox-item .preview { font-size: 12px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .inbox-item .meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-        .inbox-item .time { font-size: 10px; color: #9ca3af; }
-        .inbox-item .badge { background: #ef4444; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; }
-
-        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-        .chat-bubble { max-width: 70%; padding: 10px 15px; border-radius: 12px; font-size: 14px; line-height: 1.4; position: relative; }
-        .chat-bubble.me { align-self: flex-end; background: #4f46e5; color: white; border-bottom-right-radius: 2px; }
-        .chat-bubble.them { align-self: flex-start; background: white; border: 1px solid #e5e7eb; border-bottom-left-radius: 2px; }
-        .chat-bubble .timestamp { font-size: 9px; opacity: 0.7; text-align: right; margin-top: 4px; }
-        
-        .chat-inputs { padding: 15px; background: white; border-top: 1px solid #eee; display: flex; gap: 10px; }
-        .chat-inputs input { flex: 1; padding: 10px; border-radius: 20px; border: 1px solid #ddd; outline: none; }
-        .chat-inputs button { background: #4f46e5; color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; }
-
-        .hidden { display: none !important; }
-        .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #4f46e5; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 10px auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        @media(max-width: 640px) {
-            .inbox-list-col { width: 100%; }
-            .inbox-chat-col { display: none; }
-            .inbox-container.chat-active .inbox-list-col { display: none; }
-            .inbox-container.chat-active .inbox-chat-col { display: flex; width: 100%; }
-            .message-type-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-    `;
-    document.head.appendChild(style);
-}
+// Styles removed – now in HTML.
 
 // --- AUTO-INIT ---
 initializeFloatingMessagingButton();
@@ -3252,16 +2198,16 @@ function renderCalendarView(students) {
         const dayEvents = scheduleByDay[day];
         calendarHTML += `
             <div class="calendar-day">
-                <div class="calendar-day-header">${day}</div>
+                <div class="calendar-day-header">${escapeHtml(day)}</div>
                 <div class="calendar-day-events">
                     ${dayEvents.length === 0 ? 
                         '<div class="text-sm text-gray-400 text-center mt-4">No classes</div>' : 
                         dayEvents.map(event => `
                             <div class="calendar-event">
-                                <div class="font-medium text-xs">${event.student}</div>
-                                <div class="calendar-event-time">${event.time} ${event.isOvernight ? '🌙' : ''}</div>
-                                <div class="text-xs text-gray-500">${event.grade}</div>
-                                <button class="edit-schedule-btn mt-1" data-student-id="${event.studentId}">Edit</button>
+                                <div class="font-medium text-xs">${escapeHtml(event.student)}</div>
+                                <div class="calendar-event-time">${escapeHtml(event.time)} ${event.isOvernight ? '🌙' : ''}</div>
+                                <div class="text-xs text-gray-500">${escapeHtml(event.grade)}</div>
+                                <button class="edit-schedule-btn mt-1" data-student-id="${escapeHtml(event.studentId)}">Edit</button>
                             </div>
                         `).join('')
                     }
@@ -3281,8 +2227,8 @@ function renderCalendarView(students) {
                     <p class="text-sm"><span class="font-semibold">Total Weekly Classes:</span> ${Object.values(scheduleByDay).reduce((total, day) => total + day.length, 0)}</p>
                 </div>
                 <div>
-                    <p class="text-sm"><span class="font-semibold">Most Scheduled Day:</span> ${getMostScheduledDay(scheduleByDay)}</p>
-                    <p class="text-sm"><span class="font-semibold">Earliest Class:</span> ${getEarliestClass(scheduleByDay)}</p>
+                    <p class="text-sm"><span class="font-semibold">Most Scheduled Day:</span> ${escapeHtml(getMostScheduledDay(scheduleByDay))}</p>
+                    <p class="text-sm"><span class="font-semibold">Earliest Class:</span> ${escapeHtml(getEarliestClass(scheduleByDay))}</p>
                 </div>
             </div>
         </div>
@@ -3308,11 +2254,11 @@ function showEditScheduleModal(student) {
         <div class="modal-overlay">
             <div class="modal-content max-w-2xl">
                 <div class="modal-header">
-                    <h3 class="modal-title">✏️ Edit Schedule for ${student.studentName}</h3>
+                    <h3 class="modal-title">✏️ Edit Schedule for ${escapeHtml(student.studentName)}</h3>
                 </div>
                 <div class="modal-body">
                     <div class="mb-4 p-3 bg-blue-50 rounded-lg">
-                        <p class="text-sm text-blue-700">Student: <strong>${student.studentName}</strong> | Grade: ${student.grade}</p>
+                        <p class="text-sm text-blue-700">Student: <strong>${escapeHtml(student.studentName)}</strong> | Grade: ${escapeHtml(student.grade)}</p>
                         <p class="text-xs text-blue-500">Note: You can schedule overnight classes (e.g., 11 PM to 1 AM)</p>
                     </div>
                     
@@ -3324,19 +2270,19 @@ function showEditScheduleModal(student) {
                                         <div>
                                             <label class="form-label">Day of Week</label>
                                             <select class="form-input schedule-day">
-                                                ${DAYS_OF_WEEK.map(day => `<option value="${day}" ${day === slot.day ? 'selected' : ''}>${day}</option>`).join('')}
+                                                ${DAYS_OF_WEEK.map(day => `<option value="${escapeHtml(day)}" ${day === slot.day ? 'selected' : ''}>${escapeHtml(day)}</option>`).join('')}
                                             </select>
                                         </div>
                                         <div>
                                             <label class="form-label">Start Time</label>
                                             <select class="form-input schedule-start">
-                                                ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}" ${timeSlot.value === slot.start ? 'selected' : ''}>${timeSlot.label}</option>`).join('')}
+                                                ${TIME_SLOTS.map(timeSlot => `<option value="${escapeHtml(timeSlot.value)}" ${timeSlot.value === slot.start ? 'selected' : ''}>${escapeHtml(timeSlot.label)}</option>`).join('')}
                                             </select>
                                         </div>
                                         <div>
                                             <label class="form-label">End Time</label>
                                             <select class="form-input schedule-end">
-                                                ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}" ${timeSlot.value === slot.end ? 'selected' : ''}>${timeSlot.label}</option>`).join('')}
+                                                ${TIME_SLOTS.map(timeSlot => `<option value="${escapeHtml(timeSlot.value)}" ${timeSlot.value === slot.end ? 'selected' : ''}>${escapeHtml(timeSlot.label)}</option>`).join('')}
                                             </select>
                                         </div>
                                     </div>
@@ -3348,19 +2294,19 @@ function showEditScheduleModal(student) {
                                     <div>
                                         <label class="form-label">Day of Week</label>
                                         <select class="form-input schedule-day">
-                                            ${DAYS_OF_WEEK.map(day => `<option value="${day}">${day}</option>`).join('')}
+                                            ${DAYS_OF_WEEK.map(day => `<option value="${escapeHtml(day)}">${escapeHtml(day)}</option>`).join('')}
                                         </select>
                                     </div>
                                     <div>
                                         <label class="form-label">Start Time</label>
                                         <select class="form-input schedule-start">
-                                            ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}">${timeSlot.label}</option>`).join('')}
+                                            ${TIME_SLOTS.map(timeSlot => `<option value="${escapeHtml(timeSlot.value)}">${escapeHtml(timeSlot.label)}</option>`).join('')}
                                         </select>
                                     </div>
                                     <div>
                                         <label class="form-label">End Time</label>
                                         <select class="form-input schedule-end">
-                                            ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}">${timeSlot.label}</option>`).join('')}
+                                            ${TIME_SLOTS.map(timeSlot => `<option value="${escapeHtml(timeSlot.value)}">${escapeHtml(timeSlot.label)}</option>`).join('')}
                                         </select>
                                     </div>
                                 </div>
@@ -3374,7 +2320,7 @@ function showEditScheduleModal(student) {
                 </div>
                 <div class="modal-footer">
                     <button id="cancel-edit-schedule-btn" class="btn btn-secondary">Cancel</button>
-                    <button id="save-edit-schedule-btn" class="btn btn-primary" data-student-id="${student.id}">
+                    <button id="save-edit-schedule-btn" class="btn btn-primary" data-student-id="${escapeHtml(student.id)}">
                         Save Schedule
                     </button>
                 </div>
@@ -3484,8 +2430,8 @@ function printCalendar() {
             </head>
             <body>
                 <h2>Weekly Schedule Calendar</h2>
-                <p>Tutor: ${window.tutorData.name}</p>
-                <p>Generated on: ${new Date().toLocaleDateString()}</p>
+                <p>Tutor: ${escapeHtml(window.tutorData.name)}</p>
+                <p>Generated on: ${escapeHtml(new Date().toLocaleDateString())}</p>
                 <hr>
                 ${calendarContent}
                 <script>
@@ -3493,7 +2439,7 @@ function printCalendar() {
                         window.print();
                         setTimeout(() => window.close(), 1000);
                     }
-                </script>
+                <\/script>
             </body>
         </html>
     `);
@@ -3513,7 +2459,7 @@ function renderTutorDashboard(container, tutor) {
     
     container.innerHTML = `
         <div class="hero-section">
-            <h1 class="hero-title">Welcome, ${tutor.name || 'Tutor'}! 👋</h1>
+            <h1 class="hero-title">Welcome, ${escapeHtml(tutor.name || 'Tutor')}! 👋</h1>
             <p class="hero-subtitle">Manage your students, submit reports, and track progress</p>
         </div>
         
@@ -3609,35 +2555,35 @@ function renderTutorDashboard(container, tutor) {
 
     // Add event listeners for new buttons
     const viewCalendarBtn = document.getElementById('view-full-calendar-btn');
-if (viewCalendarBtn) {
-    viewCalendarBtn.addEventListener('click', showScheduleCalendarModal);
-}
+    if (viewCalendarBtn) {
+        viewCalendarBtn.addEventListener('click', showScheduleCalendarModal);
+    }
     
     const setupSchedulesBtn = document.getElementById('setup-all-schedules-btn');
-if (setupSchedulesBtn) {
-    setupSchedulesBtn.addEventListener('click', async () => {
-        try {
-            // Check if scheduleManager already exists
-            if (window.scheduleManager) {
-                await window.scheduleManager.openManualManager();
-            } else {
-                // Create a new instance if it doesn't exist
-                const firebaseDeps = {
-                    db: db,
-                    methods: { 
-                        getDocs, query, collection, where, doc, updateDoc, 
-                        setDoc, deleteDoc, getDoc  // Added getDoc here
-                    }
-                };
-                window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
-                await window.scheduleManager.openManualManager();
+    if (setupSchedulesBtn) {
+        setupSchedulesBtn.addEventListener('click', async () => {
+            try {
+                // Check if scheduleManager already exists
+                if (window.scheduleManager) {
+                    await window.scheduleManager.openManualManager();
+                } else {
+                    // Create a new instance if it doesn't exist
+                    const firebaseDeps = {
+                        db: db,
+                        methods: { 
+                            getDocs, query, collection, where, doc, updateDoc, 
+                            setDoc, deleteDoc, getDoc  // Added getDoc here
+                        }
+                    };
+                    window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
+                    await window.scheduleManager.openManualManager();
+                }
+            } catch (error) {
+                console.error("Error opening schedule manager:", error);
+                showCustomAlert('Error opening schedule manager. Please try again.');
             }
-        } catch (error) {
-            console.error("Error opening schedule manager:", error);
-            showCustomAlert('Error opening schedule manager. Please try again.');
-        }
-    });
-}
+        });
+    }
     
     const addTopicBtn = document.getElementById('add-topic-btn');
     if (addTopicBtn) {
@@ -3736,7 +2682,7 @@ async function loadStudentDropdowns(tutorEmail) {
             students.forEach(student => {
                 const option = document.createElement('option');
                 option.value = student.id;
-                option.textContent = `${student.studentName} (${student.grade})`;
+                option.textContent = `${escapeHtml(student.studentName)} (${escapeHtml(student.grade)})`;
                 
                 const option2 = option.cloneNode(true);
                 topicSelect.appendChild(option);
@@ -3820,8 +2766,8 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
                     <div class="card-body">
                         <div class="flex justify-between items-start mb-4">
                             <div>
-                                <h4 class="font-bold text-lg">${data.studentName}</h4>
-                                <p class="text-gray-600">${data.parentName || 'N/A'} • ${data.grade}</p>
+                                <h4 class="font-bold text-lg">${escapeHtml(data.studentName)}</h4>
+                                <p class="text-gray-600">${escapeHtml(data.parentName || 'N/A')} • ${escapeHtml(data.grade)}</p>
                             </div>
                             <span class="badge ${needsFeedback ? 'badge-warning' : 'badge-success'}">
                                 ${needsFeedback ? 'Pending Review' : 'Graded'}
@@ -3835,7 +2781,7 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
                             </div>
                             <div class="bg-gray-50 p-3 rounded">
                                 <span class="text-sm text-gray-500">Submitted:</span>
-                                <p class="font-medium">${new Date(data.submittedAt.seconds * 1000).toLocaleDateString()}</p>
+                                <p class="font-medium">${escapeHtml(new Date(data.submittedAt.seconds * 1000).toLocaleDateString())}</p>
                             </div>
                             <div class="bg-gray-50 p-3 rounded">
                                 <span class="text-sm text-gray-500">Status:</span>
@@ -3855,9 +2801,9 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
                                                     ${answer.tutorReport ? 'Graded' : 'Pending'}
                                                 </span>
                                             </div>
-                                            <p class="italic text-gray-700 mb-3">${answer.textAnswer || "No response"}</p>
+                                            <p class="italic text-gray-700 mb-3">${escapeHtml(answer.textAnswer || "No response")}</p>
                                             ${answer.fileUrl ? `
-                                                <a href="${answer.fileUrl}" target="_blank" class="btn btn-secondary btn-sm">
+                                                <a href="${escapeHtml(answer.fileUrl)}" target="_blank" class="btn btn-secondary btn-sm">
                                                     📎 Download File
                                                 </a>
                                             ` : ''}
@@ -3867,7 +2813,7 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
                                                     <label class="form-label">Your Feedback</label>
                                                     <textarea class="form-input form-textarea tutor-report" rows="3" placeholder="Write your feedback here..."></textarea>
                                                     <button class="btn btn-primary mt-2 submit-report-btn" 
-                                                            data-doc-id="${doc.id}" 
+                                                            data-doc-id="${escapeHtml(doc.id)}" 
                                                             data-collection="student_results" 
                                                             data-answer-index="${index}">
                                                         Submit Feedback
@@ -3876,7 +2822,7 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
                                             ` : `
                                                 <div class="mt-3 bg-white p-3 rounded border">
                                                     <label class="form-label">Your Feedback:</label>
-                                                    <p class="text-gray-700">${answer.tutorReport || 'N/A'}</p>
+                                                    <p class="text-gray-700">${escapeHtml(answer.tutorReport || 'N/A')}</p>
                                                 </div>
                                             `}
                                         </div>
@@ -3911,8 +2857,8 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
                     <div class="card-body">
                         <div class="flex justify-between items-start mb-4">
                             <div>
-                                <h4 class="font-bold text-lg">${data.studentName}</h4>
-                                <p class="text-gray-600">${data.parentName || 'N/A'} • ${data.grade}</p>
+                                <h4 class="font-bold text-lg">${escapeHtml(data.studentName)}</h4>
+                                <p class="text-gray-600">${escapeHtml(data.parentName || 'N/A')} • ${escapeHtml(data.grade)}</p>
                             </div>
                             <span class="badge ${needsFeedback ? 'badge-warning' : 'badge-success'}">
                                 ${needsFeedback ? 'Pending Review' : 'Graded'}
@@ -3926,7 +2872,7 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
                             </div>
                             <div class="bg-blue-50 p-3 rounded">
                                 <span class="text-sm text-blue-500">Submitted:</span>
-                                <p class="font-medium">${new Date(data.submittedAt.seconds * 1000).toLocaleDateString()}</p>
+                                <p class="font-medium">${escapeHtml(new Date(data.submittedAt.seconds * 1000).toLocaleDateString())}</p>
                             </div>
                             <div class="bg-blue-50 p-3 rounded">
                                 <span class="text-sm text-blue-500">Status:</span>
@@ -3937,10 +2883,10 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
                         <div class="border-t pt-4">
                             <h5 class="font-semibold mb-2">Writing Assignment:</h5>
                             <div class="mb-4 p-4 bg-blue-50 rounded-lg">
-                                <p class="font-medium mb-2">${data.questionText || 'Creative Writing Assignment'}</p>
-                                <p class="italic text-gray-700 bg-white p-3 rounded border">${data.textAnswer || "No response"}</p>
+                                <p class="font-medium mb-2">${escapeHtml(data.questionText || 'Creative Writing Assignment')}</p>
+                                <p class="italic text-gray-700 bg-white p-3 rounded border">${escapeHtml(data.textAnswer || "No response")}</p>
                                 ${data.fileUrl ? `
-                                    <a href="${data.fileUrl}" target="_blank" class="btn btn-secondary btn-sm mt-3">
+                                    <a href="${escapeHtml(data.fileUrl)}" target="_blank" class="btn btn-secondary btn-sm mt-3">
                                         📎 Download Attachment
                                     </a>
                                 ` : ''}
@@ -3951,7 +2897,7 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
                                     <label class="form-label">Your Feedback</label>
                                     <textarea class="form-input form-textarea tutor-report" rows="4" placeholder="Provide constructive feedback on the student's writing..."></textarea>
                                     <button class="btn btn-primary mt-3 submit-report-btn" 
-                                            data-doc-id="${doc.id}" 
+                                            data-doc-id="${escapeHtml(doc.id)}" 
                                             data-collection="tutor_submissions">
                                         Submit Feedback
                                     </button>
@@ -3959,7 +2905,7 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
                             ` : `
                                 <div class="mt-4 bg-white p-4 rounded border">
                                     <label class="form-label">Your Feedback:</label>
-                                    <p class="text-gray-700">${data.tutorReport || 'N/A'}</p>
+                                    <p class="text-gray-700">${escapeHtml(data.tutorReport || 'N/A')}</p>
                                 </div>
                             `}
                         </div>
@@ -4139,9 +3085,9 @@ function getNewStudentFormFields() {
     for (const category in subjectsByCategory) {
         subjectsHTML += `
             <details>
-                <summary class="font-semibold cursor-pointer text-sm">${category}</summary>
+                <summary class="font-semibold cursor-pointer text-sm">${escapeHtml(category)}</summary>
                 <div class="pl-4 grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-                    ${subjectsByCategory[category].map(subject => `<div><label class="text-sm font-normal"><input type="checkbox" name="subjects" value="${subject}"> ${subject}</label></div>`).join('')}
+                    ${subjectsByCategory[category].map(subject => `<div><label class="text-sm font-normal"><input type="checkbox" name="subjects" value="${escapeHtml(subject)}"> ${escapeHtml(subject)}</label></div>`).join('')}
                 </div>
             </details>
         `;
@@ -4182,7 +3128,7 @@ function showEditStudentModal(student) {
     
     for (let i = 1; i <= 12; i++) {
         const gradeValue = `Grade ${i}`;
-        gradeOptions += `<option value="${gradeValue}" ${student.grade === gradeValue ? 'selected' : ''}>${gradeValue}</option>`;
+        gradeOptions += `<option value="${escapeHtml(gradeValue)}" ${student.grade === gradeValue ? 'selected' : ''}>${escapeHtml(gradeValue)}</option>`;
     }
     
     gradeOptions += `
@@ -4208,11 +3154,11 @@ function showEditStudentModal(student) {
     for (const category in subjectsByCategory) {
         subjectsHTML += `
             <details>
-                <summary class="font-semibold cursor-pointer text-sm">${category}</summary>
+                <summary class="font-semibold cursor-pointer text-sm">${escapeHtml(category)}</summary>
                 <div class="pl-4 grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
                     ${subjectsByCategory[category].map(subject => {
                         const isChecked = student.subjects && student.subjects.includes(subject);
-                        return `<div><label class="text-sm font-normal"><input type="checkbox" name="edit-subjects" value="${subject}" ${isChecked ? 'checked' : ''}> ${subject}</label></div>`;
+                        return `<div><label class="text-sm font-normal"><input type="checkbox" name="edit-subjects" value="${escapeHtml(subject)}" ${isChecked ? 'checked' : ''}> ${escapeHtml(subject)}</label></div>`;
                     }).join('')}
                 </div>
             </details>
@@ -4221,11 +3167,11 @@ function showEditStudentModal(student) {
     subjectsHTML += `<div class="font-semibold pt-2 border-t"><label class="text-sm"><input type="checkbox" name="edit-subjects" value="Music" ${student.subjects && student.subjects.includes('Music') ? 'checked' : ''}> Music</label></div></div>`;
 
     const editFormHTML = `
-        <h3 class="text-xl font-bold mb-4">Edit Student: ${student.studentName}</h3>
+        <h3 class="text-xl font-bold mb-4">Edit Student: ${escapeHtml(student.studentName)}</h3>
         <div class="space-y-4">
-            <div><label class="block font-semibold">Parent Name</label><input type="text" id="edit-parent-name" class="w-full mt-1 p-2 border rounded" value="${student.parentName || ''}" placeholder="Parent Name"></div>
-            <div><label class="block font-semibold">Parent Phone Number</label><input type="tel" id="edit-parent-phone" class="w-full mt-1 p-2 border rounded" value="${student.parentPhone || ''}" placeholder="Parent Phone Number"></div>
-            <div><label class="block font-semibold">Student Name</label><input type="text" id="edit-student-name" class="w-full mt-1 p-2 border rounded" value="${student.studentName || ''}" placeholder="Student Name"></div>
+            <div><label class="block font-semibold">Parent Name</label><input type="text" id="edit-parent-name" class="w-full mt-1 p-2 border rounded" value="${escapeHtml(student.parentName || '')}" placeholder="Parent Name"></div>
+            <div><label class="block font-semibold">Parent Phone Number</label><input type="tel" id="edit-parent-phone" class="w-full mt-1 p-2 border rounded" value="${escapeHtml(student.parentPhone || '')}" placeholder="Parent Phone Number"></div>
+            <div><label class="block font-semibold">Student Name</label><input type="text" id="edit-student-name" class="w-full mt-1 p-2 border rounded" value="${escapeHtml(student.studentName || '')}" placeholder="Student Name"></div>
             <div><label class="block font-semibold">Grade</label><select id="edit-student-grade" class="w-full mt-1 p-2 border rounded">${gradeOptions}</select></div>
             ${subjectsHTML}
             <div><label class="block font-semibold">Days per Week</label><select id="edit-student-days" class="w-full mt-1 p-2 border rounded">${daysOptions}</select></div>
@@ -4235,7 +3181,7 @@ function showEditStudentModal(student) {
             <div><label class="block font-semibold">Fee (₦)</label><input type="text" id="edit-student-fee" class="w-full mt-1 p-2 border rounded" value="${(student.studentFee || 0).toLocaleString()}" placeholder="Enter fee (e.g., 50,000)"></div>
             <div class="flex justify-end space-x-2 mt-6">
                 <button id="cancel-edit-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
-                <button id="save-edit-btn" class="bg-green-600 text-white px-6 py-2 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Save Changes</button>
+                <button id="save-edit-btn" class="bg-green-600 text-white px-6 py-2 rounded" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Save Changes</button>
             </div>
         </div>`;
 
@@ -4261,11 +3207,11 @@ function showEditStudentModal(student) {
         const studentFee = parseFloat(feeValue.replace(/,/g, ''));
 
         if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
-             if (typeof showCustomAlert === 'function') showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.'); else alert('Please fill in all details.');
+            showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
             return;
         }
         if (isNaN(studentFee) || studentFee < 0) {
-             if (typeof showCustomAlert === 'function') showCustomAlert('Please enter a valid fee amount.'); else alert('Invalid fee.');
+            showCustomAlert('Please enter a valid fee amount.');
             return;
         }
 
@@ -4275,22 +3221,19 @@ function showEditStudentModal(student) {
             const studentRef = doc(db, collectionName, studentId);
             await updateDoc(studentRef, studentData);
             editModal.remove();
-            if (typeof showCustomAlert === 'function') showCustomAlert('Student details updated successfully!'); else alert('Updated!');
+            showCustomAlert('Student details updated successfully!');
             const mainContent = document.getElementById('mainContent');
             renderStudentDatabase(mainContent, window.tutorData);
         } catch (error) {
             console.error("Error updating student:", error);
-            if (typeof showCustomAlert === 'function') showCustomAlert(`An error occurred: ${error.message}`); else alert(`Error: ${error.message}`);
+            showCustomAlert(`An error occurred: ${error.message}`);
         }
     });
 }
 
 // --- Main Render Function ---
 async function renderStudentDatabase(container, tutor) {
-     if (window.fixedMonthSystemInitialized) {
-        // Let the fixed system handle it
-        return;
-    }
+    // REMOVED early return check for window.fixedMonthSystemInitialized
     if (!container) return;
 
     // Load Reports
@@ -4422,34 +3365,34 @@ async function renderStudentDatabase(container, tutor) {
                             if (recallStatus === 'pending') {
                                 actionsHTML += `<span class="bg-purple-200 text-purple-800 px-3 py-1 rounded text-sm">Recall Requested</span>`;
                             } else {
-                                actionsHTML += `<button class="recall-from-break-btn bg-purple-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Recall</button>`;
+                                actionsHTML += `<button class="recall-from-break-btn bg-purple-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}">Recall</button>`;
                             }
                         } else {
                             // Student is active - show Break button
-                            actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Break</button>`;
+                            actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}">Break</button>`;
                         }
                     }
 
                     if (isSubmissionEnabled && !student.summerBreak) {
                         if (approvedStudents.length === 1) {
-                            actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-is-transitioning="${student.isTransitioning}">Submit Report</button>`;
+                            actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="${student.isTransitioning}">Submit Report</button>`;
                         } else {
-                            actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-is-transitioning="${student.isTransitioning}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
+                            actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="${student.isTransitioning}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
                         }
                     } else if (!student.summerBreak) {
                         actionsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
                     }
                     if (showEditDeleteButtons && !student.summerBreak) {
-                        actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Edit</button>`;
-                        actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Delete</button>`;
+                        actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Edit</button>`;
+                        actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Delete</button>`;
                     }
                 }
-                studentsHTML += `<tr><td class="px-6 py-4 whitespace-nowrap">${student.studentName} (${cleanGradeString ? cleanGradeString(student.grade) : student.grade})<div class="text-xs text-gray-500">Subjects: ${subjects} | Days: ${days}</div>${feeDisplay}</td><td class="px-6 py-4 whitespace-nowrap">${statusHTML}</td><td class="px-6 py-4 whitespace-nowrap space-x-2">${actionsHTML}</td></tr>`;
+                studentsHTML += `<tr><td class="px-6 py-4 whitespace-nowrap">${escapeHtml(student.studentName)} (${escapeHtml(cleanGradeString ? cleanGradeString(student.grade) : student.grade)})<div class="text-xs text-gray-500">Subjects: ${escapeHtml(subjects)} | Days: ${escapeHtml(days)}</div>${feeDisplay}</td><td class="px-6 py-4 whitespace-nowrap">${statusHTML}</td><td class="px-6 py-4 whitespace-nowrap space-x-2">${actionsHTML}</td></tr>`;
             });
             studentsHTML += `</tbody></table></div>`;
             
             if (tutor.isManagementStaff) {
-                studentsHTML += `<div class="bg-green-50 p-4 rounded-lg shadow-md mt-6"><h3 class="text-lg font-bold text-green-800 mb-2">Management Fee</h3><div class="flex items-center space-x-2"><label class="font-semibold">Fee (₦):</label><input type="number" id="management-fee-input" class="p-2 border rounded w-full" value="${tutor.managementFee || 0}"><button id="save-management-fee-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Save Fee</button></div></div>`;
+                studentsHTML += `<div class="bg-green-50 p-4 rounded-lg shadow-md mt-6"><h3 class="text-lg font-bold text-green-800 mb-2">Management Fee</h3><div class="flex items-center space-x-2"><label class="font-semibold">Fee (₦):</label><input type="number" id="management-fee-input" class="p-2 border rounded w-full" value="${escapeHtml(tutor.managementFee || 0)}"><button id="save-management-fee-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Save Fee</button></div></div>`;
             }
             if (approvedStudents.length > 1 && isSubmissionEnabled) {
                 const submittable = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length;
@@ -4482,15 +3425,15 @@ async function renderStudentDatabase(container, tutor) {
         const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
         
         const reportFormHTML = `
-            <h3 class="text-xl font-bold mb-4">Monthly Report for ${student.studentName}</h3>
-            <div class="bg-blue-50 p-3 rounded-lg mb-4"><p class="text-sm font-semibold text-blue-800">Month: ${currentMonthYear}</p><p class="text-xs text-blue-600 mt-1">All fields are required</p></div>
+            <h3 class="text-xl font-bold mb-4">Monthly Report for ${escapeHtml(student.studentName)}</h3>
+            <div class="bg-blue-50 p-3 rounded-lg mb-4"><p class="text-sm font-semibold text-blue-800">Month: ${escapeHtml(currentMonthYear)}</p><p class="text-xs text-blue-600 mt-1">All fields are required</p></div>
             <div class="space-y-4">
-                <div><label class="block font-semibold">Introduction</label><textarea id="report-intro" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter introduction...">${existingReport.introduction || ''}</textarea></div>
-                <div><label class="block font-semibold">Topics & Remarks</label><textarea id="report-topics" class="w-full mt-1 p-2 border rounded required-field" rows="3" placeholder="Enter topics...">${existingReport.topics || ''}</textarea></div>
-                <div><label class="block font-semibold">Progress & Achievements</label><textarea id="report-progress" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter progress...">${existingReport.progress || ''}</textarea></div>
-                <div><label class="block font-semibold">Strengths & Weaknesses</label><textarea id="report-sw" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter strengths...">${existingReport.strengthsWeaknesses || ''}</textarea></div>
-                <div><label class="block font-semibold">Recommendations</label><textarea id="report-recs" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter recommendations...">${existingReport.recommendations || ''}</textarea></div>
-                <div><label class="block font-semibold">General Comments</label><textarea id="report-general" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter general comments...">${existingReport.generalComments || ''}</textarea></div>
+                <div><label class="block font-semibold">Introduction</label><textarea id="report-intro" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter introduction...">${escapeHtml(existingReport.introduction || '')}</textarea></div>
+                <div><label class="block font-semibold">Topics & Remarks</label><textarea id="report-topics" class="w-full mt-1 p-2 border rounded required-field" rows="3" placeholder="Enter topics...">${escapeHtml(existingReport.topics || '')}</textarea></div>
+                <div><label class="block font-semibold">Progress & Achievements</label><textarea id="report-progress" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter progress...">${escapeHtml(existingReport.progress || '')}</textarea></div>
+                <div><label class="block font-semibold">Strengths & Weaknesses</label><textarea id="report-sw" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter strengths...">${escapeHtml(existingReport.strengthsWeaknesses || '')}</textarea></div>
+                <div><label class="block font-semibold">Recommendations</label><textarea id="report-recs" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter recommendations...">${escapeHtml(existingReport.recommendations || '')}</textarea></div>
+                <div><label class="block font-semibold">General Comments</label><textarea id="report-general" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter general comments...">${escapeHtml(existingReport.generalComments || '')}</textarea></div>
                 <div class="flex justify-end space-x-2">
                     <button id="cancel-report-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
                     <button id="modal-action-btn" class="bg-green-600 text-white px-6 py-2 rounded">${isSingleApprovedStudent ? 'Proceed to Submit' : 'Save Report'}</button>
@@ -4535,10 +3478,10 @@ async function renderStudentDatabase(container, tutor) {
 
     function showFeeConfirmationModal(student, reportData) {
         const feeConfirmationHTML = `
-            <h3 class="text-xl font-bold mb-4">Confirm Fee for ${student.studentName}</h3>
+            <h3 class="text-xl font-bold mb-4">Confirm Fee for ${escapeHtml(student.studentName)}</h3>
             <p class="text-sm text-gray-600 mb-4">Please verify the monthly fee for this student.</p>
             <div class="space-y-4">
-                <div><label class="block font-semibold">Current Fee (₦)</label><input type="number" id="confirm-student-fee" class="w-full mt-1 p-2 border rounded" value="${student.studentFee || 0}"></div>
+                <div><label class="block font-semibold">Current Fee (₦)</label><input type="number" id="confirm-student-fee" class="w-full mt-1 p-2 border rounded" value="${escapeHtml(student.studentFee || 0)}"></div>
                 <div class="flex justify-end space-x-2 mt-6">
                     <button id="cancel-fee-confirm-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
                     <button id="confirm-fee-btn" class="bg-green-600 text-white px-6 py-2 rounded">Confirm Fee & Save</button>
@@ -4599,13 +3542,6 @@ async function renderStudentDatabase(container, tutor) {
         await clearAllReportsFromFirestore(tutor.email);
         showCustomAlert("Reports Submitted!");
         renderStudentDatabase(container, tutor);
-    }
-
-    function showCustomAlert(msg) {
-        const d = document.createElement('div');
-        d.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50';
-        d.innerHTML = `<div class="bg-white p-8 rounded-lg shadow-xl"><p>${msg}</p><button onclick="this.parentElement.parentElement.remove()" class="bg-green-600 text-white px-6 py-2 rounded float-right mt-4">OK</button></div>`;
-        document.body.appendChild(d);
     }
 
     // Pre-fetch recall status for all students
@@ -4709,7 +3645,7 @@ async function renderStudentDatabase(container, tutor) {
         document.querySelectorAll('.summer-break-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const s = students.find(s => s.id === btn.getAttribute('data-student-id'));
-                if (confirm(`Put ${s.studentName} on Break?`)) {
+                if (confirm(`Put ${escapeHtml(s.studentName)} on Break?`)) {
                     await updateDoc(doc(db, "students", s.id), { summerBreak: true });
                     renderStudentDatabase(container, tutor);
                 }
@@ -4722,7 +3658,7 @@ async function renderStudentDatabase(container, tutor) {
                 const studentId = btn.getAttribute('data-student-id');
                 const student = students.find(s => s.id === studentId);
                 
-                if (confirm(`Recall ${student.studentName} from break? This requires management approval.`)) {
+                if (confirm(`Recall ${escapeHtml(student.studentName)} from break? This requires management approval.`)) {
                     try {
                         // Disable button immediately
                         btn.disabled = true;
@@ -4795,7 +3731,7 @@ async function renderStudentDatabase(container, tutor) {
         document.querySelectorAll('.delete-student-btn-tutor').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const s = students.find(s => s.id === btn.getAttribute('data-student-id'));
-                if (confirm(`Delete ${s.studentName}?`)) {
+                if (confirm(`Delete ${escapeHtml(s.studentName)}?`)) {
                     await deleteDoc(doc(db, s.collection, s.id));
                     renderStudentDatabase(container, tutor);
                 }
@@ -4950,22 +3886,22 @@ function renderAutoStudentsList(students) {
         html += `
             <tr>
                 <td>
-                    <div class="font-medium">${student.studentName}</div>
-                    <div class="text-sm text-gray-500">${student.grade} • ${student.parentPhone || 'No phone'}</div>
-                    <div class="text-xs text-gray-400">${student.parentEmail || 'No email'}</div>
+                    <div class="font-medium">${escapeHtml(student.studentName)}</div>
+                    <div class="text-sm text-gray-500">${escapeHtml(student.grade)} • ${escapeHtml(student.parentPhone || 'No phone')}</div>
+                    <div class="text-xs text-gray-400">${escapeHtml(student.parentEmail || 'No email')}</div>
                 </td>
                 <td>
-                    <span class="${statusClass}">
-                        ${status}
+                    <span class="${escapeHtml(statusClass)}">
+                        ${escapeHtml(status)}
                     </span>
                 </td>
                 <td class="text-sm text-gray-500">
-                    ${student.testSubject || 'General Test'}
+                    ${escapeHtml(student.testSubject || 'General Test')}
                 </td>
                 <td>
                     <div class="action-buttons">
                         <button class="btn btn-primary btn-sm complete-student-btn" 
-                                data-student-id="${student.id}" data-collection="${student.collection}">
+                                data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">
                             Complete Profile
                         </button>
                     </div>
@@ -5054,7 +3990,7 @@ async function checkWinnerStatus(tutorId) {
                 // Logic: Blow confetti if it's the start of the month OR weekly reminder
                 // For now, we blow it on every login if they are the winner (High Dopamine)
                 triggerConfetti(); 
-                showCustomAlert(`🏆 You are the ${data.month} Tutor of the Month!`);
+                showCustomAlert(`🏆 You are the ${escapeHtml(data.month)} Tutor of the Month!`);
             }
         }
     } catch (error) {
@@ -5081,7 +4017,7 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
             <h3 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Performance Score</h3>
             
             <div class="flex items-end gap-2 mb-3">
-                <span class="text-4xl font-black ${scoreColor}">${totalScore}</span>
+                <span class="text-4xl font-black ${scoreColor}">${escapeHtml(totalScore)}</span>
                 <span class="text-gray-400 text-sm mb-1">/ 100 pts</span>
             </div>
             
@@ -5101,7 +4037,7 @@ function renderWinnerBadge(month) {
     if (header) {
         const badge = document.createElement('div');
         badge.className = 'winner-badge animate-pulse bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 rounded-full border border-yellow-300 ml-2 flex items-center gap-1';
-        badge.innerHTML = `<span>🏆</span> ${month} Top Tutor`;
+        badge.innerHTML = `<span>🏆</span> ${escapeHtml(month)} Top Tutor`;
         header.appendChild(badge);
     }
 }
@@ -5314,52 +4250,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  ******************************************************************************/
 
 // ==========================================
-// 1. INJECT GRADING STYLES (unchanged)
-// ==========================================
-(function injectGradingStyles() {
-    if(document.getElementById('gc-grading-styles')) return;
-    const style = document.createElement('style');
-    style.id = 'gc-grading-styles';
-    style.textContent = `
-        /* Overlay */
-        .gc-grading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(2px); animation: fadeIn 0.2s ease-out; }
-        .gc-grading-container { background: #f8f9fa; width: 95%; max-width: 1200px; height: 90vh; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.2); }
-        
-        /* Header */
-        .gc-grading-header { background: white; border-bottom: 1px solid #e0e0e0; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; height: 64px; }
-        .gc-student-name { font-size: 1.1rem; font-weight: 500; color: #3c4043; }
-        .gc-assignment-title { font-size: 0.9rem; color: #5f6368; margin-left: 12px; }
-
-        /* Body */
-        .gc-grading-body { display: flex; flex: 1; overflow: hidden; }
-        .gc-work-panel { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
-        
-        /* File Preview */
-        .gc-file-preview { background: white; border: 1px solid #dadce0; border-radius: 8px; width: 100%; max-width: 800px; padding: 40px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; }
-        .gc-file-icon { font-size: 48px; margin-bottom: 16px; }
-        .gc-download-btn { background: #1a73e8; color: white; padding: 8px 24px; border-radius: 4px; text-decoration: none; font-weight: 500; transition: background 0.2s; }
-        .gc-download-btn:hover { background: #1557b0; }
-
-        /* Sidebar */
-        .gc-grading-sidebar { width: 320px; background: white; border-left: 1px solid #e0e0e0; padding: 24px; display: flex; flex-direction: column; overflow-y: auto; }
-        .gc-grade-input { width: 80px; padding: 8px; border: 1px solid #dadce0; border-radius: 4px; text-align: right; font-size: 1rem; }
-        .gc-comment-box { width: 100%; min-height: 150px; padding: 12px; border: 1px solid #dadce0; border-radius: 4px; resize: vertical; margin-top: 8px; background: #f8f9fa; }
-        
-        /* Return Button */
-        .gc-action-footer { margin-top: auto; padding-top: 24px; }
-        .gc-return-btn { width: 100%; background: #1a73e8; color: white; border: none; padding: 10px; border-radius: 4px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
-        .gc-return-btn:hover { background: #1557b0; }
-        .gc-return-btn:disabled { background: #dadce0; color: #80868b; cursor: not-allowed; }
-        
-        /* Inbox Item */
-        .gc-inbox-item { display: flex; justify-content: space-between; align-items: center; padding: 16px; border-bottom: 1px solid #f1f3f4; cursor: pointer; transition: background 0.1s; }
-        .gc-inbox-item:hover { background: #f8f9fa; }
-    `;
-    document.head.appendChild(style);
-})();
-
-// ==========================================
-// 2. HELPER: Homework Cutoff Date (4th of current month)
+// 1. HELPER: Homework Cutoff Date (4th of current month)
 // ==========================================
 /**
  * Returns the cutoff date: 4th day of current month at 00:00:00.
@@ -5371,7 +4262,7 @@ function getHomeworkCutoffDate() {
 }
 
 // ==========================================
-// 3. LOAD HOMEWORK INBOX (with auto‑clear & safe date handling)
+// 2. LOAD HOMEWORK INBOX (with auto‑clear & safe date handling)
 // ==========================================
 async function loadHomeworkInbox(tutorEmail) {
     const container = document.getElementById('homework-inbox-container');
@@ -5430,21 +4321,21 @@ async function loadHomeworkInbox(tutorEmail) {
             const isLate = data.dueDate && new Date(data.dueDate) < new Date(submitted?.seconds * 1000 || 0);
 
             html += `
-                <div class="gc-inbox-item" onclick="openGradingModal('${doc.id}')">
+                <div class="gc-inbox-item" onclick="openGradingModal('${escapeHtml(doc.id)}')">
                     <div class="flex items-center gap-4">
                         <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
-                            ${data.studentName?.charAt(0) || '?'}
+                            ${escapeHtml(data.studentName?.charAt(0) || '?')}
                         </div>
                         <div>
-                            <div class="font-medium text-gray-800">${data.studentName || 'Unknown'}</div>
-                            <div class="text-xs text-gray-500">${data.title || 'Untitled'}</div>
+                            <div class="font-medium text-gray-800">${escapeHtml(data.studentName || 'Unknown')}</div>
+                            <div class="text-xs text-gray-500">${escapeHtml(data.title || 'Untitled')}</div>
                         </div>
                     </div>
                     <div class="text-right">
                         <div class="text-xs font-bold ${isLate ? 'text-red-600' : 'text-green-600'} uppercase tracking-wide">
                             ${isLate ? 'Done Late' : 'Turned In'}
                         </div>
-                        <div class="text-xs text-gray-400">${date}</div>
+                        <div class="text-xs text-gray-400">${escapeHtml(date)}</div>
                     </div>
                 </div>`;
         });
@@ -5458,7 +4349,7 @@ async function loadHomeworkInbox(tutorEmail) {
 }
 
 // ==========================================
-// 4. OPEN GRADING MODAL (unchanged – safe)
+// 3. OPEN GRADING MODAL (unchanged – safe)
 // ==========================================
 async function openGradingModal(homeworkId) {
     let hwData;
@@ -5473,7 +4364,7 @@ async function openGradingModal(homeworkId) {
     
     const hasFile = hwData.submissionUrl && hwData.submissionUrl.length > 5;
     const fileArea = hasFile ? 
-        `<div class="gc-file-preview"><div class="gc-file-icon">📄</div><div class="mb-2 font-medium">Student Submission</div><a href="${hwData.submissionUrl}" target="_blank" class="gc-download-btn">View File</a></div>` : 
+        `<div class="gc-file-preview"><div class="gc-file-icon">📄</div><div class="mb-2 font-medium">Student Submission</div><a href="${escapeHtml(hwData.submissionUrl)}" target="_blank" class="gc-download-btn">View File</a></div>` : 
         `<div class="gc-file-preview"><div class="gc-file-icon">⚠️</div><div class="text-gray-500">No file attached</div></div>`;
 
     modal.innerHTML = `
@@ -5481,7 +4372,7 @@ async function openGradingModal(homeworkId) {
             <header class="gc-grading-header">
                 <div class="flex items-center">
                     <button class="mr-4 text-gray-500 hover:text-gray-800 text-2xl" onclick="this.closest('.gc-grading-overlay').remove()">✕</button>
-                    <div><span class="gc-student-name">${hwData.studentName}</span><span class="gc-assignment-title"> ➤ ${hwData.title}</span></div>
+                    <div><span class="gc-student-name">${escapeHtml(hwData.studentName)}</span><span class="gc-assignment-title"> ➤ ${escapeHtml(hwData.title)}</span></div>
                 </div>
             </header>
             <div class="gc-grading-body">
@@ -5489,21 +4380,21 @@ async function openGradingModal(homeworkId) {
                     ${fileArea}
                     <div class="w-full max-w-2xl mt-6 border-t pt-4">
                         <div class="text-xs font-bold text-gray-500 uppercase mb-2">Original Instructions</div>
-                        <div class="text-gray-700 text-sm">${hwData.description}</div>
-                        ${hwData.fileUrl ? `<div class="mt-2"><a href="${hwData.fileUrl}" target="_blank" class="text-blue-600 text-xs hover:underline">View Assignment Reference</a></div>` : ''}
+                        <div class="text-gray-700 text-sm">${escapeHtml(hwData.description)}</div>
+                        ${hwData.fileUrl ? `<div class="mt-2"><a href="${escapeHtml(hwData.fileUrl)}" target="_blank" class="text-blue-600 text-xs hover:underline">View Assignment Reference</a></div>` : ''}
                     </div>
                 </div>
                 <div class="gc-grading-sidebar">
                     <div class="mb-6">
                         <label class="font-medium text-gray-700 block mb-2">Grade</label>
                         <div class="flex items-center gap-2">
-                            <input type="number" id="gc-score-input" class="gc-grade-input" min="0" max="100" value="${hwData.score || ''}">
+                            <input type="number" id="gc-score-input" class="gc-grade-input" min="0" max="100" value="${escapeHtml(hwData.score || '')}">
                             <span class="text-gray-500 text-sm">/ 100</span>
                         </div>
                     </div>
                     <div class="flex-1 flex flex-col">
                         <label class="font-medium text-gray-700">Private Comments</label>
-                        <textarea id="gc-feedback-input" class="gc-comment-box" placeholder="Add feedback...">${hwData.feedback || ''}</textarea>
+                        <textarea id="gc-feedback-input" class="gc-comment-box" placeholder="Add feedback...">${escapeHtml(hwData.feedback || '')}</textarea>
                     </div>
                     <div class="gc-action-footer">
                         <button id="gc-return-btn" class="gc-return-btn">Return</button>
@@ -5534,7 +4425,7 @@ async function openGradingModal(homeworkId) {
             });
 
             modal.remove();
-            showCustomAlert(`✅ Returned to ${hwData.studentName}`);
+            showCustomAlert(`✅ Returned to ${escapeHtml(hwData.studentName)}`);
             loadHomeworkInbox(window.tutorData.email); // Refresh inbox
         } catch (error) {
             console.error(error);
@@ -5546,7 +4437,7 @@ async function openGradingModal(homeworkId) {
 }
 
 // ==========================================
-// 5. DASHBOARD WIDGET INJECTOR (unchanged)
+// 4. DASHBOARD WIDGET INJECTOR (unchanged)
 // ==========================================
 const inboxObserver = new MutationObserver(() => {
     const hero = document.querySelector('.hero-section');
@@ -5568,11 +4459,7 @@ const inboxObserver = new MutationObserver(() => {
 inboxObserver.observe(document.body, { childList: true, subtree: true });
 
 // ==========================================
-// 6. EXPOSE FUNCTIONS TO WINDOW (for onclick handlers)
+// 5. EXPOSE FUNCTIONS TO WINDOW (for onclick handlers)
 // ==========================================
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
-
-
-
-
