@@ -12,7 +12,6 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- Additional styles for floating buttons & gamification (originally in tutor.js) -->
     <style>
         * {
             margin: 0;
@@ -47,7 +46,6 @@
             position: relative;
         }
 
-        /* Animated mesh overlay */
         body::before {
             content: '';
             position: fixed;
@@ -69,7 +67,6 @@
             opacity: 0.6;
         }
 
-        /* Glass panel — super refined */
         .glass-panel {
             background: var(--surface);
             backdrop-filter: blur(var(--blur)) saturate(180%);
@@ -86,7 +83,6 @@
             box-shadow: var(--shadow-hover), 0 0 0 1px rgba(255,255,255,0.2) inset;
         }
 
-        /* Floating orbs */
         .orb {
             position: absolute;
             border-radius: 50%;
@@ -104,7 +100,6 @@
             100% { transform: translate(30px, 30px) scale(1.1); }
         }
 
-        /* Avatar */
         .avatar-modern {
             width: 48px;
             height: 48px;
@@ -134,7 +129,6 @@
             color: inherit;
         }
 
-        /* Stat cards */
         .stat-card {
             background: rgba(255,255,255,0.2);
             backdrop-filter: blur(8px);
@@ -144,6 +138,7 @@
             transition: var(--transition);
             box-shadow: 0 8px 20px -10px rgba(0,0,0,0.1);
             color: inherit;
+            cursor: pointer;  /* Make cards clickable */
         }
 
         .stat-card:hover {
@@ -170,7 +165,6 @@
             box-shadow: 0 6px 14px var(--primary-glow);
         }
 
-        /* Nav pills */
         .nav-pill-container {
             background: rgba(0,0,0,0.05);
             border-radius: 3rem;
@@ -213,7 +207,6 @@
             color: var(--primary-soft);
         }
 
-        /* Buttons */
         .btn-modern {
             display: inline-flex;
             align-items: center;
@@ -255,7 +248,6 @@
             box-shadow: 0 8px 20px var(--accent-glow);
         }
 
-        /* Floating messaging buttons (originally from tutor.js) */
         .floating-messaging-btn, .floating-inbox-btn {
             position: fixed;
             right: 20px;
@@ -281,9 +273,7 @@
             transform: scale(1.1);
             box-shadow: 0 15px 30px rgba(0,0,0,0.3);
         }
-        .floating-btn-text {
-            display: none;
-        }
+        .floating-btn-text { display: none; }
         .unread-badge {
             position: absolute;
             top: -5px;
@@ -302,7 +292,6 @@
             .floating-messaging-btn, .floating-inbox-btn { width: 50px; height: 50px; font-size: 1.5rem; }
         }
 
-        /* Skeleton loader */
         .skeleton-loader {
             background: rgba(255,255,255,0.2);
             border-radius: 2rem;
@@ -341,30 +330,28 @@
             font-weight: 700;
         }
 
-        /* misc */
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
         #networkWarning, #networkErrorOverlay { z-index: 9999; }
+        .student-list-item { border-bottom: 1px solid rgba(0,0,0,0.05); padding: 0.75rem 0; }
+        .student-list-item:last-child { border-bottom: none; }
     </style>
 </head>
 <body class="antialiased">
 
-    <!-- floating orbs -->
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
 
-    <!-- network warning (original) -->
     <div id="networkWarning" class="fixed top-0 left-0 right-0 bg-yellow-100/80 backdrop-blur-md border-b border-yellow-400 text-yellow-800 px-4 py-3 text-center hidden shadow-lg z-50">
         <span id="warningMessage" class="font-medium">You appear to be offline.</span>
         <button onclick="hideNetworkWarning()" class="ml-4 text-yellow-800 hover:text-yellow-900 font-bold text-xl">&times;</button>
     </div>
 
     <div class="min-h-screen p-3 md:p-6 lg:p-8 flex justify-center items-start relative">
-
         <div class="glass-panel w-full max-w-7xl p-5 md:p-8 lg:p-10 relative overflow-hidden">
 
-            <!-- Header with avatar and date -->
+            <!-- Header -->
             <div class="relative z-20 flex flex-wrap items-center justify-between gap-4 mb-6">
                 <div class="flex items-center gap-3 sm:gap-4">
                     <div class="relative group">
@@ -382,7 +369,6 @@
                 </div>
 
                 <div class="flex items-center gap-2 sm:gap-3">
-                    <!-- live date -->
                     <div class="badge-date hidden sm:flex items-center gap-2">
                         <i class="far fa-calendar-alt text-green-600 dark:text-green-400"></i>
                         <span id="currentDate"></span>
@@ -404,55 +390,54 @@
                 </div>
             </div>
 
-            <!-- STAT CARDS (static design, will coexist with dynamic data) -->
+            <!-- STAT CARDS (clickable, data-driven) -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8 relative z-20">
-                <div class="stat-card flex items-center gap-3">
+                <div class="stat-card flex items-center gap-3" id="totalStudentsCard">
                     <div class="stat-icon"><i class="fas fa-users"></i></div>
                     <div>
                         <p class="text-xs opacity-70">Total students</p>
-                        <p class="text-2xl font-bold" id="staticTotalStudents">128</p>
+                        <p class="text-2xl font-bold" id="totalStudentsCount">0</p>
                     </div>
                 </div>
-                <div class="stat-card flex items-center gap-3">
+                <div class="stat-card flex items-center gap-3" id="todayClassesCard">
                     <div class="stat-icon" style="background: linear-gradient(145deg, #fbbf24, #d97706);"><i class="fas fa-clock"></i></div>
                     <div>
                         <p class="text-xs opacity-70">Today's classes</p>
-                        <p class="text-2xl font-bold" id="staticTodayClasses">8</p>
+                        <p class="text-2xl font-bold" id="todayClassesCount">0</p>
                     </div>
                 </div>
-                <div class="stat-card flex items-center gap-3">
+                <div class="stat-card flex items-center gap-3" id="pendingReportsCard">
                     <div class="stat-icon" style="background: linear-gradient(145deg, #3b82f6, #1e3a8a);"><i class="fas fa-book-open"></i></div>
                     <div>
                         <p class="text-xs opacity-70">Pending reports</p>
-                        <p class="text-2xl font-bold" id="staticPendingReports">3</p>
+                        <p class="text-2xl font-bold" id="pendingReportsCount">0</p>
                     </div>
                 </div>
-                <div class="stat-card flex items-center gap-3">
+                <div class="stat-card flex items-center gap-3" id="achievementsCard">
                     <div class="stat-icon" style="background: linear-gradient(145deg, #ec4899, #831843);"><i class="fas fa-star"></i></div>
                     <div>
-                        <p class="text-xs opacity-70">Achievements</p>
-                        <p class="text-2xl font-bold" id="staticAchievements">12</p>
+                        <p class="text-xs opacity-70">Performance score</p>
+                        <p class="text-2xl font-bold" id="performanceScore">0</p>
                     </div>
                 </div>
             </div>
 
-            <!-- Gamification widget (required by tutor.js) -->
-            <div id="performance-widget" class="mb-6 relative z-20"></div>
+            <!-- Gamification widget (hidden by default, used for score) -->
+            <div id="performance-widget" class="hidden"></div>
 
-            <!-- navigation pills with all required IDs -->
+            <!-- navigation pills with NEW tabs -->
             <nav class="relative z-20 mb-8 overflow-x-auto hide-scrollbar">
                 <div class="nav-pill-container">
                     <button id="navDashboard" class="nav-tab-modern active"><i class="fas fa-columns"></i>Dashboard</button>
                     <button id="navStudentDatabase" class="nav-tab-modern"><i class="fas fa-users"></i>Student Database</button>
-                    <button id="navAutoStudents" class="nav-tab-modern"><i class="fas fa-user-plus"></i>Auto‑Registered</button>
-                    <!-- extra decorative tab (no id, just for looks) -->
-                    <button class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule</button>
+                    <button id="navAcademic" class="nav-tab-modern"><i class="fas fa-graduation-cap"></i>Academic</button>
+                    <button id="navScheduleManagement" class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule Management</button>
                 </div>
             </nav>
 
-            <!-- MAIN CONTENT (JS will populate) -->
+            <!-- MAIN CONTENT (populated by JS) -->
             <main id="mainContent" class="relative z-20 min-h-[400px] transition-all duration-500">
-                <!-- Elegant loading state (will be replaced by JS) -->
+                <!-- Loading state (will be replaced) -->
                 <div class="skeleton-loader flex flex-col items-center justify-center gap-6 py-12">
                     <div class="pulse-ring">
                         <i class="fas fa-leaf text-3xl text-green-600"></i>
@@ -465,14 +450,14 @@
                 </div>
             </main>
 
-            <!-- subtle footer -->
+            <!-- footer -->
             <div class="relative z-20 mt-8 text-xs text-center opacity-40 flex items-center justify-center gap-2">
                 <i class="fas fa-shield-alt text-green-500"></i> End-to-end encrypted · Blooming Kids Care v2.0
             </div>
         </div>
     </div>
 
-    <!-- network error overlay (original) -->
+    <!-- network error overlay -->
     <div id="networkErrorOverlay" class="fixed inset-0 bg-gray-900/80 backdrop-blur-xl z-50 hidden flex-col items-center justify-center p-4">
         <div class="bg-white/90 dark:bg-gray-800/90 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-white/30">
             <div class="w-20 h-20 bg-yellow-100/80 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -487,12 +472,11 @@
         </div>
     </div>
 
-    <!-- scripts: Firebase 12+ is imported via module; canvas-confetti & html2canvas -->
+    <!-- scripts -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-    <!-- IMPORTANT: firebaseConfig.js must exist and export auth, db using modular SDK v12+ -->
+    <!-- firebaseConfig.js must exist and export auth, db -->
     <script type="module" src="tutor.js"></script>
-    <!-- games.js (if any) -->
     <script src="games.js"></script>
 
     <script>
@@ -533,7 +517,7 @@
                 setTheme(body.classList.contains('dark') ? 'light' : 'dark');
             });
 
-            // Network monitor (original functions exposed globally)
+            // Network monitor
             window.hideNetworkWarning = function() {
                 document.getElementById('networkWarning').classList.add('hidden');
             };
@@ -558,6 +542,144 @@
                 document.getElementById('networkWarning').classList.remove('hidden');
             });
         })();
+    </script>
+
+    <!-- New module script for stat card clicks (does not modify tutor.js) -->
+    <script type="module">
+        import { db } from './firebaseConfig.js';
+        import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+        // Wait for tutorData to be set by tutor.js
+        function waitForTutorData(callback) {
+            if (window.tutorData) {
+                callback();
+            } else {
+                setTimeout(() => waitForTutorData(callback), 100);
+            }
+        }
+
+        waitForTutorData(() => {
+            const tutor = window.tutorData;
+
+            // ----- Total Students Card -----
+            document.getElementById('totalStudentsCard').addEventListener('click', async () => {
+                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const snapshot = await getDocs(q);
+                const students = snapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter(s => !['archived','graduated','transferred'].includes(s.status));
+
+                // Build modal HTML
+                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="studentListModal">
+                    <div class="relative bg-white p-6 rounded-lg shadow-xl w-full max-w-4xl mx-auto">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold">My Students (${students.length})</h3>
+                            <button class="text-2xl font-bold close-modal">&times;</button>
+                        </div>
+                        <div class="overflow-auto max-h-96">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Added</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">`;
+
+                students.forEach(s => {
+                    let type = 'Regular';
+                    if (s.isTransitioning) type = 'Transitioning';
+                    else if (s.groupClass) type = 'Group Class';
+                    // Use createdAt if available, otherwise show N/A
+                    const added = s.createdAt ? new Date(s.createdAt.seconds * 1000).toLocaleDateString() : 'N/A';
+                    html += `<tr>
+                        <td class="px-4 py-2 whitespace-nowrap">${escapeHtml(s.studentName)}</td>
+                        <td class="px-4 py-2 whitespace-nowrap">${escapeHtml(s.grade)}</td>
+                        <td class="px-4 py-2 whitespace-nowrap">${escapeHtml(type)}</td>
+                        <td class="px-4 py-2 whitespace-nowrap">${escapeHtml(added)}</td>
+                    </tr>`;
+                });
+
+                html += `</tbody></table></div></div></div>`;
+
+                const modalDiv = document.createElement('div');
+                modalDiv.innerHTML = html;
+                const modal = modalDiv.firstElementChild;
+                document.body.appendChild(modal);
+
+                // Close button
+                modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
+                // Click outside to close
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) modal.remove();
+                });
+            });
+
+            // ----- Today's Classes Card -----
+            document.getElementById('todayClassesCard').addEventListener('click', async () => {
+                const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' }); // e.g., "Monday"
+                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const snapshot = await getDocs(q);
+                const students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                const todayClasses = [];
+                students.forEach(s => {
+                    if (s.schedule && Array.isArray(s.schedule)) {
+                        s.schedule.forEach(slot => {
+                            if (slot.day === todayName) {
+                                todayClasses.push({
+                                    student: s.studentName,
+                                    time: `${slot.start} - ${slot.end}`
+                                });
+                            }
+                        });
+                    }
+                });
+
+                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="todayClassesModal">
+                    <div class="relative bg-white p-6 rounded-lg shadow-xl w-full max-w-lg mx-auto">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold">Today's Classes (${todayName})</h3>
+                            <button class="text-2xl font-bold close-modal">&times;</button>
+                        </div>
+                        <div class="overflow-auto max-h-96">`;
+
+                if (todayClasses.length === 0) {
+                    html += '<p class="text-gray-500">No classes scheduled today.</p>';
+                } else {
+                    html += '<ul class="list-disc pl-5 space-y-2">';
+                    todayClasses.forEach(c => {
+                        html += `<li><strong>${escapeHtml(c.student)}</strong> at ${escapeHtml(c.time)}</li>`;
+                    });
+                    html += '</ul>';
+                }
+
+                html += `</div></div></div>`;
+
+                const modalDiv = document.createElement('div');
+                modalDiv.innerHTML = html;
+                const modal = modalDiv.firstElementChild;
+                document.body.appendChild(modal);
+
+                modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) modal.remove();
+                });
+            });
+        });
+
+        // Simple escape function for safety
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return String(unsafe)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
     </script>
 </body>
 </html>
