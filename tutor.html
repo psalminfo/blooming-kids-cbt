@@ -165,13 +165,21 @@
             box-shadow: 0 6px 14px var(--primary-glow);
         }
 
-        /* Simple tab styling like File 2 */
-        .nav-container {
-            border-bottom: 1px solid rgba(255,255,255,0.2);
-            margin-bottom: 1.5rem;
+        .nav-pill-container {
+            background: rgba(0,0,0,0.05);
+            border-radius: 3rem;
+            padding: 0.4rem;
+            backdrop-filter: blur(4px);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.2rem;
         }
+
+        body.dark .nav-pill-container { background: rgba(255,255,255,0.05); }
+
         .nav-tab-modern {
-            padding: 0.75rem 1.5rem;
+            padding: 0.7rem 1.8rem;
+            border-radius: 2.5rem;
             font-weight: 600;
             color: var(--text-light);
             opacity: 0.7;
@@ -179,17 +187,24 @@
             border: none;
             background: transparent;
             cursor: pointer;
-            border-bottom: 3px solid transparent;
-            margin-right: 0.5rem;
+            letter-spacing: -0.01em;
+            white-space: nowrap;
         }
-        .nav-tab-modern:hover {
-            opacity: 1;
-            border-bottom-color: var(--primary-soft);
-        }
+
+        .nav-tab-modern i { margin-right: 8px; }
+
+        .nav-tab-modern:hover { opacity: 1; background: rgba(255,255,255,0.3); }
+
         .nav-tab-modern.active {
             opacity: 1;
-            border-bottom-color: var(--primary);
+            background: white;
             color: var(--primary);
+            box-shadow: 0 10px 20px -8px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.7);
+        }
+
+        body.dark .nav-tab-modern.active {
+            background: #1e293b;
+            color: var(--primary-soft);
         }
 
         .btn-modern {
@@ -258,6 +273,7 @@
             transform: scale(1.1);
             box-shadow: 0 15px 30px rgba(0,0,0,0.3);
         }
+        .floating-btn-text { display: none; }
         .unread-badge {
             position: absolute;
             top: -5px;
@@ -271,6 +287,9 @@
             min-width: 22px;
             text-align: center;
             border: 2px solid white;
+        }
+        @media (max-width: 640px) {
+            .floating-messaging-btn, .floating-inbox-btn { width: 50px; height: 50px; font-size: 1.5rem; }
         }
 
         .skeleton-loader {
@@ -318,28 +337,17 @@
         .student-list-item { border-bottom: 1px solid rgba(0,0,0,0.05); padding: 0.75rem 0; }
         .student-list-item:last-child { border-bottom: none; }
 
-        /* Feature cards */
-        .feature-card {
-            background: rgba(255,255,255,0.2);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255,255,255,0.3);
-            border-radius: 1.5rem;
+        /* Old style cards for tab content */
+        .old-card {
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             padding: 1.5rem;
-            transition: var(--transition);
         }
-        .feature-card:hover {
-            background: rgba(255,255,255,0.3);
-            transform: translateY(-2px);
-            border-color: var(--primary);
+        .dark .old-card {
+            background: #1f2937;
+            color: #f1f5f9;
         }
-        .homework-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.75rem 0;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-        }
-        .homework-item:last-child { border-bottom: none; }
     </style>
 </head>
 <body class="antialiased">
@@ -355,7 +363,7 @@
     <div class="min-h-screen p-3 md:p-6 lg:p-8 flex justify-center items-start relative">
         <div class="glass-panel w-full max-w-7xl p-5 md:p-8 lg:p-10 relative overflow-hidden">
 
-            <!-- Header (unchanged) -->
+            <!-- Header -->
             <div class="relative z-20 flex flex-wrap items-center justify-between gap-4 mb-6">
                 <div class="flex items-center gap-3 sm:gap-4">
                     <div class="relative group">
@@ -394,7 +402,7 @@
                 </div>
             </div>
 
-            <!-- STAT CARDS (always visible above tabs) -->
+            <!-- STAT CARDS (clickable, data-driven) -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8 relative z-20">
                 <div class="stat-card flex items-center gap-3" id="totalStudentsCard">
                     <div class="stat-icon"><i class="fas fa-users"></i></div>
@@ -426,22 +434,22 @@
                 </div>
             </div>
 
-            <!-- Gamification widget (hidden) -->
+            <!-- Gamification widget (hidden by default, used for score) -->
             <div id="performance-widget" class="hidden"></div>
 
-            <!-- Simple navigation tabs (like File 2) -->
-            <nav class="relative z-20 mb-6 nav-container overflow-x-auto hide-scrollbar">
-                <div class="flex space-x-2">
-                    <button id="navDashboard" class="nav-tab-modern active"><i class="fas fa-columns mr-2"></i>Dashboard</button>
-                    <button id="navStudentDatabase" class="nav-tab-modern"><i class="fas fa-users mr-2"></i>Student Database</button>
-                    <button id="navAcademic" class="nav-tab-modern"><i class="fas fa-graduation-cap mr-2"></i>Academic</button>
-                    <button id="navScheduleManagement" class="nav-tab-modern"><i class="fas fa-calendar-alt mr-2"></i>Schedule Management</button>
+            <!-- navigation pills with NEW tabs -->
+            <nav class="relative z-20 mb-8 overflow-x-auto hide-scrollbar">
+                <div class="nav-pill-container">
+                    <button id="navDashboard" class="nav-tab-modern active"><i class="fas fa-columns"></i>Dashboard</button>
+                    <button id="navStudentDatabase" class="nav-tab-modern"><i class="fas fa-users"></i>Student Database</button>
+                    <button id="navAcademic" class="nav-tab-modern"><i class="fas fa-graduation-cap"></i>Academic</button>
+                    <button id="navScheduleManagement" class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule Management</button>
                 </div>
             </nav>
 
             <!-- MAIN CONTENT (populated by JS) -->
             <main id="mainContent" class="relative z-20 min-h-[400px] transition-all duration-500">
-                <!-- Loading state -->
+                <!-- Loading state (will be replaced) -->
                 <div class="skeleton-loader flex flex-col items-center justify-center gap-6 py-12">
                     <div class="pulse-ring">
                         <i class="fas fa-leaf text-3xl text-green-600"></i>
@@ -461,10 +469,6 @@
         </div>
     </div>
 
-    <!-- floating buttons (optional) -->
-    <button class="floating-messaging-btn" onclick="alert('Messaging coming soon')"><i class="fas fa-comment-dots"></i></button>
-    <button class="floating-inbox-btn" onclick="alert('Inbox coming soon')"><i class="fas fa-inbox"></i><span class="unread-badge">3</span></button>
-
     <!-- network error overlay -->
     <div id="networkErrorOverlay" class="fixed inset-0 bg-gray-900/80 backdrop-blur-xl z-50 hidden flex-col items-center justify-center p-4">
         <div class="bg-white/90 dark:bg-gray-800/90 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-white/30">
@@ -483,6 +487,7 @@
     <!-- scripts -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <!-- firebaseConfig.js must exist and export auth, db -->
     <script type="module" src="tutor.js"></script>
     <script src="games.js"></script>
 
@@ -551,11 +556,12 @@
         })();
     </script>
 
-    <!-- Main module script -->
+    <!-- Main module script for data fetching, counter updates, and tab content -->
     <script type="module">
         import { db } from './firebaseConfig.js';
         import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
+        // Wait for tutorData to be set by tutor.js
         function waitForTutorData(callback) {
             if (window.tutorData) {
                 callback();
@@ -564,51 +570,81 @@
             }
         }
 
+        // Function to update all counters
         async function updateAllCounters(tutor) {
             try {
+                // Get all students for this tutor
                 const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
                 const studentsSnapshot = await getDocs(studentsQuery);
+                
+                // Filter out inactive students for total count
                 const allStudents = studentsSnapshot.docs
                     .map(doc => ({ id: doc.id, ...doc.data() }))
                     .filter(s => !['archived', 'graduated', 'transferred'].includes(s.status));
                 
+                // Update total students count
                 document.getElementById('totalStudentsCount').textContent = allStudents.length;
 
+                // Calculate today's classes
                 const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
                 let todayClassesCount = 0;
+                
                 allStudents.forEach(s => {
                     if (s.schedule && Array.isArray(s.schedule)) {
                         s.schedule.forEach(slot => {
-                            if (slot.day === todayName) todayClassesCount++;
+                            if (slot.day === todayName) {
+                                todayClassesCount++;
+                            }
                         });
                     }
                 });
+                
                 document.getElementById('todayClassesCount').textContent = todayClassesCount;
 
+                // Calculate pending reports (students without reports in last 7 days)
                 const oneWeekAgo = new Date();
                 oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                
                 let pendingReports = 0;
                 for (const student of allStudents) {
                     if (!student.lastReportDate) {
                         pendingReports++;
                         continue;
                     }
+                    
+                    // Check if last report date is older than 7 days
                     const lastReport = student.lastReportDate?.toDate?.() || new Date(student.lastReportDate);
-                    if (lastReport < oneWeekAgo) pendingReports++;
+                    if (lastReport < oneWeekAgo) {
+                        pendingReports++;
+                    }
                 }
+                
                 document.getElementById('pendingReportsCount').textContent = pendingReports;
 
+                // Calculate performance score (placeholder logic - can be customized)
+                const totalPossible = allStudents.length * 100;
                 let earnedScore = 0;
+                
                 allStudents.forEach(s => {
-                    if (s.attendanceRate) earnedScore += s.attendanceRate;
-                    else earnedScore += 85;
+                    // Base score from attendance
+                    if (s.attendanceRate) {
+                        earnedScore += s.attendanceRate;
+                    } else {
+                        earnedScore += 85; // Default score
+                    }
+                    
+                    // Bonus for completed reports
                     if (s.lastReportDate) {
                         const reportDate = s.lastReportDate?.toDate?.() || new Date(s.lastReportDate);
                         const daysSinceReport = Math.floor((new Date() - reportDate) / (1000 * 60 * 60 * 24));
                         if (daysSinceReport < 7) earnedScore += 15;
                     }
                 });
-                const performanceScore = allStudents.length > 0 ? Math.round((earnedScore / (allStudents.length * 100)) * 100) : 100;
+                
+                const performanceScore = allStudents.length > 0 
+                    ? Math.round((earnedScore / (allStudents.length * 100)) * 100)
+                    : 100;
+                
                 document.getElementById('performanceScore').textContent = performanceScore;
 
             } catch (error) {
@@ -616,197 +652,167 @@
             }
         }
 
+        // Set up real-time counter updates (every 5 minutes)
         function startCounterUpdates(tutor) {
+            // Initial update
             updateAllCounters(tutor);
+            
+            // Update every 5 minutes
             setInterval(() => updateAllCounters(tutor), 300000);
+            
+            // Also update when window gains focus
             window.addEventListener('focus', () => updateAllCounters(tutor));
         }
 
-        // --- Tab Content Definitions ---
-        function getDashboardContent() {
-            return `
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Games Card -->
-                    <div class="feature-card">
-                        <h3 class="text-xl font-bold mb-3 flex items-center"><i class="fas fa-gamepad text-green-600 mr-2"></i>🎮 Games</h3>
-                        <p class="text-gray-600 dark:text-gray-300 mb-4">Play educational games with your students.</p>
-                        <button onclick="launchGame('memory')" class="btn-modern btn-primary w-full"><i class="fas fa-play mr-2"></i>Launch Memory Game</button>
-                        <button onclick="launchGame('quiz')" class="btn-modern mt-2 w-full"><i class="fas fa-question-circle mr-2"></i>Launch Quiz</button>
+        // --- Tab switching logic ---
+        function showTab(tabId) {
+            // Update active class on nav buttons
+            document.querySelectorAll('.nav-tab-modern').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`nav${tabId}`).classList.add('active');
+
+            const mainContent = document.getElementById('mainContent');
+            
+            // Show different content based on tab
+            if (tabId === 'Dashboard') {
+                // Keep the skeleton loader (dashboard content will be loaded by tutor.js)
+                mainContent.innerHTML = `<div class="skeleton-loader flex flex-col items-center justify-center gap-6 py-12">
+                    <div class="pulse-ring">
+                        <i class="fas fa-leaf text-3xl text-green-600"></i>
                     </div>
-                    <!-- Messages Card -->
-                    <div class="feature-card">
-                        <h3 class="text-xl font-bold mb-3 flex items-center"><i class="fas fa-envelope text-green-600 mr-2"></i>📨 Recent Messages</h3>
-                        <div class="space-y-2">
-                            <div class="flex items-center justify-between">
-                                <span class="font-medium">Parent: "Great session!"</span>
-                                <span class="text-xs opacity-70">2 min ago</span>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <span class="font-medium">Admin: "Meeting at 3pm"</span>
-                                <span class="text-xs opacity-70">1 hour ago</span>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <span class="font-medium">Student: "Need help with HW"</span>
-                                <span class="text-xs opacity-70">yesterday</span>
+                    <p class="text-lg font-medium text-gray-700 dark:text-gray-200 animate-pulse">Loading secure portal...</p>
+                    <div class="flex gap-2">
+                        <div class="w-20 h-2 bg-green-200/50 rounded-full animate-pulse"></div>
+                        <div class="w-12 h-2 bg-green-300/50 rounded-full animate-pulse delay-75"></div>
+                    </div>
+                </div>`;
+            } else if (tabId === 'StudentDatabase') {
+                mainContent.innerHTML = `<div class="old-card">
+                    <h2 class="text-2xl font-bold mb-4">Student Database</h2>
+                    <p class="text-gray-600 dark:text-gray-300">This section will list all students with search and filter options (old style).</p>
+                    <!-- You can later replace with the exact table from old tutor.html -->
+                </div>`;
+            } else if (tabId === 'Academic') {
+                // Academic tab: Homework Inbox, Today's Topic, Assign Homework
+                mainContent.innerHTML = `
+                    <div class="space-y-6">
+                        <!-- Homework Inbox -->
+                        <div class="old-card">
+                            <h3 class="text-xl font-bold mb-4 flex items-center"><i class="fas fa-inbox mr-2 text-green-600"></i>Homework Inbox</h3>
+                            <div class="space-y-3">
+                                <div class="border-b pb-2 flex justify-between items-center">
+                                    <div><span class="font-semibold">Math - Algebra</span><br><span class="text-sm text-gray-500">Due: Tomorrow</span></div>
+                                    <span class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs">Pending</span>
+                                </div>
+                                <div class="border-b pb-2 flex justify-between items-center">
+                                    <div><span class="font-semibold">English - Essay</span><br><span class="text-sm text-gray-500">Due: Friday</span></div>
+                                    <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs">Submitted</span>
+                                </div>
+                                <div class="border-b pb-2 flex justify-between items-center">
+                                    <div><span class="font-semibold">Science - Experiment</span><br><span class="text-sm text-gray-500">Due: Next Monday</span></div>
+                                    <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs">Overdue</span>
+                                </div>
                             </div>
                         </div>
-                        <button class="btn-modern w-full mt-4 text-sm" onclick="alert('View all messages')">View All</button>
-                    </div>
-                </div>
-            `;
-        }
 
-        function getStudentDatabaseContent() {
-            return `
-                <div class="feature-card">
-                    <h3 class="text-xl font-bold mb-4 flex items-center"><i class="fas fa-database text-green-600 mr-2"></i>Student Database</h3>
-                    <p class="text-gray-700 dark:text-gray-300">Click the "Total Students" stat card above to see your student list.</p>
-                </div>
-            `;
-        }
-
-        function getAcademicContent() {
-            return `
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <!-- Homework Inbox -->
-                    <div class="feature-card lg:col-span-1">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-xl font-bold flex items-center"><i class="fas fa-inbox text-green-600 mr-2"></i>Homework Inbox</h3>
-                            <span class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">3</span>
-                        </div>
-                        <div class="space-y-3">
-                            <div class="homework-item">
-                                <div><span class="font-semibold">Emma Watson</span><p class="text-sm opacity-70">Math - Algebra</p></div>
-                                <span class="text-xs bg-yellow-200 dark:bg-yellow-800 px-2 py-1 rounded-full">Pending</span>
-                            </div>
-                            <div class="homework-item">
-                                <div><span class="font-semibold">James Smith</span><p class="text-sm opacity-70">English - Essay</p></div>
-                                <span class="text-xs bg-green-200 dark:bg-green-800 px-2 py-1 rounded-full">Submitted</span>
-                            </div>
-                            <div class="homework-item">
-                                <div><span class="font-semibold">Olivia Brown</span><p class="text-sm opacity-70">Science - Project</p></div>
-                                <span class="text-xs bg-red-200 dark:bg-red-800 px-2 py-1 rounded-full">Overdue</span>
-                            </div>
-                        </div>
-                        <button class="btn-modern w-full mt-4 text-sm" onclick="alert('View all homework')"><i class="fas fa-eye mr-2"></i>View All</button>
-                    </div>
-
-                    <!-- Today's Topic & Assign Homework -->
-                    <div class="lg:col-span-2 space-y-6">
                         <!-- Today's Topic -->
-                        <div class="feature-card">
-                            <h3 class="text-xl font-bold mb-3 flex items-center"><i class="fas fa-chalkboard-teacher text-green-600 mr-2"></i>📚 Today's Topic</h3>
-                            <p class="text-lg font-medium">Photosynthesis & Plant Growth</p>
-                            <p class="text-sm opacity-70 mt-1">Grade 5 - Science · 10:30 AM</p>
-                            <div class="mt-4 flex gap-2">
-                                <span class="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-3 py-1 rounded-full text-sm">🌱 Interactive</span>
-                                <span class="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full text-sm">📊 Worksheet</span>
-                            </div>
+                        <div class="old-card">
+                            <h3 class="text-xl font-bold mb-4 flex items-center"><i class="fas fa-chalkboard-teacher mr-2 text-green-600"></i>Today's Topic</h3>
+                            <p class="text-lg"><span class="font-semibold">Grade 5:</span> Introduction to Fractions</p>
+                            <p class="text-lg mt-2"><span class="font-semibold">Grade 3:</span> Reading Comprehension - "The Garden"</p>
                         </div>
 
                         <!-- Assign Homework -->
-                        <div class="feature-card">
-                            <h3 class="text-xl font-bold mb-3 flex items-center"><i class="fas fa-pencil-alt text-green-600 mr-2"></i>Assign Homework</h3>
-                            <form class="space-y-4" onsubmit="event.preventDefault(); alert('Homework assigned!');">
+                        <div class="old-card">
+                            <h3 class="text-xl font-bold mb-4 flex items-center"><i class="fas fa-pencil-alt mr-2 text-green-600"></i>Assign Homework</h3>
+                            <form class="space-y-4">
                                 <div>
-                                    <label class="block text-sm font-medium mb-1">Select Student</label>
-                                    <select class="w-full p-2 rounded-lg bg-white/30 dark:bg-black/30 border border-white/30">
-                                        <option>Emma Watson</option>
-                                        <option>James Smith</option>
-                                        <option>Olivia Brown</option>
+                                    <label class="block text-sm font-medium mb-1">Student</label>
+                                    <select class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
+                                        <option>John Doe (Grade 5)</option>
+                                        <option>Jane Smith (Grade 3)</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium mb-1">Topic</label>
-                                    <input type="text" placeholder="e.g., Algebra Worksheet" class="w-full p-2 rounded-lg bg-white/30 dark:bg-black/30 border border-white/30">
+                                    <label class="block text-sm font-medium mb-1">Title</label>
+                                    <input type="text" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium mb-1">Due Date</label>
-                                    <input type="date" class="w-full p-2 rounded-lg bg-white/30 dark:bg-black/30 border border-white/30">
+                                    <input type="date" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
                                 </div>
-                                <button type="submit" class="btn-modern btn-primary w-full"><i class="fas fa-paper-plane mr-2"></i>Assign</button>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">Description</label>
+                                    <textarea class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" rows="3"></textarea>
+                                </div>
+                                <button type="button" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Assign Homework</button>
                             </form>
                         </div>
                     </div>
-                </div>
-            `;
-        }
-
-        function getScheduleManagementContent() {
-            return `
-                <div class="feature-card">
-                    <h3 class="text-xl font-bold mb-4 flex items-center"><i class="fas fa-calendar-alt text-green-600 mr-2"></i>Weekly Schedule</h3>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead>
-                                <tr>
-                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase">Day</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase">Time</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase">Student</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase">Subject</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase">Room</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                                <tr><td class="px-4 py-2">Monday</td><td>09:00-10:00</td><td>Emma Watson</td><td>Math</td><td>101</td></tr>
-                                <tr><td class="px-4 py-2">Monday</td><td>10:30-11:30</td><td>James Smith</td><td>English</td><td>102</td></tr>
-                                <tr><td class="px-4 py-2">Tuesday</td><td>13:00-14:00</td><td>Olivia Brown</td><td>Science</td><td>103</td></tr>
-                                <tr><td class="px-4 py-2">Wednesday</td><td>09:00-10:00</td><td>Emma Watson</td><td>Physics</td><td>104</td></tr>
-                                <tr><td class="px-4 py-2">Thursday</td><td>11:00-12:00</td><td>James Smith</td><td>History</td><td>105</td></tr>
-                            </tbody>
-                        </table>
+                `;
+            } else if (tabId === 'ScheduleManagement') {
+                // Schedule Management tab
+                mainContent.innerHTML = `
+                    <div class="old-card">
+                        <h3 class="text-xl font-bold mb-4 flex items-center"><i class="fas fa-calendar-alt mr-2 text-green-600"></i>Schedule Management</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <h4 class="font-semibold mb-2">Monday</h4>
+                                <ul class="list-disc pl-5 space-y-1">
+                                    <li>9:00 AM - Math (John)</li>
+                                    <li>10:30 AM - English (Jane)</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold mb-2">Tuesday</h4>
+                                <ul class="list-disc pl-5 space-y-1">
+                                    <li>9:00 AM - Science (John)</li>
+                                    <li>11:00 AM - Art (Jane)</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold mb-2">Wednesday</h4>
+                                <ul class="list-disc pl-5 space-y-1">
+                                    <li>9:00 AM - Math (John)</li>
+                                    <li>10:30 AM - Reading (Jane)</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold mb-2">Thursday</h4>
+                                <ul class="list-disc pl-5 space-y-1">
+                                    <li>9:00 AM - Science (John)</li>
+                                    <li>11:00 AM - Music (Jane)</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold mb-2">Friday</h4>
+                                <ul class="list-disc pl-5 space-y-1">
+                                    <li>9:00 AM - Math (John)</li>
+                                    <li>10:30 AM - PE (Jane)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="mt-6">
+                            <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"><i class="fas fa-plus mr-2"></i>Add Schedule</button>
+                        </div>
                     </div>
-                    <button class="btn-modern mt-4" onclick="alert('Add schedule form')"><i class="fas fa-plus mr-2"></i>Add Schedule</button>
-                </div>
-            `;
-        }
-
-        // --- Tab Switching ---
-        function setupTabs() {
-            const navDashboard = document.getElementById('navDashboard');
-            const navStudentDatabase = document.getElementById('navStudentDatabase');
-            const navAcademic = document.getElementById('navAcademic');
-            const navScheduleManagement = document.getElementById('navScheduleManagement');
-            const mainContent = document.getElementById('mainContent');
-
-            function setActiveTab(active) {
-                [navDashboard, navStudentDatabase, navAcademic, navScheduleManagement].forEach(btn => btn.classList.remove('active'));
-                active.classList.add('active');
+                `;
             }
-
-            navDashboard.addEventListener('click', () => {
-                setActiveTab(navDashboard);
-                mainContent.innerHTML = getDashboardContent();
-            });
-            navStudentDatabase.addEventListener('click', () => {
-                setActiveTab(navStudentDatabase);
-                mainContent.innerHTML = getStudentDatabaseContent();
-            });
-            navAcademic.addEventListener('click', () => {
-                setActiveTab(navAcademic);
-                mainContent.innerHTML = getAcademicContent();
-            });
-            navScheduleManagement.addEventListener('click', () => {
-                setActiveTab(navScheduleManagement);
-                mainContent.innerHTML = getScheduleManagementContent();
-            });
-
-            // Trigger Dashboard as default
-            navDashboard.click();
         }
 
+        // Wait for tutor data and set up tabs
         waitForTutorData(() => {
             const tutor = window.tutorData;
             
+            // Update tutor name in header
             if (tutor.name) {
                 document.querySelector('.text-gradient').textContent = tutor.name.split(' ')[0];
                 document.querySelector('.avatar-modern').textContent = tutor.name.charAt(0);
             }
             
+            // Start counter updates
             startCounterUpdates(tutor);
-            setupTabs();
 
-            // ----- Stat Card Click Handlers (preserved) -----
+            // ----- Total Students Card Click (from original) -----
             document.getElementById('totalStudentsCard').addEventListener('click', async () => {
                 const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
                 const snapshot = await getDocs(q);
@@ -859,6 +865,7 @@
                 });
             });
 
+            // ----- Today's Classes Card Click -----
             document.getElementById('todayClassesCard').addEventListener('click', async () => {
                 const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
                 const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
@@ -881,7 +888,12 @@
                     }
                 });
 
-                todayClasses.sort((a, b) => a.time.localeCompare(b.time));
+                // Sort classes by time
+                todayClasses.sort((a, b) => {
+                    const timeA = a.time.split(' - ')[0];
+                    const timeB = b.time.split(' - ')[0];
+                    return timeA.localeCompare(timeB);
+                });
 
                 let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="todayClassesModal">
                     <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-lg mx-auto">
@@ -912,12 +924,14 @@
                 modalDiv.innerHTML = html;
                 const modal = modalDiv.firstElementChild;
                 document.body.appendChild(modal);
+
                 modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
                 modal.addEventListener('click', (e) => {
                     if (e.target === modal) modal.remove();
                 });
             });
 
+            // ----- Pending Reports Card Click -----
             document.getElementById('pendingReportsCard').addEventListener('click', async () => {
                 const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
                 const snapshot = await getDocs(q);
@@ -975,12 +989,14 @@
                 modalDiv.innerHTML = html;
                 const modal = modalDiv.firstElementChild;
                 document.body.appendChild(modal);
+
                 modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
                 modal.addEventListener('click', (e) => {
                     if (e.target === modal) modal.remove();
                 });
             });
 
+            // ----- Performance Score Card Click -----
             document.getElementById('achievementsCard').addEventListener('click', () => {
                 const performance = document.getElementById('performanceScore').textContent;
                 
@@ -1018,13 +1034,24 @@
                 modalDiv.innerHTML = html;
                 const modal = modalDiv.firstElementChild;
                 document.body.appendChild(modal);
+
                 modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
                 modal.addEventListener('click', (e) => {
                     if (e.target === modal) modal.remove();
                 });
             });
+
+            // Tab click handlers
+            document.getElementById('navDashboard').addEventListener('click', () => showTab('Dashboard'));
+            document.getElementById('navStudentDatabase').addEventListener('click', () => showTab('StudentDatabase'));
+            document.getElementById('navAcademic').addEventListener('click', () => showTab('Academic'));
+            document.getElementById('navScheduleManagement').addEventListener('click', () => showTab('ScheduleManagement'));
+
+            // Initially show Dashboard tab content (skeleton loader)
+            showTab('Dashboard');
         });
 
+        // Simple escape function for safety
         function escapeHtml(unsafe) {
             if (!unsafe) return '';
             return String(unsafe)
@@ -1035,26 +1062,9 @@
                 .replace(/'/g, "&#039;");
         }
 
+        // Placeholder function for report generation
         window.generateReport = function(studentId) {
             alert('Report generation feature coming soon! Student ID: ' + studentId);
-        };
-
-        // Game launcher functions (used in dashboard)
-        window.launchGame = function(gameType) {
-            // You can integrate your actual game logic here.
-            // For now, just show a modal that appears in front.
-            const modalHtml = `
-                <div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[10000]" id="gameModal">
-                    <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl max-w-md w-full">
-                        <h3 class="text-2xl font-bold mb-4">${gameType === 'memory' ? 'Memory Game' : 'Quiz Game'}</h3>
-                        <p class="mb-4">Game would launch here. (Integration with games.js)</p>
-                        <button class="btn-modern btn-primary w-full" onclick="document.getElementById('gameModal').remove()">Close</button>
-                    </div>
-                </div>
-            `;
-            const div = document.createElement('div');
-            div.innerHTML = modalHtml;
-            document.body.appendChild(div.firstElementChild);
         };
     </script>
 </body>
