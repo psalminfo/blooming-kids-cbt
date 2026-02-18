@@ -105,7 +105,7 @@
         .btn-primary:hover { background: linear-gradient(135deg, #0f6b37, var(--primary)); }
         .btn-accent { background: linear-gradient(135deg, var(--accent), #f59e0b); color: #422006; border: none; box-shadow: 0 8px 20px var(--accent-glow); }
 
-        /* ===== MODAL & UI COMPONENTS (used by tutor.js) ===== */
+        /* ===== MODAL & UI COMPONENTS ===== */
         .modal-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
             display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 1rem;
@@ -150,7 +150,7 @@
         .spinner { border: 3px solid rgba(0,0,0,0.1); border-top-color: #1e8b4c; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Messaging & Inbox styles (shortened, same as before) */
+        /* Messaging & Inbox styles */
         .message-type-grid { display: grid; grid-template-columns: repeat(2,1fr); gap:0.5rem; margin-bottom:1rem; }
         .type-option { padding:0.75rem; border:1px solid #e5e7eb; border-radius:0.5rem; text-align:center; cursor:pointer; transition:all 0.2s; }
         .type-option.selected { background:#1e8b4c; color:white; border-color:#1e8b4c; }
@@ -200,7 +200,6 @@
         }
         .floating-messaging-btn { bottom:100px; }
         .floating-inbox-btn { bottom:30px; }
-        .floating-btn-text { display:none; }
         .unread-badge {
             position:absolute; top:-5px; right:-5px; background:#ef4444; color:white; border-radius:20px;
             padding:2px 6px; font-size:12px; font-weight:bold; min-width:22px; text-align:center; border:2px solid white;
@@ -217,7 +216,6 @@
         .hide-scrollbar::-webkit-scrollbar { display:none; }
         .hide-scrollbar { -ms-overflow-style:none; scrollbar-width:none; }
         #networkWarning, #networkErrorOverlay { z-index:9999; }
-        .sidebar-nav { display:none; }
     </style>
 </head>
 <body class="antialiased">
@@ -302,7 +300,7 @@
                     <button id="navDashboard" class="nav-tab-modern active"><i class="fas fa-columns"></i>Dashboard</button>
                     <button id="navStudentDatabase" class="nav-tab-modern"><i class="fas fa-users"></i>Student Database</button>
                     <button id="navAcademics" class="nav-tab-modern"><i class="fas fa-graduation-cap"></i>Academics</button>
-                    <button id="navScheduleManagement" class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule Management</button>
+                    <button id="navScheduleManagement" class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule</button>
                 </div>
             </nav>
 
@@ -407,7 +405,7 @@
         })();
     </script>
 
-    <!-- Main custom module for Academics and Schedule tabs -->
+    <!-- Main custom module for clean Dashboard, Academics and Schedule tabs -->
     <script type="module">
         import { db } from './firebaseConfig.js';
         import { collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
@@ -430,8 +428,7 @@
             });
         }
 
-        // Ensure required functions are attached to window (tutor.js must expose them)
-        // If not, provide helpful alerts.
+        // Ensure required functions from tutor.js are attached to window
         if (typeof window.showDailyTopicModal !== 'function') {
             window.showDailyTopicModal = (student) => {
                 alert('Please add "window.showDailyTopicModal = showDailyTopicModal;" in tutor.js to enable this feature.');
@@ -448,8 +445,9 @@
             };
         }
 
-        // Function to populate student dropdowns for Academics tab
-        async function populateStudentDropdowns() {
+        // --- Custom clean Dashboard (only stats + student list) ---
+        async function renderCustomDashboard() {
+            const container = document.getElementById('mainContent');
             if (!window.tutorData) return;
             const tutor = window.tutorData;
             try {
@@ -459,49 +457,60 @@
                     .map(doc => ({ id: doc.id, ...doc.data() }))
                     .filter(s => !['archived', 'graduated', 'transferred'].includes(s.status));
 
-                const topicSelect = document.getElementById('academic-topic-student');
-                const hwSelect = document.getElementById('academic-hw-student');
-                if (topicSelect) {
-                    topicSelect.innerHTML = '<option value="">Select a student...</option>';
-                    students.forEach(s => {
-                        const opt = document.createElement('option');
-                        opt.value = s.id;
-                        opt.textContent = `${s.studentName} (${s.grade})`;
-                        topicSelect.appendChild(opt);
-                    });
-                }
-                if (hwSelect) {
-                    hwSelect.innerHTML = '<option value="">Select a student...</option>';
-                    students.forEach(s => {
-                        const opt = document.createElement('option');
-                        opt.value = s.id;
-                        opt.textContent = `${s.studentName} (${s.grade})`;
-                        hwSelect.appendChild(opt);
-                    });
-                }
+                let html = `
+                    <div class="space-y-6">
+                        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+                            <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                                <i class="fas fa-users text-green-600"></i> My Students (${students.length})
+                            </h3>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                    <thead>
+                                        <tr>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Name</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Grade</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Subjects</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                `;
+
+                students.forEach(s => {
+                    const subjects = s.subjects ? s.subjects.slice(0, 3).join(', ') + (s.subjects.length > 3 ? '...' : '') : 'N/A';
+                    html += `
+                        <tr>
+                            <td class="px-4 py-2 whitespace-nowrap">${escapeHtml(s.studentName)}</td>
+                            <td class="px-4 py-2 whitespace-nowrap">${escapeHtml(s.grade)}</td>
+                            <td class="px-4 py-2 whitespace-nowrap">${escapeHtml(subjects)}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML = html;
             } catch (error) {
-                console.error("Error loading students for dropdowns:", error);
+                console.error("Error rendering dashboard:", error);
+                container.innerHTML = '<p class="text-red-500">Error loading students.</p>';
             }
         }
 
-        // Render Academics tab
-        function renderAcademics() {
+        // --- Academics tab (unchanged) ---
+        async function renderAcademics() {
             const container = document.getElementById('mainContent');
             container.innerHTML = `
                 <div class="space-y-6">
-                    <!-- Homework Inbox -->
                     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
-                            <i class="fas fa-inbox text-green-600"></i> Homework Inbox
-                        </h3>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="fas fa-inbox text-green-600"></i> Homework Inbox</h3>
                         <div id="homework-inbox-container"></div>
                     </div>
-
-                    <!-- Today's Topic Card -->
                     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
-                            <i class="fas fa-book-open text-blue-600"></i> Today's Topic
-                        </h3>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="fas fa-book-open text-blue-600"></i> Today's Topic</h3>
                         <div class="flex flex-col md:flex-row gap-4 items-end">
                             <div class="flex-1 w-full">
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Student</label>
@@ -512,12 +521,8 @@
                             <button id="academic-topic-btn" class="btn btn-primary px-6 py-2" disabled>Add Topic</button>
                         </div>
                     </div>
-
-                    <!-- Assign Homework Card -->
                     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
-                            <i class="fas fa-pencil-alt text-yellow-600"></i> Assign Homework
-                        </h3>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="fas fa-pencil-alt text-yellow-600"></i> Assign Homework</h3>
                         <div class="flex flex-col md:flex-row gap-4 items-end">
                             <div class="flex-1 w-full">
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Student</label>
@@ -531,83 +536,76 @@
                 </div>
             `;
 
-            // Load homework inbox (global function from tutor.js)
             if (window.tutorData && typeof window.loadHomeworkInbox === 'function') {
                 window.loadHomeworkInbox(window.tutorData.email);
             } else {
                 document.getElementById('homework-inbox-container').innerHTML = '<p class="text-gray-500">Homework inbox not available.</p>';
             }
 
-            // Populate dropdowns
-            populateStudentDropdowns().then(() => {
-                const topicSelect = document.getElementById('academic-topic-student');
-                const hwSelect = document.getElementById('academic-hw-student');
-                const topicBtn = document.getElementById('academic-topic-btn');
-                const hwBtn = document.getElementById('academic-hw-btn');
+            await populateStudentDropdowns();
 
-                if (topicSelect) {
-                    topicSelect.addEventListener('change', () => {
-                        topicBtn.disabled = !topicSelect.value;
-                    });
+            document.getElementById('academic-topic-btn')?.addEventListener('click', async () => {
+                const studentId = document.getElementById('academic-topic-student').value;
+                if (!studentId) return;
+                const studentDoc = await getDoc(doc(db, "students", studentId));
+                if (studentDoc.exists()) {
+                    window.showDailyTopicModal({ id: studentDoc.id, ...studentDoc.data() });
                 }
-                if (hwSelect) {
-                    hwSelect.addEventListener('change', () => {
-                        hwBtn.disabled = !hwSelect.value;
-                    });
+            });
+
+            document.getElementById('academic-hw-btn')?.addEventListener('click', async () => {
+                const studentId = document.getElementById('academic-hw-student').value;
+                if (!studentId) return;
+                const studentDoc = await getDoc(doc(db, "students", studentId));
+                if (studentDoc.exists()) {
+                    window.showHomeworkModal({ id: studentDoc.id, ...studentDoc.data() });
                 }
-
-                topicBtn.addEventListener('click', async () => {
-                    const studentId = topicSelect.value;
-                    if (!studentId) return;
-                    try {
-                        const studentDoc = await getDoc(doc(db, "students", studentId));
-                        if (studentDoc.exists()) {
-                            const student = { id: studentDoc.id, ...studentDoc.data() };
-                            window.showDailyTopicModal(student);
-                        } else {
-                            alert("Student not found.");
-                        }
-                    } catch (error) {
-                        console.error(error);
-                        alert("Error fetching student.");
-                    }
-                });
-
-                hwBtn.addEventListener('click', async () => {
-                    const studentId = hwSelect.value;
-                    if (!studentId) return;
-                    try {
-                        const studentDoc = await getDoc(doc(db, "students", studentId));
-                        if (studentDoc.exists()) {
-                            const student = { id: studentDoc.id, ...studentDoc.data() };
-                            window.showHomeworkModal(student);
-                        } else {
-                            alert("Student not found.");
-                        }
-                    } catch (error) {
-                        console.error(error);
-                        alert("Error fetching student.");
-                    }
-                });
             });
         }
 
-        // Render Schedule Management tab
+        async function populateStudentDropdowns() {
+            if (!window.tutorData) return;
+            const tutor = window.tutorData;
+            const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+            const snapshot = await getDocs(q);
+            const students = snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !['archived', 'graduated', 'transferred'].includes(s.status));
+
+            const topicSelect = document.getElementById('academic-topic-student');
+            const hwSelect = document.getElementById('academic-hw-student');
+            if (topicSelect) {
+                topicSelect.innerHTML = '<option value="">Select a student...</option>';
+                students.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.textContent = `${s.studentName} (${s.grade})`;
+                    topicSelect.appendChild(opt);
+                });
+                topicSelect.disabled = false;
+            }
+            if (hwSelect) {
+                hwSelect.innerHTML = '<option value="">Select a student...</option>';
+                students.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.textContent = `${s.studentName} (${s.grade})`;
+                    hwSelect.appendChild(opt);
+                });
+                hwSelect.disabled = false;
+            }
+        }
+
+        // --- Schedule Management tab (unchanged) ---
         function renderScheduleManagement() {
             const container = document.getElementById('mainContent');
             container.innerHTML = `
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
-                            <i class="fas fa-calendar-alt text-green-600"></i> View Calendar
-                        </h3>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="fas fa-calendar-alt text-green-600"></i> View Calendar</h3>
                         <p class="text-gray-600 dark:text-gray-300 mb-4">See all your scheduled classes in a weekly calendar view.</p>
                         <button id="schedule-calendar-btn" class="btn btn-primary w-full">Open Calendar</button>
                     </div>
                     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
-                            <i class="fas fa-clock text-blue-600"></i> Set Up Schedules
-                        </h3>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="fas fa-clock text-blue-600"></i> Set Up Schedules</h3>
                         <p class="text-gray-600 dark:text-gray-300 mb-4">Manage class schedules for all your students.</p>
                         <button id="schedule-manager-btn" class="btn btn-warning w-full">Manage Schedules</button>
                     </div>
@@ -631,8 +629,17 @@
             });
         }
 
-        // Tab management: override clicks for new tabs, preserve existing tabs
+        // --- Tab management ---
         waitForTutorData(() => {
+            const tutor = window.tutorData;
+            if (tutor.name) {
+                document.querySelector('.text-gradient').textContent = tutor.name.split(' ')[0];
+                document.querySelector('.avatar-modern').textContent = tutor.name.charAt(0);
+            }
+
+            // Override initial Dashboard (clear whatever tutor.js rendered)
+            renderCustomDashboard();
+
             const navDashboard = document.getElementById('navDashboard');
             const navStudentDB = document.getElementById('navStudentDatabase');
             const navAcademics = document.getElementById('navAcademics');
@@ -640,24 +647,40 @@
 
             function setActiveTab(activeId) {
                 document.querySelectorAll('.nav-tab-modern').forEach(tab => tab.classList.remove('active'));
-                const activeTab = document.getElementById(activeId);
-                if (activeTab) activeTab.classList.add('active');
+                document.getElementById(activeId)?.classList.add('active');
             }
 
-            // Dashboard and Student Database are handled by tutor.js, but we need to ensure active class
-            navDashboard.addEventListener('click', () => {
-                setTimeout(() => setActiveTab('navDashboard'), 50);
-            });
-            navStudentDB.addEventListener('click', () => {
-                setTimeout(() => setActiveTab('navStudentDatabase'), 50);
+            navDashboard.addEventListener('click', (e) => {
+                e.preventDefault();
+                setActiveTab('navDashboard');
+                renderCustomDashboard();
             });
 
-            // Custom tabs
-            navAcademics.addEventListener('click', () => {
+            // Student Database tab – we rely on tutor.js's renderStudentDatabase
+            navStudentDB.addEventListener('click', (e) => {
+                e.preventDefault();
+                setActiveTab('navStudentDatabase');
+                // tutor.js should handle rendering; we just ensure it's called
+                if (typeof window.renderStudentDatabase === 'function') {
+                    window.renderStudentDatabase(document.getElementById('mainContent'), window.tutorData);
+                } else {
+                    // fallback: try to use the global from tutor.js (it might be attached to window)
+                    import('./tutor.js').then(module => {
+                        if (module.renderStudentDatabase) {
+                            module.renderStudentDatabase(document.getElementById('mainContent'), window.tutorData);
+                        }
+                    });
+                }
+            });
+
+            navAcademics.addEventListener('click', (e) => {
+                e.preventDefault();
                 setActiveTab('navAcademics');
                 renderAcademics();
             });
-            navSchedule.addEventListener('click', () => {
+
+            navSchedule.addEventListener('click', (e) => {
+                e.preventDefault();
                 setActiveTab('navScheduleManagement');
                 renderScheduleManagement();
             });
@@ -665,9 +688,8 @@
             // Update stat counters periodically
             async function updateAllCounters() {
                 if (!window.tutorData) return;
-                const tutor = window.tutorData;
                 try {
-                    const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                    const q = query(collection(db, "students"), where("tutorEmail", "==", window.tutorData.email));
                     const snap = await getDocs(q);
                     const allStudents = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !['archived','graduated','transferred'].includes(s.status));
 
