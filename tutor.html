@@ -3,424 +3,325 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tutor Portal - Blooming Kids House</title>
+    <title>Portal | Blooming Kids House</title>
     
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self' https://*.firebaseio.com https://*.googleapis.com;
+        script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.googletagmanager.com;
+        style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com;
+        font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com;
+        img-src 'self' data: https://res.cloudinary.com https://*.googleusercontent.com;
+        connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://identitytoolkit.googleapis.com;
+    ">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
     
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
-        /* === CORE THEME VARIABLES === */
+        /* === THEME CONFIGURATION === */
         :root {
-            /* Brand Identity: Leaf Green & Yellow */
-            --primary-color: #16a34a; /* Leaf Green */
-            --primary-hover: #15803d;
-            --accent-color: #facc15;  /* Sunshine Yellow */
-            --accent-hover: #eab308;
-            
-            /* Modern UI Colors */
-            --surface-light: rgba(255, 255, 255, 0.85);
-            --surface-glass: rgba(255, 255, 255, 0.65);
-            --surface-border: rgba(255, 255, 255, 0.5);
-            --text-main: #1e293b;
-            --text-muted: #64748b;
-            
-            /* Shadows & Effects */
-            --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
-            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-            --blur-strength: 20px;
+            --primary: #10b981; /* Emerald 500 */
+            --primary-dark: #059669;
+            --accent: #f59e0b; /* Amber 500 */
+            --bg-gradient-start: #f0fdf4;
+            --bg-gradient-end: #ecfccb;
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.8);
+            --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
         }
 
-        /* Dark Mode Overrides */
-        body.dark {
-            --surface-light: rgba(17, 24, 39, 0.85);
-            --surface-glass: rgba(17, 24, 39, 0.70);
-            --surface-border: rgba(255, 255, 255, 0.1);
-            --text-main: #f3f4f6;
-            --text-muted: #9ca3af;
+        .dark {
+            --bg-gradient-start: #0f172a;
+            --bg-gradient-end: #1e293b;
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.08);
             --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
         }
 
-        /* === GLOBAL RESETS === */
         body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background-image: url('https://res.cloudinary.com/dy2hxcyaf/image/upload/v1769020680/Gemini_Generated_Image_o5m8auo5m8auo5m8_hzzxks.png');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--bg-gradient-start), var(--bg-gradient-end));
             min-height: 100vh;
-            color: var(--text-main);
+            transition: background 0.5s ease;
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3, .brand-font {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        /* === GLASSMORPHISM CARD === */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* === FLUID ANIMATIONS === */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        /* === SWEET BUTTONS === */
+        .btn-fluid {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            z-index: 1;
+        }
+
+        .btn-fluid::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s ease;
+            z-index: -1;
+        }
+
+        .btn-fluid:hover::before {
+            left: 100%;
+        }
+
+        .btn-fluid:active {
+            transform: scale(0.96);
+        }
+
+        /* Nav Tabs */
+        .nav-item {
+            position: relative;
             transition: color 0.3s ease;
         }
 
-        /* Smooth Scrolling */
-        html { scroll-behavior: smooth; }
-
-        /* === GLASSMORPHISM CONTAINERS === */
-        .glass-panel {
-            background: var(--surface-light);
-            backdrop-filter: blur(var(--blur-strength));
-            -webkit-backdrop-filter: blur(var(--blur-strength));
-            border: 1px solid var(--surface-border);
-            box-shadow: var(--glass-shadow);
-            border-radius: 1.5rem;
+        .nav-item::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 3px;
+            bottom: -5px;
+            left: 50%;
+            background-color: var(--primary);
             transition: all 0.3s ease;
+            border-radius: 99px;
+            transform: translateX(-50%);
         }
 
-        /* === UI COMPONENTS === */
-        
-        /* Buttons */
-        .btn-modern {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0.75rem 1.5rem;
-            font-weight: 600;
-            border-radius: 0.75rem;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            border: none;
-            cursor: pointer;
-            gap: 0.5rem;
-            position: relative;
-            overflow: hidden;
+        .nav-item.active {
+            color: var(--primary);
         }
 
-        .btn-modern:active { transform: scale(0.98); }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
-            color: white;
-            box-shadow: 0 4px 12px rgba(22, 163, 74, 0.2);
+        .nav-item.active::after {
+            width: 80%;
         }
 
-        .btn-primary:hover {
-            box-shadow: 0 8px 16px rgba(22, 163, 74, 0.3);
-            transform: translateY(-1px);
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
         }
-
-        .btn-accent {
-            background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
-            color: #713f12; /* Darker yellow/brown text for contrast */
-            box-shadow: 0 4px 12px rgba(250, 204, 21, 0.2);
-        }
-        
-        .btn-accent:hover {
-            box-shadow: 0 8px 16px rgba(250, 204, 21, 0.3);
-            transform: translateY(-1px);
-        }
-
-        .btn-ghost {
-            background: transparent;
-            color: var(--text-muted);
-            border: 1px solid transparent;
-        }
-
-        .btn-ghost:hover {
-            background: rgba(0,0,0,0.05);
-            color: var(--primary-color);
-        }
-        
-        body.dark .btn-ghost:hover { background: rgba(255,255,255,0.1); }
-
-        /* Navigation Tabs */
-        .nav-pill-container {
-            background: rgba(0,0,0,0.03);
-            border-radius: 1rem;
-            padding: 0.35rem;
-            display: inline-flex;
-            gap: 0.5rem;
-        }
-        
-        body.dark .nav-pill-container { background: rgba(255,255,255,0.05); }
-
-        .nav-tab-modern {
-            padding: 0.6rem 1.25rem;
-            border-radius: 0.75rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            transition: all 0.3s ease;
-            cursor: pointer;
-            border: none;
+        ::-webkit-scrollbar-track {
             background: transparent;
         }
-
-        .nav-tab-modern:hover { color: var(--primary-color); }
-
-        .nav-tab-modern.active {
-            background: white;
-            color: var(--primary-color);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
         }
 
-        body.dark .nav-tab-modern.active {
-            background: #374151;
-            color: var(--primary-color);
+        /* Loader */
+        .loader-ring {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
         }
-
-        /* Forms & Inputs */
-        .form-input-modern {
-            width: 100%;
-            padding: 0.875rem 1rem;
-            background: rgba(255,255,255,0.5);
-            border: 1px solid #e2e8f0;
-            border-radius: 0.75rem;
-            transition: all 0.2s;
-            font-size: 0.95rem;
+        .loader-ring:after {
+            content: " ";
+            display: block;
+            width: 20px;
+            height: 20px;
+            margin: 2px;
+            border-radius: 50%;
+            border: 2px solid var(--primary);
+            border-color: var(--primary) transparent var(--primary) transparent;
+            animation: ring 1.2s linear infinite;
         }
-        
-        body.dark .form-input-modern {
-            background: rgba(0,0,0,0.2);
-            border-color: #4b5563;
-            color: white;
-        }
-
-        .form-input-modern:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
-            background: white;
-        }
-        
-        body.dark .form-input-modern:focus { background: rgba(0,0,0,0.4); }
-
-        /* Cards */
-        .card-modern {
-            background: white;
-            border-radius: 1rem;
-            border: 1px solid #f1f5f9;
-            padding: 1.5rem;
-            box-shadow: var(--card-shadow);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        
-        body.dark .card-modern {
-            background: #1f2937;
-            border-color: #374151;
-        }
-
-        .card-modern:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        }
-
-        /* === MOBILE RESPONSIVENESS === */
-        @media (max-width: 768px) {
-            .glass-panel {
-                border-radius: 0;
-                min-height: 100vh;
-                margin: 0;
-                border: none;
-            }
-            
-            .header-wrapper {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 1.5rem;
-            }
-            
-            .user-actions {
-                width: 100%;
-                justify-content: space-between;
-            }
-            
-            .nav-pill-container {
-                width: 100%;
-                overflow-x: auto;
-                white-space: nowrap;
-                padding: 0.5rem;
-                /* Hide scrollbar */
-                -ms-overflow-style: none;
-                scrollbar-width: none;
-            }
-            .nav-pill-container::-webkit-scrollbar { display: none; }
-            
-            .nav-tab-modern { flex: 0 0 auto; }
-        }
-
-        /* Network Status Toast */
-        #networkWarning, #networkErrorOverlay { z-index: 10000; }
-        
-        /* Utility */
-        .text-gradient {
-            background: linear-gradient(135deg, var(--primary-color), #0ea5e9);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        @keyframes ring {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
-<body class="antialiased">
+<body class="text-gray-800 dark:text-gray-100 antialiased selection:bg-green-200 selection:text-green-900">
 
-    <div id="networkWarning" class="fixed top-0 left-0 right-0 bg-yellow-100 border-b border-yellow-400 text-yellow-800 px-4 py-3 text-center hidden shadow-lg transform transition-transform duration-300">
-        <span id="warningMessage" class="font-medium">You appear to be offline.</span>
-        <button onclick="hideNetworkWarning()" class="ml-4 text-yellow-800 hover:text-yellow-900 font-bold">&times;</button>
+    <div class="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+        <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-green-400/20 rounded-full blur-[100px] animate-float"></div>
+        <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-yellow-400/20 rounded-full blur-[100px] animate-float" style="animation-delay: 2s"></div>
     </div>
 
-    <div class="min-h-screen p-4 md:p-8 flex justify-center items-start">
+    <div class="min-h-screen flex flex-col items-center p-4 sm:p-6 lg:p-8">
         
-        <div class="glass-panel w-full max-w-7xl p-6 md:p-10 relative overflow-hidden">
-            <div class="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-green-400 opacity-10 blur-3xl pointer-events-none"></div>
-            <div class="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 rounded-full bg-yellow-400 opacity-10 blur-3xl pointer-events-none"></div>
+        <header class="w-full max-w-6xl glass-panel rounded-2xl p-4 mb-6 flex flex-col md:flex-row justify-between items-center gap-4 sticky top-4 z-50">
+            <div class="flex items-center gap-4">
+                <div class="relative group cursor-pointer">
+                    <div class="absolute -inset-0.5 bg-gradient-to-r from-green-400 to-emerald-600 rounded-full blur opacity-30 group-hover:opacity-60 transition duration-500"></div>
+                    <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
+                         alt="Logo" class="relative w-12 h-12 md:w-14 md:h-14 object-contain">
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                        Blooming Kids
+                    </h1>
+                    <p class="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Tutor Portal</p>
+                </div>
+            </div>
 
-            <header class="relative z-10 mb-8">
-                <div class="flex flex-col md:flex-row justify-between items-center header-wrapper">
-                    <div class="flex items-center gap-4 w-full md:w-auto">
-                        <div class="relative group">
-                            <div class="absolute -inset-1 bg-gradient-to-r from-green-400 to-blue-500 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-200"></div>
-                            <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
-                                 alt="Blooming Kids House" 
-                                 class="relative h-16 w-auto object-contain transform transition hover:scale-105 duration-300">
+            <nav class="flex p-1 space-x-1 bg-gray-100/50 dark:bg-gray-800/50 rounded-xl backdrop-blur-sm">
+                <button id="navDashboard" class="px-6 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 bg-white dark:bg-gray-700 shadow-sm text-emerald-600 dark:text-emerald-400 ring-1 ring-black/5">
+                    Dashboard
+                </button>
+                <button id="navStudentDatabase" class="px-6 py-2.5 text-sm font-medium rounded-lg text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-300 transition-all duration-300 hover:bg-white/50 dark:hover:bg-gray-700/50">
+                    Students
+                </button>
+            </nav>
+
+            <div class="flex items-center gap-3">
+                <button id="modeToggle" class="p-2.5 rounded-full hover:bg-gray-200/50 dark:hover:bg-gray-700/50 text-gray-600 dark:text-yellow-400 transition-colors">
+                    <i class="fas fa-moon text-lg" id="modeIcon"></i>
+                </button>
+                <button id="logoutBtn" class="btn-fluid bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-red-100 dark:hover:bg-red-900/40 flex items-center gap-2">
+                    <i class="fas fa-power-off"></i>
+                    <span class="hidden sm:inline">Logout</span>
+                </button>
+            </div>
+        </header>
+
+        <main class="w-full max-w-6xl flex-grow grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <aside class="lg:col-span-4 space-y-6">
+                <div class="glass-panel rounded-3xl p-6 lg:p-8 text-center relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <i class="fas fa-chalkboard-teacher text-8xl text-emerald-500 transform rotate-12"></i>
+                    </div>
+                    
+                    <div class="relative inline-block mb-4">
+                        <img src="https://ui-avatars.com/api/?name=Tutor&background=10b981&color=fff&size=128" 
+                             class="w-24 h-24 rounded-full border-4 border-white dark:border-gray-700 shadow-xl" alt="Profile">
+                        <div class="absolute bottom-1 right-1 w-5 h-5 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full animate-pulse"></div>
+                    </div>
+                    
+                    <h2 id="tutorNameHeading" class="text-2xl font-bold text-gray-800 dark:text-white mb-1">Welcome Back</h2>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mb-6">Senior Tutor • Mathematics</p>
+
+                    <div class="grid grid-cols-2 gap-3 mb-6">
+                        <div class="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-2xl border border-emerald-100 dark:border-emerald-800/30">
+                            <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">12</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400 font-medium">Active Students</div>
                         </div>
-                        <div>
-                            <h1 id="tutorNameHeading" class="text-2xl md:text-3xl font-bold tracking-tight text-gray-800 dark:text-white">
-                                Welcome, <span class="text-gradient">Tutor!</span>
-                            </h1>
-                            <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">Blooming Kids House Portal</p>
+                        <div class="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-2xl border border-amber-100 dark:border-amber-800/30">
+                            <div class="text-2xl font-bold text-amber-600 dark:text-amber-400">4</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400 font-medium">Pending Tasks</div>
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-3 user-actions">
-                        <button id="modeToggle" class="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors text-gray-600 dark:text-yellow-400 focus:outline-none focus:ring-2 focus:ring-green-500">
-                            <i class="fas fa-moon" id="modeIcon"></i>
+                    <a href="https://wa.me/2348158768689" target="_blank" class="btn-fluid w-full bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2">
+                        <i class="fab fa-whatsapp text-xl"></i>
+                        Contact Tech Support
+                    </a>
+                </div>
+
+                <div class="glass-panel rounded-3xl p-6">
+                    <h3 class="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                        <i class="fas fa-rocket text-accent"></i> Quick Actions
+                    </h3>
+                    <div class="space-y-3">
+                        <button class="w-full text-left px-4 py-3 rounded-xl bg-white dark:bg-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700 flex items-center justify-between group">
+                            <span class="font-medium text-gray-700 dark:text-gray-300">New Report Card</span>
+                            <i class="fas fa-chevron-right text-gray-400 group-hover:text-emerald-500 transition-transform group-hover:translate-x-1"></i>
                         </button>
-                        
-                        <a id="whatsappBtn" href="https://wa.me/2348158768689" target="_blank" class="btn-modern btn-primary text-sm">
-                            <i class="fab fa-whatsapp text-lg"></i>
-                            <span class="hidden sm:inline">Support</span>
-                        </a>
-                        
-                        <button id="logoutBtn" class="btn-modern btn-accent text-sm">
-                            <i class="fas fa-sign-out-alt"></i>
-                            <span class="hidden sm:inline">Logout</span>
+                        <button class="w-full text-left px-4 py-3 rounded-xl bg-white dark:bg-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700 flex items-center justify-between group">
+                            <span class="font-medium text-gray-700 dark:text-gray-300">Upload Resources</span>
+                            <i class="fas fa-chevron-right text-gray-400 group-hover:text-emerald-500 transition-transform group-hover:translate-x-1"></i>
                         </button>
                     </div>
                 </div>
+            </aside>
 
-                <nav class="mt-8">
-                    <div class="nav-pill-container">
-                        <button id="navDashboard" class="nav-tab-modern active">
-                            <i class="fas fa-columns mr-2"></i>Dashboard
-                        </button>
-                        <button id="navStudentDatabase" class="nav-tab-modern">
-                            <i class="fas fa-users mr-2"></i>Student Database
-                        </button>
-                        </div>
-                </nav>
-            </header>
-
-            <main id="mainContent" class="relative z-10 min-h-[500px] animate-fade-in-up">
-                <div class="flex flex-col items-center justify-center h-64 text-gray-400">
-                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mb-4"></div>
-                    <p class="animate-pulse">Loading secure data...</p>
+            <section class="lg:col-span-8">
+                <div id="mainContent" class="glass-panel rounded-3xl min-h-[500px] p-6 lg:p-10 relative">
+                    <div class="flex flex-col items-center justify-center h-full py-20 text-center opacity-60">
+                        <div class="loader-ring mb-4"></div>
+                        <p class="text-gray-500 dark:text-gray-400 font-medium">Securely loading tutor data...</p>
+                    </div>
                 </div>
-            </main>
-
-        </div>
+            </section>
+        </main>
     </div>
 
-    <div id="networkErrorOverlay" class="fixed inset-0 bg-gray-900 bg-opacity-90 z-50 hidden flex-col items-center justify-center backdrop-blur-sm p-4">
-        <div class="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-md w-full text-center shadow-2xl transform transition-all">
-            <div class="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <i class="fas fa-wifi text-3xl text-yellow-600"></i>
-            </div>
-            <h2 class="text-2xl font-bold mb-2 text-gray-800 dark:text-white">Connection Lost</h2>
-            <p class="text-gray-600 dark:text-gray-300 mb-8" id="errorMessage">We can't reach the Blooming Kids servers.</p>
-            <div class="flex flex-col gap-3">
-                <button onclick="window.location.reload()" class="btn-modern btn-primary w-full">Try Again</button>
-                <button onclick="checkConnectivity()" class="btn-modern btn-ghost w-full">Check Connection</button>
-            </div>
-        </div>
+    <div id="networkWarning" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 glass-panel bg-red-500/90 text-white px-6 py-3 rounded-full shadow-2xl z-[100] hidden flex items-center gap-3">
+        <i class="fas fa-wifi-slash animate-pulse"></i>
+        <span class="font-medium text-sm">You are offline. Data may not save.</span>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-    
     <script type="module" src="tutor.js"></script>
-    <script src="games.js"></script>
-
+    
     <script>
-        /* === LOGIC ADAPTERS === */
-        // Preserving your original logic while adapting to new UI classes
-        
+        // === FLUID INTERACTION LOGIC ===
         document.addEventListener('DOMContentLoaded', () => {
             const body = document.body;
-            const toggleButton = document.getElementById('modeToggle');
+            const modeToggle = document.getElementById('modeToggle');
             const modeIcon = document.getElementById('modeIcon');
-            const modeKey = 'tutor_theme';
+            
+            // 1. Dark Mode Logic (Persisted)
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                body.classList.add('dark');
+                modeIcon.classList.replace('fa-moon', 'fa-sun');
+            }
 
-            // Enhanced Dark Mode Logic
-            const setTheme = (theme) => {
-                if (theme === 'dark') {
-                    body.classList.add('dark');
-                    modeIcon.classList.remove('fa-moon');
-                    modeIcon.classList.add('fa-sun');
-                    localStorage.setItem(modeKey, 'dark');
-                } else {
-                    body.classList.remove('dark');
-                    modeIcon.classList.remove('fa-sun');
-                    modeIcon.classList.add('fa-moon');
-                    localStorage.setItem(modeKey, 'light');
-                }
-            };
-
-            const savedTheme = localStorage.getItem(modeKey);
-            if (savedTheme) setTheme(savedTheme);
-            else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
-            else setTheme('light');
-
-            toggleButton.addEventListener('click', () => {
-                const currentTheme = body.classList.contains('dark') ? 'dark' : 'light';
-                setTheme(currentTheme === 'light' ? 'dark' : 'light');
+            modeToggle.addEventListener('click', () => {
+                body.classList.toggle('dark');
+                const isDark = body.classList.contains('dark');
+                modeIcon.classList.toggle('fa-moon', !isDark);
+                modeIcon.classList.toggle('fa-sun', isDark);
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
             });
 
-            initializeNetworkMonitoring();
+            // 2. Tab Switcher Animation
+            const navButtons = document.querySelectorAll('nav button');
+            navButtons.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    // Reset all styles
+                    navButtons.forEach(b => {
+                        b.className = "px-6 py-2.5 text-sm font-medium rounded-lg text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-300 transition-all duration-300 hover:bg-white/50 dark:hover:bg-gray-700/50";
+                    });
+                    
+                    // Set Active Style (White Pill)
+                    e.currentTarget.className = "px-6 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 bg-white dark:bg-gray-700 shadow-sm text-emerald-600 dark:text-emerald-400 ring-1 ring-black/5 scale-105";
+                });
+            });
+
+            // 3. Network Monitoring
+            window.addEventListener('offline', () => document.getElementById('networkWarning').classList.remove('hidden'));
+            window.addEventListener('online', () => document.getElementById('networkWarning').classList.add('hidden'));
         });
-
-        // Network Logic (Keep exactly as is for reliability)
-        function initializeNetworkMonitoring() {
-            window.addEventListener('online', function() {
-                hideNetworkWarning();
-                hideNetworkError();
-            });
-            window.addEventListener('offline', function() {
-                showNetworkWarning();
-            });
-        }
-
-        function showNetworkWarning() {
-            document.getElementById('networkWarning').classList.remove('hidden');
-        }
-
-        function hideNetworkWarning() {
-            document.getElementById('networkWarning').classList.add('hidden');
-        }
-        
-        function showNetworkError(msg) {
-             const overlay = document.getElementById('networkErrorOverlay');
-             if(msg) document.getElementById('errorMessage').innerText = msg;
-             overlay.classList.remove('hidden');
-             overlay.classList.add('flex');
-        }
-        
-        function hideNetworkError() {
-             const overlay = document.getElementById('networkErrorOverlay');
-             overlay.classList.add('hidden');
-             overlay.classList.remove('flex');
-        }
-        
-        function checkConnectivity() {
-             // Simple connectivity check
-             if(navigator.onLine) {
-                 hideNetworkError();
-                 hideNetworkWarning();
-             } else {
-                 showNetworkError('Still offline. Please check your internet settings.');
-             }
-        }
     </script>
 </body>
 </html>
