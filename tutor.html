@@ -105,10 +105,10 @@
         .btn-primary:hover { background: linear-gradient(135deg, #0f6b37, var(--primary)); }
         .btn-accent { background: linear-gradient(135deg, var(--accent), #f59e0b); color: #422006; border: none; box-shadow: 0 8px 20px var(--accent-glow); }
 
-        /* ===== MODAL & UI COMPONENTS ===== */
+        /* ===== MODAL & UI COMPONENTS (used by tutor.js) ===== */
         .modal-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
-            display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 1rem;
+            display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 1rem;
         }
         .modal-content {
             background: white; border-radius: 1.5rem; padding: 1.5rem; max-width: 600px; width: 100%;
@@ -118,7 +118,8 @@
         body.dark .modal-content { background: #1e293b; color: #f1f5f9; border-color: #334155; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.75rem; margin-bottom: 1rem; }
         body.dark .modal-header { border-bottom-color: #334155; }
-        .modal-title { font-size: 1.25rem; font-weight: 700; }
+        .modal-title { font-size: 1.25rem; font-weight: 700; color: #1f2937; }
+        body.dark .modal-title { color: #f1f5f9; }
         .modal-body { margin-bottom: 1rem; }
         .modal-footer { display: flex; justify-content: flex-end; gap: 0.5rem; border-top: 1px solid #e5e7eb; padding-top: 1rem; }
         body.dark .modal-footer { border-top-color: #334155; }
@@ -141,70 +142,82 @@
         .badge-info { background: #dbeafe; color: #1e3a8a; }
         .badge-warning { background: #fef3c7; color: #92400e; }
         .badge-success { background: #d1fae5; color: #065f46; }
-        .badge-purple { background: #ede9fe; color: #5b21b6; }
         body.dark .badge-info { background: #1e3a8a; color: #dbeafe; }
         body.dark .badge-warning { background: #92400e; color: #fef3c7; }
         body.dark .badge-success { background: #065f46; color: #d1fae5; }
-        body.dark .badge-purple { background: #5b21b6; color: #ede9fe; }
 
         /* Spinner */
         .spinner { border: 3px solid rgba(0,0,0,0.1); border-top-color: #1e8b4c; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* New designs for student cards, messaging, courses */
-        .student-card {
-            background: rgba(255,255,255,0.15); backdrop-filter: blur(8px); border: 1px solid var(--border-light);
-            border-radius: 1.5rem; padding: 1rem; transition: var(--transition);
-        }
-        .student-card:hover { transform: translateY(-4px); background: rgba(255,255,255,0.25); }
-        .message-bubble {
-            max-width: 70%; padding: 0.75rem 1rem; border-radius: 1.5rem; margin-bottom: 0.5rem;
-            position: relative; word-wrap: break-word;
-        }
-        .message-bubble.me {
-            background: var(--primary); color: white; align-self: flex-end;
-            border-bottom-right-radius: 0.25rem;
-        }
-        .message-bubble.them {
-            background: #e5e7eb; color: #1f2937; align-self: flex-start;
-            border-bottom-left-radius: 0.25rem;
-        }
-        body.dark .message-bubble.them { background: #374151; color: #f1f5f9; }
-        .chat-timestamp { font-size: 0.7rem; opacity: 0.7; margin-top: 0.25rem; text-align: right; }
+        /* Messaging & Inbox styles (shortened, same as before) */
+        .message-type-grid { display: grid; grid-template-columns: repeat(2,1fr); gap:0.5rem; margin-bottom:1rem; }
+        .type-option { padding:0.75rem; border:1px solid #e5e7eb; border-radius:0.5rem; text-align:center; cursor:pointer; transition:all 0.2s; }
+        .type-option.selected { background:#1e8b4c; color:white; border-color:#1e8b4c; }
+        .checklist-box { max-height:200px; overflow-y:auto; border:1px solid #e5e7eb; border-radius:0.5rem; padding:0.5rem; }
+        .checklist-item { display:flex; align-items:center; gap:0.5rem; padding:0.25rem; }
+        .urgent-toggle { display:flex; align-items:center; gap:0.5rem; }
+        .info-box { background:#e5e7eb; padding:0.5rem; border-radius:0.5rem; }
+        .error-box { background:#fee2e2; color:#b91c1c; padding:0.5rem; border-radius:0.5rem; }
+        .inbox-container { display:flex; gap:1rem; height:500px; }
+        .inbox-list-col { width:300px; border-right:1px solid #e5e7eb; overflow-y:auto; }
+        .inbox-chat-col { flex:1; display:flex; flex-direction:column; }
+        .chat-header { padding:0.5rem; border-bottom:1px solid #e5e7eb; font-weight:bold; }
+        .chat-messages { flex:1; overflow-y:auto; padding:1rem; background:#f9fafb; border-radius:0.5rem; }
+        body.dark .chat-messages { background:#1f2937; }
+        .close-modal-absolute { position:absolute; top:1rem; right:1rem; background:transparent; border:none; font-size:1.5rem; cursor:pointer; }
+        .inbox-header { display:flex; justify-content:space-between; align-items:center; padding:0.5rem; }
+        .btn-icon { background:transparent; border:none; cursor:pointer; font-size:1.2rem; }
+        .empty-state { display:flex; align-items:center; justify-content:center; height:100%; color:#9ca3af; }
+        .inbox-list { max-height:400px; overflow-y:auto; }
+        .inbox-item { display:flex; align-items:center; padding:0.75rem; border-bottom:1px solid #e5e7eb; cursor:pointer; transition:background 0.2s; }
+        .inbox-item:hover { background:#f3f4f6; }
+        body.dark .inbox-item { border-bottom-color:#334155; }
+        body.dark .inbox-item:hover { background:#1f2937; }
+        .inbox-item.unread { background:#eff6ff; }
+        body.dark .inbox-item.unread { background:#1e3a8a20; }
+        .inbox-item .avatar { width:40px; height:40px; border-radius:50%; background:#1e8b4c; color:white; display:flex; align-items:center; justify-content:center; font-weight:bold; margin-right:0.75rem; }
+        .inbox-item .info { flex:1; }
+        .inbox-item .name { font-weight:600; }
+        .inbox-item .preview { font-size:0.875rem; color:#6b7280; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px; }
+        .inbox-item .meta { text-align:right; font-size:0.75rem; color:#9ca3af; }
+        .inbox-item .badge { background:#ef4444; color:white; border-radius:9999px; padding:0.125rem 0.375rem; font-size:0.75rem; margin-top:0.25rem; }
+        .chat-bubble { max-width:70%; margin-bottom:0.5rem; padding:0.5rem 1rem; border-radius:1rem; clear:both; }
+        .chat-bubble.me { background:#1e8b4c; color:white; float:right; border-bottom-right-radius:0.25rem; }
+        .chat-bubble.them { background:#e5e7eb; color:#1f2937; float:left; border-bottom-left-radius:0.25rem; }
+        body.dark .chat-bubble.them { background:#374151; color:#f1f5f9; }
+        .chat-bubble .timestamp { font-size:0.625rem; opacity:0.7; text-align:right; margin-top:0.25rem; }
+        .chat-inputs { display:flex; gap:0.5rem; margin-top:1rem; }
+        .chat-inputs input { flex:1; padding:0.5rem; border:1px solid #d1d5db; border-radius:0.5rem; }
+        .chat-inputs button { padding:0.5rem 1rem; background:#1e8b4c; color:white; border:none; border-radius:0.5rem; cursor:pointer; }
 
-        /* File upload styling */
-        .file-upload-area {
-            border: 2px dashed #cbd5e1; border-radius: 1rem; padding: 1.5rem; text-align: center;
-            background: rgba(255,255,255,0.3); cursor: pointer; transition: all 0.2s;
-        }
-        .file-upload-area:hover { border-color: var(--primary); background: rgba(46,204,113,0.1); }
-        body.dark .file-upload-area { border-color: #475569; }
-
-        /* Game modal front */
-        #gameModal { z-index: 20000 !important; }
-
-        /* Floating buttons */
         .floating-messaging-btn, .floating-inbox-btn {
-            position: fixed; right: 20px; width: 60px; height: 60px; border-radius: 30px;
-            background: linear-gradient(145deg, var(--primary), #0b5e2e); color: white; border: none;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2), 0 0 0 2px rgba(255,255,255,0.3); cursor: pointer;
-            display: flex; align-items: center; justify-content: center; font-size: 1.8rem;
-            transition: all 0.2s ease; z-index: 999; backdrop-filter: blur(8px);
+            position: fixed; right:20px; width:60px; height:60px; border-radius:30px;
+            background: linear-gradient(145deg, var(--primary), #0b5e2e); color:white; border:none;
+            box-shadow:0 10px 25px rgba(0,0,0,0.2), 0 0 0 2px rgba(255,255,255,0.3); cursor:pointer;
+            display:flex; align-items:center; justify-content:center; font-size:1.8rem;
+            transition:all 0.2s ease; z-index:999; backdrop-filter:blur(8px);
         }
-        .floating-messaging-btn { bottom: 100px; }
-        .floating-inbox-btn { bottom: 30px; }
+        .floating-messaging-btn { bottom:100px; }
+        .floating-inbox-btn { bottom:30px; }
+        .floating-btn-text { display:none; }
         .unread-badge {
-            position: absolute; top: -5px; right: -5px; background: #ef4444; color: white; border-radius: 20px;
-            padding: 2px 6px; font-size: 12px; font-weight: bold; min-width: 22px; text-align: center; border: 2px solid white;
+            position:absolute; top:-5px; right:-5px; background:#ef4444; color:white; border-radius:20px;
+            padding:2px 6px; font-size:12px; font-weight:bold; min-width:22px; text-align:center; border:2px solid white;
         }
-        .skeleton-loader { background: rgba(255,255,255,0.2); border-radius: 2rem; padding: 2rem; backdrop-filter: blur(4px); border: 1px dashed rgba(255,255,255,0.4); }
-        .pulse-ring { width: 72px; height: 72px; border-radius: 50%; background: rgba(46,204,113,0.3); display: flex; align-items: center; justify-content: center; position: relative; }
-        .pulse-ring::before { content: ''; position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 2px solid rgba(46,204,113,0.6); animation: pulse 1.8s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.8); opacity: 0; } }
-        .text-gradient { background: linear-gradient(145deg, var(--primary), #0f6b37); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        #networkWarning, #networkErrorOverlay { z-index: 9999; }
+        @media (max-width:640px) {
+            .floating-messaging-btn, .floating-inbox-btn { width:50px; height:50px; font-size:1.5rem; }
+        }
+
+        .skeleton-loader { background:rgba(255,255,255,0.2); border-radius:2rem; padding:2rem; backdrop-filter:blur(4px); border:1px dashed rgba(255,255,255,0.4); }
+        .pulse-ring { width:72px; height:72px; border-radius:50%; background:rgba(46,204,113,0.3); display:flex; align-items:center; justify-content:center; position:relative; }
+        .pulse-ring::before { content:''; position:absolute; width:100%; height:100%; border-radius:50%; border:2px solid rgba(46,204,113,0.6); animation:pulse 1.8s infinite; }
+        @keyframes pulse { 0% { transform:scale(1); opacity:0.8; } 100% { transform:scale(1.8); opacity:0; } }
+        .text-gradient { background:linear-gradient(145deg, var(--primary), #0f6b37); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-weight:700; }
+        .hide-scrollbar::-webkit-scrollbar { display:none; }
+        .hide-scrollbar { -ms-overflow-style:none; scrollbar-width:none; }
+        #networkWarning, #networkErrorOverlay { z-index:9999; }
+        .sidebar-nav { display:none; }
     </style>
 </head>
 <body class="antialiased">
@@ -260,7 +273,7 @@
                 </div>
             </div>
 
-            <!-- STAT CARDS (clickable, now with handlers) -->
+            <!-- STAT CARDS (clickable, data-driven) -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8 relative z-20">
                 <div class="stat-card flex items-center gap-3" id="totalStudentsCard">
                     <div class="stat-icon"><i class="fas fa-users"></i></div>
@@ -280,17 +293,16 @@
                 </div>
             </div>
 
-            <!-- Gamification widget -->
+            <!-- Gamification widget (hidden, used by tutor.js) -->
             <div id="performance-widget" class="hidden"></div>
 
-            <!-- navigation pills with 5 tabs (added Courses) -->
+            <!-- navigation pills with 4 tabs -->
             <nav class="relative z-20 mb-8 overflow-x-auto hide-scrollbar">
                 <div class="nav-pill-container">
                     <button id="navDashboard" class="nav-tab-modern active"><i class="fas fa-columns"></i>Dashboard</button>
                     <button id="navStudentDatabase" class="nav-tab-modern"><i class="fas fa-users"></i>Student Database</button>
                     <button id="navAcademics" class="nav-tab-modern"><i class="fas fa-graduation-cap"></i>Academics</button>
-                    <button id="navScheduleManagement" class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule</button>
-                    <button id="navCourses" class="nav-tab-modern"><i class="fas fa-cloud-upload-alt"></i>Courses</button>
+                    <button id="navScheduleManagement" class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule Management</button>
                 </div>
             </nav>
 
@@ -325,23 +337,13 @@
         </div>
     </div>
 
-    <!-- Game Modal (placed at end for high z-index) -->
-    <div id="gameModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-[20000] p-4">
-        <div class="bg-white dark:bg-gray-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-            <div class="flex justify-between items-center p-4 border-b dark:border-gray-700">
-                <h3 class="text-xl font-bold">Educational Game</h3>
-                <button onclick="closeGameModal()" class="text-3xl leading-none hover:text-gray-600">&times;</button>
-            </div>
-            <div class="p-4" id="gameFrame">
-                <!-- Game content loaded by games.js -->
-                <iframe src="about:blank" class="w-full h-[500px] rounded-lg"></iframe>
-            </div>
-        </div>
-    </div>
-
     <!-- scripts -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+
+    <!-- Load firebase and tutor.js (must export auth, db and attach required functions to window) -->
+    <script type="module" src="tutor.js"></script>
+    <script src="games.js"></script>
 
     <script>
         (function() {
@@ -402,49 +404,21 @@
             window.addEventListener('offline', () => {
                 document.getElementById('networkWarning').classList.remove('hidden');
             });
-
-            // Game modal functions
-            window.openGameModal = function() {
-                document.getElementById('gameModal').classList.remove('hidden');
-                document.getElementById('gameModal').classList.add('flex');
-            };
-            window.closeGameModal = function() {
-                document.getElementById('gameModal').classList.add('hidden');
-                document.getElementById('gameModal').classList.remove('flex');
-            };
         })();
     </script>
 
-    <!-- Main custom module with all functionality -->
+    <!-- Main custom module for Academics and Schedule tabs -->
     <script type="module">
-        // ==================== MOCK DATA (simulates Firebase) ====================
-        const mockStudents = [
-            { id: 's1', studentName: 'Emma Watson', grade: 'Grade 3', status: 'regular', type: 'individual', tutorEmail: 'tutor@blooming.com', assignedDate: '2024-01-15', lastReportDate: '2025-02-10', attendanceRate: 92, schedule: [{ day: 'Monday', time: '10:00', subject: 'Math' }, { day: 'Wednesday', time: '10:00', subject: 'English' }] },
-            { id: 's2', studentName: 'Liam Smith', grade: 'Grade 2', status: 'transitioning', type: 'group', tutorEmail: 'tutor@blooming.com', assignedDate: '2024-02-20', lastReportDate: '2025-02-01', attendanceRate: 78, schedule: [{ day: 'Tuesday', time: '11:00', subject: 'Science' }, { day: 'Thursday', time: '11:00', subject: 'Art' }] },
-            { id: 's3', studentName: 'Olivia Brown', grade: 'Grade 4', status: 'break', type: 'individual', tutorEmail: 'tutor@blooming.com', assignedDate: '2024-03-10', lastReportDate: '2025-01-20', attendanceRate: 0, schedule: [] },
-            { id: 's4', studentName: 'Noah Johnson', grade: 'Grade 1', status: 'regular', type: 'individual', tutorEmail: 'tutor@blooming.com', assignedDate: '2024-04-05', lastReportDate: '2025-02-12', attendanceRate: 95, schedule: [{ day: 'Monday', time: '09:00', subject: 'Reading' }, { day: 'Friday', time: '09:00', subject: 'Math' }] },
-            { id: 's5', studentName: 'Mia Garcia', grade: 'Grade 5', status: 'regular', type: 'group', tutorEmail: 'tutor@blooming.com', assignedDate: '2024-05-12', lastReportDate: '2025-02-09', attendanceRate: 88, schedule: [{ day: 'Wednesday', time: '14:00', subject: 'History' }] }
-        ];
+        import { db } from './firebaseConfig.js';
+        import { collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
-        const mockHomework = [
-            { id: 'h1', studentId: 's1', title: 'Math worksheet', dueDate: '2025-02-20', status: 'pending', file: null },
-            { id: 'h2', studentId: 's2', title: 'Science project', dueDate: '2025-02-22', status: 'submitted', file: 'project.pdf' }
-        ];
+        // Wait for tutorData to be set by tutor.js
+        function waitForTutorData(callback) {
+            if (window.tutorData) callback();
+            else setTimeout(() => waitForTutorData(callback), 100);
+        }
 
-        const mockMessages = [
-            { id: 'm1', from: 'Emma Watson', fromId: 's1', text: 'When is the next class?', timestamp: '2025-02-18T09:30', unread: false },
-            { id: 'm2', from: 'Liam Smith', fromId: 's2', text: 'I need help with homework', timestamp: '2025-02-18T10:15', unread: true }
-        ];
-
-        const mockCourses = [
-            { id: 'c1', title: 'Math Grade 3', file: 'math3.pdf', uploadedAt: '2025-02-01' },
-            { id: 'c2', title: 'Science Experiments', file: 'science.pdf', uploadedAt: '2025-02-10' }
-        ];
-
-        // Current tutor
-        window.tutorData = { email: 'tutor@blooming.com', name: 'Ms. Jenna' };
-
-        // Helper functions
+        // Simple escape function
         function escapeHtml(unsafe) {
             if (!unsafe) return '';
             return String(unsafe).replace(/[&<>"]/g, function(m) {
@@ -456,307 +430,274 @@
             });
         }
 
-        // Modal helper
-        function showModal(title, bodyHTML, onClose) {
-            const overlay = document.createElement('div');
-            overlay.className = 'modal-overlay';
-            overlay.innerHTML = `
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3 class="modal-title">${escapeHtml(title)}</h3>
-                        <button class="text-2xl leading-none hover:opacity-70 close-modal">&times;</button>
-                    </div>
-                    <div class="modal-body">${bodyHTML}</div>
-                    <div class="modal-footer">
-                        <button class="btn btn-secondary close-modal">Close</button>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(overlay);
-            const close = () => { overlay.remove(); if (onClose) onClose(); };
-            overlay.querySelectorAll('.close-modal').forEach(btn => btn.addEventListener('click', close));
+        // Ensure required functions are attached to window (tutor.js must expose them)
+        // If not, provide helpful alerts.
+        if (typeof window.showDailyTopicModal !== 'function') {
+            window.showDailyTopicModal = (student) => {
+                alert('Please add "window.showDailyTopicModal = showDailyTopicModal;" in tutor.js to enable this feature.');
+            };
+        }
+        if (typeof window.showHomeworkModal !== 'function') {
+            window.showHomeworkModal = (student) => {
+                alert('Please add "window.showHomeworkModal = showHomeworkModal;" in tutor.js to enable this feature.');
+            };
+        }
+        if (typeof window.showScheduleCalendarModal !== 'function') {
+            window.showScheduleCalendarModal = () => {
+                alert('Please add "window.showScheduleCalendarModal = showScheduleCalendarModal;" in tutor.js to enable this feature.');
+            };
         }
 
-        // ==================== STAT CARD HANDLERS ====================
-        document.getElementById('totalStudentsCard').addEventListener('click', () => {
-            const students = mockStudents.filter(s => s.tutorEmail === window.tutorData.email);
-            let rows = '';
-            students.forEach(s => {
-                const statusClass = s.status === 'break' ? 'badge-warning' : s.status === 'transitioning' ? 'badge-info' : 'badge-success';
-                rows += `<tr><td class="p-2">${escapeHtml(s.studentName)}</td><td class="p-2">${s.assignedDate}</td><td class="p-2"><span class="badge ${statusClass}">${s.status}</span></td><td class="p-2">${s.type}</td></tr>`;
-            });
-            showModal('Total Students', `
-                <table class="w-full text-sm">
-                    <thead><tr class="border-b"><th class="text-left p-2">Name</th><th class="text-left p-2">Assigned</th><th class="text-left p-2">Status</th><th class="text-left p-2">Type</th></tr></thead>
-                    <tbody>${rows || '<tr><td colspan="4" class="p-4 text-center">No students</td></tr>'}</tbody>
-                </table>
-            `);
-        });
+        // Function to populate student dropdowns for Academics tab
+        async function populateStudentDropdowns() {
+            if (!window.tutorData) return;
+            const tutor = window.tutorData;
+            try {
+                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const snapshot = await getDocs(q);
+                const students = snapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter(s => !['archived', 'graduated', 'transferred'].includes(s.status));
 
-        document.getElementById('todayClassesCard').addEventListener('click', () => {
-            const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-            const students = mockStudents.filter(s => s.tutorEmail === window.tutorData.email);
-            let classes = [];
-            students.forEach(s => {
-                if (s.schedule) s.schedule.forEach(slot => {
-                    if (slot.day === today) classes.push({ student: s.studentName, time: slot.time, subject: slot.subject });
-                });
-            });
-            let list = '';
-            classes.forEach(c => {
-                list += `<div class="flex justify-between p-2 border-b"><span>${escapeHtml(c.student)}</span><span>${c.time} - ${c.subject}</span></div>`;
-            });
-            showModal(`Today's Classes (${today})`, list || '<p class="text-center p-4">No classes today</p>');
-        });
-
-        document.getElementById('pendingReportsCard').addEventListener('click', () => {
-            const students = mockStudents.filter(s => s.tutorEmail === window.tutorData.email && s.status !== 'break');
-            const oneWeekAgo = new Date(); oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-            const pending = students.filter(s => !s.lastReportDate || new Date(s.lastReportDate) < oneWeekAgo);
-            let list = '';
-            pending.forEach(s => {
-                list += `<div class="flex justify-between p-2 border-b"><span>${escapeHtml(s.studentName)}</span><span class="text-sm opacity-70">Last: ${s.lastReportDate || 'Never'}</span></div>`;
-            });
-            showModal('Pending Reports', list || '<p class="text-center p-4">No pending reports</p>');
-        });
-
-        // ==================== RENDER FUNCTIONS FOR TABS ====================
-        function renderDashboard() {
-            const container = document.getElementById('mainContent');
-            container.innerHTML = `<div class="p-8 text-center text-gray-500">Dashboard content (integrate with your existing dashboard)</div>`;
+                const topicSelect = document.getElementById('academic-topic-student');
+                const hwSelect = document.getElementById('academic-hw-student');
+                if (topicSelect) {
+                    topicSelect.innerHTML = '<option value="">Select a student...</option>';
+                    students.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s.id;
+                        opt.textContent = `${s.studentName} (${s.grade})`;
+                        topicSelect.appendChild(opt);
+                    });
+                }
+                if (hwSelect) {
+                    hwSelect.innerHTML = '<option value="">Select a student...</option>';
+                    students.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s.id;
+                        opt.textContent = `${s.studentName} (${s.grade})`;
+                        hwSelect.appendChild(opt);
+                    });
+                }
+            } catch (error) {
+                console.error("Error loading students for dropdowns:", error);
+            }
         }
 
-        function renderStudentDatabase() {
-            const students = mockStudents.filter(s => s.tutorEmail === window.tutorData.email);
-            let cards = '';
-            students.forEach(s => {
-                const statusColor = s.status === 'break' ? 'badge-warning' : s.status === 'transitioning' ? 'badge-info' : 'badge-success';
-                cards += `
-                    <div class="student-card">
-                        <div class="flex items-center gap-3 mb-2">
-                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-bold">${s.studentName.charAt(0)}</div>
-                            <div class="flex-1">
-                                <h4 class="font-bold">${escapeHtml(s.studentName)}</h4>
-                                <p class="text-xs opacity-70">${s.grade} · ${s.type}</p>
-                            </div>
-                            <span class="badge ${statusColor}">${s.status}</span>
-                        </div>
-                        <div class="flex gap-2 mt-3">
-                            <button class="btn-modern text-sm py-1 px-3" onclick="alert('Message ${s.studentName}')"><i class="fas fa-comment"></i> Message</button>
-                            <button class="btn-modern text-sm py-1 px-3" onclick="alert('Report for ${s.studentName}')"><i class="fas fa-file-alt"></i> Report</button>
-                            <button class="btn-modern text-sm py-1 px-3" onclick="alert('View ${s.studentName} details')"><i class="fas fa-eye"></i> View</button>
-                        </div>
-                    </div>
-                `;
-            });
-            container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${cards}</div>`;
-        }
-
+        // Render Academics tab
         function renderAcademics() {
             const container = document.getElementById('mainContent');
             container.innerHTML = `
                 <div class="space-y-6">
+                    <!-- Homework Inbox -->
                     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="fas fa-inbox text-green-600"></i> Homework Inbox</h3>
-                        <div id="homework-inbox-container">
-                            ${mockHomework.map(h => {
-                                const student = mockStudents.find(s => s.id === h.studentId);
-                                return `<div class="flex justify-between items-center p-3 border-b"><span><b>${escapeHtml(student?.studentName)}</b>: ${h.title} (due ${h.dueDate})</span><span class="badge ${h.status === 'pending' ? 'badge-warning' : 'badge-success'}">${h.status}</span></div>`;
-                            }).join('')}
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                            <i class="fas fa-inbox text-green-600"></i> Homework Inbox
+                        </h3>
+                        <div id="homework-inbox-container"></div>
+                    </div>
+
+                    <!-- Today's Topic Card -->
+                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                            <i class="fas fa-book-open text-blue-600"></i> Today's Topic
+                        </h3>
+                        <div class="flex flex-col md:flex-row gap-4 items-end">
+                            <div class="flex-1 w-full">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Student</label>
+                                <select id="academic-topic-student" class="form-input w-full">
+                                    <option value="">Loading...</option>
+                                </select>
+                            </div>
+                            <button id="academic-topic-btn" class="btn btn-primary px-6 py-2" disabled>Add Topic</button>
                         </div>
                     </div>
+
+                    <!-- Assign Homework Card -->
                     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-                        <h3 class="text-xl font-bold mb-4">Today's Topic / Assign Homework</h3>
-                        <div class="flex flex-col md:flex-row gap-4">
-                            <select id="academic-student-select" class="form-input flex-1">
-                                <option value="">Select student...</option>
-                                ${mockStudents.map(s => `<option value="${s.id}">${escapeHtml(s.studentName)}</option>`).join('')}
-                            </select>
-                            <button id="topicBtn" class="btn btn-primary">Add Topic</button>
-                            <button id="hwBtn" class="btn btn-warning">Assign Homework</button>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                            <i class="fas fa-pencil-alt text-yellow-600"></i> Assign Homework
+                        </h3>
+                        <div class="flex flex-col md:flex-row gap-4 items-end">
+                            <div class="flex-1 w-full">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Student</label>
+                                <select id="academic-hw-student" class="form-input w-full">
+                                    <option value="">Loading...</option>
+                                </select>
+                            </div>
+                            <button id="academic-hw-btn" class="btn btn-warning px-6 py-2" disabled>Assign Homework</button>
                         </div>
                     </div>
                 </div>
             `;
 
-            document.getElementById('topicBtn').addEventListener('click', () => {
-                const studentId = document.getElementById('academic-student-select').value;
-                const student = mockStudents.find(s => s.id === studentId);
-                if (student) showDailyTopicModal(student);
-                else alert('Select a student');
-            });
-            document.getElementById('hwBtn').addEventListener('click', () => {
-                const studentId = document.getElementById('academic-student-select').value;
-                const student = mockStudents.find(s => s.id === studentId);
-                if (student) showHomeworkModal(student);
-                else alert('Select a student');
+            // Load homework inbox (global function from tutor.js)
+            if (window.tutorData && typeof window.loadHomeworkInbox === 'function') {
+                window.loadHomeworkInbox(window.tutorData.email);
+            } else {
+                document.getElementById('homework-inbox-container').innerHTML = '<p class="text-gray-500">Homework inbox not available.</p>';
+            }
+
+            // Populate dropdowns
+            populateStudentDropdowns().then(() => {
+                const topicSelect = document.getElementById('academic-topic-student');
+                const hwSelect = document.getElementById('academic-hw-student');
+                const topicBtn = document.getElementById('academic-topic-btn');
+                const hwBtn = document.getElementById('academic-hw-btn');
+
+                if (topicSelect) {
+                    topicSelect.addEventListener('change', () => {
+                        topicBtn.disabled = !topicSelect.value;
+                    });
+                }
+                if (hwSelect) {
+                    hwSelect.addEventListener('change', () => {
+                        hwBtn.disabled = !hwSelect.value;
+                    });
+                }
+
+                topicBtn.addEventListener('click', async () => {
+                    const studentId = topicSelect.value;
+                    if (!studentId) return;
+                    try {
+                        const studentDoc = await getDoc(doc(db, "students", studentId));
+                        if (studentDoc.exists()) {
+                            const student = { id: studentDoc.id, ...studentDoc.data() };
+                            window.showDailyTopicModal(student);
+                        } else {
+                            alert("Student not found.");
+                        }
+                    } catch (error) {
+                        console.error(error);
+                        alert("Error fetching student.");
+                    }
+                });
+
+                hwBtn.addEventListener('click', async () => {
+                    const studentId = hwSelect.value;
+                    if (!studentId) return;
+                    try {
+                        const studentDoc = await getDoc(doc(db, "students", studentId));
+                        if (studentDoc.exists()) {
+                            const student = { id: studentDoc.id, ...studentDoc.data() };
+                            window.showHomeworkModal(student);
+                        } else {
+                            alert("Student not found.");
+                        }
+                    } catch (error) {
+                        console.error(error);
+                        alert("Error fetching student.");
+                    }
+                });
             });
         }
 
+        // Render Schedule Management tab
         function renderScheduleManagement() {
             const container = document.getElementById('mainContent');
             container.innerHTML = `
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-                        <h3 class="text-xl font-bold mb-4">View Calendar</h3>
-                        <p class="mb-4">See all your scheduled classes in a weekly calendar view.</p>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                            <i class="fas fa-calendar-alt text-green-600"></i> View Calendar
+                        </h3>
+                        <p class="text-gray-600 dark:text-gray-300 mb-4">See all your scheduled classes in a weekly calendar view.</p>
                         <button id="schedule-calendar-btn" class="btn btn-primary w-full">Open Calendar</button>
                     </div>
                     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-                        <h3 class="text-xl font-bold mb-4">Set Up Schedules</h3>
-                        <p class="mb-4">Manage class schedules for all your students.</p>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                            <i class="fas fa-clock text-blue-600"></i> Set Up Schedules
+                        </h3>
+                        <p class="text-gray-600 dark:text-gray-300 mb-4">Manage class schedules for all your students.</p>
                         <button id="schedule-manager-btn" class="btn btn-warning w-full">Manage Schedules</button>
                     </div>
                 </div>
             `;
-            document.getElementById('schedule-calendar-btn').addEventListener('click', () => showScheduleCalendarModal());
-            document.getElementById('schedule-manager-btn').addEventListener('click', () => alert('Schedule manager (mock)'));
-        }
 
-        function renderCourses() {
-            const container = document.getElementById('mainContent');
-            container.innerHTML = `
-                <div class="space-y-6">
-                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-                        <h3 class="text-xl font-bold mb-4">Upload Course Material</h3>
-                        <div class="file-upload-area" id="fileUploadArea">
-                            <i class="fas fa-cloud-upload-alt text-4xl text-green-600 mb-2"></i>
-                            <p class="text-sm">Drag & drop or click to upload (PDF, DOC, images)</p>
-                            <input type="file" id="fileInput" class="hidden" accept=".pdf,.doc,.docx,.jpg,.png">
-                        </div>
-                        <button id="uploadBtn" class="btn btn-success mt-4 w-full">Upload</button>
-                    </div>
-                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-                        <h3 class="text-xl font-bold mb-4">Course Library</h3>
-                        <div id="courseList">
-                            ${mockCourses.map(c => `
-                                <div class="flex justify-between items-center p-3 border-b">
-                                    <span><i class="fas fa-file-pdf text-red-500 mr-2"></i>${escapeHtml(c.title)}</span>
-                                    <span class="text-sm opacity-70">${c.uploadedAt}</span>
-                                    <button class="btn-modern text-sm py-1 px-3" onclick="alert('Download ${c.file}')">Download</button>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            const area = document.getElementById('fileUploadArea');
-            const input = document.getElementById('fileInput');
-            area.addEventListener('click', () => input.click());
-            area.addEventListener('dragover', (e) => e.preventDefault());
-            area.addEventListener('drop', (e) => {
-                e.preventDefault();
-                input.files = e.dataTransfer.files;
-                alert('File selected: ' + input.files[0].name);
+            document.getElementById('schedule-calendar-btn').addEventListener('click', () => {
+                if (typeof window.showScheduleCalendarModal === 'function') {
+                    window.showScheduleCalendarModal();
+                } else {
+                    alert("Calendar function not available.");
+                }
             });
-            document.getElementById('uploadBtn').addEventListener('click', () => {
-                if (input.files.length) alert('Uploaded (mock): ' + input.files[0].name);
-                else alert('No file selected');
+
+            document.getElementById('schedule-manager-btn').addEventListener('click', async () => {
+                if (window.scheduleManager && typeof window.scheduleManager.openManualManager === 'function') {
+                    await window.scheduleManager.openManualManager();
+                } else {
+                    alert("Schedule manager not initialized. Please refresh.");
+                }
             });
         }
 
-        // Modal functions for Academics
-        window.showDailyTopicModal = (student) => {
-            showModal(`Today's Topic for ${student.studentName}`, `
-                <form id="topicForm">
-                    <label class="block mb-2">Topic</label>
-                    <input type="text" class="form-input mb-4" placeholder="e.g., Fractions" required>
-                    <label class="block mb-2">Description</label>
-                    <textarea class="form-textarea mb-4" rows="3"></textarea>
-                    <button type="submit" class="btn btn-primary w-full">Save Topic</button>
-                </form>
-            `);
-            setTimeout(() => {
-                document.getElementById('topicForm')?.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    alert('Topic saved (mock)');
-                    document.querySelector('.modal-overlay')?.remove();
-                });
-            }, 100);
-        };
+        // Tab management: override clicks for new tabs, preserve existing tabs
+        waitForTutorData(() => {
+            const navDashboard = document.getElementById('navDashboard');
+            const navStudentDB = document.getElementById('navStudentDatabase');
+            const navAcademics = document.getElementById('navAcademics');
+            const navSchedule = document.getElementById('navScheduleManagement');
 
-        window.showHomeworkModal = (student) => {
-            showModal(`Assign Homework for ${student.studentName}`, `
-                <form id="hwForm">
-                    <label class="block mb-2">Title</label>
-                    <input type="text" class="form-input mb-4" placeholder="Homework title" required>
-                    <label class="block mb-2">Due Date</label>
-                    <input type="date" class="form-input mb-4" required>
-                    <label class="block mb-2">Description</label>
-                    <textarea class="form-textarea mb-4" rows="3"></textarea>
-                    <label class="block mb-2">Attachment (optional)</label>
-                    <div class="file-upload-area mb-4" style="padding:1rem;" id="hwFileArea">
-                        <i class="fas fa-paperclip"></i> Click to attach file
-                        <input type="file" id="hwFileInput" class="hidden">
-                    </div>
-                    <button type="submit" class="btn btn-warning w-full">Assign Homework</button>
-                </form>
-            `);
-            setTimeout(() => {
-                document.getElementById('hwFileArea')?.addEventListener('click', () => document.getElementById('hwFileInput')?.click());
-                document.getElementById('hwForm')?.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    alert('Homework assigned (mock)');
-                    document.querySelector('.modal-overlay')?.remove();
-                });
-            }, 100);
-        };
+            function setActiveTab(activeId) {
+                document.querySelectorAll('.nav-tab-modern').forEach(tab => tab.classList.remove('active'));
+                const activeTab = document.getElementById(activeId);
+                if (activeTab) activeTab.classList.add('active');
+            }
 
-        window.showScheduleCalendarModal = () => {
-            showModal('Weekly Schedule', `<p class="text-center p-4">Mock calendar view would appear here.</p>`);
-        };
+            // Dashboard and Student Database are handled by tutor.js, but we need to ensure active class
+            navDashboard.addEventListener('click', () => {
+                setTimeout(() => setActiveTab('navDashboard'), 50);
+            });
+            navStudentDB.addEventListener('click', () => {
+                setTimeout(() => setActiveTab('navStudentDatabase'), 50);
+            });
 
-        // Tab navigation
-        function setActiveTab(activeId) {
-            document.querySelectorAll('.nav-tab-modern').forEach(tab => tab.classList.remove('active'));
-            document.getElementById(activeId)?.classList.add('active');
-        }
+            // Custom tabs
+            navAcademics.addEventListener('click', () => {
+                setActiveTab('navAcademics');
+                renderAcademics();
+            });
+            navSchedule.addEventListener('click', () => {
+                setActiveTab('navScheduleManagement');
+                renderScheduleManagement();
+            });
 
-        document.getElementById('navDashboard').addEventListener('click', () => {
-            setActiveTab('navDashboard');
-            renderDashboard();
+            // Update stat counters periodically
+            async function updateAllCounters() {
+                if (!window.tutorData) return;
+                const tutor = window.tutorData;
+                try {
+                    const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                    const snap = await getDocs(q);
+                    const allStudents = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !['archived','graduated','transferred'].includes(s.status));
+
+                    document.getElementById('totalStudentsCount').textContent = allStudents.length;
+
+                    const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                    let todayClasses = 0;
+                    allStudents.forEach(s => { if (s.schedule) s.schedule.forEach(slot => { if (slot.day === todayName) todayClasses++; }); });
+                    document.getElementById('todayClassesCount').textContent = todayClasses;
+
+                    const oneWeekAgo = new Date(); oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                    let pending = 0;
+                    allStudents.forEach(s => {
+                        if (!s.lastReportDate) { pending++; return; }
+                        const last = s.lastReportDate?.toDate?.() || new Date(s.lastReportDate);
+                        if (last < oneWeekAgo) pending++;
+                    });
+                    document.getElementById('pendingReportsCount').textContent = pending;
+
+                    let earned = 0;
+                    allStudents.forEach(s => earned += s.attendanceRate || 85);
+                    const perf = allStudents.length ? Math.round((earned / (allStudents.length * 100)) * 100) : 100;
+                    document.getElementById('performanceScore').textContent = perf;
+                } catch (e) { console.warn("Counter update failed", e); }
+            }
+
+            updateAllCounters();
+            setInterval(updateAllCounters, 300000);
+            window.addEventListener('focus', updateAllCounters);
         });
-        document.getElementById('navStudentDatabase').addEventListener('click', () => {
-            setActiveTab('navStudentDatabase');
-            renderStudentDatabase();
-        });
-        document.getElementById('navAcademics').addEventListener('click', () => {
-            setActiveTab('navAcademics');
-            renderAcademics();
-        });
-        document.getElementById('navScheduleManagement').addEventListener('click', () => {
-            setActiveTab('navScheduleManagement');
-            renderScheduleManagement();
-        });
-        document.getElementById('navCourses').addEventListener('click', () => {
-            setActiveTab('navCourses');
-            renderCourses();
-        });
-
-        // Initialize counters
-        function updateCounters() {
-            const students = mockStudents.filter(s => s.tutorEmail === window.tutorData.email);
-            document.getElementById('totalStudentsCount').textContent = students.length;
-            const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-            let classesToday = 0;
-            students.forEach(s => { if (s.schedule) s.schedule.forEach(slot => { if (slot.day === today) classesToday++; }); });
-            document.getElementById('todayClassesCount').textContent = classesToday;
-            const oneWeekAgo = new Date(); oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-            const pending = students.filter(s => s.status !== 'break' && (!s.lastReportDate || new Date(s.lastReportDate) < oneWeekAgo)).length;
-            document.getElementById('pendingReportsCount').textContent = pending;
-            let perf = students.reduce((acc, s) => acc + (s.attendanceRate || 0), 0) / (students.length || 1);
-            document.getElementById('performanceScore').textContent = Math.round(perf);
-        }
-        updateCounters();
-
-        // Load dashboard initially
-        renderDashboard();
-
-        // Expose functions for inline onclick handlers
-        window.showDailyTopicModal = window.showDailyTopicModal;
-        window.showHomeworkModal = window.showHomeworkModal;
-        window.showScheduleCalendarModal = window.showScheduleCalendarModal;
     </script>
 </body>
 </html>
