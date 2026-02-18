@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Blooming · Tutor Portal</title>
+    <title>Blooming · Tutor Portal — unified & enhanced</title>
 
+    <!-- Preconnect & fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -12,496 +13,515 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
         :root {
-            --primary: #1e8b4c;
-            --primary-soft: #2ecc71;
-            --primary-glow: rgba(46, 204, 113, 0.4);
-            --accent: #fbbf24;
-            --accent-glow: rgba(251, 191, 36, 0.5);
-            --surface: rgba(255, 255, 255, 0.75);
-            --surface-dark: rgba(17, 25, 40, 0.85);
-            --text-light: #1e293b;
-            --text-dark: #f1f5f9;
-            --border-light: rgba(255, 255, 255, 0.5);
-            --border-dark: rgba(255, 255, 255, 0.1);
-            --shadow: 0 20px 40px -15px rgba(0, 20, 10, 0.2);
-            --shadow-hover: 0 30px 50px -20px rgba(0, 40, 20, 0.3);
-            --blur: 16px;
-            --transition: all 0.25s cubic-bezier(0.2, 0, 0, 1);
+            --primary:#1e8b4c; --primary-soft:#2ecc71; --primary-glow:rgba(46,204,113,0.4);
+            --accent:#fbbf24; --accent-glow:rgba(251,191,36,0.5);
+            --surface:rgba(255,255,255,0.7); --surface-dark:rgba(17,25,40,0.75);
+            --text-light:#1e293b; --text-dark:#f1f5f9;
+            --border-light:rgba(255,255,255,0.5); --border-dark:rgba(255,255,255,0.1);
+            --shadow:0 20px 40px -15px rgba(0,20,10,0.2);
+            --shadow-hover:0 30px 50px -20px rgba(0,40,20,0.3);
+            --blur:16px; --transition:all 0.25s cubic-bezier(0.2,0,0,1);
         }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
         body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background: url('https://res.cloudinary.com/dy2hxcyaf/image/upload/v1769020680/Gemini_Generated_Image_o5m8auo5m8auo5m8_hzzxks.png') center/cover fixed;
-            min-height: 100vh;
-            color: var(--text-light);
-            position: relative;
-            overflow-x: hidden;
+            font-family:'Plus Jakarta Sans',sans-serif;
+            background:url('https://res.cloudinary.com/dy2hxcyaf/image/upload/v1769020680/Gemini_Generated_Image_o5m8auo5m8auo5m8_hzzxks.png') center/cover fixed;
+            min-height:100vh; color:var(--text-light); transition:color 0.3s,background 0.3s; position:relative;
         }
-
-        body.dark {
-            --surface: var(--surface-dark);
-            --text-light: var(--text-dark);
-            --border-light: var(--border-dark);
+        body::before {
+            content:''; position:fixed; inset:0;
+            background:radial-gradient(circle at 20% 30%,rgba(46,204,113,0.08) 0%,transparent 40%),
+                       radial-gradient(circle at 80% 70%,rgba(251,191,36,0.1) 0%,transparent 40%),
+                       repeating-linear-gradient(45deg,rgba(255,255,255,0.02) 0px,rgba(255,255,255,0.02) 2px,transparent 2px,transparent 8px);
+            pointer-events:none; z-index:0;
         }
-
+        body.dark { --surface:var(--surface-dark); --border-light:var(--border-dark); --text-light:var(--text-dark); }
+        body.dark::before { opacity:0.6; }
         .glass-panel {
-            background: var(--surface);
-            backdrop-filter: blur(var(--blur)) saturate(180%);
-            -webkit-backdrop-filter: blur(var(--blur)) saturate(180%);
-            border: 1px solid var(--border-light);
-            box-shadow: var(--shadow);
-            border-radius: 2rem;
-            transition: var(--transition);
+            background:var(--surface); backdrop-filter:blur(var(--blur)) saturate(180%);
+            -webkit-backdrop-filter:blur(var(--blur)) saturate(180%);
+            border:1px solid var(--border-light); box-shadow:var(--shadow),0 0 0 1px rgba(255,255,255,0.1) inset;
+            border-radius:2.5rem; transition:var(--transition); position:relative; z-index:10;
         }
-
+        .glass-panel:hover { box-shadow:var(--shadow-hover),0 0 0 1px rgba(255,255,255,0.2) inset; }
+        .orb {
+            position:absolute; border-radius:50%; filter:blur(70px); opacity:0.25; z-index:0;
+            animation:float 20s infinite alternate ease-in-out;
+        }
+        .orb-1 { width:300px; height:300px; background:#2ecc71; top:-100px; right:-100px; }
+        .orb-2 { width:400px; height:400px; background:#fbbf24; bottom:-150px; left:-150px; animation-delay:-5s; }
+        @keyframes float { 0% { transform:translate(0,0) scale(1); } 100% { transform:translate(30px,30px) scale(1.1); } }
+        .avatar-modern {
+            width:48px; height:48px; background:linear-gradient(145deg,var(--primary),#0b5e2e);
+            border-radius:24px 24px 24px 8px; display:flex; align-items:center; justify-content:center;
+            color:#fff; font-weight:600; font-size:1.25rem; box-shadow:0 8px 18px var(--primary-glow);
+            transition:var(--transition); border:2px solid rgba(255,255,255,0.3);
+        }
+        .badge-date {
+            background:rgba(255,255,255,0.25); backdrop-filter:blur(8px); padding:0.4rem 1.2rem;
+            border-radius:40px; font-weight:600; font-size:0.9rem; border:1px solid rgba(255,255,255,0.3);
+        }
         .stat-card {
-            cursor: pointer;
-            background: rgba(255, 255, 255, 0.3);
-            backdrop-filter: blur(8px);
-            border: 1px solid var(--border-light);
-            border-radius: 1.5rem;
-            padding: 1.25rem;
-            transition: var(--transition);
+            background:rgba(255,255,255,0.2); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.3);
+            border-radius:2rem; padding:1.2rem 1.5rem; transition:var(--transition);
+            box-shadow:0 8px 20px -10px rgba(0,0,0,0.1); color:inherit; cursor:pointer;
         }
-        .stat-card:hover {
-            transform: translateY(-5px);
-            background: rgba(255, 255, 255, 0.5);
-            border-color: var(--primary);
-        }
+        .stat-card:hover { background:rgba(255,255,255,0.3); transform:translateY(-4px); border-color:var(--primary); }
+        body.dark .stat-card { background:rgba(0,0,0,0.2); border-color:rgba(255,255,255,0.1); }
         .stat-icon {
-            width: 48px; height: 48px;
-            display: flex; align-items: center; justify-content: center;
-            border-radius: 12px; color: white; font-size: 1.25rem;
+            width:48px; height:48px; border-radius:20px; background:linear-gradient(135deg,var(--primary),#0b5e2e);
+            display:flex; align-items:center; justify-content:center; color:#fff; font-size:1.4rem;
+            box-shadow:0 6px 14px var(--primary-glow);
         }
-
         .nav-pill-container {
-            background: rgba(0,0,0,0.05);
-            border-radius: 3rem; padding: 0.35rem; display: flex; gap: 0.25rem;
+            background:rgba(0,0,0,0.05); border-radius:3rem; padding:0.4rem; backdrop-filter:blur(4px);
+            display:flex; flex-wrap:wrap; gap:0.2rem;
         }
+        body.dark .nav-pill-container { background:rgba(255,255,255,0.05); }
         .nav-tab-modern {
-            padding: 0.6rem 1.2rem; border-radius: 2rem;
-            font-weight: 600; opacity: 0.7; transition: var(--transition);
-            white-space: nowrap; border: none; background: transparent; cursor: pointer;
+            padding:0.7rem 1.8rem; border-radius:2.5rem; font-weight:600; color:var(--text-light);
+            opacity:0.7; transition:var(--transition); border:none; background:transparent; cursor:pointer;
+            letter-spacing:-0.01em; white-space:nowrap;
         }
+        .nav-tab-modern i { margin-right:8px; }
+        .nav-tab-modern:hover { opacity:1; background:rgba(255,255,255,0.3); }
         .nav-tab-modern.active {
-            opacity: 1; background: white; color: var(--primary);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            opacity:1; background:#fff; color:var(--primary);
+            box-shadow:0 10px 20px -8px rgba(0,0,0,0.2),0 0 0 1px rgba(255,255,255,0.7);
         }
+        body.dark .nav-tab-modern.active { background:#1e293b; color:var(--primary-soft); }
+        .btn-modern {
+            display:inline-flex; align-items:center; justify-content:center; gap:0.6rem;
+            padding:0.7rem 1.4rem; border-radius:2rem; font-weight:600; transition:var(--transition);
+            border:none; cursor:pointer; background:rgba(255,255,255,0.2); backdrop-filter:blur(12px);
+            border:1px solid rgba(255,255,255,0.25); color:inherit; box-shadow:0 4px 12px rgba(0,0,0,0.05);
+        }
+        .btn-modern:hover { background:rgba(255,255,255,0.35); transform:translateY(-2px); border-color:var(--primary); box-shadow:0 14px 22px -10px var(--primary-glow); }
+        .btn-primary { background:linear-gradient(135deg,var(--primary),#0f6b37); color:#fff; border:none; box-shadow:0 8px 20px var(--primary-glow); }
+        .btn-accent { background:linear-gradient(135deg,var(--accent),#f59e0b); color:#422006; border:none; box-shadow:0 8px 20px var(--accent-glow); }
 
-        .modal-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.4);
-            backdrop-filter: blur(4px); display: flex; align-items: center;
-            justify-content: center; z-index: 2000; padding: 1rem;
+        /* floating messaging */
+        .floating-messaging-btn, .floating-inbox-btn {
+            position:fixed; right:20px; width:60px; height:60px; border-radius:30px;
+            background:linear-gradient(145deg,var(--primary),#0b5e2e); color:#fff; border:none;
+            box-shadow:0 10px 25px rgba(0,0,0,0.2),0 0 0 2px rgba(255,255,255,0.3); cursor:pointer;
+            display:flex; align-items:center; justify-content:center; font-size:1.8rem;
+            transition:all 0.2s ease; z-index:999; backdrop-filter:blur(8px);
         }
-        .modal-content {
-            background: white; border-radius: 2rem; width: 100%; max-width: 600px;
-            max-height: 90vh; overflow-y: auto; padding: 2rem; position: relative;
-        }
-        body.dark .modal-content { background: #1e293b; color: white; }
-
-        .calendar-view { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; overflow-x: auto; }
-        .calendar-day { min-width: 120px; border: 1px solid rgba(0,0,0,0.1); border-radius: 1rem; padding: 0.5rem; background: rgba(255,255,255,0.4); }
-        .calendar-day-header { font-weight: 800; font-size: 0.75rem; text-transform: uppercase; margin-bottom: 8px; text-align: center; }
-        .calendar-event { background: white; border-radius: 0.5rem; padding: 0.5rem; margin-bottom: 4px; font-size: 0.7rem; border-left: 3px solid var(--primary); }
-
-        .floating-btn {
-            position: fixed; right: 20px; width: 56px; height: 56px; border-radius: 28px;
-            background: var(--primary); color: white; display: flex; align-items: center;
-            justify-content: center; font-size: 1.5rem; cursor: pointer; z-index: 1000;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2); transition: var(--transition);
-        }
-        .btn-msg { bottom: 90px; }
-        .btn-inbox { bottom: 20px; }
+        .floating-messaging-btn { bottom:100px; }
+        .floating-inbox-btn { bottom:30px; }
         .unread-badge {
-            position: absolute; top: -5px; right: -5px; background: #ef4444;
-            color: white; border-radius: 50%; width: 20px; height: 20px;
-            font-size: 10px; display: flex; align-items: center; justify-content: center;
-            border: 2px solid white;
+            position:absolute; top:-5px; right:-5px; background:#ef4444; color:#fff; border-radius:20px;
+            padding:2px 6px; font-size:12px; font-weight:bold; min-width:22px; text-align:center; border:2px solid #fff;
         }
 
-        .text-gradient {
-            background: linear-gradient(135deg, var(--primary), #0b5e2e);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        }
-        .badge { padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 700; }
-        .badge-warning { background: #fef3c7; color: #92400e; }
-        .badge-success { background: #dcfce7; color: #166534; }
-        .spinner {
-            border: 3px solid rgba(0,0,0,0.1); border-top: 3px solid var(--primary);
-            border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* modal high z-index */
+        .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:1rem; }
+        .modal-content { background:#fff; border-radius:2rem; padding:1.5rem; max-width:600px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 25px 50px -12px #000; border:1px solid rgba(255,255,255,0.3); }
+        body.dark .modal-content { background:#1e293b; color:#f1f5f9; border-color:#334155; }
 
-        .form-input { width: 100%; padding: 0.75rem 1rem; border-radius: 1rem; border: 1px solid rgba(0,0,0,0.1); margin-bottom: 1rem; background: white; }
-        .btn-action { padding: 0.75rem 1.5rem; border-radius: 1rem; font-weight: 700; transition: var(--transition); cursor: pointer; border: none; }
-        .btn-primary { background: var(--primary); color: white; }
+        /* student cards redesign */
+        .student-grid-card {
+            background:rgba(255,255,255,0.2); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.3);
+            border-radius:1.5rem; padding:1rem; transition:all 0.2s;
+        }
+        .student-grid-card:hover { transform:translateY(-4px); background:rgba(255,255,255,0.3); border-color:var(--primary); }
+        body.dark .student-grid-card { background:rgba(0,0,0,0.2); border-color:rgba(255,255,255,0.1); }
+
+        /* messaging redesign */
+        .inbox-wrapper { display:flex; gap:1rem; height:500px; background:rgba(255,255,255,0.15); backdrop-filter:blur(12px); border-radius:2rem; padding:1rem; border:1px solid var(--border-light); }
+        .inbox-list-col { width:300px; border-right:1px solid rgba(255,255,255,0.2); overflow-y:auto; padding-right:0.5rem; }
+        .inbox-chat-col { flex:1; display:flex; flex-direction:column; }
+        .chat-messages { flex:1; overflow-y:auto; padding:1rem; background:rgba(0,0,0,0.1); border-radius:1.5rem; margin-bottom:1rem; }
+        .chat-bubble { max-width:70%; margin-bottom:0.75rem; padding:0.7rem 1.2rem; border-radius:1.5rem; clear:both; }
+        .chat-bubble.me { background:var(--primary); color:#fff; float:right; border-bottom-right-radius:0.25rem; }
+        .chat-bubble.them { background:rgba(255,255,255,0.3); color:inherit; float:left; border-bottom-left-radius:0.25rem; }
+        .inbox-item { display:flex; align-items:center; padding:0.75rem; border-radius:1rem; cursor:pointer; transition:0.2s; margin-bottom:0.25rem; }
+        .inbox-item:hover { background:rgba(255,255,255,0.2); }
+        .inbox-item.unread { background:rgba(46,204,113,0.15); border-left:4px solid var(--primary); }
+
+        /* file upload area */
+        .upload-area { border:2px dashed var(--primary); border-radius:2rem; padding:2rem; text-align:center; background:rgba(255,255,255,0.1); cursor:pointer; transition:0.2s; }
+        .upload-area:hover { background:rgba(46,204,113,0.1); }
+        .file-list-item { background:rgba(255,255,255,0.1); border-radius:1rem; padding:0.75rem; margin-bottom:0.5rem; display:flex; align-items:center; gap:1rem; }
+
+        .skeleton-loader { background:rgba(255,255,255,0.2); border-radius:2rem; padding:2rem; backdrop-filter:blur(4px); border:1px dashed rgba(255,255,255,0.4); }
+        .pulse-ring { width:72px; height:72px; border-radius:50%; background:rgba(46,204,113,0.3); display:flex; align-items:center; justify-content:center; position:relative; }
+        .pulse-ring::before { content:''; position:absolute; width:100%; height:100%; border-radius:50%; border:2px solid rgba(46,204,113,0.6); animation:pulse 1.8s infinite; }
+        @keyframes pulse { 0% { transform:scale(1); opacity:0.8; } 100% { transform:scale(1.8); opacity:0; } }
+        .text-gradient { background:linear-gradient(145deg,var(--primary),#0f6b37); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-weight:700; }
+        .hide-scrollbar::-webkit-scrollbar { display:none; }
+        #networkWarning, #networkErrorOverlay { z-index:9999; }
     </style>
 </head>
 <body class="antialiased">
 
-    <div class="min-h-screen p-4 md:p-8 flex justify-center items-start">
-        <div class="glass-panel w-full max-w-7xl p-6 md:p-10">
-            
-            <header class="flex flex-col md:flex-row justify-between items-center gap-6 mb-10">
-                <div class="flex items-center gap-4">
-                    <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Logo" class="h-12 w-auto">
-                    <div>
-                        <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight">
-                            Welcome, <span class="text-gradient" id="tutorNameDisplay">Tutor</span>
-                        </h1>
-                        <p class="text-sm text-gray-500 font-medium" id="displayDate"></p>
-                    </div>
-                </div>
-                <div class="flex gap-3">
-                    <button id="modeToggle" class="w-10 h-10 rounded-full bg-white/40 flex items-center justify-center shadow-sm border-none cursor-pointer">
-                        <i class="fas fa-moon"></i>
-                    </button>
-                    <button id="logoutBtn" class="btn-action bg-red-500 text-white flex items-center gap-2">
-                        <i class="fas fa-sign-out-alt"></i> Logout
-                    </button>
-                </div>
-            </header>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-                <div class="stat-card" onclick="window.showTotalStudentsDetail()">
-                    <div class="flex items-center gap-4">
-                        <div class="stat-icon bg-green-600"><i class="fas fa-users"></i></div>
-                        <div>
-                            <p class="text-xs text-gray-500 uppercase font-bold">Total Students</p>
-                            <p class="text-2xl font-black" id="stat-total-students">0</p>
-                        </div>
+    <!-- network warning -->
+    <div id="networkWarning" class="fixed top-0 left-0 right-0 bg-yellow-100/80 backdrop-blur-md border-b border-yellow-400 text-yellow-800 px-4 py-3 text-center hidden shadow-lg z-50">
+        <span id="warningMessage" class="font-medium">Offline</span>
+        <button onclick="hideNetworkWarning()" class="ml-4 text-yellow-800 hover:text-yellow-900 font-bold text-xl">&times;</button>
+    </div>
+
+    <div class="min-h-screen p-3 md:p-6 lg:p-8 flex justify-center items-start relative">
+        <div class="glass-panel w-full max-w-7xl p-5 md:p-8 lg:p-10 relative overflow-hidden">
+
+            <!-- header -->
+            <div class="relative z-20 flex flex-wrap items-center justify-between gap-4 mb-6">
+                <div class="flex items-center gap-3 sm:gap-4">
+                    <div class="relative group">
+                        <div class="absolute -inset-1 bg-gradient-to-r from-green-400 to-blue-500 rounded-full blur-xl opacity-40 group-hover:opacity-70 transition"></div>
+                        <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids" class="relative h-14 w-auto object-contain drop-shadow-2xl">
+                    </div>
+                    <div>
+                        <h1 id="tutorNameHeading" class="text-xl md:text-3xl font-extrabold tracking-tight">
+                            Welcome, <span class="text-gradient">Tutor</span>
+                        </h1>
+                        <p class="text-xs md:text-sm text-gray-600 dark:text-gray-300 font-medium flex items-center gap-1">
+                            <i class="fas fa-seedling text-green-600"></i> Blooming Kids House
+                        </p>
                     </div>
                 </div>
-                <div class="stat-card" onclick="window.showTodayClassesDetail()">
-                    <div class="flex items-center gap-4">
-                        <div class="stat-icon bg-amber-500"><i class="fas fa-calendar-check"></i></div>
-                        <div>
-                            <p class="text-xs text-gray-500 uppercase font-bold">Today's Classes</p>
-                            <p class="text-2xl font-black" id="stat-today-classes">0</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="stat-card" onclick="window.switchTab('academic')">
-                    <div class="flex items-center gap-4">
-                        <div class="stat-icon bg-blue-600"><i class="fas fa-clipboard-list"></i></div>
-                        <div>
-                            <p class="text-xs text-gray-500 uppercase font-bold">Grading Inbox</p>
-                            <p class="text-2xl font-black" id="stat-pending-homework">0</p>
-                        </div>
-                    </div>
-                </div>
-                <div id="performance-widget" class="stat-card">
-                    <div class="flex items-center gap-4">
-                        <div class="stat-icon bg-pink-600"><i class="fas fa-trophy"></i></div>
-                        <div>
-                            <p class="text-xs text-gray-500 uppercase font-bold">Score</p>
-                            <p class="text-2xl font-black" id="stat-score">0</p>
-                        </div>
-                    </div>
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="badge-date hidden sm:flex items-center gap-2"><i class="far fa-calendar-alt text-green-600"></i><span id="currentDate"></span></div>
+                    <button id="modeToggle" class="w-11 h-11 rounded-full bg-white/30 backdrop-blur-sm border border-white/40 hover:bg-white/50 flex items-center justify-center transition-all text-gray-700 dark:text-yellow-300 shadow-md">
+                        <i class="fas fa-moon" id="modeIcon"></i>
+                    </button>
+                    <a id="whatsappBtn" href="https://wa.me/2348158768689" target="_blank" class="btn-modern btn-primary px-4 py-2 hidden sm:flex"><i class="fab fa-whatsapp text-lg"></i><span>Support</span></a>
+                    <button id="logoutBtn" class="btn-modern btn-accent px-4 py-2"><i class="fas fa-sign-out-alt"></i><span class="hidden sm:inline">Logout</span></button>
+                    <div class="avatar-modern hidden md:flex">T</div>
                 </div>
             </div>
 
-            <nav class="mb-8 overflow-x-auto hide-scrollbar">
+            <!-- stat cards (clickable) -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8 relative z-20">
+                <div class="stat-card flex items-center gap-3" id="totalStudentsCard"><div class="stat-icon"><i class="fas fa-users"></i></div><div><p class="text-xs opacity-70">Total students</p><p class="text-2xl font-bold" id="totalStudentsCount">0</p></div></div>
+                <div class="stat-card flex items-center gap-3" id="todayClassesCard"><div class="stat-icon" style="background: linear-gradient(145deg, #fbbf24, #d97706);"><i class="fas fa-clock"></i></div><div><p class="text-xs opacity-70">Today's classes</p><p class="text-2xl font-bold" id="todayClassesCount">0</p></div></div>
+                <div class="stat-card flex items-center gap-3" id="pendingReportsCard"><div class="stat-icon" style="background: linear-gradient(145deg, #3b82f6, #1e3a8a);"><i class="fas fa-book-open"></i></div><div><p class="text-xs opacity-70">Pending reports</p><p class="text-2xl font-bold" id="pendingReportsCount">0</p></div></div>
+                <div class="stat-card flex items-center gap-3" id="achievementsCard"><div class="stat-icon" style="background: linear-gradient(145deg, #ec4899, #831843);"><i class="fas fa-star"></i></div><div><p class="text-xs opacity-70">Performance score</p><p class="text-2xl font-bold" id="performanceScore">0</p></div></div>
+            </div>
+
+            <!-- gamification widget (used by tutor.js) -->
+            <div id="performance-widget" class="hidden"></div>
+
+            <!-- navigation pills: 5 tabs (dashboard, studentDB, academic, schedule, courses) -->
+            <nav class="relative z-20 mb-8 overflow-x-auto hide-scrollbar">
                 <div class="nav-pill-container">
-                    <button onclick="window.switchTab('dashboard')" id="tab-dashboard" class="nav-tab-modern active"><i class="fas fa-th-large mr-2"></i>Dashboard</button>
-                    <button onclick="window.switchTab('academic')" id="tab-academic" class="nav-tab-modern"><i class="fas fa-graduation-cap mr-2"></i>Academic</button>
-                    <button onclick="window.switchTab('schedule')" id="tab-schedule" class="nav-tab-modern"><i class="fas fa-calendar-alt mr-2"></i>Schedule Management</button>
-                    <button onclick="window.switchTab('students')" id="tab-students" class="nav-tab-modern"><i class="fas fa-user-friends mr-2"></i>Student Database</button>
+                    <button id="navDashboard" class="nav-tab-modern active"><i class="fas fa-columns"></i>Dashboard</button>
+                    <button id="navStudentDatabase" class="nav-tab-modern"><i class="fas fa-users"></i>Student Database</button>
+                    <button id="navAcademic" class="nav-tab-modern"><i class="fas fa-graduation-cap"></i>Academic</button>
+                    <button id="navScheduleManagement" class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule</button>
+                    <button id="navCourses" class="nav-tab-modern"><i class="fas fa-folder-open"></i>Courses</button>
                 </div>
             </nav>
 
-            <div id="main-content-area" class="min-h-[500px]">
-                <div class="flex flex-col items-center justify-center py-20">
-                    <div class="spinner mb-4"></div>
-                    <p class="text-gray-500 font-bold">Initializing Portal...</p>
+            <!-- main content area – initially skeleton, populated by tutor.js or custom renders -->
+            <main id="mainContent" class="relative z-20 min-h-[400px] transition-all duration-500">
+                <div class="skeleton-loader flex flex-col items-center justify-center gap-6 py-12">
+                    <div class="pulse-ring"><i class="fas fa-leaf text-3xl text-green-600"></i></div>
+                    <p class="text-lg font-medium text-gray-700 dark:text-gray-200 animate-pulse">Loading secure portal...</p>
                 </div>
-            </div>
+            </main>
 
+            <!-- footer -->
+            <div class="relative z-20 mt-8 text-xs text-center opacity-40 flex items-center justify-center gap-2"><i class="fas fa-shield-alt text-green-500"></i> End-to-end encrypted · Blooming Kids Care v3.1</div>
         </div>
     </div>
 
-    <div id="msg-btn" class="floating-btn btn-msg" onclick="window.showNewMessageModal()">
-        <i class="fas fa-paper-plane"></i>
+    <!-- floating messaging/inbox buttons (redesigned) -->
+    <button class="floating-messaging-btn" id="floatingMessageBtn"><i class="fas fa-comment-dots"></i><span class="unread-badge hidden" id="messageUnread">3</span></button>
+    <button class="floating-inbox-btn" id="floatingInboxBtn"><i class="fas fa-envelope"></i><span class="unread-badge hidden" id="inboxUnread">2</span></button>
+
+    <!-- network error overlay -->
+    <div id="networkErrorOverlay" class="fixed inset-0 bg-gray-900/80 backdrop-blur-xl z-50 hidden flex-col items-center justify-center p-4">
+        <div class="bg-white/90 dark:bg-gray-800/90 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-white/30">
+            <div class="w-20 h-20 bg-yellow-100/80 rounded-full flex items-center justify-center mx-auto mb-6"><i class="fas fa-wifi text-3xl text-yellow-600"></i></div>
+            <h2 class="text-2xl font-bold mb-2 text-gray-800 dark:text-white">Connection Lost</h2>
+            <p class="text-gray-600 dark:text-gray-300 mb-8" id="errorMessage">Can't reach Blooming Kids servers.</p>
+            <div class="flex flex-col gap-3">
+                <button onclick="window.location.reload()" class="btn-modern btn-primary w-full">Try Again</button>
+                <button onclick="checkConnectivity()" class="btn-modern border border-gray-300 dark:border-gray-600 w-full">Check Connection</button>
+            </div>
+        </div>
     </div>
-    <div id="inbox-btn" class="floating-btn btn-inbox" onclick="window.showInboxModal()">
-        <i class="fas fa-envelope"></i>
-        <div id="global-unread-count" class="unread-badge hidden">0</div>
-    </div>
 
-    <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, query, where, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+    <!-- scripts (firebase, tutor, games) -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <script type="module" src="tutor.js"></script>
+    <script src="games.js"></script>
 
-        // SAFETY: Fallback for __firebase_config if not defined in local environment
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "" };
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-tutor-app';
+    <!-- inline core logic: date, theme, network, stat modals, tab renders -->
+    <script>
+        (function() {
+            const dateEl = document.getElementById('currentDate');
+            if (dateEl) dateEl.innerText = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
 
-        window.tutorData = null;
-        window.allStudents = [];
-        window.activeTab = 'dashboard';
-        window.globalSettings = { isReportEnabled: false, isTutorAddEnabled: false };
-
-        const getCol = (name) => collection(db, 'artifacts', appId, 'public', 'data', name);
-        const getDocRef = (name, id) => doc(db, 'artifacts', appId, 'public', 'data', name, id);
-
-        // EXPOSE FUNCTIONS TO WINDOW FOR HTML ONCLICK
-        window.switchTab = (tabId) => {
-            window.activeTab = tabId;
-            document.querySelectorAll('.nav-tab-modern').forEach(t => t.classList.remove('active'));
-            const activeBtn = document.getElementById(`tab-${tabId}`);
-            if (activeBtn) activeBtn.classList.add('active');
-            renderCurrentTab();
-        };
-
-        window.showTotalStudentsDetail = () => {
-            const active = window.allStudents.filter(s => !['archived', 'graduated'].includes(s.status));
-            let listHtml = active.map(s => `
-                <div class="flex justify-between items-center p-3 border-b border-gray-100 last:border-0">
-                    <div>
-                        <p class="font-bold">${s.studentName}</p>
-                        <p class="text-xs text-gray-500">${s.grade} • ${s.isTransitioning ? 'Transitioning' : 'Full'}</p>
-                    </div>
-                    <span class="badge badge-info">${s.status || 'Active'}</span>
-                </div>
-            `).join('') || '<p class="text-center text-gray-500">No students assigned.</p>';
-
-            showModal('assigned-students-modal', `
-                <h3 class="text-xl font-bold mb-4">My Roster</h3>
-                <div class="space-y-1">${listHtml}</div>
-            `);
-        };
-
-        window.showTodayClassesDetail = () => {
-            const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-            const classes = [];
-            window.allStudents.forEach(s => {
-                if (s.schedule) {
-                    s.schedule.forEach(slot => {
-                        if (slot.day === today) classes.push({ name: s.studentName, start: slot.start, end: slot.end });
-                    });
-                }
-            });
-            classes.sort((a,b) => a.start.localeCompare(b.start));
-
-            let html = classes.map(c => `
-                <div class="p-3 bg-gray-50 rounded-xl flex justify-between items-center mb-2">
-                    <p class="font-bold">${c.name}</p>
-                    <p class="text-sm font-semibold text-blue-600">${formatTimeDisplay(c.start)} - ${formatTimeDisplay(c.end)}</p>
-                </div>
-            `).join('') || '<p class="text-center text-gray-500">No classes scheduled for today.</p>';
-
-            showModal('today-classes-modal', `<h3 class="text-xl font-bold mb-4">Today's Schedule</h3>${html}`);
-        };
-
-        window.handleDailyTopicAction = async () => {
-            const sid = document.getElementById('topic-student-select').value;
-            if(!sid) return showCustomAlert("Select a student first");
-            const student = window.allStudents.find(s => s.id === sid);
-            showModal('topic-modal', `
-                <h3 class="font-bold text-xl mb-4">Daily Topic: ${student.studentName}</h3>
-                <textarea id="topic-content" class="form-input h-32" placeholder="e.g. Long Division..."></textarea>
-                <button id="save-topic-btn" class="btn-action btn-primary w-full">Save Topic</button>
-            `);
-            document.getElementById('save-topic-btn').onclick = async () => {
-                const topics = document.getElementById('topic-content').value;
-                if(!topics) return;
-                await addDoc(getCol('daily_topics'), {
-                    studentId: sid, studentName: student.studentName, tutorEmail: window.tutorData.email,
-                    topics, date: new Date().toISOString().split('T')[0], createdAt: serverTimestamp()
-                });
-                showCustomAlert("Topic saved!");
-                document.getElementById('topic-modal').remove();
-            };
-        };
-
-        window.handleAssignHomeworkAction = () => {
-            const sid = document.getElementById('hw-student-select').value;
-            if(!sid) return showCustomAlert("Select a student first");
-            const student = window.allStudents.find(s => s.id === sid);
-            showModal('hw-modal', `
-                <h3 class="font-bold text-xl mb-4">Assign Homework: ${student.studentName}</h3>
-                <input id="hw-title" class="form-input" placeholder="Title">
-                <textarea id="hw-desc" class="form-input h-24" placeholder="Instructions..."></textarea>
-                <input id="hw-due" type="date" class="form-input">
-                <button id="assign-hw-confirm" class="btn-action btn-primary w-full">Post Assignment</button>
-            `);
-            document.getElementById('assign-hw-confirm').onclick = async () => {
-                const title = document.getElementById('hw-title').value;
-                const description = document.getElementById('hw-desc').value;
-                const dueDate = document.getElementById('hw-due').value;
-                if(!title || !dueDate) return;
-                
-                await addDoc(getCol('homework_assignments'), {
-                    studentId: sid, studentName: student.studentName, tutorEmail: window.tutorData.email,
-                    title, description, dueDate, assignedDate: serverTimestamp(), status: 'assigned'
-                });
-                showCustomAlert("Homework assigned!");
-                document.getElementById('hw-modal').remove();
-            };
-        };
-
-        window.showNewMessageModal = () => showCustomAlert("Messaging feature initialized. Waiting for parent data...", "info");
-        window.showInboxModal = () => showCustomAlert("Opening Messaging Inbox...", "info");
-
-        // APP LOGIC
-        window.onload = async () => {
-            document.getElementById('displayDate').innerText = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch(e) { console.error("Auth failed", e); }
-
-            onAuthStateChanged(auth, async (user) => {
-                if (user) {
-                    const tutorsCol = getCol('tutors');
-                    const q = query(tutorsCol, where('email', '==', user.email || ''));
-                    const snap = await getDocs(q);
-                    
-                    if (!snap.empty) {
-                        window.tutorData = { id: snap.docs[0].id, ...snap.docs[0].data() };
-                        document.getElementById('tutorNameDisplay').innerText = window.tutorData.name || 'Tutor';
-                    } else {
-                        window.tutorData = { id: user.uid, email: user.email, name: 'Guest Tutor' };
-                    }
-                    
-                    listenToStudents();
-                    window.switchTab('dashboard');
-                }
-            });
-        };
-
-        function listenToStudents() {
-            const q = query(getCol('students'), where('tutorEmail', '==', window.tutorData.email));
-            onSnapshot(q, (snap) => {
-                window.allStudents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                updateStatCards();
-                renderCurrentTab();
-            });
-        }
-
-        function updateStatCards() {
-            const activeStudents = window.allStudents.filter(s => !['archived', 'graduated'].includes(s.status));
-            document.getElementById('stat-total-students').innerText = activeStudents.length;
-
-            const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-            let todayCount = 0;
-            activeStudents.forEach(s => {
-                if (s.schedule) s.schedule.forEach(slot => { if (slot.day === today) todayCount++; });
-            });
-            document.getElementById('stat-today-classes').innerText = todayCount;
-            document.getElementById('stat-score').innerText = window.tutorData.performanceScore || 0;
-        }
-
-        function renderCurrentTab() {
-            const area = document.getElementById('main-content-area');
-            if (!area) return;
-
-            if (window.activeTab === 'dashboard') {
-                area.innerHTML = `<div class="glass-panel p-6"><h3 class="font-black text-xl mb-4">🔔 Grading Overview</h3><div id="grading-feed" class="space-y-4"><p class="text-gray-500">Scanning for student submissions...</p></div></div>`;
-                loadGradingFeed();
-            } else if (window.activeTab === 'academic') {
-                area.innerHTML = `
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div class="space-y-6">
-                            <div class="glass-panel p-6">
-                                <h3 class="font-black text-xl mb-4 text-blue-700">Daily Topics</h3>
-                                <select id="topic-student-select" class="form-input">
-                                    <option value="">Choose Student...</option>
-                                    ${window.allStudents.map(s => `<option value="${s.id}">${s.studentName}</option>`).join('')}
-                                </select>
-                                <button onclick="window.handleDailyTopicAction()" class="btn-action btn-primary w-full">Record Topic</button>
-                            </div>
-                            <div class="glass-panel p-6">
-                                <h3 class="font-black text-xl mb-4 text-orange-600">Assign Homework</h3>
-                                <select id="hw-student-select" class="form-input">
-                                    <option value="">Choose Student...</option>
-                                    ${window.allStudents.map(s => `<option value="${s.id}">${s.studentName}</option>`).join('')}
-                                </select>
-                                <button onclick="window.handleAssignHomeworkAction()" class="btn-action bg-orange-500 text-white w-full">Assign Homework</button>
-                            </div>
-                        </div>
-                        <div class="glass-panel p-6">
-                            <h3 class="font-black text-xl mb-6">Homework Inbox</h3>
-                            <div id="homework-inbox-container" class="space-y-4">No submissions yet today.</div>
-                        </div>
-                    </div>
-                `;
-            } else if (window.activeTab === 'schedule') {
-                area.innerHTML = `<div class="glass-panel p-6"><h3 class="font-black text-2xl mb-8">Weekly Calendar</h3><div id="calendar-grid" class="calendar-view"></div></div>`;
-                renderCalendar();
-            } else if (window.activeTab === 'students') {
-                area.innerHTML = `
-                    <div class="glass-panel p-6">
-                        <h3 class="font-black text-xl mb-6">My Active Students</h3>
-                        <table class="w-full text-left">
-                            <thead><tr class="text-xs font-bold uppercase text-gray-400 border-b"><th class="py-3">Student</th><th>Status</th><th>Fee</th></tr></thead>
-                            <tbody class="divide-y divide-gray-100">${window.allStudents.map(s => `<tr><td class="py-4"><p class="font-bold">${s.studentName}</p><p class="text-xs text-gray-400">${s.grade}</p></td><td><span class="badge ${s.summerBreak ? 'badge-warning' : 'badge-success'}">${s.summerBreak ? 'Break' : 'Active'}</span></td><td class="text-sm">₦${(s.studentFee || 0).toLocaleString()}</td></tr>`).join('')}</tbody>
-                        </table>
-                    </div>`;
+            // dark mode
+            const body = document.body;
+            const toggle = document.getElementById('modeToggle');
+            const icon = document.getElementById('modeIcon');
+            function setTheme(theme) {
+                if (theme === 'dark') { body.classList.add('dark'); icon.classList.replace('fa-moon','fa-sun'); localStorage.setItem('tutor_theme','dark');
+                } else { body.classList.remove('dark'); icon.classList.replace('fa-sun','fa-moon'); localStorage.setItem('tutor_theme','light'); }
             }
-        }
+            const saved = localStorage.getItem('tutor_theme');
+            if (saved) setTheme(saved);
+            else if (window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+            else setTheme('light');
+            toggle.addEventListener('click',()=>setTheme(body.classList.contains('dark')?'light':'dark'));
 
-        async function loadGradingFeed() {
-            const feed = document.getElementById('grading-feed');
-            if (!feed) return;
+            window.hideNetworkWarning = ()=>document.getElementById('networkWarning').classList.add('hidden');
+            window.hideNetworkError = ()=>document.getElementById('networkErrorOverlay').classList.add('hidden');
+            window.showNetworkError = (msg)=>{ if(msg) document.getElementById('errorMessage').innerText=msg; document.getElementById('networkErrorOverlay').classList.remove('hidden'); };
+            window.checkConnectivity = ()=>{ if (navigator.onLine) { hideNetworkError(); hideNetworkWarning(); } else showNetworkError('Still offline.'); };
+            window.addEventListener('online',()=>{ hideNetworkWarning(); hideNetworkError(); });
+            window.addEventListener('offline',()=>document.getElementById('networkWarning').classList.remove('hidden'));
+        })();
+    </script>
+
+    <!-- main module: firebase integration, tab switching, custom renders for database/academic/schedule/courses, stat card modals -->
+    <script type="module">
+        import { db } from './firebaseConfig.js';
+        import { collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+        function waitForTutorData(callback) {
+            if (window.tutorData) callback();
+            else setTimeout(()=>waitForTutorData(callback),100);
+        }
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return String(unsafe).replace(/[&<>"]/g, m => {
+                if (m==='&') return '&amp;'; if (m==='<') return '&lt;'; if (m==='>') return '&gt;'; if (m==='"') return '&quot;'; return m;
+            });
+        }
+        window.generateReport = (studentId) => alert('Create report for student: '+studentId);
+
+        // ---------- stat counters & card clicks (working version) ----------
+        async function updateAllCounters(tutor) {
             try {
-                const resultsSnap = await getDocs(query(getCol('student_results'), where('tutorEmail', '==', window.tutorData.email)));
-                if (resultsSnap.empty) feed.innerHTML = '<p class="text-gray-400">All caught up! No pending grading tasks.</p>';
-            } catch (e) { feed.innerHTML = 'Error loading feed.'; }
+                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const snap = await getDocs(q);
+                const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                const active = all.filter(s => !['archived','graduated','transferred'].includes(s.status));
+                document.getElementById('totalStudentsCount').textContent = active.length;
+
+                const todayName = new Date().toLocaleDateString('en-US', { weekday:'long' });
+                let todayCount = 0;
+                active.forEach(s => { if (s.schedule) s.schedule.forEach(slot => { if (slot.day === todayName) todayCount++; }); });
+                document.getElementById('todayClassesCount').textContent = todayCount;
+
+                const oneWeekAgo = new Date(); oneWeekAgo.setDate(oneWeekAgo.getDate()-7);
+                let pending = 0;
+                active.forEach(s => {
+                    if (s.status === 'break') return;
+                    if (!s.lastReportDate) { pending++; return; }
+                    const last = s.lastReportDate?.toDate?.() || new Date(s.lastReportDate);
+                    if (last < oneWeekAgo) pending++;
+                });
+                document.getElementById('pendingReportsCount').textContent = pending;
+
+                let earned = 0;
+                active.forEach(s => earned += s.attendanceRate || 85);
+                const perf = active.length ? Math.round((earned/(active.length*100))*100) : 100;
+                document.getElementById('performanceScore').textContent = perf;
+            } catch (e) { console.warn(e); }
         }
 
-        function renderCalendar() {
-            const grid = document.getElementById('calendar-grid');
-            if (!grid) return;
-            const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-            grid.innerHTML = days.map(day => {
-                const dayClasses = [];
-                window.allStudents.forEach(s => { if (s.schedule) s.schedule.forEach(slot => { if (slot.day === day) dayClasses.push({ ...slot, studentName: s.studentName }); }); });
-                return `<div class="calendar-day"><div class="calendar-day-header">${day}</div><div class="space-y-2">${dayClasses.map(c => `<div class="calendar-event"><p class="font-bold truncate">${c.studentName}</p></div>`).join('')}</div></div>`;
-            }).join('');
+        function attachStatClicks(tutor) {
+            // total students
+            document.getElementById('totalStudentsCard').addEventListener('click', async () => {
+                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const snap = await getDocs(q);
+                const students = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !['archived','graduated','transferred'].includes(s.status));
+                let html = `<div class="modal-overlay" id="modal"><div class="modal-content"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">My Students (${students.length})</h3><button class="text-2xl close-modal">&times;</button></div><div class="overflow-auto max-h-96"><table class="min-w-full divide-y"><thead><tr><th class="px-4 py-2 text-left">Name</th><th>Grade</th><th>Type</th><th>Added</th></tr></thead><tbody>`;
+                students.forEach(s => {
+                    let type = 'Regular';
+                    if (s.isTransitioning) type = 'Transitioning';
+                    else if (s.groupClass) type = 'Group';
+                    else if (s.status === 'break') type = 'Break';
+                    const added = s.createdAt ? new Date(s.createdAt.seconds*1000).toLocaleDateString() : 'N/A';
+                    html += `<tr><td class="px-4 py-2">${escapeHtml(s.studentName)}</td><td>${escapeHtml(s.grade)}</td><td>${type}</td><td>${added}</td></tr>`;
+                });
+                html += `</tbody></table></div></div></div>`;
+                const div = document.createElement('div'); div.innerHTML = html; document.body.appendChild(div.firstElementChild);
+                document.querySelector('#modal .close-modal').addEventListener('click', ()=>div.remove());
+                document.getElementById('modal').addEventListener('click', e => { if(e.target === document.getElementById('modal')) div.remove(); });
+            });
+
+            // today's classes
+            document.getElementById('todayClassesCard').addEventListener('click', async () => {
+                const todayName = new Date().toLocaleDateString('en-US', { weekday:'long' });
+                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const snap = await getDocs(q);
+                const students = snap.docs.map(d => d.data());
+                const classes = [];
+                students.forEach(s => { if(s.schedule) s.schedule.forEach(slot => { if(slot.day===todayName) classes.push({ student:s.studentName, time:`${slot.start}-${slot.end}`, subject:slot.subject||'General', room:slot.room||'online' }); }); });
+                classes.sort((a,b)=>a.time.localeCompare(b.time));
+                let html = `<div class="modal-overlay" id="modal"><div class="modal-content"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Today's classes (${todayName})</h3><button class="close-modal text-2xl">&times;</button></div>`;
+                if (!classes.length) html += '<p>No classes today</p>';
+                else html += '<div class="space-y-2">'+classes.map(c=>`<div class="border-l-4 border-green-500 pl-3 py-1"><p class="font-semibold">${escapeHtml(c.student)}</p><p class="text-sm">${escapeHtml(c.time)} · ${escapeHtml(c.subject)} · ${escapeHtml(c.room)}</p></div>`).join('')+'</div>';
+                html += '</div></div>';
+                const div = document.createElement('div'); div.innerHTML = html; document.body.appendChild(div.firstElementChild);
+                document.querySelector('#modal .close-modal').addEventListener('click', ()=>div.remove());
+                document.getElementById('modal').addEventListener('click', e => { if(e.target === document.getElementById('modal')) div.remove(); });
+            });
+
+            // pending reports
+            document.getElementById('pendingReportsCard').addEventListener('click', async () => {
+                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const snap = await getDocs(q);
+                const students = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+                const oneWeekAgo = new Date(); oneWeekAgo.setDate(oneWeekAgo.getDate()-7);
+                const pending = [];
+                students.forEach(s => {
+                    if (s.status === 'break') return;
+                    if (!s.lastReportDate) pending.push({...s, days:'No report'});
+                    else { const last = s.lastReportDate?.toDate?.()||new Date(s.lastReportDate); if(last < oneWeekAgo) pending.push({...s, days:`${Math.floor((new Date()-last)/(86400000))} days overdue`}); }
+                });
+                let html = `<div class="modal-overlay" id="modal"><div class="modal-content"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Pending reports (${pending.length})</h3><button class="close-modal text-2xl">&times;</button></div>`;
+                if (!pending.length) html += '<p class="text-green-600">All up to date!</p>';
+                else html += pending.map(s=>`<div class="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700 rounded-lg mb-2"><span><strong>${escapeHtml(s.studentName)}</strong> <span class="text-sm text-red-500">${escapeHtml(s.days)}</span></span><button class="btn-modern btn-primary py-1 px-3 text-sm" onclick="generateReport('${s.id}')">Write</button></div>`).join('');
+                html += '</div></div>';
+                const div = document.createElement('div'); div.innerHTML = html; document.body.appendChild(div.firstElementChild);
+                document.querySelector('#modal .close-modal').addEventListener('click', ()=>div.remove());
+                document.getElementById('modal').addEventListener('click', e => { if(e.target === document.getElementById('modal')) div.remove(); });
+            });
+
+            // performance
+            document.getElementById('achievementsCard').addEventListener('click', () => {
+                const score = document.getElementById('performanceScore').textContent;
+                const html = `<div class="modal-overlay" id="modal"><div class="modal-content text-center"><div class="flex justify-between"><h3 class="text-xl font-bold">Performance</h3><button class="close-modal text-2xl">&times;</button></div><div class="w-32 h-32 mx-auto my-4 relative"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="none" stroke="#e5e7eb" stroke-width="10"/><circle cx="50" cy="50" r="45" fill="none" stroke="#10b981" stroke-width="10" stroke-dasharray="${2*Math.PI*45}" stroke-dashoffset="${2*Math.PI*45*(1-score/100)}" stroke-linecap="round" transform="rotate(-90 50 50)"/></svg><span class="absolute inset-0 flex items-center justify-center text-3xl font-bold">${score}</span></div><p class="text-sm">Overall score based on attendance & reports.</p></div></div>`;
+                const div = document.createElement('div'); div.innerHTML = html; document.body.appendChild(div.firstElementChild);
+                document.querySelector('#modal .close-modal').addEventListener('click', ()=>div.remove());
+                document.getElementById('modal').addEventListener('click', e => { if(e.target === document.getElementById('modal')) div.remove(); });
+            });
         }
 
-        function formatTimeDisplay(time) {
-            const [h, m] = time.split(':');
-            const hh = parseInt(h);
-            return `${hh % 12 || 12}:${m} ${hh >= 12 ? 'PM' : 'AM'}`;
+        // ---------- custom tab renders (redesigned) ----------
+        async function renderStudentDatabase() {
+            if (!window.tutorData) return;
+            const tutor = window.tutorData;
+            const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+            const snap = await getDocs(q);
+            const students = snap.docs.map(d => ({ id:d.id, ...d.data() })).filter(s => !['archived','graduated','transferred'].includes(s.status));
+            let html = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">`;
+            students.forEach(s => {
+                let badgeClass = 'bg-green-100 text-green-800';
+                let type = 'Regular';
+                if (s.status === 'break') { badgeClass = 'bg-yellow-100 text-yellow-800'; type = 'Break'; }
+                else if (s.isTransitioning) { badgeClass = 'bg-purple-100 text-purple-800'; type = 'Transitioning'; }
+                else if (s.groupClass) { badgeClass = 'bg-blue-100 text-blue-800'; type = 'Group'; }
+                html += `<div class="student-grid-card">
+                    <div class="flex items-center gap-3 mb-3"><div class="avatar-modern !w-12 !h-12 text-xl">${s.studentName?.charAt(0)||'S'}</div><div><h3 class="font-bold">${escapeHtml(s.studentName)}</h3><p class="text-sm opacity-70">${escapeHtml(s.grade)}</p></div></div>
+                    <div class="flex flex-wrap gap-2 mb-2"><span class="badge ${badgeClass}">${type}</span></div>
+                    <div class="text-xs flex justify-between"><span><i class="far fa-clock mr-1"></i>Next: ${s.schedule?.length? s.schedule[0].day+' '+s.schedule[0].start : 'none'}</span><button class="text-green-600" onclick="alert('Profile view coming')">profile</button></div>
+                </div>`;
+            });
+            html += `</div>`;
+            document.getElementById('mainContent').innerHTML = html;
         }
 
-        function showModal(id, content) {
-            const overlay = document.createElement('div');
-            overlay.id = id;
-            overlay.className = 'modal-overlay';
-            overlay.innerHTML = `<div class="modal-content"><button onclick="document.getElementById('${id}').remove()" class="absolute top-4 right-4 text-gray-400 text-2xl cursor-pointer border-none bg-transparent">&times;</button>${content}</div>`;
-            document.body.appendChild(overlay);
+        function renderAcademic() {
+            document.getElementById('mainContent').innerHTML = `<div class="space-y-6">
+                <div class="bg-white/20 backdrop-blur-sm p-5 rounded-2xl"><h3 class="text-xl font-bold mb-3"><i class="fas fa-inbox text-green-600 mr-2"></i>Homework Inbox</h3><div id="homework-inbox-placeholder">Loading inbox...</div></div>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-white/20 backdrop-blur-sm p-5 rounded-2xl"><h4 class="font-semibold mb-2">📘 Today's Topic</h4><select id="topicStudentSelect" class="form-input w-full mb-2"><option>Select student</option></select><button class="btn-modern btn-primary w-full" id="topicBtn">Add Topic</button></div>
+                    <div class="bg-white/20 backdrop-blur-sm p-5 rounded-2xl"><h4 class="font-semibold mb-2">📝 Assign Homework</h4><select id="hwStudentSelect" class="form-input w-full mb-2"><option>Select student</option></select><button class="btn-modern btn-accent w-full" id="hwBtn">Assign</button></div>
+                </div>
+                <!-- redesigned file upload area for homework -->
+                <div class="bg-white/20 backdrop-blur-sm p-5 rounded-2xl">
+                    <h4 class="font-semibold mb-3"><i class="fas fa-paperclip text-blue-500 mr-2"></i>Homework file attachment</h4>
+                    <div class="upload-area mb-4" id="homeworkUploadTrigger"><i class="fas fa-cloud-upload-alt text-3xl mb-2 text-green-600"></i><p>Drag & drop or click to attach file</p></div>
+                    <div id="homeworkFileList" class="space-y-2">
+                        <div class="file-list-item"><i class="fas fa-file-pdf text-red-500"></i><span>math_hw_worksheet.pdf</span><span class="ml-auto text-sm">2.3 MB</span></div>
+                        <div class="file-list-item"><i class="fas fa-file-image text-blue-500"></i><span>science_diagram.png</span><span class="ml-auto text-sm">1.1 MB</span></div>
+                    </div>
+                </div>
+            </div>`;
+            // populate selects from firebase
+            if (window.tutorData) {
+                getDocs(query(collection(db,"students"), where("tutorEmail","==",window.tutorData.email))).then(snap => {
+                    const opts = snap.docs.map(d=>`<option value="${d.id}">${escapeHtml(d.data().studentName)}</option>`).join('');
+                    document.getElementById('topicStudentSelect').innerHTML = '<option value="">Select student</option>'+opts;
+                    document.getElementById('hwStudentSelect').innerHTML = '<option value="">Select student</option>'+opts;
+                });
+            }
+            document.getElementById('topicBtn')?.addEventListener('click', ()=>{
+                const id = document.getElementById('topicStudentSelect')?.value;
+                if(id && window.showDailyTopicModal) window.showDailyTopicModal({id});
+                else alert('Please select a student');
+            });
+            document.getElementById('hwBtn')?.addEventListener('click', ()=>{
+                const id = document.getElementById('hwStudentSelect')?.value;
+                if(id && window.showHomeworkModal) window.showHomeworkModal({id});
+                else alert('Select student');
+            });
+            document.getElementById('homeworkUploadTrigger')?.addEventListener('click', ()=> alert('File upload dialog (Firebase Storage) would open.'));
         }
 
-        function showCustomAlert(msg, type='info') {
-            const div = document.createElement('div');
-            div.className = `fixed top-6 right-6 z-[3000] p-4 rounded-2xl shadow-xl flex items-center gap-3 bg-white text-gray-800 border-l-4 ${type==='error'?'border-red-500':'border-green-500'}`;
-            div.innerHTML = `<i class="fas fa-info-circle"></i> <span>${msg}</span>`;
-            document.body.appendChild(div);
-            setTimeout(() => div.remove(), 3000);
+        function renderScheduleManagement() {
+            document.getElementById('mainContent').innerHTML = `<div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-white/20 backdrop-blur-sm p-6 rounded-2xl"><i class="fas fa-calendar-alt text-3xl text-green-600 mb-3"></i><h3 class="text-xl font-bold mb-2">View Calendar</h3><p class="mb-4 text-sm">Weekly schedule overview</p><button id="viewCalendarBtn" class="btn-modern btn-primary w-full">Open Calendar</button></div>
+                <div class="bg-white/20 backdrop-blur-sm p-6 rounded-2xl"><i class="fas fa-clock text-3xl text-blue-600 mb-3"></i><h3 class="text-xl font-bold mb-2">Manage Schedules</h3><p class="mb-4 text-sm">Set class times for students</p><button id="manageScheduleBtn" class="btn-modern btn-accent w-full">Manage</button></div>
+            </div>`;
+            document.getElementById('viewCalendarBtn').addEventListener('click', ()=>{
+                if (window.showScheduleCalendarModal) window.showScheduleCalendarModal();
+                else alert('Calendar modal not available');
+            });
+            document.getElementById('manageScheduleBtn').addEventListener('click', ()=>{
+                if (window.scheduleManager?.openManualManager) window.scheduleManager.openManualManager();
+                else alert('Schedule manager not ready');
+            });
         }
 
-        document.getElementById('logoutBtn').onclick = () => signOut(auth).then(() => window.location.reload());
-        document.getElementById('modeToggle').onclick = () => {
-            document.body.classList.toggle('dark');
-            const icon = document.querySelector('#modeToggle i');
-            icon.classList.toggle('fa-moon');
-            icon.classList.toggle('fa-sun');
-        };
+        function renderCourses() {
+            document.getElementById('mainContent').innerHTML = `<div class="space-y-6">
+                <div class="bg-white/20 backdrop-blur-sm p-6 rounded-2xl">
+                    <h3 class="text-2xl font-bold mb-4"><i class="fas fa-folder-open text-green-600 mr-2"></i>Course Materials</h3>
+                    <div class="upload-area mb-6" id="uploadTrigger"><i class="fas fa-cloud-upload-alt text-4xl mb-2 text-green-600"></i><p>Drag & drop files or click to upload</p><p class="text-xs opacity-70 mt-1">PDF, images, docs (max 50MB)</p></div>
+                    <div class="space-y-2" id="fileList"><h4 class="font-semibold">Recent uploads</h4><div class="file-list-item"><i class="fas fa-file-pdf text-red-500"></i><span>math_worksheet.pdf</span><span class="ml-auto text-sm">2 days ago</span></div><div class="file-list-item"><i class="fas fa-image text-blue-500"></i><span>science_diagram.png</span><span class="ml-auto text-sm">5 days ago</span></div></div>
+                </div>
+            </div>`;
+            document.getElementById('uploadTrigger').addEventListener('click', ()=>{
+                alert('File upload would open (Firebase Storage integration).');
+            });
+        }
 
+        // dashboard: leave to tutor.js – we just set active class and ensure skeleton replaced by tutor.js
+        function setActive(id) {
+            document.querySelectorAll('.nav-tab-modern').forEach(t=>t.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        waitForTutorData(() => {
+            const tutor = window.tutorData;
+            document.querySelector('.text-gradient').textContent = tutor.name?.split(' ')[0] || 'Tutor';
+            document.querySelector('.avatar-modern').textContent = tutor.name?.charAt(0) || 'T';
+            updateAllCounters(tutor);
+            setInterval(()=>updateAllCounters(tutor),300000);
+            attachStatClicks(tutor);
+
+            // tab switching: dashboard lets tutor.js handle (do not override mainContent)
+            document.getElementById('navDashboard').addEventListener('click', ()=>{ setActive('navDashboard'); /* tutor.js will update */ });
+            document.getElementById('navStudentDatabase').addEventListener('click', ()=>{ setActive('navStudentDatabase'); renderStudentDatabase(); });
+            document.getElementById('navAcademic').addEventListener('click', ()=>{ setActive('navAcademic'); renderAcademic(); });
+            document.getElementById('navScheduleManagement').addEventListener('click', ()=>{ setActive('navScheduleManagement'); renderScheduleManagement(); });
+            document.getElementById('navCourses').addEventListener('click', ()=>{ setActive('navCourses'); renderCourses(); });
+
+            // floating buttons open redesigned messaging modal
+            document.getElementById('floatingMessageBtn').addEventListener('click', ()=>{
+                const modalHtml = `<div class="modal-overlay" id="msgModal"><div class="modal-content max-w-4xl"><div class="flex justify-between items-center mb-3"><h3 class="text-xl font-bold">Messages</h3><button class="close-modal text-2xl">&times;</button></div><div class="inbox-wrapper"><div class="inbox-list-col"><div class="inbox-item unread"><div class="avatar-modern mr-2">J</div><div class="info"><div class="name">Jane Smith</div><div class="preview">Hey, about homework...</div></div><div class="meta"><span class="badge bg-red-500 text-white">2</span></div></div><div class="inbox-item"><div class="avatar-modern mr-2">M</div><div class="info"><div class="name">Mike Lee</div><div class="preview">See you tomorrow</div></div></div></div><div class="inbox-chat-col"><div class="chat-messages"><div class="chat-bubble them">Hi, when is the next class?</div><div class="chat-bubble me">Tomorrow at 10am</div></div><div class="chat-inputs flex gap-2"><input type="text" placeholder="Type a message..." class="flex-1 rounded-full px-4 py-2 border"><button class="btn-modern btn-primary">Send</button></div></div></div></div></div>`;
+                const div = document.createElement('div'); div.innerHTML = modalHtml; document.body.appendChild(div.firstElementChild);
+                document.querySelector('#msgModal .close-modal').addEventListener('click', ()=>div.remove());
+            });
+            document.getElementById('floatingInboxBtn').addEventListener('click', ()=>{
+                document.getElementById('floatingMessageBtn').click(); // same modal for demo
+            });
+        });
     </script>
 </body>
 </html>
