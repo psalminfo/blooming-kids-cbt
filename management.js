@@ -1337,7 +1337,7 @@ async function renderManagementTutorView(container) {
                             return;
                         }
                         document.getElementById('select-student-modal').remove();
-                        if(window.) window.(sid);
+                        if(window.viewStudentTutorHistory) window.viewStudentTutorHistory(sid);
                     });
                 }
             }, 100);
@@ -2992,7 +2992,7 @@ function renderDirectoryFromCache(searchTerm = '') {
     }
     document.querySelectorAll('.view-history-btn').forEach(b => {
         b.addEventListener('click', () => {
-            if(window.) window.(b.dataset.studentId);
+            if(window.viewStudentTutorHistory) window.viewStudentTutorHistory(b.dataset.studentId);
         });
     });
     document.querySelectorAll('.manage-transition-btn').forEach(b => {
@@ -3774,8 +3774,8 @@ function renderArchivedStudentsFromCache(searchTerm = '') {
     document.querySelectorAll('.view-student-history-btn').forEach(button => {
         button.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (typeof window. === 'function') {
-                window.(e.target.dataset.studentId);
+            if (typeof window.viewStudentTutorHistory === 'function') {
+                window.viewStudentTutorHistory(e.target.dataset.studentId);
             } else {
                 alert('Student history feature is not available.');
             }
@@ -8781,16 +8781,6 @@ async function handleRejectStudent(studentId) {
 // SECTION 8: UTILITY FUNCTIONS
 // ======================================================
 
-// ---------- Helper: Convert any date-like value to a Date object ----------
-function toDate(value) {
-    if (!value) return null;
-    if (value.toDate) return value.toDate();      // Firestore Timestamp
-    if (typeof value === 'string') return new Date(value);
-    if (value instanceof Date) return value;
-    return null;
-}
-
-// ---------- Fetch Tutor Assignment History ----------
 async function fetchTutorAssignmentHistory() {
     try {
         const studentsSnapshot = await getDocs(query(collection(db, "students")));
@@ -8810,8 +8800,8 @@ async function fetchTutorAssignmentHistory() {
                     currentTutor: studentData.tutorEmail,
                     currentTutorName: studentData.tutorName,
                     tutorHistory: studentData.tutorHistory.sort((a, b) => {
-                        const dateA = toDate(a.assignedDate) || new Date(0);
-                        const dateB = toDate(b.assignedDate) || new Date(0);
+                        const dateA = a.assignedDate?.toDate?.() || new Date(0);
+                        const dateB = b.assignedDate?.toDate?.() || new Date(0);
                         return dateB - dateA;
                     }),
                     gradeHistory: studentData.gradeHistory || []
@@ -8845,27 +8835,25 @@ async function fetchTutorAssignmentHistory() {
     }
 }
 
-// ---------- Show Tutor History Modal ----------
 function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
-    // Safely get the tutor history array
-    const studentHistoryObj = tutorAssignments[studentId];
-    const tutorHistoryArray = studentHistoryObj?.tutorHistory || [];
+    // Get all history records for this student
+    const studentHistory = tutorAssignments[studentId] || [];
     
     // Sort history by date (newest first)
-    const sortedHistory = [...tutorHistoryArray].sort((a, b) => {
-        const dateA = toDate(a.assignedDate || a.timestamp) || new Date(0);
-        const dateB = toDate(b.assignedDate || b.timestamp) || new Date(0);
-        return dateB - dateA;
+    const sortedHistory = [...studentHistory].sort((a, b) => {
+        const dateA = new Date(a.assignedAt || a.timestamp || 0);
+        const dateB = new Date(b.assignedAt || b.timestamp || 0);
+        return dateB - dateA; // Newest first
     });
 
     // Create a comprehensive timeline that includes ALL events
     const allEvents = [];
     
-    // 1. Registration event
+    // 1. Add registration event (from studentData)
     if (studentData.createdAt) {
         allEvents.push({
             type: 'REGISTRATION',
-            date: toDate(studentData.createdAt),   // ✅ now a Date object
+            date: studentData.createdAt,
             title: 'Student Registered',
             description: `Registered by ${studentData.createdBy || 'System'}`,
             details: `Student ${studentData.studentName} was added to the system.`,
@@ -8873,13 +8861,13 @@ function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
         });
     }
     
-    // 2. All tutor assignment events
+    // 2. Add all tutor assignment events
     sortedHistory.forEach((assignment, index) => {
         const isInitialAssignment = assignment.oldTutorEmail === '' && assignment.oldTutorName === 'Unassigned';
         
         allEvents.push({
             type: 'TUTOR_ASSIGNMENT',
-            date: toDate(assignment.assignedDate || assignment.timestamp),   // ✅ Date
+            date: assignment.assignedAt || assignment.timestamp,
             title: isInitialAssignment ? 'Initial Tutor Assignment' : 'Tutor Reassignment',
             description: isInitialAssignment ? 
                 `Assigned to ${assignment.newTutorName}` : 
@@ -8891,23 +8879,23 @@ function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
         });
     });
     
-    // 3. Student information updates
-    if (studentData.updatedAt) {
+    // 3. Add student information updates
+    if (studentData.updatedAt && studentData.updatedBy) {
         allEvents.push({
             type: 'INFO_UPDATE',
-            date: toDate(studentData.updatedAt),   // ✅ Date
+            date: studentData.updatedAt,
             title: 'Information Updated',
             description: `Last updated by ${studentData.updatedBy}`,
             details: 'Student details were modified',
-            user: studentData.updatedBy || 'System'
+            user: studentData.updatedBy
         });
     }
     
-    // 4. Status changes (transitioning, break)
+    // 4. Add any status changes
     if (studentData.isTransitioning) {
         allEvents.push({
             type: 'STATUS_CHANGE',
-            date: toDate(studentData.transitionDate || studentData.updatedAt || studentData.createdAt),
+            date: studentData.transitionDate || studentData.updatedAt || studentData.createdAt,
             title: 'Status: Transitioning',
             description: 'Student marked as transitioning',
             details: studentData.transitionNotes || '',
@@ -8918,7 +8906,7 @@ function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
     if (studentData.summerBreak) {
         allEvents.push({
             type: 'STATUS_CHANGE',
-            date: toDate(studentData.breakDate || studentData.updatedAt || studentData.createdAt),
+            date: studentData.breakDate || studentData.updatedAt || studentData.createdAt,
             title: 'Status: On Break',
             description: 'Student marked as on summer break',
             details: studentData.breakNotes || '',
@@ -8928,14 +8916,14 @@ function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
     
     // Sort all events by date (newest first)
     allEvents.sort((a, b) => {
-        const dateA = a.date || new Date(0);
-        const dateB = b.date || new Date(0);
-        return dateB - dateA;
+        const dateA = new Date(a.date || 0);
+        const dateB = new Date(b.date || 0);
+        return dateB - dateA; // Newest first
     });
 
     // Create timeline HTML
     const timelineHTML = allEvents.map((event, index) => {
-        const eventDate = event.date ? new Date(event.date) : new Date(); // event.date is already a Date
+        const eventDate = event.date ? new Date(event.date) : new Date();
         const formattedDate = eventDate.toLocaleDateString('en-GB', {
             day: 'numeric',
             month: 'short',
@@ -8999,7 +8987,8 @@ function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
 
     // Create detailed tutor assignment table
     const tutorAssignmentHTML = sortedHistory.map((assignment, index) => {
-        const assignedDate = toDate(assignment.assignedDate || assignment.timestamp) || new Date();
+        const assignedDate = assignment.assignedAt ? new Date(assignment.assignedAt) : 
+                           assignment.timestamp ? new Date(assignment.timestamp) : new Date();
         
         const isCurrent = (assignment.newTutorEmail === studentData.tutorEmail);
         
@@ -9019,9 +9008,6 @@ function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
             </tr>
         `;
     }).join('');
-
-    const registeredDate = toDate(studentData.createdAt);
-    const updatedDate = toDate(studentData.updatedAt);
 
     const modalHtml = `
         <div id="tutorHistoryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
@@ -9049,9 +9035,9 @@ function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
                     <div class="bg-green-50 p-4 rounded-lg border border-green-100">
                         <h4 class="font-bold text-lg mb-2 text-green-800">Registration & Contact</h4>
                         <div class="space-y-2">
-                            <p><strong>Registered:</strong> ${registeredDate ? registeredDate.toLocaleDateString() : 'N/A'}</p>
+                            <p><strong>Registered:</strong> ${studentData.createdAt ? new Date(studentData.createdAt).toLocaleDateString() : 'N/A'}</p>
                             <p><strong>Registered By:</strong> ${studentData.createdBy || 'System'}</p>
-                            <p><strong>Last Updated:</strong> ${updatedDate ? updatedDate.toLocaleDateString() : 'N/A'}</p>
+                            <p><strong>Last Updated:</strong> ${studentData.updatedAt ? new Date(studentData.updatedAt).toLocaleDateString() : 'N/A'}</p>
                             <p><strong>Updated By:</strong> ${studentData.updatedBy || 'System'}</p>
                             <p><strong>Parent:</strong> ${studentData.parentName || 'N/A'}</p>
                             <p><strong>Phone:</strong> ${studentData.parentPhone || 'N/A'}</p>
@@ -9118,11 +9104,11 @@ function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
                             <div class="text-sm text-gray-600">Tutor Assignments</div>
                         </div>
                         <div class="text-center">
-                            <div class="text-2xl font-bold text-green-600">${registeredDate ? '✓' : '0'}</div>
+                            <div class="text-2xl font-bold text-green-600">${studentData.createdAt ? '✓' : '0'}</div>
                             <div class="text-sm text-gray-600">Registration</div>
                         </div>
                         <div class="text-center">
-                            <div class="text-2xl font-bold text-yellow-600">${updatedDate ? '✓' : '0'}</div>
+                            <div class="text-2xl font-bold text-yellow-600">${studentData.updatedAt ? '✓' : '0'}</div>
                             <div class="text-sm text-gray-600">Updates</div>
                         </div>
                     </div>
@@ -9154,7 +9140,6 @@ window.viewStudentTutorHistory = function(studentId) {
     showTutorHistoryModal(studentId, student, tutorAssignments);
 };
 
-// ---------- Report Generation Functions (unchanged) ----------
 async function generateReportHTML(reportId) {
     const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
     if (!reportDoc.exists()) throw new Error("Report not found!");
@@ -9444,6 +9429,7 @@ if (!document.querySelector('style[data-reports-panel]')) {
     styleEl.innerHTML = additionalStyles;
     document.head.appendChild(styleEl);
 }
+
 // ======================================================
 // SECTION 9: NAVIGATION & AUTHENTICATION
 // ======================================================
@@ -9851,7 +9837,5 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
-
-
 
 
