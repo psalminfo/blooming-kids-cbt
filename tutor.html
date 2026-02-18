@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Blooming · Tutor Portal (Next Gen)</title>
+    <title>Blooming · Tutor Portal (Working)</title>
 
     <!-- Preconnect & fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+    <!-- Additional styles – exactly as required by tutor.js (floating buttons, gamification, glass UI) -->
     <style>
-        /* ----- design system ----- */
         * {
             margin: 0;
             padding: 0;
@@ -21,106 +21,121 @@
         }
 
         :root {
-            --primary: #0f6b37;
-            --primary-light: #2ecc71;
-            --primary-glow: rgba(46, 204, 113, 0.3);
-            --accent: #f59e0b;
-            --accent-glow: rgba(245, 158, 11, 0.3);
-            --surface: rgba(255, 255, 255, 0.6);
-            --surface-dark: rgba(15, 23, 42, 0.75);
-            --text: #0f172a;
-            --text-dark: #f8fafc;
-            --border: rgba(255, 255, 255, 0.5);
-            --border-dark: rgba(255, 255, 255, 0.08);
-            --shadow-sm: 0 10px 25px -5px rgba(0, 40, 20, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.3);
-            --shadow-md: 0 20px 40px -12px rgba(0, 60, 30, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.4);
-            --blur: 12px;
+            --primary: #1e8b4c;
+            --primary-soft: #2ecc71;
+            --primary-glow: rgba(46, 204, 113, 0.4);
+            --accent: #fbbf24;
+            --accent-glow: rgba(251, 191, 36, 0.5);
+            --surface: rgba(255, 255, 255, 0.7);
+            --surface-dark: rgba(17, 25, 40, 0.75);
+            --text-light: #1e293b;
+            --text-dark: #f1f5f9;
+            --border-light: rgba(255, 255, 255, 0.5);
+            --border-dark: rgba(255, 255, 255, 0.1);
+            --shadow: 0 20px 40px -15px rgba(0, 20, 10, 0.2);
+            --shadow-hover: 0 30px 50px -20px rgba(0, 40, 20, 0.3);
+            --blur: 16px;
             --transition: all 0.25s cubic-bezier(0.2, 0, 0, 1);
         }
 
         body {
-            font-family: 'Inter', sans-serif;
-            background: radial-gradient(circle at 20% 30%, #d1fae5 0%, #ffffff 60%);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: url('https://res.cloudinary.com/dy2hxcyaf/image/upload/v1769020680/Gemini_Generated_Image_o5m8auo5m8auo5m8_hzzxks.png') center/cover fixed;
             min-height: 100vh;
-            color: var(--text);
-            transition: background 0.3s, color 0.3s;
+            color: var(--text-light);
+            transition: color 0.3s, background-color 0.3s;
             position: relative;
         }
 
-        body.dark {
-            background: radial-gradient(circle at 80% 20%, #0f2b1d 0%, #0b1a14 90%);
-            color: var(--text-dark);
+        /* Animated mesh overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at 20% 30%, rgba(46, 204, 113, 0.08) 0%, transparent 40%),
+                        radial-gradient(circle at 80% 70%, rgba(251, 191, 36, 0.1) 0%, transparent 40%),
+                        repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 2px, transparent 2px, transparent 8px);
+            pointer-events: none;
+            z-index: 0;
         }
 
-        /* main glass container */
-        .glass-master {
+        body.dark {
+            --surface: var(--surface-dark);
+            --border-light: var(--border-dark);
+            --text-light: var(--text-dark);
+        }
+
+        body.dark::before {
+            opacity: 0.6;
+        }
+
+        /* Glass panel */
+        .glass-panel {
             background: var(--surface);
             backdrop-filter: blur(var(--blur)) saturate(180%);
             -webkit-backdrop-filter: blur(var(--blur)) saturate(180%);
-            border: 1px solid var(--border);
-            border-radius: 3rem;
-            box-shadow: var(--shadow-sm), 0 0 0 1px rgba(255,255,255,0.2) inset;
+            border: 1px solid var(--border-light);
+            box-shadow: var(--shadow), 0 0 0 1px rgba(255,255,255,0.1) inset;
+            border-radius: 2.5rem;
             transition: var(--transition);
+            position: relative;
+            z-index: 10;
         }
 
-        .glass-master:hover {
-            box-shadow: var(--shadow-md), 0 0 0 2px rgba(255,255,255,0.3) inset;
+        .glass-panel:hover {
+            box-shadow: var(--shadow-hover), 0 0 0 1px rgba(255,255,255,0.2) inset;
         }
 
-        body.dark .glass-master {
-            background: var(--surface-dark);
-            border-color: var(--border-dark);
-        }
-
-        /* floating orbs */
+        /* Floating orbs */
         .orb {
             position: absolute;
             border-radius: 50%;
-            filter: blur(80px);
-            opacity: 0.15;
+            filter: blur(70px);
+            opacity: 0.25;
             z-index: 0;
             animation: float 20s infinite alternate ease-in-out;
         }
-        .orb-1 { width: 400px; height: 400px; background: #2ecc71; top: -150px; right: -150px; }
-        .orb-2 { width: 500px; height: 500px; background: #fbbf24; bottom: -200px; left: -200px; animation-delay: -7s; }
+
+        .orb-1 { width: 300px; height: 300px; background: #2ecc71; top: -100px; right: -100px; }
+        .orb-2 { width: 400px; height: 400px; background: #fbbf24; bottom: -150px; left: -150px; animation-delay: -5s; }
 
         @keyframes float {
             0% { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(40px, 30px) scale(1.1); }
+            100% { transform: translate(30px, 30px) scale(1.1); }
         }
 
-        /* avatar */
-        .avatar-circle {
-            width: 52px;
-            height: 52px;
-            background: linear-gradient(145deg, var(--primary), #0a5c2c);
-            border-radius: 50%;
+        /* Avatar */
+        .avatar-modern {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(145deg, var(--primary), #0b5e2e);
+            border-radius: 24px 24px 24px 8px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
             font-weight: 600;
-            font-size: 1.4rem;
-            box-shadow: 0 10px 20px var(--primary-glow);
-            border: 2px solid rgba(255,255,255,0.4);
+            font-size: 1.25rem;
+            box-shadow: 0 8px 18px var(--primary-glow);
             transition: var(--transition);
+            border: 2px solid rgba(255,255,255,0.3);
         }
-        .avatar-circle:hover { transform: scale(1.05) rotate(3deg); }
 
-        /* date chip */
-        .date-chip {
-            background: rgba(255,255,255,0.3);
+        .avatar-modern:hover { transform: scale(1.05) rotate(2deg); }
+
+        .badge-date {
+            background: rgba(255,255,255,0.25);
             backdrop-filter: blur(8px);
             padding: 0.4rem 1.2rem;
             border-radius: 40px;
-            font-weight: 500;
+            font-weight: 600;
             font-size: 0.9rem;
             border: 1px solid rgba(255,255,255,0.3);
             color: inherit;
         }
 
-        /* stat cards (clickable) */
-        .stat-card-modern {
+        /* Stat cards – static decorative (won't interfere with dynamic JS) */
+        .stat-card {
             background: rgba(255,255,255,0.2);
             backdrop-filter: blur(8px);
             border: 1px solid rgba(255,255,255,0.3);
@@ -129,36 +144,35 @@
             transition: var(--transition);
             box-shadow: 0 8px 20px -10px rgba(0,0,0,0.1);
             color: inherit;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            cursor: pointer;
         }
-        .stat-card-modern:hover {
-            background: rgba(255,255,255,0.35);
+
+        .stat-card:hover {
+            background: rgba(255,255,255,0.3);
             transform: translateY(-4px);
             border-color: var(--primary);
         }
-        body.dark .stat-card-modern {
-            background: rgba(0,0,0,0.25);
+
+        body.dark .stat-card {
+            background: rgba(0,0,0,0.2);
             border-color: rgba(255,255,255,0.1);
         }
-        .stat-icon-modern {
-            width: 52px;
-            height: 52px;
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
             border-radius: 20px;
             background: linear-gradient(135deg, var(--primary), #0b5e2e);
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 1.6rem;
+            font-size: 1.4rem;
             box-shadow: 0 6px 14px var(--primary-glow);
         }
 
-        /* navigation pills */
-        .nav-pill-wrapper {
-            background: rgba(0,0,0,0.03);
+        /* Nav pills – IDs match tutor.js exactly */
+        .nav-pill-container {
+            background: rgba(0,0,0,0.05);
             border-radius: 3rem;
             padding: 0.4rem;
             backdrop-filter: blur(4px);
@@ -166,72 +180,85 @@
             flex-wrap: wrap;
             gap: 0.2rem;
         }
-        body.dark .nav-pill-wrapper { background: rgba(255,255,255,0.03); }
+
+        body.dark .nav-pill-container { background: rgba(255,255,255,0.05); }
 
         .nav-tab-modern {
             padding: 0.7rem 1.8rem;
             border-radius: 2.5rem;
             font-weight: 600;
-            color: inherit;
+            color: var(--text-light);
             opacity: 0.7;
             transition: var(--transition);
-            background: transparent;
             border: none;
+            background: transparent;
             cursor: pointer;
+            letter-spacing: -0.01em;
             white-space: nowrap;
         }
+
         .nav-tab-modern i { margin-right: 8px; }
-        .nav-tab-modern:hover { opacity: 1; background: rgba(255,255,255,0.2); }
+
+        .nav-tab-modern:hover { opacity: 1; background: rgba(255,255,255,0.3); }
+
         .nav-tab-modern.active {
             opacity: 1;
             background: white;
             color: var(--primary);
-            box-shadow: 0 10px 20px -8px rgba(0,0,0,0.15);
-        }
-        body.dark .nav-tab-modern.active {
-            background: #1e293b;
-            color: #2ecc71;
+            box-shadow: 0 10px 20px -8px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.7);
         }
 
-        /* buttons */
+        body.dark .nav-tab-modern.active {
+            background: #1e293b;
+            color: var(--primary-soft);
+        }
+
+        /* Buttons */
         .btn-modern {
             display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 0.6rem;
-            padding: 0.7rem 1.5rem;
+            padding: 0.7rem 1.4rem;
             border-radius: 2rem;
             font-weight: 600;
             transition: var(--transition);
-            border: 1px solid rgba(255,255,255,0.25);
+            border: none;
+            cursor: pointer;
             background: rgba(255,255,255,0.2);
             backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.25);
             color: inherit;
-            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
+
         .btn-modern:hover {
             background: rgba(255,255,255,0.35);
             transform: translateY(-2px);
             border-color: var(--primary);
-        }
-        .btn-primary {
-            background: linear-gradient(145deg, var(--primary), #0f6b37);
-            color: white;
-            border: none;
-            box-shadow: 0 8px 18px var(--primary-glow);
-        }
-        .btn-primary:hover { background: linear-gradient(145deg, #0f6b37, var(--primary)); }
-        .btn-accent {
-            background: linear-gradient(145deg, var(--accent), #d97706);
-            color: #422006;
-            border: none;
-            box-shadow: 0 8px 18px var(--accent-glow);
+            box-shadow: 0 14px 22px -10px var(--primary-glow);
         }
 
-        /* floating messaging (original class names, restyled) */
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), #0f6b37);
+            color: white;
+            border: none;
+            box-shadow: 0 8px 20px var(--primary-glow);
+        }
+
+        .btn-primary:hover { background: linear-gradient(135deg, #0f6b37, var(--primary)); }
+
+        .btn-accent {
+            background: linear-gradient(135deg, var(--accent), #f59e0b);
+            color: #422006;
+            border: none;
+            box-shadow: 0 8px 20px var(--accent-glow);
+        }
+
+        /* Floating messaging buttons – created dynamically by tutor.js, styles here for reliability */
         .floating-messaging-btn, .floating-inbox-btn {
             position: fixed;
-            right: 24px;
+            right: 20px;
             width: 60px;
             height: 60px;
             border-radius: 30px;
@@ -269,33 +296,30 @@
             text-align: center;
             border: 2px solid white;
         }
-
-        /* gamification widget */
-        #performance-widget > div {
-            border-radius: 2rem !important;
-            background: rgba(255,255,255,0.2) !important;
-            backdrop-filter: blur(12px) !important;
-            border: 1px solid rgba(255,255,255,0.3) !important;
+        @media (max-width: 640px) {
+            .floating-messaging-btn, .floating-inbox-btn { width: 50px; height: 50px; font-size: 1.5rem; }
         }
 
-        /* skeleton loader */
+        /* Skeleton loader */
         .skeleton-loader {
             background: rgba(255,255,255,0.2);
-            border-radius: 2.5rem;
-            padding: 2.5rem;
+            border-radius: 2rem;
+            padding: 2rem;
             backdrop-filter: blur(4px);
             border: 1px dashed rgba(255,255,255,0.4);
         }
+
         .pulse-ring {
-            width: 80px;
-            height: 80px;
+            width: 72px;
+            height: 72px;
             border-radius: 50%;
-            background: rgba(46, 204, 113, 0.2);
+            background: rgba(46, 204, 113, 0.3);
             display: flex;
             align-items: center;
             justify-content: center;
             position: relative;
         }
+
         .pulse-ring::before {
             content: '';
             position: absolute;
@@ -303,78 +327,61 @@
             height: 100%;
             border-radius: 50%;
             border: 2px solid rgba(46, 204, 113, 0.6);
-            animation: pulse 2s infinite;
+            animation: pulse 1.8s infinite;
         }
+
         @keyframes pulse { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.8); opacity: 0; } }
+
+        .text-gradient {
+            background: linear-gradient(145deg, var(--primary), #0f6b37);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+        }
 
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
         #networkWarning, #networkErrorOverlay { z-index: 9999; }
-
-        /* modal for stat clicks (simple placeholder) */
-        .stat-modal {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.5);
-            backdrop-filter: blur(8px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-        .stat-modal-content {
-            background: white;
-            border-radius: 2rem;
-            padding: 2rem;
-            max-width: 500px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.3);
-        }
-        body.dark .stat-modal-content {
-            background: #1e293b;
-            color: #f8fafc;
-        }
     </style>
 </head>
-<body>
+<body class="antialiased">
 
-    <!-- floating orbs -->
+    <!-- floating orbs (ambient) -->
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
 
-    <!-- network warning (original) -->
+    <!-- network warning (original from tutor.js, kept for full compatibility) -->
     <div id="networkWarning" class="fixed top-0 left-0 right-0 bg-yellow-100/80 backdrop-blur-md border-b border-yellow-400 text-yellow-800 px-4 py-3 text-center hidden shadow-lg z-50">
         <span id="warningMessage" class="font-medium">You appear to be offline.</span>
         <button onclick="hideNetworkWarning()" class="ml-4 text-yellow-800 hover:text-yellow-900 font-bold text-xl">&times;</button>
     </div>
 
-    <div class="min-h-screen p-4 md:p-6 lg:p-8 flex justify-center items-start relative">
+    <div class="min-h-screen p-3 md:p-6 lg:p-8 flex justify-center items-start relative">
 
-        <div class="glass-master w-full max-w-7xl p-6 md:p-8 lg:p-10 relative overflow-hidden">
+        <!-- main glass panel -->
+        <div class="glass-panel w-full max-w-7xl p-5 md:p-8 lg:p-10 relative overflow-hidden">
 
-            <!-- header with avatar and date -->
-            <div class="relative z-20 flex flex-wrap items-center justify-between gap-4 mb-8">
-                <div class="flex items-center gap-4">
+            <!-- Header with avatar, date, logout (all IDs used by JS or kept for design) -->
+            <div class="relative z-20 flex flex-wrap items-center justify-between gap-4 mb-6">
+                <div class="flex items-center gap-3 sm:gap-4">
                     <div class="relative group">
-                        <div class="absolute -inset-2 bg-gradient-to-r from-green-400 to-blue-500 rounded-full blur-2xl opacity-40 group-hover:opacity-70 transition"></div>
-                        <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids" class="relative h-16 w-auto object-contain drop-shadow-2xl">
+                        <div class="absolute -inset-1 bg-gradient-to-r from-green-400 to-blue-500 rounded-full blur-xl opacity-40 group-hover:opacity-70 transition"></div>
+                        <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids" class="relative h-14 w-auto object-contain drop-shadow-2xl">
                     </div>
                     <div>
-                        <h1 id="tutorNameHeading" class="text-2xl md:text-4xl font-extrabold tracking-tight">
-                            Welcome, <span class="text-transparent bg-clip-text bg-gradient-to-r from-green-700 to-green-500">Tutor</span>
+                        <h1 id="tutorNameHeading" class="text-xl md:text-3xl font-extrabold tracking-tight">
+                            Welcome, <span class="text-gradient">Tutor</span>
                         </h1>
-                        <p class="text-sm text-gray-600 dark:text-gray-300 font-medium flex items-center gap-1">
+                        <p class="text-xs md:text-sm text-gray-600 dark:text-gray-300 font-medium flex items-center gap-1">
                             <i class="fas fa-seedling text-green-600"></i> Blooming Kids House
                         </p>
                     </div>
                 </div>
 
-                <div class="flex items-center gap-3">
-                    <!-- live date -->
-                    <div class="date-chip hidden sm:flex items-center gap-2">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <!-- live date (populated by inline script) -->
+                    <div class="badge-date hidden sm:flex items-center gap-2">
                         <i class="far fa-calendar-alt text-green-600 dark:text-green-400"></i>
                         <span id="currentDate"></span>
                     </div>
@@ -391,56 +398,60 @@
                         <i class="fas fa-sign-out-alt"></i><span class="hidden sm:inline">Logout</span>
                     </button>
 
-                    <div class="avatar-circle hidden md:flex">T</div>
+                    <div class="avatar-modern hidden md:flex">T</div>
                 </div>
             </div>
 
-            <!-- stat cards (clickable) -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 relative z-20">
-                <!-- Total Students card -->
-                <div class="stat-card-modern" id="statTotalStudentsCard" onclick="showStudentList()">
-                    <div class="stat-icon-modern"><i class="fas fa-users"></i></div>
+            <!-- STAT CARDS (static design – they do not interfere with dynamic content; can be ignored or removed) -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8 relative z-20">
+                <div class="stat-card flex items-center gap-3">
+                    <div class="stat-icon"><i class="fas fa-users"></i></div>
                     <div>
                         <p class="text-xs opacity-70">Total students</p>
-                        <p class="text-2xl font-bold" id="staticTotalStudents">0</p>
+                        <p class="text-2xl font-bold" id="staticTotalStudents">128</p>
                     </div>
                 </div>
-                <!-- Today's Classes card -->
-                <div class="stat-card-modern" id="statTodayClassesCard" onclick="showTodayClasses()">
-                    <div class="stat-icon-modern" style="background: linear-gradient(145deg, #fbbf24, #d97706);"><i class="fas fa-clock"></i></div>
+                <div class="stat-card flex items-center gap-3">
+                    <div class="stat-icon" style="background: linear-gradient(145deg, #fbbf24, #d97706);"><i class="fas fa-clock"></i></div>
                     <div>
                         <p class="text-xs opacity-70">Today's classes</p>
-                        <p class="text-2xl font-bold" id="staticTodayClasses">0</p>
+                        <p class="text-2xl font-bold" id="staticTodayClasses">8</p>
                     </div>
                 </div>
-                <!-- Achievements card (optional) -->
-                <div class="stat-card-modern" id="statAchievementsCard">
-                    <div class="stat-icon-modern" style="background: linear-gradient(145deg, #ec4899, #831843);"><i class="fas fa-star"></i></div>
+                <div class="stat-card flex items-center gap-3">
+                    <div class="stat-icon" style="background: linear-gradient(145deg, #3b82f6, #1e3a8a);"><i class="fas fa-book-open"></i></div>
+                    <div>
+                        <p class="text-xs opacity-70">Pending reports</p>
+                        <p class="text-2xl font-bold" id="staticPendingReports">3</p>
+                    </div>
+                </div>
+                <div class="stat-card flex items-center gap-3">
+                    <div class="stat-icon" style="background: linear-gradient(145deg, #ec4899, #831843);"><i class="fas fa-star"></i></div>
                     <div>
                         <p class="text-xs opacity-70">Achievements</p>
-                        <p class="text-2xl font-bold" id="staticAchievements">0</p>
+                        <p class="text-2xl font-bold" id="staticAchievements">12</p>
                     </div>
                 </div>
             </div>
 
-            <!-- gamification widget (required) -->
-            <div id="performance-widget" class="mb-8 relative z-20"></div>
+            <!-- Gamification widget – required by tutor.js, will be populated dynamically -->
+            <div id="performance-widget" class="mb-6 relative z-20"></div>
 
-            <!-- navigation pills with new tabs -->
+            <!-- navigation pills – IDs exactly as expected by tutor.js -->
             <nav class="relative z-20 mb-8 overflow-x-auto hide-scrollbar">
-                <div class="nav-pill-wrapper">
+                <div class="nav-pill-container">
                     <button id="navDashboard" class="nav-tab-modern active"><i class="fas fa-columns"></i>Dashboard</button>
                     <button id="navStudentDatabase" class="nav-tab-modern"><i class="fas fa-users"></i>Student Database</button>
                     <button id="navAutoStudents" class="nav-tab-modern"><i class="fas fa-user-plus"></i>Auto‑Registered</button>
-                    <button id="navAcademic" class="nav-tab-modern"><i class="fas fa-book-open"></i>Academic</button>
-                    <button id="navSchedule" class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule</button>
+                    <!-- extra decorative tab (no id, harmless) -->
+                    <button class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule</button>
                 </div>
             </nav>
 
-            <!-- MAIN CONTENT (JS will populate) -->
+            <!-- MAIN CONTENT – tutor.js will replace the skeleton loader with actual views -->
             <main id="mainContent" class="relative z-20 min-h-[400px] transition-all duration-500">
-                <!-- elegant loading state -->
-                <div class="skeleton-loader flex flex-col items-center justify-center gap-6 py-16">
+                <!-- Elegant loading state (will be replaced by JS) -->
+                <div class="skeleton-loader flex flex-col items-center justify-center gap-6 py-12">
                     <div class="pulse-ring">
                         <i class="fas fa-leaf text-3xl text-green-600"></i>
                     </div>
@@ -452,14 +463,14 @@
                 </div>
             </main>
 
-            <!-- footer -->
-            <div class="relative z-20 mt-10 text-xs text-center opacity-40 flex items-center justify-center gap-2">
-                <i class="fas fa-shield-alt text-green-500"></i> End-to-end encrypted · Blooming Kids Care v3.0
+            <!-- subtle footer -->
+            <div class="relative z-20 mt-8 text-xs text-center opacity-40 flex items-center justify-center gap-2">
+                <i class="fas fa-shield-alt text-green-500"></i> End-to-end encrypted · Blooming Kids Care v2.0
             </div>
         </div>
     </div>
 
-    <!-- network error overlay (original) -->
+    <!-- network error overlay (original, kept for full functionality) -->
     <div id="networkErrorOverlay" class="fixed inset-0 bg-gray-900/80 backdrop-blur-xl z-50 hidden flex-col items-center justify-center p-4">
         <div class="bg-white/90 dark:bg-gray-800/90 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-white/30">
             <div class="w-20 h-20 bg-yellow-100/80 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -474,30 +485,25 @@
         </div>
     </div>
 
-    <!-- placeholder modal for stat clicks (will be replaced by JS) -->
-    <div id="statModal" class="stat-modal hidden" onclick="if(event.target===this) closeStatModal()">
-        <div class="stat-modal-content" id="statModalContent">
-            <!-- content will be injected by JS -->
-        </div>
-    </div>
-
-    <!-- scripts -->
+    <!-- scripts: canvas-confetti (for gamification), html2canvas (optional), and main module -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-    <!-- firebaseConfig.js must exist and export auth, db -->
+    
+    <!-- IMPORTANT: firebaseConfig.js must exist in the same directory and export auth, db using Firebase modular SDK v12+ -->
     <script type="module" src="tutor.js"></script>
+    <!-- games.js is optional; if it doesn't exist, nothing breaks -->
     <script src="games.js"></script>
 
     <script>
         (function() {
-            // set today's date
+            // set today's date in the header
             const dateEl = document.getElementById('currentDate');
             if (dateEl) {
                 const now = new Date();
                 dateEl.innerText = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
             }
 
-            // DARK MODE
+            // DARK MODE toggling (matches tutor.js theme expectations)
             const body = document.body;
             const toggle = document.getElementById('modeToggle');
             const icon = document.getElementById('modeIcon');
@@ -526,7 +532,7 @@
                 setTheme(body.classList.contains('dark') ? 'light' : 'dark');
             });
 
-            // Network monitor (original functions exposed globally)
+            // Network monitor functions (exposed globally for tutor.js compatibility)
             window.hideNetworkWarning = function() {
                 document.getElementById('networkWarning').classList.add('hidden');
             };
@@ -550,24 +556,6 @@
             window.addEventListener('offline', () => {
                 document.getElementById('networkWarning').classList.remove('hidden');
             });
-
-            // Placeholder functions for stat clicks (to be implemented in tutor.js)
-            window.showStudentList = function() {
-                // This will be overridden by tutor.js with real data
-                const modal = document.getElementById('statModal');
-                const content = document.getElementById('statModalContent');
-                content.innerHTML = '<h2 class="text-xl font-bold mb-4">Students</h2><p class="text-gray-500">Loading...</p>';
-                modal.classList.remove('hidden');
-            };
-            window.showTodayClasses = function() {
-                const modal = document.getElementById('statModal');
-                const content = document.getElementById('statModalContent');
-                content.innerHTML = '<h2 class="text-xl font-bold mb-4">Today\'s Classes</h2><p class="text-gray-500">Loading...</p>';
-                modal.classList.remove('hidden');
-            };
-            window.closeStatModal = function() {
-                document.getElementById('statModal').classList.add('hidden');
-            };
         })();
     </script>
 </body>
