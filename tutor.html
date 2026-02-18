@@ -13,683 +13,125 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
-        /* ===== GLOBAL & VARIABLES ===== */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
-            --primary: #1e8b4c;
-            --primary-soft: #2ecc71;
-            --primary-glow: rgba(46, 204, 113, 0.4);
-            --accent: #fbbf24;
-            --accent-glow: rgba(251, 191, 36, 0.5);
-            --surface: rgba(255, 255, 255, 0.7);
-            --surface-dark: rgba(17, 25, 40, 0.75);
-            --text-light: #1e293b;
-            --text-dark: #f1f5f9;
-            --border-light: rgba(255, 255, 255, 0.5);
-            --border-dark: rgba(255, 255, 255, 0.1);
-            --shadow: 0 20px 40px -15px rgba(0, 20, 10, 0.2);
-            --shadow-hover: 0 30px 50px -20px rgba(0, 40, 20, 0.3);
-            --blur: 16px;
-            --transition: all 0.25s cubic-bezier(0.2, 0, 0, 1);
+            --primary: #1e8b4c; --primary-soft: #2ecc71; --primary-glow: rgba(46,204,113,0.4);
+            --accent: #fbbf24; --accent-glow: rgba(251,191,36,0.5);
+            --surface: rgba(255,255,255,0.7); --surface-dark: rgba(17,25,40,0.75);
+            --text-light: #1e293b; --text-dark: #f1f5f9;
+            --border-light: rgba(255,255,255,0.5); --border-dark: rgba(255,255,255,0.1);
+            --shadow: 0 20px 40px -15px rgba(0,20,10,0.2);
+            --shadow-hover: 0 30px 50px -20px rgba(0,40,20,0.3);
+            --blur: 16px; --transition: all 0.25s cubic-bezier(0.2,0,0,1);
         }
-
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
             background: url('https://res.cloudinary.com/dy2hxcyaf/image/upload/v1769020680/Gemini_Generated_Image_o5m8auo5m8auo5m8_hzzxks.png') center/cover fixed;
-            min-height: 100vh;
-            color: var(--text-light);
-            transition: color 0.3s, background-color 0.3s;
-            position: relative;
+            min-height: 100vh; color: var(--text-light); transition: color 0.3s, background-color 0.3s; position: relative;
         }
-
         body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background: radial-gradient(circle at 20% 30%, rgba(46, 204, 113, 0.08) 0%, transparent 40%),
-                        radial-gradient(circle at 80% 70%, rgba(251, 191, 36, 0.1) 0%, transparent 40%),
+            content: ''; position: fixed; inset: 0;
+            background: radial-gradient(circle at 20% 30%, rgba(46,204,113,0.08) 0%, transparent 40%),
+                        radial-gradient(circle at 80% 70%, rgba(251,191,36,0.1) 0%, transparent 40%),
                         repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 2px, transparent 2px, transparent 8px);
-            pointer-events: none;
-            z-index: 0;
+            pointer-events: none; z-index: 0;
         }
-
-        body.dark {
-            --surface: var(--surface-dark);
-            --border-light: var(--border-dark);
-            --text-light: var(--text-dark);
-        }
-
-        body.dark::before {
-            opacity: 0.6;
-        }
-
+        body.dark { --surface: var(--surface-dark); --border-light: var(--border-dark); --text-light: var(--text-dark); }
+        body.dark::before { opacity: 0.6; }
         .glass-panel {
-            background: var(--surface);
-            backdrop-filter: blur(var(--blur)) saturate(180%);
+            background: var(--surface); backdrop-filter: blur(var(--blur)) saturate(180%);
             -webkit-backdrop-filter: blur(var(--blur)) saturate(180%);
-            border: 1px solid var(--border-light);
-            box-shadow: var(--shadow), 0 0 0 1px rgba(255,255,255,0.1) inset;
-            border-radius: 2.5rem;
-            transition: var(--transition);
-            position: relative;
-            z-index: 10;
+            border: 1px solid var(--border-light); box-shadow: var(--shadow), 0 0 0 1px rgba(255,255,255,0.1) inset;
+            border-radius: 2.5rem; transition: var(--transition); position: relative; z-index: 10;
         }
-
-        .glass-panel:hover {
-            box-shadow: var(--shadow-hover), 0 0 0 1px rgba(255,255,255,0.2) inset;
-        }
-
+        .glass-panel:hover { box-shadow: var(--shadow-hover), 0 0 0 1px rgba(255,255,255,0.2) inset; }
         .orb {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(70px);
-            opacity: 0.25;
-            z-index: 0;
+            position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.25; z-index: 0;
             animation: float 20s infinite alternate ease-in-out;
         }
-
         .orb-1 { width: 300px; height: 300px; background: #2ecc71; top: -100px; right: -100px; }
         .orb-2 { width: 400px; height: 400px; background: #fbbf24; bottom: -150px; left: -150px; animation-delay: -5s; }
-
-        @keyframes float {
-            0% { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(30px, 30px) scale(1.1); }
-        }
-
+        @keyframes float { 0% { transform: translate(0,0) scale(1); } 100% { transform: translate(30px,30px) scale(1.1); } }
         .avatar-modern {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(145deg, var(--primary), #0b5e2e);
-            border-radius: 24px 24px 24px 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 600;
-            font-size: 1.25rem;
-            box-shadow: 0 8px 18px var(--primary-glow);
-            transition: var(--transition);
-            border: 2px solid rgba(255,255,255,0.3);
+            width: 48px; height: 48px; background: linear-gradient(145deg, var(--primary), #0b5e2e);
+            border-radius: 24px 24px 24px 8px; display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: 600; font-size: 1.25rem; box-shadow: 0 8px 18px var(--primary-glow);
+            transition: var(--transition); border: 2px solid rgba(255,255,255,0.3);
         }
-
         .avatar-modern:hover { transform: scale(1.05) rotate(2deg); }
-
         .badge-date {
-            background: rgba(255,255,255,0.25);
-            backdrop-filter: blur(8px);
-            padding: 0.4rem 1.2rem;
-            border-radius: 40px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            border: 1px solid rgba(255,255,255,0.3);
+            background: rgba(255,255,255,0.25); backdrop-filter: blur(8px); padding: 0.4rem 1.2rem;
+            border-radius: 40px; font-weight: 600; font-size: 0.9rem; border: 1px solid rgba(255,255,255,0.3);
             color: inherit;
         }
-
         .stat-card {
-            background: rgba(255,255,255,0.2);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255,255,255,0.3);
-            border-radius: 2rem;
-            padding: 1.2rem 1.5rem;
-            transition: var(--transition);
-            box-shadow: 0 8px 20px -10px rgba(0,0,0,0.1);
-            color: inherit;
-            cursor: pointer;
+            background: rgba(255,255,255,0.2); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 2rem; padding: 1.2rem 1.5rem; transition: var(--transition);
+            box-shadow: 0 8px 20px -10px rgba(0,0,0,0.1); color: inherit; cursor: pointer;
         }
-
-        .stat-card:hover {
-            background: rgba(255,255,255,0.3);
-            transform: translateY(-4px);
-            border-color: var(--primary);
-        }
-
-        body.dark .stat-card {
-            background: rgba(0,0,0,0.2);
-            border-color: rgba(255,255,255,0.1);
-        }
-
+        .stat-card:hover { background: rgba(255,255,255,0.3); transform: translateY(-4px); border-color: var(--primary); }
+        body.dark .stat-card { background: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.1); }
         .stat-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 20px;
-            background: linear-gradient(135deg, var(--primary), #0b5e2e);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.4rem;
+            width: 48px; height: 48px; border-radius: 20px; background: linear-gradient(135deg, var(--primary), #0b5e2e);
+            display: flex; align-items: center; justify-content: center; color: white; font-size: 1.4rem;
             box-shadow: 0 6px 14px var(--primary-glow);
         }
-
         .nav-pill-container {
-            background: rgba(0,0,0,0.05);
-            border-radius: 3rem;
-            padding: 0.4rem;
-            backdrop-filter: blur(4px);
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.2rem;
+            background: rgba(0,0,0,0.05); border-radius: 3rem; padding: 0.4rem; backdrop-filter: blur(4px);
+            display: flex; flex-wrap: wrap; gap: 0.2rem;
         }
-
         body.dark .nav-pill-container { background: rgba(255,255,255,0.05); }
-
         .nav-tab-modern {
-            padding: 0.7rem 1.8rem;
-            border-radius: 2.5rem;
-            font-weight: 600;
-            color: var(--text-light);
-            opacity: 0.7;
-            transition: var(--transition);
-            border: none;
-            background: transparent;
-            cursor: pointer;
-            letter-spacing: -0.01em;
-            white-space: nowrap;
+            padding: 0.7rem 1.8rem; border-radius: 2.5rem; font-weight: 600; color: var(--text-light);
+            opacity: 0.7; transition: var(--transition); border: none; background: transparent; cursor: pointer;
+            letter-spacing: -0.01em; white-space: nowrap;
         }
-
         .nav-tab-modern i { margin-right: 8px; }
-
         .nav-tab-modern:hover { opacity: 1; background: rgba(255,255,255,0.3); }
-
         .nav-tab-modern.active {
-            opacity: 1;
-            background: white;
-            color: var(--primary);
+            opacity: 1; background: white; color: var(--primary);
             box-shadow: 0 10px 20px -8px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.7);
         }
-
-        body.dark .nav-tab-modern.active {
-            background: #1e293b;
-            color: var(--primary-soft);
-        }
-
+        body.dark .nav-tab-modern.active { background: #1e293b; color: var(--primary-soft); }
         .btn-modern {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.6rem;
-            padding: 0.7rem 1.4rem;
-            border-radius: 2rem;
-            font-weight: 600;
-            transition: var(--transition);
-            border: none;
-            cursor: pointer;
-            background: rgba(255,255,255,0.2);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255,255,255,0.25);
-            color: inherit;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.6rem;
+            padding: 0.7rem 1.4rem; border-radius: 2rem; font-weight: 600; transition: var(--transition);
+            border: none; cursor: pointer; background: rgba(255,255,255,0.2); backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.25); color: inherit; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
-
-        .btn-modern:hover {
-            background: rgba(255,255,255,0.35);
-            transform: translateY(-2px);
-            border-color: var(--primary);
-            box-shadow: 0 14px 22px -10px var(--primary-glow);
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary), #0f6b37);
-            color: white;
-            border: none;
-            box-shadow: 0 8px 20px var(--primary-glow);
-        }
-
+        .btn-modern:hover { background: rgba(255,255,255,0.35); transform: translateY(-2px); border-color: var(--primary); box-shadow: 0 14px 22px -10px var(--primary-glow); }
+        .btn-primary { background: linear-gradient(135deg, var(--primary), #0f6b37); color: white; border: none; box-shadow: 0 8px 20px var(--primary-glow); }
         .btn-primary:hover { background: linear-gradient(135deg, #0f6b37, var(--primary)); }
-
-        .btn-accent {
-            background: linear-gradient(135deg, var(--accent), #f59e0b);
-            color: #422006;
-            border: none;
-            box-shadow: 0 8px 20px var(--accent-glow);
-        }
-
-        /* ===== MODAL & UI COMPONENTS (used by tutor.js) ===== */
-        .modal-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            padding: 1rem;
-        }
-
-        .modal-content {
-            background: white;
-            border-radius: 1.5rem;
-            padding: 1.5rem;
-            max-width: 600px;
-            width: 100%;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-            border: 1px solid rgba(255,255,255,0.3);
-        }
-
-        body.dark .modal-content {
-            background: #1e293b;
-            color: #f1f5f9;
-            border-color: #334155;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #e5e7eb;
-            padding-bottom: 0.75rem;
-            margin-bottom: 1rem;
-        }
-
-        body.dark .modal-header {
-            border-bottom-color: #334155;
-        }
-
-        .modal-title {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: #1f2937;
-        }
-
-        body.dark .modal-title {
-            color: #f1f5f9;
-        }
-
-        .modal-body {
-            margin-bottom: 1rem;
-        }
-
-        .modal-footer {
-            display: flex;
-            justify-content: flex-end;
-            gap: 0.5rem;
-            border-top: 1px solid #e5e7eb;
-            padding-top: 1rem;
-        }
-
-        body.dark .modal-footer {
-            border-top-color: #334155;
-        }
-
-        .btn {
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: none;
-        }
-
-        .btn-primary {
-            background-color: #1e8b4c;
-            color: white;
-        }
-        .btn-primary:hover { background-color: #166534; }
-
-        .btn-secondary {
-            background-color: #6b7280;
-            color: white;
-        }
-        .btn-secondary:hover { background-color: #4b5563; }
-
-        .btn-success {
-            background-color: #10b981;
-            color: white;
-        }
-        .btn-success:hover { background-color: #059669; }
-
-        .btn-danger {
-            background-color: #ef4444;
-            color: white;
-        }
-        .btn-danger:hover { background-color: #dc2626; }
-
-        .btn-warning {
-            background-color: #f59e0b;
-            color: white;
-        }
-        .btn-warning:hover { background-color: #d97706; }
-
-        .btn-ghost {
-            background: transparent;
-            color: inherit;
-        }
-        .btn-ghost:hover { background: rgba(0,0,0,0.05); }
-
-        .form-input, .form-select, .form-textarea {
-            width: 100%;
-            padding: 0.5rem 0.75rem;
-            border: 1px solid #d1d5db;
-            border-radius: 0.5rem;
-            background: white;
-            color: #1f2937;
-        }
-        body.dark .form-input, body.dark .form-select, body.dark .form-textarea {
-            background: #334155;
-            border-color: #475569;
-            color: #f1f5f9;
-        }
-
-        .badge {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-        .badge-info { background: #dbeafe; color: #1e3a8a; }
-        .badge-warning { background: #fef3c7; color: #92400e; }
-        .badge-success { background: #d1fae5; color: #065f46; }
-        body.dark .badge-info { background: #1e3a8a; color: #dbeafe; }
-        body.dark .badge-warning { background: #92400e; color: #fef3c7; }
-        body.dark .badge-success { background: #065f46; color: #d1fae5; }
-
-        /* Spinner */
-        .spinner {
-            border: 3px solid rgba(0,0,0,0.1);
-            border-top-color: #1e8b4c;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* Messaging & Inbox specific */
-        .message-type-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-        }
-        .type-option {
-            padding: 0.75rem;
-            border: 1px solid #e5e7eb;
-            border-radius: 0.5rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .type-option.selected {
-            background: #1e8b4c;
-            color: white;
-            border-color: #1e8b4c;
-        }
-        .checklist-box {
-            max-height: 200px;
-            overflow-y: auto;
-            border: 1px solid #e5e7eb;
-            border-radius: 0.5rem;
-            padding: 0.5rem;
-        }
-        .checklist-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.25rem;
-        }
-        .urgent-toggle {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .info-box { background: #e5e7eb; padding: 0.5rem; border-radius: 0.5rem; }
-        .error-box { background: #fee2e2; color: #b91c1c; padding: 0.5rem; border-radius: 0.5rem; }
-
-        /* Inbox layout */
-        .inbox-container {
-            display: flex;
-            gap: 1rem;
-            height: 500px;
-        }
-        .inbox-list-col {
-            width: 300px;
-            border-right: 1px solid #e5e7eb;
-            overflow-y: auto;
-        }
-        .inbox-chat-col {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-        .chat-header {
-            padding: 0.5rem;
-            border-bottom: 1px solid #e5e7eb;
-            font-weight: bold;
-        }
-        .chat-messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1rem;
-            background: #f9fafb;
-            border-radius: 0.5rem;
-        }
-        body.dark .chat-messages { background: #1f2937; }
-        .close-modal-absolute {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: transparent;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-        }
-        .inbox-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.5rem;
-        }
-        .btn-icon {
-            background: transparent;
-            border: none;
-            cursor: pointer;
-            font-size: 1.2rem;
-        }
-        .empty-state {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            color: #9ca3af;
-        }
-
-        /* Inbox list items */
-        .inbox-list {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        .inbox-item {
-            display: flex;
-            align-items: center;
-            padding: 0.75rem;
-            border-bottom: 1px solid #e5e7eb;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .inbox-item:hover { background: #f3f4f6; }
-        body.dark .inbox-item { border-bottom-color: #334155; }
-        body.dark .inbox-item:hover { background: #1f2937; }
-
-        .inbox-item.unread { background: #eff6ff; }
-        body.dark .inbox-item.unread { background: #1e3a8a20; }
-
-        .inbox-item .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: #1e8b4c;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            margin-right: 0.75rem;
-        }
-        .inbox-item .info { flex: 1; }
-        .inbox-item .name { font-weight: 600; }
-        .inbox-item .preview { font-size: 0.875rem; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
-        .inbox-item .meta { text-align: right; font-size: 0.75rem; color: #9ca3af; }
-        .inbox-item .badge {
-            background: #ef4444;
-            color: white;
-            border-radius: 9999px;
-            padding: 0.125rem 0.375rem;
-            font-size: 0.75rem;
-            margin-top: 0.25rem;
-        }
-
-        /* Chat bubbles */
-        .chat-bubble {
-            max-width: 70%;
-            margin-bottom: 0.5rem;
-            padding: 0.5rem 1rem;
-            border-radius: 1rem;
-            clear: both;
-        }
-        .chat-bubble.me {
-            background: #1e8b4c;
-            color: white;
-            float: right;
-            border-bottom-right-radius: 0.25rem;
-        }
-        .chat-bubble.them {
-            background: #e5e7eb;
-            color: #1f2937;
-            float: left;
-            border-bottom-left-radius: 0.25rem;
-        }
-        body.dark .chat-bubble.them { background: #374151; color: #f1f5f9; }
-
-        .chat-bubble .timestamp {
-            font-size: 0.625rem;
-            opacity: 0.7;
-            text-align: right;
-            margin-top: 0.25rem;
-        }
-
-        /* Chat input */
-        .chat-inputs {
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 1rem;
-        }
-        .chat-inputs input {
-            flex: 1;
-            padding: 0.5rem;
-            border: 1px solid #d1d5db;
-            border-radius: 0.5rem;
-        }
-        .chat-inputs button {
-            padding: 0.5rem 1rem;
-            background: #1e8b4c;
-            color: white;
-            border: none;
-            border-radius: 0.5rem;
-            cursor: pointer;
-        }
-
-        /* Floating messaging buttons */
+        .btn-accent { background: linear-gradient(135deg, var(--accent), #f59e0b); color: #422006; border: none; box-shadow: 0 8px 20px var(--accent-glow); }
         .floating-messaging-btn, .floating-inbox-btn {
-            position: fixed;
-            right: 20px;
-            width: 60px;
-            height: 60px;
-            border-radius: 30px;
-            background: linear-gradient(145deg, var(--primary), #0b5e2e);
-            color: white;
-            border: none;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2), 0 0 0 2px rgba(255,255,255,0.3);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.8rem;
-            transition: all 0.2s ease;
-            z-index: 999;
-            backdrop-filter: blur(8px);
+            position: fixed; right: 20px; width: 60px; height: 60px; border-radius: 30px;
+            background: linear-gradient(145deg, var(--primary), #0b5e2e); color: white; border: none;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2), 0 0 0 2px rgba(255,255,255,0.3); cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-size: 1.8rem;
+            transition: all 0.2s ease; z-index: 999; backdrop-filter: blur(8px);
         }
         .floating-messaging-btn { bottom: 100px; }
         .floating-inbox-btn { bottom: 30px; }
-        .floating-messaging-btn:hover, .floating-inbox-btn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 15px 30px rgba(0,0,0,0.3);
-        }
-        .floating-btn-text { display: none; }
         .unread-badge {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            background: #ef4444;
-            color: white;
-            border-radius: 20px;
-            padding: 2px 6px;
-            font-size: 12px;
-            font-weight: bold;
-            min-width: 22px;
-            text-align: center;
+            position: absolute; top: -5px; right: -5px; background: #ef4444; color: white; border-radius: 20px;
+            padding: 2px 6px; font-size: 12px; font-weight: bold; min-width: 22px; text-align: center;
             border: 2px solid white;
         }
-        @media (max-width: 640px) {
-            .floating-messaging-btn, .floating-inbox-btn { width: 50px; height: 50px; font-size: 1.5rem; }
-        }
-
-        /* Loading skeleton */
-        .skeleton-loader {
-            background: rgba(255,255,255,0.2);
-            border-radius: 2rem;
-            padding: 2rem;
-            backdrop-filter: blur(4px);
-            border: 1px dashed rgba(255,255,255,0.4);
-        }
-
+        .skeleton-loader { background: rgba(255,255,255,0.2); border-radius: 2rem; padding: 2rem; backdrop-filter: blur(4px); border: 1px dashed rgba(255,255,255,0.4); }
         .pulse-ring {
-            width: 72px;
-            height: 72px;
-            border-radius: 50%;
-            background: rgba(46, 204, 113, 0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
+            width: 72px; height: 72px; border-radius: 50%; background: rgba(46,204,113,0.3);
+            display: flex; align-items: center; justify-content: center; position: relative;
         }
-
         .pulse-ring::before {
-            content: '';
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            border: 2px solid rgba(46, 204, 113, 0.6);
-            animation: pulse 1.8s infinite;
+            content: ''; position: absolute; width: 100%; height: 100%; border-radius: 50%;
+            border: 2px solid rgba(46,204,113,0.6); animation: pulse 1.8s infinite;
         }
-
         @keyframes pulse { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.8); opacity: 0; } }
-
-        .text-gradient {
-            background: linear-gradient(145deg, var(--primary), #0f6b37);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-weight: 700;
-        }
-
+        .text-gradient { background: linear-gradient(145deg, var(--primary), #0f6b37); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
         #networkWarning, #networkErrorOverlay { z-index: 9999; }
-        .student-list-item { border-bottom: 1px solid rgba(0,0,0,0.05); padding: 0.75rem 0; }
-        .student-list-item:last-child { border-bottom: none; }
-
-        /* Hidden container for dynamic inbox tab */
-        .sidebar-nav { display: none; }
+        .academic-card { background: rgba(255,255,255,0.15); backdrop-filter: blur(8px); border-radius: 1.5rem; padding: 1.5rem; border: 1px solid var(--border-light); }
     </style>
 </head>
 <body class="antialiased">
@@ -697,6 +139,7 @@
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
 
+    <!-- network warning -->
     <div id="networkWarning" class="fixed top-0 left-0 right-0 bg-yellow-100/80 backdrop-blur-md border-b border-yellow-400 text-yellow-800 px-4 py-3 text-center hidden shadow-lg z-50">
         <span id="warningMessage" class="font-medium">You appear to be offline.</span>
         <button onclick="hideNetworkWarning()" class="ml-4 text-yellow-800 hover:text-yellow-900 font-bold text-xl">&times;</button>
@@ -744,65 +187,46 @@
                 </div>
             </div>
 
-            <!-- STAT CARDS (clickable, data-driven) -->
+            <!-- Stat cards (live data) -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8 relative z-20">
                 <div class="stat-card flex items-center gap-3" id="totalStudentsCard">
                     <div class="stat-icon"><i class="fas fa-users"></i></div>
-                    <div>
-                        <p class="text-xs opacity-70">Total students</p>
-                        <p class="text-2xl font-bold" id="totalStudentsCount">0</p>
-                    </div>
+                    <div><p class="text-xs opacity-70">Total students</p><p class="text-2xl font-bold" id="totalStudentsCount">0</p></div>
                 </div>
                 <div class="stat-card flex items-center gap-3" id="todayClassesCard">
                     <div class="stat-icon" style="background: linear-gradient(145deg, #fbbf24, #d97706);"><i class="fas fa-clock"></i></div>
-                    <div>
-                        <p class="text-xs opacity-70">Today's classes</p>
-                        <p class="text-2xl font-bold" id="todayClassesCount">0</p>
-                    </div>
+                    <div><p class="text-xs opacity-70">Today's classes</p><p class="text-2xl font-bold" id="todayClassesCount">0</p></div>
                 </div>
                 <div class="stat-card flex items-center gap-3" id="pendingReportsCard">
                     <div class="stat-icon" style="background: linear-gradient(145deg, #3b82f6, #1e3a8a);"><i class="fas fa-book-open"></i></div>
-                    <div>
-                        <p class="text-xs opacity-70">Pending reports</p>
-                        <p class="text-2xl font-bold" id="pendingReportsCount">0</p>
-                    </div>
+                    <div><p class="text-xs opacity-70">Pending reports</p><p class="text-2xl font-bold" id="pendingReportsCount">0</p></div>
                 </div>
                 <div class="stat-card flex items-center gap-3" id="achievementsCard">
                     <div class="stat-icon" style="background: linear-gradient(145deg, #ec4899, #831843);"><i class="fas fa-star"></i></div>
-                    <div>
-                        <p class="text-xs opacity-70">Performance score</p>
-                        <p class="text-2xl font-bold" id="performanceScore">0</p>
-                    </div>
+                    <div><p class="text-xs opacity-70">Performance score</p><p class="text-2xl font-bold" id="performanceScore">0</p></div>
                 </div>
             </div>
 
-            <!-- Gamification widget (hidden by default, used for score) -->
+            <!-- Gamification widget placeholder (used by tutor.js) -->
             <div id="performance-widget" class="hidden"></div>
 
-            <!-- navigation pills with corrected tabs -->
+            <!-- Navigation pills (5 tabs) -->
             <nav class="relative z-20 mb-8 overflow-x-auto hide-scrollbar">
                 <div class="nav-pill-container">
                     <button id="navDashboard" class="nav-tab-modern active"><i class="fas fa-columns"></i>Dashboard</button>
                     <button id="navStudentDatabase" class="nav-tab-modern"><i class="fas fa-users"></i>Student Database</button>
-                    <button id="navAutoStudents" class="nav-tab-modern"><i class="fas fa-user-plus"></i>Auto Students</button>
+                    <button id="navAutoStudents" class="nav-tab-modern"><i class="fas fa-robot"></i>Auto Students</button>
+                    <button id="navAcademic" class="nav-tab-modern"><i class="fas fa-graduation-cap"></i>Academic</button>
+                    <button id="navScheduleManagement" class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule</button>
                 </div>
             </nav>
 
-            <!-- Hidden container for dynamic Inbox tab (injected by tutor.js) -->
-            <div class="sidebar-nav"></div>
-
-            <!-- MAIN CONTENT (populated by JS) -->
+            <!-- MAIN CONTENT (populated by tutor.js + our enhancements) -->
             <main id="mainContent" class="relative z-20 min-h-[400px] transition-all duration-500">
-                <!-- Loading state (will be replaced) -->
+                <!-- loading state -->
                 <div class="skeleton-loader flex flex-col items-center justify-center gap-6 py-12">
-                    <div class="pulse-ring">
-                        <i class="fas fa-leaf text-3xl text-green-600"></i>
-                    </div>
+                    <div class="pulse-ring"><i class="fas fa-leaf text-3xl text-green-600"></i></div>
                     <p class="text-lg font-medium text-gray-700 dark:text-gray-200 animate-pulse">Loading secure portal...</p>
-                    <div class="flex gap-2">
-                        <div class="w-20 h-2 bg-green-200/50 rounded-full animate-pulse"></div>
-                        <div class="w-12 h-2 bg-green-300/50 rounded-full animate-pulse delay-75"></div>
-                    </div>
                 </div>
             </main>
 
@@ -831,469 +255,367 @@
     <!-- scripts -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-    <!-- firebaseConfig.js must exist and export auth, db -->
+
+    <!-- main tutor logic (must be present) -->
     <script type="module" src="tutor.js"></script>
+    <!-- games.js (optional) -->
     <script src="games.js"></script>
 
-    <script>
-        (function() {
-            // set today's date
-            const dateEl = document.getElementById('currentDate');
-            if (dateEl) {
-                const now = new Date();
-                dateEl.innerText = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            }
-
-            // DARK MODE
-            const body = document.body;
-            const toggle = document.getElementById('modeToggle');
-            const icon = document.getElementById('modeIcon');
-            const modeKey = 'tutor_theme';
-
-            function setTheme(theme) {
-                if (theme === 'dark') {
-                    body.classList.add('dark');
-                    icon.classList.remove('fa-moon');
-                    icon.classList.add('fa-sun');
-                    localStorage.setItem(modeKey, 'dark');
-                } else {
-                    body.classList.remove('dark');
-                    icon.classList.remove('fa-sun');
-                    icon.classList.add('fa-moon');
-                    localStorage.setItem(modeKey, 'light');
-                }
-            }
-
-            const saved = localStorage.getItem(modeKey);
-            if (saved) setTheme(saved);
-            else if (window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
-            else setTheme('light');
-
-            toggle.addEventListener('click', () => {
-                setTheme(body.classList.contains('dark') ? 'light' : 'dark');
-            });
-
-            // Network monitor
-            window.hideNetworkWarning = function() {
-                document.getElementById('networkWarning').classList.add('hidden');
-            };
-            window.hideNetworkError = function() {
-                document.getElementById('networkErrorOverlay').classList.add('hidden');
-            };
-            window.showNetworkError = function(msg) {
-                const overlay = document.getElementById('networkErrorOverlay');
-                if (msg) document.getElementById('errorMessage').innerText = msg;
-                overlay.classList.remove('hidden');
-            };
-            window.checkConnectivity = function() {
-                if (navigator.onLine) {
-                    hideNetworkError();
-                    hideNetworkWarning();
-                } else {
-                    showNetworkError('Still offline. Please check your internet settings.');
-                }
-            };
-            window.addEventListener('online', () => { hideNetworkWarning(); hideNetworkError(); });
-            window.addEventListener('offline', () => {
-                document.getElementById('networkWarning').classList.remove('hidden');
-            });
-        })();
-    </script>
-
-    <!-- Main module script for data fetching and counter updates -->
+    <!-- Custom enhancements – carefully integrated -->
     <script type="module">
         import { db } from './firebaseConfig.js';
-        import { collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+        import { collection, query, where, getDocs, orderBy, limit } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
-        // Wait for tutorData to be set by tutor.js
-        function waitForTutorData(callback) {
-            if (window.tutorData) {
-                callback();
-            } else {
-                setTimeout(() => waitForTutorData(callback), 100);
-            }
-        }
-
-        // Simple escape function for safety
-        function escapeHtml(unsafe) {
+        // --- Helper functions (no conflict with tutor.js) ---
+        const escapeHtml = (unsafe) => {
             if (!unsafe) return '';
-            return String(unsafe)
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
-
-        // Fallback for report modal (since showDailyTopicModal is not global)
-        if (typeof window.showDailyTopicModal !== 'function') {
-            window.showDailyTopicModal = function(student) {
-                alert(`Please use the Dashboard to add a topic for ${student.studentName}.`);
-            };
-        }
-
-        // Real report generation - fetches student and calls fallback
-        window.generateReport = async function(studentId) {
-            if (!window.tutorData) {
-                alert('Tutor data not loaded yet.');
-                return;
-            }
-            try {
-                // Try to get student from window.studentCache (set by tutor.js) or fetch directly
-                let student = null;
-                if (window.studentCache) {
-                    student = window.studentCache.find(s => s.id === studentId);
-                }
-                if (!student) {
-                    const studentDoc = await getDoc(doc(db, "students", studentId));
-                    if (studentDoc.exists()) {
-                        student = { id: studentDoc.id, ...studentDoc.data() };
-                    } else {
-                        alert('Student not found.');
-                        return;
-                    }
-                }
-                // Call the global fallback function
-                window.showDailyTopicModal(student);
-            } catch (error) {
-                console.error('Error generating report:', error);
-                alert('Failed to open report. Check console.');
-            }
+            return String(unsafe).replace(/[&<>"]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                if (m === '"') return '&quot;';
+                return m;
+            });
         };
 
-        // Function to update all counters
-        async function updateAllCounters(tutor) {
-            try {
-                // Get all students for this tutor
-                const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-                const studentsSnapshot = await getDocs(studentsQuery);
-                
-                // Filter out inactive students for total count
-                const allStudents = studentsSnapshot.docs
-                    .map(doc => ({ id: doc.id, ...doc.data() }))
-                    .filter(s => !['archived', 'graduated', 'transferred'].includes(s.status));
-                
-                // Update total students count
-                document.getElementById('totalStudentsCount').textContent = allStudents.length;
+        // --- Update date in header ---
+        const dateEl = document.getElementById('currentDate');
+        if (dateEl) {
+            dateEl.innerText = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
 
-                // Calculate today's classes
-                const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-                let todayClassesCount = 0;
-                
-                allStudents.forEach(s => {
-                    if (s.schedule && Array.isArray(s.schedule)) {
-                        s.schedule.forEach(slot => {
-                            if (slot.day === todayName) {
-                                todayClassesCount++;
-                            }
-                        });
-                    }
-                });
-                
-                document.getElementById('todayClassesCount').textContent = todayClassesCount;
-
-                // Calculate pending reports (students without reports in last 7 days)
-                const oneWeekAgo = new Date();
-                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-                
-                let pendingReports = 0;
-                for (const student of allStudents) {
-                    if (!student.lastReportDate) {
-                        pendingReports++;
-                        continue;
-                    }
-                    
-                    // Check if last report date is older than 7 days
-                    const lastReport = student.lastReportDate?.toDate?.() || new Date(student.lastReportDate);
-                    if (lastReport < oneWeekAgo) {
-                        pendingReports++;
-                    }
-                }
-                
-                document.getElementById('pendingReportsCount').textContent = pendingReports;
-
-                // Calculate performance score (placeholder logic - can be customized)
-                const totalPossible = allStudents.length * 100;
-                let earnedScore = 0;
-                
-                allStudents.forEach(s => {
-                    // Base score from attendance
-                    if (s.attendanceRate) {
-                        earnedScore += s.attendanceRate;
-                    } else {
-                        earnedScore += 85; // Default score
-                    }
-                    
-                    // Bonus for completed reports
-                    if (s.lastReportDate) {
-                        const reportDate = s.lastReportDate?.toDate?.() || new Date(s.lastReportDate);
-                        const daysSinceReport = Math.floor((new Date() - reportDate) / (1000 * 60 * 60 * 24));
-                        if (daysSinceReport < 7) earnedScore += 15;
-                    }
-                });
-                
-                const performanceScore = allStudents.length > 0 
-                    ? Math.round((earnedScore / (allStudents.length * 100)) * 100)
-                    : 100;
-                
-                document.getElementById('performanceScore').textContent = performanceScore;
-
-            } catch (error) {
-                console.error("Error updating counters:", error);
+        // --- Dark mode ---
+        const body = document.body;
+        const toggle = document.getElementById('modeToggle');
+        const icon = document.getElementById('modeIcon');
+        const modeKey = 'tutor_theme';
+        function setTheme(theme) {
+            if (theme === 'dark') {
+                body.classList.add('dark');
+                icon.classList.remove('fa-moon');
+                icon.classList.add('fa-sun');
+                localStorage.setItem(modeKey, 'dark');
+            } else {
+                body.classList.remove('dark');
+                icon.classList.remove('fa-sun');
+                icon.classList.add('fa-moon');
+                localStorage.setItem(modeKey, 'light');
             }
         }
+        const saved = localStorage.getItem(modeKey);
+        if (saved) setTheme(saved);
+        else if (window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+        else setTheme('light');
+        toggle.addEventListener('click', () => setTheme(body.classList.contains('dark') ? 'light' : 'dark'));
 
-        // Set up real-time counter updates (every 5 minutes)
-        function startCounterUpdates(tutor) {
-            // Initial update
-            updateAllCounters(tutor);
-            
-            // Update every 5 minutes
-            setInterval(() => updateAllCounters(tutor), 300000);
-            
-            // Also update when window gains focus
-            window.addEventListener('focus', () => updateAllCounters(tutor));
+        // --- Network monitor (global functions) ---
+        window.hideNetworkWarning = () => document.getElementById('networkWarning').classList.add('hidden');
+        window.hideNetworkError = () => document.getElementById('networkErrorOverlay').classList.add('hidden');
+        window.showNetworkError = (msg) => {
+            const overlay = document.getElementById('networkErrorOverlay');
+            if (msg) document.getElementById('errorMessage').innerText = msg;
+            overlay.classList.remove('hidden');
+        };
+        window.checkConnectivity = () => {
+            if (navigator.onLine) { hideNetworkError(); hideNetworkWarning(); }
+            else showNetworkError('Still offline. Please check your internet settings.');
+        };
+        window.addEventListener('online', () => { hideNetworkWarning(); hideNetworkError(); });
+        window.addEventListener('offline', () => document.getElementById('networkWarning').classList.remove('hidden'));
+
+        // --- Wait for tutorData (set by tutor.js) ---
+        function waitForTutorData(callback) {
+            if (window.tutorData) callback();
+            else setTimeout(() => waitForTutorData(callback), 100);
         }
 
+        // --- Update stat counters (real data) ---
+        async function updateAllCounters(tutor) {
+            try {
+                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const snap = await getDocs(q);
+                const allStudents = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !['archived','graduated','transferred'].includes(s.status));
+
+                document.getElementById('totalStudentsCount').textContent = allStudents.length;
+
+                const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                let todayClasses = 0;
+                allStudents.forEach(s => { if (s.schedule) s.schedule.forEach(slot => { if (slot.day === todayName) todayClasses++; }); });
+                document.getElementById('todayClassesCount').textContent = todayClasses;
+
+                const oneWeekAgo = new Date(); oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                let pending = 0;
+                allStudents.forEach(s => {
+                    if (!s.lastReportDate) { pending++; return; }
+                    const last = s.lastReportDate?.toDate?.() || new Date(s.lastReportDate);
+                    if (last < oneWeekAgo) pending++;
+                });
+                document.getElementById('pendingReportsCount').textContent = pending;
+
+                let earned = 0;
+                allStudents.forEach(s => earned += s.attendanceRate || 85);
+                const perf = allStudents.length ? Math.round((earned / (allStudents.length * 100)) * 100) : 100;
+                document.getElementById('performanceScore').textContent = perf;
+            } catch (e) { console.warn("Counter update failed", e); }
+        }
+
+        // --- Custom tab: Academic ---
+        function renderAcademicView() {
+            const main = document.getElementById('mainContent');
+            main.innerHTML = `
+                <div class="space-y-6">
+                    <h2 class="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                        <i class="fas fa-graduation-cap text-green-600"></i> Academic Overview
+                    </h2>
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div class="academic-card">
+                            <h3 class="text-lg font-semibold mb-3"><i class="fas fa-pencil-alt text-blue-500 mr-2"></i>Recent homework</h3>
+                            <div id="academic-homework" class="min-h-[150px]">Loading...</div>
+                        </div>
+                        <div class="academic-card">
+                            <h3 class="text-lg font-semibold mb-3"><i class="fas fa-lightbulb text-yellow-500 mr-2"></i>Daily topics (last 5)</h3>
+                            <div id="academic-topics" class="min-h-[150px]">Loading...</div>
+                        </div>
+                    </div>
+                    <div class="flex gap-3 justify-center">
+                        <button id="goto-hw" class="btn-modern btn-primary"><i class="fas fa-plus"></i> Assign Homework</button>
+                        <button id="goto-topic" class="btn-modern btn-accent"><i class="fas fa-book"></i> Add Topic</button>
+                    </div>
+                </div>
+            `;
+
+            // Load homework using the global function from tutor.js, but redirect output
+            if (window.loadHomeworkInbox && window.tutorData) {
+                // Temporarily redirect
+                const original = window.loadHomeworkInbox;
+                window.loadHomeworkInbox = function(email) {
+                    const fakeContainer = document.createElement('div');
+                    fakeContainer.id = 'homework-inbox-container';
+                    document.getElementById('academic-homework').innerHTML = '';
+                    document.getElementById('academic-homework').appendChild(fakeContainer);
+                    original(email);
+                    setTimeout(() => { window.loadHomeworkInbox = original; }, 500);
+                };
+                window.loadHomeworkInbox(window.tutorData.email);
+            } else {
+                document.getElementById('academic-homework').innerHTML = '<p class="text-gray-400">Homework module unavailable</p>';
+            }
+
+            // Load daily topics
+            if (window.tutorData) {
+                const topicsQuery = query(
+                    collection(db, "daily_topics"),
+                    where("tutorEmail", "==", window.tutorData.email),
+                    orderBy("createdAt", "desc"),
+                    limit(5)
+                );
+                getDocs(topicsQuery).then(snap => {
+                    const container = document.getElementById('academic-topics');
+                    if (snap.empty) {
+                        container.innerHTML = '<p class="text-gray-400">No topics recorded.</p>';
+                    } else {
+                        let html = '<div class="space-y-2">';
+                        snap.forEach(doc => {
+                            const t = doc.data();
+                            const date = t.createdAt?.toDate ? t.createdAt.toDate().toLocaleDateString() : 'recent';
+                            html += `<div class="border-b border-white/20 pb-1"><span class="font-medium">${escapeHtml(t.studentName)}</span> <span class="text-xs opacity-60">${date}</span><div class="text-sm truncate">${escapeHtml(t.topics.substring(0,60))}</div></div>`;
+                        });
+                        html += '</div>';
+                        container.innerHTML = html;
+                    }
+                }).catch(() => {
+                    document.getElementById('academic-topics').innerHTML = '<p class="text-red-400">Error loading topics.</p>';
+                });
+            }
+
+            // Buttons: switch to student database tab
+            document.getElementById('goto-hw').addEventListener('click', () => {
+                document.getElementById('navStudentDatabase').click();
+            });
+            document.getElementById('goto-topic').addEventListener('click', () => {
+                document.getElementById('navStudentDatabase').click();
+            });
+        }
+
+        // --- Custom tab: Schedule Management ---
+        function renderScheduleView() {
+            const main = document.getElementById('mainContent');
+            main.innerHTML = `
+                <div class="space-y-6">
+                    <h2 class="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                        <i class="fas fa-calendar-alt text-green-600"></i> Schedule Management
+                    </h2>
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div class="academic-card">
+                            <h3 class="text-lg font-semibold mb-3">Actions</h3>
+                            <button id="schedule-open" class="btn-modern btn-primary w-full mb-3"><i class="fas fa-clock"></i> Open Schedule Manager</button>
+                            <button id="schedule-calendar" class="btn-modern btn-accent w-full"><i class="fas fa-calendar-week"></i> View Weekly Calendar</button>
+                        </div>
+                        <div class="academic-card">
+                            <h3 class="text-lg font-semibold mb-3">Upcoming (next 3 days)</h3>
+                            <div id="schedule-upcoming">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('schedule-open').addEventListener('click', () => {
+                if (window.scheduleManager) window.scheduleManager.openManualManager();
+                else alert('Schedule manager not ready.');
+            });
+
+            document.getElementById('schedule-calendar').addEventListener('click', async () => {
+                if (!window.tutorData) return;
+                const q = query(collection(db, "students"), where("tutorEmail", "==", window.tutorData.email));
+                const snap = await getDocs(q);
+                const students = snap.docs.map(d => d.data());
+                const byDay = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [], Sunday: [] };
+                students.forEach(s => {
+                    if (s.schedule) s.schedule.forEach(slot => {
+                        if (byDay[slot.day]) byDay[slot.day].push({ student: s.studentName, time: `${slot.start}-${slot.end}` });
+                    });
+                });
+                let html = '<div class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50"><div class="bg-white dark:bg-gray-800 p-6 rounded-xl max-w-4xl w-full max-h-[80vh] overflow-auto"><h3 class="text-xl font-bold mb-4">Weekly Schedule</h3><div class="grid grid-cols-7 gap-2">';
+                for (let day of Object.keys(byDay)) {
+                    html += `<div class="border rounded p-2"><h4 class="font-bold text-sm">${day}</h4>`;
+                    if (byDay[day].length === 0) html += '<p class="text-xs text-gray-400">—</p>';
+                    else byDay[day].forEach(c => html += `<div class="text-xs mt-1">${escapeHtml(c.student)}<br><span class="text-gray-500">${escapeHtml(c.time)}</span></div>`);
+                    html += '</div>';
+                }
+                html += '</div><button class="mt-4 btn-modern close-calendar">Close</button></div></div>';
+                const modal = document.createElement('div'); modal.innerHTML = html; document.body.appendChild(modal.firstElementChild);
+                modal.querySelector('.close-calendar').addEventListener('click', () => modal.remove());
+            });
+
+            // Upcoming classes
+            (async () => {
+                if (!window.tutorData) return;
+                const q = query(collection(db, "students"), where("tutorEmail", "==", window.tutorData.email));
+                const snap = await getDocs(q);
+                const students = snap.docs.map(d => d.data());
+                const now = new Date();
+                const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+                const upcoming = [];
+                for (let i = 0; i < 3; i++) {
+                    const d = new Date(now); d.setDate(now.getDate() + i);
+                    const day = dayNames[d.getDay()];
+                    students.forEach(s => {
+                        if (s.schedule) s.schedule.forEach(slot => {
+                            if (slot.day === day) upcoming.push({ day: day, date: d.toLocaleDateString(), student: s.studentName, time: slot.start+'-'+slot.end });
+                        });
+                    });
+                }
+                const container = document.getElementById('schedule-upcoming');
+                if (upcoming.length === 0) container.innerHTML = '<p class="text-gray-400">No classes in next 3 days.</p>';
+                else {
+                    let list = '<div class="space-y-2">';
+                    upcoming.forEach(u => {
+                        list += `<div class="border-b pb-1"><span class="font-medium">${escapeHtml(u.student)}</span> <span class="text-xs opacity-70">${u.date} (${u.day})</span><div class="text-sm">${escapeHtml(u.time)}</div></div>`;
+                    });
+                    list += '</div>';
+                    container.innerHTML = list;
+                }
+            })();
+        }
+
+        // --- Tab switching (preserve original three tabs, add two new ones) ---
+        function setupTabListeners() {
+            // Intercept clicks on all tabs to update active class and call appropriate renderer
+            const tabs = {
+                navDashboard: () => { /* handled by tutor.js, we just update class */ },
+                navStudentDatabase: () => { /* handled by tutor.js */ },
+                navAutoStudents: () => { /* handled by tutor.js */ },
+                navAcademic: renderAcademicView,
+                navScheduleManagement: renderScheduleView
+            };
+
+            Object.keys(tabs).forEach(id => {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    // update active class on all nav buttons
+                    document.querySelectorAll('.nav-tab-modern').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+
+                    // For the first three, let tutor.js handle content; we just ensure we don't interfere.
+                    if (id === 'navDashboard' || id === 'navStudentDatabase' || id === 'navAutoStudents') {
+                        // tutor.js will render via its own listeners; we don't call anything.
+                        // But we must ensure that tutor.js's updateActiveTab doesn't override our active class.
+                        // We'll temporarily disable its effect? Actually tutor.js's updateActiveTab only changes those three.
+                        // To avoid conflict, we can let tutor.js run and then reapply our active class after a short delay.
+                        setTimeout(() => {
+                            document.querySelectorAll('.nav-tab-modern').forEach(b => b.classList.remove('active'));
+                            btn.classList.add('active');
+                        }, 50);
+                    } else {
+                        // custom tabs
+                        tabs[id]();
+                    }
+                });
+            });
+        }
+
+        // --- Initialize after tutorData is ready ---
         waitForTutorData(() => {
             const tutor = window.tutorData;
-            
-            // Update tutor name in header
             if (tutor.name) {
                 document.querySelector('.text-gradient').textContent = tutor.name.split(' ')[0];
                 document.querySelector('.avatar-modern').textContent = tutor.name.charAt(0);
             }
-            
-            // Start counter updates
-            startCounterUpdates(tutor);
+            updateAllCounters(tutor);
+            setInterval(() => updateAllCounters(tutor), 300000);
+            window.addEventListener('focus', () => updateAllCounters(tutor));
 
-            // ----- Total Students Card Click -----
+            setupTabListeners();
+
+            // Stat card modals (simple info)
             document.getElementById('totalStudentsCard').addEventListener('click', async () => {
                 const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-                const snapshot = await getDocs(q);
-                const students = snapshot.docs
-                    .map(doc => ({ id: doc.id, ...doc.data() }))
-                    .filter(s => !['archived','graduated','transferred'].includes(s.status));
-
-                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="studentListModal">
-                    <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-4xl mx-auto">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">My Students (${students.length})</h3>
-                            <button class="text-2xl font-bold close-modal text-gray-700 dark:text-gray-300">&times;</button>
-                        </div>
-                        <div class="overflow-auto max-h-96">
-                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                <thead class="bg-gray-50 dark:bg-gray-700">
-                                    <tr>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Name</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Grade</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Type</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Added</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">`;
-
-                students.forEach(s => {
-                    let type = 'Regular';
-                    if (s.isTransitioning) type = 'Transitioning';
-                    else if (s.groupClass) type = 'Group Class';
-                    
-                    const added = s.createdAt ? new Date(s.createdAt.seconds * 1000).toLocaleDateString() : 'N/A';
-                    html += `<tr>
-                        <td class="px-4 py-2 whitespace-nowrap text-gray-900 dark:text-white">${escapeHtml(s.studentName)}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-gray-900 dark:text-white">${escapeHtml(s.grade)}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-gray-900 dark:text-white">${escapeHtml(type)}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-gray-900 dark:text-white">${escapeHtml(added)}</td>
-                    </tr>`;
-                });
-
-                html += `</tbody></table></div></div></div>`;
-
-                const modalDiv = document.createElement('div');
-                modalDiv.innerHTML = html;
-                const modal = modalDiv.firstElementChild;
-                document.body.appendChild(modal);
-
+                const snap = await getDocs(q);
+                const students = snap.docs.map(d => d.data()).filter(s => !['archived','graduated','transferred'].includes(s.status));
+                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50"><div class="bg-white dark:bg-gray-800 p-6 rounded-xl max-w-2xl w-full max-h-96 overflow-auto"><h3 class="text-xl font-bold mb-4">All students (${students.length})</h3><ul class="list-disc pl-5">`;
+                students.forEach(s => html += `<li>${escapeHtml(s.studentName)} (${escapeHtml(s.grade)})</li>`);
+                html += '</ul><button class="mt-4 btn-modern close-modal">Close</button></div></div>';
+                const modal = document.createElement('div'); modal.innerHTML = html; document.body.appendChild(modal.firstElementChild);
                 modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
-                modal.addEventListener('click', (e) => {
-                    if (e.target === modal) modal.remove();
-                });
             });
-
-            // ----- Today's Classes Card Click -----
             document.getElementById('todayClassesCard').addEventListener('click', async () => {
-                const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
                 const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-                const snapshot = await getDocs(q);
-                const students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-                const todayClasses = [];
-                students.forEach(s => {
-                    if (s.schedule && Array.isArray(s.schedule)) {
-                        s.schedule.forEach(slot => {
-                            if (slot.day === todayName) {
-                                todayClasses.push({
-                                    student: s.studentName,
-                                    time: `${slot.start} - ${slot.end}`,
-                                    subject: slot.subject || 'General',
-                                    room: slot.room || 'Not specified'
-                                });
-                            }
-                        });
-                    }
+                const snap = await getDocs(q);
+                const classes = [];
+                snap.forEach(doc => {
+                    const s = doc.data();
+                    if (s.schedule) s.schedule.forEach(slot => { if (slot.day === today) classes.push({ student: s.studentName, time: slot.start+'-'+slot.end }); });
                 });
-
-                // Sort classes by time
-                todayClasses.sort((a, b) => {
-                    const timeA = a.time.split(' - ')[0];
-                    const timeB = b.time.split(' - ')[0];
-                    return timeA.localeCompare(timeB);
-                });
-
-                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="todayClassesModal">
-                    <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-lg mx-auto">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">Today's Classes (${todayName})</h3>
-                            <button class="text-2xl font-bold close-modal text-gray-700 dark:text-gray-300">&times;</button>
-                        </div>
-                        <div class="overflow-auto max-h-96">`;
-
-                if (todayClasses.length === 0) {
-                    html += '<p class="text-gray-500 dark:text-gray-400">No classes scheduled for today.</p>';
-                } else {
-                    html += '<div class="space-y-3">';
-                    todayClasses.forEach(c => {
-                        html += `<div class="border-l-4 border-green-500 pl-4 py-2 bg-gray-50 dark:bg-gray-700 rounded-r-lg">
-                            <p class="font-semibold text-gray-900 dark:text-white">${escapeHtml(c.student)}</p>
-                            <p class="text-sm text-gray-600 dark:text-gray-300"><i class="far fa-clock mr-2"></i>${escapeHtml(c.time)}</p>
-                            <p class="text-sm text-gray-600 dark:text-gray-300"><i class="fas fa-book mr-2"></i>${escapeHtml(c.subject)}</p>
-                            <p class="text-sm text-gray-600 dark:text-gray-300"><i class="fas fa-door-open mr-2"></i>${escapeHtml(c.room)}</p>
-                        </div>`;
-                    });
-                    html += '</div>';
-                }
-
-                html += `</div></div></div>`;
-
-                const modalDiv = document.createElement('div');
-                modalDiv.innerHTML = html;
-                const modal = modalDiv.firstElementChild;
-                document.body.appendChild(modal);
-
+                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50"><div class="bg-white dark:bg-gray-800 p-6 rounded-xl max-w-md w-full"><h3 class="text-xl font-bold mb-4">Today's classes (${today})</h3>`;
+                if (!classes.length) html += '<p>No classes today</p>';
+                else classes.forEach(c => html += `<div class="border-b py-2">${escapeHtml(c.student)} — ${escapeHtml(c.time)}</div>`);
+                html += '<button class="mt-4 btn-modern close-modal">Close</button></div></div>';
+                const modal = document.createElement('div'); modal.innerHTML = html; document.body.appendChild(modal.firstElementChild);
                 modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
-                modal.addEventListener('click', (e) => {
-                    if (e.target === modal) modal.remove();
-                });
             });
-
-            // ----- Pending Reports Card Click -----
             document.getElementById('pendingReportsCard').addEventListener('click', async () => {
                 const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-                const snapshot = await getDocs(q);
-                const students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                
-                const oneWeekAgo = new Date();
-                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-                
-                const pendingStudents = [];
-                for (const student of students) {
-                    if (!student.lastReportDate) {
-                        pendingStudents.push({ ...student, daysOverdue: 'No reports yet' });
-                        continue;
-                    }
-                    
-                    const lastReport = student.lastReportDate?.toDate?.() || new Date(student.lastReportDate);
-                    const daysSinceReport = Math.floor((new Date() - lastReport) / (1000 * 60 * 60 * 24));
-                    
-                    if (daysSinceReport > 7) {
-                        pendingStudents.push({ 
-                            ...student, 
-                            daysOverdue: `${daysSinceReport} days overdue` 
-                        });
-                    }
-                }
-
-                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="pendingReportsModal">
-                    <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-2xl mx-auto">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">Pending Reports (${pendingStudents.length})</h3>
-                            <button class="text-2xl font-bold close-modal text-gray-700 dark:text-gray-300">&times;</button>
-                        </div>
-                        <div class="overflow-auto max-h-96">`;
-
-                if (pendingStudents.length === 0) {
-                    html += '<p class="text-green-600 dark:text-green-400">All reports are up to date! 🎉</p>';
-                } else {
-                    html += '<div class="space-y-2">';
-                    pendingStudents.forEach(s => {
-                        const statusClass = s.daysOverdue.includes('No reports') ? 'text-yellow-600' : 'text-red-600';
-                        html += `<div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                            <p class="font-semibold text-gray-900 dark:text-white">${escapeHtml(s.studentName)}</p>
-                            <p class="text-sm ${statusClass}">${escapeHtml(s.daysOverdue)}</p>
-                            <button class="mt-2 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400" onclick="generateReport('${s.id}')">
-                                <i class="fas fa-plus-circle mr-1"></i>Create Report
-                            </button>
-                        </div>`;
-                    });
-                    html += '</div>';
-                }
-
-                html += `</div></div></div>`;
-
-                const modalDiv = document.createElement('div');
-                modalDiv.innerHTML = html;
-                const modal = modalDiv.firstElementChild;
-                document.body.appendChild(modal);
-
-                modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
-                modal.addEventListener('click', (e) => {
-                    if (e.target === modal) modal.remove();
+                const snap = await getDocs(q);
+                const pending = [];
+                snap.forEach(doc => {
+                    const s = doc.data();
+                    if (!s.lastReportDate) pending.push(s.studentName);
                 });
+                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50"><div class="bg-white dark:bg-gray-800 p-6 rounded-xl max-w-md w-full"><h3 class="text-xl font-bold mb-4">Pending reports</h3>`;
+                if (!pending.length) html += '<p>All caught up 🎉</p>';
+                else pending.forEach(name => html += `<div class="py-1">• ${escapeHtml(name)}</div>`);
+                html += '<button class="mt-4 btn-modern close-modal">Close</button></div></div>';
+                const modal = document.createElement('div'); modal.innerHTML = html; document.body.appendChild(modal.firstElementChild);
+                modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
             });
-
-            // ----- Performance Score Card Click -----
             document.getElementById('achievementsCard').addEventListener('click', () => {
-                const performance = document.getElementById('performanceScore').textContent;
-                
-                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="performanceModal">
-                    <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md mx-auto">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">Performance Score</h3>
-                            <button class="text-2xl font-bold close-modal text-gray-700 dark:text-gray-300">&times;</button>
-                        </div>
-                        <div class="text-center">
-                            <div class="w-32 h-32 mx-auto mb-4 relative">
-                                <svg class="w-full h-full" viewBox="0 0 100 100">
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#e5e7eb" stroke-width="10"/>
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#10b981" stroke-width="10" 
-                                        stroke-dasharray="${2 * Math.PI * 45}" 
-                                        stroke-dashoffset="${2 * Math.PI * 45 * (1 - performance/100)}"
-                                        stroke-linecap="round"
-                                        transform="rotate(-90 50 50)"/>
-                                </svg>
-                                <div class="absolute inset-0 flex items-center justify-center">
-                                    <span class="text-3xl font-bold text-gray-900 dark:text-white">${performance}</span>
-                                </div>
-                            </div>
-                            <p class="text-gray-600 dark:text-gray-300 mb-2">Overall performance rating</p>
-                            <div class="text-left space-y-2 mt-4">
-                                <p class="text-sm"><i class="fas fa-check-circle text-green-500 mr-2"></i>Attendance: Excellent</p>
-                                <p class="text-sm"><i class="fas fa-check-circle text-green-500 mr-2"></i>Reports: Up to date</p>
-                                <p class="text-sm"><i class="fas fa-check-circle text-green-500 mr-2"></i>Student engagement: High</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-
-                const modalDiv = document.createElement('div');
-                modalDiv.innerHTML = html;
-                const modal = modalDiv.firstElementChild;
-                document.body.appendChild(modal);
-
+                const score = document.getElementById('performanceScore').textContent;
+                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50"><div class="bg-white dark:bg-gray-800 p-6 rounded-xl max-w-sm w-full text-center"><h3 class="text-xl font-bold mb-4">Performance score</h3><div class="text-6xl font-bold text-green-600">${score}</div><p class="mt-4 text-gray-600 dark:text-gray-300">Overall rating</p><button class="mt-4 btn-modern close-modal">Close</button></div></div>`;
+                const modal = document.createElement('div'); modal.innerHTML = html; document.body.appendChild(modal.firstElementChild);
                 modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
-                modal.addEventListener('click', (e) => {
-                    if (e.target === modal) modal.remove();
-                });
             });
         });
     </script>
