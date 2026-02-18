@@ -46,7 +46,6 @@
             position: relative;
         }
 
-        /* Animated mesh overlay */
         body::before {
             content: '';
             position: fixed;
@@ -64,11 +63,8 @@
             --text-light: var(--text-dark);
         }
 
-        body.dark::before {
-            opacity: 0.6;
-        }
+        body.dark::before { opacity: 0.6; }
 
-        /* Glass panel — super refined */
         .glass-panel {
             background: var(--surface);
             backdrop-filter: blur(var(--blur)) saturate(180%);
@@ -85,7 +81,6 @@
             box-shadow: var(--shadow-hover), 0 0 0 1px rgba(255,255,255,0.2) inset;
         }
 
-        /* Floating orbs */
         .orb {
             position: absolute;
             border-radius: 50%;
@@ -103,7 +98,7 @@
             100% { transform: translate(30px, 30px) scale(1.1); }
         }
 
-        /* Header & user */
+        /* Avatar & badges */
         .avatar-modern {
             width: 48px;
             height: 48px;
@@ -133,7 +128,7 @@
             color: inherit;
         }
 
-        /* Stat cards — modern micro-interactions */
+        /* Stat cards */
         .stat-card {
             background: rgba(255,255,255,0.2);
             backdrop-filter: blur(8px);
@@ -151,10 +146,7 @@
             border-color: var(--primary);
         }
 
-        body.dark .stat-card {
-            background: rgba(0,0,0,0.2);
-            border-color: rgba(255,255,255,0.1);
-        }
+        body.dark .stat-card { background: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.1); }
 
         .stat-icon {
             width: 48px;
@@ -169,12 +161,15 @@
             box-shadow: 0 6px 14px var(--primary-glow);
         }
 
-        /* Nav tabs ultra smooth */
+        /* Navigation pills */
         .nav-pill-container {
             background: rgba(0,0,0,0.05);
             border-radius: 3rem;
             padding: 0.4rem;
             backdrop-filter: blur(4px);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.2rem;
         }
 
         body.dark .nav-pill-container { background: rgba(255,255,255,0.05); }
@@ -190,10 +185,10 @@
             background: transparent;
             cursor: pointer;
             letter-spacing: -0.01em;
+            white-space: nowrap;
         }
 
         .nav-tab-modern i { margin-right: 8px; }
-
         .nav-tab-modern:hover { opacity: 1; background: rgba(255,255,255,0.3); }
 
         .nav-tab-modern.active {
@@ -208,7 +203,7 @@
             color: var(--primary-soft);
         }
 
-        /* Buttons — next level */
+        /* Buttons */
         .btn-modern {
             display: inline-flex;
             align-items: center;
@@ -250,7 +245,41 @@
             box-shadow: 0 8px 20px var(--accent-glow);
         }
 
-        /* Main content loader — aesthetic */
+        /* Floating messaging buttons (styles moved from JS) */
+        .floating-messaging-btn, .floating-inbox-btn {
+            position: fixed;
+            right: 24px;
+            width: 56px;
+            height: 56px;
+            border-radius: 28px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            z-index: 1000;
+            font-size: 24px;
+        }
+        .floating-messaging-btn { bottom: 100px; }
+        .floating-inbox-btn { bottom: 30px; background: var(--accent); color: #1e293b; }
+        .floating-messaging-btn:hover, .floating-inbox-btn:hover { transform: scale(1.1); }
+        .unread-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: red;
+            color: white;
+            border-radius: 20px;
+            padding: 2px 6px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* Skeleton loader */
         .skeleton-loader {
             background: rgba(255,255,255,0.2);
             border-radius: 2rem;
@@ -282,16 +311,19 @@
 
         @keyframes pulse { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.8); opacity: 0; } }
 
-        /* Modern scrollbar */
+        /* Custom scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: rgba(0,0,0,0.02); border-radius: 20px; }
-        ::-webkit-scrollbar-thumb { background: rgba(46, 204, 113, 0.3); border-radius: 20px; backdrop-filter: blur(4px); }
+        ::-webkit-scrollbar-thumb { background: rgba(46, 204, 113, 0.3); border-radius: 20px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
 
         /* Network toasts */
         #networkWarning, #networkErrorOverlay { z-index: 9999; }
 
-        /* Responsive finesse */
+        /* Performance widget */
+        #performance-widget { margin-bottom: 1rem; }
+
+        /* Responsive */
         @media (max-width: 640px) {
             .glass-panel { border-radius: 1.8rem; padding: 1.5rem !important; }
             .stat-card { padding: 1rem; }
@@ -299,7 +331,6 @@
             .badge-date { display: none; }
         }
 
-        /* extra glow */
         .text-gradient {
             background: linear-gradient(145deg, var(--primary), #0f6b37);
             -webkit-background-clip: text;
@@ -307,16 +338,12 @@
             font-weight: 700;
         }
 
-        /* simulate card styles for dynamic content (will apply after JS loads) */
-        .dashboard-card {
-            background: rgba(255,255,255,0.2);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 1.8rem;
-            padding: 1.5rem;
-            transition: var(--transition);
+        /* header-profile-section for winner badge */
+        .header-profile-section {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
-        .dashboard-card:hover { background: rgba(255,255,255,0.3); transform: translateY(-3px); }
     </style>
 </head>
 <body class="antialiased">
@@ -325,7 +352,7 @@
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
 
-    <!-- network warning (keep original) -->
+    <!-- network warning -->
     <div id="networkWarning" class="fixed top-0 left-0 right-0 bg-yellow-100/80 backdrop-blur-md border-b border-yellow-400 text-yellow-800 px-4 py-3 text-center hidden shadow-lg z-50">
         <span id="warningMessage" class="font-medium">You appear to be offline.</span>
         <button onclick="hideNetworkWarning()" class="ml-4 text-yellow-800 hover:text-yellow-900 font-bold text-xl">&times;</button>
@@ -335,9 +362,8 @@
 
         <div class="glass-panel w-full max-w-7xl p-5 md:p-8 lg:p-10 relative overflow-hidden">
 
-            <!-- Header with avatar and date -->
+            <!-- Header with avatar, date, and performance widget placeholder -->
             <div class="relative z-20 flex flex-wrap items-center justify-between gap-4 mb-6">
-                <!-- left: logo & title -->
                 <div class="flex items-center gap-3 sm:gap-4">
                     <div class="relative group">
                         <div class="absolute -inset-1 bg-gradient-to-r from-green-400 to-blue-500 rounded-full blur-xl opacity-40 group-hover:opacity-70 transition"></div>
@@ -353,9 +379,8 @@
                     </div>
                 </div>
 
-                <!-- right: date, theme, actions -->
-                <div class="flex items-center gap-2 sm:gap-3">
-                    <!-- live date -->
+                <!-- Right side: date, theme, actions, and profile section for winner badge -->
+                <div class="flex items-center gap-2 sm:gap-3 header-profile-section">
                     <div class="badge-date hidden sm:flex items-center gap-2">
                         <i class="far fa-calendar-alt text-green-600 dark:text-green-400"></i>
                         <span id="currentDate"></span>
@@ -373,12 +398,15 @@
                         <i class="fas fa-sign-out-alt"></i><span class="hidden sm:inline">Logout</span>
                     </button>
 
-                    <!-- avatar initials (instead of generic) -->
-                    <div class="avatar-modern hidden md:flex">T</div>
+                    <!-- Avatar (will be updated by JS) -->
+                    <div class="avatar-modern hidden md:flex" id="tutorAvatar">T</div>
                 </div>
             </div>
 
-            <!-- STAT CARDS (static modern metrics - untouched by JS) -->
+            <!-- Performance widget (gamification) – will be updated by JS -->
+            <div id="performance-widget" class="relative z-20 mb-4"></div>
+
+            <!-- STAT CARDS (static metrics – purely visual) -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8 relative z-20">
                 <div class="stat-card flex items-center gap-3">
                     <div class="stat-icon"><i class="fas fa-users"></i></div>
@@ -410,18 +438,17 @@
                 </div>
             </div>
 
-            <!-- navigation pills (IDs preserved) -->
+            <!-- Navigation pills – all IDs present for JS -->
             <nav class="relative z-20 mb-8 overflow-x-auto hide-scrollbar">
                 <div class="nav-pill-container">
                     <button id="navDashboard" class="nav-tab-modern active"><i class="fas fa-columns"></i>Dashboard</button>
                     <button id="navStudentDatabase" class="nav-tab-modern"><i class="fas fa-users"></i>Student Database</button>
-                    <!-- additional tab for modern feel (but no id conflict) -->
-                    <button class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule</button>
-                    <button class="nav-tab-modern"><i class="fas fa-chart-line"></i>Progress</button>
+                    <button id="navAutoStudents" class="nav-tab-modern"><i class="fas fa-robot"></i>Auto Students</button>
+                    <button id="navInbox" class="nav-tab-modern"><i class="fas fa-inbox"></i>Inbox</button>
                 </div>
             </nav>
 
-            <!-- MAIN CONTENT (JS will populate, but we style the container) -->
+            <!-- MAIN CONTENT – where all dynamic views are injected -->
             <main id="mainContent" class="relative z-20 min-h-[400px] transition-all duration-500">
                 <!-- Elegant loading state (will be replaced by JS) -->
                 <div class="skeleton-loader flex flex-col items-center justify-center gap-6 py-12">
@@ -436,6 +463,9 @@
                 </div>
             </main>
 
+            <!-- Homework inbox section (will be populated by observer) -->
+            <div id="homework-inbox-section" class="relative z-20 mt-6 hidden"></div>
+
             <!-- subtle footer note -->
             <div class="relative z-20 mt-8 text-xs text-center opacity-40 flex items-center justify-center gap-2">
                 <i class="fas fa-shield-alt text-green-500"></i> End-to-end encrypted · Blooming Kids Care v2.0
@@ -443,7 +473,7 @@
         </div>
     </div>
 
-    <!-- network error overlay (original) -->
+    <!-- network error overlay -->
     <div id="networkErrorOverlay" class="fixed inset-0 bg-gray-900/80 backdrop-blur-xl z-50 hidden flex-col items-center justify-center p-4">
         <div class="bg-white/90 dark:bg-gray-800/90 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-white/30">
             <div class="w-20 h-20 bg-yellow-100/80 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -461,19 +491,22 @@
     <!-- scripts -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    
+    <!-- Your main tutor.js (must be type="module") -->
     <script type="module" src="tutor.js"></script>
+    <!-- games.js (optional) -->
     <script src="games.js"></script>
 
     <script>
         (function() {
-            // set today's date
+            // set today's date in the badge
             const dateEl = document.getElementById('currentDate');
             if (dateEl) {
                 const now = new Date();
                 dateEl.innerText = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
             }
 
-            // DARK MODE (preserved and enhanced)
+            // DARK MODE (same as original)
             const body = document.body;
             const toggle = document.getElementById('modeToggle');
             const icon = document.getElementById('modeIcon');
@@ -502,11 +535,17 @@
                 setTheme(body.classList.contains('dark') ? 'light' : 'dark');
             });
 
-            // network monitor (original)
-            function showNetworkWarning() { document.getElementById('networkWarning').classList.remove('hidden'); }
-            function hideNetworkWarning() { document.getElementById('networkWarning').classList.add('hidden'); }
-            function hideNetworkError() { document.getElementById('networkErrorOverlay').classList.add('hidden'); }
-            window.showNetworkError = (msg) => {
+            // Network functions (exposed for buttons)
+            window.showNetworkWarning = function() {
+                document.getElementById('networkWarning').classList.remove('hidden');
+            };
+            window.hideNetworkWarning = function() {
+                document.getElementById('networkWarning').classList.add('hidden');
+            };
+            window.hideNetworkError = function() {
+                document.getElementById('networkErrorOverlay').classList.add('hidden');
+            };
+            window.showNetworkError = function(msg) {
                 const overlay = document.getElementById('networkErrorOverlay');
                 if (msg) document.getElementById('errorMessage').innerText = msg;
                 overlay.classList.remove('hidden');
@@ -521,7 +560,6 @@
             };
             window.addEventListener('online', () => { hideNetworkWarning(); hideNetworkError(); });
             window.addEventListener('offline', showNetworkWarning);
-            window.hideNetworkWarning = hideNetworkWarning;
         })();
     </script>
 </body>
