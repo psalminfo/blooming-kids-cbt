@@ -107,6 +107,10 @@ class EnrollmentApp {
         this.isLoadingSavedData = false;
         this.isSaving = false;
         
+        // CSRF Protection
+        this.csrfToken = this.generateCSRFToken();
+        this.setCSRFCookie();
+        
         this.initializeState();
     }
     
@@ -118,9 +122,40 @@ class EnrollmentApp {
         return div.innerHTML;
     }
     
+    // CSRF token generation and handling
+    generateCSRFToken() {
+        return 'csrf_' + Math.random().toString(36).substr(2, 15) + '_' + Date.now();
+    }
+    
+    setCSRFCookie() {
+        // Set a cookie with the token (HttpOnly not possible client-side, but we'll use it for double-submit)
+        document.cookie = `XSRF-TOKEN=${this.csrfToken}; path=/; SameSite=Strict`;
+    }
+    
+    addCSRFField() {
+        // Add hidden field with token
+        let field = document.getElementById('csrf-token-field');
+        if (!field) {
+            field = document.createElement('input');
+            field.type = 'hidden';
+            field.id = 'csrf-token-field';
+            field.name = '_csrf';
+            document.querySelector('.form-card').appendChild(field);
+        }
+        field.value = this.csrfToken;
+    }
+    
+    validateCSRFToken() {
+        // Double-submit: check cookie vs field
+        const cookieValue = document.cookie.split('; ').find(row => row.startsWith('XSRF-TOKEN='))?.split('=')[1];
+        const fieldValue = document.getElementById('csrf-token-field')?.value;
+        return cookieValue && fieldValue && cookieValue === fieldValue;
+    }
+    
     async initializeState() {
         await this.initializeFirebase();
         this.setupEventListeners();
+        this.addCSRFField(); // Add CSRF field to form
         await this.checkResumeLink();
     }
     
@@ -153,12 +188,20 @@ class EnrollmentApp {
         
         // Save progress
         document.getElementById('save-progress-btn').addEventListener('click', () => {
+            if (!this.validateCSRFToken()) {
+                this.showAlert("Security validation failed. Please refresh the page.", "danger");
+                return;
+            }
             this.saveProgress();
         });
         
         // Submit enrollment - attach only once
         document.getElementById('submit-enrollment').addEventListener('click', (e) => {
             e.preventDefault();
+            if (!this.validateCSRFToken()) {
+                this.showAlert("Security validation failed. Please refresh the page.", "danger");
+                return;
+            }
             this.submitEnrollment();
         });
     }
@@ -2474,10 +2517,11 @@ class EnrollmentApp {
                 this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
             }, 2000);
 
-            // STEP 4: Redirect to Parent Portal in a NEW TAB
-            setTimeout(() => {
-                window.open("parent.html", "_blank"); // '_blank' guarantees a new tab
-            }, 3000);
+            // STEP 4: Open Parent Portal in a new tab immediately after user confirmation
+            const openPortal = confirm("Your enrollment is complete! Click OK to open the parent portal now.");
+            if (openPortal) {
+                window.open("parent.html", "_blank");
+            }
 
             btn.innerHTML = 'Success!';
             btn.disabled = false;
