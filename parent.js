@@ -770,3 +770,343 @@ document.addEventListener('DOMContentLoaded', () => {
 
 window.authManager = authManager;
 window.toggleAccordion = toggleAccordion;
+
+// ============================================================================
+// SECTION 12: TAB NAVIGATION & UI SWITCHING
+// ============================================================================
+
+window.switchMainTab = function(tab) {
+    const tabs = ['report', 'academics', 'rewards'];
+    
+    // Reset all tabs
+    tabs.forEach(t => {
+        const tabBtn = document.getElementById(`${t}Tab`);
+        const contentArea = document.getElementById(`${t}ContentArea`);
+        if (tabBtn) {
+            tabBtn.classList.remove('tab-active-main');
+            tabBtn.classList.add('tab-inactive-main');
+        }
+        if (contentArea) contentArea.classList.add('hidden');
+    });
+    
+    // Hide settings if it's open
+    const settingsArea = document.getElementById('settingsContentArea');
+    if (settingsArea) settingsArea.classList.add('hidden');
+
+    // Activate selected tab
+    const activeTab = document.getElementById(`${tab}Tab`);
+    const activeContent = document.getElementById(`${tab}ContentArea`);
+    
+    if (activeTab && activeContent) {
+        activeTab.classList.remove('tab-inactive-main');
+        activeTab.classList.add('tab-active-main');
+        activeContent.classList.remove('hidden');
+    }
+
+    // Load specific data
+    if (tab === 'academics') loadAcademicsData();
+    if (tab === 'rewards' && auth.currentUser) loadReferralRewards(auth.currentUser.uid);
+};
+
+// Bind Tab Listeners
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById("reportTab")?.addEventListener("click", () => switchMainTab('reports'));
+    document.getElementById("academicsTab")?.addEventListener("click", () => switchMainTab('academics'));
+    document.getElementById("rewardsTab")?.addEventListener("click", () => switchMainTab('rewards'));
+});
+
+// ============================================================================
+// SECTION 13: REWARDS DASHBOARD
+// ============================================================================
+
+window.loadReferralRewards = async function(parentUid) {
+    const rewardsContent = document.getElementById('rewardsContent');
+    if (!rewardsContent) return;
+    
+    showSkeletonLoader('rewardsContent', 'reports');
+
+    try {
+        const userDoc = await db.collection('parent_users').doc(parentUid).get();
+        if (!userDoc.exists) {
+            rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">User data not found.</p>';
+            return;
+        }
+        
+        const userData = userDoc.data();
+        const referralCode = escapeHtml(userData.referralCode || 'N/A');
+        const totalEarnings = userData.referralEarnings || 0;
+        
+        const transactionsSnapshot = await db.collection('referral_transactions')
+            .where('ownerUid', '==', parentUid)
+            .get();
+
+        let referralsHtml = '';
+        let pendingCount = 0, approvedCount = 0, paidCount = 0;
+
+        if (transactionsSnapshot.empty) {
+            referralsHtml = `<tr><td colspan="4" class="text-center py-4 text-gray-500">No one has used your referral code yet.</td></tr>`;
+        } else {
+            const transactions = transactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            transactions.sort((a, b) => (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0));
+            
+            transactions.forEach(data => {
+                const status = escapeHtml(data.status || 'pending');
+                const statusColor = status === 'paid' ? 'bg-green-100 text-green-800' : 
+                                    status === 'approved' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800';
+                
+                if (status === 'pending') pendingCount++;
+                if (status === 'approved') approvedCount++;
+                if (status === 'paid') paidCount++;
+
+                const referredName = capitalize(data.referredStudentName || data.referredStudentPhone);
+                const rewardAmount = data.rewardAmount ? `₦${data.rewardAmount.toLocaleString()}` : '₦5,000';
+                const referralDate = data.timestamp?.toDate?.().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) || 'N/A';
+
+                referralsHtml += `
+                    <tr class="hover:bg-gray-50 border-b border-gray-100">
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900">${referredName}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500">${escapeHtml(referralDate)}</td>
+                        <td class="px-4 py-3 text-sm">
+                            <span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium ${statusColor}">
+                                ${capitalize(status)}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-900 font-bold">${escapeHtml(rewardAmount)}</td>
+                    </tr>
+                `;
+            });
+        }
+        
+        rewardsContent.innerHTML = `
+            <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-8 shadow-sm">
+                <h2 class="text-xl font-bold text-blue-800 mb-1">Your Referral Code</h2>
+                <p class="text-2xl font-mono text-blue-600 tracking-wider p-2 bg-white inline-block rounded border border-blue-200 select-all">${referralCode}</p>
+                <p class="text-blue-700 mt-2 text-sm">Share this code with other parents. You earn <b>₦5,000</b> once their child completes their first month!</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div class="bg-green-50 p-6 rounded-xl border border-green-100">
+                    <p class="text-sm font-medium text-green-700">Total Earnings</p>
+                    <p class="text-3xl font-extrabold text-green-900 mt-1">₦${totalEarnings.toLocaleString()}</p>
+                </div>
+                <div class="bg-yellow-50 p-6 rounded-xl border border-yellow-100">
+                    <p class="text-sm font-medium text-yellow-700">Approved (Awaiting Payment)</p>
+                    <p class="text-3xl font-extrabold text-yellow-900 mt-1">${approvedCount}</p>
+                </div>
+                <div class="bg-gray-50 p-6 rounded-xl border border-gray-200">
+                    <p class="text-sm font-medium text-gray-700">Successful Referrals</p>
+                    <p class="text-3xl font-extrabold text-gray-900 mt-1">${paidCount}</p>
+                </div>
+            </div>
+            <h3 class="text-lg font-bold text-gray-800 mb-4">Referral History</h3>
+            <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                <table class="w-full text-left">
+                    <thead class="bg-gray-50 text-gray-600 text-xs uppercase">
+                        <tr><th class="px-4 py-3">Referred Parent/Student</th><th class="px-4 py-3">Date Used</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Reward</th></tr>
+                    </thead>
+                    <tbody>${referralsHtml}</tbody>
+                </table>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error loading referral rewards:', error);
+        rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">Error loading rewards.</p>';
+    }
+};
+
+// ============================================================================
+// SECTION 14: ACADEMICS TAB
+// ============================================================================
+
+window.loadAcademicsData = async function() {
+    const container = document.getElementById('academicsContent');
+    if (!container) return;
+    showSkeletonLoader('academicsContent', 'reports');
+
+    try {
+        if (!allStudentData || allStudentData.length === 0) {
+            container.innerHTML = `<div class="text-center py-12"><div class="text-4xl mb-4">📚</div><h3 class="text-xl font-bold text-gray-700">No Students Found</h3><p class="text-gray-500">No students are currently linked to your account.</p></div>`;
+            return;
+        }
+
+        let html = '';
+        const studentIds = allStudentData.map(s => s.id);
+
+        // Fetch all homework for these students at once to save reads
+        const chunkArray = (arr, size) => Array.from({ length: Math.ceil(arr.length / size) }, (v, i) => arr.slice(i * size, i * size + size));
+        const batches = chunkArray(studentIds, 10);
+        let allHomework = [];
+
+        for (const batchIds of batches) {
+            const hwSnap = await db.collection('homework_assignments').where('studentId', 'in', batchIds).get();
+            hwSnap.forEach(doc => allHomework.push({ id: doc.id, ...doc.data() }));
+        }
+
+        allStudentData.forEach(student => {
+            const studentHomework = allHomework.filter(hw => hw.studentId === student.id);
+            let hwHtml = '';
+
+            if (studentHomework.length === 0) {
+                hwHtml = `<p class="text-gray-500 text-center py-4 bg-gray-50 rounded-lg">No assignments currently posted.</p>`;
+            } else {
+                studentHomework.forEach(hw => {
+                    const isOverdue = hw.dueDate && getTimestamp(hw.dueDate) < Date.now() && !['submitted', 'graded'].includes(hw.status);
+                    hwHtml += `
+                        <div class="border ${isOverdue ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-white'} rounded-lg p-4 mb-3 shadow-sm" data-homework-id="${hw.id}">
+                            <div class="flex justify-between">
+                                <h5 class="font-bold text-gray-800 text-lg">${escapeHtml(hw.title || hw.subject || 'Untitled')}</h5>
+                                <span class="text-sm font-medium ${isOverdue ? 'text-red-600' : 'text-gray-600'}">Due: ${formatDetailedDate(hw.dueDate)}</span>
+                            </div>
+                            <p class="text-gray-600 text-sm mt-2 mb-3">${escapeHtml(hw.description || 'No description provided.')}</p>
+                            ${hw.grade ? `<div class="bg-green-100 text-green-800 px-3 py-1 rounded text-sm inline-block font-bold">Grade: ${escapeHtml(hw.grade)}</div>` : ''}
+                        </div>
+                    `;
+                });
+            }
+
+            html += `
+                <div class="mb-8 fade-in">
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-600 p-4 rounded-lg mb-4">
+                        <h3 class="text-xl font-bold text-blue-900">${escapeHtml(student.name)}</h3>
+                    </div>
+                    <div class="space-y-4">
+                        <h4 class="font-semibold text-gray-700 flex items-center"><span class="mr-2">📝</span> Homework & Assignments</h4>
+                        ${hwHtml}
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+
+    } catch (error) {
+        console.error('Error loading academics:', error);
+        container.innerHTML = '<p class="text-red-500 text-center py-8">Failed to load academic data. Please refresh.</p>';
+    }
+};
+
+// ============================================================================
+// SECTION 15: SETTINGS MANAGER (RESTORED)
+// ============================================================================
+
+class SettingsManager {
+    constructor() {
+        this.injectSettingsUI();
+    }
+
+    injectSettingsUI() {
+        const mainContainer = document.getElementById('reportArea');
+        if (mainContainer && !document.getElementById('settingsContentArea')) {
+            const settingsDiv = document.createElement('div');
+            settingsDiv.id = 'settingsContentArea';
+            settingsDiv.className = 'hidden fade-in mt-6';
+            settingsDiv.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="bg-gray-800 px-6 py-4 flex justify-between items-center">
+                        <h2 class="text-xl font-bold text-white flex items-center"><span class="mr-2">⚙️</span> Profile Settings</h2>
+                        <button onclick="switchMainTab('reports')" class="text-gray-300 hover:text-white text-sm font-semibold">← Back to Dashboard</button>
+                    </div>
+                    <div id="settingsDynamicContent" class="p-6">
+                        <div class="loading-spinner mx-auto"></div>
+                    </div>
+                </div>
+            `;
+            mainContainer.appendChild(settingsDiv);
+        }
+    }
+
+    openSettingsTab() {
+        // Hide standard tabs
+        ['report', 'academics', 'rewards'].forEach(t => {
+            document.getElementById(`${t}Tab`)?.classList.remove('tab-active-main');
+            document.getElementById(`${t}Tab`)?.classList.add('tab-inactive-main');
+            document.getElementById(`${t}ContentArea`)?.classList.add('hidden');
+        });
+
+        const settingsArea = document.getElementById('settingsContentArea');
+        if (settingsArea) {
+            settingsArea.classList.remove('hidden');
+            this.loadSettingsData();
+        }
+    }
+
+    async loadSettingsData() {
+        const content = document.getElementById('settingsDynamicContent');
+        const user = auth.currentUser;
+        if (!user) return;
+
+        try {
+            const userDoc = await db.collection('parent_users').doc(user.uid).get();
+            const userData = userDoc.data();
+
+            let html = `
+                <div class="max-w-xl">
+                    <h3 class="text-lg font-bold text-gray-800 border-b pb-2 mb-4">Parent Profile</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
+                            <input type="text" id="settingParentName" value="${escapeHtml(userData.parentName || '')}" class="w-full">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Primary Phone (Cannot be changed here)</label>
+                            <input type="text" value="${escapeHtml(userData.phone)}" disabled class="w-full bg-gray-100 cursor-not-allowed">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                            <input type="email" id="settingParentEmail" value="${escapeHtml(userData.email || '')}" class="w-full">
+                        </div>
+                        <button onclick="window.settingsManager.saveProfile()" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 w-full mt-4">
+                            Update Profile
+                        </button>
+                    </div>
+                </div>
+            `;
+            content.innerHTML = html;
+        } catch (error) {
+            content.innerHTML = `<p class="text-red-500">Error loading settings.</p>`;
+        }
+    }
+
+    async saveProfile() {
+        const user = auth.currentUser;
+        const name = document.getElementById('settingParentName').value.trim();
+        const email = document.getElementById('settingParentEmail').value.trim();
+        
+        if (!name) return showMessage('Name is required', 'error');
+
+        try {
+            await db.collection('parent_users').doc(user.uid).update({ parentName: name, email: email });
+            document.getElementById('welcomeMessage').textContent = `Welcome, ${escapeHtml(name)}!`;
+            showMessage('Profile updated successfully!', 'success');
+        } catch (error) {
+            showMessage('Failed to update profile.', 'error');
+        }
+    }
+}
+
+// Hook Settings Manager into Navigation Buttons
+const originalAddNavBtns = window.addNavigationButtons;
+window.addNavigationButtons = function() {
+    if (typeof originalAddNavBtns === 'function') originalAddNavBtns();
+    
+    const nav = document.querySelector('.bg-green-50 .flex.gap-2') || document.querySelector('.flex.gap-2');
+    if (nav && !document.getElementById('settingsBtn')) {
+        const btn = document.createElement('button');
+        btn.id = 'settingsBtn';
+        btn.onclick = () => {
+            if (!window.settingsManager) window.settingsManager = new SettingsManager();
+            window.settingsManager.openSettingsTab();
+        };
+        btn.className = 'bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-700 transition-all flex items-center';
+        btn.innerHTML = '⚙️ Settings';
+        
+        // Insert before logout
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) nav.insertBefore(btn, logoutBtn);
+        else nav.appendChild(btn);
+    }
+};
+
+// Re-trigger navigation button injection if dashboard is already loaded
+if (document.getElementById('reportArea') && !document.getElementById('reportArea').classList.contains('hidden')) {
+    window.addNavigationButtons();
+}
