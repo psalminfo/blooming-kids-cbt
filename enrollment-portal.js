@@ -106,33 +106,22 @@ class EnrollmentApp {
         this.appData = null;
         this.isLoadingSavedData = false;
         this.isSaving = false;
-        this.csrfToken = this.generateCSRFToken();
         
         this.initializeState();
+    }
+    
+    // Helper to escape HTML and prevent XSS
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
     
     async initializeState() {
         await this.initializeFirebase();
         this.setupEventListeners();
         await this.checkResumeLink();
-        this.addCSRFToken();
-    }
-    
-    generateCSRFToken() {
-        return 'csrf_' + Math.random().toString(36).substr(2, 9);
-    }
-    
-    addCSRFToken() {
-        const csrfField = document.createElement('input');
-        csrfField.type = 'hidden';
-        csrfField.id = 'csrf-token';
-        csrfField.value = this.csrfToken;
-        document.querySelector('.form-card').appendChild(csrfField);
-    }
-    
-    validateCSRFToken() {
-        const token = document.getElementById('csrf-token')?.value;
-        return token === this.csrfToken;
     }
     
     async initializeFirebase() {
@@ -164,89 +153,15 @@ class EnrollmentApp {
         
         // Save progress
         document.getElementById('save-progress-btn').addEventListener('click', () => {
-            if (!this.validateCSRFToken()) {
-                this.showAlert("Security validation failed. Please refresh the page.", "danger");
-                return;
-            }
             this.saveProgress();
         });
         
-        // ==============================================
-// SUBMIT ENROLLMENT (UPGRADED ARCHITECTURE)
-// ==============================================
-async submitEnrollment() {
-    if (!this.validateForm()) {
-        this.showAlert("Please fix all errors before submitting. Make sure all time selections are completed.", "danger");
-        return;
+        // Submit enrollment - attach only once
+        document.getElementById('submit-enrollment').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.submitEnrollment();
+        });
     }
-
-    const btn = document.getElementById('submit-enrollment');
-    btn.innerHTML = '<div class="spinner"></div> Processing Enrollment...';
-    btn.disabled = true;
-
-    try {
-        // STEP 1: Save the core enrollment data first
-        const result = await this.saveProgress();
-
-        if (!result.success) {
-            throw new Error("Failed to save enrollment data.");
-        }
-
-        this.showAlert("Enrollment Saved Successfully! Setting up your portal...", "success");
-        this.showInvoice();
-
-        // STEP 2: Attempt Parent Portal Setup
-        const portalResult = await this.setupParentPortal(result.enrollmentData);
-
-        // Handle successful portal creation
-        if (portalResult && portalResult.isNew) {
-            document.getElementById('temp-password').textContent = portalResult.password;
-            document.getElementById('temp-password-container').style.display = 'block';
-            this.showAlert(`Portal created! Your temporary password is: ${portalResult.password}. Please save it.`, 'success');
-
-            if (portalResult.referralCode) {
-                const referralContainer = document.createElement('div');
-                referralContainer.id = 'referral-code-container';
-                referralContainer.className = 'mt-4 p-4 bg-green-50 border border-green-200 rounded-lg';
-                referralContainer.innerHTML = `
-                    <p class="font-semibold text-green-800">Your Referral Code:</p>
-                    <p class="text-2xl font-mono text-green-600 bg-white p-2 rounded border border-green-300 select-all">${portalResult.referralCode}</p>
-                    <p class="text-sm text-green-700 mt-2">Share this code with other parents to earn ₦5,000!</p>
-                `;
-                document.getElementById('temp-password-container').after(referralContainer);
-            }
-        } else if (portalResult && !portalResult.isNew) {
-            this.showAlert('Your existing parent account has been linked. You can log in with your email.', 'info');
-        } else {
-            // STEP 2.5: ERROR RECOVERY - Enrollment saved, but portal failed.
-            this.showAlert("Enrollment successful, but we couldn't auto-login to your portal. Please contact support to link your account.", "warning");
-            btn.innerHTML = 'Enrollment Complete (Portal Setup Pending)';
-            btn.disabled = false;
-            return; // Halt execution here so we don't open the portal tab blindly
-        }
-
-        // STEP 3: Fire-and-forget email notifications
-        setTimeout(() => {
-            const invoiceElement = document.getElementById('invoice-content');
-            const invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
-            this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
-        }, 2000);
-
-        // STEP 4: Redirect to Parent Portal in a NEW TAB
-        setTimeout(() => {
-            window.open("parent.html", "_blank"); // '_blank' guarantees a new tab
-        }, 3000);
-
-        btn.innerHTML = 'Success!';
-        btn.disabled = false;
-
-    } catch (error) {
-        console.error("Enrollment Submission Error:", error);
-        btn.innerHTML = '<i class="fas fa-lock"></i> Proceed to Secure Payment';
-        btn.disabled = false;
-        this.showAlert("An error occurred during submission. Please try again.", "danger");
-    }
-}
     
     // ==============================================
     // STUDENT MANAGEMENT
@@ -267,9 +182,13 @@ async submitEnrollment() {
         nextMonth.setDate(1);
         const defaultStartDate = nextMonth.toISOString().split('T')[0];
         
-        // Generate HTML
+        // Escape user-provided values for safe HTML insertion
+        const safeName = prefillData?.name ? this.escapeHtml(prefillData.name) : '';
+        const safeDob = prefillData?.dob ? this.escapeHtml(prefillData.dob) : '';
+        
+        // Generate HTML (with escaped values)
         const courseSelectionHTML = this.generateCourseSelectionHTML(studentId);
-
+        
         newStudent.innerHTML = `
             <div class="student-header">
                 <div class="student-number">${studentId}</div>
@@ -280,7 +199,7 @@ async submitEnrollment() {
             <div class="form-row">
                 <div class="form-group">
                     <label>Student Full Name <span class="required">*</span></label>
-                    <input type="text" class="form-control student-name" placeholder="Student Name" data-validate="required" value="${prefillData?.name || ''}">
+                    <input type="text" class="form-control student-name" placeholder="Student Name" data-validate="required" value="${safeName}">
                     <div class="error-message student-name-error"></div>
                 </div>
                 <div class="form-group">
@@ -298,7 +217,7 @@ async submitEnrollment() {
             <div class="form-row">
                 <div class="form-group">
                     <label>Date of Birth <span class="required">*</span></label>
-                    <input type="date" class="form-control student-dob" data-validate="required" value="${prefillData?.dob || ''}">
+                    <input type="date" class="form-control student-dob" data-validate="required" value="${safeDob}">
                     <div class="error-message student-dob-error"></div>
                 </div>
                 <div class="form-group">
@@ -389,10 +308,11 @@ async submitEnrollment() {
         
         // Pre-fill selections if data exists
         if (prefillData && prefillData.selectedSubjects) {
-            setTimeout(() => {
+            // Use requestAnimationFrame to ensure DOM is ready, then preload
+            requestAnimationFrame(() => {
                 this.preloadStudentSelections(newStudent, prefillData);
                 this.checkCourseSelectionRequirement(studentId);
-            }, 100);
+            });
         }
         
         this.updateRemoveButtons();
@@ -1199,7 +1119,6 @@ async submitEnrollment() {
         let hasAcademicSelection = false;
         let earliestStartDate = null;
         let totalActualAcademicFee = 0;
-        let selectedDaysPerWeek = 0;
         
         const studentEntries = document.querySelectorAll('.student-entry');
         const breakdownContainer = document.getElementById('fee-details');
@@ -1218,6 +1137,7 @@ async submitEnrollment() {
             const grade = entry.querySelector('.student-grade').value;
             const startDate = entry.querySelector('.student-start-date').value;
             const name = entry.querySelector('.student-name').value || `Student ${index + 1}`;
+            const safeName = this.escapeHtml(name);
             
             // Get selected academic sessions
             const selectedSession = entry.querySelector('.session-option.selected');
@@ -1230,7 +1150,6 @@ async submitEnrollment() {
             if (startDate) {
                 if (!earliestStartDate || new Date(startDate) < new Date(earliestStartDate)) {
                     earliestStartDate = startDate;
-                    selectedDaysPerWeek = selectedAcademicDays.length;
                 }
             }
             
@@ -1295,12 +1214,12 @@ async submitEnrollment() {
                 }
             });
 
-            // Add to breakdown list
+            // Add to breakdown list (safe name)
             const breakdownItem = document.createElement('div');
             breakdownItem.className = 'student-fee';
             breakdownItem.innerHTML = `
                 <div>
-                    <strong>${name}</strong><br>
+                    <strong>${safeName}</strong><br>
                     <small style="color: #666;">Grade: ${grade || 'None'} | Sessions: ${sessions || 'None'}</small>
                 </div>
                 <div style="text-align: right;">
@@ -1324,11 +1243,10 @@ async submitEnrollment() {
         let prorationExplanation = '';
         
         // Apply proration to academic fees if applicable
-        if (hasAcademicSelection && earliestStartDate && selectedDaysPerWeek > 0) {
+        if (hasAcademicSelection && earliestStartDate && totalActualAcademicFee > 0) {
             const prorationResult = this.calculateProratedMonthlyFee(
                 totalActualAcademicFee, 
-                earliestStartDate, 
-                Array.from({length: selectedDaysPerWeek}, (_, i) => `Day${i+1}`)
+                earliestStartDate
             );
             
             proratedAmountToPay = prorationResult.toPay || 0;
@@ -1645,9 +1563,15 @@ async submitEnrollment() {
                     this.referralValidated = false;
                     this.hideBankDetails();
                 }
+            } else {
+                // Firebase not available, assume referral invalid
+                this.referralValidated = false;
+                this.hideBankDetails();
             }
         } catch (error) {
             console.error('Referral validation error', error);
+            this.referralValidated = false;
+            this.hideBankDetails();
         }
     }
     
@@ -1739,7 +1663,6 @@ async submitEnrollment() {
             enrollmentData.lastSaved = new Date().toISOString();
             enrollmentData.status = 'draft';
             enrollmentData.createdAt = enrollmentData.createdAt || new Date().toISOString();
-            enrollmentData.csrfToken = this.csrfToken; // Add CSRF token for validation
             
             // 4. Save to Firebase if available
             if (this.db) {
@@ -1802,12 +1725,12 @@ async submitEnrollment() {
                 
                 return {
                     success: true,
-                        appId: this.currentApplicationId,
-                        resumeLink: resumeLink,
-                        enrollmentData: enrollmentData,
-                        offline: true
-                    };
-                }
+                    appId: this.currentApplicationId,
+                    resumeLink: resumeLink,
+                    enrollmentData: enrollmentData,
+                    offline: true
+                };
+            }
             
         } catch (error) {
             // Provide specific error messages
@@ -2068,10 +1991,6 @@ async submitEnrollment() {
                         
                         if (doc.exists) {
                             this.appData = doc.data();
-                            // Validate CSRF token if present
-                            if (this.appData.csrfToken) {
-                                this.csrfToken = this.appData.csrfToken;
-                            }
                             loadedData = this.appData;
                         }
                     } catch (firebaseError) {
@@ -2084,10 +2003,6 @@ async submitEnrollment() {
                     const localData = localStorage.getItem('lastEnrollmentData');
                     if (localData) {
                         this.appData = JSON.parse(localData);
-                        // Validate CSRF token if present
-                        if (this.appData.csrfToken) {
-                            this.csrfToken = this.appData.csrfToken;
-                        }
                         loadedData = this.appData;
                     }
                 }
@@ -2214,7 +2129,7 @@ async submitEnrollment() {
         const alertArea = document.getElementById('alert-area');
         const alertDiv = document.createElement('div');
         alertDiv.className = `alert alert-${type}`;
-        alertDiv.innerHTML = `<i class="fas fa-info-circle"></i> ${message}`;
+        alertDiv.innerHTML = `<i class="fas fa-info-circle"></i> ${this.escapeHtml(message)}`;
         alertArea.prepend(alertDiv);
         setTimeout(() => alertDiv.remove(), 5000);
     }
@@ -2234,17 +2149,18 @@ async submitEnrollment() {
         dueDate.setDate(dueDate.getDate() + 14);
         document.getElementById('invoice-due-date').textContent = dueDate.toLocaleDateString();
         
-        // Populate Bill To
-        const pName = document.getElementById('parentName').value || 'N/A';
-        const city = document.getElementById('city').value || '';
-        const country = document.getElementById('country').value || '';
+        // Populate Bill To (escaped)
+        const pName = this.escapeHtml(document.getElementById('parentName').value || 'N/A');
+        const city = this.escapeHtml(document.getElementById('city').value || '');
+        const country = this.escapeHtml(document.getElementById('country').value || '');
         const cityCountry = `${city}, ${country}`;
-        const normalizedPhone = `${document.getElementById('countryCode').value}-${document.getElementById('parentPhone').value}`;
+        const normalizedPhone = this.escapeHtml(`${document.getElementById('countryCode').value}-${document.getElementById('parentPhone').value}`);
+        const parentEmail = this.escapeHtml(document.getElementById('parentEmail').value || '');
         
         document.getElementById('invoice-bill-to').innerHTML = `
             <p><strong>${pName}</strong></p>
             <p>${cityCountry}</p>
-            <p>${document.getElementById('parentEmail').value || ''}</p>
+            <p>${parentEmail}</p>
             <p>${normalizedPhone}</p>
         `;
         
@@ -2268,8 +2184,8 @@ async submitEnrollment() {
         // Academic fees with details
         const studentEntries = document.querySelectorAll('.student-entry');
         studentEntries.forEach((entry, index) => {
-            const studentName = entry.querySelector('.student-name').value || `Student ${index + 1}`;
-            const selectedSubjects = Array.from(entry.querySelectorAll('.subject-option.selected')).map(opt => opt.dataset.subject);
+            const studentName = this.escapeHtml(entry.querySelector('.student-name').value || `Student ${index + 1}`);
+            const selectedSubjects = Array.from(entry.querySelectorAll('.subject-option.selected')).map(opt => this.escapeHtml(opt.dataset.subject));
             const grade = entry.querySelector('.student-grade').value;
             const selectedSession = entry.querySelector('.session-option.selected');
             const sessions = selectedSession ? selectedSession.dataset.sessions : null;
@@ -2296,16 +2212,16 @@ async submitEnrollment() {
                 const extraFee = extraCount * CONFIG.CONSTANTS.ADDITIONAL_SUBJECT_FEE;
                 const studentAcademicFee = baseFee + extraFee;
                 
-                tbody.innerHTML += `<tr><td>${description}</td><td>1</td><td>₦${studentAcademicFee.toLocaleString()}</td><td>₦${studentAcademicFee.toLocaleString()}</td></tr>`;
+                tbody.innerHTML += `<tr><td>${this.escapeHtml(description)}</td><td>1</td><td>₦${studentAcademicFee.toLocaleString()}</td><td>₦${studentAcademicFee.toLocaleString()}</td></tr>`;
             }
         });
         
         // Extracurricular activities with details
         studentEntries.forEach((entry, index) => {
-            const studentName = entry.querySelector('.student-name').value || `Student ${index + 1}`;
+            const studentName = this.escapeHtml(entry.querySelector('.student-name').value || `Student ${index + 1}`);
             
             entry.querySelectorAll('.extracurricular-card.selected').forEach(card => {
-                const activityName = card.querySelector('.extracurricular-name').textContent;
+                const activityName = this.escapeHtml(card.querySelector('.extracurricular-name').textContent);
                 const selectedDays = Array.from(card.querySelectorAll('.extracurricular-day-btn.selected')).map(btn => btn.dataset.day);
                 const activityId = card.dataset.activityId;
                 const startHour = document.getElementById(`extracurricular-start-hour-${index + 1}-${activityId}`)?.value || '';
@@ -2332,7 +2248,7 @@ async submitEnrollment() {
                     }
                     
                     if (fee > 0) {
-                        tbody.innerHTML += `<tr><td>${description}</td><td>1</td><td>₦${fee.toLocaleString()}</td><td>₦${fee.toLocaleString()}</td></tr>`;
+                        tbody.innerHTML += `<tr><td>${this.escapeHtml(description)}</td><td>1</td><td>₦${fee.toLocaleString()}</td><td>₦${fee.toLocaleString()}</td></tr>`;
                     }
                 }
             });
@@ -2340,10 +2256,10 @@ async submitEnrollment() {
         
         // Test prep with details
         studentEntries.forEach((entry, index) => {
-            const studentName = entry.querySelector('.student-name').value || `Student ${index + 1}`;
+            const studentName = this.escapeHtml(entry.querySelector('.student-name').value || `Student ${index + 1}`);
             
             entry.querySelectorAll('.test-prep-card.active').forEach(card => {
-                const testName = card.querySelector('.test-prep-name').textContent;
+                const testName = this.escapeHtml(card.querySelector('.test-prep-name').textContent);
                 const hours = parseFloat(card.querySelector('.test-prep-hours').value) || 0;
                 const selectedDays = Array.from(card.querySelectorAll('.test-prep-day-btn.selected')).map(btn => btn.dataset.day);
                 const testId = card.dataset.testId;
@@ -2362,7 +2278,7 @@ async submitEnrollment() {
                     
                     const description = `${studentName}: ${testName} (${selectedDays.join(', ')}, ${startTime}-${endTime}, ${hours}hrs/session)`;
                     
-                    tbody.innerHTML += `<tr><td>${description}</td><td>1</td><td>₦${fee.toLocaleString()}</td><td>₦${fee.toLocaleString()}</td></tr>`;
+                    tbody.innerHTML += `<tr><td>${this.escapeHtml(description)}</td><td>1</td><td>₦${fee.toLocaleString()}</td><td>₦${fee.toLocaleString()}</td></tr>`;
                 }
             });
         });
@@ -2375,7 +2291,7 @@ async submitEnrollment() {
         // Prorated adjustment
         if (prorated > 0) {
             const explanation = document.getElementById('proration-explanation').textContent;
-            tbody.innerHTML += `<tr><td>Prorated Adjustment (Mid-month Start)<br><small>${explanation}</small></td><td>1</td><td>-</td><td>-₦${prorated.toLocaleString()}</td></tr>`;
+            tbody.innerHTML += `<tr><td>Prorated Adjustment (Mid-month Start)<br><small>${this.escapeHtml(explanation)}</small></td><td>1</td><td>-</td><td>-₦${prorated.toLocaleString()}</td></tr>`;
         }
 
         modal.classList.add('active');
@@ -2391,7 +2307,7 @@ async submitEnrollment() {
         
         studentEntries.forEach((entry, index) => {
             const studentId = index + 1;
-            const studentName = entry.querySelector('.student-name').value || `Student ${studentId}`;
+            const studentName = this.escapeHtml(entry.querySelector('.student-name').value || `Student ${studentId}`);
             const grade = entry.querySelector('.student-grade').value;
             const startDate = entry.querySelector('.student-start-date').value;
             
@@ -2412,7 +2328,7 @@ async submitEnrollment() {
             let detailsHTML = `<h4>${studentName} (${grade}) - ${sessionsText} - ${tutorText} - Starting: ${startDate}</h4>`;
             
             // Academic details
-            const selectedSubjects = Array.from(entry.querySelectorAll('.subject-option.selected')).map(opt => opt.dataset.subject);
+            const selectedSubjects = Array.from(entry.querySelectorAll('.subject-option.selected')).map(opt => this.escapeHtml(opt.dataset.subject));
             const academicDays = Array.from(entry.querySelectorAll('.academic-day-btn.selected')).map(btn => btn.dataset.day);
             const startHour = document.getElementById(`academic-start-hour-${studentId}`)?.value || '';
             const endHour = document.getElementById(`academic-end-hour-${studentId}`)?.value || '';
@@ -2436,7 +2352,7 @@ async submitEnrollment() {
                 
                 extracurricularCards.forEach(card => {
                     const activityId = card.dataset.activityId;
-                    const activityName = card.querySelector('.extracurricular-name').textContent;
+                    const activityName = this.escapeHtml(card.querySelector('.extracurricular-name').textContent);
                     const selectedDays = Array.from(card.querySelectorAll('.extracurricular-day-btn.selected')).map(btn => btn.dataset.day);
                     const startHour = document.getElementById(`extracurricular-start-hour-${studentId}-${activityId}`)?.value || '';
                     const endHour = document.getElementById(`extracurricular-end-hour-${studentId}-${activityId}`)?.value || '';
@@ -2457,7 +2373,7 @@ async submitEnrollment() {
                 
                 testPrepCards.forEach(card => {
                     const testId = card.dataset.testId;
-                    const testName = card.querySelector('.test-prep-name').textContent;
+                    const testName = this.escapeHtml(card.querySelector('.test-prep-name').textContent);
                     const hours = parseFloat(card.querySelector('.test-prep-hours').value) || 0;
                     const selectedDays = Array.from(card.querySelectorAll('.test-prep-day-btn.selected')).map(btn => btn.dataset.day);
                     const startHour = document.getElementById(`test-prep-start-hour-${studentId}-${testId}`)?.value || '';
@@ -2478,6 +2394,12 @@ async submitEnrollment() {
     }
 
     async downloadInvoicePDF() {
+        // Check if required libraries are loaded
+        if (typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') {
+            this.showAlert("PDF generation libraries not loaded. Please try again later.", "danger");
+            return;
+        }
+        
         const element = document.getElementById('invoice-content');
         const canvas = await html2canvas(element, { scale: 2 });
         const imgData = canvas.toDataURL('image/png');
@@ -2501,196 +2423,253 @@ async submitEnrollment() {
         }
 
         const btn = document.getElementById('submit-enrollment');
-        btn.innerHTML = '<div class="spinner"></div> Processing...';
+        btn.innerHTML = '<div class="spinner"></div> Processing Enrollment...';
         btn.disabled = true;
 
-        // Save first, then proceed to portal setup
-        const result = await this.saveProgress();
+        try {
+            // STEP 1: Save the core enrollment data first
+            const result = await this.saveProgress();
 
-        if (result.success) {
-            // Show success message
-            this.showAlert("Enrollment Submitted Successfully!", "success");
-            
-            // Show the invoice
+            if (!result.success) {
+                throw new Error("Failed to save enrollment data.");
+            }
+
+            this.showAlert("Enrollment Saved Successfully! Setting up your portal...", "success");
             this.showInvoice();
 
-            // Set up parent portal account and get result
+            // STEP 2: Attempt Parent Portal Setup
             const portalResult = await this.setupParentPortal(result.enrollmentData);
-            
-            // If a new account was created with a temporary password, display it
-            if (portalResult && portalResult.isNew && portalResult.password) {
+
+            // Handle successful portal creation
+            if (portalResult && portalResult.isNew) {
                 document.getElementById('temp-password').textContent = portalResult.password;
                 document.getElementById('temp-password-container').style.display = 'block';
-                this.showAlert(`Your temporary password is: ${portalResult.password}. Please save it.`, 'success');
-                
-                // Also display referral code
+                this.showAlert(`Portal created! Your temporary password is: ${portalResult.password}. Please save it.`, 'success');
+
                 if (portalResult.referralCode) {
                     const referralContainer = document.createElement('div');
                     referralContainer.id = 'referral-code-container';
                     referralContainer.className = 'mt-4 p-4 bg-green-50 border border-green-200 rounded-lg';
                     referralContainer.innerHTML = `
                         <p class="font-semibold text-green-800">Your Referral Code:</p>
-                        <p class="text-2xl font-mono text-green-600 bg-white p-2 rounded border border-green-300 select-all">${portalResult.referralCode}</p>
+                        <p class="text-2xl font-mono text-green-600 bg-white p-2 rounded border border-green-300 select-all">${this.escapeHtml(portalResult.referralCode)}</p>
                         <p class="text-sm text-green-700 mt-2">Share this code with other parents to earn ₦5,000!</p>
                     `;
                     document.getElementById('temp-password-container').after(referralContainer);
                 }
             } else if (portalResult && !portalResult.isNew) {
-                // Existing account linked – user may need to log in
                 this.showAlert('Your existing parent account has been linked. You can log in with your email.', 'info');
+            } else {
+                // STEP 2.5: ERROR RECOVERY - Enrollment saved, but portal failed.
+                this.showAlert("Enrollment successful, but we couldn't auto-login to your portal. Please contact support to link your account.", "warning");
+                btn.innerHTML = 'Enrollment Complete (Portal Setup Pending)';
+                btn.disabled = false;
+                return; // Halt execution here so we don't open the portal tab blindly
             }
 
-            // Send invoice email notification (fire and forget)
+            // STEP 3: Fire-and-forget email notifications
             setTimeout(() => {
                 const invoiceElement = document.getElementById('invoice-content');
                 const invoiceContent = invoiceElement ? invoiceElement.innerHTML : "";
                 this.sendEmailNotifications(result.enrollmentData || this.collectFormData(), invoiceContent);
             }, 2000);
 
-            // Open parent portal in a new tab after 2 seconds
+            // STEP 4: Redirect to Parent Portal in a NEW TAB
             setTimeout(() => {
-                if (confirm("Your enrollment is complete! Would you like to open the parent portal now?")) {
-                    window.open("parent.html", "_blank"); // Opens in new tab
-                }
-            }, 2000);
+                window.open("parent.html", "_blank"); // '_blank' guarantees a new tab
+            }, 3000);
 
             btn.innerHTML = 'Success!';
             btn.disabled = false;
-            
-        } else {
+
+        } catch (error) {
+            console.error("Enrollment Submission Error:", error);
             btn.innerHTML = '<i class="fas fa-lock"></i> Proceed to Secure Payment';
             btn.disabled = false;
-            this.showAlert("Failed to save enrollment. Please try again.", "danger");
+            this.showAlert("An error occurred during submission. Please try again.", "danger");
         }
     }
 
     copyResumeLink(btn) {
         const text = document.getElementById('resume-link').textContent;
-        navigator.clipboard.writeText(text).then(() => {
-            btn.textContent = "Copied!";
-            btn.classList.add('copied');
-            setTimeout(() => {
-                btn.innerHTML = '<i class="fas fa-copy"></i> Copy Link';
-                btn.classList.remove('copied');
-            }, 2000);
-        });
+        
+        // Use modern clipboard API with fallback
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                this.showCopySuccess(btn);
+            }).catch(() => {
+                this.fallbackCopy(text, btn);
+            });
+        } else {
+            this.fallbackCopy(text, btn);
+        }
+    }
+    
+    fallbackCopy(text, btn) {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            this.showCopySuccess(btn);
+        } catch (err) {
+            this.showAlert("Failed to copy link. Please copy manually.", "warning");
+        }
+        document.body.removeChild(textarea);
+    }
+    
+    showCopySuccess(btn) {
+        btn.textContent = "Copied!";
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.innerHTML = '<i class="fas fa-copy"></i> Copy Link';
+            btn.classList.remove('copied');
+        }, 2000);
     }
 
    // ==============================================
-// REFERRAL CODE GENERATION (HIGH ENTROPY)
-// ==============================================
-async generateReferralCode() {
-    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const prefix = 'BKH';
-    let code;
-    let isUnique = false;
-    let attempts = 0;
-
-    while (!isUnique && attempts < 20) {
-        attempts++;
-        let suffix = '';
-        
-        // Increased to 8 characters + adding a timestamp seed for near-zero collision probability
-        const timeSeed = Date.now().toString(36).toUpperCase().slice(-2); 
-        
-        for (let i = 0; i < 6; i++) {
-            suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+   // REFERRAL CODE GENERATION (HIGH ENTROPY)
+   // ==============================================
+   async generateReferralCode() {
+        if (!this.db) {
+            // If no database, generate a random code anyway (entropy is high)
+            const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            const prefix = 'BKH';
+            const timeSeed = Date.now().toString(36).toUpperCase().slice(-2);
+            let suffix = '';
+            for (let i = 0; i < 6; i++) {
+                suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return prefix + timeSeed + suffix;
         }
-        
-        code = prefix + timeSeed + suffix; // e.g., BKH + K8 + X7Y2ZP
 
-        try {
-            // Actively query the database to guarantee uniqueness
-            const snapshot = await this.db.collection('parent_users').where('referralCode', '==', code).limit(1).get();
-            if (snapshot.empty) {
+        const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const prefix = 'BKH';
+        let code;
+        let isUnique = false;
+        let attempts = 0;
+        const maxAttempts = 20;
+
+        while (!isUnique && attempts < maxAttempts) {
+            attempts++;
+            const timeSeed = Date.now().toString(36).toUpperCase().slice(-2);
+            let suffix = '';
+            for (let i = 0; i < 6; i++) {
+                suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            code = prefix + timeSeed + suffix;
+
+            try {
+                const snapshot = await this.db.collection('parent_users').where('referralCode', '==', code).limit(1).get();
+                if (snapshot.empty) {
+                    isUnique = true;
+                }
+            } catch (error) {
+                console.warn("Firestore query for referral code uniqueness failed. Assuming unique due to high entropy.", error);
+                // If query fails (e.g., permission denied), accept the code as unique
                 isUnique = true;
             }
-        } catch (error) {
-            console.warn("Permission denied or network error checking referral code. Defaulting to generated code.", error);
-            // Fallback: If Firestore read fails (e.g., security rules), assume unique due to high entropy
-            isUnique = true; 
         }
-    }
-    
-    if (attempts >= 20) {
-        console.error("Warning: Referral code generation hit max attempts. Possible database issue.");
-    }
-    
-    return code;
-}
-
-// ==============================================
-// PARENT PORTAL ACCOUNT SETUP (SECURE)
-// ==============================================
-async setupParentPortal(enrollmentData) {
-    if (!enrollmentData || !enrollmentData.parent) {
-        console.warn("No parent data available to set up account");
-        return null;
+        
+        if (attempts >= maxAttempts) {
+            console.warn("Referral code generation reached max attempts, using last generated code.");
+        }
+        
+        return code;
     }
 
-    const parentEmail = enrollmentData.parent.email;
-    const parentName = enrollmentData.parent.name || 'Parent';
-    const parentPhone = enrollmentData.parent.phone;
+    // ==============================================
+    // PARENT PORTAL ACCOUNT SETUP (SECURE)
+    // ==============================================
+    async setupParentPortal(enrollmentData) {
+        if (!enrollmentData || !enrollmentData.parent) {
+            console.warn("No parent data available to set up account");
+            return null;
+        }
 
-    if (!parentEmail) {
-        this.showAlert("Cannot create parent account: email missing", "warning");
-        return null;
-    }
+        const parentEmail = enrollmentData.parent.email;
+        const parentName = enrollmentData.parent.name || 'Parent';
+        const parentPhone = enrollmentData.parent.phone;
 
-    try {
-        const methods = await firebase.auth().fetchSignInMethodsForEmail(parentEmail);
+        if (!parentEmail) {
+            this.showAlert("Cannot create parent account: email missing", "warning");
+            return null;
+        }
 
-        if (methods.length > 0) {
-            // EXISTING USER LOGIC
-            const snapshot = await this.db.collection('parent_users')
-                .where('email', '==', parentEmail)
-                .limit(1)
-                .get();
+        // Check if Firebase auth is available
+        if (typeof firebase === 'undefined' || !firebase.auth) {
+            this.showAlert("Parent portal setup temporarily unavailable. Please contact support.", "warning");
+            return null;
+        }
 
-            if (!snapshot.empty) {
-                const existingParent = snapshot.docs[0].data();
-                const parentUid = existingParent.uid;
+        try {
+            const methods = await firebase.auth().fetchSignInMethodsForEmail(parentEmail);
 
-                await this.db.collection('enrollments').doc(this.currentApplicationId).update({
-                    parentUid: parentUid
-                });
+            if (methods.length > 0) {
+                // EXISTING USER LOGIC
+                if (!this.db) {
+                    this.showAlert("Existing parent account detected, but database unavailable. Please log in manually.", "info");
+                    return null;
+                }
+                
+                const snapshot = await this.db.collection('parent_users')
+                    .where('email', '==', parentEmail)
+                    .limit(1)
+                    .get();
 
-                return { isNew: false, uid: parentUid };
+                if (!snapshot.empty) {
+                    const existingParent = snapshot.docs[0].data();
+                    const parentUid = existingParent.uid;
+
+                    await this.db.collection('enrollments').doc(this.currentApplicationId).update({
+                        parentUid: parentUid
+                    });
+
+                    return { isNew: false, uid: parentUid };
+                } else {
+                    return null; // Exists in Auth but no profile found
+                }
             } else {
-                return null; // Exists in Auth but no profile found
+                // NEW USER CREATION LOGIC
+                const randomPassword = Math.random().toString(36).slice(-10) + 
+                                       Math.random().toString(36).slice(-10).toUpperCase();
+                
+                const userCredential = await firebase.auth().createUserWithEmailAndPassword(parentEmail, randomPassword);
+                const user = userCredential.user;
+
+                const newReferralCode = await this.generateReferralCode();
+
+                // Create Profile
+                if (this.db) {
+                    await this.db.collection('parent_users').doc(user.uid).set({
+                        email: parentEmail,
+                        phone: parentPhone,
+                        normalizedPhone: parentPhone,
+                        parentName: parentName,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        referralCode: newReferralCode,
+                        referralEarnings: 0,
+                        uid: user.uid
+                    });
+                } else {
+                    // If no DB, still return the password but note that profile may not persist
+                    this.showAlert("Parent account created, but profile storage failed. Please contact support.", "warning");
+                }
+
+                // Update enrollment - link parent UID
+                if (this.db) {
+                    await this.db.collection('enrollments').doc(this.currentApplicationId).update({
+                        parentUid: user.uid
+                    });
+                }
+
+                return { isNew: true, uid: user.uid, password: randomPassword, referralCode: newReferralCode };
             }
-        } else {
-            // NEW USER CREATION LOGIC
-            const randomPassword = Math.random().toString(36).slice(-10) + 
-                                   Math.random().toString(36).slice(-10).toUpperCase();
-            
-            const userCredential = await firebase.auth().createUserWithEmailAndPassword(parentEmail, randomPassword);
-            const user = userCredential.user;
-
-            const newReferralCode = await this.generateReferralCode();
-
-            // Create Profile
-            await this.db.collection('parent_users').doc(user.uid).set({
-                email: parentEmail,
-                phone: parentPhone,
-                normalizedPhone: parentPhone,
-                parentName: parentName,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                referralCode: newReferralCode,
-                referralEarnings: 0,
-                uid: user.uid
-            });
-
-            // Update enrollment - SECURITY FIX: Removed tempPassword from the database update
-            await this.db.collection('enrollments').doc(this.currentApplicationId).update({
-                parentUid: user.uid
-            });
-
-            return { isNew: true, uid: user.uid, password: randomPassword, referralCode: newReferralCode };
+        } catch (error) {
+            console.error('Error setting up parent portal account:', error);
+            return null; // Return null so submitEnrollment() can handle the graceful failure
         }
-    } catch (error) {
-        console.error('Error setting up parent portal account:', error);
-        return null; // Return null so submitEnrollment() can handle the graceful failure
     }
 }
 
