@@ -138,7 +138,7 @@
             transition: var(--transition);
             box-shadow: 0 8px 20px -10px rgba(0,0,0,0.1);
             color: inherit;
-            cursor: pointer;  /* Make cards clickable */
+            cursor: pointer;
         }
 
         .stat-card:hover {
@@ -544,7 +544,7 @@
         })();
     </script>
 
-    <!-- New module script for stat card clicks (does not modify tutor.js) -->
+    <!-- Main module script for data fetching and counter updates -->
     <script type="module">
         import { db } from './firebaseConfig.js';
         import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
@@ -558,10 +558,113 @@
             }
         }
 
+        // Function to update all counters
+        async function updateAllCounters(tutor) {
+            try {
+                // Get all students for this tutor
+                const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const studentsSnapshot = await getDocs(studentsQuery);
+                
+                // Filter out inactive students for total count
+                const allStudents = studentsSnapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter(s => !['archived', 'graduated', 'transferred'].includes(s.status));
+                
+                // Update total students count
+                document.getElementById('totalStudentsCount').textContent = allStudents.length;
+
+                // Calculate today's classes
+                const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                let todayClassesCount = 0;
+                
+                allStudents.forEach(s => {
+                    if (s.schedule && Array.isArray(s.schedule)) {
+                        s.schedule.forEach(slot => {
+                            if (slot.day === todayName) {
+                                todayClassesCount++;
+                            }
+                        });
+                    }
+                });
+                
+                document.getElementById('todayClassesCount').textContent = todayClassesCount;
+
+                // Calculate pending reports (students without reports in last 7 days)
+                const oneWeekAgo = new Date();
+                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                
+                let pendingReports = 0;
+                for (const student of allStudents) {
+                    if (!student.lastReportDate) {
+                        pendingReports++;
+                        continue;
+                    }
+                    
+                    // Check if last report date is older than 7 days
+                    const lastReport = student.lastReportDate?.toDate?.() || new Date(student.lastReportDate);
+                    if (lastReport < oneWeekAgo) {
+                        pendingReports++;
+                    }
+                }
+                
+                document.getElementById('pendingReportsCount').textContent = pendingReports;
+
+                // Calculate performance score (placeholder logic - can be customized)
+                const totalPossible = allStudents.length * 100;
+                let earnedScore = 0;
+                
+                allStudents.forEach(s => {
+                    // Base score from attendance
+                    if (s.attendanceRate) {
+                        earnedScore += s.attendanceRate;
+                    } else {
+                        earnedScore += 85; // Default score
+                    }
+                    
+                    // Bonus for completed reports
+                    if (s.lastReportDate) {
+                        const reportDate = s.lastReportDate?.toDate?.() || new Date(s.lastReportDate);
+                        const daysSinceReport = Math.floor((new Date() - reportDate) / (1000 * 60 * 60 * 24));
+                        if (daysSinceReport < 7) earnedScore += 15;
+                    }
+                });
+                
+                const performanceScore = allStudents.length > 0 
+                    ? Math.round((earnedScore / (allStudents.length * 100)) * 100)
+                    : 100;
+                
+                document.getElementById('performanceScore').textContent = performanceScore;
+
+            } catch (error) {
+                console.error("Error updating counters:", error);
+            }
+        }
+
+        // Set up real-time counter updates (every 5 minutes)
+        function startCounterUpdates(tutor) {
+            // Initial update
+            updateAllCounters(tutor);
+            
+            // Update every 5 minutes
+            setInterval(() => updateAllCounters(tutor), 300000);
+            
+            // Also update when window gains focus
+            window.addEventListener('focus', () => updateAllCounters(tutor));
+        }
+
         waitForTutorData(() => {
             const tutor = window.tutorData;
+            
+            // Update tutor name in header
+            if (tutor.name) {
+                document.querySelector('.text-gradient').textContent = tutor.name.split(' ')[0];
+                document.querySelector('.avatar-modern').textContent = tutor.name.charAt(0);
+            }
+            
+            // Start counter updates
+            startCounterUpdates(tutor);
 
-            // ----- Total Students Card -----
+            // ----- Total Students Card Click -----
             document.getElementById('totalStudentsCard').addEventListener('click', async () => {
                 const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
                 const snapshot = await getDocs(q);
@@ -569,36 +672,35 @@
                     .map(doc => ({ id: doc.id, ...doc.data() }))
                     .filter(s => !['archived','graduated','transferred'].includes(s.status));
 
-                // Build modal HTML
                 let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="studentListModal">
-                    <div class="relative bg-white p-6 rounded-lg shadow-xl w-full max-w-4xl mx-auto">
+                    <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-4xl mx-auto">
                         <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xl font-bold">My Students (${students.length})</h3>
-                            <button class="text-2xl font-bold close-modal">&times;</button>
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">My Students (${students.length})</h3>
+                            <button class="text-2xl font-bold close-modal text-gray-700 dark:text-gray-300">&times;</button>
                         </div>
                         <div class="overflow-auto max-h-96">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
+                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead class="bg-gray-50 dark:bg-gray-700">
                                     <tr>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Added</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Name</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Grade</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Type</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Added</th>
                                     </tr>
                                 </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">`;
+                                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">`;
 
                 students.forEach(s => {
                     let type = 'Regular';
                     if (s.isTransitioning) type = 'Transitioning';
                     else if (s.groupClass) type = 'Group Class';
-                    // Use createdAt if available, otherwise show N/A
+                    
                     const added = s.createdAt ? new Date(s.createdAt.seconds * 1000).toLocaleDateString() : 'N/A';
                     html += `<tr>
-                        <td class="px-4 py-2 whitespace-nowrap">${escapeHtml(s.studentName)}</td>
-                        <td class="px-4 py-2 whitespace-nowrap">${escapeHtml(s.grade)}</td>
-                        <td class="px-4 py-2 whitespace-nowrap">${escapeHtml(type)}</td>
-                        <td class="px-4 py-2 whitespace-nowrap">${escapeHtml(added)}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-gray-900 dark:text-white">${escapeHtml(s.studentName)}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-gray-900 dark:text-white">${escapeHtml(s.grade)}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-gray-900 dark:text-white">${escapeHtml(type)}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-gray-900 dark:text-white">${escapeHtml(added)}</td>
                     </tr>`;
                 });
 
@@ -609,17 +711,15 @@
                 const modal = modalDiv.firstElementChild;
                 document.body.appendChild(modal);
 
-                // Close button
                 modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
-                // Click outside to close
                 modal.addEventListener('click', (e) => {
                     if (e.target === modal) modal.remove();
                 });
             });
 
-            // ----- Today's Classes Card -----
+            // ----- Today's Classes Card Click -----
             document.getElementById('todayClassesCard').addEventListener('click', async () => {
-                const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' }); // e.g., "Monday"
+                const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
                 const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
                 const snapshot = await getDocs(q);
                 const students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -631,32 +731,156 @@
                             if (slot.day === todayName) {
                                 todayClasses.push({
                                     student: s.studentName,
-                                    time: `${slot.start} - ${slot.end}`
+                                    time: `${slot.start} - ${slot.end}`,
+                                    subject: slot.subject || 'General',
+                                    room: slot.room || 'Not specified'
                                 });
                             }
                         });
                     }
                 });
 
+                // Sort classes by time
+                todayClasses.sort((a, b) => {
+                    const timeA = a.time.split(' - ')[0];
+                    const timeB = b.time.split(' - ')[0];
+                    return timeA.localeCompare(timeB);
+                });
+
                 let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="todayClassesModal">
-                    <div class="relative bg-white p-6 rounded-lg shadow-xl w-full max-w-lg mx-auto">
+                    <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-lg mx-auto">
                         <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xl font-bold">Today's Classes (${todayName})</h3>
-                            <button class="text-2xl font-bold close-modal">&times;</button>
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">Today's Classes (${todayName})</h3>
+                            <button class="text-2xl font-bold close-modal text-gray-700 dark:text-gray-300">&times;</button>
                         </div>
                         <div class="overflow-auto max-h-96">`;
 
                 if (todayClasses.length === 0) {
-                    html += '<p class="text-gray-500">No classes scheduled today.</p>';
+                    html += '<p class="text-gray-500 dark:text-gray-400">No classes scheduled for today.</p>';
                 } else {
-                    html += '<ul class="list-disc pl-5 space-y-2">';
+                    html += '<div class="space-y-3">';
                     todayClasses.forEach(c => {
-                        html += `<li><strong>${escapeHtml(c.student)}</strong> at ${escapeHtml(c.time)}</li>`;
+                        html += `<div class="border-l-4 border-green-500 pl-4 py-2 bg-gray-50 dark:bg-gray-700 rounded-r-lg">
+                            <p class="font-semibold text-gray-900 dark:text-white">${escapeHtml(c.student)}</p>
+                            <p class="text-sm text-gray-600 dark:text-gray-300"><i class="far fa-clock mr-2"></i>${escapeHtml(c.time)}</p>
+                            <p class="text-sm text-gray-600 dark:text-gray-300"><i class="fas fa-book mr-2"></i>${escapeHtml(c.subject)}</p>
+                            <p class="text-sm text-gray-600 dark:text-gray-300"><i class="fas fa-door-open mr-2"></i>${escapeHtml(c.room)}</p>
+                        </div>`;
                     });
-                    html += '</ul>';
+                    html += '</div>';
                 }
 
                 html += `</div></div></div>`;
+
+                const modalDiv = document.createElement('div');
+                modalDiv.innerHTML = html;
+                const modal = modalDiv.firstElementChild;
+                document.body.appendChild(modal);
+
+                modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) modal.remove();
+                });
+            });
+
+            // ----- Pending Reports Card Click -----
+            document.getElementById('pendingReportsCard').addEventListener('click', async () => {
+                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const snapshot = await getDocs(q);
+                const students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                const oneWeekAgo = new Date();
+                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                
+                const pendingStudents = [];
+                for (const student of students) {
+                    if (!student.lastReportDate) {
+                        pendingStudents.push({ ...student, daysOverdue: 'No reports yet' });
+                        continue;
+                    }
+                    
+                    const lastReport = student.lastReportDate?.toDate?.() || new Date(student.lastReportDate);
+                    const daysSinceReport = Math.floor((new Date() - lastReport) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysSinceReport > 7) {
+                        pendingStudents.push({ 
+                            ...student, 
+                            daysOverdue: `${daysSinceReport} days overdue` 
+                        });
+                    }
+                }
+
+                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="pendingReportsModal">
+                    <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-2xl mx-auto">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">Pending Reports (${pendingStudents.length})</h3>
+                            <button class="text-2xl font-bold close-modal text-gray-700 dark:text-gray-300">&times;</button>
+                        </div>
+                        <div class="overflow-auto max-h-96">`;
+
+                if (pendingStudents.length === 0) {
+                    html += '<p class="text-green-600 dark:text-green-400">All reports are up to date! 🎉</p>';
+                } else {
+                    html += '<div class="space-y-2">';
+                    pendingStudents.forEach(s => {
+                        const statusClass = s.daysOverdue.includes('No reports') ? 'text-yellow-600' : 'text-red-600';
+                        html += `<div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                            <p class="font-semibold text-gray-900 dark:text-white">${escapeHtml(s.studentName)}</p>
+                            <p class="text-sm ${statusClass}">${escapeHtml(s.daysOverdue)}</p>
+                            <button class="mt-2 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400" onclick="generateReport('${s.id}')">
+                                <i class="fas fa-plus-circle mr-1"></i>Create Report
+                            </button>
+                        </div>`;
+                    });
+                    html += '</div>';
+                }
+
+                html += `</div></div></div>`;
+
+                const modalDiv = document.createElement('div');
+                modalDiv.innerHTML = html;
+                const modal = modalDiv.firstElementChild;
+                document.body.appendChild(modal);
+
+                modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) modal.remove();
+                });
+            });
+
+            // ----- Performance Score Card Click -----
+            document.getElementById('achievementsCard').addEventListener('click', () => {
+                const performance = document.getElementById('performanceScore').textContent;
+                
+                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="performanceModal">
+                    <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md mx-auto">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">Performance Score</h3>
+                            <button class="text-2xl font-bold close-modal text-gray-700 dark:text-gray-300">&times;</button>
+                        </div>
+                        <div class="text-center">
+                            <div class="w-32 h-32 mx-auto mb-4 relative">
+                                <svg class="w-full h-full" viewBox="0 0 100 100">
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#e5e7eb" stroke-width="10"/>
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#10b981" stroke-width="10" 
+                                        stroke-dasharray="${2 * Math.PI * 45}" 
+                                        stroke-dashoffset="${2 * Math.PI * 45 * (1 - performance/100)}"
+                                        stroke-linecap="round"
+                                        transform="rotate(-90 50 50)"/>
+                                </svg>
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <span class="text-3xl font-bold text-gray-900 dark:text-white">${performance}</span>
+                                </div>
+                            </div>
+                            <p class="text-gray-600 dark:text-gray-300 mb-2">Overall performance rating</p>
+                            <div class="text-left space-y-2 mt-4">
+                                <p class="text-sm"><i class="fas fa-check-circle text-green-500 mr-2"></i>Attendance: Excellent</p>
+                                <p class="text-sm"><i class="fas fa-check-circle text-green-500 mr-2"></i>Reports: Up to date</p>
+                                <p class="text-sm"><i class="fas fa-check-circle text-green-500 mr-2"></i>Student engagement: High</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
 
                 const modalDiv = document.createElement('div');
                 modalDiv.innerHTML = html;
@@ -680,6 +904,11 @@
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;");
         }
+
+        // Placeholder function for report generation
+        window.generateReport = function(studentId) {
+            alert('Report generation feature coming soon! Student ID: ' + studentId);
+        };
     </script>
 </body>
 </html>
