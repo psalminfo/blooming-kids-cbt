@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Blooming · Tutor Portal — unified & enhanced</title>
+    <title>Blooming · Tutor Portal — fully fixed + courses</title>
 
     <!-- Preconnect & fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -207,7 +207,7 @@
             <!-- gamification widget (used by tutor.js) -->
             <div id="performance-widget" class="hidden"></div>
 
-            <!-- navigation pills: 5 tabs (dashboard, studentDB, academic, schedule, courses) -->
+            <!-- navigation pills: 5 tabs -->
             <nav class="relative z-20 mb-8 overflow-x-auto hide-scrollbar">
                 <div class="nav-pill-container">
                     <button id="navDashboard" class="nav-tab-modern active"><i class="fas fa-columns"></i>Dashboard</button>
@@ -227,7 +227,7 @@
             </main>
 
             <!-- footer -->
-            <div class="relative z-20 mt-8 text-xs text-center opacity-40 flex items-center justify-center gap-2"><i class="fas fa-shield-alt text-green-500"></i> End-to-end encrypted · Blooming Kids Care v3.1</div>
+            <div class="relative z-20 mt-8 text-xs text-center opacity-40 flex items-center justify-center gap-2"><i class="fas fa-shield-alt text-green-500"></i> End-to-end encrypted · Blooming Kids Care v3.3</div>
         </div>
     </div>
 
@@ -248,13 +248,13 @@
         </div>
     </div>
 
-    <!-- scripts (firebase, tutor, games) -->
+    <!-- scripts -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script type="module" src="tutor.js"></script>
     <script src="games.js"></script>
 
-    <!-- inline core logic: date, theme, network, stat modals, tab renders -->
+    <!-- inline core logic: date, theme, network, stat modals, tab renders with exhaustive null checks -->
     <script>
         (function() {
             const dateEl = document.getElementById('currentDate');
@@ -265,25 +265,25 @@
             const toggle = document.getElementById('modeToggle');
             const icon = document.getElementById('modeIcon');
             function setTheme(theme) {
-                if (theme === 'dark') { body.classList.add('dark'); icon.classList.replace('fa-moon','fa-sun'); localStorage.setItem('tutor_theme','dark');
-                } else { body.classList.remove('dark'); icon.classList.replace('fa-sun','fa-moon'); localStorage.setItem('tutor_theme','light'); }
+                if (theme === 'dark') { body.classList.add('dark'); icon?.classList.replace('fa-moon','fa-sun'); localStorage.setItem('tutor_theme','dark');
+                } else { body.classList.remove('dark'); icon?.classList.replace('fa-sun','fa-moon'); localStorage.setItem('tutor_theme','light'); }
             }
             const saved = localStorage.getItem('tutor_theme');
             if (saved) setTheme(saved);
             else if (window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
             else setTheme('light');
-            toggle.addEventListener('click',()=>setTheme(body.classList.contains('dark')?'light':'dark'));
+            if (toggle) toggle.addEventListener('click',()=>setTheme(body.classList.contains('dark')?'light':'dark'));
 
-            window.hideNetworkWarning = ()=>document.getElementById('networkWarning').classList.add('hidden');
-            window.hideNetworkError = ()=>document.getElementById('networkErrorOverlay').classList.add('hidden');
-            window.showNetworkError = (msg)=>{ if(msg) document.getElementById('errorMessage').innerText=msg; document.getElementById('networkErrorOverlay').classList.remove('hidden'); };
+            window.hideNetworkWarning = ()=>document.getElementById('networkWarning')?.classList.add('hidden');
+            window.hideNetworkError = ()=>document.getElementById('networkErrorOverlay')?.classList.add('hidden');
+            window.showNetworkError = (msg)=>{ if(msg) document.getElementById('errorMessage').innerText=msg; document.getElementById('networkErrorOverlay')?.classList.remove('hidden'); };
             window.checkConnectivity = ()=>{ if (navigator.onLine) { hideNetworkError(); hideNetworkWarning(); } else showNetworkError('Still offline.'); };
             window.addEventListener('online',()=>{ hideNetworkWarning(); hideNetworkError(); });
-            window.addEventListener('offline',()=>document.getElementById('networkWarning').classList.remove('hidden'));
+            window.addEventListener('offline',()=>document.getElementById('networkWarning')?.classList.remove('hidden'));
         })();
     </script>
 
-    <!-- main module: firebase integration, tab switching, custom renders for database/academic/schedule/courses, stat card modals -->
+    <!-- main module: firebase integration, tab switching, custom renders, with safety checks -->
     <script type="module">
         import { db } from './firebaseConfig.js';
         import { collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
@@ -332,8 +332,13 @@
         }
 
         function attachStatClicks(tutor) {
-            // total students
-            document.getElementById('totalStudentsCard').addEventListener('click', async () => {
+            const safeAdd = (id, fn) => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('click', fn);
+                else console.warn(`Element #${id} not found for click attachment`);
+            };
+
+            safeAdd('totalStudentsCard', async () => {
                 const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
                 const snap = await getDocs(q);
                 const students = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !['archived','graduated','transferred'].includes(s.status));
@@ -348,12 +353,11 @@
                 });
                 html += `</tbody></table></div></div></div>`;
                 const div = document.createElement('div'); div.innerHTML = html; document.body.appendChild(div.firstElementChild);
-                document.querySelector('#modal .close-modal').addEventListener('click', ()=>div.remove());
-                document.getElementById('modal').addEventListener('click', e => { if(e.target === document.getElementById('modal')) div.remove(); });
+                document.querySelector('#modal .close-modal')?.addEventListener('click', ()=>div.remove());
+                document.getElementById('modal')?.addEventListener('click', e => { if(e.target === document.getElementById('modal')) div.remove(); });
             });
 
-            // today's classes
-            document.getElementById('todayClassesCard').addEventListener('click', async () => {
+            safeAdd('todayClassesCard', async () => {
                 const todayName = new Date().toLocaleDateString('en-US', { weekday:'long' });
                 const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
                 const snap = await getDocs(q);
@@ -366,12 +370,11 @@
                 else html += '<div class="space-y-2">'+classes.map(c=>`<div class="border-l-4 border-green-500 pl-3 py-1"><p class="font-semibold">${escapeHtml(c.student)}</p><p class="text-sm">${escapeHtml(c.time)} · ${escapeHtml(c.subject)} · ${escapeHtml(c.room)}</p></div>`).join('')+'</div>';
                 html += '</div></div>';
                 const div = document.createElement('div'); div.innerHTML = html; document.body.appendChild(div.firstElementChild);
-                document.querySelector('#modal .close-modal').addEventListener('click', ()=>div.remove());
-                document.getElementById('modal').addEventListener('click', e => { if(e.target === document.getElementById('modal')) div.remove(); });
+                document.querySelector('#modal .close-modal')?.addEventListener('click', ()=>div.remove());
+                document.getElementById('modal')?.addEventListener('click', e => { if(e.target === document.getElementById('modal')) div.remove(); });
             });
 
-            // pending reports
-            document.getElementById('pendingReportsCard').addEventListener('click', async () => {
+            safeAdd('pendingReportsCard', async () => {
                 const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
                 const snap = await getDocs(q);
                 const students = snap.docs.map(d => ({ id:d.id, ...d.data() }));
@@ -387,21 +390,20 @@
                 else html += pending.map(s=>`<div class="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700 rounded-lg mb-2"><span><strong>${escapeHtml(s.studentName)}</strong> <span class="text-sm text-red-500">${escapeHtml(s.days)}</span></span><button class="btn-modern btn-primary py-1 px-3 text-sm" onclick="generateReport('${s.id}')">Write</button></div>`).join('');
                 html += '</div></div>';
                 const div = document.createElement('div'); div.innerHTML = html; document.body.appendChild(div.firstElementChild);
-                document.querySelector('#modal .close-modal').addEventListener('click', ()=>div.remove());
-                document.getElementById('modal').addEventListener('click', e => { if(e.target === document.getElementById('modal')) div.remove(); });
+                document.querySelector('#modal .close-modal')?.addEventListener('click', ()=>div.remove());
+                document.getElementById('modal')?.addEventListener('click', e => { if(e.target === document.getElementById('modal')) div.remove(); });
             });
 
-            // performance
-            document.getElementById('achievementsCard').addEventListener('click', () => {
+            safeAdd('achievementsCard', () => {
                 const score = document.getElementById('performanceScore').textContent;
                 const html = `<div class="modal-overlay" id="modal"><div class="modal-content text-center"><div class="flex justify-between"><h3 class="text-xl font-bold">Performance</h3><button class="close-modal text-2xl">&times;</button></div><div class="w-32 h-32 mx-auto my-4 relative"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="none" stroke="#e5e7eb" stroke-width="10"/><circle cx="50" cy="50" r="45" fill="none" stroke="#10b981" stroke-width="10" stroke-dasharray="${2*Math.PI*45}" stroke-dashoffset="${2*Math.PI*45*(1-score/100)}" stroke-linecap="round" transform="rotate(-90 50 50)"/></svg><span class="absolute inset-0 flex items-center justify-center text-3xl font-bold">${score}</span></div><p class="text-sm">Overall score based on attendance & reports.</p></div></div>`;
                 const div = document.createElement('div'); div.innerHTML = html; document.body.appendChild(div.firstElementChild);
-                document.querySelector('#modal .close-modal').addEventListener('click', ()=>div.remove());
-                document.getElementById('modal').addEventListener('click', e => { if(e.target === document.getElementById('modal')) div.remove(); });
+                document.querySelector('#modal .close-modal')?.addEventListener('click', ()=>div.remove());
+                document.getElementById('modal')?.addEventListener('click', e => { if(e.target === document.getElementById('modal')) div.remove(); });
             });
         }
 
-        // ---------- custom tab renders (redesigned) ----------
+        // ---------- custom tab renders ----------
         async function renderStudentDatabase() {
             if (!window.tutorData) return;
             const tutor = window.tutorData;
@@ -432,7 +434,6 @@
                     <div class="bg-white/20 backdrop-blur-sm p-5 rounded-2xl"><h4 class="font-semibold mb-2">📘 Today's Topic</h4><select id="topicStudentSelect" class="form-input w-full mb-2"><option>Select student</option></select><button class="btn-modern btn-primary w-full" id="topicBtn">Add Topic</button></div>
                     <div class="bg-white/20 backdrop-blur-sm p-5 rounded-2xl"><h4 class="font-semibold mb-2">📝 Assign Homework</h4><select id="hwStudentSelect" class="form-input w-full mb-2"><option>Select student</option></select><button class="btn-modern btn-accent w-full" id="hwBtn">Assign</button></div>
                 </div>
-                <!-- redesigned file upload area for homework -->
                 <div class="bg-white/20 backdrop-blur-sm p-5 rounded-2xl">
                     <h4 class="font-semibold mb-3"><i class="fas fa-paperclip text-blue-500 mr-2"></i>Homework file attachment</h4>
                     <div class="upload-area mb-4" id="homeworkUploadTrigger"><i class="fas fa-cloud-upload-alt text-3xl mb-2 text-green-600"></i><p>Drag & drop or click to attach file</p></div>
@@ -442,12 +443,13 @@
                     </div>
                 </div>
             </div>`;
-            // populate selects from firebase
             if (window.tutorData) {
                 getDocs(query(collection(db,"students"), where("tutorEmail","==",window.tutorData.email))).then(snap => {
                     const opts = snap.docs.map(d=>`<option value="${d.id}">${escapeHtml(d.data().studentName)}</option>`).join('');
-                    document.getElementById('topicStudentSelect').innerHTML = '<option value="">Select student</option>'+opts;
-                    document.getElementById('hwStudentSelect').innerHTML = '<option value="">Select student</option>'+opts;
+                    const topicSelect = document.getElementById('topicStudentSelect');
+                    const hwSelect = document.getElementById('hwStudentSelect');
+                    if (topicSelect) topicSelect.innerHTML = '<option value="">Select student</option>'+opts;
+                    if (hwSelect) hwSelect.innerHTML = '<option value="">Select student</option>'+opts;
                 });
             }
             document.getElementById('topicBtn')?.addEventListener('click', ()=>{
@@ -468,11 +470,11 @@
                 <div class="bg-white/20 backdrop-blur-sm p-6 rounded-2xl"><i class="fas fa-calendar-alt text-3xl text-green-600 mb-3"></i><h3 class="text-xl font-bold mb-2">View Calendar</h3><p class="mb-4 text-sm">Weekly schedule overview</p><button id="viewCalendarBtn" class="btn-modern btn-primary w-full">Open Calendar</button></div>
                 <div class="bg-white/20 backdrop-blur-sm p-6 rounded-2xl"><i class="fas fa-clock text-3xl text-blue-600 mb-3"></i><h3 class="text-xl font-bold mb-2">Manage Schedules</h3><p class="mb-4 text-sm">Set class times for students</p><button id="manageScheduleBtn" class="btn-modern btn-accent w-full">Manage</button></div>
             </div>`;
-            document.getElementById('viewCalendarBtn').addEventListener('click', ()=>{
+            document.getElementById('viewCalendarBtn')?.addEventListener('click', ()=>{
                 if (window.showScheduleCalendarModal) window.showScheduleCalendarModal();
                 else alert('Calendar modal not available');
             });
-            document.getElementById('manageScheduleBtn').addEventListener('click', ()=>{
+            document.getElementById('manageScheduleBtn')?.addEventListener('click', ()=>{
                 if (window.scheduleManager?.openManualManager) window.scheduleManager.openManualManager();
                 else alert('Schedule manager not ready');
             });
@@ -486,43 +488,61 @@
                     <div class="space-y-2" id="fileList"><h4 class="font-semibold">Recent uploads</h4><div class="file-list-item"><i class="fas fa-file-pdf text-red-500"></i><span>math_worksheet.pdf</span><span class="ml-auto text-sm">2 days ago</span></div><div class="file-list-item"><i class="fas fa-image text-blue-500"></i><span>science_diagram.png</span><span class="ml-auto text-sm">5 days ago</span></div></div>
                 </div>
             </div>`;
-            document.getElementById('uploadTrigger').addEventListener('click', ()=>{
+            document.getElementById('uploadTrigger')?.addEventListener('click', ()=>{
                 alert('File upload would open (Firebase Storage integration).');
             });
         }
 
-        // dashboard: leave to tutor.js – we just set active class and ensure skeleton replaced by tutor.js
         function setActive(id) {
             document.querySelectorAll('.nav-tab-modern').forEach(t=>t.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
+            document.getElementById(id)?.classList.add('active');
         }
 
+        // wait for tutor data, then attach listeners with exhaustive null checks
         waitForTutorData(() => {
             const tutor = window.tutorData;
-            document.querySelector('.text-gradient').textContent = tutor.name?.split(' ')[0] || 'Tutor';
-            document.querySelector('.avatar-modern').textContent = tutor.name?.charAt(0) || 'T';
+            if (!tutor) return;
+
+            // Safely update header elements
+            const gradientSpan = document.querySelector('.text-gradient');
+            if (gradientSpan) gradientSpan.textContent = tutor.name?.split(' ')[0] || 'Tutor';
+            const avatarDiv = document.querySelector('.avatar-modern');
+            if (avatarDiv) avatarDiv.textContent = tutor.name?.charAt(0) || 'T';
+
             updateAllCounters(tutor);
             setInterval(()=>updateAllCounters(tutor),300000);
             attachStatClicks(tutor);
 
-            // tab switching: dashboard lets tutor.js handle (do not override mainContent)
-            document.getElementById('navDashboard').addEventListener('click', ()=>{ setActive('navDashboard'); /* tutor.js will update */ });
-            document.getElementById('navStudentDatabase').addEventListener('click', ()=>{ setActive('navStudentDatabase'); renderStudentDatabase(); });
-            document.getElementById('navAcademic').addEventListener('click', ()=>{ setActive('navAcademic'); renderAcademic(); });
-            document.getElementById('navScheduleManagement').addEventListener('click', ()=>{ setActive('navScheduleManagement'); renderScheduleManagement(); });
-            document.getElementById('navCourses').addEventListener('click', ()=>{ setActive('navCourses'); renderCourses(); });
+            // tab switching – only if elements exist
+            const navDashboard = document.getElementById('navDashboard');
+            const navStudentDB = document.getElementById('navStudentDatabase');
+            const navAcademic = document.getElementById('navAcademic');
+            const navSchedule = document.getElementById('navScheduleManagement');
+            const navCourses = document.getElementById('navCourses');
 
-            // floating buttons open redesigned messaging modal
-            document.getElementById('floatingMessageBtn').addEventListener('click', ()=>{
-                const modalHtml = `<div class="modal-overlay" id="msgModal"><div class="modal-content max-w-4xl"><div class="flex justify-between items-center mb-3"><h3 class="text-xl font-bold">Messages</h3><button class="close-modal text-2xl">&times;</button></div><div class="inbox-wrapper"><div class="inbox-list-col"><div class="inbox-item unread"><div class="avatar-modern mr-2">J</div><div class="info"><div class="name">Jane Smith</div><div class="preview">Hey, about homework...</div></div><div class="meta"><span class="badge bg-red-500 text-white">2</span></div></div><div class="inbox-item"><div class="avatar-modern mr-2">M</div><div class="info"><div class="name">Mike Lee</div><div class="preview">See you tomorrow</div></div></div></div><div class="inbox-chat-col"><div class="chat-messages"><div class="chat-bubble them">Hi, when is the next class?</div><div class="chat-bubble me">Tomorrow at 10am</div></div><div class="chat-inputs flex gap-2"><input type="text" placeholder="Type a message..." class="flex-1 rounded-full px-4 py-2 border"><button class="btn-modern btn-primary">Send</button></div></div></div></div></div>`;
-                const div = document.createElement('div'); div.innerHTML = modalHtml; document.body.appendChild(div.firstElementChild);
-                document.querySelector('#msgModal .close-modal').addEventListener('click', ()=>div.remove());
-            });
-            document.getElementById('floatingInboxBtn').addEventListener('click', ()=>{
-                document.getElementById('floatingMessageBtn').click(); // same modal for demo
-            });
+            if (navDashboard) navDashboard.addEventListener('click', ()=>{ setActive('navDashboard'); /* tutor.js handles content */ });
+            if (navStudentDB) navStudentDB.addEventListener('click', ()=>{ setActive('navStudentDatabase'); renderStudentDatabase(); });
+            if (navAcademic) navAcademic.addEventListener('click', ()=>{ setActive('navAcademic'); renderAcademic(); });
+            if (navSchedule) navSchedule.addEventListener('click', ()=>{ setActive('navScheduleManagement'); renderScheduleManagement(); });
+            if (navCourses) navCourses.addEventListener('click', ()=>{ setActive('navCourses'); renderCourses(); });
+
+            // floating buttons
+            const floatingMsg = document.getElementById('floatingMessageBtn');
+            const floatingInbox = document.getElementById('floatingInboxBtn');
+
+            if (floatingMsg) {
+                floatingMsg.addEventListener('click', ()=>{
+                    const modalHtml = `<div class="modal-overlay" id="msgModal"><div class="modal-content max-w-4xl"><div class="flex justify-between items-center mb-3"><h3 class="text-xl font-bold">Messages</h3><button class="close-modal text-2xl">&times;</button></div><div class="inbox-wrapper"><div class="inbox-list-col"><div class="inbox-item unread"><div class="avatar-modern mr-2">J</div><div class="info"><div class="name">Jane Smith</div><div class="preview">Hey, about homework...</div></div><div class="meta"><span class="badge bg-red-500 text-white">2</span></div></div><div class="inbox-item"><div class="avatar-modern mr-2">M</div><div class="info"><div class="name">Mike Lee</div><div class="preview">See you tomorrow</div></div></div></div><div class="inbox-chat-col"><div class="chat-messages"><div class="chat-bubble them">Hi, when is the next class?</div><div class="chat-bubble me">Tomorrow at 10am</div></div><div class="chat-inputs flex gap-2"><input type="text" placeholder="Type a message..." class="flex-1 rounded-full px-4 py-2 border"><button class="btn-modern btn-primary">Send</button></div></div></div></div></div>`;
+                    const div = document.createElement('div'); div.innerHTML = modalHtml; document.body.appendChild(div.firstElementChild);
+                    document.querySelector('#msgModal .close-modal')?.addEventListener('click', ()=>div.remove());
+                });
+            }
+            if (floatingInbox) {
+                floatingInbox.addEventListener('click', ()=>{
+                    if (floatingMsg) floatingMsg.click();
+                });
+            }
         });
     </script>
 </body>
 </html>
-
