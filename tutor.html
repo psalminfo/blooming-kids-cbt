@@ -15,10 +15,6 @@
         gtag('config', 'G-NBTVEGH1SL');
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <!-- REMOVED BROKEN FONT LINK -->
-    <!-- <link rel="stylesheet" href="fonts/material-design-iconic-font/css/material-design-iconic-font.min.css"> -->
-    <!-- REMOVED BROKEN CSS LINK -->
-    <!-- <link rel="stylesheet" href="css/style.css"> -->
     
     <style>
         /* Custom Styles for Nav Buttons */
@@ -40,12 +36,11 @@
             justify-content: center;
             align-items: flex-start;
             min-height: 100vh;
-            /* FIXED: Subtle background image with transparency */
             background-image: 
                 linear-gradient(rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.70)),
                 url('https://res.cloudinary.com/dy2hxcyaf/image/upload/v1769020680/Gemini_Generated_Image_o5m8auo5m8auo5m8_hzzxks.png') !important;
             background-size: cover;
-            background-position: center top; /* Show only top part */
+            background-position: center top;
             background-attachment: fixed;
             background-blend-mode: overlay;
             transition: background-color 0.3s;
@@ -207,7 +202,6 @@
         /* --- DARK MODE STYLES --- */
         .dark .wrapper {
             background-color: #111827 !important;
-            /* Same background image but with dark overlay for dark mode */
             background-image: 
                 linear-gradient(rgba(17, 24, 39, 0.70), rgba(17, 24, 39, 0.70)),
                 url('https://res.cloudinary.com/dy2hxcyaf/image/upload/v1769020680/Gemini_Generated_Image_o5m8auo5m8auo5m8_hzzxks.png') !important;
@@ -271,6 +265,29 @@
 
         .nav-container::-webkit-scrollbar { display: none; }
         .nav-container { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Additional styles for new tab content */
+        .academics-card, .schedule-card {
+            background: rgba(255,255,255,0.5);
+            backdrop-filter: blur(8px);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border: 1px solid rgba(255,255,255,0.3);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .dark .academics-card, .dark .schedule-card {
+            background: rgba(0,0,0,0.3);
+            border-color: rgba(255,255,255,0.1);
+        }
+        .homework-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            background: rgba(255,255,255,0.2);
+            margin-bottom: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -319,6 +336,9 @@
                     <div class="flex space-x-4 nav-buttons">
                         <button id="navDashboard" class="nav-btn text-lg font-semibold active dashboard-header">Dashboard</button>
                         <button id="navStudentDatabase" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Student Database</button>
+                        <!-- NEW TABS -->
+                        <button id="navAcademics" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Academics</button>
+                        <button id="navScheduleManagement" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Schedule Management</button>
                     </div>
                 </nav>
 
@@ -367,6 +387,7 @@
     <script type="module" src="tutor.js"></script>
 
     <script>
+        // Original DOMContentLoaded and network monitoring (preserved)
         document.addEventListener('DOMContentLoaded', () => {
             const body = document.body;
             const toggleButton = document.getElementById('modeToggle');
@@ -414,8 +435,183 @@
 
             // Network Monitoring
             initializeNetworkMonitoring();
+
+            // ---------- New tabs functionality ----------
+            const navContainer = document.querySelector('.nav-buttons');
+            const mainContent = document.getElementById('mainContent');
+            const perfWidget = document.getElementById('performance-widget');
+
+            // Function to remove active from all nav buttons
+            function setActiveNav(activeId) {
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                const activeBtn = document.getElementById(activeId);
+                if (activeBtn) activeBtn.classList.add('active');
+            }
+
+            // Render Academics tab content
+            function renderAcademics() {
+                perfWidget.style.display = 'block'; // keep widget (optional)
+                mainContent.innerHTML = `
+                    <div class="space-y-6">
+                        <!-- Today's Topic -->
+                        <div class="academics-card">
+                            <h3 class="text-xl font-bold mb-3 flex items-center"><i class="fas fa-chalkboard-teacher text-green-600 mr-2"></i>Today's Topic</h3>
+                            <div class="flex flex-wrap gap-4">
+                                <select class="flex-1 p-2 border rounded-lg bg-white/50 dark:bg-gray-700">
+                                    <option>Select student</option>
+                                    <option>Emma Watson</option>
+                                    <option>Liam Smith</option>
+                                    <option>Olivia Jones</option>
+                                </select>
+                                <input type="text" placeholder="e.g. Fractions" class="flex-1 p-2 border rounded-lg bg-white/50 dark:bg-gray-700">
+                                <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Set Topic</button>
+                            </div>
+                        </div>
+
+                        <!-- Homework Inbox -->
+                        <div class="academics-card">
+                            <h3 class="text-xl font-bold mb-3 flex items-center"><i class="fas fa-inbox text-blue-600 mr-2"></i>Homework Inbox</h3>
+                            <div class="space-y-2">
+                                <div class="homework-item">
+                                    <i class="fas fa-file-pdf text-red-500"></i>
+                                    <span class="flex-1"><strong>Math worksheet</strong> – submitted by Emma (due tomorrow)</span>
+                                    <span class="text-sm px-2 py-1 bg-yellow-100 dark:bg-yellow-800 rounded">Pending</span>
+                                </div>
+                                <div class="homework-item">
+                                    <i class="fas fa-file-image text-blue-500"></i>
+                                    <span class="flex-1"><strong>Science diagram</strong> – submitted by Liam (due Friday)</span>
+                                    <span class="text-sm px-2 py-1 bg-green-100 dark:bg-green-800 rounded">Graded</span>
+                                </div>
+                                <div class="homework-item">
+                                    <i class="fas fa-file-alt text-purple-500"></i>
+                                    <span class="flex-1"><strong>Essay draft</strong> – submitted by Olivia (due next week)</span>
+                                    <span class="text-sm px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">New</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Assign Homework -->
+                        <div class="academics-card">
+                            <h3 class="text-xl font-bold mb-3 flex items-center"><i class="fas fa-pen-alt text-purple-600 mr-2"></i>Assign Homework</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">Student</label>
+                                    <select class="w-full p-2 border rounded-lg bg-white/50 dark:bg-gray-700">
+                                        <option>Emma Watson</option>
+                                        <option>Liam Smith</option>
+                                        <option>Olivia Jones</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">Due Date</label>
+                                    <input type="date" class="w-full p-2 border rounded-lg bg-white/50 dark:bg-gray-700">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-medium mb-1">Description</label>
+                                    <textarea rows="2" class="w-full p-2 border rounded-lg bg-white/50 dark:bg-gray-700" placeholder="Homework details..."></textarea>
+                                </div>
+                                <div class="md:col-span-2 flex justify-end">
+                                    <button class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"><i class="fas fa-paper-plane mr-2"></i>Assign</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Render Schedule Management tab content
+            function renderScheduleManagement() {
+                perfWidget.style.display = 'block';
+                mainContent.innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Calendar Overview -->
+                        <div class="schedule-card">
+                            <h3 class="text-xl font-bold mb-3 flex items-center"><i class="fas fa-calendar-alt text-green-600 mr-2"></i>Weekly Schedule</h3>
+                            <div class="space-y-2">
+                                <div class="flex justify-between p-2 border-b dark:border-gray-600">
+                                    <span class="font-medium">Monday</span>
+                                    <span>9:00 Emma, 11:00 Liam</span>
+                                </div>
+                                <div class="flex justify-between p-2 border-b dark:border-gray-600">
+                                    <span class="font-medium">Tuesday</span>
+                                    <span>10:00 Olivia, 14:00 Group</span>
+                                </div>
+                                <div class="flex justify-between p-2 border-b dark:border-gray-600">
+                                    <span class="font-medium">Wednesday</span>
+                                    <span>9:30 Emma, 13:00 Liam</span>
+                                </div>
+                                <div class="flex justify-between p-2 border-b dark:border-gray-600">
+                                    <span class="font-medium">Thursday</span>
+                                    <span>11:00 Olivia, 15:00 Group</span>
+                                </div>
+                                <div class="flex justify-between p-2">
+                                    <span class="font-medium">Friday</span>
+                                    <span>No classes</span>
+                                </div>
+                            </div>
+                            <button class="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"><i class="fas fa-edit mr-2"></i>Edit Schedule</button>
+                        </div>
+
+                        <!-- Quick Actions -->
+                        <div class="schedule-card">
+                            <h3 class="text-xl font-bold mb-3 flex items-center"><i class="fas fa-clock text-orange-600 mr-2"></i>Manage Classes</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">Add class for student</label>
+                                    <select class="w-full p-2 border rounded-lg bg-white/50 dark:bg-gray-700 mb-2">
+                                        <option>Emma Watson</option>
+                                        <option>Liam Smith</option>
+                                        <option>Olivia Jones</option>
+                                    </select>
+                                    <div class="flex gap-2">
+                                        <input type="time" class="flex-1 p-2 border rounded-lg bg-white/50 dark:bg-gray-700" value="09:00">
+                                        <input type="time" class="flex-1 p-2 border rounded-lg bg-white/50 dark:bg-gray-700" value="10:00">
+                                    </div>
+                                    <select class="w-full p-2 border rounded-lg bg-white/50 dark:bg-gray-700 mt-2">
+                                        <option>Monday</option>
+                                        <option>Tuesday</option>
+                                        <option>Wednesday</option>
+                                        <option>Thursday</option>
+                                        <option>Friday</option>
+                                    </select>
+                                </div>
+                                <button class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">Add Class</button>
+                                <hr class="dark:border-gray-600">
+                                <button class="w-full bg-yellow-500 text-white py-2 rounded-lg hover:bg-yellow-600">View All Scheduled Classes</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Click handler for nav buttons
+            navContainer.addEventListener('click', (e) => {
+                const btn = e.target.closest('.nav-btn');
+                if (!btn) return;
+                const id = btn.id;
+
+                // Update active class
+                setActiveNav(id);
+
+                // Handle new tabs
+                if (id === 'navAcademics') {
+                    renderAcademics();
+                } else if (id === 'navScheduleManagement') {
+                    renderScheduleManagement();
+                }
+                // For original tabs (Dashboard, StudentDatabase), we do nothing here,
+                // letting tutor.js handle the content. But we must ensure they are not overwritten.
+                // The original tabs already have their own listeners (in tutor.js) that populate mainContent.
+                // Our active class update is harmless.
+            });
+
+            // Ensure the initial active state matches (Dashboard active by default)
+            // But tutor.js might also set active; we keep both.
         });
 
+        // The rest of the original functions (network, etc.) remain unchanged
         function initializeNetworkMonitoring() {
             window.addEventListener('online', function() {
                 hideNetworkWarning();
@@ -534,6 +730,3 @@
     </script>
 </body>
 </html>
-
-
-
