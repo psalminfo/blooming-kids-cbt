@@ -438,14 +438,14 @@
                 const nameHeading = document.getElementById('tutorNameHeading');
                 if (tutor.name) nameHeading.innerText = tutor.name.split(' ')[0] || 'Tutor';
 
-                // ------ DYNAMIC IMPORT FIRESTORE ------
+                // ------ DYNAMIC IMPORT FIRESTORE (fixed duplicate db) ------
                 try {
-                    const { db, collection, query, where, getDocs } = await import('https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js');
-                    // we also need firebase app? assume firebaseConfig initialised app already (tutor.js did)
-                    // but we need the 'db' reference from same config. we re-import from config.
-                    const { db } = await import('./firebaseConfig.js'); // should resolve to same instance
+                    // Import Firestore functions from CDN
+                    const { collection, query, where, getDocs } = await import('https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js');
+                    // Import the initialized db instance from your local config
+                    const { db } = await import('./firebaseConfig.js');
 
-                    // QUERY HELPERS
+                    // Build query
                     const studentsRef = collection(db, 'students');
                     const q = query(studentsRef, where('tutorEmail', '==', tutor.email));
                     const snapshot = await getDocs(q);
@@ -490,7 +490,7 @@
                     document.getElementById('performanceScoreCount').innerText = avgScore + '%';
 
                 } catch (e) {
-                    console.warn('Firestore dynamic import failed (offline or config missing). Using fallback.');
+                    console.warn('Firestore dynamic import failed (offline or config missing). Using fallback.', e);
                     // fallback dummy data
                     document.getElementById('totalStudentsCount').innerText = '12';
                     document.getElementById('todayClassesCount').innerText = '5';
@@ -537,7 +537,6 @@
                             alert('Course materials will appear here.');
                         }
                         // other tabs are handled by tutor.js (Dashboard, StudentDatabase, AutoStudents)
-                        // we can manually trigger mainContent changes if needed, but tutor.js will override.
                         // we just update active style.
                     });
                 });
