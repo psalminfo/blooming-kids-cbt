@@ -2,14 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Blooming · Tutor Portal</title>
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tutor Portal - Blooming Kids House</title>
+    
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-NBTVEGH1SL"></script>
     <script>
@@ -18,182 +14,321 @@
         gtag('js', new Date());
         gtag('config', 'G-NBTVEGH1SL');
     </script>
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
     <style>
-        * { margin:0; padding:0; box-sizing:border-box; }
-        :root {
-            --primary:#1e8b4c; --primary-soft:#2ecc71; --primary-glow:rgba(46,204,113,0.4);
-            --accent:#fbbf24; --accent-glow:rgba(251,191,36,0.5);
-            --surface:rgba(255,255,255,0.7); --surface-dark:rgba(17,25,40,0.75);
-            --text-light:#1e293b; --text-dark:#f1f5f9;
-            --border-light:rgba(255,255,255,0.5); --border-dark:rgba(255,255,255,0.1);
-            --shadow:0 20px 40px -15px rgba(0,20,10,0.2);
-            --shadow-hover:0 30px 50px -20px rgba(0,40,20,0.3);
-            --blur:16px; --transition:all 0.25s cubic-bezier(0.2,0,0,1);
+        /* Custom Styles for Nav Buttons */
+        .nav-btn {
+            padding: 8px 16px;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+            white-space: nowrap;
         }
-        body {
-            font-family:'Plus Jakarta Sans',sans-serif;
-            background:url('https://res.cloudinary.com/dy2hxcyaf/image/upload/v1769020680/Gemini_Generated_Image_o5m8auo5m8auo5m8_hzzxks.png') center/cover fixed;
-            min-height:100vh; color:var(--text-light); transition:color 0.3s,background 0.3s; position:relative;
+        .nav-btn.active {
+            border-bottom-color: #16a34a; /* green-600 */
+            color: #16a34a;
         }
-        body::before {
-            content:''; position:fixed; inset:0;
-            background:radial-gradient(circle at 20% 30%,rgba(46,204,113,0.08) 0%,transparent 40%),
-                       radial-gradient(circle at 80% 70%,rgba(251,191,36,0.1) 0%,transparent 40%),
-                       repeating-linear-gradient(45deg,rgba(255,255,255,0.02) 0px,rgba(255,255,255,0.02) 2px,transparent 2px,transparent 8px);
-            pointer-events:none; z-index:0;
+        
+        /* Layout Wrappers */
+        .wrapper {
+            padding: 10px 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.70)),
+                url('https://res.cloudinary.com/dy2hxcyaf/image/upload/v1769020680/Gemini_Generated_Image_o5m8auo5m8auo5m8_hzzxks.png') !important;
+            background-size: cover;
+            background-position: center top;
+            background-attachment: fixed;
+            background-blend-mode: overlay;
+            transition: background-color 0.3s;
         }
-        body.dark { --surface:var(--surface-dark); --border-light:var(--border-dark); --text-light:var(--text-dark); }
-        body.dark::before { opacity:0.6; }
-        .glass-panel {
-            background:var(--surface); backdrop-filter:blur(var(--blur)) saturate(180%);
-            -webkit-backdrop-filter:blur(var(--blur)) saturate(180%);
-            border:1px solid var(--border-light); box-shadow:var(--shadow),0 0 0 1px rgba(255,255,255,0.1) inset;
-            border-radius:2.5rem; transition:var(--transition); position:relative; z-index:10;
+        .inner {
+            max-width: 1280px; 
+            width: 95%; 
+            padding: 20px;
+            background: #ffffff; 
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+            min-height: 80vh; 
+            transition: background-color 0.3s, color 0.3s;
+            margin: 10px 0;
         }
-        .glass-panel:hover { box-shadow:var(--shadow-hover),0 0 0 1px rgba(255,255,255,0.2) inset; }
-        .orb {
-            position:absolute; border-radius:50%; filter:blur(70px); opacity:0.25; z-index:0;
-            animation:float 20s infinite alternate ease-in-out;
+        
+        .dashboard-header {
+            color: #333;
+            text-shadow: none;
+            transition: color 0.3s;
         }
-        .orb-1 { width:300px; height:300px; background:#2ecc71; top:-100px; right:-100px; }
-        .orb-2 { width:400px; height:400px; background:#fbbf24; bottom:-150px; left:-150px; animation-delay:-5s; }
-        @keyframes float { 0% { transform:translate(0,0) scale(1); } 100% { transform:translate(30px,30px) scale(1.1); } }
-        .avatar-modern {
-            width:48px; height:48px; background:linear-gradient(145deg,var(--primary),#0b5e2e);
-            border-radius:24px 24px 24px 8px; display:flex; align-items:center; justify-content:center;
-            color:#fff; font-weight:600; font-size:1.25rem; box-shadow:0 8px 18px var(--primary-glow);
-            transition:var(--transition); border:2px solid rgba(255,255,255,0.3);
-        }
-        .badge-date {
-            background:rgba(255,255,255,0.25); backdrop-filter:blur(8px); padding:0.4rem 1.2rem;
-            border-radius:40px; font-weight:600; font-size:0.9rem; border:1px solid rgba(255,255,255,0.3);
-        }
-        .stat-card {
-            background:rgba(255,255,255,0.2); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.3);
-            border-radius:2rem; padding:1.2rem 1.5rem; transition:var(--transition);
-            box-shadow:0 8px 20px -10px rgba(0,0,0,0.1); color:inherit; cursor:pointer;
-        }
-        .stat-card:hover { background:rgba(255,255,255,0.3); transform:translateY(-4px); border-color:var(--primary); }
-        body.dark .stat-card { background:rgba(0,0,0,0.2); border-color:rgba(255,255,255,0.1); }
-        .stat-icon {
-            width:48px; height:48px; border-radius:20px; background:linear-gradient(135deg,var(--primary),#0b5e2e);
-            display:flex; align-items:center; justify-content:center; color:#fff; font-size:1.4rem;
-            box-shadow:0 6px 14px var(--primary-glow);
-        }
-        .nav-pill-container {
-            background:rgba(0,0,0,0.05); border-radius:3rem; padding:0.4rem; backdrop-filter:blur(4px);
-            display:flex; flex-wrap:wrap; gap:0.2rem;
-        }
-        body.dark .nav-pill-container { background:rgba(255,255,255,0.05); }
-        .nav-tab-modern {
-            padding:0.7rem 1.8rem; border-radius:2.5rem; font-weight:600; color:var(--text-light);
-            opacity:0.7; transition:var(--transition); border:none; background:transparent; cursor:pointer;
-            letter-spacing:-0.01em; white-space:nowrap;
-        }
-        .nav-tab-modern i { margin-right:8px; }
-        .nav-tab-modern:hover { opacity:1; background:rgba(255,255,255,0.3); }
-        .nav-tab-modern.active {
-            opacity:1; background:#fff; color:var(--primary);
-            box-shadow:0 10px 20px -8px rgba(0,0,0,0.2),0 0 0 1px rgba(255,255,255,0.7);
-        }
-        body.dark .nav-tab-modern.active { background:#1e293b; color:var(--primary-soft); }
-        .btn-modern {
-            display:inline-flex; align-items:center; justify-content:center; gap:0.6rem;
-            padding:0.7rem 1.4rem; border-radius:2rem; font-weight:600; transition:var(--transition);
-            border:none; cursor:pointer; background:rgba(255,255,255,0.2); backdrop-filter:blur(12px);
-            border:1px solid rgba(255,255,255,0.25); color:inherit; box-shadow:0 4px 12px rgba(0,0,0,0.05);
-        }
-        .btn-modern:hover { background:rgba(255,255,255,0.35); transform:translateY(-2px); border-color:var(--primary); box-shadow:0 14px 22px -10px var(--primary-glow); }
-        .btn-primary { background:linear-gradient(135deg,var(--primary),#0f6b37); color:#fff; border:none; box-shadow:0 8px 20px var(--primary-glow); }
-        .btn-accent { background:linear-gradient(135deg,var(--accent),#f59e0b); color:#422006; border:none; box-shadow:0 8px 20px var(--accent-glow); }
 
-        .skeleton-loader { background:rgba(255,255,255,0.2); border-radius:2rem; padding:2rem; backdrop-filter:blur(4px); border:1px dashed rgba(255,255,255,0.4); }
-        .pulse-ring { width:72px; height:72px; border-radius:50%; background:rgba(46,204,113,0.3); display:flex; align-items:center; justify-content:center; position:relative; }
-        .pulse-ring::before { content:''; position:absolute; width:100%; height:100%; border-radius:50%; border:2px solid rgba(46,204,113,0.6); animation:pulse 1.8s infinite; }
-        @keyframes pulse { 0% { transform:scale(1); opacity:0.8; } 100% { transform:scale(1.8); opacity:0; } }
-        .text-gradient { background:linear-gradient(145deg,var(--primary),#0f6b37); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-weight:700; }
-        .hide-scrollbar::-webkit-scrollbar { display:none; }
+        /* Network Error Overlay Styles */
+        #networkErrorOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .error-content {
+            background: white;
+            padding: 3rem;
+            border-radius: 15px;
+            text-align: center;
+            max-width: 500px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .dark .error-content {
+            background: #1f2937;
+            color: white;
+        }
+
+        .error-icon {
+            font-size: 4rem;
+            color: #f59e0b;
+            margin-bottom: 1rem;
+        }
+
+        .error-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .error-btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+
+        .error-btn.primary {
+            background: #16a34a;
+            color: white;
+        }
+
+        .error-btn.secondary {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .error-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Network Warning Banner */
+        #networkWarning {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #fef3cd;
+            border-bottom: 2px solid #f59e0b;
+            padding: 12px 20px;
+            text-align: center;
+            z-index: 9999;
+            font-weight: 500;
+        }
+
+        .dark #networkWarning {
+            background: #78350f;
+            border-bottom-color: #f59e0b;
+            color: white;
+        }
+
+        #networkWarning .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            margin-left: 15px;
+            padding: 5px 10px;
+            border-radius: 3px;
+        }
+
+        .dark #networkWarning .close-btn {
+            color: white;
+        }
+
+        /* Mobile-first responsive design */
+        @media (max-width: 768px) {
+            .wrapper { padding: 5px 0; }
+            .inner { width: 98%; padding: 15px; margin: 5px 0; }
+            .header-container { flex-direction: column; align-items: flex-start !important; gap: 15px; }
+            .logo-title-container { flex-direction: column; align-items: flex-start !important; text-align: left; width: 100%; }
+            .action-buttons { width: 100%; justify-content: space-between; gap: 10px; }
+            .action-buttons .btn-mobile { flex: 1; min-width: 0; padding: 10px 8px; font-size: 0.875rem; }
+            #tutorNameHeading { font-size: 1.5rem; margin-top: 10px; }
+            #logoImg { height: 50px !important; }
+            .nav-container { overflow-x: auto; padding-bottom: 5px; }
+            .nav-buttons { display: flex; min-width: max-content; gap: 10px; }
+            .nav-btn { padding: 8px 12px; font-size: 1rem; }
+            .error-content { margin: 20px; padding: 2rem; }
+            .error-buttons { flex-direction: column; }
+            .error-btn { width: 100%; }
+        }
+
+        @media (max-width: 480px) {
+            .inner { padding: 12px; border-radius: 8px; }
+            .action-buttons { flex-direction: column; }
+            .action-buttons .btn-mobile { width: 100%; }
+            #tutorNameHeading { font-size: 1.25rem; }
+            .nav-btn { padding: 6px 10px; font-size: 0.9rem; }
+            .error-content { padding: 1.5rem; margin: 15px; }
+        }
+
+        /* --- DARK MODE STYLES --- */
+        .dark .wrapper {
+            background-color: #111827 !important;
+            background-image: 
+                linear-gradient(rgba(17, 24, 39, 0.70), rgba(17, 24, 39, 0.70)),
+                url('https://res.cloudinary.com/dy2hxcyaf/image/upload/v1769020680/Gemini_Generated_Image_o5m8auo5m8auo5m8_hzzxks.png') !important;
+            background-blend-mode: overlay;
+        }
+        
+        .dark #logoImg {
+            filter: brightness(2) drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+        }
+
+        .dark .inner {
+            background: #1f2937;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+        
+        .dark .inner, .dark .inner p, .dark .inner span, .dark .inner a, .dark .inner label, 
+        .dark .inner div, .dark .inner button, .dark .inner input, .dark .inner select, 
+        .dark .inner textarea, .dark .inner h1, .dark .inner h2, .dark .inner h3 {
+             color: #ffffff !important;
+        }
+        
+        .dark .inner input::placeholder, .dark .inner textarea::placeholder {
+            color: #cccccc !important;
+            opacity: 1 !important;
+        }
+        
+        .dark .inner input:not([type="checkbox"]):not([type="radio"]),
+        .dark .inner select, .dark .inner textarea {
+            background-color: #374151 !important;
+            border-color: #4b5563 !important;
+            color: #ffffff !important;
+        }
+        
+        .dark .inner table, .dark .inner .bg-white {
+            background-color: #374151 !important;
+            color: #ffffff !important;
+        }
+        
+        .dark .inner table td, .dark .inner table th {
+            border-color: #4b5563 !important;
+            color: #ffffff !important;
+        }
+        
+        .dark .inner .bg-gray-50 {
+            background-color: #374151 !important;
+        }
+        
+        .dark .inner button:focus, .dark .inner input:focus, .dark .inner select:focus {
+            outline: 2px solid #3b82f6 !important;
+            outline-offset: 2px !important;
+        }
+        
+        .inner * {
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+
+        .dark .dashboard-header { color: #ffffff !important; }
+        .dark .nav-btn { color: #e5e7eb !important; }
+        .dark .nav-btn.active { border-bottom-color: #10b981 !important; color: #10b981 !important; }
+        .dark #logoutBtn, .dark #whatsappBtn { filter: brightness(1.2); }
+
+        .nav-container::-webkit-scrollbar { display: none; }
+        .nav-container { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
-<body class="antialiased">
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
+<body>
 
-    <div id="networkWarning" class="fixed top-0 left-0 right-0 bg-yellow-100/80 backdrop-blur-md border-b border-yellow-400 text-yellow-800 px-4 py-3 text-center hidden shadow-lg z-50">
-        <span id="warningMessage" class="font-medium">Offline</span>
-        <button onclick="hideNetworkWarning()" class="ml-4 text-yellow-800 hover:text-yellow-900 font-bold text-xl">&times;</button>
-    </div>
-
-    <div class="min-h-screen p-3 md:p-6 lg:p-8 flex justify-center items-start relative">
-        <div class="glass-panel w-full max-w-7xl p-5 md:p-8 lg:p-10 relative overflow-hidden">
-            <div class="relative z-20 flex flex-wrap items-center justify-between gap-4 mb-6">
-                <div class="flex items-center gap-3 sm:gap-4">
-                    <div class="relative group">
-                        <div class="absolute -inset-1 bg-gradient-to-r from-green-400 to-blue-500 rounded-full blur-xl opacity-40 group-hover:opacity-70 transition"></div>
-                        <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids" class="relative h-14 w-auto object-contain drop-shadow-2xl">
-                    </div>
-                    <div>
-                        <h1 id="tutorNameHeading" class="text-xl md:text-3xl font-extrabold tracking-tight">
-                            Welcome, <span class="text-gradient">Tutor</span>
-                        </h1>
-                        <p class="text-xs md:text-sm text-gray-600 dark:text-gray-300 font-medium flex items-center gap-1">
-                            <i class="fas fa-seedling text-green-600"></i> Blooming Kids House
-                        </p>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2 sm:gap-3">
-                    <div class="badge-date hidden sm:flex items-center gap-2"><i class="far fa-calendar-alt text-green-600"></i><span id="currentDate"></span></div>
-                    <button id="modeToggle" class="w-11 h-11 rounded-full bg-white/30 backdrop-blur-sm border border-white/40 hover:bg-white/50 flex items-center justify-center transition-all text-gray-700 dark:text-yellow-300 shadow-md">
-                        <i class="fas fa-moon" id="modeIcon"></i>
-                    </button>
-                    <a id="whatsappBtn" href="https://wa.me/2348158768689" target="_blank" class="btn-modern btn-primary px-4 py-2 hidden sm:flex"><i class="fab fa-whatsapp text-lg"></i><span>Support</span></a>
-                    <button id="logoutBtn" class="btn-modern btn-accent px-4 py-2"><i class="fas fa-sign-out-alt"></i><span class="hidden sm:inline">Logout</span></button>
-                    <div class="avatar-modern hidden md:flex">T</div>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8 relative z-20">
-                <div class="stat-card flex items-center gap-3" id="totalStudentsCard"><div class="stat-icon"><i class="fas fa-users"></i></div><div><p class="text-xs opacity-70">Total students</p><p class="text-2xl font-bold" id="totalStudentsCount">0</p></div></div>
-                <div class="stat-card flex items-center gap-3" id="todayClassesCard"><div class="stat-icon" style="background: linear-gradient(145deg, #fbbf24, #d97706);"><i class="fas fa-clock"></i></div><div><p class="text-xs opacity-70">Today's classes</p><p class="text-2xl font-bold" id="todayClassesCount">0</p></div></div>
-                <div class="stat-card flex items-center gap-3" id="pendingReportsCard"><div class="stat-icon" style="background: linear-gradient(145deg, #3b82f6, #1e3a8a);"><i class="fas fa-book-open"></i></div><div><p class="text-xs opacity-70">Pending reports</p><p class="text-2xl font-bold" id="pendingReportsCount">0</p></div></div>
-                <div class="stat-card flex items-center gap-3" id="achievementsCard"><div class="stat-icon" style="background: linear-gradient(145deg, #ec4899, #831843);"><i class="fas fa-star"></i></div><div><p class="text-xs opacity-70">Performance score</p><p class="text-2xl font-bold" id="performanceScore">0</p></div></div>
-            </div>
-
-            <nav class="relative z-20 mb-8 overflow-x-auto hide-scrollbar">
-                <div class="nav-pill-container">
-                    <button id="navDashboard" class="nav-tab-modern active"><i class="fas fa-columns"></i>Dashboard</button>
-                    <button id="navStudentDatabase" class="nav-tab-modern"><i class="fas fa-users"></i>Student Database</button>
-                    <button id="navAutoStudents" class="nav-tab-modern"><i class="fas fa-user-plus"></i>Auto Students</button>
-                    <button id="navAcademic" class="nav-tab-modern"><i class="fas fa-graduation-cap"></i>Academic</button>
-                    <button id="navScheduleManagement" class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule</button>
-                    <button id="navCourses" class="nav-tab-modern"><i class="fas fa-folder-open"></i>Courses</button>
-                </div>
-            </nav>
-
-            <main id="mainContent" class="relative z-20 min-h-[400px] transition-all duration-500">
-                <div class="skeleton-loader flex flex-col items-center justify-center gap-6 py-12">
-                    <div class="pulse-ring"><i class="fas fa-leaf text-3xl text-green-600"></i></div>
-                    <p class="text-lg font-medium text-gray-700 dark:text-gray-200 animate-pulse">Loading secure portal...</p>
-                </div>
-            </main>
-
-            <div class="relative z-20 mt-8 text-xs text-center opacity-40 flex items-center justify-center gap-2"><i class="fas fa-shield-alt text-green-500"></i> End-to-end encrypted · Blooming Kids Care v3.3</div>
-        </div>
-    </div>
-
-    <div id="networkErrorOverlay" class="fixed inset-0 bg-gray-900/80 backdrop-blur-xl z-50 hidden flex-col items-center justify-center p-4">
-        <div class="bg-white/90 dark:bg-gray-800/90 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-white/30">
-            <div class="w-20 h-20 bg-yellow-100/80 rounded-full flex items-center justify-center mx-auto mb-6"><i class="fas fa-wifi text-3xl text-yellow-600"></i></div>
-            <h2 class="text-2xl font-bold mb-2 text-gray-800 dark:text-white">Connection Lost</h2>
-            <p class="text-gray-600 dark:text-gray-300 mb-8" id="errorMessage">Can't reach Blooming Kids servers.</p>
-            <div class="flex flex-col gap-3">
-                <button onclick="window.location.reload()" class="btn-modern btn-primary w-full">Try Again</button>
-                <button onclick="checkConnectivity()" class="btn-modern border border-gray-300 dark:border-gray-600 w-full">Check Connection</button>
+    <div id="networkErrorOverlay">
+        <div class="error-content">
+            <div class="error-icon"><i class="fas fa-wifi"></i></div>
+            <h2 class="text-2xl font-bold mb-4">Connection Issue</h2>
+            <p class="text-lg mb-2" id="errorMessage">We're having trouble connecting to the server.</p>
+            <p class="text-gray-600 dark:text-gray-300 mb-6">This might be due to network problems or temporary server issues.</p>
+            <div class="error-buttons">
+                <button onclick="window.location.reload()" class="error-btn primary"><i class="fas fa-redo mr-2"></i>Try Again</button>
+                <button onclick="checkConnectivity()" class="error-btn secondary"><i class="fas fa-network-wired mr-2"></i>Check Connection</button>
             </div>
         </div>
     </div>
 
+    <div id="networkWarning">
+        <span id="warningMessage">You appear to be offline. Some features may not work properly.</span>
+        <button class="close-btn" onclick="hideNetworkWarning()">×</button>
+    </div>
+
+    <div class="wrapper">
+        <div class="inner">
+            <div class="max-w-7xl mx-auto">
+                <div class="flex justify-between items-center mb-6 header-container">
+                    <div class="flex items-center logo-title-container">
+                        <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mr-4 mobile-logo" style="filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.2));">
+                        <h1 id="tutorNameHeading" class="text-3xl font-bold dashboard-header mobile-title">Welcome, Tutor!</h1>
+                    </div>
+                    
+                    <div class="flex space-x-3 items-center action-buttons">
+                        <button id="modeToggle" class="p-3 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-600 dark:hover:bg-gray-700 dark:text-white transition-colors duration-300 shadow-md btn-mobile" aria-label="Toggle dark mode">
+                            <i class="fas fa-moon" id="modeIcon"></i>
+                        </button>
+                        <a id="whatsappBtn" href="https://wa.me/2348158768689" target="_blank" class="bg-green-500 text-white px-4 py-2 rounded flex items-center hover:bg-green-600 shadow-md transition-colors duration-300 btn-mobile">
+                            <i class="fab fa-whatsapp mr-2 text-lg"></i><span class="mobile-text">Tech Support</span>
+                        </a>
+                        <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 shadow-md btn-mobile">
+                            <span class="mobile-text">Logout</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <nav class="mb-6 border-b border-gray-200 dark:border-gray-700 nav-container">
+                    <div class="flex space-x-4 nav-buttons">
+                        <button id="navDashboard" class="nav-btn text-lg font-semibold active dashboard-header">Dashboard</button>
+                        <button id="navAcademics" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Academics</button>
+                        <button id="navSchedule" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Schedule Management</button>
+                        <button id="navStudentDatabase" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Student Database</button>
+                    </div>
+                </nav>
+
+                <div id="performance-widget" class="mb-6">
+                    <div class="animate-pulse bg-gray-100 dark:bg-gray-700 h-24 rounded-xl"></div>
+                </div>
+
+                <div id="mainContent">
+                    <p class="text-center text-gray-600 mt-12 mobile-content">Checking user permissions...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script> 
     
@@ -212,136 +347,185 @@
             appId: "1:238975054977:web:87c70b4db044998a204980"
         };
 
-        // Initialize Firebase 8 Globally for legacy scripts
+        // Initialize Firebase
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
-            console.log("🔥 Firebase 8 Initialized");
+            console.log("🔥 Firebase Initialized");
         }
         
-        // Expose DB for games.js and tutor.js
+        // Expose DB for games.js
         window.db = firebase.firestore();
         window.auth = firebase.auth();
     </script>
     
     <script src="games.js"></script>
+    
     <script type="module" src="tutor.js"></script>
 
     <script>
-        (function() {
-            // Theme & Date Control
-            const dateEl = document.getElementById('currentDate');
-            if (dateEl) dateEl.innerText = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+        document.addEventListener('DOMContentLoaded', () => {
             const body = document.body;
-            const toggle = document.getElementById('modeToggle');
-            const icon = document.getElementById('modeIcon');
-            
-            function setTheme(theme) {
-                if (theme === 'dark') { 
-                    body.classList.add('dark'); 
-                    icon?.classList.replace('fa-moon','fa-sun'); 
-                    localStorage.setItem('tutor_theme','dark');
-                } else { 
-                    body.classList.remove('dark'); 
-                    icon?.classList.replace('fa-sun','fa-moon'); 
-                    localStorage.setItem('tutor_theme','light'); 
-                }
-            }
-            
-            const saved = localStorage.getItem('tutor_theme');
-            if (saved) setTheme(saved);
-            else if (window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
-            else setTheme('light');
-            
-            if (toggle) toggle.addEventListener('click', () => setTheme(body.classList.contains('dark') ? 'light' : 'dark'));
+            const toggleButton = document.getElementById('modeToggle');
+            const modeIcon = document.getElementById('modeIcon');
+            const modeKey = 'tutor_theme';
 
-            // Network State Handling
-            window.hideNetworkWarning = () => document.getElementById('networkWarning')?.classList.add('hidden');
-            window.hideNetworkError = () => document.getElementById('networkErrorOverlay')?.classList.add('hidden');
-            window.showNetworkError = (msg) => { 
-                if(msg) document.getElementById('errorMessage').innerText = msg; 
-                document.getElementById('networkErrorOverlay')?.classList.remove('hidden'); 
+            // Theme Setting
+            const setTheme = (theme) => {
+                if (theme === 'dark') {
+                    body.classList.add('dark');
+                    modeIcon.classList.remove('fa-moon');
+                    modeIcon.classList.add('fa-sun');
+                    localStorage.setItem(modeKey, 'dark');
+                } else {
+                    body.classList.remove('dark');
+                    modeIcon.classList.remove('fa-sun');
+                    modeIcon.classList.add('fa-moon');
+                    localStorage.setItem(modeKey, 'light');
+                }
             };
-            window.checkConnectivity = () => { if (navigator.onLine) { hideNetworkError(); hideNetworkWarning(); } else showNetworkError('Still offline.'); };
-            window.addEventListener('online', () => { hideNetworkWarning(); hideNetworkError(); });
-            window.addEventListener('offline', () => document.getElementById('networkWarning')?.classList.remove('hidden'));
 
-            // Data Polling & Stat Card Injection via Firebase 8
-            function waitForTutorData(callback) {
-                if (window.tutorData) callback();
-                else setTimeout(() => waitForTutorData(callback), 100);
-            }
+            const savedTheme = localStorage.getItem(modeKey);
+            if (savedTheme) setTheme(savedTheme);
+            else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+            else setTheme('light');
 
-            waitForTutorData(async () => {
-                const tutor = window.tutorData;
-                if (!tutor) return;
-
-                try {
-                    // Refactored to use Firebase 8 logic strictly attached to window.db
-                    const snapshot = await window.db.collection("students").where("tutorEmail", "==", tutor.email).get();
-                    const all = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                    const active = all.filter(s => !['archived','graduated','transferred'].includes(s.status));
-                    
-                    document.getElementById('totalStudentsCount').textContent = active.length;
-
-                    const todayName = new Date().toLocaleDateString('en-US', { weekday:'long' });
-                    let todayCount = 0;
-                    active.forEach(s => { 
-                        if (s.schedule) s.schedule.forEach(slot => { if (slot.day === todayName) todayCount++; }); 
-                    });
-                    document.getElementById('todayClassesCount').textContent = todayCount;
-
-                    const oneWeekAgo = new Date(); 
-                    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-                    let pending = 0;
-                    
-                    active.forEach(s => {
-                        if (s.status === 'break') return;
-                        if (!s.lastReportDate) { pending++; return; }
-                        // Support both Firebase Timestamps and standard dates
-                        const last = s.lastReportDate.toDate ? s.lastReportDate.toDate() : new Date(s.lastReportDate);
-                        if (last < oneWeekAgo) pending++;
-                    });
-                    document.getElementById('pendingReportsCount').textContent = pending;
-
-                    let earned = 0;
-                    active.forEach(s => earned += s.attendanceRate || 85);
-                    const perf = active.length ? Math.round((earned / (active.length * 100)) * 100) : 100;
-                    document.getElementById('performanceScore').textContent = perf;
-                    
-                } catch (e) { 
-                    console.warn('Stat update failed', e); 
-                }
-
-                // Global function triggers
-                document.getElementById('navAcademic')?.addEventListener('click', () => {
-                    alert('Please select a student from the Dashboard or Student Database to add a topic or assign homework.');
-                });
-
-                document.getElementById('navScheduleManagement')?.addEventListener('click', () => {
-                    if (typeof showScheduleCalendarModal === 'function') {
-                        showScheduleCalendarModal();
-                    } else {
-                        alert('Schedule calendar not available');
-                    }
-                });
-
-                document.getElementById('navCourses')?.addEventListener('click', () => {
-                    if (typeof showCoursesModal === 'function') {
-                        showCoursesModal();
-                    } else {
-                        alert('Courses feature coming soon – you can manage materials per student from the Student Database.');
-                    }
-                });
-
-                // Stat Card Interactivity
-                document.getElementById('totalStudentsCard')?.addEventListener('click', () => document.getElementById('navStudentDatabase')?.click());
-                document.getElementById('todayClassesCard')?.addEventListener('click', () => {
-                    if (typeof showScheduleCalendarModal === 'function') showScheduleCalendarModal();
-                });
-                document.getElementById('pendingReportsCard')?.addEventListener('click', () => document.getElementById('navDashboard')?.click());
-                document.getElementById('achievementsCard')?.addEventListener('click', () => alert('Performance score is updated by management.'));
+            toggleButton.addEventListener('click', () => {
+                const currentTheme = body.classList.contains('dark') ? 'dark' : 'light';
+                setTheme(currentTheme === 'light' ? 'dark' : 'light');
             });
-        })();
+
+            // Mobile Resize
+            function handleResize() {
+                const isMobile = window.innerWidth < 768;
+                if (isMobile) {
+                    document.body.classList.add('mobile-view');
+                    document.body.classList.remove('desktop-view');
+                } else {
+                    document.body.classList.add('desktop-view');
+                    document.body.classList.remove('mobile-view');
+                }
+            }
+            handleResize();
+            window.addEventListener('resize', handleResize);
+
+            // Network Monitoring
+            initializeNetworkMonitoring();
+        });
+
+        function initializeNetworkMonitoring() {
+            window.addEventListener('online', function() {
+                hideNetworkWarning();
+                hideNetworkError();
+                if (window.wasShowingError) {
+                    showTemporaryMessage('Connection restored!', 'success');
+                    window.wasShowingError = false;
+                }
+            });
+
+            window.addEventListener('offline', function() {
+                showNetworkWarning('You appear to be offline. Some features may not work properly.');
+                window.wasShowingError = true;
+            });
+
+            const originalFetch = window.fetch;
+            window.fetch = function(...args) {
+                return originalFetch.apply(this, args)
+                    .then(response => {
+                        if (!response.ok && response.status >= 500) {
+                            showNetworkWarning('Server is experiencing issues. Please try again later.');
+                        }
+                        return response;
+                    })
+                    .catch(error => {
+                        if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                            if (!navigator.onLine) showNetworkError('Cannot connect to server. Please check your internet connection.');
+                            else showNetworkError('Server is unreachable. Please try again later.');
+                            window.wasShowingError = true;
+                        }
+                        throw error;
+                    });
+            };
+
+            setInterval(() => {
+                if (!navigator.onLine) checkConnectivity();
+            }, 30000);
+        }
+
+        function showNetworkError(message = 'Connection issue detected') {
+            const overlay = document.getElementById('networkErrorOverlay');
+            const errorMessage = document.getElementById('errorMessage');
+            if (errorMessage) errorMessage.textContent = message;
+            overlay.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+            window.isShowingError = true;
+        }
+
+        function hideNetworkError() {
+            const overlay = document.getElementById('networkErrorOverlay');
+            overlay.style.display = 'none';
+            document.body.style.overflow = 'auto';
+            window.isShowingError = false;
+        }
+
+        function showNetworkWarning(message) {
+            if (window.isShowingError) return;
+            const warning = document.getElementById('networkWarning');
+            const messageElement = document.getElementById('warningMessage');
+            if (messageElement) messageElement.textContent = message;
+            warning.style.display = 'block';
+            window.isShowingWarning = true;
+            setTimeout(() => {
+                if (navigator.onLine && window.isShowingWarning) hideNetworkWarning();
+            }, 10000);
+        }
+
+        function hideNetworkWarning() {
+            const warning = document.getElementById('networkWarning');
+            warning.style.display = 'none';
+            window.isShowingWarning = false;
+        }
+
+        function checkConnectivity() {
+            if (!navigator.onLine || window.isShowingError || window.isShowingWarning) {
+                fetch('https://www.google.com/favicon.ico', { 
+                    mode: 'no-cors',
+                    cache: 'no-store',
+                    headers: { 'Cache-Control': 'no-cache' }
+                })
+                .then(() => {
+                    hideNetworkWarning();
+                    hideNetworkError();
+                    if (window.wasShowingError) showTemporaryMessage('Connection is working properly!', 'success');
+                })
+                .catch(() => {
+                    if (!window.isShowingError) showNetworkError('No internet connection detected.');
+                });
+            }
+        }
+
+        function showTemporaryMessage(message, type = 'info') {
+            const messageEl = document.createElement('div');
+            messageEl.textContent = message;
+            messageEl.style.cssText = `
+                position: fixed; top: 20px; right: 20px;
+                background: ${type === 'success' ? '#10b981' : '#3b82f6'};
+                color: white; padding: 12px 20px; border-radius: 8px;
+                z-index: 10001; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                animation: slideIn 0.3s ease-out;
+            `;
+            document.body.appendChild(messageEl);
+            setTimeout(() => {
+                messageEl.style.animation = 'slideOut 0.3s ease-in';
+                setTimeout(() => { if (messageEl.parentNode) messageEl.parentNode.removeChild(messageEl); }, 300);
+            }, 3000);
+        }
+
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+            @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+        `;
+        document.head.appendChild(style);
     </script>
 </body>
 </html>
