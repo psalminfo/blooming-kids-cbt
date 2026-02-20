@@ -4,11 +4,8 @@
  ******************************************************************************/
 
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc, deleteField } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
-import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc, deleteField, orderBy } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
 /*******************************************************************************
  * SECTION 2: STYLES & CSS (REMOVED – MOVED TO HTML)
@@ -4915,4 +4912,5 @@ window.showScheduleCalendarModal = showScheduleCalendarModal;
 window.renderCourses = renderCourses;
 window.loadCourseMaterials = loadCourseMaterials;
 window.uploadCourseMaterial = uploadCourseMaterial;
+
 
