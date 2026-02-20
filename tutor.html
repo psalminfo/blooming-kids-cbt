@@ -1,541 +1,1769 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tutor Portal - Blooming Kids House</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Blooming · Tutor Portal</title>
+
+    <!-- Preconnect & fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-NBTVEGH1SL"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'G-NBTVEGH1SL');
-    </script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <!-- REMOVED BROKEN FONT LINK -->
-    <!-- <link rel="stylesheet" href="fonts/material-design-iconic-font/css/material-design-iconic-font.min.css"> -->
-    <!-- REMOVED BROKEN CSS LINK -->
-    <!-- <link rel="stylesheet" href="css/style.css"> -->
-    
     <style>
-        /* Custom Styles for Nav Buttons */
-        .nav-btn {
-            padding: 8px 16px;
-            border-bottom: 2px solid transparent;
-            transition: all 0.3s ease;
-            white-space: nowrap;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        .nav-btn.active {
-            border-bottom-color: #16a34a; /* green-600 */
-            color: #16a34a;
+
+        :root {
+            --primary: #1e8b4c;
+            --primary-soft: #2ecc71;
+            --primary-glow: rgba(46, 204, 113, 0.4);
+            --accent: #fbbf24;
+            --accent-glow: rgba(251, 191, 36, 0.5);
+            --surface: rgba(255, 255, 255, 0.7);
+            --surface-dark: rgba(17, 25, 40, 0.75);
+            --text-light: #1e293b;
+            --text-dark: #f1f5f9;
+            --border-light: rgba(255, 255, 255, 0.5);
+            --border-dark: rgba(255, 255, 255, 0.1);
+            --shadow: 0 20px 40px -15px rgba(0, 20, 10, 0.2);
+            --shadow-hover: 0 30px 50px -20px rgba(0, 40, 20, 0.3);
+            --blur: 16px;
+            --transition: all 0.25s cubic-bezier(0.2, 0, 0, 1);
         }
-        
-        /* Layout Wrappers */
-        .wrapper {
-            padding: 10px 0;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: url('https://res.cloudinary.com/dy2hxcyaf/image/upload/v1769020680/Gemini_Generated_Image_o5m8auo5m8auo5m8_hzzxks.png') center/cover fixed;
             min-height: 100vh;
-            /* FIXED: Subtle background image with transparency */
-            background-image: 
-                linear-gradient(rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.70)),
-                url('https://res.cloudinary.com/dy2hxcyaf/image/upload/v1769020680/Gemini_Generated_Image_o5m8auo5m8auo5m8_hzzxks.png') !important;
-            background-size: cover;
-            background-position: center top; /* Show only top part */
-            background-attachment: fixed;
-            background-blend-mode: overlay;
-            transition: background-color 0.3s;
-        }
-        .inner {
-            max-width: 1280px; 
-            width: 95%; 
-            padding: 20px;
-            background: #ffffff; 
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-            min-height: 80vh; 
-            transition: background-color 0.3s, color 0.3s;
-            margin: 10px 0;
-        }
-        
-        .dashboard-header {
-            color: #333;
-            text-shadow: none;
-            transition: color 0.3s;
+            color: var(--text-light);
+            transition: color 0.3s, background-color 0.3s;
+            position: relative;
         }
 
-        /* Network Error Overlay Styles */
-        #networkErrorOverlay {
-            display: none;
+        body::before {
+            content: '';
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            z-index: 10000;
-            justify-content: center;
-            align-items: center;
-            backdrop-filter: blur(5px);
+            inset: 0;
+            background: radial-gradient(circle at 20% 30%, rgba(46, 204, 113, 0.08) 0%, transparent 40%),
+                        radial-gradient(circle at 80% 70%, rgba(251, 191, 36, 0.1) 0%, transparent 40%),
+                        repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 2px, transparent 2px, transparent 8px);
+            pointer-events: none;
+            z-index: 0;
         }
 
-        .error-content {
-            background: white;
-            padding: 3rem;
-            border-radius: 15px;
-            text-align: center;
-            max-width: 500px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-            animation: fadeIn 0.5s ease-out;
+        body.dark {
+            --surface: var(--surface-dark);
+            --border-light: var(--border-dark);
+            --text-light: var(--text-dark);
         }
 
-        .dark .error-content {
-            background: #1f2937;
-            color: white;
+        body.dark::before {
+            opacity: 0.6;
         }
 
-        .error-icon {
-            font-size: 4rem;
-            color: #f59e0b;
-            margin-bottom: 1rem;
+        .glass-panel {
+            background: var(--surface);
+            backdrop-filter: blur(var(--blur)) saturate(180%);
+            -webkit-backdrop-filter: blur(var(--blur)) saturate(180%);
+            border: 1px solid var(--border-light);
+            box-shadow: var(--shadow), 0 0 0 1px rgba(255,255,255,0.1) inset;
+            border-radius: 2.5rem;
+            transition: var(--transition);
+            position: relative;
+            z-index: 10;
         }
 
-        .error-buttons {
+        .glass-panel:hover {
+            box-shadow: var(--shadow-hover), 0 0 0 1px rgba(255,255,255,0.2) inset;
+        }
+
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(70px);
+            opacity: 0.25;
+            z-index: 0;
+            animation: float 20s infinite alternate ease-in-out;
+        }
+
+        .orb-1 { width: 300px; height: 300px; background: #2ecc71; top: -100px; right: -100px; }
+        .orb-2 { width: 400px; height: 400px; background: #fbbf24; bottom: -150px; left: -150px; animation-delay: -5s; }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(30px, 30px) scale(1.1); }
+        }
+
+        .avatar-modern {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(145deg, var(--primary), #0b5e2e);
+            border-radius: 24px 24px 24px 8px;
             display: flex;
-            gap: 15px;
+            align-items: center;
             justify-content: center;
-            margin-top: 2rem;
-            flex-wrap: wrap;
+            color: white;
+            font-weight: 600;
+            font-size: 1.25rem;
+            box-shadow: 0 8px 18px var(--primary-glow);
+            transition: var(--transition);
+            border: 2px solid rgba(255,255,255,0.3);
         }
 
-        .error-btn {
-            padding: 12px 24px;
-            border-radius: 8px;
-            text-decoration: none;
+        .avatar-modern:hover { transform: scale(1.05) rotate(2deg); }
+
+        .badge-date {
+            background: rgba(255,255,255,0.25);
+            backdrop-filter: blur(8px);
+            padding: 0.4rem 1.2rem;
+            border-radius: 40px;
             font-weight: 600;
-            transition: all 0.3s ease;
-            border: none;
+            font-size: 0.9rem;
+            border: 1px solid rgba(255,255,255,0.3);
+            color: inherit;
+        }
+
+        .stat-card {
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 2rem;
+            padding: 1.2rem 1.5rem;
+            transition: var(--transition);
+            box-shadow: 0 8px 20px -10px rgba(0,0,0,0.1);
+            color: inherit;
             cursor: pointer;
         }
 
-        .error-btn.primary {
-            background: #16a34a;
-            color: white;
+        .stat-card:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-4px);
+            border-color: var(--primary);
         }
 
-        .error-btn.secondary {
-            background: #f59e0b;
-            color: white;
+        body.dark .stat-card {
+            background: rgba(0,0,0,0.2);
+            border-color: rgba(255,255,255,0.1);
         }
 
-        .error-btn:hover {
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, var(--primary), #0b5e2e);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.4rem;
+            box-shadow: 0 6px 14px var(--primary-glow);
+        }
+
+        .nav-pill-container {
+            background: rgba(0,0,0,0.05);
+            border-radius: 3rem;
+            padding: 0.4rem;
+            backdrop-filter: blur(4px);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.2rem;
+        }
+
+        body.dark .nav-pill-container { background: rgba(255,255,255,0.05); }
+
+        .nav-tab-modern {
+            padding: 0.7rem 1.8rem;
+            border-radius: 2.5rem;
+            font-weight: 600;
+            color: var(--text-light);
+            opacity: 0.7;
+            transition: var(--transition);
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            letter-spacing: -0.01em;
+            white-space: nowrap;
+        }
+
+        .nav-tab-modern i { margin-right: 8px; }
+
+        .nav-tab-modern:hover { opacity: 1; background: rgba(255,255,255,0.3); }
+
+        .nav-tab-modern.active {
+            opacity: 1;
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 10px 20px -8px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.7);
+        }
+
+        body.dark .nav-tab-modern.active {
+            background: #1e293b;
+            color: var(--primary-soft);
+        }
+
+        .btn-modern {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+            padding: 0.7rem 1.4rem;
+            border-radius: 2rem;
+            font-weight: 600;
+            transition: var(--transition);
+            border: none;
+            cursor: pointer;
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.25);
+            color: inherit;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .btn-modern:hover {
+            background: rgba(255,255,255,0.35);
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            border-color: var(--primary);
+            box-shadow: 0 14px 22px -10px var(--primary-glow);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), #0f6b37);
+            color: white;
+            border: none;
+            box-shadow: 0 8px 20px var(--primary-glow);
+        }
+
+        .btn-primary:hover { background: linear-gradient(135deg, #0f6b37, var(--primary)); }
+
+        .btn-accent {
+            background: linear-gradient(135deg, var(--accent), #f59e0b);
+            color: #422006;
+            border: none;
+            box-shadow: 0 8px 20px var(--accent-glow);
+        }
+
+        .floating-messaging-btn, .floating-inbox-btn {
+            position: fixed;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 30px;
+            background: linear-gradient(145deg, var(--primary), #0b5e2e);
+            color: white;
+            border: none;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2), 0 0 0 2px rgba(255,255,255,0.3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            transition: all 0.2s ease;
+            z-index: 999;
+            backdrop-filter: blur(8px);
+        }
+        .floating-messaging-btn { bottom: 100px; }
+        .floating-inbox-btn { bottom: 30px; }
+        .floating-messaging-btn:hover, .floating-inbox-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+        }
+        .floating-btn-text { display: none; }
+        .unread-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #ef4444;
+            color: white;
+            border-radius: 20px;
+            padding: 2px 6px;
+            font-size: 12px;
+            font-weight: bold;
+            min-width: 22px;
+            text-align: center;
+            border: 2px solid white;
+        }
+        @media (max-width: 640px) {
+            .floating-messaging-btn, .floating-inbox-btn { width: 50px; height: 50px; font-size: 1.5rem; }
+        }
+
+        .skeleton-loader {
+            background: rgba(255,255,255,0.2);
+            border-radius: 2rem;
+            padding: 2rem;
+            backdrop-filter: blur(4px);
+            border: 1px dashed rgba(255,255,255,0.4);
+        }
+
+        .pulse-ring {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: rgba(46, 204, 113, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .pulse-ring::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 2px solid rgba(46, 204, 113, 0.6);
+            animation: pulse 1.8s infinite;
+        }
+
+        @keyframes pulse { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.8); opacity: 0; } }
+
+        .text-gradient {
+            background: linear-gradient(145deg, var(--primary), #0f6b37);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+        }
+
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        #networkWarning, #networkErrorOverlay { z-index: 9999; }
+        .student-list-item { border-bottom: 1px solid rgba(0,0,0,0.05); padding: 0.75rem 0; }
+        .student-list-item:last-child { border-bottom: none; }
+    </style>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         SECTION 2: EXTENDED UI STYLES (all transition bugs fixed)
+         ═══════════════════════════════════════════════════════════════ -->
+    <style>
+        /* Extended CSS Variables */
+        :root {
+            --primary-color: #10b981;
+            --primary-dark: #059669;
+            --primary-light: #d1fae5;
+            --secondary-color: #6366f1;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --info-color: #3b82f6;
+            --dark-color: #1f2937;
+            --light-color: #f9fafb;
+            --border-color: #e5e7eb;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --radius-sm: 0.375rem;
+            --radius: 0.5rem;
+            --radius-lg: 0.75rem;
+            --success-color: #10b981;
+        }
+
+        /* Active Tab Styling */
+        .nav-tab {
+            padding: 0.75rem 1rem;
+            border-radius: var(--radius);
+            font-weight: 500;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--dark-color);
+        }
+
+        .nav-tab:hover {
+            background-color: var(--light-color);
+        }
+
+        .nav-tab.active {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            color: white;
+            box-shadow: var(--shadow);
+        }
+
+        /* Enhanced Button Styles */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.625rem 1.25rem;
+            border-radius: var(--radius);
+            font-weight: 500;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            transition: all 0.2s ease;
+            border: none;
+            cursor: pointer;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            color: white;
+            box-shadow: var(--shadow);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-secondary {
+            background-color: white;
+            color: var(--dark-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--light-color);
+        }
+
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+        }
+
+        .btn-warning {
+            background-color: var(--warning-color);
+            color: white;
+        }
+
+        .btn-info {
+            background-color: var(--info-color);
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.75rem;
+        }
+
+        /* Card Styles */
+        .card {
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .card-header {
+            padding: 1.5rem 1.5rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        .card-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border-color);
+            background-color: var(--light-color);
+            border-bottom-left-radius: var(--radius-lg);
+            border-bottom-right-radius: var(--radius-lg);
+        }
+
+        /* Badge Styles */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            line-height: 1;
+        }
+
+        .badge-success {
+            background-color: var(--primary-light);
+            color: var(--primary-dark);
+        }
+
+        .badge-warning {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-danger {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge-info {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-secondary {
+            background-color: #e5e7eb;
+            color: #4b5563;
+        }
+
+        /* Table Styles */
+        .table-container {
+            overflow-x: auto;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .table th {
+            background-color: var(--light-color);
+            padding: 1rem;
+            font-weight: 600;
+            text-align: left;
+            color: var(--dark-color);
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+        }
+
+        .table tr:hover {
+            background-color: var(--light-color);
+        }
+
+        /* Form Styles */
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--dark-color);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            font-size: 1rem;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+
+        .form-textarea {
+            min-height: 120px;
+            resize: vertical;
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+        }
+
+        /* Modal Enhancements */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            padding: 1rem;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            width: 100%;
+            max-width: 48rem;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: slideIn 0.3s ease;
+        }
+
+        .modal-header {
+            padding: 1.5rem 1.5rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
-        /* Network Warning Banner */
-        #networkWarning {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: #fef3cd;
-            border-bottom: 2px solid #f59e0b;
-            padding: 12px 20px;
-            text-align: center;
-            z-index: 9999;
-            font-weight: 500;
+        @keyframes slideIn {
+            from { transform: translateY(-1rem); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
 
-        .dark #networkWarning {
-            background: #78350f;
-            border-bottom-color: #f59e0b;
+        /* Loading Spinner */
+        .spinner {
+            animation: spin 1s linear infinite;
+            width: 1.5rem;
+            height: 1.5rem;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Hero Section */
+        .hero-section {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            border-radius: var(--radius-lg);
             color: white;
+            padding: 2rem;
+            margin-bottom: 2rem;
         }
 
-        #networkWarning .close-btn {
-            background: none;
-            border: none;
-            font-size: 1.2rem;
-            cursor: pointer;
-            margin-left: 15px;
-            padding: 5px 10px;
-            border-radius: 3px;
+        .hero-title {
+            font-size: 1.875rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
         }
 
-        .dark #networkWarning .close-btn {
+        .hero-subtitle {
+            opacity: 0.9;
+            font-size: 1.125rem;
+        }
+
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        /* Status Indicators */
+        .status-dot {
+            display: inline-block;
+            width: 0.75rem;
+            height: 0.75rem;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .status-dot-success { background-color: var(--primary-color); }
+        .status-dot-warning { background-color: var(--warning-color); }
+        .status-dot-danger  { background-color: var(--danger-color); }
+
+        /* Action Buttons Container */
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        /* Add Ingredient Button */
+        #add-ing-btn {
+            display: block !important;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+            color: white !important;
+            padding: 0.625rem 1.25rem !important;
+            border-radius: var(--radius) !important;
+            border: none !important;
+            cursor: pointer !important;
+            margin: 0.25rem !important;
+            font-weight: 500 !important;
+            transition: all 0.2s ease !important;
+            box-shadow: var(--shadow) !important;
+        }
+
+        #add-ing-btn:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: var(--shadow-lg) !important;
+            background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
+        }
+
+        /* Messaging Button */
+        .messaging-btn {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%) !important;
+            color: white !important;
+            padding: 0.625rem 1.25rem !important;
+            border-radius: var(--radius) !important;
+            border: none !important;
+            cursor: pointer !important;
+            margin: 0.25rem !important;
+            font-weight: 500 !important;
+            transition: all 0.2s ease !important;
+            box-shadow: var(--shadow) !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 0.5rem !important;
+        }
+
+        .messaging-btn:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: var(--shadow-lg) !important;
+            background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%) !important;
+        }
+
+        /* Inbox Button */
+        .inbox-btn {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important;
+            color: white !important;
+            padding: 0.625rem 1.25rem !important;
+            border-radius: var(--radius) !important;
+            border: none !important;
+            cursor: pointer !important;
+            margin: 0.25rem !important;
+            font-weight: 500 !important;
+            transition: all 0.2s ease !important;
+            box-shadow: var(--shadow) !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 0.5rem !important;
+            position: relative;
+        }
+
+        .inbox-btn:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: var(--shadow-lg) !important;
+            background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%) !important;
+        }
+
+        .inbox-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: #ef4444;
             color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
         }
 
-        /* Mobile-first responsive design */
+        /* Responsive Design */
         @media (max-width: 768px) {
-            .wrapper { padding: 5px 0; }
-            .inner { width: 98%; padding: 15px; margin: 5px 0; }
-            .header-container { flex-direction: column; align-items: flex-start !important; gap: 15px; }
-            .logo-title-container { flex-direction: column; align-items: flex-start !important; text-align: left; width: 100%; }
-            .action-buttons { width: 100%; justify-content: space-between; gap: 10px; }
-            .action-buttons .btn-mobile { flex: 1; min-width: 0; padding: 10px 8px; font-size: 0.875rem; }
-            #tutorNameHeading { font-size: 1.5rem; margin-top: 10px; }
-            #logoImg { height: 50px !important; }
-            .nav-container { overflow-x: auto; padding-bottom: 5px; }
-            .nav-buttons { display: flex; min-width: max-content; gap: 10px; }
-            .nav-btn { padding: 8px 12px; font-size: 1rem; }
-            .error-content { margin: 20px; padding: 2rem; }
-            .error-buttons { flex-direction: column; }
-            .error-btn { width: 100%; }
-        }
-
-        @media (max-width: 480px) {
-            .inner { padding: 12px; border-radius: 8px; }
+            .hero-section { padding: 1.5rem; }
+            .hero-title { font-size: 1.5rem; }
+            .dashboard-grid { grid-template-columns: 1fr; }
             .action-buttons { flex-direction: column; }
-            .action-buttons .btn-mobile { width: 100%; }
-            #tutorNameHeading { font-size: 1.25rem; }
-            .nav-btn { padding: 6px 10px; font-size: 0.9rem; }
-            .error-content { padding: 1.5rem; margin: 15px; }
+            .action-buttons .btn { width: 100%; }
+            .modal-content { max-width: 95%; }
         }
 
-        /* --- DARK MODE STYLES --- */
-        .dark .wrapper {
-            background-color: #111827 !important;
-            /* Same background image but with dark overlay for dark mode */
-            background-image: 
-                linear-gradient(rgba(17, 24, 39, 0.70), rgba(17, 24, 39, 0.70)),
-                url('https://res.cloudinary.com/dy2hxcyaf/image/upload/v1769020680/Gemini_Generated_Image_o5m8auo5m8auo5m8_hzzxks.png') !important;
-            background-blend-mode: overlay;
-        }
-        
-        .dark #logoImg {
-            filter: brightness(2) drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+        /* Calendar View */
+        .calendar-view {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 1rem;
         }
 
-        .dark .inner {
-            background: #1f2937;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
-        }
-        
-        .dark .inner, .dark .inner p, .dark .inner span, .dark .inner a, .dark .inner label, 
-        .dark .inner div, .dark .inner button, .dark .inner input, .dark .inner select, 
-        .dark .inner textarea, .dark .inner h1, .dark .inner h2, .dark .inner h3 {
-             color: #ffffff !important;
-        }
-        
-        .dark .inner input::placeholder, .dark .inner textarea::placeholder {
-            color: #cccccc !important;
-            opacity: 1 !important;
-        }
-        
-        .dark .inner input:not([type="checkbox"]):not([type="radio"]),
-        .dark .inner select, .dark .inner textarea {
-            background-color: #374151 !important;
-            border-color: #4b5563 !important;
-            color: #ffffff !important;
-        }
-        
-        .dark .inner table, .dark .inner .bg-white {
-            background-color: #374151 !important;
-            color: #ffffff !important;
-        }
-        
-        .dark .inner table td, .dark .inner table th {
-            border-color: #4b5563 !important;
-            color: #ffffff !important;
-        }
-        
-        .dark .inner .bg-gray-50 {
-            background-color: #374151 !important;
-        }
-        
-        .dark .inner button:focus, .dark .inner input:focus, .dark .inner select:focus {
-            outline: 2px solid #3b82f6 !important;
-            outline-offset: 2px !important;
-        }
-        
-        .inner * {
-            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        .calendar-day {
+            background: var(--light-color);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 0.75rem;
+            min-height: 100px;
         }
 
-        .dark .dashboard-header { color: #ffffff !important; }
-        .dark .nav-btn { color: #e5e7eb !important; }
-        .dark .nav-btn.active { border-bottom-color: #10b981 !important; color: #10b981 !important; }
-        .dark #logoutBtn, .dark #whatsappBtn { filter: brightness(1.2); }
+        .calendar-day-header {
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--dark-color);
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid var(--border-color);
+        }
 
-        .nav-container::-webkit-scrollbar { display: none; }
-        .nav-container { -ms-overflow-style: none; scrollbar-width: none; }
+        .calendar-event {
+            background: white;
+            border-left: 3px solid var(--primary-color);
+            padding: 0.375rem;
+            margin-bottom: 0.25rem;
+            font-size: 0.75rem;
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .calendar-event-time {
+            font-size: 0.7rem;
+            color: var(--dark-color);
+            opacity: 0.8;
+        }
+
+        /* Student Actions */
+        .student-actions-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .student-action-card {
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        .student-action-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        /* Report Textarea */
+        .report-textarea {
+            min-height: 150px;
+            font-size: 1.05rem;
+            line-height: 1.5;
+        }
+
+        /* Edit Schedule Button */
+        .edit-schedule-btn {
+            background-color: var(--info-color);
+            color: white;
+            border: none;
+            padding: 0.375rem 0.75rem;
+            border-radius: var(--radius);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .edit-schedule-btn:hover {
+            background-color: #2563eb;
+        }
+
+        /* File Upload */
+        .file-upload-container {
+            border: 2px dashed var(--border-color);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .file-upload-container:hover {
+            border-color: var(--primary-color);
+            background-color: var(--primary-light);
+        }
+
+        .file-upload-label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .file-upload-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary-color);
+        }
+
+        .file-preview {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background-color: var(--light-color);
+            border-radius: var(--radius);
+        }
+
+        .file-name {
+            font-size: 0.875rem;
+            color: var(--dark-color);
+            margin-bottom: 0.25rem;
+        }
+
+        .file-size {
+            font-size: 0.75rem;
+            color: var(--dark-color);
+            opacity: 0.7;
+        }
+
+        /* Email Settings */
+        .email-settings {
+            background-color: var(--light-color);
+            border-radius: var(--radius);
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .email-preview {
+            background-color: white;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 1rem;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        .email-preview-header {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        /* WhatsApp-like Chat UI */
+        .whatsapp-chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #128c7e 0%, #075e54 100%);
+            color: white;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chat-header-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .chat-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: #128c7e;
+        }
+
+        .chat-header-text h4 { margin: 0; font-weight: 600; }
+        .chat-header-text p  { margin: 0; font-size: 0.8rem; opacity: 0.9; }
+
+        .chat-messages {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            background-color: #e5ddd5;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23a8a8a8' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
+        }
+
+        .message-bubble {
+            max-width: 70%;
+            padding: 0.5rem 0.75rem;
+            border-radius: 1rem;
+            margin-bottom: 0.5rem;
+            position: relative;
+            word-wrap: break-word;
+        }
+
+        .message-bubble.sent {
+            background-color: #dcf8c6;
+            align-self: flex-end;
+            margin-left: auto;
+            border-bottom-right-radius: 0.25rem;
+        }
+
+        .message-bubble.received {
+            background-color: white;
+            align-self: flex-start;
+            margin-right: auto;
+            border-bottom-left-radius: 0.25rem;
+        }
+
+        .message-content { font-size: 0.9rem; line-height: 1.4; }
+        .message-time { font-size: 0.7rem; color: #666; text-align: right; margin-top: 0.25rem; }
+        .message-sender { font-weight: 600; font-size: 0.8rem; margin-bottom: 0.25rem; color: #333; }
+
+        .chat-input-area {
+            padding: 0.75rem;
+            background-color: white;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 2rem;
+            font-size: 0.9rem;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: #128c7e;
+        }
+
+        .send-message-btn {
+            background-color: #128c7e;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .send-message-btn:hover { background-color: #075e54; }
+
+        .message-recipient-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .recipient-option {
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .recipient-option:hover {
+            border-color: var(--primary-color);
+            background-color: var(--primary-light);
+        }
+
+        .recipient-option.selected {
+            border-color: var(--primary-color);
+            background-color: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+
+        .recipient-option input[type="checkbox"] { margin-right: 0.5rem; }
+
+        .recipient-label {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        /* Inbox Modal */
+        .inbox-container {
+            display: flex;
+            height: 600px;
+        }
+
+        .conversations-sidebar {
+            width: 300px;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .conversations-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+        }
+
+        .conversations-list { flex: 1; overflow-y: auto; }
+
+        .conversation-item {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .conversation-item:hover { background-color: var(--light-color); }
+
+        .conversation-item.active {
+            background-color: var(--primary-light);
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .conversation-info { display: flex; align-items: center; gap: 0.75rem; }
+
+        .conversation-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+
+        .conversation-details { flex: 1; }
+
+        .conversation-title {
+            font-weight: 600;
+            margin: 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .conversation-preview {
+            font-size: 0.85rem;
+            color: #666;
+            margin: 0.25rem 0 0 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .conversation-time { font-size: 0.75rem; color: #999; }
+
+        .conversation-unread {
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .chat-main { flex: 1; display: flex; flex-direction: column; }
+
+        /* New message indicator */
+        .new-message-indicator {
+            background-color: #ef4444;
+            color: white;
+            border-radius: 50%;
+            width: 8px;
+            height: 8px;
+            display: inline-block;
+            margin-left: 0.5rem;
+        }
     </style>
 </head>
-<body>
+<body class="antialiased">
 
-    <div id="networkErrorOverlay">
-        <div class="error-content">
-            <div class="error-icon"><i class="fas fa-wifi"></i></div>
-            <h2 class="text-2xl font-bold mb-4">Connection Issue</h2>
-            <p class="text-lg mb-2" id="errorMessage">We're having trouble connecting to the server.</p>
-            <p class="text-gray-600 dark:text-gray-300 mb-6">This might be due to network problems or temporary server issues.</p>
-            <div class="error-buttons">
-                <button onclick="window.location.reload()" class="error-btn primary"><i class="fas fa-redo mr-2"></i>Try Again</button>
-                <button onclick="checkConnectivity()" class="error-btn secondary"><i class="fas fa-network-wired mr-2"></i>Check Connection</button>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <div id="networkWarning" class="fixed top-0 left-0 right-0 bg-yellow-100/80 backdrop-blur-md border-b border-yellow-400 text-yellow-800 px-4 py-3 text-center hidden shadow-lg z-50">
+        <span id="warningMessage" class="font-medium">You appear to be offline.</span>
+        <button onclick="hideNetworkWarning()" class="ml-4 text-yellow-800 hover:text-yellow-900 font-bold text-xl">&times;</button>
+    </div>
+
+    <div class="min-h-screen p-3 md:p-6 lg:p-8 flex justify-center items-start relative">
+        <div class="glass-panel w-full max-w-7xl p-5 md:p-8 lg:p-10 relative overflow-hidden">
+
+            <!-- Header -->
+            <div class="relative z-20 flex flex-wrap items-center justify-between gap-4 mb-6">
+                <div class="flex items-center gap-3 sm:gap-4">
+                    <div class="relative group">
+                        <div class="absolute -inset-1 bg-gradient-to-r from-green-400 to-blue-500 rounded-full blur-xl opacity-40 group-hover:opacity-70 transition"></div>
+                        <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids" class="relative h-14 w-auto object-contain drop-shadow-2xl">
+                    </div>
+                    <div>
+                        <h1 id="tutorNameHeading" class="text-xl md:text-3xl font-extrabold tracking-tight">
+                            Welcome, <span class="text-gradient">Tutor</span>
+                        </h1>
+                        <p class="text-xs md:text-sm text-gray-600 dark:text-gray-300 font-medium flex items-center gap-1">
+                            <i class="fas fa-seedling text-green-600"></i> Blooming Kids House
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="badge-date hidden sm:flex items-center gap-2">
+                        <i class="far fa-calendar-alt text-green-600 dark:text-green-400"></i>
+                        <span id="currentDate"></span>
+                    </div>
+
+                    <button id="modeToggle" class="w-11 h-11 rounded-full bg-white/30 backdrop-blur-sm border border-white/40 hover:bg-white/50 flex items-center justify-center transition-all text-gray-700 dark:text-yellow-300 shadow-md">
+                        <i class="fas fa-moon" id="modeIcon"></i>
+                    </button>
+
+                    <a id="whatsappBtn" href="https://wa.me/2348158768689" target="_blank" class="btn-modern btn-primary px-4 py-2 hidden sm:flex">
+                        <i class="fab fa-whatsapp text-lg"></i><span>Support</span>
+                    </a>
+
+                    <button id="logoutBtn" class="btn-modern btn-accent px-4 py-2">
+                        <i class="fas fa-sign-out-alt"></i><span class="hidden sm:inline">Logout</span>
+                    </button>
+
+                    <div class="avatar-modern hidden md:flex">T</div>
+                </div>
+            </div>
+
+            <!-- STAT CARDS (clickable, data-driven) -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8 relative z-20">
+                <div class="stat-card flex items-center gap-3" id="totalStudentsCard">
+                    <div class="stat-icon"><i class="fas fa-users"></i></div>
+                    <div>
+                        <p class="text-xs opacity-70">Total students</p>
+                        <p class="text-2xl font-bold" id="totalStudentsCount">0</p>
+                    </div>
+                </div>
+                <div class="stat-card flex items-center gap-3" id="todayClassesCard">
+                    <div class="stat-icon" style="background: linear-gradient(145deg, #fbbf24, #d97706);"><i class="fas fa-clock"></i></div>
+                    <div>
+                        <p class="text-xs opacity-70">Today's classes</p>
+                        <p class="text-2xl font-bold" id="todayClassesCount">0</p>
+                    </div>
+                </div>
+                <div class="stat-card flex items-center gap-3" id="pendingReportsCard">
+                    <div class="stat-icon" style="background: linear-gradient(145deg, #3b82f6, #1e3a8a);"><i class="fas fa-book-open"></i></div>
+                    <div>
+                        <p class="text-xs opacity-70">Pending reports</p>
+                        <p class="text-2xl font-bold" id="pendingReportsCount">0</p>
+                    </div>
+                </div>
+                <div class="stat-card flex items-center gap-3" id="achievementsCard">
+                    <div class="stat-icon" style="background: linear-gradient(145deg, #ec4899, #831843);"><i class="fas fa-star"></i></div>
+                    <div>
+                        <p class="text-xs opacity-70">Performance score</p>
+                        <p class="text-2xl font-bold" id="performanceScore">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gamification widget (hidden by default, used for score) -->
+            <div id="performance-widget" class="hidden"></div>
+
+            <!-- navigation pills with NEW tabs -->
+            <nav class="relative z-20 mb-8 overflow-x-auto hide-scrollbar">
+                <div class="nav-pill-container">
+                    <button id="navDashboard" class="nav-tab-modern active"><i class="fas fa-columns"></i>Dashboard</button>
+                    <button id="navStudentDatabase" class="nav-tab-modern"><i class="fas fa-users"></i>Student Database</button>
+                    <button id="navAcademic" class="nav-tab-modern"><i class="fas fa-graduation-cap"></i>Academic</button>
+                    <button id="navScheduleManagement" class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule Management</button>
+                </div>
+            </nav>
+
+            <!-- MAIN CONTENT (populated by JS) -->
+            <main id="mainContent" class="relative z-20 min-h-[400px] transition-all duration-500">
+                <!-- Loading state (will be replaced) -->
+                <div class="skeleton-loader flex flex-col items-center justify-center gap-6 py-12">
+                    <div class="pulse-ring">
+                        <i class="fas fa-leaf text-3xl text-green-600"></i>
+                    </div>
+                    <p class="text-lg font-medium text-gray-700 dark:text-gray-200 animate-pulse">Loading secure portal...</p>
+                    <div class="flex gap-2">
+                        <div class="w-20 h-2 bg-green-200/50 rounded-full animate-pulse"></div>
+                        <div class="w-12 h-2 bg-green-300/50 rounded-full animate-pulse delay-75"></div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- footer -->
+            <div class="relative z-20 mt-8 text-xs text-center opacity-40 flex items-center justify-center gap-2">
+                <i class="fas fa-shield-alt text-green-500"></i> End-to-end encrypted · Blooming Kids Care v2.0
             </div>
         </div>
     </div>
 
-    <div id="networkWarning">
-        <span id="warningMessage">You appear to be offline. Some features may not work properly.</span>
-        <button class="close-btn" onclick="hideNetworkWarning()">×</button>
-    </div>
-
-    <div class="wrapper">
-        <div class="inner">
-            <div class="max-w-7xl mx-auto">
-                <div class="flex justify-between items-center mb-6 header-container">
-                    <div class="flex items-center logo-title-container">
-                        <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mr-4 mobile-logo" style="filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.2));">
-                        <h1 id="tutorNameHeading" class="text-3xl font-bold dashboard-header mobile-title">Welcome, Tutor!</h1>
-                    </div>
-                    
-                    <div class="flex space-x-3 items-center action-buttons">
-                        <button id="modeToggle" class="p-3 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-600 dark:hover:bg-gray-700 dark:text-white transition-colors duration-300 shadow-md btn-mobile" aria-label="Toggle dark mode">
-                            <i class="fas fa-moon" id="modeIcon"></i>
-                        </button>
-                        <a id="whatsappBtn" href="https://wa.me/2348158768689" target="_blank" class="bg-green-500 text-white px-4 py-2 rounded flex items-center hover:bg-green-600 shadow-md transition-colors duration-300 btn-mobile">
-                            <i class="fab fa-whatsapp mr-2 text-lg"></i><span class="mobile-text">Tech Support</span>
-                        </a>
-                        <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 shadow-md btn-mobile">
-                            <span class="mobile-text">Logout</span>
-                        </button>
-                    </div>
-                </div>
-                
-                <nav class="mb-6 border-b border-gray-200 dark:border-gray-700 nav-container">
-                    <div class="flex space-x-4 nav-buttons">
-                        <button id="navDashboard" class="nav-btn text-lg font-semibold active dashboard-header">Dashboard</button>
-                        <button id="navStudentDatabase" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Student Database</button>
-                    </div>
-                </nav>
-
-                <div id="performance-widget" class="mb-6">
-                    <div class="animate-pulse bg-gray-100 dark:bg-gray-700 h-24 rounded-xl"></div>
-                </div>
-
-                <div id="mainContent">
-                    <p class="text-center text-gray-600 mt-12 mobile-content">Checking user permissions...</p>
-                </div>
+    <!-- network error overlay -->
+    <div id="networkErrorOverlay" class="fixed inset-0 bg-gray-900/80 backdrop-blur-xl z-50 hidden flex-col items-center justify-center p-4">
+        <div class="bg-white/90 dark:bg-gray-800/90 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-white/30">
+            <div class="w-20 h-20 bg-yellow-100/80 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="fas fa-wifi text-3xl text-yellow-600"></i>
+            </div>
+            <h2 class="text-2xl font-bold mb-2 text-gray-800 dark:text-white">Connection Lost</h2>
+            <p class="text-gray-600 dark:text-gray-300 mb-8" id="errorMessage">We can't reach the Blooming Kids servers.</p>
+            <div class="flex flex-col gap-3">
+                <button onclick="window.location.reload()" class="btn-modern btn-primary w-full">Try Again</button>
+                <button onclick="checkConnectivity()" class="btn-modern border border-gray-300 dark:border-gray-600 w-full">Check Connection</button>
             </div>
         </div>
     </div>
-    
+
+    <!-- scripts -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script> 
-    
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-
-    <script>
-        // Your Specific Keys
-        const firebaseConfig = {
-            apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
-            authDomain: "bloomingkidsassessment.firebaseapp.com",
-            projectId: "bloomingkidsassessment",
-            storageBucket: "bloomingkidsassessment.appspot.com",
-            messagingSenderId: "238975054977",
-            appId: "1:238975054977:web:87c70b4db044998a204980"
-        };
-
-        // Initialize Firebase
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-            console.log("🔥 Firebase Initialized");
-        }
-        
-        // Expose DB for games.js
-        window.db = firebase.firestore();
-        window.auth = firebase.auth();
-    </script>
-    
-    <script src="games.js"></script>
-    
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <!-- firebaseConfig.js must exist and export auth, db -->
     <script type="module" src="tutor.js"></script>
+    <script src="games.js"></script>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
+        (function() {
+            // set today's date
+            const dateEl = document.getElementById('currentDate');
+            if (dateEl) {
+                const now = new Date();
+                dateEl.innerText = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            }
+
+            // DARK MODE
             const body = document.body;
-            const toggleButton = document.getElementById('modeToggle');
-            const modeIcon = document.getElementById('modeIcon');
+            const toggle = document.getElementById('modeToggle');
+            const icon = document.getElementById('modeIcon');
             const modeKey = 'tutor_theme';
 
-            // Theme Setting
-            const setTheme = (theme) => {
+            function setTheme(theme) {
                 if (theme === 'dark') {
                     body.classList.add('dark');
-                    modeIcon.classList.remove('fa-moon');
-                    modeIcon.classList.add('fa-sun');
+                    icon.classList.remove('fa-moon');
+                    icon.classList.add('fa-sun');
                     localStorage.setItem(modeKey, 'dark');
                 } else {
                     body.classList.remove('dark');
-                    modeIcon.classList.remove('fa-sun');
-                    modeIcon.classList.add('fa-moon');
+                    icon.classList.remove('fa-sun');
+                    icon.classList.add('fa-moon');
                     localStorage.setItem(modeKey, 'light');
                 }
-            };
+            }
 
-            const savedTheme = localStorage.getItem(modeKey);
-            if (savedTheme) setTheme(savedTheme);
-            else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+            const saved = localStorage.getItem(modeKey);
+            if (saved) setTheme(saved);
+            else if (window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
             else setTheme('light');
 
-            toggleButton.addEventListener('click', () => {
-                const currentTheme = body.classList.contains('dark') ? 'dark' : 'light';
-                setTheme(currentTheme === 'light' ? 'dark' : 'light');
+            toggle.addEventListener('click', () => {
+                setTheme(body.classList.contains('dark') ? 'light' : 'dark');
             });
 
-            // Mobile Resize
-            function handleResize() {
-                const isMobile = window.innerWidth < 768;
-                if (isMobile) {
-                    document.body.classList.add('mobile-view');
-                    document.body.classList.remove('desktop-view');
+            // Network monitor
+            window.hideNetworkWarning = function() {
+                document.getElementById('networkWarning').classList.add('hidden');
+            };
+            window.hideNetworkError = function() {
+                document.getElementById('networkErrorOverlay').classList.add('hidden');
+            };
+            window.showNetworkError = function(msg) {
+                const overlay = document.getElementById('networkErrorOverlay');
+                if (msg) document.getElementById('errorMessage').innerText = msg;
+                overlay.classList.remove('hidden');
+            };
+            window.checkConnectivity = function() {
+                if (navigator.onLine) {
+                    hideNetworkError();
+                    hideNetworkWarning();
                 } else {
-                    document.body.classList.add('desktop-view');
-                    document.body.classList.remove('mobile-view');
+                    showNetworkError('Still offline. Please check your internet settings.');
                 }
-            }
-            handleResize();
-            window.addEventListener('resize', handleResize);
+            };
+            window.addEventListener('online', () => { hideNetworkWarning(); hideNetworkError(); });
+            window.addEventListener('offline', () => {
+                document.getElementById('networkWarning').classList.remove('hidden');
+            });
+        })();
+    </script>
 
-            // Network Monitoring
-            initializeNetworkMonitoring();
+    <!-- Main module script for data fetching and counter updates -->
+    <script type="module">
+        import { db } from './firebaseConfig.js';
+        import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+        // Wait for tutorData to be set by tutor.js
+        function waitForTutorData(callback) {
+            if (window.tutorData) {
+                callback();
+            } else {
+                setTimeout(() => waitForTutorData(callback), 100);
+            }
+        }
+
+        // Function to update all counters
+        async function updateAllCounters(tutor) {
+            try {
+                // Get all students for this tutor
+                const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const studentsSnapshot = await getDocs(studentsQuery);
+                
+                // Filter out inactive students for total count
+                const allStudents = studentsSnapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter(s => !['archived', 'graduated', 'transferred'].includes(s.status));
+                
+                // Update total students count
+                document.getElementById('totalStudentsCount').textContent = allStudents.length;
+
+                // Calculate today's classes
+                const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                let todayClassesCount = 0;
+                
+                allStudents.forEach(s => {
+                    if (s.schedule && Array.isArray(s.schedule)) {
+                        s.schedule.forEach(slot => {
+                            if (slot.day === todayName) {
+                                todayClassesCount++;
+                            }
+                        });
+                    }
+                });
+                
+                document.getElementById('todayClassesCount').textContent = todayClassesCount;
+
+                // Calculate pending reports (students without reports in last 7 days)
+                const oneWeekAgo = new Date();
+                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                
+                let pendingReports = 0;
+                for (const student of allStudents) {
+                    if (!student.lastReportDate) {
+                        pendingReports++;
+                        continue;
+                    }
+                    
+                    // Check if last report date is older than 7 days
+                    const lastReport = student.lastReportDate?.toDate?.() || new Date(student.lastReportDate);
+                    if (lastReport < oneWeekAgo) {
+                        pendingReports++;
+                    }
+                }
+                
+                document.getElementById('pendingReportsCount').textContent = pendingReports;
+
+                // Calculate performance score (placeholder logic - can be customized)
+                const totalPossible = allStudents.length * 100;
+                let earnedScore = 0;
+                
+                allStudents.forEach(s => {
+                    // Base score from attendance
+                    if (s.attendanceRate) {
+                        earnedScore += s.attendanceRate;
+                    } else {
+                        earnedScore += 85; // Default score
+                    }
+                    
+                    // Bonus for completed reports
+                    if (s.lastReportDate) {
+                        const reportDate = s.lastReportDate?.toDate?.() || new Date(s.lastReportDate);
+                        const daysSinceReport = Math.floor((new Date() - reportDate) / (1000 * 60 * 60 * 24));
+                        if (daysSinceReport < 7) earnedScore += 15;
+                    }
+                });
+                
+                const performanceScore = allStudents.length > 0 
+                    ? Math.round((earnedScore / (allStudents.length * 100)) * 100)
+                    : 100;
+                
+                document.getElementById('performanceScore').textContent = performanceScore;
+
+            } catch (error) {
+                console.error("Error updating counters:", error);
+            }
+        }
+
+        // Set up real-time counter updates (every 5 minutes)
+        function startCounterUpdates(tutor) {
+            // Initial update
+            updateAllCounters(tutor);
+            
+            // Update every 5 minutes
+            setInterval(() => updateAllCounters(tutor), 300000);
+            
+            // Also update when window gains focus
+            window.addEventListener('focus', () => updateAllCounters(tutor));
+        }
+
+        waitForTutorData(() => {
+            const tutor = window.tutorData;
+            
+            // Update tutor name in header
+            if (tutor.name) {
+                document.querySelector('.text-gradient').textContent = tutor.name.split(' ')[0];
+                document.querySelector('.avatar-modern').textContent = tutor.name.charAt(0);
+            }
+            
+            // Start counter updates
+            startCounterUpdates(tutor);
+
+            // ----- Total Students Card Click -----
+            document.getElementById('totalStudentsCard').addEventListener('click', async () => {
+                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const snapshot = await getDocs(q);
+                const students = snapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter(s => !['archived','graduated','transferred'].includes(s.status));
+
+                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="studentListModal">
+                    <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-4xl mx-auto">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">My Students (${students.length})</h3>
+                            <button class="text-2xl font-bold close-modal text-gray-700 dark:text-gray-300">&times;</button>
+                        </div>
+                        <div class="overflow-auto max-h-96">
+                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead class="bg-gray-50 dark:bg-gray-700">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Name</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Grade</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Type</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Added</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">`;
+
+                students.forEach(s => {
+                    let type = 'Regular';
+                    if (s.isTransitioning) type = 'Transitioning';
+                    else if (s.groupClass) type = 'Group Class';
+                    
+                    const added = s.createdAt ? new Date(s.createdAt.seconds * 1000).toLocaleDateString() : 'N/A';
+                    html += `<tr>
+                        <td class="px-4 py-2 whitespace-nowrap text-gray-900 dark:text-white">${escapeHtml(s.studentName)}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-gray-900 dark:text-white">${escapeHtml(s.grade)}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-gray-900 dark:text-white">${escapeHtml(type)}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-gray-900 dark:text-white">${escapeHtml(added)}</td>
+                    </tr>`;
+                });
+
+                html += `</tbody></table></div></div></div>`;
+
+                const modalDiv = document.createElement('div');
+                modalDiv.innerHTML = html;
+                const modal = modalDiv.firstElementChild;
+                document.body.appendChild(modal);
+
+                modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) modal.remove();
+                });
+            });
+
+            // ----- Today's Classes Card Click -----
+            document.getElementById('todayClassesCard').addEventListener('click', async () => {
+                const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const snapshot = await getDocs(q);
+                const students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                const todayClasses = [];
+                students.forEach(s => {
+                    if (s.schedule && Array.isArray(s.schedule)) {
+                        s.schedule.forEach(slot => {
+                            if (slot.day === todayName) {
+                                todayClasses.push({
+                                    student: s.studentName,
+                                    time: `${slot.start} - ${slot.end}`,
+                                    subject: slot.subject || 'General',
+                                    room: slot.room || 'Not specified'
+                                });
+                            }
+                        });
+                    }
+                });
+
+                // Sort classes by time
+                todayClasses.sort((a, b) => {
+                    const timeA = a.time.split(' - ')[0];
+                    const timeB = b.time.split(' - ')[0];
+                    return timeA.localeCompare(timeB);
+                });
+
+                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="todayClassesModal">
+                    <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-lg mx-auto">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">Today's Classes (${todayName})</h3>
+                            <button class="text-2xl font-bold close-modal text-gray-700 dark:text-gray-300">&times;</button>
+                        </div>
+                        <div class="overflow-auto max-h-96">`;
+
+                if (todayClasses.length === 0) {
+                    html += '<p class="text-gray-500 dark:text-gray-400">No classes scheduled for today.</p>';
+                } else {
+                    html += '<div class="space-y-3">';
+                    todayClasses.forEach(c => {
+                        html += `<div class="border-l-4 border-green-500 pl-4 py-2 bg-gray-50 dark:bg-gray-700 rounded-r-lg">
+                            <p class="font-semibold text-gray-900 dark:text-white">${escapeHtml(c.student)}</p>
+                            <p class="text-sm text-gray-600 dark:text-gray-300"><i class="far fa-clock mr-2"></i>${escapeHtml(c.time)}</p>
+                            <p class="text-sm text-gray-600 dark:text-gray-300"><i class="fas fa-book mr-2"></i>${escapeHtml(c.subject)}</p>
+                            <p class="text-sm text-gray-600 dark:text-gray-300"><i class="fas fa-door-open mr-2"></i>${escapeHtml(c.room)}</p>
+                        </div>`;
+                    });
+                    html += '</div>';
+                }
+
+                html += `</div></div></div>`;
+
+                const modalDiv = document.createElement('div');
+                modalDiv.innerHTML = html;
+                const modal = modalDiv.firstElementChild;
+                document.body.appendChild(modal);
+
+                modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) modal.remove();
+                });
+            });
+
+            // ----- Pending Reports Card Click -----
+            document.getElementById('pendingReportsCard').addEventListener('click', async () => {
+                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const snapshot = await getDocs(q);
+                const students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                const oneWeekAgo = new Date();
+                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                
+                const pendingStudents = [];
+                for (const student of students) {
+                    if (!student.lastReportDate) {
+                        pendingStudents.push({ ...student, daysOverdue: 'No reports yet' });
+                        continue;
+                    }
+                    
+                    const lastReport = student.lastReportDate?.toDate?.() || new Date(student.lastReportDate);
+                    const daysSinceReport = Math.floor((new Date() - lastReport) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysSinceReport > 7) {
+                        pendingStudents.push({ 
+                            ...student, 
+                            daysOverdue: `${daysSinceReport} days overdue` 
+                        });
+                    }
+                }
+
+                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="pendingReportsModal">
+                    <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-2xl mx-auto">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">Pending Reports (${pendingStudents.length})</h3>
+                            <button class="text-2xl font-bold close-modal text-gray-700 dark:text-gray-300">&times;</button>
+                        </div>
+                        <div class="overflow-auto max-h-96">`;
+
+                if (pendingStudents.length === 0) {
+                    html += '<p class="text-green-600 dark:text-green-400">All reports are up to date! 🎉</p>';
+                } else {
+                    html += '<div class="space-y-2">';
+                    pendingStudents.forEach(s => {
+                        const statusClass = s.daysOverdue.includes('No reports') ? 'text-yellow-600' : 'text-red-600';
+                        html += `<div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                            <p class="font-semibold text-gray-900 dark:text-white">${escapeHtml(s.studentName)}</p>
+                            <p class="text-sm ${statusClass}">${escapeHtml(s.daysOverdue)}</p>
+                            <button class="mt-2 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400" onclick="generateReport('${s.id}')">
+                                <i class="fas fa-plus-circle mr-1"></i>Create Report
+                            </button>
+                        </div>`;
+                    });
+                    html += '</div>';
+                }
+
+                html += `</div></div></div>`;
+
+                const modalDiv = document.createElement('div');
+                modalDiv.innerHTML = html;
+                const modal = modalDiv.firstElementChild;
+                document.body.appendChild(modal);
+
+                modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) modal.remove();
+                });
+            });
+
+            // ----- Performance Score Card Click -----
+            document.getElementById('achievementsCard').addEventListener('click', () => {
+                const performance = document.getElementById('performanceScore').textContent;
+                
+                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="performanceModal">
+                    <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md mx-auto">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">Performance Score</h3>
+                            <button class="text-2xl font-bold close-modal text-gray-700 dark:text-gray-300">&times;</button>
+                        </div>
+                        <div class="text-center">
+                            <div class="w-32 h-32 mx-auto mb-4 relative">
+                                <svg class="w-full h-full" viewBox="0 0 100 100">
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#e5e7eb" stroke-width="10"/>
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#10b981" stroke-width="10" 
+                                        stroke-dasharray="${2 * Math.PI * 45}" 
+                                        stroke-dashoffset="${2 * Math.PI * 45 * (1 - performance/100)}"
+                                        stroke-linecap="round"
+                                        transform="rotate(-90 50 50)"/>
+                                </svg>
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <span class="text-3xl font-bold text-gray-900 dark:text-white">${performance}</span>
+                                </div>
+                            </div>
+                            <p class="text-gray-600 dark:text-gray-300 mb-2">Overall performance rating</p>
+                            <div class="text-left space-y-2 mt-4">
+                                <p class="text-sm"><i class="fas fa-check-circle text-green-500 mr-2"></i>Attendance: Excellent</p>
+                                <p class="text-sm"><i class="fas fa-check-circle text-green-500 mr-2"></i>Reports: Up to date</p>
+                                <p class="text-sm"><i class="fas fa-check-circle text-green-500 mr-2"></i>Student engagement: High</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+
+                const modalDiv = document.createElement('div');
+                modalDiv.innerHTML = html;
+                const modal = modalDiv.firstElementChild;
+                document.body.appendChild(modal);
+
+                modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) modal.remove();
+                });
+            });
         });
 
-        function initializeNetworkMonitoring() {
-            window.addEventListener('online', function() {
-                hideNetworkWarning();
-                hideNetworkError();
-                if (window.wasShowingError) {
-                    showTemporaryMessage('Connection restored!', 'success');
-                    window.wasShowingError = false;
-                }
-            });
-
-            window.addEventListener('offline', function() {
-                showNetworkWarning('You appear to be offline. Some features may not work properly.');
-                window.wasShowingError = true;
-            });
-
-            const originalFetch = window.fetch;
-            window.fetch = function(...args) {
-                return originalFetch.apply(this, args)
-                    .then(response => {
-                        if (!response.ok && response.status >= 500) {
-                            showNetworkWarning('Server is experiencing issues. Please try again later.');
-                        }
-                        return response;
-                    })
-                    .catch(error => {
-                        if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-                            if (!navigator.onLine) showNetworkError('Cannot connect to server. Please check your internet connection.');
-                            else showNetworkError('Server is unreachable. Please try again later.');
-                            window.wasShowingError = true;
-                        }
-                        throw error;
-                    });
-            };
-
-            setInterval(() => {
-                if (!navigator.onLine) checkConnectivity();
-            }, 30000);
+        // Simple escape function for safety
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return String(unsafe)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
         }
 
-        function showNetworkError(message = 'Connection issue detected') {
-            const overlay = document.getElementById('networkErrorOverlay');
-            const errorMessage = document.getElementById('errorMessage');
-            if (errorMessage) errorMessage.textContent = message;
-            overlay.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
-            window.isShowingError = true;
-        }
-
-        function hideNetworkError() {
-            const overlay = document.getElementById('networkErrorOverlay');
-            overlay.style.display = 'none';
-            document.body.style.overflow = 'auto';
-            window.isShowingError = false;
-        }
-
-        function showNetworkWarning(message) {
-            if (window.isShowingError) return;
-            const warning = document.getElementById('networkWarning');
-            const messageElement = document.getElementById('warningMessage');
-            if (messageElement) messageElement.textContent = message;
-            warning.style.display = 'block';
-            window.isShowingWarning = true;
-            setTimeout(() => {
-                if (navigator.onLine && window.isShowingWarning) hideNetworkWarning();
-            }, 10000);
-        }
-
-        function hideNetworkWarning() {
-            const warning = document.getElementById('networkWarning');
-            warning.style.display = 'none';
-            window.isShowingWarning = false;
-        }
-
-        function checkConnectivity() {
-            if (!navigator.onLine || window.isShowingError || window.isShowingWarning) {
-                fetch('https://www.google.com/favicon.ico', { 
-                    mode: 'no-cors',
-                    cache: 'no-store',
-                    headers: { 'Cache-Control': 'no-cache' }
-                })
-                .then(() => {
-                    hideNetworkWarning();
-                    hideNetworkError();
-                    if (window.wasShowingError) showTemporaryMessage('Connection is working properly!', 'success');
-                })
-                .catch(() => {
-                    if (!window.isShowingError) showNetworkError('No internet connection detected.');
-                });
-            }
-        }
-
-        function showTemporaryMessage(message, type = 'info') {
-            const messageEl = document.createElement('div');
-            messageEl.textContent = message;
-            messageEl.style.cssText = `
-                position: fixed; top: 20px; right: 20px;
-                background: ${type === 'success' ? '#10b981' : '#3b82f6'};
-                color: white; padding: 12px 20px; border-radius: 8px;
-                z-index: 10001; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                animation: slideIn 0.3s ease-out;
-            `;
-            document.body.appendChild(messageEl);
-            setTimeout(() => {
-                messageEl.style.animation = 'slideOut 0.3s ease-in';
-                setTimeout(() => { if (messageEl.parentNode) messageEl.parentNode.removeChild(messageEl); }, 300);
-            }, 3000);
-        }
-
-        // Add CSS for slide animations
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-            @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
-        `;
-        document.head.appendChild(style);
+        // Placeholder function for report generation
+        window.generateReport = function(studentId) {
+            alert('Report generation feature coming soon! Student ID: ' + studentId);
+        };
     </script>
 </body>
 </html>
-
-
-
