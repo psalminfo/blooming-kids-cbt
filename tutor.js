@@ -4900,34 +4900,6 @@ const inboxObserver = new MutationObserver(() => {
 });
 inboxObserver.observe(document.body, { childList: true, subtree: true });
 
-// Add Courses navigation listener (create if missing)
-addNavListener('navCourses', renderCourses);
-
-// Dynamically create Courses nav item if it doesn't exist (similar to Inbox)
-setTimeout(() => {
-    const navCourses = document.getElementById('navCourses');
-    if (!navCourses) {
-        const sidebar = document.querySelector('.sidebar-nav');
-        if (sidebar) {
-            const coursesNav = document.createElement('li');
-            coursesNav.id = 'navCourses';
-            coursesNav.innerHTML = `
-                <a href="#" class="nav-link flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-                    <span class="text-xl">📚</span>
-                    <span>Courses</span>
-                </a>
-            `;
-            sidebar.appendChild(coursesNav);
-
-            coursesNav.addEventListener('click', () => {
-                if (window.tutorData) {
-                    renderCourses(document.getElementById('mainContent'), window.tutorData);
-                }
-            });
-        }
-    }
-}, 500);
-
 // ==========================================
 // 5. EXPOSE FUNCTIONS TO WINDOW (for onclick handlers)
 // ==========================================
@@ -4935,10 +4907,7 @@ window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
 window.showDailyTopicModal = showDailyTopicModal;
 window.showHomeworkModal = showHomeworkModal;
-window.showScheduleCalendarModal = showScheduleCalendarModal
+window.showScheduleCalendarModal = showScheduleCalendarModal;
 window.renderCourses = renderCourses;
 window.loadCourseMaterials = loadCourseMaterials;
 window.uploadCourseMaterial = uploadCourseMaterial;
-
-
-
