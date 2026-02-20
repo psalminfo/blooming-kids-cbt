@@ -7,6 +7,7 @@ import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc, deleteField } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc, deleteField, orderBy } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 
 /*******************************************************************************
@@ -4882,6 +4883,9 @@ async function openGradingModal(homeworkId) {
 // 4. DASHBOARD WIDGET INJECTOR (unchanged)
 // ==========================================
 const inboxObserver = new MutationObserver(() => {
+    // Only run if we are on the Dashboard tab (unique element present)
+    if (!document.getElementById('pendingReportsContainer')) return;
+
     const hero = document.querySelector('.hero-section');
     if (hero && !document.getElementById('homework-inbox-section')) {
         const div = document.createElement('div');
@@ -4911,3 +4915,4 @@ window.showScheduleCalendarModal = showScheduleCalendarModal;
 window.renderCourses = renderCourses;
 window.loadCourseMaterials = loadCourseMaterials;
 window.uploadCourseMaterial = uploadCourseMaterial;
+
