@@ -431,7 +431,7 @@ function showCustomAlert(message) {
 
 // Update active tab
 function updateActiveTab(activeTabId) {
-    const navTabs = ['navDashboard', 'navStudentDatabase', 'navAutoStudents'];
+    const navTabs = ['navDashboard', 'navStudentDatabase', 'navAutoStudents', 'navScheduleManagement', 'navAcademic'];
     navTabs.forEach(tabId => {
         const tab = document.getElementById(tabId);
         if (tab) {
@@ -2453,6 +2453,242 @@ function printCalendar() {
 let studentCache = [];
 
 // Enhanced Tutor Dashboard - WITH MESSAGING & INBOX FEATURES
+/*******************************************************************************
+ * SCHEDULE MANAGEMENT TAB
+ ******************************************************************************/
+function renderScheduleManagement(container, tutor) {
+    updateActiveTab('navScheduleManagement');
+
+    container.innerHTML = `
+        <div class="hero-section">
+            <h1 class="hero-title">📅 Schedule Management</h1>
+            <p class="hero-subtitle">Set up, view and edit class schedules for all your students</p>
+        </div>
+
+        <div class="student-actions-container" style="grid-template-columns: repeat(auto-fit, minmax(280px,1fr));">
+            <div class="student-action-card">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="stat-icon" style="width:44px;height:44px;font-size:1.2rem;border-radius:1rem;">📆</div>
+                    <h3 class="font-bold text-lg">View Calendar</h3>
+                </div>
+                <p class="text-sm text-gray-600 mb-4">See a full weekly overview of all scheduled classes across your students.</p>
+                <button id="view-full-calendar-btn" class="btn btn-info w-full">View Schedule Calendar</button>
+            </div>
+
+            <div class="student-action-card">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="stat-icon" style="width:44px;height:44px;font-size:1.2rem;border-radius:1rem;">⚙️</div>
+                    <h3 class="font-bold text-lg">Set Up Schedules</h3>
+                </div>
+                <p class="text-sm text-gray-600 mb-4">Create or update class schedules for individual students including days, times and subjects.</p>
+                <button id="setup-all-schedules-btn" class="btn btn-primary w-full">Set Up Schedules</button>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header flex items-center gap-2">
+                <span class="text-xl">📊</span>
+                <h3 class="font-bold text-lg">Today's Schedule</h3>
+            </div>
+            <div class="card-body" id="todays-schedule-inline">
+                <div class="text-center py-6">
+                    <div class="spinner mx-auto mb-3"></div>
+                    <p class="text-gray-500">Loading today's schedule...</p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // View calendar button
+    const viewCalendarBtn = document.getElementById('view-full-calendar-btn');
+    if (viewCalendarBtn) {
+        viewCalendarBtn.addEventListener('click', showScheduleCalendarModal);
+    }
+
+    // Set up schedules button
+    const setupSchedulesBtn = document.getElementById('setup-all-schedules-btn');
+    if (setupSchedulesBtn) {
+        setupSchedulesBtn.addEventListener('click', async () => {
+            try {
+                if (window.scheduleManager) {
+                    await window.scheduleManager.openManualManager();
+                } else {
+                    const firebaseDeps = {
+                        db: db,
+                        methods: { getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc, getDoc }
+                    };
+                    window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
+                    await window.scheduleManager.openManualManager();
+                }
+            } catch (error) {
+                console.error("Error opening schedule manager:", error);
+                showCustomAlert('Error opening schedule manager. Please try again.');
+            }
+        });
+    }
+
+    // Load today's classes inline
+    (async () => {
+        const inlineContainer = document.getElementById('todays-schedule-inline');
+        if (!inlineContainer) return;
+        try {
+            const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+            const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+            const snapshot = await getDocs(studentsQuery);
+            const todayClasses = [];
+            snapshot.forEach(d => {
+                const s = { id: d.id, ...d.data() };
+                if (s.schedule && Array.isArray(s.schedule)) {
+                    s.schedule.forEach(slot => {
+                        if (slot.day === todayName) {
+                            todayClasses.push({ student: s.studentName, ...slot });
+                        }
+                    });
+                }
+            });
+
+            if (todayClasses.length === 0) {
+                inlineContainer.innerHTML = `
+                    <div class="text-center py-6">
+                        <div class="text-4xl mb-2">🌿</div>
+                        <p class="text-gray-500">No classes scheduled for today (${todayName}).</p>
+                    </div>`;
+                return;
+            }
+
+            // Sort by start time
+            todayClasses.sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+
+            inlineContainer.innerHTML = `
+                <p class="text-sm font-semibold text-gray-500 mb-3 uppercase tracking-wide">${todayName} — ${todayClasses.length} class${todayClasses.length !== 1 ? 'es' : ''}</p>
+                <div class="space-y-3">
+                    ${todayClasses.map(c => `
+                        <div class="flex items-center gap-4 p-3 rounded-xl border border-gray-100 bg-gray-50 hover:bg-green-50 hover:border-green-200 transition-all">
+                            <div class="w-10 h-10 rounded-xl bg-green-100 text-green-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                                ${escapeHtml((c.student || '?').charAt(0))}
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="font-semibold text-gray-800">${escapeHtml(c.student)}</p>
+                                <p class="text-sm text-gray-500">${escapeHtml(c.subject || '')} ${c.room ? '· ' + escapeHtml(c.room) : ''}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-bold text-green-700">${escapeHtml(formatScheduleTime(c.start))} – ${escapeHtml(formatScheduleTime(c.end))}</p>
+                            </div>
+                        </div>`).join('')}
+                </div>`;
+        } catch (err) {
+            inlineContainer.innerHTML = '<p class="text-red-500 text-center">Failed to load today\'s schedule.</p>';
+        }
+    })();
+}
+
+/*******************************************************************************
+ * ACADEMIC TAB
+ ******************************************************************************/
+function renderAcademic(container, tutor) {
+    updateActiveTab('navAcademic');
+
+    container.innerHTML = `
+        <div class="hero-section">
+            <h1 class="hero-title">🎓 Academic</h1>
+            <p class="hero-subtitle">Record today's topics, assign homework, and review student submissions</p>
+        </div>
+
+        <div class="student-actions-container">
+            <div class="student-action-card">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="stat-icon" style="width:44px;height:44px;font-size:1.2rem;border-radius:1rem;background:linear-gradient(135deg,#3b82f6,#1d4ed8);">📚</div>
+                    <h3 class="font-bold text-lg">Today's Topic</h3>
+                </div>
+                <p class="text-sm text-gray-600 mb-4">Record topics covered in today's classes.</p>
+                <select id="select-student-topic" class="form-input mb-3">
+                    <option value="">Select a student...</option>
+                </select>
+                <button id="add-topic-btn" class="btn btn-secondary w-full" disabled>Add Today's Topic</button>
+            </div>
+
+            <div class="student-action-card">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="stat-icon" style="width:44px;height:44px;font-size:1.2rem;border-radius:1rem;background:linear-gradient(135deg,#f59e0b,#d97706);">📝</div>
+                    <h3 class="font-bold text-lg">Assign Homework</h3>
+                </div>
+                <p class="text-sm text-gray-600 mb-4">Assign homework to your students.</p>
+                <select id="select-student-hw" class="form-input mb-3">
+                    <option value="">Select a student...</option>
+                </select>
+                <button id="assign-hw-btn" class="btn btn-warning w-full" disabled>Assign Homework</button>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">📨</span>
+                    <h3 class="font-bold text-lg">Homework Inbox</h3>
+                </div>
+                <button id="refresh-inbox-btn" class="btn btn-secondary btn-sm">🔄 Refresh</button>
+            </div>
+            <div class="card-body" id="homework-inbox-container">
+                <div class="text-center py-6">
+                    <div class="spinner mx-auto mb-3"></div>
+                    <p class="text-gray-500">Loading homework submissions...</p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Load student dropdowns
+    loadStudentDropdowns(tutor.email);
+
+    // Today's topic button
+    const addTopicBtn = document.getElementById('add-topic-btn');
+    if (addTopicBtn) {
+        addTopicBtn.addEventListener('click', () => {
+            const studentId = document.getElementById('select-student-topic').value;
+            const student = getStudentFromCache(studentId);
+            if (student) showDailyTopicModal(student);
+        });
+    }
+
+    // Assign homework button
+    const assignHwBtn = document.getElementById('assign-hw-btn');
+    if (assignHwBtn) {
+        assignHwBtn.addEventListener('click', () => {
+            const studentId = document.getElementById('select-student-hw').value;
+            const student = getStudentFromCache(studentId);
+            if (student) showHomeworkModal(student);
+        });
+    }
+
+    // Enable topic button on selection
+    const topicSelect = document.getElementById('select-student-topic');
+    if (topicSelect) {
+        topicSelect.addEventListener('change', (e) => {
+            document.getElementById('add-topic-btn').disabled = !e.target.value;
+        });
+    }
+
+    // Enable homework button on selection
+    const hwSelect = document.getElementById('select-student-hw');
+    if (hwSelect) {
+        hwSelect.addEventListener('change', (e) => {
+            document.getElementById('assign-hw-btn').disabled = !e.target.value;
+        });
+    }
+
+    // Refresh inbox button
+    const refreshInboxBtn = document.getElementById('refresh-inbox-btn');
+    if (refreshInboxBtn) {
+        refreshInboxBtn.addEventListener('click', () => loadHomeworkInbox(tutor.email));
+    }
+
+    // Load homework inbox
+    loadHomeworkInbox(tutor.email);
+}
+
+/*******************************************************************************
+ * DASHBOARD TAB
+ ******************************************************************************/
 function renderTutorDashboard(container, tutor) {
     // Update active tab
     updateActiveTab('navDashboard');
@@ -2460,34 +2696,7 @@ function renderTutorDashboard(container, tutor) {
     container.innerHTML = `
         <div class="hero-section">
             <h1 class="hero-title">Welcome, ${escapeHtml(tutor.name || 'Tutor')}! 👋</h1>
-            <p class="hero-subtitle">Manage your students, submit reports, and track progress</p>
-        </div>
-        
-        <div class="student-actions-container">
-            <div class="student-action-card">
-                <h3 class="font-bold text-lg mb-3">📅 Schedule Management</h3>
-                <p class="text-sm text-gray-600 mb-4">Set up and view class schedules for all students</p>
-                <button id="view-full-calendar-btn" class="btn btn-info w-full mb-2">View Schedule Calendar</button>
-                <button id="setup-all-schedules-btn" class="btn btn-primary w-full">Set Up Schedules</button>
-            </div>
-            
-            <div class="student-action-card">
-                <h3 class="font-bold text-lg mb-3">📚 Today's Topic</h3>
-                <p class="text-sm text-gray-600 mb-4">Record topics covered in today's classes</p>
-                <select id="select-student-topic" class="form-input mb-3">
-                    <option value="">Select a student...</option>
-                </select>
-                <button id="add-topic-btn" class="btn btn-secondary w-full" disabled>Add Today's Topic</button>
-            </div>
-            
-            <div class="student-action-card">
-                <h3 class="font-bold text-lg mb-3">📝 Assign Homework</h3>
-                <p class="text-sm text-gray-600 mb-4">Assign homework to your students</p>
-                <select id="select-student-hw" class="form-input mb-3">
-                    <option value="">Select a student...</option>
-                </select>
-                <button id="assign-hw-btn" class="btn btn-warning w-full" disabled>Assign Homework</button>
-            </div>
+            <p class="hero-subtitle">Review pending submissions, search records, and track your progress</p>
         </div>
         
         <div class="card">
@@ -2550,84 +2759,7 @@ function renderTutorDashboard(container, tutor) {
         </div>
     `;
 
-    // Load student dropdowns
-    loadStudentDropdowns(tutor.email);
-
-    // Add event listeners for new buttons
-    const viewCalendarBtn = document.getElementById('view-full-calendar-btn');
-    if (viewCalendarBtn) {
-        viewCalendarBtn.addEventListener('click', showScheduleCalendarModal);
-    }
-    
-    const setupSchedulesBtn = document.getElementById('setup-all-schedules-btn');
-    if (setupSchedulesBtn) {
-        setupSchedulesBtn.addEventListener('click', async () => {
-            try {
-                // Check if scheduleManager already exists
-                if (window.scheduleManager) {
-                    await window.scheduleManager.openManualManager();
-                } else {
-                    // Create a new instance if it doesn't exist
-                    const firebaseDeps = {
-                        db: db,
-                        methods: { 
-                            getDocs, query, collection, where, doc, updateDoc, 
-                            setDoc, deleteDoc, getDoc  // Added getDoc here
-                        }
-                    };
-                    window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
-                    await window.scheduleManager.openManualManager();
-                }
-            } catch (error) {
-                console.error("Error opening schedule manager:", error);
-                showCustomAlert('Error opening schedule manager. Please try again.');
-            }
-        });
-    }
-    
-    const addTopicBtn = document.getElementById('add-topic-btn');
-    if (addTopicBtn) {
-        addTopicBtn.addEventListener('click', () => {
-            const studentId = document.getElementById('select-student-topic').value;
-            const student = getStudentFromCache(studentId);
-            if (student) {
-                showDailyTopicModal(student);
-            }
-        });
-    }
-    
-    const assignHwBtn = document.getElementById('assign-hw-btn');
-    if (assignHwBtn) {
-        assignHwBtn.addEventListener('click', () => {
-            const studentId = document.getElementById('select-student-hw').value;
-            const student = getStudentFromCache(studentId);
-            if (student) {
-                showHomeworkModal(student);
-            }
-        });
-    }
-    
-    // Enable buttons when students are selected
-    const topicSelect = document.getElementById('select-student-topic');
-    if (topicSelect) {
-        topicSelect.addEventListener('change', (e) => {
-            const addTopicBtn = document.getElementById('add-topic-btn');
-            if (addTopicBtn) {
-                addTopicBtn.disabled = !e.target.value;
-            }
-        });
-    }
-    
-    const hwSelect = document.getElementById('select-student-hw');
-    if (hwSelect) {
-        hwSelect.addEventListener('change', (e) => {
-            const assignHwBtn = document.getElementById('assign-hw-btn');
-            if (assignHwBtn) {
-                assignHwBtn.disabled = !e.target.value;
-            }
-        });
-    }
-
+    // Toggle graded submissions visibility
     const toggleGradedBtn = document.getElementById('toggle-graded-btn');
     if (toggleGradedBtn) {
         toggleGradedBtn.addEventListener('click', () => {
@@ -4211,6 +4343,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     addNavListener('navDashboard', renderTutorDashboard);
     addNavListener('navStudentDatabase', renderStudentDatabase);
     addNavListener('navAutoStudents', renderAutoRegisteredStudents);
+    addNavListener('navScheduleManagement', renderScheduleManagement);
+    addNavListener('navAcademic', renderAcademic);
     
     // Add inbox navigation to the sidebar if it exists
     setTimeout(() => {
@@ -4466,4 +4600,3 @@ window.openGradingModal = openGradingModal;
 window.showDailyTopicModal = showDailyTopicModal;
 window.showHomeworkModal = showHomeworkModal;
 window.showScheduleCalendarModal = showScheduleCalendarModal
-
