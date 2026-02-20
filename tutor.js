@@ -4236,6 +4236,288 @@ onSnapshot(settingsDocRef, (docSnap) => {
     }
 });
 
+/*******************************************************************************
+ * SECTION 17: COURSE MATERIALS UPLOAD (NEW TAB)
+ * Allows tutors to upload and manage learning materials for their students.
+ ******************************************************************************/
+
+/**
+ * Main render function for the Courses tab.
+ */
+async function renderCourses(container, tutor) {
+    updateActiveTab('navCourses');
+    
+    container.innerHTML = `
+        <div class="hero-section">
+            <h1 class="hero-title">📚 Course Materials</h1>
+            <p class="hero-subtitle">Upload and manage learning resources for your students</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left Panel: Student Selector & Upload Form -->
+            <div class="lg:col-span-1">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="font-bold text-lg">➕ Add New Material</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label class="form-label">Select Student</label>
+                            <select id="material-student-select" class="form-input">
+                                <option value="">— Choose a student —</option>
+                            </select>
+                        </div>
+
+                        <div id="upload-form-container" class="space-y-3 mt-4 hidden">
+                            <div class="form-group">
+                                <label class="form-label">Title</label>
+                                <input type="text" id="material-title" class="form-input" placeholder="e.g. Chapter 5 Worksheet">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Description (optional)</label>
+                                <textarea id="material-description" class="form-input form-textarea" rows="2" placeholder="Brief description..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">File</label>
+                                <input type="file" id="material-file" class="form-input" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.jpg,.jpeg,.png,.txt">
+                                <p class="text-xs text-gray-500 mt-1">Max 10MB</p>
+                            </div>
+                            <button id="upload-material-btn" class="btn btn-primary w-full" disabled>Upload Material</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Material List -->
+            <div class="lg:col-span-2">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="font-bold text-lg">📋 Materials for <span id="selected-student-name">selected student</span></h3>
+                    </div>
+                    <div class="card-body" id="materials-list-container">
+                        <div class="text-center py-6 text-gray-500">
+                            Select a student to view materials.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Load students into dropdown
+    await loadStudentDropdownCourses(tutor.email);
+
+    const studentSelect = document.getElementById('material-student-select');
+    const uploadForm = document.getElementById('upload-form-container');
+    const selectedStudentNameSpan = document.getElementById('selected-student-name');
+    const materialsContainer = document.getElementById('materials-list-container');
+
+    // When student changes
+    studentSelect.addEventListener('change', async (e) => {
+        const studentId = e.target.value;
+        if (studentId) {
+            uploadForm.classList.remove('hidden');
+            const studentName = studentSelect.options[studentSelect.selectedIndex].text;
+            selectedStudentNameSpan.textContent = studentName;
+            await loadCourseMaterials(studentId, materialsContainer, tutor);
+        } else {
+            uploadForm.classList.add('hidden');
+            selectedStudentNameSpan.textContent = 'selected student';
+            materialsContainer.innerHTML = '<div class="text-center py-6 text-gray-500">Select a student to view materials.</div>';
+        }
+    });
+
+    // Enable/disable upload button based on file selection and title
+    const titleInput = document.getElementById('material-title');
+    const fileInput = document.getElementById('material-file');
+    const uploadBtn = document.getElementById('upload-material-btn');
+
+    function checkUploadReady() {
+        const titleOk = titleInput.value.trim() !== '';
+        const fileOk = fileInput.files.length > 0;
+        uploadBtn.disabled = !(titleOk && fileOk);
+    }
+
+    titleInput.addEventListener('input', checkUploadReady);
+    fileInput.addEventListener('change', checkUploadReady);
+
+    // Handle upload
+    uploadBtn.addEventListener('click', async () => {
+        const studentId = studentSelect.value;
+        if (!studentId) return;
+
+        const title = titleInput.value.trim();
+        const description = document.getElementById('material-description').value.trim();
+        const file = fileInput.files[0];
+
+        if (!title || !file) {
+            showCustomAlert('Please provide a title and select a file.');
+            return;
+        }
+
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<span class="spinner-small"></span> Uploading...';
+
+        try {
+            await uploadCourseMaterial(file, studentId, tutor, title, description);
+            showCustomAlert('✅ Material uploaded successfully!');
+            
+            // Reset form
+            titleInput.value = '';
+            document.getElementById('material-description').value = '';
+            fileInput.value = '';
+            checkUploadReady();
+
+            // Refresh list
+            await loadCourseMaterials(studentId, materialsContainer, tutor);
+        } catch (error) {
+            console.error('Upload error:', error);
+            showCustomAlert('❌ Upload failed. Please try again.');
+        } finally {
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = 'Upload Material';
+        }
+    });
+}
+
+/**
+ * Load students for the courses dropdown.
+ */
+async function loadStudentDropdownCourses(tutorEmail) {
+    try {
+        const q = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
+        const snapshot = await getDocs(q);
+        const select = document.getElementById('material-student-select');
+        
+        // Keep the first placeholder option
+        select.innerHTML = '<option value="">— Choose a student —</option>';
+        
+        snapshot.forEach(doc => {
+            const student = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = `${student.studentName} (${student.grade})`;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error("Error loading students for courses:", error);
+    }
+}
+
+/**
+ * Upload a single file to Cloudinary and store metadata in Firestore.
+ */
+async function uploadCourseMaterial(file, studentId, tutor, title, description) {
+    // 1. Upload to Cloudinary
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+    formData.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
+    formData.append('folder', 'course_materials');
+    formData.append('public_id', `material_${studentId}_${Date.now()}_${file.name.replace(/\.[^/.]+$/, "")}`);
+
+    const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/upload`, {
+        method: 'POST',
+        body: formData
+    });
+    const uploadData = await uploadRes.json();
+    if (!uploadData.secure_url) throw new Error(uploadData.error?.message || 'Upload failed');
+
+    // 2. Get student name
+    const studentSnap = await getDoc(doc(db, "students", studentId));
+    const studentName = studentSnap.exists() ? studentSnap.data().studentName : 'Unknown';
+
+    // 3. Save to Firestore
+    const materialData = {
+        studentId,
+        studentName,
+        tutorId: tutor.id,
+        tutorEmail: tutor.email,
+        tutorName: tutor.name,
+        title,
+        description,
+        fileUrl: uploadData.secure_url,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        uploadedAt: new Date()
+    };
+
+    await addDoc(collection(db, "course_materials"), materialData);
+}
+
+/**
+ * Load and display materials for a specific student.
+ */
+async function loadCourseMaterials(studentId, container, tutor) {
+    container.innerHTML = '<div class="text-center py-6"><div class="spinner mx-auto"></div><p class="text-gray-500 mt-2">Loading materials...</p></div>';
+
+    try {
+        const q = query(
+            collection(db, "course_materials"),
+            where("studentId", "==", studentId),
+            orderBy("uploadedAt", "desc")
+        );
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+            container.innerHTML = '<div class="text-center py-6 text-gray-500">No materials uploaded yet.</div>';
+            return;
+        }
+
+        let html = '<div class="space-y-3">';
+        snapshot.forEach(doc => {
+            const mat = doc.data();
+            const date = mat.uploadedAt?.toDate ? mat.uploadedAt.toDate().toLocaleDateString() : 'Unknown';
+            const size = formatFileSize(mat.fileSize || 0);
+
+            html += `
+                <div class="material-item border rounded-lg p-4 bg-white hover:shadow-sm transition">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <h4 class="font-semibold text-gray-800">${escapeHtml(mat.title)}</h4>
+                            ${mat.description ? `<p class="text-sm text-gray-600 mt-1">${escapeHtml(mat.description)}</p>` : ''}
+                            <div class="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                                <span>📄 ${escapeHtml(mat.fileName)}</span>
+                                <span>⚖️ ${escapeHtml(size)}</span>
+                                <span>📅 ${escapeHtml(date)}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 ml-4">
+                            <a href="${escapeHtml(mat.fileUrl)}" target="_blank" class="btn btn-secondary btn-sm" title="Download">⬇️</a>
+                            ${showEditDeleteButtons ? `<button class="btn btn-danger btn-sm delete-material" data-id="${escapeHtml(doc.id)}" title="Delete">🗑️</button>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+
+        container.innerHTML = html;
+
+        // Attach delete handlers if enabled
+        if (showEditDeleteButtons) {
+            container.querySelectorAll('.delete-material').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const materialId = e.target.getAttribute('data-id');
+                    if (confirm('Delete this material? This action cannot be undone.')) {
+                        try {
+                            await deleteDoc(doc(db, "course_materials", materialId));
+                            showCustomAlert('✅ Material deleted.');
+                            await loadCourseMaterials(studentId, container, tutor);
+                        } catch (error) {
+                            console.error('Delete error:', error);
+                            showCustomAlert('❌ Failed to delete material.');
+                        }
+                    }
+                });
+            });
+        }
+    } catch (error) {
+        console.error('Error loading materials:', error);
+        container.innerHTML = '<div class="text-center py-6 text-red-500">Failed to load materials.</div>';
+    }
+}
 
 /*******************************************************************************
  * SECTION 15: MAIN APP INITIALIZATION (UPDATED)
@@ -4658,285 +4940,5 @@ window.renderCourses = renderCourses;
 window.loadCourseMaterials = loadCourseMaterials;
 window.uploadCourseMaterial = uploadCourseMaterial;
 
-/*******************************************************************************
- * SECTION 17: COURSE MATERIALS UPLOAD (NEW TAB)
- * Allows tutors to upload and manage learning materials for their students.
- ******************************************************************************/
 
-/**
- * Main render function for the Courses tab.
- */
-async function renderCourses(container, tutor) {
-    updateActiveTab('navCourses');
-    
-    container.innerHTML = `
-        <div class="hero-section">
-            <h1 class="hero-title">📚 Course Materials</h1>
-            <p class="hero-subtitle">Upload and manage learning resources for your students</p>
-        </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Left Panel: Student Selector & Upload Form -->
-            <div class="lg:col-span-1">
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="font-bold text-lg">➕ Add New Material</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="form-group">
-                            <label class="form-label">Select Student</label>
-                            <select id="material-student-select" class="form-input">
-                                <option value="">— Choose a student —</option>
-                            </select>
-                        </div>
-
-                        <div id="upload-form-container" class="space-y-3 mt-4 hidden">
-                            <div class="form-group">
-                                <label class="form-label">Title</label>
-                                <input type="text" id="material-title" class="form-input" placeholder="e.g. Chapter 5 Worksheet">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Description (optional)</label>
-                                <textarea id="material-description" class="form-input form-textarea" rows="2" placeholder="Brief description..."></textarea>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">File</label>
-                                <input type="file" id="material-file" class="form-input" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.jpg,.jpeg,.png,.txt">
-                                <p class="text-xs text-gray-500 mt-1">Max 10MB</p>
-                            </div>
-                            <button id="upload-material-btn" class="btn btn-primary w-full" disabled>Upload Material</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Panel: Material List -->
-            <div class="lg:col-span-2">
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="font-bold text-lg">📋 Materials for <span id="selected-student-name">selected student</span></h3>
-                    </div>
-                    <div class="card-body" id="materials-list-container">
-                        <div class="text-center py-6 text-gray-500">
-                            Select a student to view materials.
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    // Load students into dropdown
-    await loadStudentDropdownCourses(tutor.email);
-
-    const studentSelect = document.getElementById('material-student-select');
-    const uploadForm = document.getElementById('upload-form-container');
-    const selectedStudentNameSpan = document.getElementById('selected-student-name');
-    const materialsContainer = document.getElementById('materials-list-container');
-
-    // When student changes
-    studentSelect.addEventListener('change', async (e) => {
-        const studentId = e.target.value;
-        if (studentId) {
-            uploadForm.classList.remove('hidden');
-            const studentName = studentSelect.options[studentSelect.selectedIndex].text;
-            selectedStudentNameSpan.textContent = studentName;
-            await loadCourseMaterials(studentId, materialsContainer, tutor);
-        } else {
-            uploadForm.classList.add('hidden');
-            selectedStudentNameSpan.textContent = 'selected student';
-            materialsContainer.innerHTML = '<div class="text-center py-6 text-gray-500">Select a student to view materials.</div>';
-        }
-    });
-
-    // Enable/disable upload button based on file selection and title
-    const titleInput = document.getElementById('material-title');
-    const fileInput = document.getElementById('material-file');
-    const uploadBtn = document.getElementById('upload-material-btn');
-
-    function checkUploadReady() {
-        const titleOk = titleInput.value.trim() !== '';
-        const fileOk = fileInput.files.length > 0;
-        uploadBtn.disabled = !(titleOk && fileOk);
-    }
-
-    titleInput.addEventListener('input', checkUploadReady);
-    fileInput.addEventListener('change', checkUploadReady);
-
-    // Handle upload
-    uploadBtn.addEventListener('click', async () => {
-        const studentId = studentSelect.value;
-        if (!studentId) return;
-
-        const title = titleInput.value.trim();
-        const description = document.getElementById('material-description').value.trim();
-        const file = fileInput.files[0];
-
-        if (!title || !file) {
-            showCustomAlert('Please provide a title and select a file.');
-            return;
-        }
-
-        uploadBtn.disabled = true;
-        uploadBtn.innerHTML = '<span class="spinner-small"></span> Uploading...';
-
-        try {
-            await uploadCourseMaterial(file, studentId, tutor, title, description);
-            showCustomAlert('✅ Material uploaded successfully!');
-            
-            // Reset form
-            titleInput.value = '';
-            document.getElementById('material-description').value = '';
-            fileInput.value = '';
-            checkUploadReady();
-
-            // Refresh list
-            await loadCourseMaterials(studentId, materialsContainer, tutor);
-        } catch (error) {
-            console.error('Upload error:', error);
-            showCustomAlert('❌ Upload failed. Please try again.');
-        } finally {
-            uploadBtn.disabled = false;
-            uploadBtn.innerHTML = 'Upload Material';
-        }
-    });
-}
-
-/**
- * Load students for the courses dropdown.
- */
-async function loadStudentDropdownCourses(tutorEmail) {
-    try {
-        const q = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
-        const snapshot = await getDocs(q);
-        const select = document.getElementById('material-student-select');
-        
-        // Keep the first placeholder option
-        select.innerHTML = '<option value="">— Choose a student —</option>';
-        
-        snapshot.forEach(doc => {
-            const student = doc.data();
-            const option = document.createElement('option');
-            option.value = doc.id;
-            option.textContent = `${student.studentName} (${student.grade})`;
-            select.appendChild(option);
-        });
-    } catch (error) {
-        console.error("Error loading students for courses:", error);
-    }
-}
-
-/**
- * Upload a single file to Cloudinary and store metadata in Firestore.
- */
-async function uploadCourseMaterial(file, studentId, tutor, title, description) {
-    // 1. Upload to Cloudinary
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
-    formData.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
-    formData.append('folder', 'course_materials');
-    formData.append('public_id', `material_${studentId}_${Date.now()}_${file.name.replace(/\.[^/.]+$/, "")}`);
-
-    const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/upload`, {
-        method: 'POST',
-        body: formData
-    });
-    const uploadData = await uploadRes.json();
-    if (!uploadData.secure_url) throw new Error(uploadData.error?.message || 'Upload failed');
-
-    // 2. Get student name
-    const studentSnap = await getDoc(doc(db, "students", studentId));
-    const studentName = studentSnap.exists() ? studentSnap.data().studentName : 'Unknown';
-
-    // 3. Save to Firestore
-    const materialData = {
-        studentId,
-        studentName,
-        tutorId: tutor.id,
-        tutorEmail: tutor.email,
-        tutorName: tutor.name,
-        title,
-        description,
-        fileUrl: uploadData.secure_url,
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type,
-        uploadedAt: new Date()
-    };
-
-    await addDoc(collection(db, "course_materials"), materialData);
-}
-
-/**
- * Load and display materials for a specific student.
- */
-async function loadCourseMaterials(studentId, container, tutor) {
-    container.innerHTML = '<div class="text-center py-6"><div class="spinner mx-auto"></div><p class="text-gray-500 mt-2">Loading materials...</p></div>';
-
-    try {
-        const q = query(
-            collection(db, "course_materials"),
-            where("studentId", "==", studentId),
-            orderBy("uploadedAt", "desc")
-        );
-        const snapshot = await getDocs(q);
-
-        if (snapshot.empty) {
-            container.innerHTML = '<div class="text-center py-6 text-gray-500">No materials uploaded yet.</div>';
-            return;
-        }
-
-        let html = '<div class="space-y-3">';
-        snapshot.forEach(doc => {
-            const mat = doc.data();
-            const date = mat.uploadedAt?.toDate ? mat.uploadedAt.toDate().toLocaleDateString() : 'Unknown';
-            const size = formatFileSize(mat.fileSize || 0);
-
-            html += `
-                <div class="material-item border rounded-lg p-4 bg-white hover:shadow-sm transition">
-                    <div class="flex items-start justify-between">
-                        <div class="flex-1">
-                            <h4 class="font-semibold text-gray-800">${escapeHtml(mat.title)}</h4>
-                            ${mat.description ? `<p class="text-sm text-gray-600 mt-1">${escapeHtml(mat.description)}</p>` : ''}
-                            <div class="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                                <span>📄 ${escapeHtml(mat.fileName)}</span>
-                                <span>⚖️ ${escapeHtml(size)}</span>
-                                <span>📅 ${escapeHtml(date)}</span>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2 ml-4">
-                            <a href="${escapeHtml(mat.fileUrl)}" target="_blank" class="btn btn-secondary btn-sm" title="Download">⬇️</a>
-                            ${showEditDeleteButtons ? `<button class="btn btn-danger btn-sm delete-material" data-id="${escapeHtml(doc.id)}" title="Delete">🗑️</button>` : ''}
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-        html += '</div>';
-
-        container.innerHTML = html;
-
-        // Attach delete handlers if enabled
-        if (showEditDeleteButtons) {
-            container.querySelectorAll('.delete-material').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
-                    const materialId = e.target.getAttribute('data-id');
-                    if (confirm('Delete this material? This action cannot be undone.')) {
-                        try {
-                            await deleteDoc(doc(db, "course_materials", materialId));
-                            showCustomAlert('✅ Material deleted.');
-                            await loadCourseMaterials(studentId, container, tutor);
-                        } catch (error) {
-                            console.error('Delete error:', error);
-                            showCustomAlert('❌ Failed to delete material.');
-                        }
-                    }
-                });
-            });
-        }
-    } catch (error) {
-        console.error('Error loading materials:', error);
-        container.innerHTML = '<div class="text-center py-6 text-red-500">Failed to load materials.</div>';
-    }
-}
