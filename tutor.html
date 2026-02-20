@@ -302,12 +302,12 @@
                 <a id="whatsappBtn" href="https://wa.me/2348158768689" target="_blank" class="btn-modern bg-green-600/30 border-green-400/60 hover:bg-green-600/50">
                     <i class="fa-brands fa-whatsapp"></i> <span class="hidden sm:inline">Support</span>
                 </a>
-                <!-- logout button -->
+                <!-- logout button — handled exclusively by tutor.js (signOut + redirect) -->
                 <button id="logoutBtn" class="btn-modern bg-amber-600/40 border-amber-400/60 hover:bg-amber-600/60">
                     <i class="fa-solid fa-right-from-bracket"></i> <span class="hidden sm:inline">Logout</span>
                 </button>
                 <!-- avatar -->
-                <div class="avatar-modern">T</div>
+                <div class="avatar-modern" id="tutorAvatar">T</div>
             </div>
         </div>
 
@@ -355,17 +355,18 @@
         </div>
     </div>
 
-    <!-- external scripts (references only) -->
+    <!-- tutor.js is the authoritative module — loads first -->
     <script type="module" src="tutor.js"></script>
     <script src="games.js"></script>
 
-    <!-- inline enhancement script (dynamic stats, dark mode, network) -->
+    <!-- inline enhancement script: dark mode, date, network, stats, extra tabs -->
     <script>
         (function() {
             // ---------- DARK MODE ----------
             const modeToggle = document.getElementById('modeToggle');
-            const modeIcon = document.getElementById('modeIcon');
-            const body = document.body;
+            const modeIcon   = document.getElementById('modeIcon');
+            const body       = document.body;
+
             function setTheme(theme) {
                 if (theme === 'dark') {
                     body.classList.add('dark');
@@ -376,35 +377,31 @@
                 }
                 localStorage.setItem('tutorTheme', theme);
             }
-            const saved = localStorage.getItem('tutorTheme') || 'light';
-            setTheme(saved);
+            setTheme(localStorage.getItem('tutorTheme') || 'light');
             modeToggle.addEventListener('click', () => {
                 setTheme(body.classList.contains('dark') ? 'light' : 'dark');
             });
 
             // ---------- CURRENT DATE ----------
-            const dateSpan = document.getElementById('currentDate');
             const now = new Date();
-            dateSpan.textContent = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            document.getElementById('currentDate').textContent =
+                now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
             // ---------- NETWORK HANDLERS ----------
             const warningEl = document.getElementById('networkWarning');
             const overlayEl = document.getElementById('networkErrorOverlay');
             const warningMsg = document.getElementById('warningMessage');
-            const errorMsg = document.getElementById('errorMessage');
+            const errorMsg   = document.getElementById('errorMessage');
 
-            window.hideNetworkWarning = function() {
-                warningEl.classList.add('hidden');
+            window.hideNetworkWarning = function() { warningEl.classList.add('hidden'); };
+            window.showNetworkError   = function(show) {
+                overlayEl.classList.toggle('show', !!show);
             };
-            window.showNetworkError = function(show) {
-                if (show) overlayEl.classList.add('show');
-                else overlayEl.classList.remove('show');
-            };
-            window.checkConnectivity = function() {
+            window.checkConnectivity  = function() {
                 if (navigator.onLine) {
                     showNetworkError(false);
                     warningEl.classList.add('hidden');
-                    location.reload(); // quick refresh
+                    location.reload();
                 } else {
                     errorMsg.innerText = 'Still offline. Check connection.';
                 }
@@ -419,11 +416,11 @@
                     showNetworkError(false);
                 }
             }
-            window.addEventListener('online', updateNetworkUI);
+            window.addEventListener('online',  updateNetworkUI);
             window.addEventListener('offline', updateNetworkUI);
-            updateNetworkUI(); // initial
+            updateNetworkUI();
 
-            // ---------- WAIT FOR window.tutorData (set by tutor.js) AND UPDATE STATS / HANDLERS ----------
+            // ---------- WAIT FOR window.tutorData (set by tutor.js) ----------
             function waitForTutorData() {
                 if (window.tutorData && window.tutorData.email) {
                     initEnhancements(window.tutorData);
@@ -434,29 +431,30 @@
             waitForTutorData();
 
             async function initEnhancements(tutor) {
-                // update welcome with tutor name
+                // Update welcome heading with first name
                 const nameHeading = document.getElementById('tutorNameHeading');
                 if (tutor.name) nameHeading.innerText = tutor.name.split(' ')[0] || 'Tutor';
 
-                // ------ DYNAMIC IMPORT FIRESTORE (fixed duplicate db) ------
+                // Update avatar initial
+                const avatar = document.getElementById('tutorAvatar');
+                if (tutor.name && avatar) avatar.innerText = tutor.name.charAt(0).toUpperCase();
+
+                // ---------- DYNAMIC FIRESTORE STATS ----------
                 try {
-                    // Import Firestore functions from CDN
-                    const { collection, query, where, getDocs } = await import('https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js');
-                    // Import the initialized db instance from your local config
+                    const { collection, query, where, getDocs } =
+                        await import('https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js');
                     const { db } = await import('./firebaseConfig.js');
 
-                    // Build query
-                    const studentsRef = collection(db, 'students');
-                    const q = query(studentsRef, where('tutorEmail', '==', tutor.email));
+                    const q = query(collection(db, 'students'), where('tutorEmail', '==', tutor.email));
                     const snapshot = await getDocs(q);
                     const activeStudents = snapshot.docs
                         .map(d => ({ id: d.id, ...d.data() }))
-                        .filter(s => !['archived','graduated','transferred'].includes(s.status));
+                        .filter(s => !['archived', 'graduated', 'transferred'].includes(s.status));
 
-                    // 1) total students
+                    // 1) Total students
                     document.getElementById('totalStudentsCount').innerText = activeStudents.length;
 
-                    // 2) today's classes (weekday name)
+                    // 2) Today's classes
                     const weekdays = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
                     const todayName = weekdays[new Date().getDay()];
                     let todayCount = 0;
@@ -467,94 +465,103 @@
                     });
                     document.getElementById('todayClassesCount').innerText = todayCount;
 
-                    // 3) pending reports (no report in last 7 days OR lastReportDate older than 7 days)
+                    // 3) Pending reports (no report in last 7 days)
                     const sevenDaysAgo = new Date();
                     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
                     let pending = 0;
                     activeStudents.forEach(s => {
                         if (!s.lastReportDate) { pending++; return; }
-                        let lastDate = s.lastReportDate?.toDate ? s.lastReportDate.toDate() : new Date(s.lastReportDate);
+                        const lastDate = s.lastReportDate?.toDate
+                            ? s.lastReportDate.toDate()
+                            : new Date(s.lastReportDate);
                         if (lastDate < sevenDaysAgo) pending++;
                     });
                     document.getElementById('pendingReportsCount').innerText = pending;
 
-                    // 4) performance score (avg attendanceRate, default 85)
+                    // 4) Performance score (avg attendanceRate)
                     let totalRate = 0, count = 0;
                     activeStudents.forEach(s => {
-                        if (s.attendanceRate != null) {
-                            totalRate += Number(s.attendanceRate);
-                            count++;
-                        }
+                        if (s.attendanceRate != null) { totalRate += Number(s.attendanceRate); count++; }
                     });
-                    let avgScore = count ? Math.round(totalRate / count) : 85;
+                    const avgScore = count ? Math.round(totalRate / count) : 85;
                     document.getElementById('performanceScoreCount').innerText = avgScore + '%';
 
                 } catch (e) {
-                    console.warn('Firestore dynamic import failed (offline or config missing). Using fallback.', e);
-                    // fallback dummy data
-                    document.getElementById('totalStudentsCount').innerText = '12';
-                    document.getElementById('todayClassesCount').innerText = '5';
-                    document.getElementById('pendingReportsCount').innerText = '3';
-                    document.getElementById('performanceScoreCount').innerText = '91%';
+                    console.warn('Firestore stats load failed (offline or config missing). Using fallback.', e);
+                    document.getElementById('totalStudentsCount').innerText = '—';
+                    document.getElementById('todayClassesCount').innerText  = '—';
+                    document.getElementById('pendingReportsCount').innerText = '—';
+                    document.getElementById('performanceScoreCount').innerText = '—';
                 }
 
-                // ----- ATTACH CLICK HANDLERS TO STAT CARDS & EXTRA TABS -----
-                // total students → activate Student Database tab
+                // ---------- STAT CARD CLICK HANDLERS ----------
                 document.getElementById('totalStudentsCard').addEventListener('click', () => {
                     document.getElementById('navStudentDatabase')?.click();
                 });
-                // today's classes → try schedule modal (from tutor.js)
+
                 document.getElementById('todayClassesCard').addEventListener('click', () => {
-                    if (typeof window.showScheduleCalendarModal === 'function') window.showScheduleCalendarModal();
-                    else alert('Schedule calendar modal not yet loaded.');
+                    // showScheduleCalendarModal is exposed by tutor.js after scheduleManager init
+                    if (typeof window.showScheduleCalendarModal === 'function') {
+                        window.showScheduleCalendarModal();
+                    } else {
+                        document.getElementById('navScheduleManagement')?.click();
+                    }
                 });
-                // pending reports → focus on dashboard (pending section)
+
                 document.getElementById('pendingReportsCard').addEventListener('click', () => {
                     document.getElementById('navDashboard')?.click();
                 });
-                // achievements (performance) → maybe show gamification
+
                 document.getElementById('achievementsCard').addEventListener('click', () => {
-                    if (typeof window.initGamification === 'function') window.initGamification(tutor.id);
-                    else alert('Performance details coming soon.');
+                    if (typeof window.initGamification === 'function') {
+                        window.initGamification(tutor.id);
+                    } else {
+                        alert('Performance details coming soon.');
+                    }
                 });
 
-                // navigation pills active toggle and placeholder actions
-                const tabs = ['navDashboard','navStudentDatabase','navAutoStudents','navAcademic','navScheduleManagement','navCourses'];
-                tabs.forEach(id => {
+                // ---------- EXTRA NAV TABS (Academic, Schedule, Courses) ----------
+                // Note: navDashboard / navStudentDatabase / navAutoStudents are handled
+                // entirely by tutor.js — we must NOT add extra click listeners to those
+                // or content rendering will fire twice.
+
+                const ALL_TABS = ['navDashboard','navStudentDatabase','navAutoStudents','navAcademic','navScheduleManagement','navCourses'];
+
+                // Helper to mark active on all 6 tabs without affecting tutor.js content rendering
+                function setActiveTab(id) {
+                    ALL_TABS.forEach(tabId => {
+                        document.getElementById(tabId)?.classList.toggle('active', tabId === id);
+                    });
+                }
+
+                // Patch tutor.js's three nav tabs: after they fire content rendering,
+                // ensure the other 3 "extra" tabs lose their active class.
+                ['navDashboard','navStudentDatabase','navAutoStudents'].forEach(id => {
                     const el = document.getElementById(id);
                     if (!el) return;
-                    el.addEventListener('click', (e) => {
-                        // remove active from all
-                        tabs.forEach(tabId => document.getElementById(tabId)?.classList.remove('active'));
-                        el.classList.add('active');
-                        // custom actions for extra tabs
-                        if (id === 'navAcademic') {
-                            alert('Academic module – coming soon.');
-                        } else if (id === 'navScheduleManagement') {
-                            if (typeof window.showScheduleCalendarModal === 'function') window.showScheduleCalendarModal();
-                            else alert('Schedule view loading...');
-                        } else if (id === 'navCourses') {
-                            alert('Course materials will appear here.');
-                        }
-                        // other tabs are handled by tutor.js (Dashboard, StudentDatabase, AutoStudents)
-                        // we just update active style.
-                    });
+                    el.addEventListener('click', () => setActiveTab(id));
                 });
 
-                // logout button (reuse from tutor.js if it exists, else simple redirect)
-                document.getElementById('logoutBtn').addEventListener('click', () => {
-                    if (typeof window.signOut === 'function') {
-                        // use global auth from tutor.js? just redirect.
+                // Extra tabs — only managed here
+                document.getElementById('navAcademic')?.addEventListener('click', () => {
+                    setActiveTab('navAcademic');
+                    alert('Academic module – coming soon.');
+                });
+
+                document.getElementById('navScheduleManagement')?.addEventListener('click', () => {
+                    setActiveTab('navScheduleManagement');
+                    if (typeof window.showScheduleCalendarModal === 'function') {
+                        window.showScheduleCalendarModal();
+                    } else {
+                        alert('Schedule manager is still loading. Please try again in a moment.');
                     }
-                    window.location.href = 'tutor-auth.html';
+                });
+
+                document.getElementById('navCourses')?.addEventListener('click', () => {
+                    setActiveTab('navCourses');
+                    alert('Course materials will appear here.');
                 });
             }
-
-            // attach quick placeholder for "Academic" etc even before tutorData
-            document.getElementById('navAcademic').addEventListener('click', (e) => {
-                // default behaviour (active will be set later but we can show toast)
-                if (!window.tutorData) alert('Please wait for data load.');
-            });
         })();
     </script>
 </body>
