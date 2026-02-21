@@ -96,7 +96,10 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewParentFeedback: false, 
             viewEnrollments: false,
             viewInactiveTutors: false,
-            viewArchivedStudents: false
+            viewArchivedStudents: false,
+            viewMasterPortal: false,   // Management Portal tab
+            canQA: false,              // QA Session Observation button
+            canQC: false               // Lesson Plan QC button
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -117,7 +120,10 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewParentFeedback: false, 
             viewEnrollments: false,
             viewInactiveTutors: false,
-            viewArchivedStudents: false
+            viewArchivedStudents: false,
+            viewMasterPortal: false,   // Management Portal tab
+            canQA: false,              // QA Session Observation button
+            canQC: false               // Lesson Plan QC button
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -138,7 +144,10 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewParentFeedback: true, 
             viewEnrollments: true,
             viewInactiveTutors: true,
-            viewArchivedStudents: true
+            viewArchivedStudents: true,
+            viewMasterPortal: true,    // Managers can see the Master View
+            canQA: false,              // Only QA officers rate sessions
+            canQC: false               // Only QC officers rate lesson plans
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -159,7 +168,10 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewParentFeedback: true, 
             viewEnrollments: true,
             viewInactiveTutors: true,
-            viewArchivedStudents: true
+            viewArchivedStudents: true,
+            viewMasterPortal: true,    // Directors can see the Master View
+            canQA: true,               // Directors can do QA ratings
+            canQC: true                // Directors can do QC ratings
         }, 
         actions: { 
             canDownloadReports: true, 
@@ -180,7 +192,10 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewParentFeedback: true, 
             viewEnrollments: true,
             viewInactiveTutors: true,
-            viewArchivedStudents: true
+            viewArchivedStudents: true,
+            viewMasterPortal: true,    // Admins have full access
+            canQA: true,               // Admins can do QA ratings
+            canQC: true                // Admins can do QC ratings
         }, 
         actions: { 
             canDownloadReports: true, 
