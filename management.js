@@ -9618,6 +9618,7 @@ function updatePageTitle(title) {
 
 const allNavItems = {
     navDashboard: { fn: renderDashboardPanel, perm: 'viewDashboard', label: 'Dashboard' },
+    navMasterPortal: { fn: renderMasterPortal, perm: 'viewMasterPortal', label: 'Management Portal' },
     navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement', label: 'Tutor Directory' },
     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice', label: 'Pay Advice' },
     navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports', label: 'Tutor Reports' },
@@ -10691,5 +10692,6 @@ window.submitTutorRating = submitTutorRating;
 window.exportMasterDataToCSV = exportMasterDataToCSV;
 
 console.log("✅ Management Portal module loaded successfully");
+
 
 
