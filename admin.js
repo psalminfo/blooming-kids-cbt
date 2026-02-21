@@ -2551,6 +2551,7 @@ async function openPermissionsModal(staffId) {
                             <label class="flex items-center"><input type="checkbox" id="p-viewEnrollments" class="mr-2" ${permissions.tabs?.viewEnrollments ? 'checked' : ''}> Enrollments</label>
                             <label class="flex items-center"><input type="checkbox" id="p-viewInactiveTutors" class="mr-2" ${permissions.tabs?.viewInactiveTutors ? 'checked' : ''}> Inactive Tutors</label>
                             <label class="flex items-center"><input type="checkbox" id="p-viewArchivedStudents" class="mr-2" ${permissions.tabs?.viewArchivedStudents ? 'checked' : ''}> Archived Students</label>
+                            <label class="flex items-center col-span-2"><input type="checkbox" id="p-viewMasterPortal" class="mr-2" ${permissions.tabs?.viewMasterPortal ? 'checked' : ''}> <span class="font-semibold text-emerald-700">🗂 Management Portal (Master View)</span></label>
                         </div>
                     </div>
                     <div class="border-t pt-4">
@@ -2560,6 +2561,11 @@ async function openPermissionsModal(staffId) {
                         <label class="flex items-center"><input type="checkbox" id="p-canEndSummerBreak" class="mr-2" ${permissions.actions?.canEndSummerBreak ? 'checked' : ''}> Can End Summer Break</label>
                         <label class="flex items-center"><input type="checkbox" id="p-canEditStudents" class="mr-2" ${permissions.actions?.canEditStudents ? 'checked' : ''}> Can Edit Students</label>
                         <label class="flex items-center"><input type="checkbox" id="p-canDeleteStudents" class="mr-2" ${permissions.actions?.canDeleteStudents ? 'checked' : ''}> Can Delete Students</label>
+                        <div class="border-t mt-3 pt-3">
+                            <h4 class="font-semibold mb-2 text-purple-700">🏅 QA / QC Rating Actions:</h4>
+                            <label class="flex items-center"><input type="checkbox" id="p-canQA" class="mr-2" ${permissions.tabs?.canQA ? 'checked' : ''}> <span class="text-purple-700">Can Rate Tutors — QA (Session Observation)</span></label>
+                            <label class="flex items-center mt-1"><input type="checkbox" id="p-canQC" class="mr-2" ${permissions.tabs?.canQC ? 'checked' : ''}> <span class="text-amber-700">Can Rate Tutors — QC (Lesson Plan Review)</span></label>
+                        </div>
                     </div>
                 </div>
                 <div class="flex justify-end space-x-4 mt-6">
@@ -2584,7 +2590,10 @@ async function openPermissionsModal(staffId) {
                 viewParentFeedback: document.getElementById('p-viewParentFeedback').checked,
                 viewEnrollments: document.getElementById('p-viewEnrollments').checked,
                 viewInactiveTutors: document.getElementById('p-viewInactiveTutors').checked,
-                viewArchivedStudents: document.getElementById('p-viewArchivedStudents').checked
+                viewArchivedStudents: document.getElementById('p-viewArchivedStudents').checked,
+                viewMasterPortal: document.getElementById('p-viewMasterPortal').checked,
+                canQA: document.getElementById('p-canQA').checked,
+                canQC: document.getElementById('p-canQC').checked
             },
             actions: { 
                 canDownloadReports: document.getElementById('p-canDownloadReports').checked, 
