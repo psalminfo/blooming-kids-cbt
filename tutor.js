@@ -2467,132 +2467,162 @@ let studentCache = [];
 function renderScheduleManagement(container, tutor) {
     updateActiveTab('navScheduleManagement');
 
+    const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+    const todayName = lagosNow.toLocaleDateString('en-US', { weekday:'long', timeZone:'Africa/Lagos' });
+
     container.innerHTML = `
-        <div class="hero-section">
-            <h1 class="hero-title">📅 Schedule Management</h1>
-            <p class="hero-subtitle">Set up, view and edit class schedules for all your students</p>
-        </div>
-
-        <div class="student-actions-container" style="grid-template-columns: repeat(auto-fit, minmax(280px,1fr));">
-            <div class="student-action-card">
-                <div class="flex items-center gap-3 mb-3">
-                    <div class="stat-icon" style="width:44px;height:44px;font-size:1.2rem;border-radius:1rem;">📆</div>
-                    <h3 class="font-bold text-lg">View Calendar</h3>
-                </div>
-                <p class="text-sm text-gray-600 mb-4">See a full weekly overview of all scheduled classes across your students.</p>
-                <button id="view-full-calendar-btn" class="btn btn-info w-full">View Schedule Calendar</button>
+        <div style="background:linear-gradient(135deg,#1e40af,#4338ca);color:#fff;border-radius:1rem;padding:1.2rem 1.5rem;margin-bottom:1.2rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+            <div>
+                <h1 style="font-size:1.2rem;font-weight:900;margin:0">📅 Schedule Management</h1>
+                <p style="font-size:.8rem;opacity:.85;margin:.2rem 0 0">Manage, view and update your students\' class schedules</p>
             </div>
-
-            <div class="student-action-card">
-                <div class="flex items-center gap-3 mb-3">
-                    <div class="stat-icon" style="width:44px;height:44px;font-size:1.2rem;border-radius:1rem;">⚙️</div>
-                    <h3 class="font-bold text-lg">Set Up Schedules</h3>
-                </div>
-                <p class="text-sm text-gray-600 mb-4">Create or update class schedules for individual students including days, times and subjects.</p>
-                <button id="setup-all-schedules-btn" class="btn btn-primary w-full">Set Up Schedules</button>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                <button id="view-full-calendar-btn" style="background:rgba(255,255,255,.2);color:#fff;border:none;padding:.5rem .9rem;border-radius:.6rem;font-size:.8rem;font-weight:700;cursor:pointer;">📆 Weekly View</button>
+                <button id="setup-all-schedules-btn" style="background:#fff;color:#1e40af;border:none;padding:.5rem .9rem;border-radius:.6rem;font-size:.8rem;font-weight:700;cursor:pointer;">⚙️ Quick Setup</button>
             </div>
         </div>
 
-        <div class="card mt-4">
+        <div class="card mb-4">
             <div class="card-header flex items-center gap-2">
-                <span class="text-xl">📊</span>
-                <h3 class="font-bold text-lg">Today's Schedule</h3>
+                <span style="display:inline-block;width:.55rem;height:.55rem;border-radius:50%;background:#4ade80;"></span>
+                <h3 class="font-bold">Today — ${escapeHtml(todayName)}</h3>
             </div>
             <div class="card-body" id="todays-schedule-inline">
-                <div class="text-center py-6">
-                    <div class="spinner mx-auto mb-3"></div>
-                    <p class="text-gray-500">Loading today's schedule...</p>
-                </div>
+                <div class="text-center py-4"><div class="spinner mx-auto mb-2"></div><p class="text-gray-500 text-sm">Loading today…</p></div>
             </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header flex items-center justify-between">
+                <h3 class="font-bold">🗓️ Full Week Overview</h3>
+                <span class="text-xs text-gray-400">Nigeria Time (WAT)</span>
+            </div>
+            <div class="card-body" style="overflow-x:auto;">
+                <div id="week-grid-container"><div class="text-center py-4"><div class="spinner mx-auto mb-2"></div><p class="text-gray-500 text-sm">Building grid…</p></div></div>
+            </div>
+        </div>
+
+        <div class="mb-3 flex items-center justify-between">
+            <h3 class="text-lg font-bold text-gray-800">👥 Student Schedules</h3>
+            <span class="text-xs text-gray-400" id="sched-student-count">Loading…</span>
+        </div>
+        <div id="student-schedule-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;">
+            <div class="card"><div class="card-body text-center py-6"><div class="spinner mx-auto mb-2"></div></div></div>
         </div>
     `;
 
-    // View calendar button
-    const viewCalendarBtn = document.getElementById('view-full-calendar-btn');
-    if (viewCalendarBtn) {
-        viewCalendarBtn.addEventListener('click', showScheduleCalendarModal);
-    }
+    document.getElementById('view-full-calendar-btn')?.addEventListener('click', showScheduleCalendarModal);
+    document.getElementById('setup-all-schedules-btn')?.addEventListener('click', async () => {
+        const firebaseDeps = { db, methods: { getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc, getDoc } };
+        if (!window.scheduleManager) window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
+        await window.scheduleManager.openManualManager();
+    });
 
-    // Set up schedules button
-    const setupSchedulesBtn = document.getElementById('setup-all-schedules-btn');
-    if (setupSchedulesBtn) {
-        setupSchedulesBtn.addEventListener('click', async () => {
-            try {
-                if (window.scheduleManager) {
-                    await window.scheduleManager.openManualManager();
-                } else {
-                    const firebaseDeps = {
-                        db: db,
-                        methods: { getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc, getDoc }
-                    };
-                    window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
-                    await window.scheduleManager.openManualManager();
-                }
-            } catch (error) {
-                console.error("Error opening schedule manager:", error);
-                showCustomAlert('Error opening schedule manager. Please try again.');
-            }
-        });
-    }
-
-    // Load today's classes inline
     (async () => {
-        const inlineContainer = document.getElementById('todays-schedule-inline');
-        if (!inlineContainer) return;
         try {
-            const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-            const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-            const snapshot = await getDocs(studentsQuery);
-            const todayClasses = [];
-            snapshot.forEach(d => {
-                const s = { id: d.id, ...d.data() };
-                if (s.schedule && Array.isArray(s.schedule)) {
-                    s.schedule.forEach(slot => {
-                        if (slot.day === todayName) {
-                            todayClasses.push({ student: s.studentName, ...slot });
-                        }
-                    });
-                }
-            });
+            const snap = await getDocs(query(collection(db, 'students'), where('tutorEmail', '==', tutor.email)));
+            const students = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s =>
+                !['archived','graduated','transferred'].includes(s.status)
+            );
 
-            if (todayClasses.length === 0) {
-                inlineContainer.innerHTML = `
-                    <div class="text-center py-6">
-                        <div class="text-4xl mb-2">🌿</div>
-                        <p class="text-gray-500">No classes scheduled for today (${todayName}).</p>
-                    </div>`;
+            document.getElementById('sched-student-count').textContent = `${students.length} student${students.length !== 1 ? 's' : ''}`;
+
+            // TODAY STRIP
+            const todayEl = document.getElementById('todays-schedule-inline');
+            const todaySlots = [];
+            students.forEach(s => {
+                (s.schedule || []).forEach(sl => {
+                    if (sl.day === todayName) todaySlots.push({ ...sl, studentName: s.studentName });
+                });
+            });
+            todaySlots.sort((a,b) => (a.start||'').localeCompare(b.start||''));
+            if (todaySlots.length === 0) {
+                todayEl.innerHTML = `<div class="text-center py-4">🌿 <span class="text-gray-500">No classes today</span></div>`;
+            } else {
+                todayEl.innerHTML = `<div class="space-y-2">${todaySlots.map(sl => `
+                    <div class="flex items-center gap-3 p-3 rounded-xl" style="background:#f0fdf4;border:1px solid #bbf7d0;">
+                        <div style="width:2.2rem;height:2.2rem;border-radius:.75rem;background:#86efac;color:#14532d;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0">${escapeHtml((sl.studentName||'?').charAt(0))}</div>
+                        <div style="flex:1;min-width:0;">
+                            <p style="font-weight:700;font-size:.875rem;margin:0;">${escapeHtml(sl.studentName||'')}</p>
+                            ${sl.subject ? `<p style="font-size:.75rem;color:#6b7280;margin:0;">${escapeHtml(sl.subject)}</p>` : ''}
+                        </div>
+                        <div style="text-align:right;">
+                            <p style="font-size:.85rem;font-weight:700;color:#15803d;font-variant-numeric:tabular-nums;">${escapeHtml(formatScheduleTime(sl.start))} – ${escapeHtml(formatScheduleTime(sl.end))}</p>
+                        </div>
+                    </div>`).join('')}</div>`;
+            }
+
+            // WEEK GRID
+            const gridEl = document.getElementById('week-grid-container');
+            const byDay = {};
+            DAYS.forEach(d => { byDay[d] = []; });
+            students.forEach(s => {
+                (s.schedule || []).forEach(sl => {
+                    if (byDay[sl.day]) byDay[sl.day].push({ ...sl, studentName: s.studentName });
+                });
+            });
+            DAYS.forEach(d => byDay[d].sort((a,b) => (a.start||'').localeCompare(b.start||'')));
+
+            const maxSlots = Math.max(1, ...DAYS.map(d => byDay[d].length));
+            gridEl.innerHTML = `<table style="min-width:660px;border-collapse:collapse;width:100%;font-size:.72rem;">
+                <thead><tr>${DAYS.map(d => `<th style="padding:8px 5px;text-align:center;font-weight:700;color:${d===todayName?'#1d4ed8':'#6b7280'};background:${d===todayName?'#eff6ff':'#f9fafb'};border:1px solid #e5e7eb;">${d.slice(0,3).toUpperCase()}${d===todayName?' ●':''}</th>`).join('')}</tr></thead>
+                <tbody>${Array.from({length:maxSlots}).map((_,i) => `<tr>${DAYS.map(d => {
+                    const sl = byDay[d][i];
+                    return sl
+                        ? `<td style="padding:4px;border:1px solid #e5e7eb;background:${d===todayName?'#eff6ff':'#fff'}"><div style="background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;border-radius:7px;padding:5px 6px;"><div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:85px;">${escapeHtml(sl.studentName||'')}</div><div style="opacity:.85">${escapeHtml(formatScheduleTime(sl.start))}–${escapeHtml(formatScheduleTime(sl.end))}</div></div></td>`
+                        : `<td style="padding:4px;border:1px solid #f3f4f6;background:${d===todayName?'#f0f9ff':'#fafafa'}">&nbsp;</td>`;
+                }).join('')}</tr>`).join('')}</tbody>
+            </table>`;
+
+            // PER-STUDENT CARDS
+            const cardsEl = document.getElementById('student-schedule-cards');
+            if (students.length === 0) {
+                cardsEl.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:2rem;color:#9ca3af;">No active students found.</div>`;
                 return;
             }
-
-            // Sort by start time
-            todayClasses.sort((a, b) => (a.start || '').localeCompare(b.start || ''));
-
-            inlineContainer.innerHTML = `
-                <p class="text-sm font-semibold text-gray-500 mb-3 uppercase tracking-wide">${todayName} — ${todayClasses.length} class${todayClasses.length !== 1 ? 'es' : ''}</p>
-                <div class="space-y-3">
-                    ${todayClasses.map(c => `
-                        <div class="flex items-center gap-4 p-3 rounded-xl border border-gray-100 bg-gray-50 hover:bg-green-50 hover:border-green-200 transition-all">
-                            <div class="w-10 h-10 rounded-xl bg-green-100 text-green-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
-                                ${escapeHtml((c.student || '?').charAt(0))}
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <p class="font-semibold text-gray-800">${escapeHtml(c.student)}</p>
-                                <p class="text-sm text-gray-500">${escapeHtml(c.subject || '')} ${c.room ? '· ' + escapeHtml(c.room) : ''}</p>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-sm font-bold text-green-700">${escapeHtml(formatScheduleTime(c.start))} – ${escapeHtml(formatScheduleTime(c.end))}</p>
-                            </div>
-                        </div>`).join('')}
+            cardsEl.innerHTML = students.map(s => {
+                const slots = s.schedule || [];
+                const slotsHtml = slots.length === 0
+                    ? `<p style="font-size:.75rem;color:#9ca3af;font-style:italic;margin:.5rem 0 0;">No schedule set yet</p>`
+                    : slots.map(sl => `<div style="display:flex;align-items:center;gap:.5rem;font-size:.75rem;padding:.35rem 0;border-bottom:1px solid #f3f4f6;">
+                        <span style="width:2rem;text-align:center;font-weight:700;color:#4f46e5;">${sl.day?.slice(0,3)||'?'}</span>
+                        <span style="color:#374151;font-variant-numeric:tabular-nums;">${escapeHtml(formatScheduleTime(sl.start))} – ${escapeHtml(formatScheduleTime(sl.end))}</span>
+                        ${sl.subject ? `<span style="margin-left:auto;color:#9ca3af;">${escapeHtml(sl.subject)}</span>` : ''}
+                    </div>`).join('');
+                return `<div style="background:#fff;border-radius:1rem;border:1px solid #e5e7eb;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden;">
+                    <div style="display:flex;align-items:center;gap:.75rem;padding:1rem;border-bottom:1px solid #f3f4f6;">
+                        <div style="width:2.5rem;height:2.5rem;border-radius:.75rem;background:linear-gradient(135deg,#818cf8,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">${escapeHtml((s.studentName||'?').charAt(0))}</div>
+                        <div style="flex:1;min-width:0;">
+                            <p style="font-weight:700;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(s.studentName||'')}</p>
+                            <p style="font-size:.72rem;color:#6b7280;margin:0;">Grade ${escapeHtml(s.grade||'?')} · ${slots.length} session${slots.length!==1?'s':''}/wk</p>
+                        </div>
+                        <button class="edit-sched-btn" data-sid="${escapeHtml(s.id)}" style="font-size:.72rem;background:#eff6ff;color:#1d4ed8;border:none;padding:.35rem .7rem;border-radius:.5rem;font-weight:700;cursor:pointer;">✏️ Edit</button>
+                    </div>
+                    <div style="padding:.75rem 1rem;">${slotsHtml}</div>
                 </div>`;
-        } catch (err) {
-            inlineContainer.innerHTML = '<p class="text-red-500 text-center">Failed to load today\'s schedule.</p>';
+            }).join('');
+
+            cardsEl.querySelectorAll('.edit-sched-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const sid = btn.dataset.sid;
+                    const student = students.find(s => s.id === sid);
+                    if (!student) return;
+                    const firebaseDeps = { db, methods: { getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc, getDoc } };
+                    if (!window.scheduleManager) window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
+                    window.scheduleManager.students = students;
+                    window.scheduleManager.scheduledStudentIds = new Set(students.filter(s => s.schedule?.length).map(s => s.id));
+                    window.scheduleManager.openModal([student]);
+                });
+            });
+
+        } catch(err) {
+            console.error("Schedule load error:", err);
+            document.getElementById('student-schedule-cards').innerHTML = `<div style="grid-column:1/-1;color:#dc2626;text-align:center;padding:2rem;">Failed to load schedules.</div>`;
         }
     })();
 }
 
-/*******************************************************************************
- * ACADEMIC TAB — Enhanced with monthly archive
- ******************************************************************************/
 function renderAcademic(container, tutor) {
     updateActiveTab('navAcademic');
 
@@ -3002,7 +3032,7 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
         const activeStudentMap = {};
         activeStudentsSnap.docs.forEach(d => {
             const s = d.data();
-            if (!s.summerBreak && !['archived','graduated','transferred'].includes(s.status)) {
+            if (!s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status)) {
                 activeStudentIds.add(d.id);
                 activeStudentMap[d.id] = s;
             }
@@ -4123,6 +4153,49 @@ const GAMIFICATION_CONFIG = {
 
 // --- STATE MANAGEMENT ---
 let currentTutorScore = 0;
+
+/**
+ * Starts a persistent Lagos clock injected into the page header.
+ * Called once after auth — survives all tab switches because it
+ * targets an element OUTSIDE #mainContent.
+ */
+function startGlobalTutorClock() {
+    function formatLagosFull() {
+        return new Intl.DateTimeFormat('en-NG', {
+            weekday:'short', day:'numeric', month:'short', year:'numeric',
+            hour:'2-digit', minute:'2-digit', second:'2-digit',
+            hour12:true, timeZone:'Africa/Lagos'
+        }).format(new Date());
+    }
+
+    // Try to find a persistent element outside mainContent
+    // We'll create a fixed element in the page header or inject one
+    let clockWrapper = document.getElementById('global-tutor-clock-bar');
+    if (!clockWrapper) {
+        clockWrapper = document.createElement('div');
+        clockWrapper.id = 'global-tutor-clock-bar';
+        clockWrapper.style.cssText = `
+            position:fixed; top:0; right:0; z-index:9000;
+            background:linear-gradient(135deg,#1e40af,#2563eb);
+            color:#fff; font-size:0.72rem; font-weight:600;
+            padding:4px 14px 4px 10px; border-radius:0 0 0 10px;
+            display:flex; align-items:center; gap:6px; box-shadow:0 2px 8px rgba(0,0,0,.18);
+        `;
+        clockWrapper.innerHTML = `
+            <span style="opacity:.75">📍 Lagos, Nigeria (WAT)</span>
+            <span id="global-tutor-clock-time" style="font-variant-numeric:tabular-nums; letter-spacing:.02em">--:--:-- --</span>
+        `;
+        document.body.appendChild(clockWrapper);
+    }
+
+    const tickEl = () => {
+        const el = document.getElementById('global-tutor-clock-time');
+        if (el) el.textContent = formatLagosFull();
+    };
+    tickEl();
+    if (window._globalTutorClockInterval) clearInterval(window._globalTutorClockInterval);
+    window._globalTutorClockInterval = setInterval(tickEl, 1000);
+}
 let isTutorOfTheMonth = false;
 
 /**
@@ -4131,43 +4204,98 @@ let isTutorOfTheMonth = false;
  */
 async function initGamification(tutorId) {
     try {
-        const tutorRef = doc(db, "tutors", tutorId);
-        onSnapshot(tutorRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                // Store detailed grade data on window.tutorData for scorecard
-                if (window.tutorData) {
-                    window.tutorData.qaScore        = data.qaScore        ?? null;
-                    window.tutorData.qcScore        = data.qcScore        ?? null;
-                    window.tutorData.qaAdvice       = data.qaAdvice       || '';
-                    window.tutorData.qcAdvice       = data.qcAdvice       || '';
-                    window.tutorData.qaGradedByName = data.qaGradedByName || '';
-                    window.tutorData.qcGradedByName = data.qcGradedByName || '';
-                    window.tutorData.performanceMonth = data.performanceMonth || '';
-                }
-                // Combined score = average of QA + QC if both exist
-                const qa = data.qaScore ?? null;
-                const qc = data.qcScore ?? null;
-                let combined = data.performanceScore || 0;
-                if (qa !== null && qc !== null) combined = Math.round((qa + qc) / 2);
-                else if (qa !== null) combined = qa;
-                else if (qc !== null) combined = qc;
-                currentTutorScore = combined;
-                // Pass grading details directly so scorecard never has a stale read
-                updateScoreDisplay(currentTutorScore, {
-                    qaScore: qa,
-                    qcScore: qc,
-                    qaAdvice: data.qaAdvice || '',
-                    qcAdvice: data.qcAdvice || '',
-                    qaGradedByName: data.qaGradedByName || '',
-                    qcGradedByName: data.qcGradedByName || '',
-                    performanceMonth: data.performanceMonth || ''
+        const tutorEmail = window.tutorData?.email;
+        if (!tutorEmail) { console.warn("initGamification: no tutorEmail"); return; }
+
+        // Lagos month key
+        const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+        const currentMonthKey = `${lagosNow.getFullYear()}-${String(lagosNow.getMonth()+1).padStart(2,'0')}`;
+
+        // ── Single-field query (no composite index needed) ──
+        // We query only by tutorEmail, then filter month client-side.
+        // Two-field queries require a Firestore composite index which may not exist.
+        const gradesQ = query(
+            collection(db, 'tutor_grades'),
+            where('tutorEmail', '==', tutorEmail)
+        );
+
+        if (window._gamifUnsubscribe) window._gamifUnsubscribe();
+
+        window._gamifUnsubscribe = onSnapshot(gradesQ, (snapshot) => {
+            // Find the doc for the current month (client-side filter)
+            let gradeDoc = null;
+            snapshot.forEach(d => {
+                const dd = d.data();
+                if (dd.month === currentMonthKey) gradeDoc = dd;
+            });
+
+            if (!gradeDoc) {
+                // Also try tutorId field match in case email differs from tutorId field
+                snapshot.forEach(d => {
+                    const dd = d.data();
+                    if (!gradeDoc && dd.month === currentMonthKey &&
+                        (dd.tutorId === tutorEmail || dd.tutorId === tutorId)) {
+                        gradeDoc = dd;
+                    }
                 });
             }
+
+            if (!gradeDoc) {
+                updateScoreDisplay(0, { noGrade: true });
+                return;
+            }
+
+            const qa = gradeDoc.qa?.score  ?? null;
+            const qc = gradeDoc.qc?.score  ?? null;
+
+            let combined = 0;
+            if (qa !== null && qc !== null) combined = Math.round((qa + qc) / 2);
+            else if (qa !== null) combined = qa;
+            else if (qc !== null) combined = qc;
+
+            currentTutorScore = combined;
+
+            if (window.tutorData) {
+                window.tutorData.qaScore          = qa;
+                window.tutorData.qcScore          = qc;
+                window.tutorData.qaAdvice         = gradeDoc.qa?.notes || '';
+                window.tutorData.qcAdvice         = gradeDoc.qc?.notes || '';
+                window.tutorData.qaGradedByName   = gradeDoc.qa?.gradedByName || '';
+                window.tutorData.qcGradedByName   = gradeDoc.qc?.gradedByName || '';
+                window.tutorData.performanceMonth = gradeDoc.month || currentMonthKey;
+            }
+
+            updateScoreDisplay(combined, {
+                qaScore:          qa,
+                qcScore:          qc,
+                qaAdvice:         gradeDoc.qa?.notes || '',
+                qcAdvice:         gradeDoc.qc?.notes || '',
+                qaGradedByName:   gradeDoc.qa?.gradedByName || '',
+                qcGradedByName:   gradeDoc.qc?.gradedByName || '',
+                performanceMonth: gradeDoc.month || currentMonthKey,
+                qaBreakdown:      gradeDoc.qa?.breakdown || {},
+                qcBreakdown:      gradeDoc.qc?.breakdown || {},
+                noGrade:          false
+            });
+        }, (err) => {
+            console.error("tutor_grades snapshot error:", err);
+            // Graceful fallback: try reading from tutors doc (also updated by management)
+            getDoc(doc(db, 'tutors', tutorId)).then(tSnap => {
+                if (!tSnap.exists()) return;
+                const td = tSnap.data();
+                if (!td.qaScore && !td.qcScore) return;
+                const combined = td.performanceScore || Math.round(((td.qaScore||0)+(td.qcScore||0))/2);
+                updateScoreDisplay(combined, {
+                    qaScore: td.qaScore||null, qcScore: td.qcScore||null,
+                    qaAdvice: td.qaAdvice||'', qcAdvice: td.qcAdvice||'',
+                    qaGradedByName: td.qaGradedByName||'',
+                    qcGradedByName: td.qcGradedByName||'',
+                    performanceMonth: td.performanceMonth||currentMonthKey
+                });
+            }).catch(()=>{});
         });
 
         checkWinnerStatus(tutorId);
-
     } catch (error) {
         console.error("Gamification Error:", error);
     }
@@ -4216,6 +4344,17 @@ async function checkWinnerStatus(tutorId) {
 function updateScoreDisplay(totalScore, breakdown = {}) {
     const scoreWidget = document.getElementById('performance-widget');
     if (!scoreWidget) return;
+
+    // If no grade yet — show a friendly placeholder
+    if (breakdown.noGrade) {
+        scoreWidget.innerHTML = `
+            <div class="bg-white rounded-2xl shadow-sm border border-dashed border-gray-200 p-4 text-center">
+                <div class="text-3xl mb-2">📊</div>
+                <h3 class="font-bold text-gray-700 mb-1">Performance Score</h3>
+                <p class="text-sm text-gray-400">No grade recorded yet this month.<br>Your QA &amp; QC scores will appear here once management grades you.</p>
+            </div>`;
+        return;
+    }
 
     let scoreColor = 'text-red-500', barColor = 'from-red-400 to-red-500';
     if (totalScore >= 65) { scoreColor = 'text-yellow-500'; barColor = 'from-yellow-400 to-yellow-500'; }
@@ -4674,6 +4813,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 
                 window.tutorData = tutorData;
+
+                // Start persistent Lagos clock in page header (survives all tab switches)
+                startGlobalTutorClock();
                 
                 if (shouldShowEmploymentPopup(tutorData)) {
                     showEmploymentDatePopup(tutorData);
@@ -4832,86 +4974,136 @@ function getHomeworkCutoffDate() {
 async function loadHomeworkInbox(tutorEmail) {
     const container = document.getElementById('homework-inbox-container');
     if (!container) return;
-    container.innerHTML = '<div class="spinner mx-auto"></div>';
+    container.innerHTML = '<div class="text-center py-4"><div class="spinner mx-auto mb-2"></div><p class="text-xs text-gray-400">Loading homework data…</p></div>';
 
     try {
-        // Query by Tutor Name OR Email to be safe
-        let q = query(
-            collection(db, "homework_assignments"),
-            where("tutorName", "==", window.tutorData.name),
-            where("status", "==", "submitted")
-        );
-        let snapshot = await getDocs(q);
+        // Fetch ALL homework assigned by this tutor (sent + submitted + graded)
+        const [allHwSnap, studentsSnap] = await Promise.all([
+            getDocs(query(collection(db, 'homework_assignments'), where('tutorEmail', '==', tutorEmail))),
+            getDocs(query(collection(db, 'students'), where('tutorEmail', '==', tutorEmail)))
+        ]);
 
-        if (snapshot.empty) {
-            // Fallback query using email
-            q = query(
-                collection(db, "homework_assignments"),
-                where("tutorEmail", "==", tutorEmail),
-                where("status", "==", "submitted")
-            );
-            snapshot = await getDocs(q);
-        }
+        const studentMap = {};
+        studentsSnap.docs.forEach(d => { studentMap[d.id] = d.data().studentName || d.id; });
 
-        // ---------- AUTO‑CLEAR LOGIC (4th day of month) ----------
-        const cutoffDate = getHomeworkCutoffDate();
-        const visibleSubmissions = snapshot.docs.filter(doc => {
-            const data = doc.data();
-            const submitted = data.submittedAt;
-            if (!submitted || typeof submitted.seconds !== 'number') return false;
-            const submittedDate = new Date(submitted.seconds * 1000);
-            return submittedDate >= cutoffDate;
+        // Group homework by studentId (fallback to studentName)
+        const byStudent = {};  // key = studentName → { sent: [], submitted: [], graded: [] }
+        allHwSnap.docs.forEach(d => {
+            const hw = { id: d.id, ...d.data() };
+            const key = hw.studentName || hw.studentId || 'Unknown';
+            if (!byStudent[key]) byStudent[key] = { sent: [], submitted: [], graded: [] };
+            if (hw.status === 'submitted') byStudent[key].submitted.push(hw);
+            else if (hw.status === 'graded') byStudent[key].graded.push(hw);
+            else byStudent[key].sent.push(hw);
         });
-        // ---------------------------------------------------------
 
-        if (visibleSubmissions.length === 0) {
-            container.innerHTML = `<div class="text-center py-6">
-                <div class="text-3xl mb-2">🎉</div>
-                <p class="text-gray-500 text-sm">No pending homework from this month.</p>
-            </div>`;
+        const studentKeys = Object.keys(byStudent).sort();
+        const inboxCountEl = document.getElementById('inbox-count');
+        const totalSubmitted = Object.values(byStudent).reduce((a,b) => a + b.submitted.length, 0);
+        if (inboxCountEl) inboxCountEl.textContent = totalSubmitted > 0 ? `${totalSubmitted} pending` : 'All clear';
+
+        if (studentKeys.length === 0) {
+            container.innerHTML = `<div class="text-center py-6"><div class="text-3xl mb-2">📬</div><p class="text-gray-500 text-sm">No homework assigned yet.</p></div>`;
             return;
         }
 
-        let html = '<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">';
-        visibleSubmissions.forEach(doc => {
-            const data = doc.data();
-            
-            // ✅ SAFE date formatting
-            const submitted = data.submittedAt;
-            let date = 'Unknown';
-            if (submitted && typeof submitted.seconds === 'number') {
-                date = new Date(submitted.seconds * 1000).toLocaleDateString();
-            }
+        // Build tab interface: "Submitted (needs grading)" | "All by Student"
+        container.innerHTML = `
+            <div style="display:flex;gap:.5rem;margin-bottom:1rem;border-bottom:2px solid #f3f4f6;padding-bottom:.5rem;">
+                <button id="hw-tab-pending" onclick="hwSwitchTab('pending')" style="font-size:.8rem;font-weight:700;padding:.3rem .8rem;border-radius:.5rem;background:#3b82f6;color:#fff;border:none;cursor:pointer;">📥 Needs Grading (${totalSubmitted})</button>
+                <button id="hw-tab-archive" onclick="hwSwitchTab('archive')" style="font-size:.8rem;font-weight:700;padding:.3rem .8rem;border-radius:.5rem;background:#f3f4f6;color:#374151;border:none;cursor:pointer;">📂 Archive by Student</button>
+            </div>
 
-            const isLate = data.dueDate && new Date(data.dueDate) < new Date(submitted?.seconds * 1000 || 0);
+            <!-- PENDING TAB -->
+            <div id="hw-panel-pending">
+                ${totalSubmitted === 0 ? `<div class="text-center py-6"><div class="text-3xl mb-2">🎉</div><p class="text-gray-500 text-sm">All caught up — nothing pending!</p></div>` : 
+                    `<div style="border:1px solid #e5e7eb;border-radius:.75rem;overflow:hidden;">
+                        ${allHwSnap.docs.filter(d => d.data().status === 'submitted').map(d => {
+                            const hw = d.data();
+                            const submittedRaw = hw.submittedAt;
+                            const submittedDate = submittedRaw?.seconds ? new Date(submittedRaw.seconds * 1000) : null;
+                            const dateStr = submittedDate ? submittedDate.toLocaleDateString('en-NG', { day:'numeric', month:'short', year:'numeric' }) : 'Unknown date';
+                            return `<div class="gc-inbox-item" onclick="openGradingModal('${escapeHtml(d.id)}')" style="cursor:pointer;">
+                                <div style="display:flex;align-items:center;gap:.75rem;">
+                                    <div style="width:2.5rem;height:2.5rem;border-radius:50%;background:#dbeafe;color:#2563eb;display:flex;align-items:center;justify-content:center;font-weight:700;">${escapeHtml((hw.studentName||'?').charAt(0))}</div>
+                                    <div>
+                                        <div style="font-weight:600;font-size:.875rem;">${escapeHtml(hw.studentName||'Unknown')}</div>
+                                        <div style="font-size:.75rem;color:#6b7280;">${escapeHtml(hw.title||'Untitled')}</div>
+                                    </div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div style="font-size:.7rem;font-weight:700;color:#f59e0b;text-transform:uppercase;">Awaiting Grade</div>
+                                    <div style="font-size:.7rem;color:#9ca3af;">${escapeHtml(dateStr)}</div>
+                                </div>
+                            </div>`;
+                        }).join('')}
+                    </div>`}
+            </div>
 
-            html += `
-                <div class="gc-inbox-item" onclick="openGradingModal('${escapeHtml(doc.id)}')">
-                    <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
-                            ${escapeHtml(data.studentName?.charAt(0) || '?')}
-                        </div>
-                        <div>
-                            <div class="font-medium text-gray-800">${escapeHtml(data.studentName || 'Unknown')}</div>
-                            <div class="text-xs text-gray-500">${escapeHtml(data.title || 'Untitled')}</div>
-                        </div>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-xs font-bold ${isLate ? 'text-red-600' : 'text-green-600'} uppercase tracking-wide">
-                            ${isLate ? 'Done Late' : 'Turned In'}
-                        </div>
-                        <div class="text-xs text-gray-400">${escapeHtml(date)}</div>
-                    </div>
-                </div>`;
-        });
-        html += '</div>';
-        container.innerHTML = html;
+            <!-- ARCHIVE TAB -->
+            <div id="hw-panel-archive" style="display:none;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.75rem;">
+                    ${studentKeys.map(sName => {
+                        const { sent, submitted, graded } = byStudent[sName];
+                        const all = [...sent, ...submitted, ...graded].sort((a,b) => {
+                            const tA = (a.assignedAt?.seconds || a.createdAt?.seconds || 0);
+                            const tB = (b.assignedAt?.seconds || b.createdAt?.seconds || 0);
+                            return tB - tA;
+                        });
+                        return `<details style="background:#fff;border:1px solid #e5e7eb;border-radius:.85rem;overflow:hidden;">
+                            <summary style="display:flex;align-items:center;gap:.6rem;padding:.75rem 1rem;cursor:pointer;list-style:none;user-select:none;">
+                                <div style="width:2rem;height:2rem;border-radius:.5rem;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;flex-shrink:0;">${escapeHtml(sName.charAt(0))}</div>
+                                <div style="flex:1;min-width:0;">
+                                    <p style="font-weight:700;font-size:.85rem;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(sName)}</p>
+                                    <p style="font-size:.7rem;color:#6b7280;margin:0;">${all.length} assignment${all.length!==1?'s':''} · ${submitted.length} pending</p>
+                                </div>
+                                ${submitted.length > 0 ? `<span style="background:#fef3c7;color:#d97706;font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:.4rem;">${submitted.length} to grade</span>` : ''}
+                            </summary>
+                            <div style="border-top:1px solid #f3f4f6;padding:.5rem .75rem;">
+                                ${all.length === 0 ? '<p style="font-size:.75rem;color:#9ca3af;padding:.5rem 0;">No assignments yet</p>' :
+                                    all.map(hw => {
+                                        const ts = hw.assignedAt?.seconds || hw.createdAt?.seconds;
+                                        const dateStr = ts ? new Date(ts*1000).toLocaleDateString('en-NG',{day:'numeric',month:'short'}) : '';
+                                        const statusColor = hw.status==='graded'?'#16a34a':hw.status==='submitted'?'#d97706':'#6b7280';
+                                        const statusLabel = hw.status==='graded'?'Graded':hw.status==='submitted'?'Submitted':'Assigned';
+                                        return `<div style="display:flex;align-items:center;gap:.5rem;padding:.4rem 0;border-bottom:1px solid #f9fafb;font-size:.78rem;" ${hw.status==='submitted'?`onclick="openGradingModal('${escapeHtml(hw.id)}')" style="cursor:pointer;display:flex;align-items:center;gap:.5rem;padding:.4rem 0;border-bottom:1px solid #f9fafb;font-size:.78rem;"`:''}>
+                                            <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#374151;">${escapeHtml(hw.title||'Untitled')}</div>
+                                            <span style="flex-shrink:0;font-size:.65rem;color:${statusColor};font-weight:700;">${statusLabel}</span>
+                                            ${dateStr ? `<span style="flex-shrink:0;font-size:.65rem;color:#9ca3af;">${escapeHtml(dateStr)}</span>` : ''}
+                                            ${hw.score ? `<span style="flex-shrink:0;font-size:.65rem;font-weight:700;color:#1d4ed8;">${hw.score}/100</span>` : ''}
+                                        </div>`;
+                                    }).join('')}
+                            </div>
+                        </details>`;
+                    }).join('')}
+                </div>
+            </div>
+        `;
 
     } catch (error) {
         console.error("Inbox Error:", error);
-        container.innerHTML = '<p class="text-red-500 text-center">Error loading inbox.</p>';
+        container.innerHTML = '<p class="text-red-500 text-center py-4">Error loading homework data.</p>';
     }
 }
+
+window.hwSwitchTab = function(tab) {
+    const pendingPanel = document.getElementById('hw-panel-pending');
+    const archivePanel = document.getElementById('hw-panel-archive');
+    const pendingBtn = document.getElementById('hw-tab-pending');
+    const archiveBtn = document.getElementById('hw-tab-archive');
+    if (!pendingPanel || !archivePanel) return;
+    if (tab === 'pending') {
+        pendingPanel.style.display = '';
+        archivePanel.style.display = 'none';
+        if (pendingBtn) { pendingBtn.style.background = '#3b82f6'; pendingBtn.style.color = '#fff'; }
+        if (archiveBtn) { archiveBtn.style.background = '#f3f4f6'; archiveBtn.style.color = '#374151'; }
+    } else {
+        pendingPanel.style.display = 'none';
+        archivePanel.style.display = '';
+        if (pendingBtn) { pendingBtn.style.background = '#f3f4f6'; pendingBtn.style.color = '#374151'; }
+        if (archiveBtn) { archiveBtn.style.background = '#3b82f6'; archiveBtn.style.color = '#fff'; }
+    }
+};
 
 // ==========================================
 // 3. OPEN GRADING MODAL (unchanged – safe)
