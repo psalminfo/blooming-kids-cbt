@@ -9431,795 +9431,742 @@ if (!document.querySelector('style[data-reports-panel]')) {
 }
 
 // ======================================================
-// SECTION 8.5: MANAGEMENT PORTAL — MASTER VIEW TAB
-// Permissions required in staff doc (permissions.tabs):
-//   viewMasterPortal: true  → see this tab
-//   canQA: true             → purple QA Rate button
-//   canQC: true             → amber QC Rate button
+
+// ======================================================
+// SECTION 8.5: MASTER PORTAL — MANAGEMENT CONTROL CENTRE
+// ======================================================
+// Firestore collections used:
+//   tutors              → tutor profiles
+//   students            → student records (schedule, type flags)
+//   tutor_grades        → { tutorId, tutorEmail, month, qa:{score,notes,gradedBy,gradedByName,gradedAt}, qc:{...}, totalScore }
+//   gamification/current_cycle → { winnerId, winnerEmail, winnerName, month, year, totalScore }
 // ======================================================
 
-// ─────────────────────────────────────────────────────
-//  DATA LAYER: fetchMasterData()
-//  Joins tutors → students → produces flat records
-// ─────────────────────────────────────────────────────
-
-async function fetchMasterData() {
-    const tutorsSnap = await getDocs(collection(db, "tutors"));
-    const tutors = tutorsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-    const masterRows = [];
-
-    await Promise.all(tutors.map(async (tutor) => {
-        const tutorEmail = tutor.email || tutor.tutorEmail || '';
-        if (!tutorEmail) return;
-
-        const studentsSnap = await getDocs(
-            query(collection(db, "students"), where("tutorEmail", "==", tutorEmail))
-        );
-
-        if (studentsSnap.empty) {
-            masterRows.push({
-                tutorId: tutor.id,
-                tutorName: tutor.name || tutorEmail,
-                tutorEmail,
-                qaScore: tutor.qaScore ?? null,
-                qcScore: tutor.qcScore ?? null,
-                studentId: null,
-                studentName: '—',
-                parentName: '—',
-                parentPhone: '',
-                scheduleSummary: '—'
-            });
-            return;
-        }
-
-        studentsSnap.docs.forEach(sDoc => {
-            const s = sDoc.data();
-            let scheduleSummary = '—';
-            if (s.days && s.time) {
-                const daysStr = Array.isArray(s.days) ? s.days.join('/') : s.days;
-                scheduleSummary = `${daysStr} ${s.time}`;
-            } else if (s.schedule) {
-                scheduleSummary = typeof s.schedule === 'string' ? s.schedule : JSON.stringify(s.schedule);
-            } else if (s.sessionDays) {
-                scheduleSummary = Array.isArray(s.sessionDays) ? s.sessionDays.join('/') : s.sessionDays;
-            }
-
-            masterRows.push({
-                tutorId: tutor.id,
-                tutorName: tutor.name || tutorEmail,
-                tutorEmail,
-                qaScore: tutor.qaScore ?? null,
-                qcScore: tutor.qcScore ?? null,
-                studentId: sDoc.id,
-                studentName: s.studentName || s.name || '—',
-                parentName: s.parentName || '—',
-                parentPhone: s.parentPhone || s.phone || '',
-                scheduleSummary
-            });
-        });
-    }));
-
-    masterRows.sort((a, b) =>
-        a.tutorName.localeCompare(b.tutorName) || a.studentName.localeCompare(b.studentName)
-    );
-
-    return masterRows;
+// --- Lagos Time Helper ---
+function getLagosDatetime() {
+    return new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+}
+function formatLagosDatetime() {
+    const d = getLagosDatetime();
+    const opts = { weekday:'long', year:'numeric', month:'long', day:'numeric',
+                   hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true,
+                   timeZone:'Africa/Lagos' };
+    return new Intl.DateTimeFormat('en-NG', opts).format(new Date());
+}
+function getCurrentMonthKeyLagos() {
+    const d = getLagosDatetime();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function getCurrentMonthLabelLagos() {
+    return getLagosDatetime().toLocaleString('en-NG', { month:'long', year:'numeric', timeZone:'Africa/Lagos' });
 }
 
-// ─────────────────────────────────────────────────────
-//  MAIN PANEL RENDERER
-// ─────────────────────────────────────────────────────
+// --- Score Color Helper ---
+function getScoreColor(score) {
+    if (score >= 85) return 'text-green-600';
+    if (score >= 65) return 'text-yellow-600';
+    if (score >= 45) return 'text-orange-500';
+    return 'text-red-500';
+}
+function getScoreBg(score) {
+    if (score >= 85) return 'bg-green-50 border-green-200';
+    if (score >= 65) return 'bg-yellow-50 border-yellow-200';
+    if (score >= 45) return 'bg-orange-50 border-orange-200';
+    return 'bg-red-50 border-red-200';
+}
+function getScoreBar(score) {
+    if (score >= 85) return 'bg-green-500';
+    if (score >= 65) return 'bg-yellow-500';
+    if (score >= 45) return 'bg-orange-400';
+    return 'bg-red-400';
+}
 
-async function renderMasterPortalPanel(container) {
-    const userPermissions = window.userData?.permissions?.tabs || {};
-    const canQC = userPermissions.canQC === true;
-    const canQA = userPermissions.canQA === true;
+// --- Student Type Label ---
+function getStudentTypeLabel(student) {
+    if (student.groupClass) return '<span class="px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700 font-semibold">Group</span>';
+    if (student.isTransitioning) return '<span class="px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-700 font-semibold">Transitioning</span>';
+    return '<span class="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700 font-semibold">Regular</span>';
+}
 
-    if (userPermissions.viewMasterPortal !== true) {
-        container.innerHTML = `
-            <div class="bg-white p-10 rounded-xl shadow text-center">
-                <i class="fas fa-lock text-gray-300 text-6xl mb-4"></i>
-                <h2 class="text-2xl font-bold text-gray-500 mb-2">Access Restricted</h2>
-                <p class="text-gray-400">You do not have permission to view the Management Portal.<br>Contact an administrator.</p>
-            </div>`;
-        return;
+// --- Schedule Display ---
+function formatStudentSchedule(student) {
+    if (!student.schedule || !Array.isArray(student.schedule) || student.schedule.length === 0) {
+        return '<span class="text-gray-400 text-xs italic">No schedule</span>';
     }
+    return student.schedule.map(slot => {
+        const day = slot.day ? slot.day.substring(0,3) : '?';
+        const start = slot.start || '';
+        const end = slot.end || '';
+        function fmtTime(t) {
+            if (!t) return '';
+            const [h, m] = t.split(':').map(Number);
+            const ap = h >= 12 ? 'PM' : 'AM';
+            return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${ap}`;
+        }
+        return `<span class="inline-block bg-gray-100 rounded px-1.5 py-0.5 text-xs mr-1 mb-1">${day} ${fmtTime(start)}–${fmtTime(end)}</span>`;
+    }).join('');
+}
+
+// --- Main Render Function ---
+async function renderMasterPortalPanel(container) {
+    const monthKey = getCurrentMonthKeyLagos();
+    const monthLabel = getCurrentMonthLabelLagos();
 
     container.innerHTML = `
-        <div class="bg-white rounded-xl shadow-md overflow-hidden">
-
-            <!-- Header bar -->
-            <div class="flex flex-wrap items-center justify-between gap-4 px-6 py-5 border-b bg-gradient-to-r from-slate-800 to-slate-700">
-                <div>
-                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                        <i class="fas fa-th-large text-emerald-400"></i>
-                        Management Portal — Master View
-                    </h2>
-                    <p class="text-slate-400 text-sm mt-0.5">Aggregated view of Tutors · Students · Parent Contacts · QA &amp; QC Scores</p>
-                </div>
-                <div class="flex gap-3 flex-wrap items-center">
-                    <input type="search" id="master-search"
-                        placeholder="Search tutor, student, parent..."
-                        class="px-4 py-2 rounded-lg border border-slate-600 bg-slate-700 text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 w-64">
-                    <button id="master-refresh-btn"
-                        class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-                        <i class="fas fa-sync-alt"></i> Refresh
-                    </button>
-                </div>
+    <div class="space-y-4">
+        <!-- Header bar with Lagos clock -->
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">🗂 Management Portal</h2>
+                <p class="text-sm text-gray-500">Master View — ${monthLabel}</p>
             </div>
-
-            <!-- Stats bar -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-0 border-b divide-x">
-                <div class="px-6 py-4 text-center">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Tutors</p>
-                    <p id="stat-tutors" class="text-3xl font-extrabold text-slate-800 mt-1">—</p>
+            <div class="text-right">
+                <div id="lagos-clock" class="text-sm font-semibold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200">
+                    Loading time…
                 </div>
-                <div class="px-6 py-4 text-center">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Students</p>
-                    <p id="stat-students" class="text-3xl font-extrabold text-blue-600 mt-1">—</p>
-                </div>
-                <div class="px-6 py-4 text-center">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Avg QA Score</p>
-                    <p id="stat-qa" class="text-3xl font-extrabold text-purple-600 mt-1">—</p>
-                </div>
-                <div class="px-6 py-4 text-center">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Avg QC Score</p>
-                    <p id="stat-qc" class="text-3xl font-extrabold text-amber-600 mt-1">—</p>
-                </div>
-            </div>
-
-            <!-- Table -->
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-slate-50 text-slate-600 uppercase text-xs tracking-wider">
-                        <tr>
-                            <th class="px-5 py-3 text-left">Tutor</th>
-                            <th class="px-5 py-3 text-left">Student</th>
-                            <th class="px-5 py-3 text-left">Parent Contact</th>
-                            <th class="px-5 py-3 text-left">Schedule</th>
-                            <th class="px-5 py-3 text-center">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="master-table-body">
-                        <tr>
-                            <td colspan="5" class="py-16 text-center text-slate-400">
-                                <i class="fas fa-circle-notch fa-spin text-3xl mb-3 block text-emerald-500"></i>
-                                Loading master data…
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div id="master-no-results" class="hidden py-12 text-center text-slate-400">
-                <i class="fas fa-search text-4xl mb-3 block"></i>
-                No matching records found.
+                <div class="text-xs text-gray-400 mt-0.5">📍 Lagos, Nigeria</div>
             </div>
         </div>
+
+        <!-- Tutor of the Month Banner -->
+        <div id="totm-banner" class="hidden bg-gradient-to-r from-yellow-400 to-amber-500 rounded-2xl p-4 text-white shadow flex items-center gap-4">
+            <div class="text-4xl">🏆</div>
+            <div>
+                <div class="font-black text-lg" id="totm-name">Tutor of the Month</div>
+                <div class="text-sm opacity-90" id="totm-score"></div>
+            </div>
+            <div class="ml-auto text-right">
+                <div class="text-xs opacity-80">${monthLabel}</div>
+            </div>
+        </div>
+
+        <!-- Loading indicator -->
+        <div id="master-portal-loading" class="text-center py-12">
+            <div class="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+            <p class="text-gray-500">Loading tutor data…</p>
+        </div>
+
+        <!-- Tutors accordion list -->
+        <div id="master-portal-list" class="space-y-3 hidden"></div>
+    </div>
     `;
 
-    document.getElementById('master-refresh-btn').addEventListener('click', () => {
-        loadAndRenderMasterTable(canQC, canQA, true);
-    });
+    // Start Lagos clock
+    const clockEl = document.getElementById('lagos-clock');
+    function tickClock() { if (clockEl) clockEl.textContent = formatLagosDatetime(); }
+    tickClock();
+    const clockInterval = setInterval(tickClock, 1000);
+    // Cleanup on tab change
+    window._masterPortalClockInterval = clockInterval;
 
-    await loadAndRenderMasterTable(canQC, canQA, false);
-}
+    try {
+        // Load all data in parallel
+        const [tutorsSnap, studentsSnap, gradesSnap, cycleSnap] = await Promise.all([
+            getDocs(query(collection(db, 'tutors'), orderBy('name'))),
+            getDocs(collection(db, 'students')),
+            getDocs(query(collection(db, 'tutor_grades'), where('month', '==', monthKey))),
+            getDoc(doc(db, 'gamification', 'current_cycle'))
+        ]);
 
-// ─────────────────────────────────────────────────────
-//  TABLE LOADER + RENDERER
-// ─────────────────────────────────────────────────────
+        const tutors = tutorsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const students = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const grades = {};
+        gradesSnap.docs.forEach(d => { grades[d.data().tutorId || d.data().tutorEmail] = { id: d.id, ...d.data() }; });
 
-let _masterData = [];
+        // Build student map by tutor email
+        const studentsByTutor = {};
+        students.forEach(s => {
+            const key = s.tutorEmail || '';
+            if (!studentsByTutor[key]) studentsByTutor[key] = [];
+            studentsByTutor[key].push(s);
+        });
 
-async function loadAndRenderMasterTable(canQC, canQA, forceRefresh) {
-    const tbody = document.getElementById('master-table-body');
-    if (!tbody) return;
+        // Determine leading tutor
+        let leadingTutor = null, leadingScore = -1;
+        tutors.forEach(t => {
+            const g = grades[t.id] || grades[t.email] || {};
+            const qaScore = g.qa?.score ?? 0;
+            const qcScore = g.qc?.score ?? 0;
+            const total = Math.round((qaScore + qcScore) / 2);
+            if (total > leadingScore) { leadingScore = total; leadingTutor = { ...t, total }; }
+        });
 
-    if (forceRefresh || _masterData.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5" class="py-16 text-center text-slate-400">
-                    <i class="fas fa-circle-notch fa-spin text-3xl mb-3 block text-emerald-500"></i>
-                    ${forceRefresh ? 'Refreshing data…' : 'Loading master data…'}
-                </td>
-            </tr>`;
-        try {
-            _masterData = await fetchMasterData();
-        } catch (err) {
-            console.error("fetchMasterData error:", err);
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="5" class="py-12 text-center text-red-500">
-                        <i class="fas fa-exclamation-circle text-3xl mb-3 block"></i>
-                        Failed to load data. ${err.message}
-                    </td>
-                </tr>`;
-            return;
+        // Handle tutor of month banner
+        const totmBanner = document.getElementById('totm-banner');
+        if (leadingTutor && leadingScore > 0) {
+            document.getElementById('totm-name').textContent = `👑 ${leadingTutor.name}`;
+            document.getElementById('totm-score').textContent = `Leading score: ${leadingScore}% this month`;
+            totmBanner.classList.remove('hidden');
         }
-    }
 
-    // Update stats
-    const uniqueTutors = new Set(_masterData.map(r => r.tutorId)).size;
-    const uniqueStudents = _masterData.filter(r => r.studentId).length;
-    const qaTutors = _masterData.filter((r, i, arr) =>
-        arr.findIndex(x => x.tutorId === r.tutorId) === i && r.qaScore !== null && r.qaScore !== undefined
-    );
-    const qcTutors = _masterData.filter((r, i, arr) =>
-        arr.findIndex(x => x.tutorId === r.tutorId) === i && r.qcScore !== null && r.qcScore !== undefined
-    );
-    const avgQA = qaTutors.length ? (qaTutors.reduce((a, r) => a + (r.qaScore || 0), 0) / qaTutors.length).toFixed(1) : '—';
-    const avgQC = qcTutors.length ? (qcTutors.reduce((a, r) => a + (r.qcScore || 0), 0) / qcTutors.length).toFixed(1) : '—';
+        // Render accordion list
+        const listEl = document.getElementById('master-portal-list');
+        const currentStaff = window.userData;
 
-    const el = (id) => document.getElementById(id);
-    if (el('stat-tutors'))   el('stat-tutors').textContent = uniqueTutors;
-    if (el('stat-students')) el('stat-students').textContent = uniqueStudents;
-    if (el('stat-qa'))       el('stat-qa').textContent = avgQA;
-    if (el('stat-qc'))       el('stat-qc').textContent = avgQC;
+        tutors.forEach((tutor, idx) => {
+            const tutorStudents = studentsByTutor[tutor.email] || [];
+            const activeStudents = tutorStudents.filter(s => !s.summerBreak && !['archived','graduated','transferred'].includes(s.status));
+            const g = grades[tutor.id] || grades[tutor.email] || {};
+            const qaScore = g.qa?.score ?? null;
+            const qcScore = g.qc?.score ?? null;
+            const totalScore = (qaScore !== null && qcScore !== null)
+                ? Math.round((qaScore + qcScore) / 2)
+                : (qaScore !== null ? qaScore : (qcScore !== null ? qcScore : null));
+            const scoreDisplay = totalScore !== null ? totalScore : '—';
+            const colorClass = totalScore !== null ? getScoreColor(totalScore) : 'text-gray-400';
+            const bgClass = totalScore !== null ? getScoreBg(totalScore) : 'bg-gray-50 border-gray-200';
 
-    const searchInput = document.getElementById('master-search');
-    if (searchInput) {
-        searchInput.oninput = (e) => renderMasterRows(_masterData, e.target.value, canQC, canQA);
-    }
+            // Check if current user already graded this tutor
+            const canQA = currentStaff?.permissions?.tabs?.canQA;
+            const canQC = currentStaff?.permissions?.tabs?.canQC;
+            const alreadyQA = g.qa?.gradedBy === currentStaff?.email;
+            const alreadyQC = g.qc?.gradedBy === currentStaff?.email;
 
-    renderMasterRows(_masterData, '', canQC, canQA);
-}
-
-function getMasterScoreBadge(score, type) {
-    if (score === null || score === undefined || score === '') {
-        return `<span class="text-slate-400 text-xs italic">No score</span>`;
-    }
-    const n = parseFloat(score);
-    let colorClass, label;
-    if (n >= 90) {
-        colorClass = 'bg-emerald-100 text-emerald-700 border-emerald-300';
-        label = 'Excellent';
-    } else if (n >= 75) {
-        colorClass = 'bg-blue-100 text-blue-700 border-blue-300';
-        label = type === 'qc' ? 'Good' : 'Very Good';
-    } else if (n >= 60) {
-        colorClass = 'bg-amber-100 text-amber-700 border-amber-300';
-        label = type === 'qc' ? 'Needs Revision' : 'Needs Support';
-    } else {
-        colorClass = 'bg-red-100 text-red-700 border-red-300';
-        label = type === 'qc' ? 'Rejected' : 'Intervention';
-    }
-    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${colorClass}">${n}% <em class="not-italic opacity-70">· ${label}</em></span>`;
-}
-
-function renderMasterRows(data, searchTerm, canQC, canQA) {
-    const tbody = document.getElementById('master-table-body');
-    const noResults = document.getElementById('master-no-results');
-    if (!tbody) return;
-
-    const q = (searchTerm || '').toLowerCase().trim();
-    const filtered = q
-        ? data.filter(r =>
-            [r.tutorName, r.studentName, r.parentName, r.parentPhone, r.scheduleSummary, r.tutorEmail]
-                .some(v => (v || '').toLowerCase().includes(q))
-          )
-        : data;
-
-    if (filtered.length === 0) {
-        tbody.innerHTML = '';
-        if (noResults) noResults.classList.remove('hidden');
-        return;
-    }
-    if (noResults) noResults.classList.add('hidden');
-
-    let lastTutorId = null;
-    let html = '';
-
-    filtered.forEach((row, idx) => {
-        const isNewTutor = row.tutorId !== lastTutorId;
-        lastTutorId = row.tutorId;
-        const rowBg = isNewTutor ? 'bg-white' : 'bg-slate-50/60';
-        const borderTop = isNewTutor && idx !== 0 ? 'border-t-2 border-slate-200' : '';
-
-        const safeId    = (row.tutorId    || '').replace(/'/g, "\\'");
-        const safeName  = (row.tutorName  || '').replace(/'/g, "\\'");
-        const safeEmail = (row.tutorEmail || '').replace(/'/g, "\\'");
-
-        const tutorCell = isNewTutor ? `
-            <td class="px-5 py-4 align-top ${borderTop}">
-                <div class="font-semibold text-slate-800">${capitalize(row.tutorName)}</div>
-                <div class="text-xs text-slate-500 mt-0.5">${row.tutorEmail}</div>
-                <div class="mt-2 flex flex-col gap-1">
-                    <div class="text-xs text-slate-500">QA: ${getMasterScoreBadge(row.qaScore, 'qa')}</div>
-                    <div class="text-xs text-slate-500">QC: ${getMasterScoreBadge(row.qcScore, 'qc')}</div>
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden';
+            card.innerHTML = `
+            <!-- Accordion Header -->
+            <button class="w-full text-left p-4 flex items-center gap-4 hover:bg-gray-50 transition-colors accordion-header" data-idx="${idx}">
+                <div class="flex-1 min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="font-bold text-gray-800">${escHtml(tutor.name)}</span>
+                        ${leadingTutor && tutor.id === leadingTutor.id ? '<span class="text-yellow-500">👑</span>' : ''}
+                        <span class="text-xs text-gray-400">${activeStudents.length} active student${activeStudents.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div class="text-xs text-gray-400 truncate">${escHtml(tutor.email || '')}</div>
                 </div>
-            </td>
-        ` : `<td class="px-5 py-4 align-top ${borderTop}"></td>`;
-
-        const actionsCell = isNewTutor ? `
-            <td class="px-5 py-4 align-top text-center ${borderTop}">
-                <div class="flex flex-col gap-2 items-center">
-                    ${canQA ? `
-                    <button onclick="openQAModal('${safeId}','${safeName}','${safeEmail}')"
-                        class="inline-flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition w-full justify-center">
-                        <i class="fas fa-binoculars"></i> QA Rate
-                    </button>` : ''}
-                    ${canQC ? `
-                    <button onclick="openQCModal('${safeId}','${safeName}','${safeEmail}')"
-                        class="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition w-full justify-center">
-                        <i class="fas fa-clipboard-check"></i> QC Rate
-                    </button>` : ''}
-                    ${(!canQA && !canQC) ? `<span class="text-xs text-slate-400 italic">No access</span>` : ''}
+                <!-- Combined score pill -->
+                <div class="flex-shrink-0 text-center px-3 py-2 rounded-xl border ${bgClass}">
+                    <div class="text-2xl font-black ${colorClass}">${scoreDisplay}${totalScore !== null ? '<span class="text-sm">%</span>' : ''}</div>
+                    <div class="text-xs text-gray-500">Combined</div>
                 </div>
-            </td>
-        ` : `<td class="px-5 py-4 align-top ${borderTop}"></td>`;
+                <i class="fas fa-chevron-down text-gray-400 transition-transform flex-shrink-0 accordion-arrow"></i>
+            </button>
 
-        const phoneLink = row.parentPhone
-            ? `<a href="tel:${row.parentPhone}" class="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium">
-                <i class="fas fa-phone-alt text-xs"></i> ${row.parentPhone}
-               </a>`
-            : `<span class="text-slate-400">—</span>`;
+            <!-- Accordion Body -->
+            <div class="accordion-body hidden border-t border-gray-100">
+                <!-- Mini score breakdown -->
+                <div class="p-4 grid grid-cols-2 gap-3 bg-gray-50">
+                    <!-- QA Score -->
+                    <div class="bg-white rounded-xl border border-purple-100 p-3">
+                        <div class="flex justify-between items-start mb-1">
+                            <div class="text-xs font-bold text-purple-600 uppercase tracking-wide">QA – Session Obs.</div>
+                            ${g.qa?.gradedByName ? `<span class="text-xs text-gray-400">by ${escHtml(g.qa.gradedByName)}</span>` : ''}
+                        </div>
+                        ${qaScore !== null ? `
+                            <div class="text-3xl font-black ${getScoreColor(qaScore)}">${qaScore}<span class="text-sm">%</span></div>
+                            <div class="w-full bg-gray-100 rounded-full h-1.5 mt-2">
+                                <div class="${getScoreBar(qaScore)} h-1.5 rounded-full" style="width:${qaScore}%"></div>
+                            </div>
+                            ${g.qa?.notes ? `<div class="mt-2 text-xs text-gray-600 bg-purple-50 rounded p-1.5 italic">"${escHtml(g.qa.notes)}"</div>` : ''}
+                        ` : `<div class="text-gray-400 text-sm mt-1">Not graded</div>`}
+                        ${canQA && !alreadyQA ? `
+                            <button class="open-qa-btn mt-2 w-full bg-purple-600 text-white text-xs rounded-lg py-1.5 hover:bg-purple-700" data-tutor-id="${tutor.id}" data-tutor-name="${escHtml(tutor.name)}" data-tutor-email="${escHtml(tutor.email)}" data-grade-id="${g.id || ''}">
+                                ${qaScore !== null ? '✏️ View QA' : '📋 Grade QA'}
+                            </button>
+                        ` : canQA && alreadyQA ? `
+                            <div class="mt-2 text-xs text-green-600 font-semibold text-center">✅ You graded QA this month</div>
+                            <button class="open-qa-btn mt-1 w-full bg-purple-100 text-purple-700 text-xs rounded-lg py-1.5 hover:bg-purple-200" data-tutor-id="${tutor.id}" data-tutor-name="${escHtml(tutor.name)}" data-tutor-email="${escHtml(tutor.email)}" data-grade-id="${g.id || ''}" data-readonly="true">
+                                👁 View My QA Grade
+                            </button>
+                        ` : ''}
+                    </div>
 
-        html += `
-            <tr class="${rowBg} hover:bg-emerald-50/40 transition">
-                ${tutorCell}
-                <td class="px-5 py-4 align-middle ${borderTop}">
-                    <span class="inline-block bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-full">
-                        ${row.studentName}
-                    </span>
-                </td>
-                <td class="px-5 py-4 align-middle ${borderTop}">
-                    <div class="font-medium text-slate-700 text-sm">${row.parentName}</div>
-                    <div class="mt-0.5">${phoneLink}</div>
-                </td>
-                <td class="px-5 py-4 align-middle ${borderTop}">
-                    <span class="text-slate-600 text-sm">${row.scheduleSummary}</span>
-                </td>
-                ${actionsCell}
-            </tr>
-        `;
-    });
+                    <!-- QC Score -->
+                    <div class="bg-white rounded-xl border border-amber-100 p-3">
+                        <div class="flex justify-between items-start mb-1">
+                            <div class="text-xs font-bold text-amber-600 uppercase tracking-wide">QC – Lesson Plan</div>
+                            ${g.qc?.gradedByName ? `<span class="text-xs text-gray-400">by ${escHtml(g.qc.gradedByName)}</span>` : ''}
+                        </div>
+                        ${qcScore !== null ? `
+                            <div class="text-3xl font-black ${getScoreColor(qcScore)}">${qcScore}<span class="text-sm">%</span></div>
+                            <div class="w-full bg-gray-100 rounded-full h-1.5 mt-2">
+                                <div class="${getScoreBar(qcScore)} h-1.5 rounded-full" style="width:${qcScore}%"></div>
+                            </div>
+                            ${g.qc?.notes ? `<div class="mt-2 text-xs text-gray-600 bg-amber-50 rounded p-1.5 italic">"${escHtml(g.qc.notes)}"</div>` : ''}
+                        ` : `<div class="text-gray-400 text-sm mt-1">Not graded</div>`}
+                        ${canQC && !alreadyQC ? `
+                            <button class="open-qc-btn mt-2 w-full bg-amber-600 text-white text-xs rounded-lg py-1.5 hover:bg-amber-700" data-tutor-id="${tutor.id}" data-tutor-name="${escHtml(tutor.name)}" data-tutor-email="${escHtml(tutor.email)}" data-grade-id="${g.id || ''}">
+                                ${qcScore !== null ? '✏️ View QC' : '📋 Grade QC'}
+                            </button>
+                        ` : canQC && alreadyQC ? `
+                            <div class="mt-2 text-xs text-green-600 font-semibold text-center">✅ You graded QC this month</div>
+                            <button class="open-qc-btn mt-1 w-full bg-amber-100 text-amber-700 text-xs rounded-lg py-1.5 hover:bg-amber-200" data-tutor-id="${tutor.id}" data-tutor-name="${escHtml(tutor.name)}" data-tutor-email="${escHtml(tutor.email)}" data-grade-id="${g.id || ''}" data-readonly="true">
+                                👁 View My QC Grade
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
 
-    tbody.innerHTML = html;
+                <!-- Students table -->
+                ${activeStudents.length > 0 ? `
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
+                                <th class="text-left py-2 px-4">Student</th>
+                                <th class="text-left py-2 px-4">Grade</th>
+                                <th class="text-left py-2 px-4">Type</th>
+                                <th class="text-left py-2 px-4">Schedule</th>
+                                <th class="text-left py-2 px-4">Subjects</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${activeStudents.map(s => `
+                            <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                <td class="py-2 px-4 font-medium text-gray-800">${escHtml(s.studentName || '')}<div class="text-xs text-gray-400">${escHtml(s.parentName || '')}</div></td>
+                                <td class="py-2 px-4 text-gray-600">${escHtml(s.grade || '—')}</td>
+                                <td class="py-2 px-4">${getStudentTypeLabel(s)}</td>
+                                <td class="py-2 px-4">${formatStudentSchedule(s)}</td>
+                                <td class="py-2 px-4 text-xs text-gray-500">${escHtml((s.subjects || []).join(', ') || '—')}</td>
+                            </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                ` : `<div class="p-4 text-center text-gray-400 text-sm">No active students this month.</div>`}
+            </div>
+            `;
+
+            listEl.appendChild(card);
+        });
+
+        // Accordion toggle behaviour
+        listEl.querySelectorAll('.accordion-header').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const body = btn.nextElementSibling;
+                const arrow = btn.querySelector('.accordion-arrow');
+                const isOpen = !body.classList.contains('hidden');
+                body.classList.toggle('hidden', isOpen);
+                arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
+            });
+        });
+
+        // QA grade buttons
+        listEl.querySelectorAll('.open-qa-btn').forEach(btn => {
+            btn.addEventListener('click', () => openGradeModal('qa', btn.dataset, grades, monthKey));
+        });
+
+        // QC grade buttons
+        listEl.querySelectorAll('.open-qc-btn').forEach(btn => {
+            btn.addEventListener('click', () => openGradeModal('qc', btn.dataset, grades, monthKey));
+        });
+
+        document.getElementById('master-portal-loading').classList.add('hidden');
+        listEl.classList.remove('hidden');
+
+        // After render, update gamification winner in Firestore if needed
+        if (leadingTutor && leadingScore > 0) {
+            updateTutorOfMonthIfNeeded(leadingTutor, leadingScore, monthKey, getCurrentMonthLabelLagos());
+        }
+
+    } catch (err) {
+        console.error('Master Portal error:', err);
+        document.getElementById('master-portal-loading').innerHTML =
+            `<p class="text-red-500">❌ Failed to load: ${err.message}</p>`;
+    }
 }
 
-// ─────────────────────────────────────────────────────
-//  QA MODAL — Session Observation Scoring
-// ─────────────────────────────────────────────────────
+// --- QA/QC Grade Modal ---
+function openGradeModal(type, dataset, grades, monthKey) {
+    const tutorId = dataset.tutorId;
+    const tutorName = dataset.tutorName;
+    const tutorEmail = dataset.tutorEmail;
+    const gradeId = dataset.gradeId;
+    const isReadOnly = dataset.readonly === 'true';
+    const staff = window.userData;
+    const existingGrade = gradeId ? (Object.values(grades).find(g => g.id === gradeId) || {}) : {};
+    const existingSection = existingGrade[type] || {};
 
-window.openQAModal = function(tutorId, tutorName, tutorEmail) {
-    const existing = document.getElementById('qa-rating-modal');
-    if (existing) existing.remove();
+    const isQA = type === 'qa';
+    const themeColor = isQA ? 'purple' : 'amber';
+    const title = isQA ? '📋 QA — Session Observation Rating' : '📐 QC — Lesson Plan Quality Control';
 
-    const qaAreas = [
-        { id: 'qa_punctuality',     label: 'Punctuality & Readiness',     icon: 'fa-clock' },
-        { id: 'qa_lesson_plan',     label: 'Lesson Planning & Structure',  icon: 'fa-book-open' },
-        { id: 'qa_subject',         label: 'Subject Mastery',              icon: 'fa-brain' },
-        { id: 'qa_engagement',      label: 'Student Engagement',           icon: 'fa-users' },
-        { id: 'qa_classroom',       label: 'Classroom Management',         icon: 'fa-chalkboard' },
-        { id: 'qa_tools',           label: 'Use of Online Tools',          icon: 'fa-laptop' },
-        { id: 'qa_feedback',        label: 'Feedback & Communication',     icon: 'fa-comments' }
+    // QA has 7 areas, QC has 10 areas
+    const areas = isQA ? [
+        { id: 'preparation',    label: 'Lesson Preparation & Resources', max: 15 },
+        { id: 'delivery',       label: 'Teaching Delivery & Clarity',    max: 15 },
+        { id: 'engagement',     label: 'Student Engagement',             max: 15 },
+        { id: 'differentiation',label: 'Differentiation & Adaptation',   max: 15 },
+        { id: 'assessment',     label: 'In-class Assessment',            max: 10 },
+        { id: 'classroom',      label: 'Classroom Management',           max: 15 },
+        { id: 'professionalism',label: 'Professionalism & Attitude',     max: 15 },
+    ] : [
+        { id: 'objectives',     label: 'Clear Learning Objectives',      max: 10 },
+        { id: 'structure',      label: 'Lesson Structure & Flow',        max: 10 },
+        { id: 'differentiation',label: 'Differentiation Strategies',     max: 10 },
+        { id: 'resources',      label: 'Resource Quality',               max: 10 },
+        { id: 'assessment',     label: 'Assessment Plan',                max: 10 },
+        { id: 'timing',         label: 'Timing & Pacing',                max: 10 },
+        { id: 'curriculum',     label: 'Curriculum Alignment',           max: 10 },
+        { id: 'innovation',     label: 'Innovation & Creativity',        max: 10 },
+        { id: 'feedback',       label: 'Feedback Mechanism',             max: 10 },
+        { id: 'documentation',  label: 'Documentation & Completeness',   max: 10 },
     ];
 
-    const areasHTML = qaAreas.map(a => `
-        <div class="mb-4">
-            <div class="flex justify-between items-center mb-1">
-                <label class="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                    <i class="fas ${a.icon} text-purple-400 w-4"></i> ${a.label}
-                </label>
-                <span id="${a.id}-val" class="text-sm font-bold text-purple-700 w-8 text-right">0</span>
+    const breakdown = existingSection.breakdown || {};
+    const existingNotes = existingSection.notes || '';
+
+    const areasHTML = areas.map(a => `
+        <div class="flex items-center gap-3 py-1.5 border-b border-gray-50 last:border-0">
+            <span class="flex-1 text-sm text-gray-700">${a.label}</span>
+            <div class="flex items-center gap-2 flex-shrink-0">
+                <input type="number" id="area-${a.id}" class="w-16 text-center border rounded-lg py-1 text-sm font-bold ${isReadOnly ? 'bg-gray-50 cursor-not-allowed' : ''}"
+                    min="0" max="${a.max}" value="${breakdown[a.id] ?? ''}" ${isReadOnly ? 'readonly' : ''}
+                    placeholder="0">
+                <span class="text-xs text-gray-400 w-10">/ ${a.max}</span>
             </div>
-            <input type="range" id="${a.id}" min="0" max="10" value="0" step="1"
-                class="w-full accent-purple-600"
-                oninput="document.getElementById('${a.id}-val').textContent=this.value; updateQATotal();">
         </div>
     `).join('');
 
     const modal = document.createElement('div');
-    modal.id = 'qa-rating-modal';
+    modal.id = 'grade-modal-overlay';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 overflow-y-auto';
     modal.innerHTML = `
-        <div class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-4">
-
-                <div class="flex justify-between items-start px-6 py-5 bg-gradient-to-r from-purple-700 to-purple-500 rounded-t-2xl">
-                    <div>
-                        <h3 class="text-lg font-bold text-white">QA Session Observation</h3>
-                        <p class="text-purple-200 text-sm mt-0.5">Tutor: <strong>${capitalize(tutorName)}</strong> &nbsp;·&nbsp; ${tutorEmail}</p>
-                    </div>
-                    <button onclick="document.getElementById('qa-rating-modal').remove()" class="text-white/70 hover:text-white text-2xl leading-none">&times;</button>
-                </div>
-
-                <div class="px-6 py-5 overflow-y-auto" style="max-height:65vh;">
-
-                    <div class="mb-5 p-4 bg-purple-50 rounded-xl border border-purple-200 text-center">
-                        <p class="text-xs text-purple-500 uppercase font-bold tracking-wider mb-1">Overall QA Score</p>
-                        <p id="qa-total-display" class="text-5xl font-extrabold text-purple-700">0<span class="text-2xl">%</span></p>
-                        <p id="qa-rating-label" class="text-sm font-semibold mt-1 text-slate-500">—</p>
-                        <div class="mt-3 grid grid-cols-2 gap-2 text-xs text-left text-slate-500">
-                            <div><span class="inline-block w-2 h-2 bg-emerald-500 rounded-full mr-1"></span>90–100%: Excellent (Model Tutor)</div>
-                            <div><span class="inline-block w-2 h-2 bg-blue-500 rounded-full mr-1"></span>75–89%: Very Good (Minor improvements)</div>
-                            <div><span class="inline-block w-2 h-2 bg-amber-500 rounded-full mr-1"></span>60–74%: Needs Support &amp; Coaching</div>
-                            <div><span class="inline-block w-2 h-2 bg-red-500 rounded-full mr-1"></span>Below 60%: Immediate Intervention Required</div>
-                        </div>
-                    </div>
-
-                    <h4 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3">Scoring Areas (0–10 each)</h4>
-                    ${areasHTML}
-
-                    <h4 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3 mt-5 border-t pt-4">Mandatory QA Officer Comments</h4>
-
-                    <div class="mb-4">
-                        <label class="block text-sm font-semibold text-slate-600 mb-1">
-                            <i class="fas fa-star text-amber-400 mr-1"></i> Strengths Observed <span class="text-red-500">*</span>
-                        </label>
-                        <textarea id="qa-strengths" rows="2" placeholder="What the tutor did well…"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="block text-sm font-semibold text-slate-600 mb-1">
-                            <i class="fas fa-exclamation-triangle text-red-400 mr-1"></i> Areas for Improvement <span class="text-red-500">*</span>
-                        </label>
-                        <textarea id="qa-improvements" rows="2" placeholder="Specific areas to work on…"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="block text-sm font-semibold text-slate-600 mb-1">
-                            <i class="fas fa-tasks text-blue-400 mr-1"></i> Action Steps for Tutor <span class="text-red-500">*</span>
-                        </label>
-                        <textarea id="qa-actions" rows="2" placeholder="Concrete steps the tutor should take…"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="block text-sm font-semibold text-slate-600 mb-2">
-                            <i class="fas fa-calendar-check text-green-400 mr-1"></i> Follow-up Required?
-                        </label>
-                        <div class="flex gap-4">
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="radio" name="qa-followup" value="Yes" class="accent-purple-600"> <span class="text-sm">Yes</span>
-                            </label>
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="radio" name="qa-followup" value="No" checked class="accent-purple-600"> <span class="text-sm">No</span>
-                            </label>
-                        </div>
-                    </div>
-
-                </div>
-
-                <div class="flex justify-end gap-3 px-6 py-4 border-t bg-slate-50 rounded-b-2xl">
-                    <button onclick="document.getElementById('qa-rating-modal').remove()"
-                        class="px-5 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-100 text-sm">Cancel</button>
-                    <button id="qa-save-btn"
-                        class="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold flex items-center gap-2">
-                        <i class="fas fa-save"></i> Save QA Rating
-                    </button>
-                </div>
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-auto my-4">
+        <div class="p-5 border-b border-gray-100 flex items-center justify-between bg-${themeColor}-50 rounded-t-2xl">
+            <div>
+                <h3 class="font-bold text-lg text-${themeColor}-800">${title}</h3>
+                <p class="text-sm text-${themeColor}-600">${escHtml(tutorName)} · ${monthKey}</p>
             </div>
+            <button id="close-grade-modal" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">✕</button>
         </div>
-    `;
+        <div class="p-5 max-h-[60vh] overflow-y-auto">
+            <div class="space-y-1">
+                ${areasHTML}
+            </div>
+            <div class="mt-4">
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Notes & Advice for Tutor</label>
+                <textarea id="grade-notes" class="w-full border rounded-xl p-3 text-sm resize-none ${isReadOnly ? 'bg-gray-50 cursor-not-allowed' : ''}"
+                    rows="3" placeholder="Add advice, commendations, or improvement areas…" ${isReadOnly ? 'readonly' : ''}>${escHtml(existingNotes)}</textarea>
+            </div>
+            <!-- Live total -->
+            <div class="mt-3 bg-${themeColor}-50 rounded-xl p-3 flex items-center justify-between">
+                <span class="text-sm font-semibold text-${themeColor}-700">Score</span>
+                <span id="live-total" class="text-2xl font-black text-${themeColor}-700">—</span>
+            </div>
+            ${existingSection.gradedByName ? `<div class="mt-2 text-xs text-gray-400 text-center">Graded by <strong>${escHtml(existingSection.gradedByName)}</strong></div>` : ''}
+        </div>
+        <div class="p-4 border-t border-gray-100 flex gap-3 justify-end">
+            <button id="cancel-grade-modal" class="px-4 py-2 bg-gray-100 rounded-xl text-sm hover:bg-gray-200">Cancel</button>
+            ${!isReadOnly ? `<button id="save-grade-modal" class="px-6 py-2 bg-${themeColor}-600 text-white rounded-xl text-sm font-bold hover:bg-${themeColor}-700">Save Grade</button>` : ''}
+        </div>
+    </div>`;
+
     document.body.appendChild(modal);
 
-    document.getElementById('qa-save-btn').addEventListener('click', () => {
-        submitQARating(tutorId, tutorName);
-    });
-};
-
-window.updateQATotal = function() {
-    const ids = ['qa_punctuality','qa_lesson_plan','qa_subject','qa_engagement','qa_classroom','qa_tools','qa_feedback'];
-    const sum = ids.reduce((acc, id) => acc + (parseInt(document.getElementById(id)?.value) || 0), 0);
-    const pct = Math.round((sum / 70) * 100);
-    const display = document.getElementById('qa-total-display');
-    const label   = document.getElementById('qa-rating-label');
-    if (display) display.innerHTML = `${pct}<span class="text-2xl">%</span>`;
-    if (label) {
-        if (pct >= 90)      { label.textContent = '🏆 Excellent — Model Tutor';               label.className = 'text-sm font-semibold mt-1 text-emerald-600'; }
-        else if (pct >= 75) { label.textContent = '✅ Very Good — Minor Improvements';         label.className = 'text-sm font-semibold mt-1 text-blue-600'; }
-        else if (pct >= 60) { label.textContent = '⚠️ Needs Support & Coaching';              label.className = 'text-sm font-semibold mt-1 text-amber-600'; }
-        else                { label.textContent = '🚨 Immediate Intervention Required';       label.className = 'text-sm font-semibold mt-1 text-red-600'; }
-    }
-};
-
-async function submitQARating(tutorId, tutorName) {
-    const areaIds    = ['qa_punctuality','qa_lesson_plan','qa_subject','qa_engagement','qa_classroom','qa_tools','qa_feedback'];
-    const areaLabels = ['Punctuality & Readiness','Lesson Planning & Structure','Subject Mastery','Student Engagement','Classroom Management','Use of Online Tools','Feedback & Communication'];
-
-    const strengths    = document.getElementById('qa-strengths')?.value.trim();
-    const improvements = document.getElementById('qa-improvements')?.value.trim();
-    const actions      = document.getElementById('qa-actions')?.value.trim();
-    const followup     = document.querySelector('input[name="qa-followup"]:checked')?.value || 'No';
-
-    if (!strengths || !improvements || !actions) {
-        alert('Please complete all mandatory comment fields before saving.');
-        return;
-    }
-
-    const areaScores = {};
-    let sum = 0;
-    areaIds.forEach((id, i) => {
-        const val = parseInt(document.getElementById(id)?.value || 0);
-        areaScores[areaLabels[i]] = val;
-        sum += val;
-    });
-    const qaScore = Math.round((sum / 70) * 100);
-
-    let ratingLabel;
-    if (qaScore >= 90)      ratingLabel = 'Excellent (Model Tutor)';
-    else if (qaScore >= 75) ratingLabel = 'Very Good (Minor improvements)';
-    else if (qaScore >= 60) ratingLabel = 'Needs Support & Coaching';
-    else                    ratingLabel = 'Immediate Intervention Required';
-
-    const btn = document.getElementById('qa-save-btn');
-    const origText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Saving…';
-    btn.disabled = true;
-
-    try {
-        const tutorRef = doc(db, "tutors", tutorId);
-
-        await addDoc(collection(db, "tutors", tutorId, "qaReviews"), {
-            qaScore,
-            ratingLabel,
-            areaScores,
-            strengths,
-            improvements,
-            actionSteps: actions,
-            followUpRequired: followup,
-            reviewedBy: window.userData?.name || 'QA Officer',
-            reviewedByEmail: window.userData?.email || '',
-            reviewedAt: new Date().toISOString()
+    // Live total calculation
+    function recalcTotal() {
+        let sum = 0, maxSum = 0;
+        areas.forEach(a => {
+            const val = parseInt(document.getElementById(`area-${a.id}`)?.value || 0) || 0;
+            sum += Math.min(val, a.max);
+            maxSum += a.max;
         });
+        const pct = maxSum > 0 ? Math.round((sum / maxSum) * 100) : 0;
+        const el = document.getElementById('live-total');
+        if (el) el.textContent = `${pct}%`;
+        return pct;
+    }
+    modal.querySelectorAll('input[type=number]').forEach(inp => inp.addEventListener('input', recalcTotal));
+    recalcTotal();
 
-        await updateDoc(tutorRef, {
-            qaScore,
-            qaRatingLabel: ratingLabel,
-            qaLastReviewedAt: new Date().toISOString(),
-            qaLastReviewedBy: window.userData?.email || ''
+    // Close
+    modal.querySelector('#close-grade-modal').addEventListener('click', () => modal.remove());
+    modal.querySelector('#cancel-grade-modal').addEventListener('click', () => modal.remove());
+
+    // Save
+    if (!isReadOnly) {
+        modal.querySelector('#save-grade-modal').addEventListener('click', async () => {
+            const breakdownData = {};
+            areas.forEach(a => {
+                const val = parseInt(document.getElementById(`area-${a.id}`)?.value || 0) || 0;
+                breakdownData[a.id] = Math.min(val, a.max);
+            });
+            const totalPct = recalcTotal();
+            const notes = document.getElementById('grade-notes').value.trim();
+
+            const sectionData = {
+                score: totalPct,
+                notes,
+                breakdown: breakdownData,
+                gradedBy: staff.email || '',
+                gradedByName: staff.name || 'Management',
+                gradedAt: new Date()
+            };
+
+            try {
+                const btn = modal.querySelector('#save-grade-modal');
+                btn.textContent = 'Saving…'; btn.disabled = true;
+
+                if (gradeId) {
+                    await updateDoc(doc(db, 'tutor_grades', gradeId), { [type]: sectionData });
+                } else {
+                    // Create new doc
+                    const newDoc = {
+                        tutorId,
+                        tutorEmail,
+                        month: monthKey,
+                        [type]: sectionData
+                    };
+                    await addDoc(collection(db, 'tutor_grades'), newDoc);
+                }
+
+                // Update performanceScore on tutor doc for tutor.js to read
+                const existingGradeForTutor = grades[tutorId] || grades[tutorEmail] || {};
+                const qaScore = type === 'qa' ? totalPct : (existingGradeForTutor.qa?.score ?? null);
+                const qcScore = type === 'qc' ? totalPct : (existingGradeForTutor.qc?.score ?? null);
+                const combined = (qaScore !== null && qcScore !== null) ? Math.round((qaScore + qcScore) / 2)
+                    : (qaScore !== null ? qaScore : qcScore);
+
+                if (combined !== null) {
+                    const tutorDocRef = doc(db, 'tutors', tutorId);
+                    await updateDoc(tutorDocRef, {
+                        performanceScore: combined,
+                        qaScore: qaScore,
+                        qcScore: qcScore,
+                        performanceMonth: monthKey,
+                        qaAdvice: type === 'qa' ? notes : (existingGradeForTutor.qa?.notes || ''),
+                        qcAdvice: type === 'qc' ? notes : (existingGradeForTutor.qc?.notes || ''),
+                        qaGradedByName: type === 'qa' ? sectionData.gradedByName : (existingGradeForTutor.qa?.gradedByName || ''),
+                        qcGradedByName: type === 'qc' ? sectionData.gradedByName : (existingGradeForTutor.qc?.gradedByName || '')
+                    });
+                }
+
+                modal.remove();
+                // Refresh portal
+                renderMasterPortalPanel(document.getElementById('main-content'));
+            } catch (e) {
+                console.error('Grade save error:', e);
+                btn.textContent = 'Save Grade'; btn.disabled = false;
+                alert('❌ Error saving grade: ' + e.message);
+            }
         });
-
-        _masterData.forEach(r => { if (r.tutorId === tutorId) r.qaScore = qaScore; });
-
-        document.getElementById('qa-rating-modal').remove();
-        alert(`✅ QA Rating saved! ${capitalize(tutorName)} scored ${qaScore}% — ${ratingLabel}`);
-
-        const perms = window.userData?.permissions?.tabs || {};
-        renderMasterRows(_masterData, document.getElementById('master-search')?.value || '', perms.canQC === true, perms.canQA === true);
-
-    } catch (err) {
-        console.error("Error saving QA rating:", err);
-        alert("Failed to save QA rating. " + err.message);
-        btn.innerHTML = origText;
-        btn.disabled = false;
     }
 }
 
-// ─────────────────────────────────────────────────────
-//  QC MODAL — Lesson Plan Quality Control Scoring
-// ─────────────────────────────────────────────────────
-
-window.openQCModal = function(tutorId, tutorName, tutorEmail) {
-    const existing = document.getElementById('qc-rating-modal');
-    if (existing) existing.remove();
-
-    const qcAreas = [
-        { id: 'qc_completeness',    label: 'Completeness & Compliance',  icon: 'fa-check-double' },
-        { id: 'qc_objectives',      label: 'Learning Objectives',         icon: 'fa-bullseye' },
-        { id: 'qc_curriculum',      label: 'Curriculum Alignment',        icon: 'fa-align-center' },
-        { id: 'qc_structure',       label: 'Structure & Flow',            icon: 'fa-sitemap' },
-        { id: 'qc_strategies',      label: 'Teaching Strategies',         icon: 'fa-lightbulb' },
-        { id: 'qc_differentiation', label: 'Differentiation',             icon: 'fa-code-branch' },
-        { id: 'qc_engagement',      label: 'Engagement Activities',       icon: 'fa-theater-masks' },
-        { id: 'qc_assessment',      label: 'Assessment Strategy',         icon: 'fa-chart-bar' },
-        { id: 'qc_resources',       label: 'Resources',                   icon: 'fa-book' },
-        { id: 'qc_homework',        label: 'Homework / Follow-up',        icon: 'fa-home' }
-    ];
-
-    const areasHTML = qcAreas.map(a => `
-        <div class="mb-4">
-            <div class="flex justify-between items-center mb-1">
-                <label class="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                    <i class="fas ${a.icon} text-amber-400 w-4"></i> ${a.label}
-                </label>
-                <span id="${a.id}-val" class="text-sm font-bold text-amber-700 w-8 text-right">0</span>
-            </div>
-            <input type="range" id="${a.id}" min="0" max="10" value="0" step="1"
-                class="w-full accent-amber-500"
-                oninput="document.getElementById('${a.id}-val').textContent=this.value; updateQCTotal();">
-        </div>
-    `).join('');
-
-    const modal = document.createElement('div');
-    modal.id = 'qc-rating-modal';
-    modal.innerHTML = `
-        <div class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-4">
-
-                <div class="flex justify-between items-start px-6 py-5 bg-gradient-to-r from-amber-600 to-amber-400 rounded-t-2xl">
-                    <div>
-                        <h3 class="text-lg font-bold text-white">Lesson Plan QC Scoring</h3>
-                        <p class="text-amber-100 text-sm mt-0.5">Tutor: <strong>${capitalize(tutorName)}</strong> &nbsp;·&nbsp; ${tutorEmail}</p>
-                    </div>
-                    <button onclick="document.getElementById('qc-rating-modal').remove()" class="text-white/70 hover:text-white text-2xl leading-none">&times;</button>
-                </div>
-
-                <div class="px-6 py-5 overflow-y-auto" style="max-height:65vh;">
-
-                    <div class="mb-5 p-4 bg-amber-50 rounded-xl border border-amber-200 text-center">
-                        <p class="text-xs text-amber-500 uppercase font-bold tracking-wider mb-1">Overall QC Score</p>
-                        <p id="qc-total-display" class="text-5xl font-extrabold text-amber-700">0<span class="text-2xl">%</span></p>
-                        <p id="qc-rating-label" class="text-sm font-semibold mt-1 text-slate-500">—</p>
-                        <div class="mt-3 grid grid-cols-2 gap-2 text-xs text-left text-slate-500">
-                            <div><span class="inline-block w-2 h-2 bg-emerald-500 rounded-full mr-1"></span>90–100%: Excellent (Approved)</div>
-                            <div><span class="inline-block w-2 h-2 bg-blue-500 rounded-full mr-1"></span>75–89%: Good (Minor edits)</div>
-                            <div><span class="inline-block w-2 h-2 bg-amber-500 rounded-full mr-1"></span>60–74%: Needs Revision</div>
-                            <div><span class="inline-block w-2 h-2 bg-red-500 rounded-full mr-1"></span>Below 60%: Rejected &amp; Resubmission Required</div>
-                        </div>
-                    </div>
-
-                    <h4 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3">Scoring Areas (0–10 each · Total /100)</h4>
-                    ${areasHTML}
-
-                    <h4 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3 mt-5 border-t pt-4">Mandatory QC Officer Notes</h4>
-
-                    <div class="mb-4">
-                        <label class="block text-sm font-semibold text-slate-600 mb-1">
-                            <i class="fas fa-star text-amber-400 mr-1"></i> Strengths of Lesson Plan <span class="text-red-500">*</span>
-                        </label>
-                        <textarea id="qc-strengths" rows="2" placeholder="What was done well in the lesson plan…"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="block text-sm font-semibold text-slate-600 mb-1">
-                            <i class="fas fa-tools text-red-400 mr-1"></i> Required Improvements <span class="text-red-500">*</span>
-                        </label>
-                        <textarea id="qc-improvements" rows="2" placeholder="Specific changes that must be made…"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="block text-sm font-semibold text-slate-600 mb-1">
-                            <i class="fas fa-magic text-blue-400 mr-1"></i> Suggested Strategies / Resources <span class="text-red-500">*</span>
-                        </label>
-                        <textarea id="qc-suggestions" rows="2" placeholder="Recommended teaching methods or tools…"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="block text-sm font-semibold text-slate-600 mb-2">
-                            <i class="fas fa-stamp text-green-500 mr-1"></i> Approval Status <span class="text-red-500">*</span>
-                        </label>
-                        <div class="grid grid-cols-2 gap-2">
-                            <label class="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-emerald-50">
-                                <input type="radio" name="qc-approval" value="Approved" class="accent-emerald-600">
-                                <span class="text-sm font-medium text-emerald-700">✅ Approved</span>
-                            </label>
-                            <label class="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-blue-50">
-                                <input type="radio" name="qc-approval" value="Revise" class="accent-blue-600">
-                                <span class="text-sm font-medium text-blue-700">✏️ Revise</span>
-                            </label>
-                            <label class="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-amber-50">
-                                <input type="radio" name="qc-approval" value="Needs Revision" class="accent-amber-600">
-                                <span class="text-sm font-medium text-amber-700">⚠️ Needs Revision</span>
-                            </label>
-                            <label class="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-red-50">
-                                <input type="radio" name="qc-approval" value="Resubmit" class="accent-red-600">
-                                <span class="text-sm font-medium text-red-700">🚫 Resubmit</span>
-                            </label>
-                        </div>
-                    </div>
-
-                </div>
-
-                <div class="flex justify-end gap-3 px-6 py-4 border-t bg-slate-50 rounded-b-2xl">
-                    <button onclick="document.getElementById('qc-rating-modal').remove()"
-                        class="px-5 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-100 text-sm">Cancel</button>
-                    <button id="qc-save-btn"
-                        class="px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-semibold flex items-center gap-2">
-                        <i class="fas fa-save"></i> Save QC Rating
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-
-    document.getElementById('qc-save-btn').addEventListener('click', () => {
-        submitQCRating(tutorId, tutorName);
-    });
-};
-
-window.updateQCTotal = function() {
-    const ids = ['qc_completeness','qc_objectives','qc_curriculum','qc_structure','qc_strategies','qc_differentiation','qc_engagement','qc_assessment','qc_resources','qc_homework'];
-    const sum = ids.reduce((acc, id) => acc + (parseInt(document.getElementById(id)?.value) || 0), 0);
-    // 10 areas × max 10 = 100, so sum IS the percentage
-    const pct = sum;
-    const display = document.getElementById('qc-total-display');
-    const label   = document.getElementById('qc-rating-label');
-    if (display) display.innerHTML = `${pct}<span class="text-2xl">%</span>`;
-    if (label) {
-        if (pct >= 90)      { label.textContent = '🏆 Excellent — Approved';              label.className = 'text-sm font-semibold mt-1 text-emerald-600'; }
-        else if (pct >= 75) { label.textContent = '✅ Good — Minor Edits Needed';          label.className = 'text-sm font-semibold mt-1 text-blue-600'; }
-        else if (pct >= 60) { label.textContent = '⚠️ Needs Revision';                    label.className = 'text-sm font-semibold mt-1 text-amber-600'; }
-        else                { label.textContent = '🚫 Rejected — Resubmission Required'; label.className = 'text-sm font-semibold mt-1 text-red-600'; }
-    }
-};
-
-async function submitQCRating(tutorId, tutorName) {
-    const areaIds    = ['qc_completeness','qc_objectives','qc_curriculum','qc_structure','qc_strategies','qc_differentiation','qc_engagement','qc_assessment','qc_resources','qc_homework'];
-    const areaLabels = ['Completeness & Compliance','Learning Objectives','Curriculum Alignment','Structure & Flow','Teaching Strategies','Differentiation','Engagement Activities','Assessment Strategy','Resources','Homework / Follow-up'];
-
-    const strengths    = document.getElementById('qc-strengths')?.value.trim();
-    const improvements = document.getElementById('qc-improvements')?.value.trim();
-    const suggestions  = document.getElementById('qc-suggestions')?.value.trim();
-    const approval     = document.querySelector('input[name="qc-approval"]:checked')?.value;
-
-    if (!strengths || !improvements || !suggestions) {
-        alert('Please complete all mandatory note fields before saving.');
-        return;
-    }
-    if (!approval) {
-        alert('Please select an approval status before saving.');
-        return;
-    }
-
-    const areaScores = {};
-    let sum = 0;
-    areaIds.forEach((id, i) => {
-        const val = parseInt(document.getElementById(id)?.value || 0);
-        areaScores[areaLabels[i]] = val;
-        sum += val;
-    });
-    const qcScore = sum; // out of 100 directly (10 areas × max 10)
-
-    let ratingLabel;
-    if (qcScore >= 90)      ratingLabel = 'Excellent (Approved)';
-    else if (qcScore >= 75) ratingLabel = 'Good (Minor edits)';
-    else if (qcScore >= 60) ratingLabel = 'Needs Revision';
-    else                    ratingLabel = 'Rejected & Resubmission Required';
-
-    const btn = document.getElementById('qc-save-btn');
-    const origText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Saving…';
-    btn.disabled = true;
-
+// --- Update tutor of month document ---
+async function updateTutorOfMonthIfNeeded(tutor, score, monthKey, monthLabel) {
     try {
-        const tutorRef = doc(db, "tutors", tutorId);
-
-        await addDoc(collection(db, "tutors", tutorId, "qcReviews"), {
-            qcScore,
-            ratingLabel,
-            areaScores,
-            strengths,
-            requiredImprovements: improvements,
-            suggestedStrategies: suggestions,
-            approvalStatus: approval,
-            reviewedBy: window.userData?.name || 'QC Officer',
-            reviewedByEmail: window.userData?.email || '',
-            reviewedAt: new Date().toISOString()
-        });
-
-        await updateDoc(tutorRef, {
-            qcScore,
-            qcRatingLabel: ratingLabel,
-            qcApprovalStatus: approval,
-            qcLastReviewedAt: new Date().toISOString(),
-            qcLastReviewedBy: window.userData?.email || ''
-        });
-
-        _masterData.forEach(r => { if (r.tutorId === tutorId) r.qcScore = qcScore; });
-
-        document.getElementById('qc-rating-modal').remove();
-        alert(`✅ QC Rating saved! ${capitalize(tutorName)} scored ${qcScore}% — ${ratingLabel} · Status: ${approval}`);
-
-        const perms = window.userData?.permissions?.tabs || {};
-        renderMasterRows(_masterData, document.getElementById('master-search')?.value || '', perms.canQC === true, perms.canQA === true);
-
-    } catch (err) {
-        console.error("Error saving QC rating:", err);
-        alert("Failed to save QC rating. " + err.message);
-        btn.innerHTML = origText;
-        btn.disabled = false;
-    }
+        const cycleRef = doc(db, 'gamification', 'current_cycle');
+        const cycleSnap = await getDoc(cycleRef);
+        const existing = cycleSnap.exists() ? cycleSnap.data() : {};
+        if (existing.month !== monthKey || existing.winnerId !== tutor.id) {
+            await setDoc(cycleRef, {
+                winnerId: tutor.id,
+                winnerEmail: tutor.email,
+                winnerName: tutor.name,
+                month: monthKey,
+                monthLabel,
+                totalScore: score
+            }, { merge: true });
+        }
+    } catch (e) { /* silent */ }
 }
 
 // ======================================================
+// SECTION 8.6: ACADEMIC FOLLOW-UP — TALLY SYSTEM
+// ======================================================
+// Reads:  daily_topics  →  { studentId, tutorEmail, topics, createdAt }
+//         homework_assignments → { tutorEmail, studentName, title, assignedAt / createdAt }
+// ======================================================
+
+async function renderAcademicFollowUpPanel(container) {
+    container.innerHTML = `
+    <div class="space-y-4">
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex items-center justify-between">
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">📊 Academic Follow-Up</h2>
+                <p class="text-sm text-gray-500">Topic entries & homework per tutor, month by month</p>
+            </div>
+            <div id="afu-clock" class="text-sm font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+                ${formatLagosDatetime()}
+            </div>
+        </div>
+
+        <div id="afu-loading" class="text-center py-12">
+            <div class="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+            <p class="text-gray-500">Loading academic data…</p>
+        </div>
+        <div id="afu-list" class="space-y-4 hidden"></div>
+    </div>`;
+
+    // Tick clock
+    setInterval(() => { const el = document.getElementById('afu-clock'); if (el) el.textContent = formatLagosDatetime(); }, 1000);
+
+    try {
+        const [tutorsSnap, topicsSnap, hwSnap] = await Promise.all([
+            getDocs(query(collection(db, 'tutors'), orderBy('name'))),
+            getDocs(collection(db, 'daily_topics')),
+            getDocs(collection(db, 'homework_assignments'))
+        ]);
+
+        const tutors = tutorsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        // Build per-tutor topic data keyed by month
+        const topicsByTutor = {}; // tutorEmail → { 'YYYY-MM' → [{ date, topics, studentId }] }
+        topicsSnap.docs.forEach(d => {
+            const data = d.data();
+            const email = data.tutorEmail || '';
+            const date = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || '');
+            if (isNaN(date.getTime())) return;
+            const mk = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+            if (!topicsByTutor[email]) topicsByTutor[email] = {};
+            if (!topicsByTutor[email][mk]) topicsByTutor[email][mk] = [];
+            topicsByTutor[email][mk].push({ date, topics: data.topics || '', studentId: data.studentId || '' });
+        });
+
+        // Build per-tutor homework data keyed by month
+        const hwByTutor = {}; // tutorEmail → { 'YYYY-MM' → [{ date, title, studentName }] }
+        hwSnap.docs.forEach(d => {
+            const data = d.data();
+            const email = data.tutorEmail || '';
+            const raw = data.assignedAt || data.createdAt || data.uploadedAt;
+            const date = raw?.toDate ? raw.toDate() : new Date(raw || '');
+            if (isNaN(date.getTime())) return;
+            const mk = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+            if (!hwByTutor[email]) hwByTutor[email] = {};
+            if (!hwByTutor[email][mk]) hwByTutor[email][mk] = [];
+            hwByTutor[email][mk].push({ date, title: data.title || 'Homework', studentName: data.studentName || '' });
+        });
+
+        const listEl = document.getElementById('afu-list');
+
+        tutors.forEach((tutor, idx) => {
+            const tutorTopics = topicsByTutor[tutor.email] || {};
+            const tutorHw = hwByTutor[tutor.email] || {};
+
+            // Collect all months
+            const allMonths = new Set([...Object.keys(tutorTopics), ...Object.keys(tutorHw)]);
+            const sortedMonths = Array.from(allMonths).sort((a, b) => b.localeCompare(a)); // newest first
+
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden';
+
+            const totalTopics = Object.values(tutorTopics).reduce((s, arr) => s + arr.length, 0);
+            const totalHw = Object.values(tutorHw).reduce((s, arr) => s + arr.length, 0);
+
+            card.innerHTML = `
+            <!-- Tutor header accordion -->
+            <button class="w-full text-left p-4 flex items-center gap-4 hover:bg-gray-50 transition-colors afu-header" data-idx="${idx}">
+                <div class="flex-1">
+                    <div class="font-bold text-gray-800">${escHtml(tutor.name)}</div>
+                    <div class="text-xs text-gray-400">${escHtml(tutor.email || '')}</div>
+                </div>
+                <div class="flex gap-4 text-center flex-shrink-0">
+                    <div class="bg-blue-50 rounded-xl px-3 py-1.5">
+                        <div class="text-xl font-black text-blue-600">${totalTopics}</div>
+                        <div class="text-xs text-blue-500">Topics</div>
+                    </div>
+                    <div class="bg-green-50 rounded-xl px-3 py-1.5">
+                        <div class="text-xl font-black text-green-600">${totalHw}</div>
+                        <div class="text-xs text-green-500">H/W</div>
+                    </div>
+                </div>
+                <i class="fas fa-chevron-down text-gray-400 transition-transform flex-shrink-0 afu-arrow"></i>
+            </button>
+
+            <!-- Months accordion body -->
+            <div class="afu-body hidden border-t border-gray-100">
+                ${sortedMonths.length === 0 ? `
+                    <div class="p-6 text-center text-gray-400 text-sm">No academic activity recorded yet.</div>
+                ` : sortedMonths.map(mk => {
+                    const topics = tutorTopics[mk] || [];
+                    const hw = tutorHw[mk] || [];
+                    const [y, m] = mk.split('-');
+                    const label = new Date(parseInt(y), parseInt(m)-1, 1).toLocaleString('en-NG', { month:'long', year:'numeric' });
+
+                    // Build tally groups by day
+                    const dayMap = {}; // dateString → { topics:[], hw:[] }
+                    topics.forEach(t => {
+                        const ds = t.date.toLocaleDateString('en-NG', { day:'2-digit', month:'short', year:'numeric' });
+                        if (!dayMap[ds]) dayMap[ds] = { topics:[], hw:[], rawDate: t.date };
+                        dayMap[ds].topics.push(t.topics);
+                    });
+                    hw.forEach(h => {
+                        const ds = h.date.toLocaleDateString('en-NG', { day:'2-digit', month:'short', year:'numeric' });
+                        if (!dayMap[ds]) dayMap[ds] = { topics:[], hw:[], rawDate: h.date };
+                        dayMap[ds].hw.push(h.title + (h.studentName ? ` (${h.studentName})` : ''));
+                    });
+
+                    const sortedDays = Object.entries(dayMap).sort((a, b) => b[1].rawDate - a[1].rawDate);
+
+                    // Abacus/tally representation
+                    function tallyDots(count, color) {
+                        const full = Math.floor(count / 5);
+                        const remainder = count % 5;
+                        let html = '';
+                        for (let i = 0; i < full; i++) html += `<span class="inline-flex gap-0.5">${'<span class="w-2 h-2 rounded-full inline-block ' + color + '"></span>'.repeat(4)}<span class="w-0.5 h-3 rounded inline-block ${color} opacity-60 mx-0.5" style="vertical-align:middle"></span></span>`;
+                        for (let i = 0; i < remainder; i++) html += `<span class="w-2 h-2 rounded-full inline-block ${color}"></span>`;
+                        return html || '<span class="text-gray-300">—</span>';
+                    }
+
+                    return `
+                    <details class="border-b border-gray-100 last:border-0">
+                        <summary class="p-3 flex items-center gap-3 cursor-pointer hover:bg-gray-50 list-none">
+                            <div class="flex-1">
+                                <span class="font-semibold text-sm text-gray-700">${label}</span>
+                            </div>
+                            <!-- Tally visual for the month -->
+                            <div class="flex items-center gap-4 flex-shrink-0">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-xs text-blue-500 font-bold">${topics.length} T</span>
+                                    <div class="flex flex-wrap gap-0.5 max-w-32">${tallyDots(topics.length, 'bg-blue-400')}</div>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-xs text-green-500 font-bold">${hw.length} H</span>
+                                    <div class="flex flex-wrap gap-0.5 max-w-32">${tallyDots(hw.length, 'bg-green-400')}</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                        </summary>
+                        <!-- Daily breakdown -->
+                        <div class="px-4 pb-3 space-y-2">
+                            ${sortedDays.map(([ds, day]) => `
+                            <div class="bg-gray-50 rounded-xl p-3">
+                                <div class="text-xs font-bold text-gray-500 mb-1">${ds}</div>
+                                <div class="flex flex-wrap gap-2">
+                                    ${day.topics.map(t => `<span class="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">📝 ${escHtml(t.substring(0,40))}</span>`).join('')}
+                                    ${day.hw.map(h => `<span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">📚 ${escHtml(h.substring(0,40))}</span>`).join('')}
+                                </div>
+                            </div>
+                            `).join('')}
+                        </div>
+                    </details>
+                    `;
+                }).join('')}
+            </div>
+            `;
+
+            listEl.appendChild(card);
+        });
+
+        // Accordion toggle
+        listEl.querySelectorAll('.afu-header').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const body = btn.nextElementSibling;
+                const arrow = btn.querySelector('.afu-arrow');
+                const isOpen = !body.classList.contains('hidden');
+                body.classList.toggle('hidden', isOpen);
+                arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
+            });
+        });
+
+        document.getElementById('afu-loading').classList.add('hidden');
+        listEl.classList.remove('hidden');
+
+    } catch (err) {
+        console.error('Academic Follow-Up error:', err);
+        document.getElementById('afu-loading').innerHTML = `<p class="text-red-500">❌ Error: ${err.message}</p>`;
+    }
+}
+
+// Shared HTML escape helper (management scope)
+function escHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 // SECTION 9: NAVIGATION & AUTHENTICATION
 // ======================================================
 
@@ -10233,10 +10180,9 @@ const navigationGroups = {
         icon: "fas fa-user-friends",
         label: "Tutor Management",
         items: [
-            { id: "navMasterPortal",    label: "Management Portal",  icon: "fas fa-th-large",    fn: renderMasterPortalPanel },
-            { id: "navTutorManagement", label: "Tutor Directory",    icon: "fas fa-users",        fn: renderManagementTutorView },
-            { id: "navInactiveTutors",  label: "Inactive Tutors",    icon: "fas fa-user-slash",   fn: renderInactiveTutorsPanel },
-            { id: "navArchivedStudents",label: "Archived Students",  icon: "fas fa-archive",      fn: renderArchivedStudentsPanel }
+            { id: "navTutorManagement", label: "Tutor Directory", icon: "fas fa-users", fn: renderManagementTutorView },
+            { id: "navInactiveTutors", label: "Inactive Tutors", icon: "fas fa-user-slash", fn: renderInactiveTutorsPanel },
+            { id: "navArchivedStudents", label: "Archived Students", icon: "fas fa-archive", fn: renderArchivedStudentsPanel }
         ]
     },
     "financial": {
@@ -10255,6 +10201,14 @@ const navigationGroups = {
             { id: "navEnrollments", label: "Enrollments", icon: "fas fa-user-plus", fn: renderEnrollmentsPanel },
             { id: "navPendingApprovals", label: "Pending Approvals", icon: "fas fa-user-check", fn: renderPendingApprovalsPanel },
             { id: "navSummerBreak", label: "Summer Break", icon: "fas fa-umbrella-beach", fn: renderSummerBreakPanel }
+        ]
+    },
+    "masterPortal": {
+        icon: "fas fa-chart-line",
+        label: "Master Portal",
+        items: [
+            { id: "navMasterPortal", label: "Management Portal", icon: "fas fa-table", fn: renderMasterPortalPanel },
+            { id: "navAcademicFollowUp", label: "Academic Follow-Up", icon: "fas fa-graduation-cap", fn: renderAcademicFollowUpPanel }
         ]
     },
     "communication": {
@@ -10407,7 +10361,6 @@ function updatePageTitle(title) {
 
 const allNavItems = {
     navDashboard: { fn: renderDashboardPanel, perm: 'viewDashboard', label: 'Dashboard' },
-    navMasterPortal: { fn: renderMasterPortalPanel, perm: 'viewMasterPortal', label: 'Management Portal' },
     navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement', label: 'Tutor Directory' },
     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice', label: 'Pay Advice' },
     navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports', label: 'Tutor Reports' },
@@ -10417,7 +10370,9 @@ const allNavItems = {
     navReferralsAdmin: { fn: renderReferralsAdminPanel, perm: 'viewReferralsAdmin', label: 'Referral Management' },
     navEnrollments: { fn: renderEnrollmentsPanel, perm: 'viewEnrollments', label: 'Enrollments' },
     navInactiveTutors: { fn: renderInactiveTutorsPanel, perm: 'viewInactiveTutors', label: 'Inactive Tutors' },
-    navArchivedStudents: { fn: renderArchivedStudentsPanel, perm: 'viewArchivedStudents', label: 'Archived Students' }
+    navArchivedStudents: { fn: renderArchivedStudentsPanel, perm: 'viewArchivedStudents', label: 'Archived Students' },
+    navMasterPortal: { fn: renderMasterPortalPanel, perm: 'viewMasterPortal', label: 'Management Portal' },
+    navAcademicFollowUp: { fn: renderAcademicFollowUpPanel, perm: 'viewMasterPortal', label: 'Academic Follow-Up' }
 };
 
 window.closeManagementModal = function(modalId) {
