@@ -1,1396 +1,1436 @@
-// student-portal.js
-// Full student dashboard loaded at BKHstudentlogin.html
-// Reads from: students, homework_assignments, daily_topics, courses, conversations, schedules, student_results, game_leaderboard
+// studentsignup-app.js
+// Production-ready Firebase authentication module + Student Dashboard
 
+// IMPORTANT: Import Firebase modules
 import { auth, db } from './firebaseConfig-studentsignupmodular.js';
-import {
-    collection, query, where, getDocs, doc, getDoc, addDoc,
-    updateDoc, setDoc, onSnapshot, orderBy, serverTimestamp, limit
+import { 
+    collection, 
+    query, 
+    where, 
+    getDocs, 
+    doc, 
+    updateDoc, 
+    setDoc,
+    getDoc,
+    addDoc,
+    orderBy,
+    onSnapshot,
+    serverTimestamp 
 } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+import { 
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword, 
+    updateProfile, 
+    signInWithPopup, 
+    GoogleAuthProvider,
+    sendPasswordResetEmail,
+    setPersistence,
+    browserSessionPersistence,
+    browserLocalPersistence,
+    onAuthStateChanged,
+    signOut
+} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
-/*──────────────────────────────────────────────────────────
-  GLOBAL STATE
-──────────────────────────────────────────────────────────*/
-let studentData = null;
-let currentTab = 'dashboard';
-let unsubMessages = null;
-let unsubNotifs = null;
-let unreadCount = 0;
-let notifList = [];
-let localTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
-let localCity = '';
+// Security: Rate limiting variables
+let failedAttempts = 0;
+let lastAttemptTime = 0;
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
 
-/*──────────────────────────────────────────────────────────
-  HELPERS
-──────────────────────────────────────────────────────────*/
-const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const $ = (id) => document.getElementById(id);
-const fmtDate = (ts) => {
-    if (!ts) return '';
-    const d = ts?.seconds ? new Date(ts.seconds*1000) : new Date(ts);
-    return d.toLocaleDateString('en-NG',{day:'numeric',month:'short',year:'numeric'});
-};
-const fmtTime = (ts) => {
-    if (!ts) return '';
-    const d = ts?.seconds ? new Date(ts.seconds*1000) : new Date(ts);
-    return d.toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit',hour12:true});
-};
-const fmtDateTime = (ts) => {
-    if (!ts) return '';
-    const d = ts?.seconds ? new Date(ts.seconds*1000) : new Date(ts);
-    return d.toLocaleString('en-NG',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
-};
+// ─────────────────────────────────────────────────────────────
+// SECTION A: SHARED UI UTILITIES
+// ─────────────────────────────────────────────────────────────
 
-// Convert a Lagos time string (e.g. "09:00") for a given day to student local time
-function convertLagosToLocal(day, timeStr) {
-    if (!timeStr) return '';
-    try {
-        const [h, m] = timeStr.split(':').map(Number);
-        const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-        const today = new Date();
-        const lagosOffset = +1; // UTC+1
-        const targetDayNum = DAYS.indexOf(day);
-        if (targetDayNum < 0) return timeStr;
-        // Find next occurrence of day in Lagos TZ
-        const lagosNow = new Date(today.toLocaleString('en-US',{timeZone:'Africa/Lagos'}));
-        const diff = (targetDayNum - lagosNow.getDay() + 7) % 7;
-        const lagosDT = new Date(lagosNow);
-        lagosDT.setDate(lagosNow.getDate() + diff);
-        lagosDT.setHours(h, m, 0, 0);
-        // Build UTC from Lagos
-        const utcMs = lagosDT.getTime() - (lagosOffset * 3600000);
-        const localDT = new Date(utcMs);
-        return localDT.toLocaleTimeString(undefined, {hour:'2-digit',minute:'2-digit',hour12:true,timeZone: localTZ});
-    } catch(e) { return timeStr; }
+function showToast(message, type = 'info', duration = 5000) {
+    const container = document.getElementById('toast-container');
+    if (!container) { console.log(type + ':', message); return; }
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle' };
+    toast.innerHTML = `<i class="fas ${icons[type]||icons.info} text-xl"></i><span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => toast.classList.add('show'), 10);
+    setTimeout(() => { toast.classList.remove('show'); setTimeout(() => container.contains(toast) && container.removeChild(toast), 400); }, duration);
 }
 
-function getWeekRange(weekOffset = 0) {
-    const now = new Date();
-    const day = now.getDay(); // 0=Sun
-    const mon = new Date(now);
-    mon.setDate(now.getDate() - (day === 0 ? 6 : day - 1) + weekOffset * 7);
-    mon.setHours(0,0,0,0);
-    const sun = new Date(mon); sun.setDate(mon.getDate() + 6); sun.setHours(23,59,59,999);
-    return { mon, sun };
+function safeEscape(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 }
 
-function getISOWeekKey(date) {
-    const y = date.getFullYear(), m = String(date.getMonth()+1).padStart(2,'0'), d = String(date.getDate()).padStart(2,'0');
-    const weekStart = new Date(date); weekStart.setDate(date.getDate() - (date.getDay()||7)+1);
-    return `${weekStart.getFullYear()}-W${String(Math.ceil(((weekStart - new Date(weekStart.getFullYear(),0,1))/86400000+1)/7)).padStart(2,'0')}`;
-}
-
-/*──────────────────────────────────────────────────────────
-  CLOCK & LOCATION
-──────────────────────────────────────────────────────────*/
-function startStudentClock() {
-    const tickEl = () => {
-        const el = $('student-clock-time');
-        if (!el) return;
-        el.textContent = new Intl.DateTimeFormat(undefined, {
-            hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true,timeZone: localTZ
+// Real-time clock at student's local time
+function startStudentClock(elementId) {
+    const key = `_sclock_${elementId}`;
+    if (window[key]) clearInterval(window[key]);
+    function tick() {
+        const el = document.getElementById(elementId);
+        if (!el) { clearInterval(window[key]); return; }
+        el.textContent = new Intl.DateTimeFormat('en', {
+            weekday:'short', day:'numeric', month:'short', year:'numeric',
+            hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true
         }).format(new Date());
-    };
-    tickEl();
-    if (window._studentClockInterval) clearInterval(window._studentClockInterval);
-    window._studentClockInterval = setInterval(tickEl, 1000);
-}
-
-async function detectLocation() {
-    try {
-        // Use IP-based geolocation (no permission required, low-cost)
-        const res = await fetch('https://ipapi.co/json/');
-        const data = await res.json();
-        localCity = data.city || data.country_name || '';
-        localTZ = data.timezone || localTZ;
-        const locEl = $('student-location-display');
-        if (locEl && localCity) locEl.textContent = `📍 ${localCity}`;
-    } catch(e) {
-        const locEl = $('student-location-display');
-        if (locEl) locEl.textContent = `📍 ${localTZ}`;
     }
+    tick();
+    window[key] = setInterval(tick, 1000);
 }
 
-/*──────────────────────────────────────────────────────────
-  NOTIFICATION SYSTEM
-──────────────────────────────────────────────────────────*/
-function buildAutoNotifications(student) {
-    const notifs = [];
-    const tutorName = student.tutorName || 'your tutor';
-    const now = new Date();
-    const dayOfMonth = now.getDate();
-    const weekOfMonth = Math.ceil(dayOfMonth / 7);
+// ─────────────────────────────────────────────────────────────
+// SECTION B: AUTH FUNCTIONS (unchanged logic, cleaned up)
+// ─────────────────────────────────────────────────────────────
 
-    // Welcome notification (always present)
-    notifs.push({
-        id: 'welcome',
-        icon: '👋',
-        title: `Welcome back, ${student.studentName || 'there'}!`,
-        body: `Hi ${student.studentName?.split(' ')[0] || 'there'}! ${tutorName} is glad to have you here. Keep up the great work and stay focused on your learning journey. You've got this! 💪`,
-        time: 'From your tutor',
-        read: false,
-        type: 'welcome'
+window.checkPasswordStrength = () => {
+    const password = document.getElementById('student-pass')?.value || '';
+    const meter = document.getElementById('password-strength-meter');
+    const strengthText = document.getElementById('strength-text');
+    if (!meter) return;
+    const hasLength = password.length >= 12;
+    const hasUpper = /[A-Z]/.test(password);
+    const hasLower = /[a-z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    ['req-length','req-uppercase','req-lowercase','req-number','req-special'].forEach((id,i) => {
+        const checks = [hasLength,hasUpper,hasLower,hasNumber,hasSpecial];
+        document.getElementById(id)?.classList.toggle('valid', checks[i]);
+    });
+    let score = [hasLength,hasUpper,hasLower,hasNumber,hasSpecial].filter(Boolean).length;
+    meter.className = `password-strength-meter strength-${score}`;
+    const strengthLabels = ['Very Weak','Weak','Fair','Strong','Very Strong'];
+    const strengthColors = ['text-red-600','text-orange-500','text-yellow-500','text-green-500','text-emerald-600'];
+    if (strengthText) { strengthText.textContent = strengthLabels[score]; strengthText.className = `text-sm font-bold ${strengthColors[score]}`; }
+    const activateBtn = document.getElementById('activate-portal-btn');
+    if (activateBtn) activateBtn.disabled = !(hasLength && hasUpper && hasLower && hasNumber && hasSpecial);
+};
+
+window.togglePasswordVisibility = (inputId) => {
+    const input = document.getElementById(inputId);
+    const eyeIcon = document.getElementById(`eye-icon-${inputId === 'student-pass' ? 'student' : 'login'}`);
+    if (!input) return;
+    input.type = input.type === 'password' ? 'text' : 'password';
+    if (eyeIcon) eyeIcon.className = input.type === 'password' ? 'far fa-eye' : 'far fa-eye-slash';
+};
+
+window.switchTab = (tab) => {
+    const activateTab = document.getElementById('tab-activate');
+    const loginTab = document.getElementById('tab-login');
+    const activationFlow = document.getElementById('activation-flow');
+    const loginFlow = document.getElementById('login-flow');
+    if (tab === 'activate') {
+        activateTab?.classList.add('active'); activateTab?.classList.remove('text-gray-600');
+        loginTab?.classList.remove('active'); loginTab?.classList.add('text-gray-600');
+        activationFlow?.classList.remove('hidden-step'); loginFlow?.classList.add('hidden-step');
+        document.getElementById('step-1')?.classList.remove('hidden-step');
+        document.getElementById('step-2')?.classList.add('hidden-step');
+        document.getElementById('parent-email') && (document.getElementById('parent-email').value = '');
+        resetRateLimiting();
+    } else {
+        loginTab?.classList.add('active'); loginTab?.classList.remove('text-gray-600');
+        activateTab?.classList.remove('active'); activateTab?.classList.add('text-gray-600');
+        loginFlow?.classList.remove('hidden-step'); activationFlow?.classList.add('hidden-step');
+        const rememberedEmail = localStorage.getItem('student_email');
+        if (rememberedEmail && document.getElementById('login-email')) document.getElementById('login-email').value = rememberedEmail;
+        resetRateLimiting();
+    }
+};
+
+window.goBackToStep1 = () => {
+    document.getElementById('step-1')?.classList.remove('hidden-step');
+    document.getElementById('step-2')?.classList.add('hidden-step');
+};
+
+window.showForgotPassword = () => document.getElementById('forgot-password-modal')?.classList.remove('hidden-step');
+window.hideForgotPassword = () => {
+    document.getElementById('forgot-password-modal')?.classList.add('hidden-step');
+    const re = document.getElementById('reset-email'); if (re) re.value = '';
+};
+
+function resetRateLimiting() {
+    failedAttempts = 0;
+    document.getElementById('rate-limit-warning')?.classList.add('hidden');
+    document.getElementById('failed-attempts-warning')?.classList.add('hidden');
+}
+
+function checkRateLimit() {
+    const now = Date.now();
+    if (failedAttempts >= MAX_ATTEMPTS) {
+        if (now - lastAttemptTime < LOCKOUT_TIME) {
+            const remaining = Math.ceil((LOCKOUT_TIME - (now - lastAttemptTime)) / 60000);
+            const msg = document.getElementById('rate-limit-message');
+            if (msg) msg.textContent = `Too many failed attempts. Please try again in ${remaining} minute${remaining>1?'s':''}.`;
+            document.getElementById('rate-limit-warning')?.classList.remove('hidden');
+            return true;
+        } else { failedAttempts = 0; }
+    }
+    return false;
+}
+
+async function getClientIP() {
+    try { const r = await fetch('https://api.ipify.org?format=json'); return (await r.json()).ip; } catch { return 'unknown'; }
+}
+
+window.findStudents = async () => {
+    if (checkRateLimit()) return;
+    const email = document.getElementById('parent-email')?.value.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('Please enter a valid email.', 'error'); return; }
+    try {
+        document.getElementById('find-profile-text')?.classList.add('hidden');
+        document.getElementById('find-profile-loading')?.classList.remove('hidden');
+        const findBtn = document.getElementById('find-profile-btn'); if (findBtn) findBtn.disabled = true;
+        const qSnap = await getDocs(query(collection(db,'students'), where('parentEmail','==',email)));
+        if (qSnap.empty) { showToast('No student records found for this email.','error'); failedAttempts++; lastAttemptTime=Date.now(); return; }
+        const select = document.getElementById('student-select');
+        select.innerHTML = '<option value="">Select your name</option>';
+        let foundInactive = false;
+        qSnap.forEach(d => {
+            const data = d.data();
+            if (!data.studentUid || data.status !== 'active') {
+                const opt = document.createElement('option');
+                opt.value = d.id;
+                opt.textContent = data.studentName + (data.grade ? ` - Grade ${data.grade}` : '');
+                select.appendChild(opt);
+                foundInactive = true;
+            }
+        });
+        if (foundInactive) {
+            document.getElementById('step-1')?.classList.add('hidden-step');
+            document.getElementById('step-2')?.classList.remove('hidden-step');
+            showToast('Students found! Please select your name.','success');
+        } else { showToast('All students already activated. Please login instead.','info'); window.switchTab('login'); }
+    } catch(e) { console.error(e); showToast('An error occurred. Please try again.','error'); failedAttempts++; lastAttemptTime=Date.now(); }
+    finally {
+        document.getElementById('find-profile-text')?.classList.remove('hidden');
+        document.getElementById('find-profile-loading')?.classList.add('hidden');
+        const btn = document.getElementById('find-profile-btn'); if (btn) btn.disabled = false;
+    }
+};
+
+window.completeRegistration = async () => {
+    const docId    = document.getElementById('student-select')?.value;
+    const email    = document.getElementById('student-email-input')?.value.trim();
+    const password = document.getElementById('student-pass')?.value;
+    const rememberMe = document.getElementById('remember-me-activation')?.checked;
+    if (!docId) { showToast('Please select your name.','error'); return; }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('Please enter a valid email.','error'); return; }
+    const hasLength=password.length>=12, hasUpper=/[A-Z]/.test(password), hasLower=/[a-z]/.test(password), hasNumber=/\d/.test(password), hasSpecial=/[!@#$%^&*(),.?":{}|<>]/.test(password);
+    if (!hasLength||!hasUpper||!hasLower||!hasNumber||!hasSpecial) { showToast('Password does not meet all requirements.','error'); return; }
+    try {
+        document.getElementById('activate-text')?.classList.add('hidden');
+        document.getElementById('activate-loading')?.classList.remove('hidden');
+        const btn = document.getElementById('activate-portal-btn'); if (btn) btn.disabled = true;
+        await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+        const emailCheck = await getDocs(query(collection(db,'students'), where('studentEmail','==',email)));
+        if (!emailCheck.empty) { showToast('Email already registered. Please login.','error'); return; }
+        const userCred = await createUserWithEmailAndPassword(auth, email, password);
+        const studentName = document.getElementById('student-select')?.options[document.getElementById('student-select').selectedIndex]?.text.split(' - ')[0] || 'Student';
+        await updateDoc(doc(db,'students',docId), { studentUid: userCred.user.uid, studentEmail: email, status:'active', activatedAt: serverTimestamp(), lastLogin: serverTimestamp(), security: { passwordChangedAt: serverTimestamp(), mfaEnabled: false } });
+        await setDoc(doc(collection(db,'audit_logs')), { action:'student_activation', studentId:docId, studentName, email, timestamp:serverTimestamp(), userAgent:navigator.userAgent, ip: await getClientIP() });
+        await updateProfile(userCred.user, { displayName: studentName });
+        if (rememberMe) { localStorage.setItem('student_remember_me','true'); localStorage.setItem('student_email',email); }
+        showToast('Account activated! Redirecting…','success');
+        setTimeout(() => { window.location.href = 'BKHstudentlogin.html'; }, 2000);
+    } catch(e) {
+        console.error(e);
+        if (e.code==='auth/email-already-in-use') { showToast('Email already registered. Please login.','error'); window.switchTab('login'); }
+        else showToast('Registration failed: '+e.message,'error');
+    } finally {
+        document.getElementById('activate-text')?.classList.remove('hidden');
+        document.getElementById('activate-loading')?.classList.add('hidden');
+        const btn = document.getElementById('activate-portal-btn'); if (btn) btn.disabled = false;
+    }
+};
+
+window.loginStudent = async () => {
+    if (checkRateLimit()) return;
+    const email    = document.getElementById('login-email')?.value.trim();
+    const password = document.getElementById('login-password')?.value;
+    const rememberMe = document.getElementById('remember-me-login')?.checked;
+    if (!email || !password) { showToast('Please enter email and password.','error'); return; }
+    try {
+        document.getElementById('login-text')?.classList.add('hidden');
+        document.getElementById('login-loading')?.classList.remove('hidden');
+        const btn = document.getElementById('login-portal-btn'); if (btn) btn.disabled = true;
+        await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+        const userCred = await signInWithEmailAndPassword(auth, email, password);
+        const qSnap = await getDocs(query(collection(db,'students'), where('studentUid','==',userCred.user.uid)));
+        if (qSnap.empty) { await signOut(auth); showToast('Student account not found.','error'); failedAttempts++; lastAttemptTime=Date.now(); return; }
+        const studentDoc = qSnap.docs[0];
+        await updateDoc(doc(db,'students',studentDoc.id), { lastLogin: serverTimestamp(), failedAttempts: 0 });
+        await setDoc(doc(collection(db,'audit_logs')), { action:'student_login', studentId:studentDoc.id, studentName:studentDoc.data().studentName, timestamp:serverTimestamp(), userAgent:navigator.userAgent, rememberMe, ip: await getClientIP() });
+        if (rememberMe) { localStorage.setItem('student_remember_me','true'); localStorage.setItem('student_email',email); }
+        showToast('Login successful! Redirecting…','success');
+        setTimeout(() => { window.location.href = 'BKHstudentlogin.html'; }, 1500);
+    } catch(e) {
+        console.error(e); failedAttempts++; lastAttemptTime=Date.now();
+        const errMessages = { 'auth/user-not-found':'No account found with this email.', 'auth/wrong-password':'Incorrect password.', 'auth/too-many-requests':'Too many attempts. Please try later.', 'auth/invalid-email':'Invalid email format.' };
+        showToast(errMessages[e.code] || 'Login failed: '+e.message, 'error');
+        if (failedAttempts>=3) document.getElementById('failed-attempts-warning')?.classList.remove('hidden');
+    } finally {
+        document.getElementById('login-text')?.classList.remove('hidden');
+        document.getElementById('login-loading')?.classList.add('hidden');
+        const btn = document.getElementById('login-portal-btn'); if (btn) btn.disabled = false;
+    }
+};
+
+window.signInWithGoogle = async () => {
+    try {
+        const provider = new GoogleAuthProvider();
+        provider.addScope('email'); provider.addScope('profile');
+        provider.setCustomParameters({ prompt:'select_account' });
+        const rememberMe = document.getElementById('remember-me-login')?.checked;
+        await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        let qSnap = await getDocs(query(collection(db,'students'), where('studentUid','==',user.uid)));
+        if (!qSnap.empty) { await updateDoc(doc(db,'students',qSnap.docs[0].id), { lastLogin: serverTimestamp() }); window.location.href='BKHstudentlogin.html'; return; }
+        const emailSnap = await getDocs(query(collection(db,'students'), where('studentEmail','==',user.email)));
+        if (!emailSnap.empty) { await updateDoc(doc(db,'students',emailSnap.docs[0].id), { studentUid: user.uid, lastLogin: serverTimestamp() }); window.location.href='BKHstudentlogin.html'; return; }
+        await signOut(auth); showToast('No student account found for this Google account.','error');
+    } catch(e) {
+        console.error(e);
+        const msgs = { 'auth/unauthorized-domain':'Google sign-in not configured for this domain.', 'auth/popup-blocked':'Popup blocked. Please allow popups.', 'auth/popup-closed-by-user':'Sign-in cancelled.' };
+        showToast(msgs[e.code] || 'Google sign-in failed: '+e.message, e.code==='auth/popup-closed-by-user'?'info':'error');
+    }
+};
+
+window.signInWithGoogleForActivation = async () => {
+    try {
+        const provider = new GoogleAuthProvider();
+        provider.addScope('email'); provider.addScope('profile');
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        const qSnap = await getDocs(query(collection(db,'students'), where('studentUid','==',user.uid)));
+        if (!qSnap.empty) { showToast('Account already activated. Please login.','info'); window.switchTab('login'); await signOut(auth); return; }
+        const emailEl = document.getElementById('student-email-input'); if (emailEl) emailEl.value = user.email;
+        document.getElementById('step-1')?.classList.add('hidden-step');
+        document.getElementById('step-2')?.classList.remove('hidden-step');
+        showToast('Google account linked. Select your name and create a password.','success');
+    } catch(e) {
+        console.error(e);
+        showToast(e.code==='auth/popup-closed-by-user'?'Sign-in cancelled.':'Google sign-in failed: '+e.message, 'error');
+    }
+};
+
+window.sendPasswordReset = async () => {
+    const email = document.getElementById('reset-email')?.value.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('Please enter a valid email.','error'); return; }
+    try {
+        document.getElementById('reset-text')?.classList.add('hidden');
+        document.getElementById('reset-loading')?.classList.remove('hidden');
+        const btn = document.getElementById('send-reset-btn'); if (btn) btn.disabled = true;
+        const emailSnap = await getDocs(query(collection(db,'students'), where('studentEmail','==',email)));
+        if (emailSnap.empty) { showToast('No student account found with this email.','error'); return; }
+        await sendPasswordResetEmail(auth, email, { url: window.location.origin+'/studentsignup.html', handleCodeInApp: false });
+        await setDoc(doc(collection(db,'audit_logs')), { action:'password_reset_requested', email, timestamp:serverTimestamp(), userAgent:navigator.userAgent, ip: await getClientIP() });
+        showToast('Password reset link sent! Check your email.','success');
+        setTimeout(() => window.hideForgotPassword(), 2000);
+    } catch(e) {
+        console.error(e);
+        showToast(e.code==='auth/too-many-requests'?'Too many attempts. Try later.':'Failed to send reset email: '+e.message,'error');
+    } finally {
+        document.getElementById('reset-text')?.classList.remove('hidden');
+        document.getElementById('reset-loading')?.classList.add('hidden');
+        const btn = document.getElementById('send-reset-btn'); if (btn) btn.disabled = false;
+    }
+};
+
+// ─────────────────────────────────────────────────────────────
+// SECTION C: STUDENT DASHBOARD
+// Activated when the user is logged in on the dashboard page.
+// Call initStudentDashboard() from your HTML page after DOMContentLoaded.
+// ─────────────────────────────────────────────────────────────
+
+let studentData = null;        // The student Firestore doc
+let unsubMessages = null;      // Real-time message listener
+
+window.initStudentDashboard = async function() {
+    onAuthStateChanged(auth, async user => {
+        if (!user) { window.location.href = 'studentsignup.html'; return; }
+
+        // Load student doc
+        const qSnap = await getDocs(query(collection(db,'students'), where('studentUid','==',user.uid)));
+        if (qSnap.empty) { alert('Student record not found.'); await signOut(auth); window.location.href='studentsignup.html'; return; }
+
+        studentData = { id: qSnap.docs[0].id, ...qSnap.docs[0].data() };
+        window.studentData = studentData;
+
+        // Update last login
+        await updateDoc(doc(db,'students',studentData.id), { lastLogin: serverTimestamp() });
+
+        // Render dashboard shell
+        renderDashboardShell(studentData);
+
+        // Start student local clock
+        startStudentClock('student-local-clock');
+
+        // Load all data
+        loadDashboardData(studentData);
+        setupNotifications(studentData);
+        setupMessagingTab(studentData);
+    });
+};
+
+// ── Dashboard Shell ──
+function renderDashboardShell(student) {
+    // Update name in header
+    document.querySelectorAll('.student-name-placeholder').forEach(el => el.textContent = student.studentName || 'Student');
+    document.querySelectorAll('.student-grade-placeholder').forEach(el => el.textContent = student.grade || '');
+
+    // Set up logout
+    document.getElementById('logout-btn')?.addEventListener('click', async () => {
+        await signOut(auth); window.location.href = 'studentsignup.html';
     });
 
-    // Beginning-of-month reminder
-    if (dayOfMonth <= 7) {
-        notifs.push({
-            id: `month-start-${now.getFullYear()}-${now.getMonth()}`,
-            icon: '📅',
-            title: 'New Month — Fresh Start!',
-            body: `Hello ${student.studentName?.split(' ')[0] || 'there'}! A new month means new opportunities. Review last month's topics, check your pending assignments, and set your learning goals. Your tutor is cheering you on!`,
-            time: 'Monthly Reminder',
-            read: sessionStorage.getItem(`notif_read_month_start`) === 'true',
-            type: 'monthly'
-        });
-    }
+    // Tab navigation
+    document.querySelectorAll('[data-tab]').forEach(btn => {
+        btn.addEventListener('click', () => switchDashboardTab(btn.dataset.tab, student));
+    });
 
-    // 2nd week reminder
-    if (weekOfMonth === 2) {
-        notifs.push({
-            id: `week2-${now.getFullYear()}-${now.getMonth()}`,
-            icon: '📚',
-            title: "Mid-Month Check-In",
-            body: `Hi ${student.studentName?.split(' ')[0] || 'there'}! You're halfway through the month. Have you reviewed your topics and completed your homework? Don't forget to check your assignments tab!`,
-            time: 'Weekly Reminder',
-            read: sessionStorage.getItem('notif_read_week2') === 'true',
-            type: 'weekly'
-        });
-    }
-
-    return notifs;
+    // Default tab
+    switchDashboardTab('overview', student);
 }
 
-async function loadNotifications(student) {
-    notifList = buildAutoNotifications(student);
+function switchDashboardTab(tab, student) {
+    document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.student-tab-panel').forEach(p => p.classList.add('hidden'));
+    document.querySelector(`[data-tab="${tab}"]`)?.classList.add('active');
+    document.getElementById(`tab-${tab}`)?.classList.remove('hidden');
 
-    // Load real notifications from Firestore
-    try {
-        const snap = await getDocs(query(
-            collection(db, 'notifications'),
-            where('studentId', '==', student.id)
-        ));
-        snap.forEach(d => {
-            const n = d.data();
-            notifList.push({
-                id: d.id,
-                icon: n.icon || '🔔',
-                title: n.title || 'Notification',
-                body: n.body || n.message || '',
-                time: fmtDateTime(n.createdAt),
-                read: n.read || false,
-                type: n.type || 'general'
-            });
-        });
-    } catch(e) { /* notifications collection may not exist */ }
-
-    // Check for unread homework (from DB)
-    try {
-        const hwSnap = await getDocs(query(
-            collection(db, 'homework_assignments'),
-            where('studentId', '==', student.id)
-        ));
-        const pending = hwSnap.docs.filter(d => {
-            const s = d.data().status;
-            return s === 'assigned' || s === 'sent';
-        });
-        if (pending.length > 0) {
-            notifList.unshift({
-                id: 'hw-pending',
-                icon: '📝',
-                title: `You have ${pending.length} assignment${pending.length > 1 ? 's' : ''} pending`,
-                body: 'Check your Assignments tab to view and submit your homework.',
-                time: 'Recent',
-                read: false,
-                type: 'homework'
-            });
-        }
-    } catch(e) {}
-
-    unreadCount = notifList.filter(n => !n.read).length;
-    updateBellBadge();
-}
-
-function updateBellBadge() {
-    const badge = $('bell-badge');
-    if (badge) {
-        badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
-        badge.style.display = unreadCount > 0 ? 'flex' : 'none';
+    // Lazy-load content for specific tabs
+    switch(tab) {
+        case 'assignments': loadAssignmentsTab(student); break;
+        case 'courses':     loadCoursesTab(student);     break;
+        case 'results':     loadResultsTab(student);     break;
+        case 'schedule':    loadScheduleTab(student);    break;
+        case 'games':       loadGamesTab(student);       break;
+        case 'messaging':   loadMessagingTab(student);   break;
     }
 }
 
-function showNotificationPanel() {
-    document.querySelectorAll('.notif-panel').forEach(e => e.remove());
-
-    const panel = document.createElement('div');
-    panel.className = 'notif-panel';
-    panel.style.cssText = `
-        position:fixed;top:60px;right:16px;width:340px;max-width:calc(100vw-32px);
-        background:#fff;border-radius:1rem;box-shadow:0 8px 40px rgba(0,0,0,.18);
-        border:1px solid #e5e7eb;z-index:9999;overflow:hidden;
-        max-height:80vh;overflow-y:auto;`;
-
-    panel.innerHTML = `
-        <div style="padding:1rem;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;">
-            <h3 style="font-weight:700;font-size:1rem;margin:0;">🔔 Notifications</h3>
-            <button id="close-notif" style="border:none;background:none;font-size:1.2rem;cursor:pointer;color:#9ca3af;">&times;</button>
-        </div>
-        <div id="notif-list-inner">
-            ${notifList.length === 0
-                ? `<div style="padding:2rem;text-align:center;color:#9ca3af;">No notifications yet</div>`
-                : notifList.map((n,i) => `
-                    <div style="display:flex;gap:.75rem;padding:.9rem 1rem;border-bottom:1px solid #f9fafb;background:${n.read?'#fff':'#f0f9ff'};cursor:pointer;" onclick="markNotifRead(${i})">
-                        <div style="font-size:1.4rem;flex-shrink:0">${n.icon}</div>
-                        <div style="flex:1;min-width:0;">
-                            <div style="font-weight:${n.read?'500':'700'};font-size:.875rem;color:#1f2937;">${esc(n.title)}</div>
-                            <div style="font-size:.78rem;color:#6b7280;margin-top:.2rem;line-height:1.4;">${esc(n.body)}</div>
-                            <div style="font-size:.7rem;color:#9ca3af;margin-top:.3rem;">${esc(n.time)}</div>
-                        </div>
-                        ${!n.read ? '<div style="width:.5rem;height:.5rem;border-radius:50%;background:#3b82f6;flex-shrink:0;margin-top:.35rem;"></div>' : ''}
-                    </div>`).join('')}
-        </div>
-        ${unreadCount > 0 ? `
-        <div style="padding:.75rem;border-top:1px solid #f3f4f6;text-align:center;">
-            <button onclick="markAllNotifsRead()" style="font-size:.8rem;color:#3b82f6;border:none;background:none;cursor:pointer;font-weight:600;">Mark all as read</button>
-        </div>` : ''}
-    `;
-
-    document.body.appendChild(panel);
-    $('close-notif')?.addEventListener('click', () => panel.remove());
-    setTimeout(() => document.addEventListener('click', function closePanel(e) {
-        if (!panel.contains(e.target) && e.target.id !== 'bell-btn') {
-            panel.remove(); document.removeEventListener('click', closePanel);
-        }
-    }), 100);
-}
-
-window.markNotifRead = function(i) {
-    if (notifList[i]) notifList[i].read = true;
-    unreadCount = notifList.filter(n => !n.read).length;
-    updateBellBadge();
-    showNotificationPanel();
-};
-
-window.markAllNotifsRead = function() {
-    notifList.forEach(n => n.read = true);
-    unreadCount = 0;
-    updateBellBadge();
-    document.querySelector('.notif-panel')?.remove();
-};
-
-/*──────────────────────────────────────────────────────────
-  RENDER FUNCTIONS
-──────────────────────────────────────────────────────────*/
-
-// ── DASHBOARD ──
-async function renderDashboard(student) {
-    const main = $('main-content');
-    if (!main) return;
-    main.innerHTML = `<div class="text-center py-10"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading dashboard…</p></div>`;
-
-    // Parallel fetch for speed
-    const [hwSnap, topicsSnap, schedSnap, resultsSnap, allGradesSnap] = await Promise.all([
-        getDocs(query(collection(db,'homework_assignments'), where('studentId','==',student.id))).catch(()=>({docs:[]})),
-        getDocs(query(collection(db,'daily_topics'), where('studentId','==',student.id))).catch(()=>({docs:[]})),
-        getDocs(query(collection(db,'schedules'), where('studentId','==',student.id))).catch(()=>({docs:[]})),
-        getDocs(query(collection(db,'student_results'), where('studentId','==',student.id))).catch(()=>({docs:[]})),
-        getDocs(query(collection(db,'student_results'), where('grade','==',student.grade))).catch(()=>({docs:[]}))
+// ── Load all overview/dashboard data ──
+async function loadDashboardData(student) {
+    await Promise.allSettled([
+        loadNextClassCard(student),
+        loadAverageGradeCard(student),
+        loadCoursesSummary(student),
+        loadUpcomingScheduleCard(student)
     ]);
-
-    // Next class calculation
-    const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    let schedSlots = student.schedule || [];
-    if (schedSnap.docs.length > 0) schedSlots = schedSnap.docs[0].data().schedule || schedSlots;
-
-    let nextClassHTML = '<p class="text-gray-400 text-sm">No upcoming classes scheduled.</p>';
-    if (schedSlots.length > 0) {
-        const now = new Date();
-        const lagosNow = new Date(now.toLocaleString('en-US',{timeZone:'Africa/Lagos'}));
-        let best = null, bestMs = Infinity;
-        schedSlots.forEach(sl => {
-            if (!sl.day || !sl.start) return;
-            const [h,m] = sl.start.split(':').map(Number);
-            const diff = (DAYS.indexOf(sl.day) - lagosNow.getDay() + 7) % 7 || 7;
-            const slDate = new Date(lagosNow); slDate.setDate(lagosNow.getDate()+diff); slDate.setHours(h,m,0,0);
-            if (slDate > lagosNow && slDate - lagosNow < bestMs) { bestMs = slDate - lagosNow; best = sl; }
-        });
-        if (best) {
-            const localTime = convertLagosToLocal(best.day, best.start);
-            const hoursAway = Math.round(bestMs / 3600000);
-            nextClassHTML = `
-                <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:.75rem;padding:1rem;color:#fff;">
-                    <div style="font-size:.75rem;opacity:.8;margin-bottom:.25rem">NEXT SESSION</div>
-                    <div style="font-size:1.1rem;font-weight:800;">${esc(best.day)}</div>
-                    <div style="font-size:.9rem;margin-top:.2rem">⏰ ${esc(best.start)} Nigeria / ${localTime} local</div>
-                    ${best.subject ? `<div style="font-size:.8rem;opacity:.8;margin-top:.2rem">📖 ${esc(best.subject)}</div>` : ''}
-                    <div style="font-size:.75rem;opacity:.7;margin-top:.4rem">In about ${hoursAway} hour${hoursAway!==1?'s':''}</div>
-                </div>`;
-        }
-    }
-
-    // Average grade vs peers
-    const myGrades = resultsSnap.docs.map(d => Number(d.data().score || d.data().percentage || 0)).filter(n => n>0);
-    const myAvg = myGrades.length ? Math.round(myGrades.reduce((a,b)=>a+b,0)/myGrades.length) : null;
-    const peerGrades = allGradesSnap.docs.map(d => Number(d.data().score || d.data().percentage || 0)).filter(n=>n>0);
-    const peerAvg = peerGrades.length ? Math.round(peerGrades.reduce((a,b)=>a+b,0)/peerGrades.length) : null;
-
-    // Performance chart data (last 6 results by date)
-    const sorted = [...resultsSnap.docs].sort((a,b) => {
-        const ta = a.data().submittedAt?.seconds || a.data().date?.seconds || 0;
-        const tb = b.data().submittedAt?.seconds || b.data().date?.seconds || 0;
-        return ta - tb;
-    }).slice(-6);
-    const chartLabels = sorted.map(d => {
-        const ts = d.data().submittedAt || d.data().date;
-        return ts?.seconds ? new Date(ts.seconds*1000).toLocaleDateString('en-NG',{day:'numeric',month:'short'}) : '';
-    });
-    const chartVals = sorted.map(d => Number(d.data().score || d.data().percentage || 0));
-    const maxScore = Math.max(100, ...chartVals);
-    const chartBars = chartVals.map((v,i) => {
-        const pct = Math.round((v/maxScore)*100);
-        const col = v >= 85 ? '#22c55e' : v >= 65 ? '#f59e0b' : '#ef4444';
-        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:.3rem;">
-            <div style="font-size:.65rem;font-weight:700;color:#374151;">${v}%</div>
-            <div style="width:100%;background:#f3f4f6;border-radius:.4rem;overflow:hidden;height:80px;display:flex;flex-direction:column;justify-content:flex-end;">
-                <div style="background:${col};width:100%;height:${pct}%;transition:height .6s ease;border-radius:.4rem .4rem 0 0;"></div>
-            </div>
-            <div style="font-size:.6rem;color:#9ca3af;text-align:center;max-width:42px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(chartLabels[i])}</div>
-        </div>`;
-    }).join('');
-
-    const pendingHw = hwSnap.docs.filter(d => ['assigned','sent'].includes(d.data().status));
-    const totalTopics = topicsSnap.docs.length;
-
-    main.innerHTML = `
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem;">
-            <!-- Next class -->
-            <div style="grid-column:1/-1;">${nextClassHTML}</div>
-
-            <!-- Stats row -->
-            <div class="sp-stat-card" style="background:#fef3c7;">
-                <div style="font-size:2rem;font-weight:900;color:#d97706;">${pendingHw.length}</div>
-                <div style="font-size:.75rem;font-weight:600;color:#92400e;">📝 Assignments Due</div>
-            </div>
-            <div class="sp-stat-card" style="background:#d1fae5;">
-                <div style="font-size:2rem;font-weight:900;color:#065f46;">${totalTopics}</div>
-                <div style="font-size:.75rem;font-weight:600;color:#065f46;">📚 Topics Covered</div>
-            </div>
-            <div class="sp-stat-card" style="background:#ede9fe;">
-                <div style="font-size:2rem;font-weight:900;color:#5b21b6;">${myAvg !== null ? myAvg+'%' : '—'}</div>
-                <div style="font-size:.75rem;font-weight:600;color:#5b21b6;">🏅 My Avg Grade</div>
-            </div>
-            <div class="sp-stat-card" style="background:#dbeafe;">
-                <div style="font-size:2rem;font-weight:900;color:#1d4ed8;">${peerAvg !== null ? peerAvg+'%' : '—'}</div>
-                <div style="font-size:.75rem;font-weight:600;color:#1d4ed8;">👥 Grade ${esc(student.grade||'')} Avg</div>
-            </div>
-        </div>
-
-        <!-- Performance chart -->
-        <div class="sp-card mb-4">
-            <div class="sp-card-header"><h3>📈 Performance Overview</h3></div>
-            <div class="sp-card-body">
-                ${chartVals.length === 0
-                    ? `<div class="text-center py-6 text-gray-400">No grades recorded yet. Your progress chart will appear here as results come in.</div>`
-                    : `<div style="display:flex;gap:.5rem;align-items:flex-end;height:130px;padding:.5rem 0;">${chartBars}</div>`}
-            </div>
-        </div>
-
-        <!-- Upcoming Schedule -->
-        <div class="sp-card mb-4">
-            <div class="sp-card-header"><h3>🗓️ Upcoming Schedule</h3></div>
-            <div class="sp-card-body">
-                ${schedSlots.length === 0
-                    ? '<p class="text-gray-400 text-sm text-center py-4">No schedule set yet. Your tutor will add it soon.</p>'
-                    : `<div class="space-y-2">${schedSlots.sort((a,b)=>(DAYS.indexOf(a.day)-DAYS.indexOf(b.day))).map(sl => {
-                        const local = convertLagosToLocal(sl.day, sl.start);
-                        const localEnd = sl.end ? convertLagosToLocal(sl.day, sl.end) : '';
-                        return `<div style="display:flex;align-items:center;gap:.75rem;background:#f8fafc;border-radius:.6rem;padding:.6rem .9rem;border:1px solid #e5e7eb;">
-                            <div style="font-weight:700;width:2.8rem;color:#4f46e5;font-size:.85rem;">${esc(sl.day?.slice(0,3))}</div>
-                            <div style="flex:1;">
-                                <span style="font-size:.85rem;font-weight:600;">${esc(sl.start)} ${sl.end?'– '+sl.end:''}</span>
-                                <span style="font-size:.75rem;color:#6b7280;margin-left:.4rem;">(Nigeria)</span>
-                                <div style="font-size:.75rem;color:#4f46e5;margin-top:.1rem;">🕐 ${local}${localEnd?' – '+localEnd:''} <span style="color:#9ca3af;">(Your Time)</span></div>
-                            </div>
-                            ${sl.subject ? `<div style="font-size:.75rem;color:#9ca3af;">${esc(sl.subject)}</div>` : ''}
-                        </div>`;
-                    }).join('')}</div>`}
-            </div>
-        </div>
-    `;
 }
 
-// ── MESSAGES ──
-async function renderMessages(student) {
-    const main = $('main-content');
-    main.innerHTML = `
-        <div class="sp-card" style="height:calc(100vh - 160px);display:flex;flex-direction:column;">
-            <div class="sp-card-header" style="flex-shrink:0;">
-                <h3>💬 Messages with ${esc(student.tutorName||'Tutor')}</h3>
-                <div style="font-size:.75rem;color:#9ca3af;">All messages are private between you and your tutor</div>
-            </div>
-            <div id="chat-messages-student" style="flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:.75rem;">
-                <div class="text-center py-6"><div class="spinner mx-auto mb-2"></div><p class="text-gray-500 text-sm">Loading messages…</p></div>
-            </div>
-            <div style="flex-shrink:0;padding:.75rem;border-top:1px solid #f3f4f6;display:flex;gap:.5rem;">
-                <input type="text" id="student-msg-input" placeholder="Type a message…"
-                    style="flex:1;border:1px solid #e5e7eb;border-radius:.75rem;padding:.6rem 1rem;font-size:.875rem;outline:none;">
-                <button id="student-send-btn" style="background:#4f46e5;color:#fff;border:none;border-radius:.75rem;padding:.6rem 1rem;font-weight:700;cursor:pointer;">Send ➤</button>
-            </div>
-        </div>
-    `;
+// ── Next Live Class Card ──
+async function loadNextClassCard(student) {
+    const el = document.getElementById('next-class-card');
+    if (!el) return;
+    el.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm">Loading…</div>';
 
-    // Build conversation ID (student.id + tutor ID or email)
-    const tutorEmail = student.tutorEmail || '';
-    const convId = [student.id, tutorEmail].sort().join('_');
-    const messagesRef = collection(db, 'conversations', convId, 'messages');
-
-    // Ensure conversation doc exists
     try {
-        await setDoc(doc(db, 'conversations', convId), {
-            participants: [student.id, tutorEmail],
-            participantDetails: {
-                [student.id]: { name: student.studentName || 'Student', role: 'student' },
-                [tutorEmail]: { name: student.tutorName || 'Tutor', role: 'tutor' }
-            },
-            lastMessage: '',
-            lastMessageTimestamp: new Date(),
-            lastSenderId: '',
-            unreadCount: 0
-        }, { merge: true });
-    } catch(e) {}
-
-    if (unsubMessages) unsubMessages();
-    unsubMessages = onSnapshot(query(messagesRef), (snap) => {
-        const msgEl = $('chat-messages-student');
-        if (!msgEl) return;
-        const msgs = [];
-        snap.forEach(d => msgs.push({ id: d.id, ...d.data() }));
-        msgs.sort((a,b) => {
-            const ta = a.createdAt?.seconds || 0, tb = b.createdAt?.seconds || 0;
-            return ta - tb;
-        });
-        if (msgs.length === 0) {
-            msgEl.innerHTML = `<div class="text-center py-8 text-gray-400">
-                <div style="font-size:2rem;margin-bottom:.5rem">💬</div>
-                <p>No messages yet. Say hello to your tutor!</p>
-            </div>`;
+        // Get schedule from student doc (stored in Nigeria time = WAT = UTC+1)
+        const schedule = student.schedule || [];
+        if (!schedule.length) {
+            el.innerHTML = '<p class="text-gray-400 text-sm text-center">No schedule set yet.</p>';
             return;
         }
-        msgEl.innerHTML = msgs.map(msg => {
-            const isMe = msg.senderId === student.id;
-            const time = fmtDateTime(msg.createdAt);
-            const hasImg = msg.imageUrl;
-            return `<div style="display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'};">
-                <div style="max-width:75%;background:${isMe?'#4f46e5':'#f3f4f6'};color:${isMe?'#fff':'#1f2937'};
-                    border-radius:${isMe?'1rem 1rem 0 1rem':'1rem 1rem 1rem 0'};padding:.6rem .9rem;font-size:.875rem;">
-                    ${msg.subject ? `<div style="font-weight:700;margin-bottom:.2rem;font-size:.8rem;opacity:.8;">${esc(msg.subject)}</div>` : ''}
-                    <div>${esc(msg.content || msg.text || '')}</div>
-                    ${hasImg ? `<img src="${esc(msg.imageUrl)}" style="max-width:100%;border-radius:.5rem;margin-top:.4rem;" />` : ''}
+
+        const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+        const now = new Date();
+        const nowWAT = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+        const todayIndex = nowWAT.getDay();
+        const nowMinutes = nowWAT.getHours()*60 + nowWAT.getMinutes();
+
+        let nextSlot = null;
+        let daysAhead = 0;
+
+        // Look through the next 7 days for the next class
+        for (let d = 0; d < 7 && !nextSlot; d++) {
+            const targetDayIndex = (todayIndex + d) % 7;
+            const targetDay = DAYS[targetDayIndex];
+            const daySlots = schedule
+                .filter(s => s.day === targetDay)
+                .sort((a,b) => (a.start||'').localeCompare(b.start||''));
+
+            for (const slot of daySlots) {
+                const [sh,sm] = (slot.start||'00:00').split(':').map(Number);
+                const slotMins = sh*60 + sm;
+                if (d > 0 || slotMins > nowMinutes) {
+                    nextSlot = { ...slot, targetDay, daysAhead: d };
+                    daysAhead = d;
+                    break;
+                }
+            }
+        }
+
+        if (!nextSlot) {
+            el.innerHTML = '<p class="text-gray-400 text-sm text-center">No upcoming classes found.</p>';
+            return;
+        }
+
+        // Convert Nigeria time to student's local time
+        const [sh,sm] = (nextSlot.start||'00:00').split(':').map(Number);
+        const [eh,em] = (nextSlot.end||'00:00').split(':').map(Number);
+
+        // Build a Date in Nigeria's timezone
+        const targetDate = new Date(nowWAT);
+        targetDate.setDate(targetDate.getDate() + daysAhead);
+        targetDate.setHours(sh, sm, 0, 0);
+
+        const localStart = new Date(targetDate.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+        // Adjust to local time by re-interpreting
+        const offsetDiff = (new Date().getTimezoneOffset() - (-60)) * 60000; // WAT is UTC+1 → -60 min offset
+        const localStartStr = new Intl.DateTimeFormat('en', { hour:'2-digit', minute:'2-digit', hour12:true }).format(targetDate);
+
+        const dayLabel = daysAhead === 0 ? 'Today' : daysAhead === 1 ? 'Tomorrow' : nextSlot.targetDay;
+
+        el.innerHTML = `
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-2xl flex-shrink-0">📅</div>
+                <div class="flex-1">
+                    <p class="text-xs text-gray-400 uppercase font-semibold mb-1">Next Class</p>
+                    <p class="font-bold text-gray-800 text-lg">${safeEscape(dayLabel)}</p>
+                    <p class="text-blue-600 font-semibold text-sm">${safeEscape(localStart)} (Nigeria Time)</p>
                 </div>
-                <div style="font-size:.65rem;color:#9ca3af;margin-top:.2rem;padding:0 .3rem;">${time}</div>
-            </div>`;
-        }).join('');
-        msgEl.scrollTop = msgEl.scrollHeight;
-    });
-
-    // Image upload button
-    const inputArea = $('student-msg-input')?.parentElement;
-    if (inputArea) {
-        const imgBtn = document.createElement('label');
-        imgBtn.style.cssText = 'cursor:pointer;display:flex;align-items:center;color:#9ca3af;font-size:1.2rem;';
-        imgBtn.innerHTML = `📎<input type="file" accept="image/*" id="msg-img-file" style="display:none;">`;
-        inputArea.insertBefore(imgBtn, $('student-msg-input'));
-    }
-
-    const sendMessage = async () => {
-        const input = $('student-msg-input');
-        const txt = input?.value?.trim();
-        const imgFile = $('msg-img-file')?.files?.[0];
-        if (!txt && !imgFile) return;
-        if (input) input.value = '';
-
-        let imageUrl = null;
-        if (imgFile) {
-            // Convert to base64 dataURL (no Firebase Storage needed)
-            imageUrl = await new Promise(resolve => {
-                const r = new FileReader();
-                r.onload = () => resolve(r.result);
-                r.readAsDataURL(imgFile);
-            });
-            if ($('msg-img-file')) $('msg-img-file').value = '';
-        }
-
-        const now = new Date();
-        const msgData = { content: txt || '', senderId: student.id, senderName: student.studentName || 'Student', createdAt: now, read: false };
-        if (imageUrl) msgData.imageUrl = imageUrl;
-
-        await addDoc(messagesRef, msgData);
-        await updateDoc(doc(db, 'conversations', convId), {
-            lastMessage: txt || '📷 Image', lastMessageTimestamp: now,
-            lastSenderId: student.id, unreadCount: 1
-        });
-    };
-
-    $('student-send-btn')?.addEventListener('click', sendMessage);
-    $('student-msg-input')?.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
-}
-
-// ── MY COURSES ──
-async function renderCourses(student) {
-    const main = $('main-content');
-    main.innerHTML = `<div class="text-center py-10"><div class="spinner mx-auto mb-3"></div></div>`;
-
-    try {
-        const snap = await getDocs(query(
-            collection(db, 'courses'),
-            where('tutorEmail', '==', student.tutorEmail)
-        ));
-
-        if (snap.empty) {
-            main.innerHTML = `<div class="sp-empty-state"><div style="font-size:2rem">📚</div><p>No courses shared yet. Check back soon!</p></div>`;
-            return;
-        }
-
-        const courses = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-            .filter(c => !c.targetStudentId || c.targetStudentId === student.id);
-
-        main.innerHTML = `
-            <h2 style="font-size:1.1rem;font-weight:800;margin-bottom:1rem;">📚 My Courses</h2>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem;">
-                ${courses.map(c => {
-                    const fileUrl = c.fileUrl || c.url || c.driveLink || '';
-                    const preview = c.thumbnailUrl || c.previewUrl || '';
-                    const isLink = fileUrl.startsWith('http');
-                    return `<div class="sp-course-card" onclick="window.open('${esc(fileUrl)}','_blank')" style="cursor:${isLink?'pointer':'default'};">
-                        ${preview ? `<div style="height:120px;overflow:hidden;border-radius:.6rem .6rem 0 0;background:#f3f4f6;">
-                            <img src="${esc(preview)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'">
-                        </div>` : `<div style="height:80px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:.6rem .6rem 0 0;display:flex;align-items:center;justify-content:center;font-size:2rem;">📄</div>`}
-                        <div style="padding:.75rem;">
-                            <div style="font-weight:700;font-size:.9rem;margin-bottom:.25rem;">${esc(c.title||c.name||'Course Material')}</div>
-                            <div style="font-size:.75rem;color:#6b7280;">${esc(c.subject||c.category||'')} ${c.uploadedAt?'· '+fmtDate(c.uploadedAt):''}</div>
-                            ${c.description ? `<div style="font-size:.75rem;color:#9ca3af;margin-top:.3rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(c.description)}</div>` : ''}
-                            ${isLink ? `<div style="margin-top:.6rem;font-size:.75rem;color:#4f46e5;font-weight:600;">🔗 Open in new tab ↗</div>` : ''}
-                        </div>
-                    </div>`;
-                }).join('')}
+            </div>
+            <div class="mt-3 text-xs text-gray-400 bg-gray-50 rounded-lg p-2">
+                📍 Your local time may differ. The time shown is Nigeria (WAT) time.
             </div>`;
     } catch(e) {
-        main.innerHTML = `<div class="sp-empty-state text-red-500">Error loading courses: ${esc(e.message)}</div>`;
+        console.error('loadNextClassCard:', e);
+        el.innerHTML = '<p class="text-red-400 text-sm text-center">Could not load class info.</p>';
     }
 }
 
-// ── ASSIGNMENTS ──
-async function renderAssignments(student) {
-    const main = $('main-content');
-    main.innerHTML = `<div class="text-center py-10"><div class="spinner mx-auto mb-3"></div></div>`;
+// ── Average Grade Card ──
+async function loadAverageGradeCard(student) {
+    const el = document.getElementById('avg-grade-card');
+    if (!el) return;
+    el.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm">Loading…</div>';
+
+    try {
+        // Get graded homework for this student
+        const hwSnap = await getDocs(query(
+            collection(db,'homework_assignments'),
+            where('studentId','==',student.id),
+            where('status','==','graded')
+        ));
+        const myScores = hwSnap.docs.map(d => parseFloat(d.data().score)).filter(s => !isNaN(s));
+        const myAvg = myScores.length ? Math.round(myScores.reduce((a,b)=>a+b,0)/myScores.length) : null;
+
+        // Compare with same-grade students
+        let gradeAvg = null;
+        if (student.grade) {
+            const gradeSnap = await getDocs(query(
+                collection(db,'homework_assignments'),
+                where('status','==','graded')
+            ));
+            // Filter by grade - we need to match the grade from the student's record
+            const gradeScores = gradeSnap.docs
+                .filter(d => {
+                    const sid = d.data().studentId;
+                    // We'd need student grade info — use tutorEmail as a proxy scope
+                    return d.data().tutorEmail === student.tutorEmail;
+                })
+                .map(d => parseFloat(d.data().score))
+                .filter(s => !isNaN(s));
+            if (gradeScores.length) gradeAvg = Math.round(gradeScores.reduce((a,b)=>a+b,0)/gradeScores.length);
+        }
+
+        if (myAvg === null) {
+            el.innerHTML = `<div class="text-center py-4"><div class="text-3xl mb-2">📊</div><p class="text-gray-400 text-sm">No graded assignments yet.</p></div>`;
+            return;
+        }
+
+        const scoreColor = myAvg >= 85 ? 'text-green-600' : myAvg >= 65 ? 'text-yellow-500' : 'text-red-500';
+        const barColor   = myAvg >= 85 ? 'bg-green-500' : myAvg >= 65 ? 'bg-yellow-400' : 'bg-red-400';
+
+        el.innerHTML = `
+            <div class="text-center">
+                <p class="text-xs text-gray-400 uppercase font-semibold mb-2">My Average Grade</p>
+                <p class="text-5xl font-black ${scoreColor} mb-2">${myAvg}<span class="text-xl font-normal text-gray-400">%</span></p>
+                <div class="w-full bg-gray-100 rounded-full h-2.5 mb-2">
+                    <div class="h-2.5 rounded-full ${barColor} transition-all duration-700" style="width:${myAvg}%"></div>
+                </div>
+                <p class="text-xs text-gray-500">Based on ${myScores.length} graded assignment${myScores.length!==1?'s':''}</p>
+                ${gradeAvg !== null ? `<p class="text-xs text-gray-400 mt-1">Class average: <strong class="text-gray-600">${gradeAvg}%</strong> ${myAvg >= gradeAvg ? '🌟 Above average!' : '📈 Keep going!'}</p>` : ''}
+            </div>`;
+    } catch(e) {
+        console.error('loadAverageGradeCard:', e);
+        el.innerHTML = '<p class="text-red-400 text-sm text-center">Could not load grade data.</p>';
+    }
+}
+
+// ── Courses Summary on Overview ──
+async function loadCoursesSummary(student) {
+    const el = document.getElementById('courses-summary-card');
+    if (!el) return;
+    const subjects = student.subjects || [];
+    if (!subjects.length) { el.innerHTML = '<p class="text-gray-400 text-sm">No courses enrolled yet.</p>'; return; }
+    el.innerHTML = `
+        <p class="text-xs text-gray-400 uppercase font-semibold mb-3">My Courses</p>
+        <div class="flex flex-wrap gap-2">
+            ${subjects.map(s => `<span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">${safeEscape(s)}</span>`).join('')}
+        </div>`;
+}
+
+// ── Upcoming Schedule Card ──
+async function loadUpcomingScheduleCard(student) {
+    const el = document.getElementById('upcoming-schedule-card');
+    if (!el) return;
+    const schedule = student.schedule || [];
+    if (!schedule.length) { el.innerHTML = '<p class="text-gray-400 text-sm">No schedule set yet.</p>'; return; }
+
+    const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const nowWAT = new Date(new Date().toLocaleString('en-US', { timeZone:'Africa/Lagos' }));
+    const todayIndex = nowWAT.getDay();
+
+    // Get next 5 upcoming slots
+    const upcoming = [];
+    for (let d = 0; d < 14 && upcoming.length < 5; d++) {
+        const targetIndex = (todayIndex + d) % 7;
+        const targetDay = DAYS[targetIndex];
+        const nowMins = d === 0 ? nowWAT.getHours()*60+nowWAT.getMinutes() : -1;
+        const slots = schedule.filter(s=>s.day===targetDay).sort((a,b)=>(a.start||'').localeCompare(b.start||''));
+        for (const slot of slots) {
+            const [sh,sm] = (slot.start||'00:00').split(':').map(Number);
+            if (d > 0 || sh*60+sm > nowMins) {
+                upcoming.push({ day: targetDay, daysAhead: d, ...slot });
+                if (upcoming.length >= 5) break;
+            }
+        }
+    }
+
+    function fmtTime(t) {
+        if (!t) return '';
+        const [h,m] = t.split(':').map(Number);
+        const ap = h>=12?'PM':'AM';
+        return `${h%12||12}:${String(m).padStart(2,'0')} ${ap}`;
+    }
+
+    el.innerHTML = `
+        <p class="text-xs text-gray-400 uppercase font-semibold mb-3">Upcoming Classes (Nigeria Time)</p>
+        <div class="space-y-2">
+            ${upcoming.map((s,i) => `
+            <div class="flex items-center gap-3 p-2 rounded-lg ${i===0?'bg-blue-50 border border-blue-200':'bg-gray-50'}">
+                <div class="text-center flex-shrink-0 w-12">
+                    <p class="text-xs font-bold ${i===0?'text-blue-600':'text-gray-500'}">${safeEscape(s.day.substring(0,3))}</p>
+                    <p class="text-xs text-gray-400">${s.daysAhead===0?'Today':s.daysAhead===1?'Tmrw':'+'+s.daysAhead+'d'}</p>
+                </div>
+                <div class="flex-1">
+                    <p class="text-sm font-semibold text-gray-700">${safeEscape(fmtTime(s.start))} – ${safeEscape(fmtTime(s.end))}</p>
+                </div>
+                ${i===0?'<span class="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">Next</span>':''}
+            </div>`).join('')}
+        </div>`;
+}
+
+// ── Assignments Tab ──
+async function loadAssignmentsTab(student) {
+    const el = document.getElementById('tab-assignments');
+    if (!el || el.dataset.loaded === '1') return;
+    el.innerHTML = '<div class="text-center py-8"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading assignments…</p></div>';
 
     try {
         const snap = await getDocs(query(
             collection(db,'homework_assignments'),
-            where('studentId','==',student.id)
+            where('studentId','==',student.id),
+            orderBy('assignedDate','desc')
         ));
 
-        const hwList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-        // Group by ISO week key
-        const byWeek = {};
-        hwList.forEach(hw => {
-            const ts = hw.assignedAt || hw.createdAt;
-            const d = ts?.seconds ? new Date(ts.seconds*1000) : new Date(ts || Date.now());
-            const wk = getISOWeekKey(d);
-            if (!byWeek[wk]) byWeek[wk] = { date: d, hw: [] };
-            byWeek[wk].hw.push(hw);
-        });
-
-        const weeks = Object.entries(byWeek).sort((a,b) => b[0].localeCompare(a[0]));
-
-        if (weeks.length === 0) {
-            main.innerHTML = `<div class="sp-empty-state"><div style="font-size:2rem">📝</div><p>No assignments yet. Your tutor will send some soon!</p></div>`;
+        if (snap.empty) {
+            el.innerHTML = '<div class="text-center py-10"><div class="text-4xl mb-3">📭</div><p class="text-gray-400">No assignments yet.</p></div>';
             return;
         }
 
-        main.innerHTML = `
-            <h2 style="font-size:1.1rem;font-weight:800;margin-bottom:1rem;">📝 Assignments</h2>
-            <div style="display:flex;flex-direction:column;gap:.75rem;">
-                ${weeks.map(([wk, { date, hw }]) => {
-                    const { mon } = getWeekRange(0);
-                    const isCurrentWeek = getISOWeekKey(new Date()) === wk;
-                    const weekLabel = isCurrentWeek ? 'This Week'
-                        : `Week of ${date.toLocaleDateString('en-NG',{day:'numeric',month:'short',year:'numeric'})}`;
-                    const pending = hw.filter(h => ['assigned','sent'].includes(h.status)).length;
-                    return `<details ${isCurrentWeek?'open':''} style="background:#fff;border:1px solid #e5e7eb;border-radius:1rem;overflow:hidden;">
-                        <summary style="display:flex;align-items:center;gap:.75rem;padding:.9rem 1.1rem;cursor:pointer;list-style:none;user-select:none;">
-                            <div style="flex:1;">
-                                <span style="font-weight:700;font-size:.9rem;">${esc(weekLabel)}</span>
-                                ${isCurrentWeek?`<span style="margin-left:.5rem;background:#dbeafe;color:#1d4ed8;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:.3rem;">CURRENT</span>`:''}
-                            </div>
-                            <span style="font-size:.75rem;font-weight:600;color:${pending>0?'#d97706':'#16a34a'};">${pending} pending · ${hw.length} total</span>
-                            <i class="fas fa-chevron-right" style="font-size:.7rem;color:#9ca3af;transition:.2s;"></i>
-                        </summary>
-                        <div style="border-top:1px solid #f3f4f6;padding:.75rem;">
-                            ${hw.sort((a,b)=>(b.assignedAt?.seconds||0)-(a.assignedAt?.seconds||0)).map(h => {
-                                const status = h.status || 'assigned';
-                                const statusCol = status==='graded'?'#16a34a':status==='submitted'?'#d97706':'#ef4444';
-                                const statusLabel = status==='graded'?`✅ Graded ${h.score?`(${h.score}/100)`:''}`
-                                    :status==='submitted'?'⏳ Submitted':'📋 Pending';
-                                const fileUrl = h.fileUrl || h.url || h.driveLink || '';
-                                return `<div style="border:1px solid #f3f4f6;border-radius:.65rem;padding:.75rem;margin-bottom:.5rem;background:#fafafa;">
-                                    <div style="display:flex;align-items:start;gap:.5rem;">
-                                        <div style="flex:1;min-width:0;">
-                                            <div style="font-weight:600;font-size:.875rem;">${esc(h.title||'Homework')}</div>
-                                            <div style="font-size:.75rem;color:#6b7280;margin-top:.1rem;">${fmtDate(h.assignedAt)} ${h.subject?'· '+h.subject:''}</div>
-                                            ${h.description?`<div style="font-size:.78rem;color:#374151;margin-top:.35rem;">${esc(h.description)}</div>`:''}
-                                            ${h.feedback?`<div style="margin-top:.4rem;background:#f0fdf4;border-radius:.5rem;padding:.4rem .6rem;font-size:.75rem;color:#166534;border-left:2px solid #16a34a;">${esc(h.feedback)}</div>`:''}
-                                        </div>
-                                        <div style="font-size:.72rem;font-weight:700;color:${statusCol};white-space:nowrap;">${statusLabel}</div>
-                                    </div>
-                                    <div style="display:flex;gap:.5rem;margin-top:.6rem;flex-wrap:wrap;">
-                                        ${fileUrl ? `<button onclick="window.open('${esc(fileUrl)}','_blank')" style="font-size:.75rem;background:#eff6ff;color:#1d4ed8;border:none;border-radius:.5rem;padding:.3rem .7rem;cursor:pointer;font-weight:600;">📄 Open Assignment</button>` : ''}
-                                        ${fileUrl && status !== 'graded' ? `<button onclick="openAnnotateModal('${esc(h.id)}','${esc(fileUrl)}')" style="font-size:.75rem;background:#fef3c7;color:#92400e;border:none;border-radius:.5rem;padding:.3rem .7rem;cursor:pointer;font-weight:600;">✏️ Annotate & Submit</button>` : ''}
-                                        ${status === 'submitted' || status === 'graded' ? `<span style="font-size:.72rem;color:#9ca3af;">Submitted ${fmtDate(h.submittedAt)}</span>` : ''}
-                                    </div>
-                                </div>`;
-                            }).join('')}
+        // Group by week
+        const byWeek = {};
+        snap.docs.forEach(d => {
+            const data = d.data();
+            const raw  = data.assignedDate || data.assignedAt || data.createdAt;
+            const date = raw?.toDate ? raw.toDate() : new Date(raw || Date.now());
+            const weekStart = new Date(date); weekStart.setDate(date.getDate() - date.getDay());
+            const wk = weekStart.toISOString().slice(0,10);
+            if (!byWeek[wk]) byWeek[wk] = [];
+            byWeek[wk].push({ id: d.id, date, ...data });
+        });
+
+        const sortedWeeks = Object.keys(byWeek).sort((a,b) => b.localeCompare(a));
+
+        el.innerHTML = `<div class="space-y-3">
+            ${sortedWeeks.map((wk,wi) => {
+                const assignments = byWeek[wk];
+                const weekDate = new Date(wk);
+                const weekEnd  = new Date(wk); weekEnd.setDate(weekEnd.getDate()+6);
+                const label = `${weekDate.toLocaleDateString('en-NG',{day:'numeric',month:'short'})} – ${weekEnd.toLocaleDateString('en-NG',{day:'numeric',month:'short',year:'numeric'})}`;
+                const pendingCount = assignments.filter(a=>a.status!=='graded').length;
+                return `
+                <details ${wi===0?'open':''} class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                    <summary class="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 list-none">
+                        <span class="font-bold text-gray-700">Week of ${safeEscape(label)}</span>
+                        <div class="flex gap-2">
+                            <span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">${assignments.length} assignments</span>
+                            ${pendingCount>0?`<span class="bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full text-xs">${pendingCount} pending</span>`:''}
                         </div>
-                    </details>`;
-                }).join('')}
-            </div>`;
+                    </summary>
+                    <div class="divide-y divide-gray-100 border-t border-gray-100">
+                        ${assignments.map(a => `
+                        <div class="p-4">
+                            <div class="flex items-start justify-between gap-3 flex-wrap">
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2 flex-wrap mb-1">
+                                        <h4 class="font-bold text-gray-800">${safeEscape(a.title||'Untitled')}</h4>
+                                        ${a.status==='graded'?'<span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">✅ Graded</span>':a.status==='submitted'?'<span class="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">📤 Submitted</span>':'<span class="bg-orange-100 text-orange-600 text-xs px-2 py-0.5 rounded-full">⏳ Pending</span>'}
+                                    </div>
+                                    ${a.description?`<p class="text-sm text-gray-600 mb-2">${safeEscape(a.description)}</p>`:''}
+                                    <p class="text-xs text-gray-400">Due: ${safeEscape(a.dueDate||'Not set')} · Assigned: ${safeEscape(a.date.toLocaleDateString('en-NG'))}</p>
+                                    ${a.score!=null&&a.score!==''?`<p class="text-sm font-bold text-green-600 mt-1">Score: ${safeEscape(String(a.score))}/100</p>`:''}
+                                    ${a.feedback?`<p class="text-sm text-gray-500 italic mt-1 bg-gray-50 rounded-lg p-2">"${safeEscape(a.feedback)}"</p>`:''}
+                                </div>
+                                <div class="flex gap-2 flex-shrink-0">
+                                    ${a.fileUrl||a.attachments?.[0]?.url?`<a href="${safeEscape(a.fileUrl||a.attachments[0].url)}" target="_blank" class="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded-lg px-3 py-2 hover:bg-blue-100">📄 Open</a>`:''}
+                                    ${a.status!=='graded'?`<button onclick="submitHomework('${safeEscape(a.id)}')" class="text-xs bg-green-50 text-green-600 border border-green-200 rounded-lg px-3 py-2 hover:bg-green-100">📤 Submit</button>`:''}
+                                </div>
+                            </div>
+                        </div>`).join('')}
+                    </div>
+                </details>`;
+            }).join('')}
+        </div>`;
+        el.dataset.loaded = '1';
     } catch(e) {
-        main.innerHTML = `<div class="sp-empty-state text-red-500">Error: ${esc(e.message)}</div>`;
+        console.error(e);
+        el.innerHTML = '<p class="text-red-400 text-center py-8">Error loading assignments.</p>';
     }
 }
 
-// ── ANNOTATE MODAL ──
-window.openAnnotateModal = function(hwId, fileUrl) {
-    document.querySelectorAll('.annotate-modal').forEach(e => e.remove());
+// ── Submit Homework Modal ──
+window.submitHomework = function(homeworkId) {
     const modal = document.createElement('div');
-    modal.className = 'annotate-modal';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;flex-direction:column;';
+    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px';
     modal.innerHTML = `
-        <div style="background:#1f2937;color:#fff;padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem;flex-shrink:0;">
-            <button onclick="this.closest('.annotate-modal').remove()" style="border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:.4rem;padding:.3rem .7rem;cursor:pointer;">✕ Close</button>
-            <span style="font-weight:700;flex:1;">✏️ Annotate & Submit Assignment</span>
-            <textarea id="annotation-note" placeholder="Add your answer or comments here…" rows="2"
-                style="font-size:.8rem;border:none;border-radius:.4rem;padding:.4rem .6rem;resize:none;width:220px;"></textarea>
-            <button id="submit-annotated-btn" style="background:#22c55e;color:#fff;border:none;border-radius:.5rem;padding:.5rem 1rem;font-weight:700;cursor:pointer;">📤 Submit</button>
-        </div>
-        <iframe src="${esc(fileUrl)}" style="flex:1;width:100%;border:none;" sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
-    `;
+        <div style="background:white;border-radius:16px;padding:24px;max-width:480px;width:100%">
+            <h3 style="font-weight:700;font-size:1.1rem;margin-bottom:16px">📤 Submit Homework</h3>
+            <p style="color:#6b7280;font-size:0.875rem;margin-bottom:12px">You can type comments and/or upload a file.</p>
+            <textarea id="hw-submit-comment" rows="3" placeholder="Comments or notes for your tutor…" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:0.875rem;margin-bottom:10px;box-sizing:border-box"></textarea>
+            <input type="file" id="hw-submit-file" style="margin-bottom:12px;font-size:0.875rem" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt">
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+                <button onclick="this.closest('[style]').remove()" style="border:1px solid #d1d5db;border-radius:8px;padding:8px 16px;cursor:pointer;background:white">Cancel</button>
+                <button id="hw-submit-btn" onclick="doSubmitHomework('${safeEscape(homeworkId)}',this)" style="background:#2563eb;color:white;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:600">Submit</button>
+            </div>
+        </div>`;
     document.body.appendChild(modal);
-    $('submit-annotated-btn')?.addEventListener('click', async () => {
-        const note = $('annotation-note')?.value?.trim() || '';
-        try {
-            await updateDoc(doc(db, 'homework_assignments', hwId), {
-                status: 'submitted',
-                submittedAt: new Date(),
-                studentNote: note,
-                submittedBy: studentData?.studentName || ''
-            });
-            modal.remove();
-            renderAssignments(studentData);
-            alert('Assignment submitted!');
-        } catch(e) { alert('Error: ' + e.message); }
-    });
 };
 
-// ── RESULTS ──
-async function renderResults(student) {
-    const main = $('main-content');
-    main.innerHTML = `<div class="text-center py-10"><div class="spinner mx-auto mb-3"></div></div>`;
+window.doSubmitHomework = async function(homeworkId, btn) {
+    btn.textContent = 'Submitting…'; btn.disabled = true;
+    const comment  = document.getElementById('hw-submit-comment')?.value.trim();
+    const fileEl   = document.getElementById('hw-submit-file');
+    const file     = fileEl?.files[0];
+
+    try {
+        let submissionUrl = null;
+        if (file) {
+            // Upload to Cloudinary (uses student's tutor's config)
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('upload_preset', 'tutor_homework');
+            fd.append('folder', 'student_submissions');
+            const res = await fetch('https://api.cloudinary.com/v1_1/dwjq7j5zp/upload', { method:'POST', body:fd });
+            const data = await res.json();
+            submissionUrl = data.secure_url || null;
+        }
+
+        await updateDoc(doc(db,'homework_assignments',homeworkId), {
+            status: 'submitted',
+            submittedAt: serverTimestamp(),
+            submissionUrl: submissionUrl || '',
+            studentComment: comment || ''
+        });
+
+        btn.closest('[style]').remove();
+        showToast('Homework submitted successfully! ✅', 'success');
+        // Reload assignments
+        const el = document.getElementById('tab-assignments');
+        if (el) { delete el.dataset.loaded; loadAssignmentsTab(studentData); }
+    } catch(e) {
+        console.error(e);
+        showToast('Submission failed: '+e.message, 'error');
+        btn.textContent = 'Submit'; btn.disabled = false;
+    }
+};
+
+// ── Courses Tab ──
+async function loadCoursesTab(student) {
+    const el = document.getElementById('tab-courses');
+    if (!el || el.dataset.loaded === '1') return;
+    el.innerHTML = '<div class="text-center py-8"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading courses…</p></div>';
 
     try {
         const snap = await getDocs(query(
-            collection(db,'student_results'),
-            where('studentId','==',student.id)
+            collection(db,'course_materials'),
+            where('studentId','==',student.id),
+            orderBy('uploadedAt','desc')
         ));
-        const results = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-            .sort((a,b) => (b.submittedAt?.seconds||b.date?.seconds||0) - (a.submittedAt?.seconds||a.date?.seconds||0));
 
-        if (results.length === 0) {
-            main.innerHTML = `<div class="sp-empty-state"><div style="font-size:2rem">📊</div><p>No results yet. Your grades will appear here once homework is graded.</p></div>`;
-            return;
+        if (snap.empty) { el.innerHTML = '<div class="text-center py-10"><div class="text-4xl mb-3">📚</div><p class="text-gray-400">No course materials uploaded yet.</p></div>'; el.dataset.loaded='1'; return; }
+
+        function iconForType(type) {
+            if (!type) return '📄';
+            if (type.includes('pdf')) return '📕';
+            if (type.includes('image')) return '🖼️';
+            if (type.includes('word')||type.includes('doc')) return '📝';
+            if (type.includes('spreadsheet')||type.includes('xls')) return '📊';
+            if (type.includes('presentation')||type.includes('ppt')) return '📊';
+            return '📄';
         }
 
-        main.innerHTML = `
-            <h2 style="font-size:1.1rem;font-weight:800;margin-bottom:1rem;">📊 My Results</h2>
-            <div style="display:flex;flex-direction:column;gap:.75rem;">
-                ${results.map(r => {
-                    const score = r.score || r.percentage || 0;
-                    const col = score >= 85 ? '#22c55e' : score >= 65 ? '#f59e0b' : '#ef4444';
-                    const label = score >= 85 ? 'Excellent' : score >= 65 ? 'Good' : score >= 50 ? 'Average' : 'Needs Work';
-                    return `<div style="background:#fff;border:1px solid #e5e7eb;border-radius:.85rem;padding:1rem;display:flex;align-items:center;gap:1rem;">
-                        <div style="width:3rem;height:3rem;border-radius:.75rem;background:${col}20;display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:900;color:${col};flex-shrink:0;">${score}</div>
-                        <div style="flex:1;min-width:0;">
-                            <div style="font-weight:700;font-size:.9rem;">${esc(r.subject||r.course||r.title||'Assignment')}</div>
-                            <div style="font-size:.75rem;color:#6b7280;margin-top:.15rem;">${fmtDate(r.submittedAt||r.date)} ${r.tutorName?'· by '+r.tutorName:''}</div>
-                            ${r.feedback?`<div style="font-size:.78rem;color:#374151;margin-top:.3rem;font-style:italic;">"${esc(r.feedback)}"</div>`:''}
-                        </div>
-                        <div style="text-align:right;flex-shrink:0;">
-                            <div style="font-size:.75rem;font-weight:700;color:${col};">${label}</div>
-                            <div style="font-size:.7rem;color:#9ca3af;margin-top:.2rem;">${score}%</div>
-                        </div>
+        el.innerHTML = `
+            <p class="text-xs text-gray-400 uppercase font-semibold mb-4">My Course Materials (${snap.size})</p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px">
+                ${snap.docs.map(d => {
+                    const mat = d.data();
+                    const date = mat.uploadedAt?.toDate ? mat.uploadedAt.toDate().toLocaleDateString('en-NG') : 'Unknown';
+                    const icon = iconForType(mat.fileType);
+                    const url  = safeEscape(mat.fileUrl||'#');
+                    return `
+                    <div style="background:white;border:1px solid #e5e7eb;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;transition:box-shadow .2s" 
+                         onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow='none'"
+                         onclick="window.open('${url}','_blank')">
+                        <div style="font-size:2rem;text-align:center;margin-bottom:4px">${icon}</div>
+                        <p style="font-weight:700;font-size:0.9rem;color:#1f2937;margin:0;text-align:center;word-break:break-word">${safeEscape(mat.title)}</p>
+                        ${mat.description?`<p style="font-size:0.75rem;color:#6b7280;text-align:center;margin:0">${safeEscape(mat.description)}</p>`:''}
+                        <p style="font-size:0.7rem;color:#9ca3af;text-align:center;margin:0">📅 ${safeEscape(date)}</p>
+                        <a href="${url}" target="_blank" onclick="event.stopPropagation()" style="display:block;text-align:center;background:#2563eb;color:white;border-radius:8px;padding:6px;font-size:0.75rem;text-decoration:none;font-weight:600;margin-top:4px">Open in New Tab ↗</a>
                     </div>`;
                 }).join('')}
             </div>`;
+        el.dataset.loaded = '1';
     } catch(e) {
-        main.innerHTML = `<div class="sp-empty-state text-red-500">Error: ${esc(e.message)}</div>`;
+        console.error(e);
+        el.innerHTML = '<p class="text-red-400 text-center py-8">Error loading courses.</p>';
     }
 }
 
-// ── SCHEDULE ──
-async function renderSchedule(student) {
-    const main = $('main-content');
+// ── Results Tab ──
+async function loadResultsTab(student) {
+    const el = document.getElementById('tab-results');
+    if (!el || el.dataset.loaded === '1') return;
+    el.innerHTML = '<div class="text-center py-8"><div class="spinner mx-auto mb-3"></div></div>';
+
+    try {
+        const snap = await getDocs(query(
+            collection(db,'homework_assignments'),
+            where('studentId','==',student.id),
+            where('status','==','graded')
+        ));
+
+        if (snap.empty) { el.innerHTML = '<div class="text-center py-10"><div class="text-4xl mb-3">📊</div><p class="text-gray-400">No graded results yet.</p></div>'; el.dataset.loaded='1'; return; }
+
+        const results = snap.docs.map(d => {
+            const data = d.data();
+            const raw  = data.gradedAt || data.assignedDate;
+            const date = raw?.toDate ? raw.toDate() : new Date(raw || Date.now());
+            return { date, title: data.title||'Homework', score: data.score, feedback: data.feedback };
+        }).sort((a,b) => b.date - a.date);
+
+        el.innerHTML = `
+            <p class="text-xs text-gray-400 uppercase font-semibold mb-4">My Results</p>
+            <div class="overflow-x-auto">
+                <table style="width:100%;border-collapse:collapse;font-size:0.875rem">
+                    <thead>
+                        <tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb">
+                            <th style="text-align:left;padding:10px 12px;color:#6b7280;font-weight:600;font-size:0.75rem;text-transform:uppercase">Assignment</th>
+                            <th style="text-align:center;padding:10px 12px;color:#6b7280;font-weight:600;font-size:0.75rem;text-transform:uppercase">Score</th>
+                            <th style="text-align:left;padding:10px 12px;color:#6b7280;font-weight:600;font-size:0.75rem;text-transform:uppercase">Date</th>
+                            <th style="text-align:left;padding:10px 12px;color:#6b7280;font-weight:600;font-size:0.75rem;text-transform:uppercase">Feedback</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${results.map((r,i) => {
+                            const sc = parseFloat(r.score);
+                            const color = isNaN(sc) ? '#6b7280' : sc>=85 ? '#16a34a' : sc>=65 ? '#ca8a04' : '#dc2626';
+                            return `
+                            <tr style="border-bottom:1px solid #f3f4f6;${i%2===0?'background:white':'background:#fafafa'}">
+                                <td style="padding:10px 12px;font-weight:600;color:#1f2937">${safeEscape(r.title)}</td>
+                                <td style="padding:10px 12px;text-align:center;font-weight:700;color:${color};">${isNaN(sc)?'—':sc+'/100'}</td>
+                                <td style="padding:10px 12px;color:#6b7280;font-size:0.8rem">${safeEscape(r.date.toLocaleDateString('en-NG'))}</td>
+                                <td style="padding:10px 12px;color:#6b7280;font-size:0.8rem;max-width:240px">${safeEscape(r.feedback||'—')}</td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>`;
+        el.dataset.loaded = '1';
+    } catch(e) {
+        console.error(e);
+        el.innerHTML = '<p class="text-red-400 text-center py-8">Error loading results.</p>';
+    }
+}
+
+// ── Schedule Tab ──
+async function loadScheduleTab(student) {
+    const el = document.getElementById('tab-schedule');
+    if (!el || el.dataset.loaded === '1') return;
+
+    const schedule = student.schedule || [];
     const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 
-    let slots = student.schedule || [];
-    try {
-        const snap = await getDocs(query(collection(db,'schedules'), where('studentId','==',student.id)));
-        if (!snap.empty) slots = snap.docs[0].data().schedule || slots;
-    } catch(e) {}
+    function fmtTime(t) {
+        if (!t) return '';
+        const [h,m] = t.split(':').map(Number);
+        return `${h%12||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`;
+    }
 
-    if (slots.length === 0) {
-        main.innerHTML = `<div class="sp-empty-state"><div style="font-size:2rem">🗓️</div><p>No schedule set yet. Your tutor will configure it shortly.</p></div>`;
+    if (!schedule.length) {
+        el.innerHTML = '<div class="text-center py-10"><div class="text-4xl mb-3">📅</div><p class="text-gray-400">No schedule set yet. Contact your tutor.</p></div>';
+        el.dataset.loaded = '1';
         return;
     }
 
     const byDay = {};
-    DAYS.forEach(d => { byDay[d] = []; });
-    slots.forEach(sl => { if (byDay[sl.day]) byDay[sl.day].push(sl); });
+    DAYS.forEach(d => byDay[d] = []);
+    schedule.forEach(s => { if (byDay[s.day]) byDay[s.day].push(s); });
 
-    main.innerHTML = `
-        <h2 style="font-size:1.1rem;font-weight:800;margin-bottom:1rem;">🗓️ My Schedule</h2>
-        <div style="font-size:.8rem;color:#6b7280;margin-bottom:1rem;">Times shown in Nigeria time (WAT) and your local time (${esc(localTZ.replace('_',' '))})</div>
-        <div style="display:flex;flex-direction:column;gap:1rem;">
-            ${DAYS.filter(d => byDay[d].length > 0).map(d => `
-                <div style="background:#fff;border:1px solid #e5e7eb;border-radius:.85rem;overflow:hidden;">
-                    <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;padding:.6rem 1rem;font-weight:700;font-size:.875rem;">${d}</div>
-                    <div style="padding:.75rem;display:flex;flex-direction:column;gap:.5rem;">
-                        ${byDay[d].map(sl => {
-                            const local = convertLagosToLocal(sl.day, sl.start);
-                            const localEnd = sl.end ? convertLagosToLocal(sl.day, sl.end) : '';
-                            return `<div style="display:flex;align-items:center;gap:.75rem;background:#f8fafc;border-radius:.5rem;padding:.5rem .75rem;">
-                                <div style="flex:1;">
-                                    <div style="font-size:.85rem;font-weight:600;">⏰ ${esc(sl.start)}${sl.end?' – '+sl.end:''} <span style="color:#9ca3af;font-weight:400;font-size:.75rem;">(Nigeria)</span></div>
-                                    <div style="font-size:.8rem;color:#4f46e5;margin-top:.15rem;">🕐 ${local}${localEnd?' – '+localEnd:''} <span style="color:#9ca3af;font-size:.7rem;">(Your Time)</span></div>
-                                    ${sl.subject?`<div style="font-size:.75rem;color:#6b7280;margin-top:.1rem;">📖 ${esc(sl.subject)}</div>`:''}
-                                </div>
-                            </div>`;
-                        }).join('')}
-                    </div>
-                </div>`).join('')}
-        </div>`;
-}
-
-/*──────────────────────────────────────────────────────────
-  EDUCATIONAL GAMES
-──────────────────────────────────────────────────────────*/
-
-const GAME_SUBJECTS = ['maths','ela','biology','chemistry','physics','scrabble','snake'];
-
-function getGradeLevel(grade) {
-    const g = parseInt(grade) || 5;
-    if (g <= 3) return 'beginner';
-    if (g <= 6) return 'intermediate';
-    if (g <= 9) return 'advanced';
-    return 'expert';
-}
-
-const QUESTIONS = {
-    maths: {
-        beginner: [
-            { q: 'What is 7 + 8?', opts: ['13','14','15','16'], a: '15' },
-            { q: 'What is 36 ÷ 6?', opts: ['5','6','7','8'], a: '6' },
-            { q: 'What is 12 × 3?', opts: ['34','36','38','40'], a: '36' },
-            { q: 'What is 25 − 9?', opts: ['14','15','16','17'], a: '16' },
-            { q: 'What is 100 ÷ 4?', opts: ['20','25','30','35'], a: '25' }
-        ],
-        intermediate: [
-            { q: 'Solve: 3x = 27', opts: ['6','7','8','9'], a: '9' },
-            { q: 'Area of rectangle 7×4?', opts: ['22','24','28','30'], a: '28' },
-            { q: 'What is 15% of 200?', opts: ['25','30','35','40'], a: '30' },
-            { q: 'What is 2³ + 4²?', opts: ['20','22','24','26'], a: '24' },
-            { q: 'LCM of 4 and 6?', opts: ['10','12','14','16'], a: '12' }
-        ],
-        advanced: [
-            { q: 'If f(x) = 2x² – 3, what is f(3)?', opts: ['15','18','21','27'], a: '15' },
-            { q: 'Solve: x² − 5x + 6 = 0, larger root?', opts: ['2','3','4','5'], a: '3' },
-            { q: 'What is √(144)?', opts: ['10','11','12','13'], a: '12' },
-            { q: 'Gradient of line y = 3x + 5?', opts: ['3','5','8','15'], a: '3' },
-            { q: 'Sum of interior angles of hexagon?', opts: ['540','600','720','900'], a: '720' }
-        ],
-        expert: [
-            { q: 'Integral of 2x dx =?', opts: ['x + C','x² + C','2x² + C','x²/2 + C'], a: 'x² + C' },
-            { q: 'sin²θ + cos²θ =?', opts: ['0','1','2', 'sin2θ'], a: '1' },
-            { q: 'Derivative of x³ =?', opts: ['x²','2x²','3x²','4x²'], a: '3x²' },
-            { q: 'log₁₀(1000) =?', opts: ['2','3','4','5'], a: '3' },
-            { q: 'Arithmetic sequence 2,5,8,11... 10th term?', opts: ['27','28','29','30'], a: '29' }
-        ]
-    },
-    ela: {
-        beginner: [
-            { q: 'Which is a noun?', opts: ['run','happy','quickly','apple'], a: 'apple' },
-            { q: 'Plural of "child"?', opts: ['childs','childrens','children','childes'], a: 'children' },
-            { q: 'Opposite of "hot"?', opts: ['warm','cool','cold','icy'], a: 'cold' },
-            { q: '"She __ to school." (Correct verb)', opts: ['go','goes','gone','going'], a: 'goes' },
-            { q: 'Which sentence is correct?', opts: ['He run fast.','He runs fast.','He running fast.','He ran fast is.'], a: 'He runs fast.' }
-        ],
-        intermediate: [
-            { q: 'A simile compares using:', opts: ['metaphor','as or like','hyperbole','alliteration'], a: 'as or like' },
-            { q: 'What is a homophone of "their"?', opts: ['there','the','them','they'], a: 'there' },
-            { q: '"Enormous" means:', opts: ['tiny','medium','very large','colourful'], a: 'very large' },
-            { q: 'Which is the topic sentence of a paragraph?', opts: ['A detail sentence','The closing sentence','The opening main-idea sentence','A transition word'], a: 'The opening main-idea sentence' },
-            { q: '"Fortnight" means:', opts: ['4 days','7 days','14 days','30 days'], a: '14 days' }
-        ],
-        advanced: [
-            { q: 'What literary device is "The wind whispered"?', opts: ['simile','metaphor','personification','alliteration'], a: 'personification' },
-            { q: 'A persuasive essay's primary purpose is to:', opts: ['entertain','inform','convince','describe'], a: 'convince' },
-            { q: 'The climax of a story is:', opts: ['the introduction','the rising action','the turning point of highest tension','the resolution'], a: 'the turning point of highest tension' },
-            { q: '"Loquacious" means:', opts: ['silent','very talkative','confused','aggressive'], a: 'very talkative' },
-            { q: 'Which is NOT a type of irony?', opts: ['verbal','dramatic','situational','circular'], a: 'circular' }
-        ],
-        expert: [
-            { q: 'A Shakespearean sonnet has __ lines.', opts: ['10','12','14','16'], a: '14' },
-            { q: 'Epistrophe is the repetition of words at:', opts: ['the start of clauses','the end of clauses','random intervals','the middle of clauses'], a: 'the end of clauses' },
-            { q: 'Which novel features Winston Smith?', opts: ['Brave New World','Animal Farm','1984','Fahrenheit 451'], a: '1984' },
-            { q: 'The "unreliable narrator" technique means:', opts: ['the narrator is omniscient','we cannot fully trust the narrator's account','the story has no narrator','first-person only'], a: 'we cannot fully trust the narrator\'s account' },
-            { q: 'Iambic pentameter has __ syllables per line.', opts: ['8','10','12','14'], a: '10' }
-        ]
-    },
-    biology: {
-        beginner: [
-            { q: 'What do plants use to make food?', opts: ['Moonlight','Sunlight','Rainwater only','Oxygen'], a: 'Sunlight' },
-            { q: 'Humans have how many chambers in the heart?', opts: ['2','3','4','5'], a: '4' },
-            { q: 'DNA is found in the cell\'s:', opts: ['membrane','cytoplasm','nucleus','wall'], a: 'nucleus' },
-            { q: 'Which gas do plants absorb?', opts: ['Oxygen','Nitrogen','Carbon dioxide','Hydrogen'], a: 'Carbon dioxide' },
-            { q: 'The basic unit of life is the:', opts: ['atom','organ','cell','tissue'], a: 'cell' }
-        ],
-        intermediate: [
-            { q: 'Mitosis produces __ daughter cells.', opts: ['1','2','3','4'], a: '2' },
-            { q: 'Osmosis is the movement of:', opts: ['solutes','proteins','water','ions'], a: 'water' },
-            { q: 'Which blood cells carry oxygen?', opts: ['White blood cells','Platelets','Red blood cells','Plasma'], a: 'Red blood cells' },
-            { q: 'The powerhouse of the cell is:', opts: ['ribosome','mitochondria','nucleus','vacuole'], a: 'mitochondria' },
-            { q: 'A dominant allele is represented by:', opts: ['lowercase letter','uppercase letter','number','symbol'], a: 'uppercase letter' }
-        ],
-        advanced: [
-            { q: 'Enzyme activity is affected by:', opts: ['colour','temperature & pH','gravity','pressure alone'], a: 'temperature & pH' },
-            { q: 'During meiosis, chromosome number:', opts: ['doubles','stays same','halves','triples'], a: 'halves' },
-            { q: 'The fluid-mosaic model describes:', opts: ['DNA structure','cell membrane','nuclear envelope','ribosome'], a: 'cell membrane' },
-            { q: 'Biotic factors include:', opts: ['temperature','rainfall','living organisms','soil pH'], a: 'living organisms' },
-            { q: 'ATP stands for:', opts: ['Adenine Tri-Phosphate','Adenosine Tri-Protein','Adenosine Triphosphate','Acid Transfer Protein'], a: 'Adenosine Triphosphate' }
-        ],
-        expert: [
-            { q: 'The lac operon is an example of:', opts: ['eukaryotic gene expression','prokaryotic gene regulation','mRNA splicing','post-translational modification'], a: 'prokaryotic gene regulation' },
-            { q: 'Hardy-Weinberg equilibrium assumes:', opts: ['natural selection','genetic drift','random mating','mutation'], a: 'random mating' },
-            { q: 'Chargaff\'s rule states:', opts: ['A=G, T=C','A=T, G=C','A+T=G+C','A=C, T=G'], a: 'A=T, G=C' },
-            { q: 'Sodium-potassium pump moves:', opts: ['3 Na⁺ out, 2 K⁺ in','2 Na⁺ out, 3 K⁺ in','3 K⁺ out, 2 Na⁺ in','equal exchange'], a: '3 Na⁺ out, 2 K⁺ in' },
-            { q: 'Signal transduction involves:', opts: ['direct DNA exchange','receptor → second messenger → response','osmosis only','pure diffusion'], a: 'receptor → second messenger → response' }
-        ]
-    },
-    chemistry: {
-        beginner: [
-            { q: 'The symbol for water is:', opts: ['H₂O₂','HO','H₂O','H₃O'], a: 'H₂O' },
-            { q: 'What is the atomic number of Carbon?', opts: ['6','8','12','14'], a: '6' },
-            { q: 'Acids have a pH:', opts: ['above 7','equal to 7','below 7','above 14'], a: 'below 7' },
-            { q: 'Which is a noble gas?', opts: ['Nitrogen','Helium','Hydrogen','Oxygen'], a: 'Helium' },
-            { q: 'NaCl is common:', opts: ['sugar','salt','soap','baking soda'], a: 'salt' }
-        ],
-        intermediate: [
-            { q: 'Number of electrons in Na⁺:', opts: ['10','11','12','9'], a: '10' },
-            { q: 'Avogadro\'s number is approximately:', opts: ['6.02×10²³','6.02×10²⁰','3.14×10²³','1×10²⁴'], a: '6.02×10²³' },
-            { q: 'In endothermic reactions, energy is:', opts: ['released','absorbed','neither','produced as light'], a: 'absorbed' },
-            { q: 'Valency of Oxygen:', opts: ['1','2','3','4'], a: '2' },
-            { q: 'The formula for sulfuric acid:', opts: ['HCl','HNO₃','H₂SO₄','H₃PO₄'], a: 'H₂SO₄' }
-        ],
-        advanced: [
-            { q: 'An oxidising agent is:', opts: ['gains electrons','loses electrons','gains protons','loses protons'], a: 'gains electrons' },
-            { q: 'Boyle\'s Law states P and V are:', opts: ['directly proportional','inversely proportional','equal','unrelated'], a: 'inversely proportional' },
-            { q: 'The rate-determining step is:', opts: ['fastest step','slowest step','first step','last step'], a: 'slowest step' },
-            { q: 'Le Chatelier\'s principle is about:', opts: ['entropy','equilibrium shifts','ionisation','orbital theory'], a: 'equilibrium shifts' },
-            { q: 'Electronegativity increases:', opts: ['down a group','across a period left to right','down and left','randomly'], a: 'across a period left to right' }
-        ],
-        expert: [
-            { q: 'VSEPR predicts:', opts: ['electron mass','molecular geometry','reaction rate','bond enthalpy'], a: 'molecular geometry' },
-            { q: 'The Haber process produces:', opts: ['H₂SO₄','HNO₃','NH₃','CO₂'], a: 'NH₃' },
-            { q: 'Buffer solutions resist changes in:', opts: ['temperature','pressure','pH','volume'], a: 'pH' },
-            { q: 'Entropy (S) measures:', opts: ['energy content','disorder/randomness','temperature','enthalpy'], a: 'disorder/randomness' },
-            { q: 'Ziegler-Natta catalysts are used in:', opts: ['petroleum refining','polymerisation','alcohol production','acid-base reactions'], a: 'polymerisation' }
-        ]
-    },
-    physics: {
-        beginner: [
-            { q: 'Speed = Distance ÷ ?', opts: ['Mass','Time','Force','Energy'], a: 'Time' },
-            { q: 'What is the unit of force?', opts: ['Joule','Watt','Newton','Pascal'], a: 'Newton' },
-            { q: 'Light travels fastest in:', opts: ['water','glass','vacuum','air'], a: 'vacuum' },
-            { q: 'Which is NOT a type of energy?', opts: ['kinetic','potential','molecular','thermal'], a: 'molecular' },
-            { q: 'Gravity on Earth is approx. __ m/s²:', opts: ['5.8','8.9','9.8','10.8'], a: '9.8' }
-        ],
-        intermediate: [
-            { q: 'Ohm\'s Law: V = ?', opts: ['I/R','R/I','IR','I+R'], a: 'IR' },
-            { q: 'Power = Energy ÷ ?', opts: ['Force','Distance','Time','Mass'], a: 'Time' },
-            { q: 'A convex lens __ light rays.', opts: ['diverges','reflects','converges','absorbs'], a: 'converges' },
-            { q: 'Frequency is measured in:', opts: ['Metres','Watts','Hertz','Joules'], a: 'Hertz' },
-            { q: 'Pressure = Force ÷ ?', opts: ['Area','Volume','Mass','Time'], a: 'Area' }
-        ],
-        advanced: [
-            { q: 'Momentum = mass × ?', opts: ['acceleration','force','velocity','energy'], a: 'velocity' },
-            { q: 'E = mc² was proposed by:', opts: ['Newton','Bohr','Einstein','Faraday'], a: 'Einstein' },
-            { q: 'Total internal reflection requires:', opts: ['angle < critical angle','angle = 0','angle > critical angle','any angle'], a: 'angle > critical angle' },
-            { q: 'Half-life is the time for __ of atoms to decay.', opts: ['all','1/4','1/2','3/4'], a: '1/2' },
-            { q: 'In SHM, acceleration is proportional to:', opts: ['velocity','displacement','time','force'], a: 'displacement' }
-        ],
-        expert: [
-            { q: 'Heisenberg\'s Uncertainty Principle states we cannot precisely know both:', opts: ['mass & charge','position & momentum','speed & direction','energy & time'], a: 'position & momentum' },
-            { q: 'A photon\'s energy E = ?', opts: ['hf','hλ','mc²','fλ'], a: 'hf' },
-            { q: 'Maxwell\'s equations describe:', opts: ['quantum states','electromagnetism','thermodynamics','nuclear forces'], a: 'electromagnetism' },
-            { q: 'Boltzmann constant relates temperature to:', opts: ['pressure','thermal energy','entropy only','electric field'], a: 'thermal energy' },
-            { q: 'Superconductivity occurs:', opts: ['at high temperatures','at critical low temperatures','at high pressure only','always in metals'], a: 'at critical low temperatures' }
-        ]
-    }
-};
-
-const SCRABBLE_WORDS = {
-    beginner: ['CAT','DOG','SUN','RUN','TOP','HAT','BIG','CUP','MAN','BOY','TEN','CAR','BED','EGG','HEN'],
-    intermediate: ['PLANT','WATER','SHINE','BRAIN','STORM','CHAIR','SHELF','TRACK','GRAPE','BLEND'],
-    advanced: ['OXYGEN','BRIDGE','FLIGHT','MASTER','SILVER','JUNGLE','FREEZE','THRONE','BOUNTY','CASTLE'],
-    expert: ['QUANTUM','ECLIPSE','NUCLEUS','TRIUMPH','PHANTOM','BIZARRE','FRACTAL','JOURNEY','OLYMPIC','GLACIER']
-};
-
-async function renderGames(student) {
-    const main = $('main-content');
-    const level = getGradeLevel(student.grade);
-    const subjects = student.subjects || ['maths','ela'];
-    // Always include scrabble & snake, subject games only if student takes them
-    const availableSubjects = ['maths','ela','biology','chemistry','physics'].filter(s =>
-        subjects.map(sub => sub.toLowerCase()).some(sub => sub.includes(s.replace('maths','math'))) || s === 'maths' || s === 'ela'
-    );
-    const allGames = [...new Set([...availableSubjects, 'scrabble', 'snake'])];
-
-    main.innerHTML = `
-        <h2 style="font-size:1.1rem;font-weight:800;margin-bottom:.5rem;">🎮 Educational Games</h2>
-        <p style="font-size:.8rem;color:#6b7280;margin-bottom:1rem;">Level: <strong>${level}</strong> (Grade ${esc(student.grade||'?')})</p>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:1rem;margin-bottom:1.5rem;">
-            ${allGames.map(g => {
-                const icons = {maths:'➗',ela:'📖',biology:'🧬',chemistry:'⚗️',physics:'⚡',scrabble:'🔤',snake:'🐍'};
-                const colors = {maths:'#eff6ff',ela:'#fdf4ff',biology:'#f0fdf4',chemistry:'#fef3c7',physics:'#fff1f2',scrabble:'#f0f9ff',snake:'#ecfdf5'};
-                const tcols = {maths:'#1d4ed8',ela:'#7c3aed',biology:'#15803d',chemistry:'#d97706',physics:'#dc2626',scrabble:'#0369a1',snake:'#065f46'};
-                return `<button onclick="startGame('${g}')" style="background:${colors[g]||'#f9fafb'};border:2px solid ${tcols[g]||'#e5e7eb'};border-radius:1rem;padding:1.2rem .5rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:.4rem;transition:transform .15s;">
-                    <div style="font-size:2rem;">${icons[g]||'🎯'}</div>
-                    <div style="font-weight:700;font-size:.8rem;color:${tcols[g]||'#374151'};text-transform:capitalize;">${g === 'ela' ? 'ELA' : g.charAt(0).toUpperCase()+g.slice(1)}</div>
-                </button>`;
+    el.innerHTML = `
+        <p class="text-xs text-gray-400 uppercase font-semibold mb-4">My Weekly Schedule (Nigeria Time)</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px">
+            ${DAYS.map(day => {
+                const slots = byDay[day].sort((a,b)=>(a.start||'').localeCompare(b.start||''));
+                const isToday = new Date().toLocaleDateString('en-US',{weekday:'long'}) === day;
+                return `
+                <div style="background:${isToday?'#eff6ff':'white'};border:${isToday?'2px solid #2563eb':'1px solid #e5e7eb'};border-radius:12px;padding:12px">
+                    <p style="font-weight:700;font-size:0.8rem;color:${isToday?'#2563eb':'#374151'};text-transform:uppercase;margin-bottom:8px;border-bottom:1px solid ${isToday?'#bfdbfe':'#f3f4f6'};padding-bottom:4px">
+                        ${safeEscape(day.substring(0,3))}${isToday?' ·Today':''}
+                    </p>
+                    ${slots.length ? slots.map(s => `
+                    <div style="background:${isToday?'#dbeafe':'#f8fafc'};border-radius:8px;padding:6px 8px;margin-bottom:4px">
+                        <p style="font-size:0.75rem;font-weight:600;color:#1f2937;margin:0">${safeEscape(fmtTime(s.start))} – ${safeEscape(fmtTime(s.end))}</p>
+                        ${s.isOvernight?'<p style="font-size:0.65rem;color:#7c3aed;margin:0">🌙 Overnight</p>':''}
+                    </div>`).join('') : `<p style="font-size:0.75rem;color:#d1d5db;text-align:center">No class</p>`}
+                </div>`;
             }).join('')}
         </div>
-        <div id="game-area"></div>
-        <div id="leaderboard-area" style="margin-top:1.5rem;"></div>
-    `;
-
-    loadLeaderboard(allGames, student);
+        <p style="font-size:0.75rem;color:#9ca3af;margin-top:12px;text-align:center">All times in Nigeria (WAT). Your local time may differ.</p>`;
+    el.dataset.loaded = '1';
 }
 
-window.startGame = function(subject) {
-    const level = getGradeLevel(studentData?.grade);
-    const area = $('game-area');
-    if (!area) return;
-    if (subject === 'snake') { startSnakeGame(area, level); return; }
-    if (subject === 'scrabble') { startScrabbleGame(area, level); return; }
-    startQuizGame(area, subject, level);
-};
+// ── Notifications System ──
+async function setupNotifications(student) {
+    const bellEl = document.getElementById('notification-bell');
+    const badgeEl = document.getElementById('notification-badge');
+    const panelEl = document.getElementById('notification-panel');
+    if (!bellEl) return;
 
-function startQuizGame(container, subject, level) {
-    const pool = QUESTIONS[subject]?.[level] || QUESTIONS[subject]?.beginner || [];
-    if (pool.length === 0) { container.innerHTML = `<div class="sp-empty-state">No questions available for this level.</div>`; return; }
-    const questions = [...pool].sort(() => Math.random()-0.5);
-    let idx = 0, score = 0;
-    const render = () => {
-        if (idx >= questions.length) {
-            container.innerHTML = `
-                <div class="sp-card" style="text-align:center;padding:2rem;">
-                    <div style="font-size:3rem;margin-bottom:.5rem;">${score >= questions.length*0.8?'🏆':score>=questions.length*0.5?'⭐':'💪'}</div>
-                    <h3 style="font-size:1.2rem;font-weight:800;">Quiz Complete!</h3>
-                    <p style="font-size:1.5rem;font-weight:900;color:#4f46e5;margin:.5rem 0;">${score}/${questions.length}</p>
-                    <p style="font-size:.85rem;color:#6b7280;margin-bottom:1rem;">${score >= questions.length*0.8?'Outstanding!':score>=questions.length*0.5?'Good effort!':'Keep practising!'}</p>
-                    <button onclick="startQuizGame($('game-area'),'${subject}','${level}')" style="background:#4f46e5;color:#fff;border:none;border-radius:.5rem;padding:.5rem 1.2rem;font-weight:700;cursor:pointer;margin-right:.5rem;">🔄 Try Again</button>
-                    <button onclick="window.startGame('${subject}')" style="background:#f3f4f6;color:#374151;border:none;border-radius:.5rem;padding:.5rem 1.2rem;font-weight:700;cursor:pointer;">✕ Quit</button>
-                </div>`;
-            saveScore(subject, score, questions.length);
-            return;
-        }
-        const q = questions[idx];
-        container.innerHTML = `
-            <div class="sp-card" style="padding:1.5rem;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:1rem;">
-                    <span style="font-size:.8rem;font-weight:700;color:#6b7280;">Question ${idx+1}/${questions.length}</span>
-                    <span style="font-size:.8rem;font-weight:700;color:#4f46e5;">Score: ${score}</span>
-                </div>
-                <div style="font-size:1rem;font-weight:700;margin-bottom:1rem;color:#1f2937;">${esc(q.q)}</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-                    ${q.opts.map((opt,i) => `<button onclick="answerQ('${esc(opt).replace(/'/g,"\\'")}')" style="background:#f3f4f6;border:2px solid #e5e7eb;border-radius:.65rem;padding:.6rem .5rem;font-size:.85rem;font-weight:600;cursor:pointer;transition:.15s;">
-                        ${['A','B','C','D'][i]}) ${esc(opt)}</button>`).join('')}
-                </div>
-            </div>`;
-        window.answerQ = (ans) => {
-            const correct = ans === q.a;
-            if (correct) score++;
-            const btns = container.querySelectorAll('button');
-            btns.forEach(btn => {
-                const isCorrect = btn.textContent.includes(q.a);
-                btn.style.background = isCorrect ? '#dcfce7' : (btn.textContent.includes(ans) && !correct ? '#fee2e2' : '#f3f4f6');
-                btn.style.borderColor = isCorrect ? '#16a34a' : (btn.textContent.includes(ans) && !correct ? '#dc2626' : '#e5e7eb');
-                btn.disabled = true;
-            });
-            setTimeout(() => { idx++; render(); }, 900);
-        };
-    };
-    render();
-}
+    const notifications = [];
 
-function startScrabbleGame(container, level) {
-    const pool = SCRABBLE_WORDS[level] || SCRABBLE_WORDS.beginner;
-    const word = pool[Math.floor(Math.random()*pool.length)];
-    const scrambled = word.split('').sort(() => Math.random()-.5).join('');
-    container.innerHTML = `
-        <div class="sp-card" style="padding:1.5rem;text-align:center;">
-            <h3 style="font-weight:800;margin-bottom:.5rem;">🔤 Scrabble Challenge</h3>
-            <p style="color:#6b7280;font-size:.8rem;margin-bottom:1rem;">Unscramble the letters to form a word! Level: <strong>${level}</strong></p>
-            <div style="display:flex;gap:.5rem;justify-content:center;margin-bottom:1.2rem;flex-wrap:wrap;">
-                ${scrambled.split('').map(l => `<div style="width:2.5rem;height:2.5rem;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border-radius:.5rem;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:900;box-shadow:0 2px 6px rgba(0,0,0,.15);">${l}</div>`).join('')}
-            </div>
-            <input id="scrabble-input" maxlength="${word.length}" placeholder="Type your answer…" style="border:2px solid #e5e7eb;border-radius:.65rem;padding:.6rem 1rem;font-size:1rem;width:200px;text-align:center;text-transform:uppercase;outline:none;margin-bottom:.75rem;">
-            <br>
-            <button id="scrabble-check" style="background:#4f46e5;color:#fff;border:none;border-radius:.5rem;padding:.5rem 1.2rem;font-weight:700;cursor:pointer;margin-right:.5rem;">Check ✓</button>
-            <button onclick="startScrabbleGame($('game-area'),'${level}')" style="background:#f3f4f6;color:#374151;border:none;border-radius:.5rem;padding:.5rem 1rem;cursor:pointer;font-weight:600;">🔄 New Word</button>
-            <div id="scrabble-result" style="margin-top:.75rem;font-size:.9rem;font-weight:700;min-height:1.5rem;"></div>
-        </div>`;
-    $('scrabble-check')?.addEventListener('click', () => {
-        const ans = ($('scrabble-input')?.value || '').trim().toUpperCase();
-        const res = $('scrabble-result');
-        if (ans === word) {
-            if (res) res.innerHTML = '<span style="color:#16a34a;">✅ Correct! Well done!</span>';
-            saveScore('scrabble', 1, 1);
-        } else {
-            if (res) res.innerHTML = `<span style="color:#dc2626;">❌ Not quite. Try again!</span>`;
-        }
-    });
-    $('scrabble-input')?.addEventListener('keypress', e => { if(e.key==='Enter') $('scrabble-check')?.click(); });
-}
+    // 1. Welcome message
+    notifications.push({ type:'welcome', icon:'👋', text:`Welcome back, ${student.studentName}! Great to see you today.`, time:'now', isNew:true });
 
-function startSnakeGame(container, level) {
-    const speed = { beginner: 200, intermediate: 150, advanced: 100, expert: 70 }[level] || 150;
-    const size = 20, cols = 18, rows = 14;
-    container.innerHTML = `
-        <div class="sp-card" style="padding:1rem;text-align:center;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
-                <h3 style="font-weight:800;margin:0;">🐍 Snake — ${level} (speed: ${1000/speed|0}x)</h3>
-                <span id="snake-score" style="font-size:1rem;font-weight:700;color:#4f46e5;">Score: 0</span>
-            </div>
-            <canvas id="snake-canvas" width="${cols*size}" height="${rows*size}" style="border:2px solid #4f46e5;border-radius:.75rem;background:#0f172a;display:block;margin:0 auto;max-width:100%;cursor:pointer;"></canvas>
-            <p style="font-size:.75rem;color:#9ca3af;margin-top:.5rem;">Use arrow keys or swipe to move. Click canvas to start/restart.</p>
-        </div>`;
+    // 2. Weekly reminder (every time)
+    notifications.push({ type:'reminder', icon:'📖', text:`Reminder: Read your books and complete your homework this week!`, time:'Weekly', isNew:false });
 
-    const canvas = $('snake-canvas');
-    const ctx = canvas.getContext('2d');
-    let snake = [{x:5,y:7}], dir = {x:1,y:0}, food = null, score = 0, interval = null, running = false;
+    // 3. Auto messages: beginning of month and 2nd week
+    const now = new Date();
+    const day = now.getDate();
+    if (day <= 3) notifications.push({ type:'auto', icon:'🗓️', text:`New month, new goals! Stay focused and give it your best.`, time:'Start of month', isNew:true });
+    if (day >= 8 && day <= 14) notifications.push({ type:'auto', icon:'💪', text:`You're in the 2nd week — keep up the great work!`, time:'Week 2', isNew:false });
 
-    const randomFood = () => {
-        let f;
-        do { f = {x:Math.floor(Math.random()*cols), y:Math.floor(Math.random()*rows)}; }
-        while (snake.some(s => s.x===f.x && s.y===f.y));
-        return f;
-    };
-
-    const draw = () => {
-        ctx.fillStyle = '#0f172a'; ctx.fillRect(0,0,canvas.width,canvas.height);
-        // Grid dots
-        ctx.fillStyle = 'rgba(255,255,255,.04)';
-        for(let x=0;x<cols;x++) for(let y=0;y<rows;y++) ctx.fillRect(x*size+size/2-1,y*size+size/2-1,2,2);
-        // Food
-        if(food) {
-            ctx.fillStyle = '#f59e0b';
-            ctx.beginPath();
-            ctx.arc(food.x*size+size/2, food.y*size+size/2, size/2-2, 0, Math.PI*2);
-            ctx.fill();
-        }
-        // Snake
-        snake.forEach((s,i) => {
-            ctx.fillStyle = i===0?'#4ade80':'#22c55e';
-            ctx.beginPath();
-            ctx.roundRect(s.x*size+1, s.y*size+1, size-2, size-2, 4);
-            ctx.fill();
-        });
-    };
-
-    const gameOver = () => {
-        clearInterval(interval); running = false;
-        ctx.fillStyle = 'rgba(0,0,0,.7)';
-        ctx.fillRect(0,0,canvas.width,canvas.height);
-        ctx.fillStyle = '#f87171'; ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText('GAME OVER', canvas.width/2, canvas.height/2 - 15);
-        ctx.fillStyle = '#fff'; ctx.font = '16px sans-serif';
-        ctx.fillText(`Score: ${score}`, canvas.width/2, canvas.height/2+15);
-        saveScore('snake', score, score);
-    };
-
-    const tick = () => {
-        const head = {x:snake[0].x+dir.x, y:snake[0].y+dir.y};
-        if(head.x<0||head.x>=cols||head.y<0||head.y>=rows||snake.some(s=>s.x===head.x&&s.y===head.y)){gameOver();return;}
-        snake.unshift(head);
-        if(food && head.x===food.x && head.y===food.y) {
-            score++; $('snake-score').textContent=`Score: ${score}`; food=randomFood();
-        } else { snake.pop(); }
-        draw();
-    };
-
-    const start = () => {
-        snake=[{x:5,y:7}]; dir={x:1,y:0}; score=0; food=randomFood(); running=true;
-        if($('snake-score')) $('snake-score').textContent='Score: 0';
-        clearInterval(interval); interval=setInterval(tick, speed); draw();
-    };
-
-    canvas.addEventListener('click', () => { if(!running) start(); });
-    document.addEventListener('keydown', e => {
-        if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
-        if(e.key==='ArrowUp'&&dir.y!==1) dir={x:0,y:-1};
-        if(e.key==='ArrowDown'&&dir.y!==-1) dir={x:0,y:1};
-        if(e.key==='ArrowLeft'&&dir.x!==1) dir={x:-1,y:0};
-        if(e.key==='ArrowRight'&&dir.x!==-1) dir={x:1,y:0};
-    });
-
-    // Touch/swipe
-    let touchStart = null;
-    canvas.addEventListener('touchstart', e => { touchStart = e.touches[0]; e.preventDefault(); }, {passive:false});
-    canvas.addEventListener('touchend', e => {
-        if(!touchStart) return;
-        const dx = e.changedTouches[0].clientX - touchStart.clientX;
-        const dy = e.changedTouches[0].clientY - touchStart.clientY;
-        if(Math.abs(dx) > Math.abs(dy)) { if(dx>0&&dir.x!==-1) dir={x:1,y:0}; else if(dx<0&&dir.x!==1) dir={x:-1,y:0}; }
-        else { if(dy>0&&dir.y!==-1) dir={x:0,y:1}; else if(dy<0&&dir.y!==1) dir={x:0,y:-1}; }
-        touchStart = null;
-    });
-
-    draw();
-    ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle='#fff'; ctx.font='bold 18px sans-serif'; ctx.textAlign='center';
-    ctx.fillText('Click to Start', canvas.width/2, canvas.height/2);
-}
-
-async function saveScore(game, score, total) {
-    if (!studentData) return;
+    // 4. Check for new homework
     try {
-        const percentage = total ? Math.round((score/total)*100) : score;
-        const snap = await getDocs(query(
-            collection(db,'game_leaderboard'),
-            where('game','==',game),
-            where('studentId','==',studentData.id)
+        const hwSnap = await getDocs(query(
+            collection(db,'homework_assignments'),
+            where('studentId','==',student.id),
+            where('status','==','assigned')
         ));
-        if (!snap.empty) {
-            const existing = snap.docs[0].data();
-            if (percentage > (existing.score || 0)) {
-                await updateDoc(doc(db,'game_leaderboard',snap.docs[0].id), {
-                    score: percentage, updatedAt: new Date(), grade: studentData.grade||''
-                });
-            }
-        } else {
-            await addDoc(collection(db,'game_leaderboard'), {
-                game, studentId: studentData.id,
-                studentName: studentData.studentName || 'Student',
-                score: percentage, grade: studentData.grade || '',
-                createdAt: new Date(), updatedAt: new Date()
-            });
-        }
-        // Refresh leaderboard
-        loadLeaderboard([game], studentData);
-    } catch(e) {}
-}
+        const pending = hwSnap.size;
+        if (pending > 0) notifications.push({ type:'homework', icon:'📝', text:`You have ${pending} pending assignment${pending!==1?'s':''} to complete.`, time:'Now', isNew:true });
+    } catch(e) { console.warn(e); }
 
-async function loadLeaderboard(games, student) {
-    const area = $('leaderboard-area');
-    if (!area) return;
+    // 5. Check for new courses
     try {
-        const results = await Promise.all(games.map(g =>
-            getDocs(query(collection(db,'game_leaderboard'), where('game','==',g))).catch(()=>({docs:[]}))
-        ));
-        area.innerHTML = `
-            <h3 style="font-size:1rem;font-weight:800;margin-bottom:.75rem;">🏆 Leaderboards</h3>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.75rem;">
-                ${games.map((g,i) => {
-                    const docs = results[i].docs || [];
-                    const top3 = docs.map(d => d.data()).sort((a,b) => (b.score||0)-(a.score||0)).slice(0,3);
-                    const icons = ['🥇','🥈','🥉'];
-                    return `<div style="background:#fff;border:1px solid #e5e7eb;border-radius:.85rem;padding:.9rem;">
-                        <div style="font-weight:700;font-size:.85rem;margin-bottom:.5rem;text-transform:capitalize;">${g === 'ela' ? 'ELA' : g.charAt(0).toUpperCase()+g.slice(1)}</div>
-                        ${top3.length===0 ? '<div style="font-size:.75rem;color:#9ca3af;">No scores yet. Be first!</div>'
-                            : top3.map((p,j) => `<div style="display:flex;align-items:center;gap:.4rem;padding:.25rem 0;font-size:.8rem;${p.studentId===student.id?'font-weight:700;color:#4f46e5':''}">
-                                <span>${icons[j]}</span>
-                                <span style="flex:1;">${esc(p.studentName)}</span>
-                                <span style="font-weight:700;">${p.score}%</span>
-                            </div>`).join('')}
-                    </div>`;
-                }).join('')}
-            </div>`;
-    } catch(e) {}
-}
+        const courseSnap = await getDocs(query(collection(db,'course_materials'), where('studentId','==',student.id)));
+        if (courseSnap.size > 0) notifications.push({ type:'course', icon:'📚', text:`${courseSnap.size} course material${courseSnap.size!==1?'s':''} available from your tutor.`, time:'', isNew:false });
+    } catch(e) { console.warn(e); }
 
-/*──────────────────────────────────────────────────────────
-  LAYOUT & NAVIGATION
-──────────────────────────────────────────────────────────*/
-function renderShell(student) {
-    document.body.innerHTML = `
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; min-height: 100vh; }
-        .sp-topbar { position:fixed;top:0;left:0;right:0;z-index:1000;background:#fff;border-bottom:1px solid #e5e7eb;padding:.6rem 1rem;display:flex;align-items:center;gap:.75rem;box-shadow:0 1px 4px rgba(0,0,0,.06); }
-        .sp-nav { position:fixed;bottom:0;left:0;right:0;z-index:1000;background:#fff;border-top:1px solid #e5e7eb;display:flex;box-shadow:0 -1px 4px rgba(0,0,0,.06); }
-        .sp-nav-btn { flex:1;display:flex;flex-direction:column;align-items:center;gap:.15rem;padding:.6rem .25rem;border:none;background:none;cursor:pointer;font-size:.6rem;font-weight:600;color:#9ca3af;transition:.15s; }
-        .sp-nav-btn.active { color:#4f46e5; }
-        .sp-nav-btn .sp-nav-icon { font-size:1.2rem; }
-        .sp-main { margin-top:56px;margin-bottom:64px;padding:1rem;max-width:768px;margin-left:auto;margin-right:auto; }
-        .sp-card { background:#fff;border:1px solid #e5e7eb;border-radius:1rem;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.05); }
-        .sp-card-header { padding:.8rem 1rem;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between; }
-        .sp-card-header h3 { font-weight:700;font-size:.95rem; }
-        .sp-card-body { padding:1rem; }
-        .sp-stat-card { background:#fff;border-radius:1rem;padding:1rem;border:1px solid #e5e7eb;box-shadow:0 1px 4px rgba(0,0,0,.04); }
-        .sp-empty-state { text-align:center;padding:3rem 1rem;color:#9ca3af; }
-        .sp-empty-state div { margin-bottom:.5rem; }
-        .sp-course-card { background:#fff;border:1px solid #e5e7eb;border-radius:.85rem;overflow:hidden;transition:box-shadow .15s;box-shadow:0 1px 3px rgba(0,0,0,.05); }
-        .sp-course-card:hover { box-shadow:0 4px 12px rgba(0,0,0,.1); }
-        .spinner { width:24px;height:24px;border:3px solid #e5e7eb;border-top:3px solid #4f46e5;border-radius:50%;animation:spin .7s linear infinite;display:inline-block; }
-        @keyframes spin { to{transform:rotate(360deg)} }
-        details[open] summary i { transform:rotate(90deg); }
-        .space-y-2 > * + * { margin-top:.5rem; }
-    </style>
+    // 6. Check for new messages
+    try {
+        if (student.id) {
+            const convSnap = await getDocs(query(collection(db,'conversations'), where('studentId','==',student.id)));
+            let unread = 0;
+            convSnap.forEach(d => { const data=d.data(); if (data.unreadCount>0 && data.lastSenderId!==student.id) unread+=data.unreadCount; });
+            if (unread > 0) notifications.push({ type:'message', icon:'💬', text:`You have ${unread} new message${unread!==1?'s':''} from your tutor.`, time:'Now', isNew:true });
+        }
+    } catch(e) { console.warn(e); }
 
-    <!-- TOP BAR -->
-    <div class="sp-topbar">
-        <div style="width:2.2rem;height:2.2rem;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">
-            ${esc((student.studentName||'S').charAt(0))}
-        </div>
-        <div style="flex:1;min-width:0;">
-            <div style="font-weight:700;font-size:.875rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(student.studentName||'Student')}</div>
-            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
-                <span id="student-location-display" style="font-size:.65rem;color:#9ca3af;"></span>
-                <span id="student-clock-time" style="font-size:.7rem;font-weight:600;color:#4f46e5;background:#eff6ff;padding:.1rem .4rem;border-radius:.3rem;font-variant-numeric:tabular-nums;"></span>
+    const newCount = notifications.filter(n=>n.isNew).length;
+    if (badgeEl) { badgeEl.textContent = newCount; badgeEl.style.display = newCount > 0 ? '' : 'none'; }
+
+    // Build panel
+    if (panelEl) {
+        panelEl.innerHTML = `
+            <div style="padding:14px 16px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">
+                <h4 style="font-weight:700;margin:0">Notifications</h4>
+                <span style="font-size:0.75rem;color:#9ca3af">${notifications.length} total</span>
             </div>
-        </div>
-        <div style="position:relative;">
-            <button id="bell-btn" style="background:none;border:none;font-size:1.4rem;cursor:pointer;padding:.2rem;" title="Notifications">🔔</button>
-            <span id="bell-badge" style="position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;font-size:.6rem;font-weight:700;border-radius:50%;width:1.1rem;height:1.1rem;display:none;align-items:center;justify-content:center;"></span>
-        </div>
-        <button id="logout-btn" style="font-size:.75rem;color:#ef4444;border:1px solid #fee2e2;background:#fff;border-radius:.5rem;padding:.3rem .6rem;cursor:pointer;font-weight:600;">Sign Out</button>
-    </div>
-
-    <!-- MAIN CONTENT -->
-    <div class="sp-main" id="main-content">
-        <div class="text-center py-10"><div class="spinner mx-auto mb-3"></div></div>
-    </div>
-
-    <!-- BOTTOM NAV -->
-    <nav class="sp-nav">
-        <button class="sp-nav-btn active" id="nav-dashboard" onclick="switchTab('dashboard')">
-            <span class="sp-nav-icon">🏠</span>Dashboard
-        </button>
-        <button class="sp-nav-btn" id="nav-messages" onclick="switchTab('messages')">
-            <span class="sp-nav-icon">💬</span>Messages
-        </button>
-        <button class="sp-nav-btn" id="nav-courses" onclick="switchTab('courses')">
-            <span class="sp-nav-icon">📚</span>Courses
-        </button>
-        <button class="sp-nav-btn" id="nav-assignments" onclick="switchTab('assignments')">
-            <span class="sp-nav-icon">📝</span>Assignments
-        </button>
-        <button class="sp-nav-btn" id="nav-results" onclick="switchTab('results')">
-            <span class="sp-nav-icon">📊</span>Results
-        </button>
-        <button class="sp-nav-btn" id="nav-schedule" onclick="switchTab('schedule')">
-            <span class="sp-nav-icon">🗓️</span>Schedule
-        </button>
-        <button class="sp-nav-btn" id="nav-games" onclick="switchTab('games')">
-            <span class="sp-nav-icon">🎮</span>Games
-        </button>
-    </nav>
-    `;
-
-    // Events
-    $('bell-btn')?.addEventListener('click', showNotificationPanel);
-    $('logout-btn')?.addEventListener('click', () => {
-        signOut(auth).then(() => { window.location.href = 'studentsignup.html'; });
-    });
-
-    // Clock + location
-    startStudentClock();
-    detectLocation();
-
-    // Notifications
-    loadNotifications(student);
-}
-
-window.switchTab = function(tab) {
-    currentTab = tab;
-    document.querySelectorAll('.sp-nav-btn').forEach(btn => btn.classList.remove('active'));
-    const navBtn = $(`nav-${tab}`);
-    if (navBtn) navBtn.classList.add('active');
-
-    // Fade
-    const main = $('main-content');
-    if (main) {
-        main.style.opacity = '0'; main.style.transform = 'translateY(6px)';
-        main.style.transition = 'opacity .2s ease, transform .2s ease';
-        setTimeout(() => {
-            main.style.opacity = '1'; main.style.transform = 'translateY(0)';
-        }, 30);
+            <div style="overflow-y:auto;max-height:320px">
+                ${notifications.map(n => `
+                <div style="padding:12px 16px;border-bottom:1px solid #f3f4f6;display:flex;gap:10px;align-items:flex-start;${n.isNew?'background:#fafff5':''}">
+                    <span style="font-size:1.4rem;flex-shrink:0">${n.icon}</span>
+                    <div style="flex:1;min-width:0">
+                        <p style="margin:0;font-size:0.875rem;color:#1f2937">${safeEscape(n.text)}</p>
+                        ${n.time?`<p style="margin:2px 0 0;font-size:0.7rem;color:#9ca3af">${safeEscape(n.time)}</p>`:''}
+                    </div>
+                    ${n.isNew?'<span style="width:8px;height:8px;background:#22c55e;border-radius:50%;flex-shrink:0;margin-top:4px"></span>':''}
+                </div>`).join('')}
+            </div>`;
+        panelEl.style.display = 'none';
     }
 
-    // Unsubscribe messages listener if leaving messages tab
-    if (tab !== 'messages' && unsubMessages) { unsubMessages(); unsubMessages = null; }
+    bellEl.onclick = () => {
+        if (!panelEl) return;
+        const visible = panelEl.style.display !== 'none';
+        panelEl.style.display = visible ? 'none' : 'block';
+    };
 
-    switch (tab) {
-        case 'dashboard':   renderDashboard(studentData); break;
-        case 'messages':    renderMessages(studentData); break;
-        case 'courses':     renderCourses(studentData); break;
-        case 'assignments': renderAssignments(studentData); break;
-        case 'results':     renderResults(studentData); break;
-        case 'schedule':    renderSchedule(studentData); break;
-        case 'games':       renderGames(studentData); break;
-    }
-};
+    // Close on outside click
+    document.addEventListener('click', e => {
+        if (panelEl && !bellEl.contains(e.target) && !panelEl.contains(e.target)) panelEl.style.display='none';
+    });
+}
 
-/*──────────────────────────────────────────────────────────
-  AUTH & BOOT
-──────────────────────────────────────────────────────────*/
-document.addEventListener('DOMContentLoaded', () => {
-    onAuthStateChanged(auth, async (user) => {
-        if (!user) { window.location.href = 'studentsignup.html'; return; }
+// ── Messaging Tab (student side) ──
+let unsubStudentChat = null;
 
-        try {
-            // Find student by UID
-            const q = query(collection(db,'students'), where('studentUid','==',user.uid));
-            const snap = await getDocs(q);
+function setupMessagingTab(student) {
+    // This is called once; the tab renders on click
+}
 
+async function loadMessagingTab(student) {
+    const el = document.getElementById('tab-messaging');
+    if (!el) return;
+
+    // Find tutor conversation
+    const convId = [student.tutorId||student.tutorEmail, student.id].sort().join('_');
+    const tutorName = student.tutorName || 'Tutor';
+
+    el.innerHTML = `
+        <div style="max-width:600px;margin:0 auto;background:white;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;display:flex;flex-direction:column;height:70vh">
+            <div style="padding:14px 16px;border-bottom:1px solid #e5e7eb;background:#f9fafb;display:flex;align-items:center;gap:10px">
+                <div style="width:36px;height:36px;background:#dbeafe;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#2563eb;flex-shrink:0">
+                    ${safeEscape((tutorName||'T').charAt(0).toUpperCase())}
+                </div>
+                <div>
+                    <p style="font-weight:700;margin:0;font-size:0.9rem">${safeEscape(tutorName)}</p>
+                    <p style="font-size:0.7rem;color:#9ca3af;margin:0">Your Tutor</p>
+                </div>
+            </div>
+            <div id="student-chat-messages" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px">
+                <div style="text-align:center;color:#9ca3af;margin:auto;font-size:0.875rem">Loading messages…</div>
+            </div>
+            <div style="padding:10px 12px;border-top:1px solid #e5e7eb;display:flex;gap:6px;align-items:center">
+                <label style="cursor:pointer;font-size:1.2rem;flex-shrink:0" title="Send image">
+                    📷<input type="file" id="student-img-input" accept="image/*" style="display:none">
+                </label>
+                <input type="text" id="student-chat-input" placeholder="Type a message…" style="flex:1;border:1px solid #d1d5db;border-radius:8px;padding:8px 12px;font-size:0.875rem">
+                <button id="student-chat-send" style="background:#2563eb;color:white;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:1rem">➤</button>
+            </div>
+        </div>`;
+
+    // Mark messages as read
+    try { await updateDoc(doc(db,'conversations',convId), { unreadCount: 0 }); } catch(_) {}
+
+    // Listen for messages
+    if (unsubStudentChat) unsubStudentChat();
+    const msgEl = document.getElementById('student-chat-messages');
+
+    try {
+        const q = query(collection(db,'conversations',convId,'messages'), orderBy('createdAt','asc'));
+        unsubStudentChat = onSnapshot(q, snap => {
+            if (!msgEl) return;
+            msgEl.innerHTML = '';
             if (snap.empty) {
-                document.body.innerHTML = `<div style="text-align:center;padding:3rem;font-family:sans-serif;">
-                    <div style="font-size:2rem;margin-bottom:1rem;">⚠️</div>
-                    <h2>Student profile not found</h2>
-                    <p style="color:#6b7280;margin:1rem 0;">Please contact your tutor or school.</p>
-                    <a href="studentsignup.html" style="color:#4f46e5;">← Back to login</a>
-                </div>`;
+                msgEl.innerHTML = '<div style="text-align:center;color:#9ca3af;margin:auto;font-size:0.875rem">No messages yet. Say hello! 👋</div>';
                 return;
             }
+            snap.forEach(d => {
+                const m = d.data();
+                const isMe = m.senderId === student.id;
+                const bubble = document.createElement('div');
+                bubble.style.cssText = `max-width:72%;padding:10px 14px;border-radius:${isMe?'18px 18px 4px 18px':'18px 18px 18px 4px'};background:${isMe?'#2563eb':'#f3f4f6'};color:${isMe?'white':'#1f2937'};align-self:${isMe?'flex-end':'flex-start'};word-break:break-word`;
+                let inner = '';
+                if (m.imageUrl) inner += `<img src="${safeEscape(m.imageUrl)}" style="max-width:180px;border-radius:8px;display:block;margin-bottom:4px">`;
+                if (m.content) inner += `<span style="font-size:0.875rem">${safeEscape(m.content)}</span>`;
+                const ts = m.createdAt?.toDate ? m.createdAt.toDate() : new Date(m.createdAt||0);
+                inner += `<div style="font-size:0.65rem;opacity:0.7;margin-top:3px;text-align:right">${ts.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>`;
+                bubble.innerHTML = inner;
+                msgEl.appendChild(bubble);
+            });
+            msgEl.scrollTop = msgEl.scrollHeight;
+        });
+    } catch(e) {
+        if (msgEl) msgEl.innerHTML = '<p style="text-align:center;color:#9ca3af">Could not load messages.</p>';
+    }
 
-            const studentDoc = snap.docs[0];
-            studentData = { id: studentDoc.id, ...studentDoc.data() };
+    // Send handler
+    async function sendStudentMsg() {
+        const input  = document.getElementById('student-chat-input');
+        const imgInp = document.getElementById('student-img-input');
+        const txt    = input?.value.trim();
+        const file   = imgInp?.files[0];
+        if (!txt && !file) return;
+        if (input) input.value = '';
 
-            // Update last login
-            updateDoc(doc(db,'students',studentDoc.id), { lastLogin: serverTimestamp() }).catch(()=>{});
+        const now = new Date();
+        let imageUrl = null;
 
-            renderShell(studentData);
-            renderDashboard(studentData);
+        if (file) {
+            try {
+                const fd = new FormData();
+                fd.append('file', file);
+                fd.append('upload_preset', 'tutor_homework');
+                fd.append('folder', 'chat_images');
+                const res = await fetch('https://api.cloudinary.com/v1_1/dwjq7j5zp/upload',{method:'POST',body:fd});
+                imageUrl = (await res.json()).secure_url || null;
+                if (imgInp) imgInp.value = '';
+            } catch(e) { console.error(e); }
+        }
 
-        } catch(e) {
-            console.error('Portal boot error:', e);
-            document.body.innerHTML = `<div style="text-align:center;padding:3rem;font-family:sans-serif;">
-                <div style="font-size:2rem;margin-bottom:1rem;">❌</div>
-                <p>Error loading portal: ${esc(e.message)}</p>
-                <a href="studentsignup.html">← Back to login</a>
-            </div>`;
+        try {
+            // Ensure conversation doc exists
+            await setDoc(doc(db,'conversations',convId), {
+                participants: [student.tutorId||student.tutorEmail, student.id],
+                participantDetails: {
+                    [student.id]: { name: student.studentName, role:'student' },
+                    [student.tutorId||student.tutorEmail]: { name: tutorName, role:'tutor' }
+                },
+                lastMessage: imageUrl ? '📷 Image' : txt,
+                lastMessageTimestamp: now,
+                lastSenderId: student.id,
+                unreadCount: 1,
+                studentId: student.id,
+                tutorId: student.tutorId || ''
+            }, { merge: true });
+
+            await addDoc(collection(db,'conversations',convId,'messages'), {
+                content: txt||'', imageUrl: imageUrl||null,
+                senderId: student.id, senderName: student.studentName, senderRole:'student',
+                createdAt: now, read: false
+            });
+        } catch(e) { console.error(e); showToast('Message failed to send.','error'); }
+    }
+
+    document.getElementById('student-chat-send')?.addEventListener('click', sendStudentMsg);
+    document.getElementById('student-chat-input')?.addEventListener('keypress', e => { if (e.key==='Enter') sendStudentMsg(); });
+}
+
+// ── Games Tab (Educational Games) ──
+async function loadGamesTab(student) {
+    const el = document.getElementById('tab-games');
+    if (!el || el.dataset.loaded === '1') return;
+
+    const subjects = student.subjects || [];
+    const grade    = parseInt((student.grade||'').replace(/\D/g,'')) || 5;
+
+    // Only show games for enrolled subjects + always Scrabble/Snake
+    const MATH_GAMES    = ['Maths','Math','Mathematics'];
+    const ELA_GAMES     = ['English','Language Arts','English Proficiency','ELA'];
+    const SCI_GAMES     = { Biology:'Biology', Chemistry:'Chemistry', Physics:'Physics' };
+
+    const availableGames = [];
+
+    // Maths
+    if (subjects.some(s => MATH_GAMES.some(m => s.toLowerCase().includes(m.toLowerCase())))) {
+        availableGames.push({ id:'maths-quiz', name:'Maths Quiz', icon:'🔢', desc:'Arithmetic & problem solving', subject:'Maths' });
+    }
+
+    // ELA
+    if (subjects.some(s => ELA_GAMES.some(m => s.toLowerCase().includes(m.toLowerCase())))) {
+        availableGames.push({ id:'word-puzzle', name:'Word Puzzle', icon:'🔤', desc:'Vocabulary & comprehension', subject:'ELA' });
+    }
+
+    // Sciences
+    Object.entries(SCI_GAMES).forEach(([subj, label]) => {
+        if (subjects.some(s => s.toLowerCase().includes(subj.toLowerCase()))) {
+            availableGames.push({ id: subj.toLowerCase()+'-quiz', name: label+' Quiz', icon: subj==='Biology'?'🧬':subj==='Chemistry'?'⚗️':'⚛️', desc: label+' concepts for Grade '+grade, subject: label });
         }
     });
-});
+
+    // Always available
+    availableGames.push({ id:'scrabble', name:'Scrabble', icon:'🔡', desc:'Build words and score points', subject:'All' });
+    availableGames.push({ id:'snake', name:'Snake', icon:'🐍', desc:'Classic snake game — collect as many as you can!', subject:'All' });
+
+    el.innerHTML = `
+        <p class="text-xs text-gray-400 uppercase font-semibold mb-4">Educational Games</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:24px">
+            ${availableGames.map(g => `
+            <div style="background:white;border:1px solid #e5e7eb;border-radius:16px;padding:20px;text-align:center;cursor:pointer;transition:all .2s"
+                 onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 20px rgba(0,0,0,.08)'"
+                 onmouseout="this.style.transform='';this.style.boxShadow=''"
+                 onclick="launchGame('${safeEscape(g.id)}','${safeEscape(g.name)}')">
+                <div style="font-size:2.5rem;margin-bottom:8px">${g.icon}</div>
+                <p style="font-weight:700;color:#1f2937;margin:0 0 4px">${safeEscape(g.name)}</p>
+                <p style="font-size:0.75rem;color:#6b7280;margin:0 0 8px">${safeEscape(g.desc)}</p>
+                <span style="font-size:0.7rem;background:#dbeafe;color:#2563eb;padding:2px 8px;border-radius:999px">${safeEscape(g.subject)}</span>
+            </div>`).join('')}
+        </div>
+        <div id="game-container" style="background:white;border:1px solid #e5e7eb;border-radius:16px;padding:20px;display:none"></div>
+        <div id="game-leaderboard" style="margin-top:20px"></div>`;
+
+    el.dataset.loaded = '1';
+}
+
+window.launchGame = function(gameId, gameName) {
+    const container = document.getElementById('game-container');
+    if (!container) return;
+    container.style.display = 'block';
+    container.scrollIntoView({ behavior:'smooth' });
+
+    if (gameId === 'snake') {
+        container.innerHTML = renderSnakeGame();
+        initSnakeGame();
+    } else if (gameId === 'scrabble') {
+        container.innerHTML = renderScrabbleGame();
+        initScrabbleGame();
+    } else if (gameId.includes('quiz')) {
+        const subject = gameId.replace('-quiz','');
+        container.innerHTML = renderQuizGame(gameName, subject, parseInt((studentData?.grade||'5').replace(/\D/g,''))||5);
+        initQuizGame(subject);
+    }
+};
+
+// ── Snake Game ──
+function renderSnakeGame() {
+    return `
+        <div style="text-align:center">
+            <h3 style="font-weight:700;margin-bottom:12px">🐍 Snake</h3>
+            <canvas id="snake-canvas" width="320" height="320" style="border:2px solid #e5e7eb;border-radius:8px;display:block;margin:0 auto"></canvas>
+            <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+                <p id="snake-score" style="font-weight:700;color:#2563eb">Score: 0</p>
+                <button onclick="startSnake()" style="background:#2563eb;color:white;border:none;border-radius:8px;padding:8px 16px;cursor:pointer">▶ Start / Restart</button>
+            </div>
+            <p style="font-size:0.75rem;color:#9ca3af;margin-top:6px">Use Arrow Keys or WASD to move</p>
+        </div>`;
+}
+
+function initSnakeGame() {
+    window.startSnake = function() {
+        const canvas = document.getElementById('snake-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const SIZE = 16, COLS = canvas.width/SIZE, ROWS = canvas.height/SIZE;
+        let snake = [{x:10,y:10}], dir={x:1,y:0}, food=newFood(), score=0, gameLoop;
+
+        function newFood() { return { x:Math.floor(Math.random()*COLS), y:Math.floor(Math.random()*ROWS) }; }
+
+        function draw() {
+            ctx.fillStyle='#f9fafb'; ctx.fillRect(0,0,canvas.width,canvas.height);
+            ctx.fillStyle='#ef4444'; ctx.fillRect(food.x*SIZE+1,food.y*SIZE+1,SIZE-2,SIZE-2);
+            snake.forEach((s,i) => {
+                ctx.fillStyle = i===0?'#2563eb':'#93c5fd';
+                ctx.fillRect(s.x*SIZE+1,s.y*SIZE+1,SIZE-2,SIZE-2);
+            });
+        }
+
+        function tick() {
+            const head = {x:snake[0].x+dir.x, y:snake[0].y+dir.y};
+            if (head.x<0||head.x>=COLS||head.y<0||head.y>=ROWS||snake.some(s=>s.x===head.x&&s.y===head.y)) {
+                clearInterval(gameLoop);
+                ctx.fillStyle='rgba(0,0,0,.6)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+                ctx.fillStyle='white'; ctx.font='bold 24px sans-serif'; ctx.textAlign='center';
+                ctx.fillText('Game Over!', canvas.width/2, canvas.height/2-10);
+                ctx.font='16px sans-serif'; ctx.fillText('Score: '+score, canvas.width/2, canvas.height/2+20);
+                saveGameScore('snake', score);
+                return;
+            }
+            snake.unshift(head);
+            if (head.x===food.x && head.y===food.y) { score++; document.getElementById('snake-score').textContent='Score: '+score; food=newFood(); }
+            else snake.pop();
+            draw();
+        }
+
+        clearInterval(gameLoop);
+        snake=[{x:10,y:10}]; dir={x:1,y:0}; food=newFood(); score=0;
+        document.getElementById('snake-score').textContent='Score: 0';
+        draw();
+        gameLoop = setInterval(tick, 130);
+    };
+
+    document.addEventListener('keydown', e => {
+        const map = { ArrowUp:{x:0,y:-1}, ArrowDown:{x:0,y:1}, ArrowLeft:{x:-1,y:0}, ArrowRight:{x:1,y:0}, w:{x:0,y:-1}, s:{x:0,y:1}, a:{x:-1,y:0}, d:{x:1,y:0} };
+        if (map[e.key] && window._snakeDir) { const nd=map[e.key]; if(nd.x!=-window._snakeDir.x||nd.y!=-window._snakeDir.y) window._snakeDir=nd; }
+    });
+}
+
+// ── Simple Scrabble ──
+function renderScrabbleGame() {
+    const WORDS = ['CAT','DOG','SUN','MAP','JAR','PIG','HEN','COW','ANT','BEE','WEB','FLY','CUP','BAG','HAT','NET','PIN','TAB','VAN','ZAP'];
+    const target = WORDS[Math.floor(Math.random()*WORDS.length)];
+    const letters = target.split('').concat(['A','E','I','O','U','R','S','T'].sort(()=>Math.random()-.5).slice(0,4));
+    const shuffled = letters.sort(()=>Math.random()-.5);
+
+    return `
+        <div style="text-align:center" data-word="${target}">
+            <h3 style="font-weight:700;margin-bottom:4px">🔡 Scrabble Challenge</h3>
+            <p style="font-size:0.875rem;color:#6b7280;margin-bottom:16px">Arrange the letters to form a valid word!</p>
+            <div id="scrabble-answer" style="display:flex;justify-content:center;gap:6px;min-height:48px;border:2px dashed #e5e7eb;border-radius:8px;padding:8px;margin-bottom:12px;flex-wrap:wrap"></div>
+            <div id="scrabble-pool" style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-bottom:16px">
+                ${shuffled.map((l,i)=>`<button onclick="scrabblePickLetter(this,'${l}')" style="width:44px;height:44px;font-size:1.1rem;font-weight:700;background:#dbeafe;color:#2563eb;border:2px solid #93c5fd;border-radius:8px;cursor:pointer">${l}</button>`).join('')}
+            </div>
+            <div style="display:flex;gap:8px;justify-content:center">
+                <button onclick="scrabbleCheck()" style="background:#2563eb;color:white;border:none;border-radius:8px;padding:10px 20px;cursor:pointer;font-weight:600">✅ Check</button>
+                <button onclick="scrabbleClear()" style="background:#f3f4f6;color:#374151;border:1px solid #e5e7eb;border-radius:8px;padding:10px 20px;cursor:pointer">🔄 Clear</button>
+            </div>
+            <p id="scrabble-result" style="margin-top:12px;font-weight:700;font-size:1.1rem"></p>
+        </div>`;
+}
+
+function initScrabbleGame() {
+    window._scrabbleSelected = [];
+
+    window.scrabblePickLetter = function(btn, letter) {
+        btn.style.opacity='0.4'; btn.disabled=true;
+        window._scrabbleSelected.push({letter, btn});
+        const ans = document.getElementById('scrabble-answer');
+        const chip = document.createElement('span');
+        chip.style.cssText='display:inline-block;width:40px;height:40px;line-height:40px;text-align:center;font-size:1.1rem;font-weight:700;background:#2563eb;color:white;border-radius:8px;cursor:pointer';
+        chip.textContent = letter;
+        chip.onclick = () => {
+            const idx = window._scrabbleSelected.indexOf(window._scrabbleSelected.find(s=>s.btn===btn||s.letter===letter));
+            if (idx>-1) { window._scrabbleSelected[idx].btn.style.opacity='1'; window._scrabbleSelected[idx].btn.disabled=false; window._scrabbleSelected.splice(idx,1); }
+            chip.remove();
+        };
+        ans?.appendChild(chip);
+    };
+
+    window.scrabbleCheck = function() {
+        const word = window._scrabbleSelected.map(s=>s.letter).join('');
+        const target = document.querySelector('[data-word]')?.dataset.word;
+        const result = document.getElementById('scrabble-result');
+        if (!result) return;
+        if (word === target) { result.textContent = '🎉 Correct! Well done!'; result.style.color='#16a34a'; saveGameScore('scrabble',10); }
+        else { result.textContent = `❌ Not quite! The word was "${target}"`; result.style.color='#dc2626'; }
+    };
+
+    window.scrabbleClear = function() {
+        window._scrabbleSelected.forEach(s => { s.btn.style.opacity='1'; s.btn.disabled=false; });
+        window._scrabbleSelected = [];
+        const ans = document.getElementById('scrabble-answer');
+        if (ans) ans.innerHTML = '';
+        const result = document.getElementById('scrabble-result');
+        if (result) result.textContent = '';
+    };
+}
+
+// ── Subject Quiz ──
+function renderQuizGame(name, subject, grade) {
+    return `
+        <div id="quiz-container" data-subject="${subject}" data-grade="${grade}">
+            <h3 style="font-weight:700;text-align:center;margin-bottom:16px">${safeEscape(name)}</h3>
+            <div id="quiz-inner" style="text-align:center"><div class="spinner" style="margin:20px auto"></div></div>
+        </div>`;
+}
+
+function initQuizGame(subject) {
+    // Grade-appropriate questions by subject
+    const QUESTIONS = {
+        maths: [
+            { q:'What is 15 × 7?', options:['95','105','100','110'], answer:1 },
+            { q:'What is the square root of 144?', options:['10','11','12','13'], answer:2 },
+            { q:'What is 25% of 200?', options:['40','50','60','45'], answer:1 },
+            { q:'What is 3/4 + 1/2?', options:['5/4','7/6','1','4/6'], answer:0 },
+        ],
+        biology: [
+            { q:'What is the powerhouse of the cell?', options:['Nucleus','Mitochondria','Ribosome','Vacuole'], answer:1 },
+            { q:'What gas do plants absorb during photosynthesis?', options:['Oxygen','Nitrogen','Carbon Dioxide','Hydrogen'], answer:2 },
+            { q:'How many chromosomes does a human body cell have?', options:['23','46','64','22'], answer:1 },
+        ],
+        chemistry: [
+            { q:'What is the chemical symbol for Gold?', options:['Go','Gd','Au','Ag'], answer:2 },
+            { q:'What is the pH of pure water?', options:['5','7','9','14'], answer:1 },
+            { q:'What is the most abundant gas in Earth\'s atmosphere?', options:['Oxygen','Carbon Dioxide','Nitrogen','Argon'], answer:2 },
+        ],
+        physics: [
+            { q:'What is the unit of electric current?', options:['Volt','Watt','Ampere','Ohm'], answer:2 },
+            { q:'What is the speed of light (approx)?', options:['3×10⁸ m/s','3×10⁶ m/s','3×10⁴ m/s','3×10¹⁰ m/s'], answer:0 },
+            { q:'F = ma is Newton\'s which law?', options:['First','Second','Third','Fourth'], answer:1 },
+        ],
+        ela: [
+            { q:'What is an antonym of "brave"?', options:['Bold','Fearless','Cowardly','Daring'], answer:2 },
+            { q:'Identify the verb: "She runs every morning."', options:['She','runs','every','morning'], answer:1 },
+            { q:'What literary device uses "the wind whispered"?', options:['Simile','Metaphor','Personification','Alliteration'], answer:2 },
+        ]
+    };
+
+    const qs = QUESTIONS[subject] || QUESTIONS.maths;
+    let current = 0, score = 0;
+
+    function renderQ() {
+        const inner = document.getElementById('quiz-inner');
+        if (!inner) return;
+        if (current >= qs.length) {
+            inner.innerHTML = `
+                <div class="text-center py-4">
+                    <div style="font-size:3rem;margin-bottom:8px">${score===qs.length?'🏆':score>qs.length/2?'⭐':'💪'}</div>
+                    <p style="font-size:1.5rem;font-weight:700;color:#2563eb">${score}/${qs.length}</p>
+                    <p style="color:#6b7280;margin-bottom:16px">${score===qs.length?'Perfect score!':score>qs.length/2?'Great job!':'Keep practising!'}</p>
+                    <button onclick="initQuizGame('${subject}')" style="background:#2563eb;color:white;border:none;border-radius:8px;padding:10px 20px;cursor:pointer;font-weight:600">Play Again</button>
+                </div>`;
+            saveGameScore(subject+'-quiz', Math.round(score/qs.length*100));
+            return;
+        }
+        const q = qs[current];
+        inner.innerHTML = `
+            <div style="text-align:left">
+                <p style="font-size:0.8rem;color:#9ca3af;margin-bottom:8px">Question ${current+1} of ${qs.length} · Score: ${score}</p>
+                <p style="font-weight:700;font-size:1rem;color:#1f2937;margin-bottom:16px">${safeEscape(q.q)}</p>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                    ${q.options.map((opt,i)=>`
+                    <button onclick="quizAnswer(${i},${q.answer})" style="background:#f9fafb;border:2px solid #e5e7eb;border-radius:10px;padding:10px 16px;text-align:left;cursor:pointer;font-size:0.875rem;color:#374151;transition:all .15s"
+                        onmouseover="this.style.background='#eff6ff';this.style.borderColor='#93c5fd'"
+                        onmouseout="this.style.background='#f9fafb';this.style.borderColor='#e5e7eb'">
+                        ${String.fromCharCode(65+i)}. ${safeEscape(opt)}
+                    </button>`).join('')}
+                </div>
+            </div>`;
+    }
+
+    window.quizAnswer = function(chosen, correct) {
+        const btns = document.querySelectorAll('#quiz-inner button');
+        btns.forEach((b,i) => {
+            b.disabled = true;
+            if (i===correct) b.style.background='#dcfce7', b.style.borderColor='#86efac';
+            else if (i===chosen) b.style.background='#fee2e2', b.style.borderColor='#fca5a5';
+        });
+        if (chosen===correct) score++;
+        setTimeout(() => { current++; renderQ(); }, 1000);
+    };
+
+    renderQ();
+}
+
+// ── Leaderboard ──
+async function saveGameScore(gameId, score) {
+    if (!studentData) return;
+    try {
+        const ref = doc(db, 'game_leaderboard', `${gameId}_${studentData.id}`);
+        const existing = await getDoc(ref);
+        const prev = existing.exists() ? (existing.data().score||0) : 0;
+        if (score > prev) {
+            await setDoc(ref, { gameId, studentId: studentData.id, studentName: studentData.studentName, grade: studentData.grade, score, updatedAt: serverTimestamp() });
+        }
+    } catch(e) { console.warn('Score save failed:', e); }
+}
+
+// ── Global Exports ──
+window.showToast = showToast;
+window.checkPasswordStrength = window.checkPasswordStrength;
+window.togglePasswordVisibility = window.togglePasswordVisibility;
+window.switchTab = window.switchTab;
+window.goBackToStep1 = window.goBackToStep1;
+window.showForgotPassword = window.showForgotPassword;
+window.hideForgotPassword = window.hideForgotPassword;
+window.findStudents = window.findStudents;
+window.completeRegistration = window.completeRegistration;
+window.loginStudent = window.loginStudent;
+window.signInWithGoogle = window.signInWithGoogle;
+window.signInWithGoogleForActivation = window.signInWithGoogleForActivation;
+window.sendPasswordReset = window.sendPasswordReset;
+window.initStudentDashboard = window.initStudentDashboard;
+window.submitHomework = window.submitHomework;
+window.doSubmitHomework = window.doSubmitHomework;
+window.launchGame = window.launchGame;
