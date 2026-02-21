@@ -10207,8 +10207,8 @@ const navigationGroups = {
         icon: "fas fa-chart-line",
         label: "Master Portal",
         items: [
-            { id: "navMasterPortal", label: "Management Portal", icon: "fas fa-table", fn: renderMasterPortalPanel },
-            { id: "navAcademicFollowUp", label: "Academic Follow-Up", icon: "fas fa-graduation-cap", fn: renderAcademicFollowUpPanel }
+            { id: "navMasterPortal", label: "Management Portal", icon: "fas fa-table", fn: renderMasterPortalPanel, perm: "viewMasterPortal" },
+            { id: "navAcademicFollowUp", label: "Academic Follow-Up", icon: "fas fa-graduation-cap", fn: renderAcademicFollowUpPanel, perm: "viewMasterPortal" }
         ]
     },
     "communication": {
@@ -10233,10 +10233,12 @@ function initializeSidebarNavigation(staffData) {
     
     Object.entries(navigationGroups).forEach(([groupKey, group]) => {
         const visibleItems = group.items ? group.items.filter(item => {
+            // Use explicit perm key if provided on the item, otherwise derive it
+            const permKey = item.perm || getPermissionKey(item.id);
             const hasPermission = item.id === 'navReferralsAdmin' || 
                                 !staffData.permissions || 
                                 !staffData.permissions.tabs || 
-                                staffData.permissions.tabs[getPermissionKey(item.id)] === true;
+                                staffData.permissions.tabs[permKey] === true;
             return hasPermission;
         }) : [];
         
