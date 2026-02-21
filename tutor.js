@@ -2800,10 +2800,20 @@ function renderTutorDashboard(container, tutor) {
     updateActiveTab('navDashboard');
     
     container.innerHTML = `
-        <div class="hero-section">
-            <h1 class="hero-title">Welcome, ${escapeHtml(tutor.name || 'Tutor')}! 👋</h1>
-            <p class="hero-subtitle">Review pending submissions, search records, and track your progress</p>
+        <!-- Top bar: greeting + Lagos clock + Performance scorecard -->
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div class="flex-1">
+                <h1 class="text-xl font-black text-gray-800">Welcome, ${escapeHtml(tutor.name || 'Tutor')}! 👋</h1>
+                <p class="text-sm text-gray-400">Review submissions, track your performance and manage students</p>
+            </div>
+            <div class="flex flex-col items-end gap-1">
+                <div id="tutor-lagos-clock" class="text-sm font-semibold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 whitespace-nowrap">Loading time…</div>
+                <div class="text-xs text-gray-400">📍 Lagos, Nigeria (WAT)</div>
+            </div>
         </div>
+
+        <!-- Performance Scorecard always visible on dashboard -->
+        <div id="performance-widget" class="mb-4"></div>
         
         <div class="card">
             <div class="card-header">
@@ -2892,6 +2902,32 @@ function renderTutorDashboard(container, tutor) {
     }
 
     loadTutorReports(tutor.email);
+
+    // Start Lagos clock on dashboard
+    (function startTutorClock() {
+        function getLagosTime() {
+            return new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+        }
+        function formatLagosDT() {
+            const opts = { weekday:'short', day:'numeric', month:'short', year:'numeric',
+                           hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true, timeZone:'Africa/Lagos' };
+            return new Intl.DateTimeFormat('en-NG', opts).format(new Date());
+        }
+        const clockEl = document.getElementById('tutor-lagos-clock');
+        if (clockEl) {
+            clockEl.textContent = formatLagosDT();
+            // Store interval id so it can be cleared on tab switch
+            if (window._tutorClockInterval) clearInterval(window._tutorClockInterval);
+            window._tutorClockInterval = setInterval(() => {
+                const el = document.getElementById('tutor-lagos-clock');
+                if (el) el.textContent = formatLagosDT();
+                else clearInterval(window._tutorClockInterval);
+            }, 1000);
+        }
+    })();
+
+    // Init performance scorecard (real-time listener to tutor doc)
+    if (tutor.id) initGamification(tutor.id);
 }
 
 async function loadStudentDropdowns(tutorEmail) {
@@ -4117,7 +4153,16 @@ async function initGamification(tutorId) {
                 else if (qa !== null) combined = qa;
                 else if (qc !== null) combined = qc;
                 currentTutorScore = combined;
-                updateScoreDisplay(currentTutorScore, data.scoreBreakdown || {});
+                // Pass grading details directly so scorecard never has a stale read
+                updateScoreDisplay(currentTutorScore, {
+                    qaScore: qa,
+                    qcScore: qc,
+                    qaAdvice: data.qaAdvice || '',
+                    qcAdvice: data.qcAdvice || '',
+                    qaGradedByName: data.qaGradedByName || '',
+                    qcGradedByName: data.qcGradedByName || '',
+                    performanceMonth: data.performanceMonth || ''
+                });
             }
         });
 
@@ -4176,15 +4221,15 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
     if (totalScore >= 65) { scoreColor = 'text-yellow-500'; barColor = 'from-yellow-400 to-yellow-500'; }
     if (totalScore >= 85) { scoreColor = 'text-green-600'; barColor = 'from-green-400 to-green-600'; }
 
-    // Pull QA/QC details stored on the tutor doc
-    const tutorData = window.tutorData || {};
-    const qaScore    = tutorData.qaScore    ?? null;
-    const qcScore    = tutorData.qcScore    ?? null;
-    const qaAdvice   = tutorData.qaAdvice   || '';
-    const qcAdvice   = tutorData.qcAdvice   || '';
-    const qaGraderName = tutorData.qaGradedByName || '';
-    const qcGraderName = tutorData.qcGradedByName || '';
-    const perfMonth  = tutorData.performanceMonth || '';
+    // Accept grading details either via breakdown param (real-time) or window.tutorData (fallback)
+    const td = window.tutorData || {};
+    const qaScore      = breakdown.qaScore      ?? td.qaScore      ?? null;
+    const qcScore      = breakdown.qcScore      ?? td.qcScore      ?? null;
+    const qaAdvice     = breakdown.qaAdvice     ?? td.qaAdvice     ?? '';
+    const qcAdvice     = breakdown.qcAdvice     ?? td.qcAdvice     ?? '';
+    const qaGraderName = breakdown.qaGradedByName ?? td.qaGradedByName ?? '';
+    const qcGraderName = breakdown.qcGradedByName ?? td.qcGradedByName ?? '';
+    const perfMonth    = breakdown.performanceMonth ?? td.performanceMonth ?? '';
 
     function scoreBadge(score, label, graderName, advice, themeClass) {
         if (score === null || score === undefined) return `
