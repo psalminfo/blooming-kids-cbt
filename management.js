@@ -9431,6 +9431,795 @@ if (!document.querySelector('style[data-reports-panel]')) {
 }
 
 // ======================================================
+// SECTION 8.5: MANAGEMENT PORTAL — MASTER VIEW TAB
+// Permissions required in staff doc (permissions.tabs):
+//   viewMasterPortal: true  → see this tab
+//   canQA: true             → purple QA Rate button
+//   canQC: true             → amber QC Rate button
+// ======================================================
+
+// ─────────────────────────────────────────────────────
+//  DATA LAYER: fetchMasterData()
+//  Joins tutors → students → produces flat records
+// ─────────────────────────────────────────────────────
+
+async function fetchMasterData() {
+    const tutorsSnap = await getDocs(collection(db, "tutors"));
+    const tutors = tutorsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    const masterRows = [];
+
+    await Promise.all(tutors.map(async (tutor) => {
+        const tutorEmail = tutor.email || tutor.tutorEmail || '';
+        if (!tutorEmail) return;
+
+        const studentsSnap = await getDocs(
+            query(collection(db, "students"), where("tutorEmail", "==", tutorEmail))
+        );
+
+        if (studentsSnap.empty) {
+            masterRows.push({
+                tutorId: tutor.id,
+                tutorName: tutor.name || tutorEmail,
+                tutorEmail,
+                qaScore: tutor.qaScore ?? null,
+                qcScore: tutor.qcScore ?? null,
+                studentId: null,
+                studentName: '—',
+                parentName: '—',
+                parentPhone: '',
+                scheduleSummary: '—'
+            });
+            return;
+        }
+
+        studentsSnap.docs.forEach(sDoc => {
+            const s = sDoc.data();
+            let scheduleSummary = '—';
+            if (s.days && s.time) {
+                const daysStr = Array.isArray(s.days) ? s.days.join('/') : s.days;
+                scheduleSummary = `${daysStr} ${s.time}`;
+            } else if (s.schedule) {
+                scheduleSummary = typeof s.schedule === 'string' ? s.schedule : JSON.stringify(s.schedule);
+            } else if (s.sessionDays) {
+                scheduleSummary = Array.isArray(s.sessionDays) ? s.sessionDays.join('/') : s.sessionDays;
+            }
+
+            masterRows.push({
+                tutorId: tutor.id,
+                tutorName: tutor.name || tutorEmail,
+                tutorEmail,
+                qaScore: tutor.qaScore ?? null,
+                qcScore: tutor.qcScore ?? null,
+                studentId: sDoc.id,
+                studentName: s.studentName || s.name || '—',
+                parentName: s.parentName || '—',
+                parentPhone: s.parentPhone || s.phone || '',
+                scheduleSummary
+            });
+        });
+    }));
+
+    masterRows.sort((a, b) =>
+        a.tutorName.localeCompare(b.tutorName) || a.studentName.localeCompare(b.studentName)
+    );
+
+    return masterRows;
+}
+
+// ─────────────────────────────────────────────────────
+//  MAIN PANEL RENDERER
+// ─────────────────────────────────────────────────────
+
+async function renderMasterPortalPanel(container) {
+    const userPermissions = window.userData?.permissions?.tabs || {};
+    const canQC = userPermissions.canQC === true;
+    const canQA = userPermissions.canQA === true;
+
+    if (userPermissions.viewMasterPortal !== true) {
+        container.innerHTML = `
+            <div class="bg-white p-10 rounded-xl shadow text-center">
+                <i class="fas fa-lock text-gray-300 text-6xl mb-4"></i>
+                <h2 class="text-2xl font-bold text-gray-500 mb-2">Access Restricted</h2>
+                <p class="text-gray-400">You do not have permission to view the Management Portal.<br>Contact an administrator.</p>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+
+            <!-- Header bar -->
+            <div class="flex flex-wrap items-center justify-between gap-4 px-6 py-5 border-b bg-gradient-to-r from-slate-800 to-slate-700">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="fas fa-th-large text-emerald-400"></i>
+                        Management Portal — Master View
+                    </h2>
+                    <p class="text-slate-400 text-sm mt-0.5">Aggregated view of Tutors · Students · Parent Contacts · QA &amp; QC Scores</p>
+                </div>
+                <div class="flex gap-3 flex-wrap items-center">
+                    <input type="search" id="master-search"
+                        placeholder="Search tutor, student, parent..."
+                        class="px-4 py-2 rounded-lg border border-slate-600 bg-slate-700 text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 w-64">
+                    <button id="master-refresh-btn"
+                        class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats bar -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-0 border-b divide-x">
+                <div class="px-6 py-4 text-center">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Tutors</p>
+                    <p id="stat-tutors" class="text-3xl font-extrabold text-slate-800 mt-1">—</p>
+                </div>
+                <div class="px-6 py-4 text-center">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Students</p>
+                    <p id="stat-students" class="text-3xl font-extrabold text-blue-600 mt-1">—</p>
+                </div>
+                <div class="px-6 py-4 text-center">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Avg QA Score</p>
+                    <p id="stat-qa" class="text-3xl font-extrabold text-purple-600 mt-1">—</p>
+                </div>
+                <div class="px-6 py-4 text-center">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Avg QC Score</p>
+                    <p id="stat-qc" class="text-3xl font-extrabold text-amber-600 mt-1">—</p>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-600 uppercase text-xs tracking-wider">
+                        <tr>
+                            <th class="px-5 py-3 text-left">Tutor</th>
+                            <th class="px-5 py-3 text-left">Student</th>
+                            <th class="px-5 py-3 text-left">Parent Contact</th>
+                            <th class="px-5 py-3 text-left">Schedule</th>
+                            <th class="px-5 py-3 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="master-table-body">
+                        <tr>
+                            <td colspan="5" class="py-16 text-center text-slate-400">
+                                <i class="fas fa-circle-notch fa-spin text-3xl mb-3 block text-emerald-500"></i>
+                                Loading master data…
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="master-no-results" class="hidden py-12 text-center text-slate-400">
+                <i class="fas fa-search text-4xl mb-3 block"></i>
+                No matching records found.
+            </div>
+        </div>
+    `;
+
+    document.getElementById('master-refresh-btn').addEventListener('click', () => {
+        loadAndRenderMasterTable(canQC, canQA, true);
+    });
+
+    await loadAndRenderMasterTable(canQC, canQA, false);
+}
+
+// ─────────────────────────────────────────────────────
+//  TABLE LOADER + RENDERER
+// ─────────────────────────────────────────────────────
+
+let _masterData = [];
+
+async function loadAndRenderMasterTable(canQC, canQA, forceRefresh) {
+    const tbody = document.getElementById('master-table-body');
+    if (!tbody) return;
+
+    if (forceRefresh || _masterData.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="py-16 text-center text-slate-400">
+                    <i class="fas fa-circle-notch fa-spin text-3xl mb-3 block text-emerald-500"></i>
+                    ${forceRefresh ? 'Refreshing data…' : 'Loading master data…'}
+                </td>
+            </tr>`;
+        try {
+            _masterData = await fetchMasterData();
+        } catch (err) {
+            console.error("fetchMasterData error:", err);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="py-12 text-center text-red-500">
+                        <i class="fas fa-exclamation-circle text-3xl mb-3 block"></i>
+                        Failed to load data. ${err.message}
+                    </td>
+                </tr>`;
+            return;
+        }
+    }
+
+    // Update stats
+    const uniqueTutors = new Set(_masterData.map(r => r.tutorId)).size;
+    const uniqueStudents = _masterData.filter(r => r.studentId).length;
+    const qaTutors = _masterData.filter((r, i, arr) =>
+        arr.findIndex(x => x.tutorId === r.tutorId) === i && r.qaScore !== null && r.qaScore !== undefined
+    );
+    const qcTutors = _masterData.filter((r, i, arr) =>
+        arr.findIndex(x => x.tutorId === r.tutorId) === i && r.qcScore !== null && r.qcScore !== undefined
+    );
+    const avgQA = qaTutors.length ? (qaTutors.reduce((a, r) => a + (r.qaScore || 0), 0) / qaTutors.length).toFixed(1) : '—';
+    const avgQC = qcTutors.length ? (qcTutors.reduce((a, r) => a + (r.qcScore || 0), 0) / qcTutors.length).toFixed(1) : '—';
+
+    const el = (id) => document.getElementById(id);
+    if (el('stat-tutors'))   el('stat-tutors').textContent = uniqueTutors;
+    if (el('stat-students')) el('stat-students').textContent = uniqueStudents;
+    if (el('stat-qa'))       el('stat-qa').textContent = avgQA;
+    if (el('stat-qc'))       el('stat-qc').textContent = avgQC;
+
+    const searchInput = document.getElementById('master-search');
+    if (searchInput) {
+        searchInput.oninput = (e) => renderMasterRows(_masterData, e.target.value, canQC, canQA);
+    }
+
+    renderMasterRows(_masterData, '', canQC, canQA);
+}
+
+function getMasterScoreBadge(score, type) {
+    if (score === null || score === undefined || score === '') {
+        return `<span class="text-slate-400 text-xs italic">No score</span>`;
+    }
+    const n = parseFloat(score);
+    let colorClass, label;
+    if (n >= 90) {
+        colorClass = 'bg-emerald-100 text-emerald-700 border-emerald-300';
+        label = 'Excellent';
+    } else if (n >= 75) {
+        colorClass = 'bg-blue-100 text-blue-700 border-blue-300';
+        label = type === 'qc' ? 'Good' : 'Very Good';
+    } else if (n >= 60) {
+        colorClass = 'bg-amber-100 text-amber-700 border-amber-300';
+        label = type === 'qc' ? 'Needs Revision' : 'Needs Support';
+    } else {
+        colorClass = 'bg-red-100 text-red-700 border-red-300';
+        label = type === 'qc' ? 'Rejected' : 'Intervention';
+    }
+    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${colorClass}">${n}% <em class="not-italic opacity-70">· ${label}</em></span>`;
+}
+
+function renderMasterRows(data, searchTerm, canQC, canQA) {
+    const tbody = document.getElementById('master-table-body');
+    const noResults = document.getElementById('master-no-results');
+    if (!tbody) return;
+
+    const q = (searchTerm || '').toLowerCase().trim();
+    const filtered = q
+        ? data.filter(r =>
+            [r.tutorName, r.studentName, r.parentName, r.parentPhone, r.scheduleSummary, r.tutorEmail]
+                .some(v => (v || '').toLowerCase().includes(q))
+          )
+        : data;
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '';
+        if (noResults) noResults.classList.remove('hidden');
+        return;
+    }
+    if (noResults) noResults.classList.add('hidden');
+
+    let lastTutorId = null;
+    let html = '';
+
+    filtered.forEach((row, idx) => {
+        const isNewTutor = row.tutorId !== lastTutorId;
+        lastTutorId = row.tutorId;
+        const rowBg = isNewTutor ? 'bg-white' : 'bg-slate-50/60';
+        const borderTop = isNewTutor && idx !== 0 ? 'border-t-2 border-slate-200' : '';
+
+        const safeId    = (row.tutorId    || '').replace(/'/g, "\\'");
+        const safeName  = (row.tutorName  || '').replace(/'/g, "\\'");
+        const safeEmail = (row.tutorEmail || '').replace(/'/g, "\\'");
+
+        const tutorCell = isNewTutor ? `
+            <td class="px-5 py-4 align-top ${borderTop}">
+                <div class="font-semibold text-slate-800">${capitalize(row.tutorName)}</div>
+                <div class="text-xs text-slate-500 mt-0.5">${row.tutorEmail}</div>
+                <div class="mt-2 flex flex-col gap-1">
+                    <div class="text-xs text-slate-500">QA: ${getMasterScoreBadge(row.qaScore, 'qa')}</div>
+                    <div class="text-xs text-slate-500">QC: ${getMasterScoreBadge(row.qcScore, 'qc')}</div>
+                </div>
+            </td>
+        ` : `<td class="px-5 py-4 align-top ${borderTop}"></td>`;
+
+        const actionsCell = isNewTutor ? `
+            <td class="px-5 py-4 align-top text-center ${borderTop}">
+                <div class="flex flex-col gap-2 items-center">
+                    ${canQA ? `
+                    <button onclick="openQAModal('${safeId}','${safeName}','${safeEmail}')"
+                        class="inline-flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition w-full justify-center">
+                        <i class="fas fa-binoculars"></i> QA Rate
+                    </button>` : ''}
+                    ${canQC ? `
+                    <button onclick="openQCModal('${safeId}','${safeName}','${safeEmail}')"
+                        class="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition w-full justify-center">
+                        <i class="fas fa-clipboard-check"></i> QC Rate
+                    </button>` : ''}
+                    ${(!canQA && !canQC) ? `<span class="text-xs text-slate-400 italic">No access</span>` : ''}
+                </div>
+            </td>
+        ` : `<td class="px-5 py-4 align-top ${borderTop}"></td>`;
+
+        const phoneLink = row.parentPhone
+            ? `<a href="tel:${row.parentPhone}" class="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium">
+                <i class="fas fa-phone-alt text-xs"></i> ${row.parentPhone}
+               </a>`
+            : `<span class="text-slate-400">—</span>`;
+
+        html += `
+            <tr class="${rowBg} hover:bg-emerald-50/40 transition">
+                ${tutorCell}
+                <td class="px-5 py-4 align-middle ${borderTop}">
+                    <span class="inline-block bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-full">
+                        ${row.studentName}
+                    </span>
+                </td>
+                <td class="px-5 py-4 align-middle ${borderTop}">
+                    <div class="font-medium text-slate-700 text-sm">${row.parentName}</div>
+                    <div class="mt-0.5">${phoneLink}</div>
+                </td>
+                <td class="px-5 py-4 align-middle ${borderTop}">
+                    <span class="text-slate-600 text-sm">${row.scheduleSummary}</span>
+                </td>
+                ${actionsCell}
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+}
+
+// ─────────────────────────────────────────────────────
+//  QA MODAL — Session Observation Scoring
+// ─────────────────────────────────────────────────────
+
+window.openQAModal = function(tutorId, tutorName, tutorEmail) {
+    const existing = document.getElementById('qa-rating-modal');
+    if (existing) existing.remove();
+
+    const qaAreas = [
+        { id: 'qa_punctuality',     label: 'Punctuality & Readiness',     icon: 'fa-clock' },
+        { id: 'qa_lesson_plan',     label: 'Lesson Planning & Structure',  icon: 'fa-book-open' },
+        { id: 'qa_subject',         label: 'Subject Mastery',              icon: 'fa-brain' },
+        { id: 'qa_engagement',      label: 'Student Engagement',           icon: 'fa-users' },
+        { id: 'qa_classroom',       label: 'Classroom Management',         icon: 'fa-chalkboard' },
+        { id: 'qa_tools',           label: 'Use of Online Tools',          icon: 'fa-laptop' },
+        { id: 'qa_feedback',        label: 'Feedback & Communication',     icon: 'fa-comments' }
+    ];
+
+    const areasHTML = qaAreas.map(a => `
+        <div class="mb-4">
+            <div class="flex justify-between items-center mb-1">
+                <label class="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <i class="fas ${a.icon} text-purple-400 w-4"></i> ${a.label}
+                </label>
+                <span id="${a.id}-val" class="text-sm font-bold text-purple-700 w-8 text-right">0</span>
+            </div>
+            <input type="range" id="${a.id}" min="0" max="10" value="0" step="1"
+                class="w-full accent-purple-600"
+                oninput="document.getElementById('${a.id}-val').textContent=this.value; updateQATotal();">
+        </div>
+    `).join('');
+
+    const modal = document.createElement('div');
+    modal.id = 'qa-rating-modal';
+    modal.innerHTML = `
+        <div class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-4">
+
+                <div class="flex justify-between items-start px-6 py-5 bg-gradient-to-r from-purple-700 to-purple-500 rounded-t-2xl">
+                    <div>
+                        <h3 class="text-lg font-bold text-white">QA Session Observation</h3>
+                        <p class="text-purple-200 text-sm mt-0.5">Tutor: <strong>${capitalize(tutorName)}</strong> &nbsp;·&nbsp; ${tutorEmail}</p>
+                    </div>
+                    <button onclick="document.getElementById('qa-rating-modal').remove()" class="text-white/70 hover:text-white text-2xl leading-none">&times;</button>
+                </div>
+
+                <div class="px-6 py-5 overflow-y-auto" style="max-height:65vh;">
+
+                    <div class="mb-5 p-4 bg-purple-50 rounded-xl border border-purple-200 text-center">
+                        <p class="text-xs text-purple-500 uppercase font-bold tracking-wider mb-1">Overall QA Score</p>
+                        <p id="qa-total-display" class="text-5xl font-extrabold text-purple-700">0<span class="text-2xl">%</span></p>
+                        <p id="qa-rating-label" class="text-sm font-semibold mt-1 text-slate-500">—</p>
+                        <div class="mt-3 grid grid-cols-2 gap-2 text-xs text-left text-slate-500">
+                            <div><span class="inline-block w-2 h-2 bg-emerald-500 rounded-full mr-1"></span>90–100%: Excellent (Model Tutor)</div>
+                            <div><span class="inline-block w-2 h-2 bg-blue-500 rounded-full mr-1"></span>75–89%: Very Good (Minor improvements)</div>
+                            <div><span class="inline-block w-2 h-2 bg-amber-500 rounded-full mr-1"></span>60–74%: Needs Support &amp; Coaching</div>
+                            <div><span class="inline-block w-2 h-2 bg-red-500 rounded-full mr-1"></span>Below 60%: Immediate Intervention Required</div>
+                        </div>
+                    </div>
+
+                    <h4 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3">Scoring Areas (0–10 each)</h4>
+                    ${areasHTML}
+
+                    <h4 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3 mt-5 border-t pt-4">Mandatory QA Officer Comments</h4>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-slate-600 mb-1">
+                            <i class="fas fa-star text-amber-400 mr-1"></i> Strengths Observed <span class="text-red-500">*</span>
+                        </label>
+                        <textarea id="qa-strengths" rows="2" placeholder="What the tutor did well…"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-slate-600 mb-1">
+                            <i class="fas fa-exclamation-triangle text-red-400 mr-1"></i> Areas for Improvement <span class="text-red-500">*</span>
+                        </label>
+                        <textarea id="qa-improvements" rows="2" placeholder="Specific areas to work on…"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-slate-600 mb-1">
+                            <i class="fas fa-tasks text-blue-400 mr-1"></i> Action Steps for Tutor <span class="text-red-500">*</span>
+                        </label>
+                        <textarea id="qa-actions" rows="2" placeholder="Concrete steps the tutor should take…"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-slate-600 mb-2">
+                            <i class="fas fa-calendar-check text-green-400 mr-1"></i> Follow-up Required?
+                        </label>
+                        <div class="flex gap-4">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="qa-followup" value="Yes" class="accent-purple-600"> <span class="text-sm">Yes</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="qa-followup" value="No" checked class="accent-purple-600"> <span class="text-sm">No</span>
+                            </label>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="flex justify-end gap-3 px-6 py-4 border-t bg-slate-50 rounded-b-2xl">
+                    <button onclick="document.getElementById('qa-rating-modal').remove()"
+                        class="px-5 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-100 text-sm">Cancel</button>
+                    <button id="qa-save-btn"
+                        class="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold flex items-center gap-2">
+                        <i class="fas fa-save"></i> Save QA Rating
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    document.getElementById('qa-save-btn').addEventListener('click', () => {
+        submitQARating(tutorId, tutorName);
+    });
+};
+
+window.updateQATotal = function() {
+    const ids = ['qa_punctuality','qa_lesson_plan','qa_subject','qa_engagement','qa_classroom','qa_tools','qa_feedback'];
+    const sum = ids.reduce((acc, id) => acc + (parseInt(document.getElementById(id)?.value) || 0), 0);
+    const pct = Math.round((sum / 70) * 100);
+    const display = document.getElementById('qa-total-display');
+    const label   = document.getElementById('qa-rating-label');
+    if (display) display.innerHTML = `${pct}<span class="text-2xl">%</span>`;
+    if (label) {
+        if (pct >= 90)      { label.textContent = '🏆 Excellent — Model Tutor';               label.className = 'text-sm font-semibold mt-1 text-emerald-600'; }
+        else if (pct >= 75) { label.textContent = '✅ Very Good — Minor Improvements';         label.className = 'text-sm font-semibold mt-1 text-blue-600'; }
+        else if (pct >= 60) { label.textContent = '⚠️ Needs Support & Coaching';              label.className = 'text-sm font-semibold mt-1 text-amber-600'; }
+        else                { label.textContent = '🚨 Immediate Intervention Required';       label.className = 'text-sm font-semibold mt-1 text-red-600'; }
+    }
+};
+
+async function submitQARating(tutorId, tutorName) {
+    const areaIds    = ['qa_punctuality','qa_lesson_plan','qa_subject','qa_engagement','qa_classroom','qa_tools','qa_feedback'];
+    const areaLabels = ['Punctuality & Readiness','Lesson Planning & Structure','Subject Mastery','Student Engagement','Classroom Management','Use of Online Tools','Feedback & Communication'];
+
+    const strengths    = document.getElementById('qa-strengths')?.value.trim();
+    const improvements = document.getElementById('qa-improvements')?.value.trim();
+    const actions      = document.getElementById('qa-actions')?.value.trim();
+    const followup     = document.querySelector('input[name="qa-followup"]:checked')?.value || 'No';
+
+    if (!strengths || !improvements || !actions) {
+        alert('Please complete all mandatory comment fields before saving.');
+        return;
+    }
+
+    const areaScores = {};
+    let sum = 0;
+    areaIds.forEach((id, i) => {
+        const val = parseInt(document.getElementById(id)?.value || 0);
+        areaScores[areaLabels[i]] = val;
+        sum += val;
+    });
+    const qaScore = Math.round((sum / 70) * 100);
+
+    let ratingLabel;
+    if (qaScore >= 90)      ratingLabel = 'Excellent (Model Tutor)';
+    else if (qaScore >= 75) ratingLabel = 'Very Good (Minor improvements)';
+    else if (qaScore >= 60) ratingLabel = 'Needs Support & Coaching';
+    else                    ratingLabel = 'Immediate Intervention Required';
+
+    const btn = document.getElementById('qa-save-btn');
+    const origText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Saving…';
+    btn.disabled = true;
+
+    try {
+        const tutorRef = doc(db, "tutors", tutorId);
+
+        await addDoc(collection(db, "tutors", tutorId, "qaReviews"), {
+            qaScore,
+            ratingLabel,
+            areaScores,
+            strengths,
+            improvements,
+            actionSteps: actions,
+            followUpRequired: followup,
+            reviewedBy: window.userData?.name || 'QA Officer',
+            reviewedByEmail: window.userData?.email || '',
+            reviewedAt: new Date().toISOString()
+        });
+
+        await updateDoc(tutorRef, {
+            qaScore,
+            qaRatingLabel: ratingLabel,
+            qaLastReviewedAt: new Date().toISOString(),
+            qaLastReviewedBy: window.userData?.email || ''
+        });
+
+        _masterData.forEach(r => { if (r.tutorId === tutorId) r.qaScore = qaScore; });
+
+        document.getElementById('qa-rating-modal').remove();
+        alert(`✅ QA Rating saved! ${capitalize(tutorName)} scored ${qaScore}% — ${ratingLabel}`);
+
+        const perms = window.userData?.permissions?.tabs || {};
+        renderMasterRows(_masterData, document.getElementById('master-search')?.value || '', perms.canQC === true, perms.canQA === true);
+
+    } catch (err) {
+        console.error("Error saving QA rating:", err);
+        alert("Failed to save QA rating. " + err.message);
+        btn.innerHTML = origText;
+        btn.disabled = false;
+    }
+}
+
+// ─────────────────────────────────────────────────────
+//  QC MODAL — Lesson Plan Quality Control Scoring
+// ─────────────────────────────────────────────────────
+
+window.openQCModal = function(tutorId, tutorName, tutorEmail) {
+    const existing = document.getElementById('qc-rating-modal');
+    if (existing) existing.remove();
+
+    const qcAreas = [
+        { id: 'qc_completeness',    label: 'Completeness & Compliance',  icon: 'fa-check-double' },
+        { id: 'qc_objectives',      label: 'Learning Objectives',         icon: 'fa-bullseye' },
+        { id: 'qc_curriculum',      label: 'Curriculum Alignment',        icon: 'fa-align-center' },
+        { id: 'qc_structure',       label: 'Structure & Flow',            icon: 'fa-sitemap' },
+        { id: 'qc_strategies',      label: 'Teaching Strategies',         icon: 'fa-lightbulb' },
+        { id: 'qc_differentiation', label: 'Differentiation',             icon: 'fa-code-branch' },
+        { id: 'qc_engagement',      label: 'Engagement Activities',       icon: 'fa-theater-masks' },
+        { id: 'qc_assessment',      label: 'Assessment Strategy',         icon: 'fa-chart-bar' },
+        { id: 'qc_resources',       label: 'Resources',                   icon: 'fa-book' },
+        { id: 'qc_homework',        label: 'Homework / Follow-up',        icon: 'fa-home' }
+    ];
+
+    const areasHTML = qcAreas.map(a => `
+        <div class="mb-4">
+            <div class="flex justify-between items-center mb-1">
+                <label class="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <i class="fas ${a.icon} text-amber-400 w-4"></i> ${a.label}
+                </label>
+                <span id="${a.id}-val" class="text-sm font-bold text-amber-700 w-8 text-right">0</span>
+            </div>
+            <input type="range" id="${a.id}" min="0" max="10" value="0" step="1"
+                class="w-full accent-amber-500"
+                oninput="document.getElementById('${a.id}-val').textContent=this.value; updateQCTotal();">
+        </div>
+    `).join('');
+
+    const modal = document.createElement('div');
+    modal.id = 'qc-rating-modal';
+    modal.innerHTML = `
+        <div class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-4">
+
+                <div class="flex justify-between items-start px-6 py-5 bg-gradient-to-r from-amber-600 to-amber-400 rounded-t-2xl">
+                    <div>
+                        <h3 class="text-lg font-bold text-white">Lesson Plan QC Scoring</h3>
+                        <p class="text-amber-100 text-sm mt-0.5">Tutor: <strong>${capitalize(tutorName)}</strong> &nbsp;·&nbsp; ${tutorEmail}</p>
+                    </div>
+                    <button onclick="document.getElementById('qc-rating-modal').remove()" class="text-white/70 hover:text-white text-2xl leading-none">&times;</button>
+                </div>
+
+                <div class="px-6 py-5 overflow-y-auto" style="max-height:65vh;">
+
+                    <div class="mb-5 p-4 bg-amber-50 rounded-xl border border-amber-200 text-center">
+                        <p class="text-xs text-amber-500 uppercase font-bold tracking-wider mb-1">Overall QC Score</p>
+                        <p id="qc-total-display" class="text-5xl font-extrabold text-amber-700">0<span class="text-2xl">%</span></p>
+                        <p id="qc-rating-label" class="text-sm font-semibold mt-1 text-slate-500">—</p>
+                        <div class="mt-3 grid grid-cols-2 gap-2 text-xs text-left text-slate-500">
+                            <div><span class="inline-block w-2 h-2 bg-emerald-500 rounded-full mr-1"></span>90–100%: Excellent (Approved)</div>
+                            <div><span class="inline-block w-2 h-2 bg-blue-500 rounded-full mr-1"></span>75–89%: Good (Minor edits)</div>
+                            <div><span class="inline-block w-2 h-2 bg-amber-500 rounded-full mr-1"></span>60–74%: Needs Revision</div>
+                            <div><span class="inline-block w-2 h-2 bg-red-500 rounded-full mr-1"></span>Below 60%: Rejected &amp; Resubmission Required</div>
+                        </div>
+                    </div>
+
+                    <h4 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3">Scoring Areas (0–10 each · Total /100)</h4>
+                    ${areasHTML}
+
+                    <h4 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3 mt-5 border-t pt-4">Mandatory QC Officer Notes</h4>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-slate-600 mb-1">
+                            <i class="fas fa-star text-amber-400 mr-1"></i> Strengths of Lesson Plan <span class="text-red-500">*</span>
+                        </label>
+                        <textarea id="qc-strengths" rows="2" placeholder="What was done well in the lesson plan…"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-slate-600 mb-1">
+                            <i class="fas fa-tools text-red-400 mr-1"></i> Required Improvements <span class="text-red-500">*</span>
+                        </label>
+                        <textarea id="qc-improvements" rows="2" placeholder="Specific changes that must be made…"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-slate-600 mb-1">
+                            <i class="fas fa-magic text-blue-400 mr-1"></i> Suggested Strategies / Resources <span class="text-red-500">*</span>
+                        </label>
+                        <textarea id="qc-suggestions" rows="2" placeholder="Recommended teaching methods or tools…"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-slate-600 mb-2">
+                            <i class="fas fa-stamp text-green-500 mr-1"></i> Approval Status <span class="text-red-500">*</span>
+                        </label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-emerald-50">
+                                <input type="radio" name="qc-approval" value="Approved" class="accent-emerald-600">
+                                <span class="text-sm font-medium text-emerald-700">✅ Approved</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-blue-50">
+                                <input type="radio" name="qc-approval" value="Revise" class="accent-blue-600">
+                                <span class="text-sm font-medium text-blue-700">✏️ Revise</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-amber-50">
+                                <input type="radio" name="qc-approval" value="Needs Revision" class="accent-amber-600">
+                                <span class="text-sm font-medium text-amber-700">⚠️ Needs Revision</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-red-50">
+                                <input type="radio" name="qc-approval" value="Resubmit" class="accent-red-600">
+                                <span class="text-sm font-medium text-red-700">🚫 Resubmit</span>
+                            </label>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="flex justify-end gap-3 px-6 py-4 border-t bg-slate-50 rounded-b-2xl">
+                    <button onclick="document.getElementById('qc-rating-modal').remove()"
+                        class="px-5 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-100 text-sm">Cancel</button>
+                    <button id="qc-save-btn"
+                        class="px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-semibold flex items-center gap-2">
+                        <i class="fas fa-save"></i> Save QC Rating
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    document.getElementById('qc-save-btn').addEventListener('click', () => {
+        submitQCRating(tutorId, tutorName);
+    });
+};
+
+window.updateQCTotal = function() {
+    const ids = ['qc_completeness','qc_objectives','qc_curriculum','qc_structure','qc_strategies','qc_differentiation','qc_engagement','qc_assessment','qc_resources','qc_homework'];
+    const sum = ids.reduce((acc, id) => acc + (parseInt(document.getElementById(id)?.value) || 0), 0);
+    // 10 areas × max 10 = 100, so sum IS the percentage
+    const pct = sum;
+    const display = document.getElementById('qc-total-display');
+    const label   = document.getElementById('qc-rating-label');
+    if (display) display.innerHTML = `${pct}<span class="text-2xl">%</span>`;
+    if (label) {
+        if (pct >= 90)      { label.textContent = '🏆 Excellent — Approved';              label.className = 'text-sm font-semibold mt-1 text-emerald-600'; }
+        else if (pct >= 75) { label.textContent = '✅ Good — Minor Edits Needed';          label.className = 'text-sm font-semibold mt-1 text-blue-600'; }
+        else if (pct >= 60) { label.textContent = '⚠️ Needs Revision';                    label.className = 'text-sm font-semibold mt-1 text-amber-600'; }
+        else                { label.textContent = '🚫 Rejected — Resubmission Required'; label.className = 'text-sm font-semibold mt-1 text-red-600'; }
+    }
+};
+
+async function submitQCRating(tutorId, tutorName) {
+    const areaIds    = ['qc_completeness','qc_objectives','qc_curriculum','qc_structure','qc_strategies','qc_differentiation','qc_engagement','qc_assessment','qc_resources','qc_homework'];
+    const areaLabels = ['Completeness & Compliance','Learning Objectives','Curriculum Alignment','Structure & Flow','Teaching Strategies','Differentiation','Engagement Activities','Assessment Strategy','Resources','Homework / Follow-up'];
+
+    const strengths    = document.getElementById('qc-strengths')?.value.trim();
+    const improvements = document.getElementById('qc-improvements')?.value.trim();
+    const suggestions  = document.getElementById('qc-suggestions')?.value.trim();
+    const approval     = document.querySelector('input[name="qc-approval"]:checked')?.value;
+
+    if (!strengths || !improvements || !suggestions) {
+        alert('Please complete all mandatory note fields before saving.');
+        return;
+    }
+    if (!approval) {
+        alert('Please select an approval status before saving.');
+        return;
+    }
+
+    const areaScores = {};
+    let sum = 0;
+    areaIds.forEach((id, i) => {
+        const val = parseInt(document.getElementById(id)?.value || 0);
+        areaScores[areaLabels[i]] = val;
+        sum += val;
+    });
+    const qcScore = sum; // out of 100 directly (10 areas × max 10)
+
+    let ratingLabel;
+    if (qcScore >= 90)      ratingLabel = 'Excellent (Approved)';
+    else if (qcScore >= 75) ratingLabel = 'Good (Minor edits)';
+    else if (qcScore >= 60) ratingLabel = 'Needs Revision';
+    else                    ratingLabel = 'Rejected & Resubmission Required';
+
+    const btn = document.getElementById('qc-save-btn');
+    const origText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Saving…';
+    btn.disabled = true;
+
+    try {
+        const tutorRef = doc(db, "tutors", tutorId);
+
+        await addDoc(collection(db, "tutors", tutorId, "qcReviews"), {
+            qcScore,
+            ratingLabel,
+            areaScores,
+            strengths,
+            requiredImprovements: improvements,
+            suggestedStrategies: suggestions,
+            approvalStatus: approval,
+            reviewedBy: window.userData?.name || 'QC Officer',
+            reviewedByEmail: window.userData?.email || '',
+            reviewedAt: new Date().toISOString()
+        });
+
+        await updateDoc(tutorRef, {
+            qcScore,
+            qcRatingLabel: ratingLabel,
+            qcApprovalStatus: approval,
+            qcLastReviewedAt: new Date().toISOString(),
+            qcLastReviewedBy: window.userData?.email || ''
+        });
+
+        _masterData.forEach(r => { if (r.tutorId === tutorId) r.qcScore = qcScore; });
+
+        document.getElementById('qc-rating-modal').remove();
+        alert(`✅ QC Rating saved! ${capitalize(tutorName)} scored ${qcScore}% — ${ratingLabel} · Status: ${approval}`);
+
+        const perms = window.userData?.permissions?.tabs || {};
+        renderMasterRows(_masterData, document.getElementById('master-search')?.value || '', perms.canQC === true, perms.canQA === true);
+
+    } catch (err) {
+        console.error("Error saving QC rating:", err);
+        alert("Failed to save QC rating. " + err.message);
+        btn.innerHTML = origText;
+        btn.disabled = false;
+    }
+}
+
+// ======================================================
 // SECTION 9: NAVIGATION & AUTHENTICATION
 // ======================================================
 
@@ -9444,9 +10233,10 @@ const navigationGroups = {
         icon: "fas fa-user-friends",
         label: "Tutor Management",
         items: [
-            { id: "navTutorManagement", label: "Tutor Directory", icon: "fas fa-users", fn: renderManagementTutorView },
-            { id: "navInactiveTutors", label: "Inactive Tutors", icon: "fas fa-user-slash", fn: renderInactiveTutorsPanel },
-            { id: "navArchivedStudents", label: "Archived Students", icon: "fas fa-archive", fn: renderArchivedStudentsPanel }
+            { id: "navMasterPortal",    label: "Management Portal",  icon: "fas fa-th-large",    fn: renderMasterPortalPanel },
+            { id: "navTutorManagement", label: "Tutor Directory",    icon: "fas fa-users",        fn: renderManagementTutorView },
+            { id: "navInactiveTutors",  label: "Inactive Tutors",    icon: "fas fa-user-slash",   fn: renderInactiveTutorsPanel },
+            { id: "navArchivedStudents",label: "Archived Students",  icon: "fas fa-archive",      fn: renderArchivedStudentsPanel }
         ]
     },
     "financial": {
@@ -9617,6 +10407,7 @@ function updatePageTitle(title) {
 
 const allNavItems = {
     navDashboard: { fn: renderDashboardPanel, perm: 'viewDashboard', label: 'Dashboard' },
+    navMasterPortal: { fn: renderMasterPortalPanel, perm: 'viewMasterPortal', label: 'Management Portal' },
     navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement', label: 'Tutor Directory' },
     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice', label: 'Pay Advice' },
     navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports', label: 'Tutor Reports' },
@@ -9837,4 +10628,3 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
-
