@@ -321,6 +321,35 @@ function getCurrentMonthYear() {
     return now.toLocaleString('default', { month: 'long', year: 'numeric' });
 }
 
+// ── SHARED: Start a Lagos clock in any element by id ──
+function startTabClock(elementId) {
+    // Clear any existing interval on the same id
+    const key = `_clock_${elementId}`;
+    if (window[key]) clearInterval(window[key]);
+    function tick() {
+        const el = document.getElementById(elementId);
+        if (!el) { clearInterval(window[key]); return; }
+        el.textContent = new Intl.DateTimeFormat('en-NG', {
+            weekday:'short', day:'numeric', month:'short', year:'numeric',
+            hour:'2-digit', minute:'2-digit', second:'2-digit',
+            hour12:true, timeZone:'Africa/Lagos'
+        }).format(new Date());
+    }
+    tick();
+    window[key] = setInterval(tick, 1000);
+}
+
+// ── SHARED: Returns the clock bar HTML to inject at the top of every tab ──
+function tabClockBarHTML(clockId = 'tab-lagos-clock') {
+    return `
+        <div class="flex items-center justify-end mb-3">
+            <div class="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
+                <span class="text-xs text-gray-400">📍 Lagos</span>
+                <span id="${clockId}" class="text-sm font-semibold text-blue-700">Loading…</span>
+            </div>
+        </div>`;
+}
+
 // Get most scheduled day from schedule data
 function getMostScheduledDay(scheduleByDay) {
     let maxDay = '';
@@ -1547,518 +1576,468 @@ async function scheduleEmailReminder(hwData, fileUrl = '') {
 }
 
 /*******************************************************************************
- * SECTION 9: MESSAGING & INBOX FEATURES (CRASH-PROOF EDITION)
- * * CRITICAL FIXES:
- * - Removed 'serverTimestamp' dependency. Now uses native 'new Date()'.
- * - Removed 'increment' dependency. Now uses manual count updates.
- * - This resolves the "invalid data / custom object" error permanently.
+ * SECTION 9: MESSAGING & INBOX FEATURES
+ * ARCHITECTURE: Conversations use studentId as participant (not parentPhone).
+ *   - Collection: "conversations"  Doc ID: tutorId + "_" + studentId (sorted)
+ *   - Messages sub-collection: "messages" per conversation
+ *   - Students can message tutors from the Messaging tab on their portal.
+ *   - Images supported via Cloudinary upload before sending.
  ******************************************************************************/
 
-// --- STATE MANAGEMENT ---
+// --- STATE ---
 let msgSectionUnreadCount = 0;
 let btnFloatingMsg = null;
 let btnFloatingInbox = null;
-
-// --- LISTENERS (Memory Management) ---
 let unsubInboxListener = null;
 let unsubChatListener = null;
 let unsubUnreadListener = null;
 
-// --- UTILITY FUNCTIONS ---
-
+// --- UTILS ---
 function msgEscapeHtml(text) {
     if (!text) return '';
-    return String(text)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+    return String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 }
 
-function msgGenerateConvId(tutorId, parentPhone) {
-    return [tutorId, parentPhone].sort().join("_");
+/** ConvId: sort [tutorId, studentId] so both sides produce the same key */
+function msgGenerateConvId(tutorId, studentId) {
+    return [tutorId, studentId].sort().join('_');
 }
 
 function msgFormatTime(timestamp) {
     if (!timestamp) return '';
-    // Handle Firestore Timestamp vs JS Date
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    if (isNaN(date.getTime())) return ''; // Invalid date check
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (isNaN(date.getTime())) return '';
+    const diff = Date.now() - date.getTime();
+    if (diff < 86400000) return date.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+    if (diff < 604800000) return date.toLocaleDateString([], { weekday:'short' });
+    return date.toLocaleDateString([], { month:'short', day:'numeric' });
 }
 
-// --- INITIALIZATION ---
-
+// --- FLOATING BUTTONS ---
 function initializeFloatingMessagingButton() {
-    // 1. Clean up old buttons
-    const oldBtns = document.querySelectorAll('.floating-messaging-btn, .floating-inbox-btn');
-    oldBtns.forEach(btn => btn.remove());
-    
-    // 2. Create Messaging Button
+    document.querySelectorAll('.floating-messaging-btn, .floating-inbox-btn').forEach(b => b.remove());
+
     btnFloatingMsg = document.createElement('button');
     btnFloatingMsg.className = 'floating-messaging-btn';
-    btnFloatingMsg.innerHTML = `<span class="floating-btn-icon">💬</span><span class="floating-btn-text">New</span>`;
+    btnFloatingMsg.innerHTML = `<span class="floating-btn-icon">💬</span><span class="floating-btn-text">Message</span>`;
     btnFloatingMsg.onclick = showEnhancedMessagingModal;
-    
-    // 3. Create Inbox Button
+
     btnFloatingInbox = document.createElement('button');
     btnFloatingInbox.className = 'floating-inbox-btn';
     btnFloatingInbox.innerHTML = `<span class="floating-btn-icon">📨</span><span class="floating-btn-text">Inbox</span>`;
     btnFloatingInbox.onclick = showInboxModal;
-    
-    // 4. Mount to DOM
+
     document.body.appendChild(btnFloatingMsg);
     document.body.appendChild(btnFloatingInbox);
-    
-    // Styles are now in HTML, no injection needed
-    
-    // 5. Start Listener
-    if (window.tutorData && window.tutorData.id) {
-        initializeUnreadListener();
-    } else {
-        setTimeout(() => {
-            if (window.tutorData && window.tutorData.id) initializeUnreadListener();
-        }, 3000);
-    }
+
+    if (window.tutorData?.id) initializeUnreadListener();
+    else setTimeout(() => { if (window.tutorData?.id) initializeUnreadListener(); }, 3000);
 }
 
-// --- BACKGROUND LISTENERS ---
-
 function initializeUnreadListener() {
-    const tutorId = window.tutorData.id;
     if (unsubUnreadListener) unsubUnreadListener();
-
-    const q = query(
-        collection(db, "conversations"),
-        where("participants", "array-contains", tutorId)
-    );
-
-    unsubUnreadListener = onSnapshot(q, (snapshot) => {
+    const tutorId = window.tutorData.id;
+    const q = query(collection(db, 'conversations'), where('participants', 'array-contains', tutorId));
+    unsubUnreadListener = onSnapshot(q, snap => {
         let count = 0;
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            // Count unread if I am NOT the last sender
-            if (data.unreadCount > 0 && data.lastSenderId !== tutorId) {
-                count += data.unreadCount;
-            }
+        snap.forEach(d => {
+            const data = d.data();
+            if (data.unreadCount > 0 && data.lastSenderId !== tutorId) count += data.unreadCount;
         });
-        
         msgSectionUnreadCount = count;
         updateFloatingBadges();
     });
 }
 
-// Compatibility Alias
 window.updateUnreadMessageCount = function() {
-    if (window.tutorData && window.tutorData.id) {
-        initializeUnreadListener();
-    }
+    if (window.tutorData?.id) initializeUnreadListener();
 };
 
 function updateFloatingBadges() {
-    const updateBadge = (btn) => {
+    [btnFloatingMsg, btnFloatingInbox].forEach(btn => {
         if (!btn) return;
-        const existing = btn.querySelector('.unread-badge');
-        if (existing) existing.remove();
-
+        btn.querySelector('.unread-badge')?.remove();
         if (msgSectionUnreadCount > 0) {
-            const badge = document.createElement('span');
-            badge.className = 'unread-badge';
-            badge.textContent = msgSectionUnreadCount > 99 ? '99+' : msgSectionUnreadCount;
-            btn.appendChild(badge);
+            const b = document.createElement('span');
+            b.className = 'unread-badge';
+            b.textContent = msgSectionUnreadCount > 99 ? '99+' : msgSectionUnreadCount;
+            btn.appendChild(b);
         }
-    };
-    updateBadge(btnFloatingMsg);
-    updateBadge(btnFloatingInbox);
+    });
 }
 
-// --- FEATURE 1: SEND MESSAGE MODAL ---
-
+// --- SEND MESSAGE MODAL ---
 function showEnhancedMessagingModal() {
     document.querySelectorAll('.enhanced-messaging-modal').forEach(e => e.remove());
-
     const modal = document.createElement('div');
     modal.className = 'modal-overlay enhanced-messaging-modal';
-    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+    modal.onclick = e => { if (e.target === modal) modal.remove(); };
 
     modal.innerHTML = `
-        <div class="modal-content messaging-modal-content">
+        <div class="modal-content messaging-modal-content" style="max-width:520px">
             <div class="modal-header">
                 <h3>💬 Send Message</h3>
                 <button type="button" class="close-modal-btn text-2xl font-bold">&times;</button>
             </div>
-            <div class="modal-body">
-                <div class="message-type-grid">
-                    <div class="type-option selected" data-type="individual">
-                        <div class="icon">👤</div><div>Individual</div>
-                    </div>
-                    <div class="type-option" data-type="group">
-                        <div class="icon">👨‍👩‍👧‍👦</div><div>Group</div>
-                    </div>
-                    <div class="type-option" data-type="management">
-                        <div class="icon">🏢</div><div>Admin</div>
-                    </div>
-                    <div class="type-option" data-type="all">
-                        <div class="icon">📢</div><div>All Parents</div>
-                    </div>
+            <div class="modal-body space-y-3">
+                <div class="message-type-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+                    <div class="type-option selected text-center p-2 rounded-lg border-2 border-blue-500 cursor-pointer bg-blue-50" data-type="individual"><div>👤</div><div class="text-xs mt-1">Student</div></div>
+                    <div class="type-option text-center p-2 rounded-lg border-2 border-gray-200 cursor-pointer" data-type="group"><div>👨‍👩‍👧‍👦</div><div class="text-xs mt-1">Group</div></div>
+                    <div class="type-option text-center p-2 rounded-lg border-2 border-gray-200 cursor-pointer" data-type="all"><div>📢</div><div class="text-xs mt-1">All</div></div>
                 </div>
-
                 <div id="recipient-loader" class="recipient-area"></div>
-
-                <input type="text" id="msg-subject" class="form-input" placeholder="Subject">
-                <textarea id="msg-content" class="form-input" rows="5" placeholder="Type your message..."></textarea>
-                
-                <div class="flex-row-spaced mt-2">
-                     <label class="urgent-toggle">
-                        <input type="checkbox" id="msg-urgent">
-                        <span class="text-red-500 font-bold">Mark as Urgent</span>
-                     </label>
+                <input type="text" id="msg-subject" class="form-input" placeholder="Subject (optional)">
+                <textarea id="msg-content" class="form-input" rows="4" placeholder="Type your message…"></textarea>
+                <!-- Image attach -->
+                <div class="flex items-center gap-2">
+                    <label class="btn btn-secondary btn-sm cursor-pointer">
+                        📎 Attach Image
+                        <input type="file" id="msg-image-file" class="hidden" accept="image/*">
+                    </label>
+                    <span id="msg-image-name" class="text-xs text-gray-500"></span>
+                    <button id="msg-image-clear" class="text-red-400 text-xs hidden">✕ Remove</button>
                 </div>
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" id="msg-urgent"> <span class="text-red-500 font-bold">Mark as Urgent</span>
+                </label>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary close-modal-btn">Cancel</button>
-                <button type="button" id="btn-send-initial" class="btn btn-primary">Send Message</button>
+                <button type="button" id="btn-send-initial" class="btn btn-primary">Send</button>
             </div>
-        </div>
-    `;
+        </div>`;
 
     document.body.appendChild(modal);
+    modal.querySelectorAll('.close-modal-btn').forEach(b => b.onclick = () => modal.remove());
 
-    msgLoadRecipients('individual', modal.querySelector('#recipient-loader'));
+    // Image attach
+    const imgInput = modal.querySelector('#msg-image-file');
+    const imgName  = modal.querySelector('#msg-image-name');
+    const imgClear = modal.querySelector('#msg-image-clear');
+    imgInput.onchange = () => {
+        if (imgInput.files[0]) { imgName.textContent = imgInput.files[0].name; imgClear.classList.remove('hidden'); }
+    };
+    imgClear.onclick = () => { imgInput.value=''; imgName.textContent=''; imgClear.classList.add('hidden'); };
 
+    // Type selector
+    msgLoadStudentRecipients('individual', modal.querySelector('#recipient-loader'));
     modal.querySelectorAll('.type-option').forEach(opt => {
         opt.onclick = () => {
-            modal.querySelectorAll('.type-option').forEach(o => o.classList.remove('selected'));
-            opt.classList.add('selected');
-            msgLoadRecipients(opt.dataset.type, modal.querySelector('#recipient-loader'));
+            modal.querySelectorAll('.type-option').forEach(o => {
+                o.classList.remove('selected','border-blue-500','bg-blue-50');
+                o.classList.add('border-gray-200');
+            });
+            opt.classList.add('selected','border-blue-500','bg-blue-50');
+            opt.classList.remove('border-gray-200');
+            msgLoadStudentRecipients(opt.dataset.type, modal.querySelector('#recipient-loader'));
         };
     });
 
-    const closeBtns = modal.querySelectorAll('.close-modal-btn');
-    closeBtns.forEach(btn => btn.onclick = () => modal.remove());
-    
-    const sendBtn = modal.querySelector('#btn-send-initial');
-    sendBtn.onclick = () => msgProcessSend(modal);
+    modal.querySelector('#btn-send-initial').onclick = () => msgProcessSend(modal);
 }
 
-async function msgLoadRecipients(type, container) {
+async function msgLoadStudentRecipients(type, container) {
     container.innerHTML = '<div class="spinner"></div>';
     const tutorEmail = window.tutorData?.email;
-
     try {
-        const q = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
-        const snap = await getDocs(q);
-        const students = snap.docs.map(d => d.data());
+        const snap = await getDocs(query(collection(db,'students'), where('tutorEmail','==',tutorEmail)));
+        // Filter to only active students (not on break, not transitioning)
+        const students = snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(s => !s.summerBreak && !['archived','graduated','transferred'].includes(s.status));
 
         if (type === 'individual') {
             container.innerHTML = `
                 <select id="sel-recipient" class="form-input">
-                    <option value="">Select Parent...</option>
-                    ${students.map(s => `<option value="${escapeHtml(s.parentPhone)}" data-name="${escapeHtml(s.parentName)}">${escapeHtml(s.parentName)} (${escapeHtml(s.studentName)})</option>`).join('')}
-                </select>
-            `;
+                    <option value="">Select Student…</option>
+                    ${students.map(s => `<option value="${escapeHtml(s.id)}" data-name="${escapeHtml(s.studentName)}">${escapeHtml(s.studentName)} (${escapeHtml(s.grade||'')})</option>`).join('')}
+                </select>`;
         } else if (type === 'group') {
-            container.innerHTML = `
-                <div class="checklist-box">
-                    ${students.map(s => `
-                        <label class="checklist-item">
-                            <input type="checkbox" class="chk-recipient" value="${escapeHtml(s.parentPhone)}" data-name="${escapeHtml(s.parentName)}">
-                            <span>${escapeHtml(s.parentName)} <small>(${escapeHtml(s.studentName)})</small></span>
-                        </label>
-                    `).join('')}
-                </div>
-            `;
-        } else if (type === 'all') {
-            container.innerHTML = `<div class="info-box">Sending to all ${students.length} parents.</div>`;
+            container.innerHTML = `<div class="checklist-box border rounded p-2 max-h-36 overflow-y-auto space-y-1">
+                ${students.map(s => `<label class="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" class="chk-recipient" value="${escapeHtml(s.id)}" data-name="${escapeHtml(s.studentName)}">
+                    ${escapeHtml(s.studentName)}
+                </label>`).join('')}
+            </div>`;
         } else {
-            container.innerHTML = `<div class="info-box">Sending to Management/Admin.</div>`;
+            container.innerHTML = `<div class="text-sm text-gray-500 bg-gray-50 p-2 rounded">Sending to all ${students.length} active students.</div>`;
+            container.dataset.allStudents = JSON.stringify(students.map(s => ({ id: s.id, name: s.studentName })));
         }
-    } catch (e) {
-        container.innerHTML = `<div class="error-box">Error loading students: ${escapeHtml(e.message)}</div>`;
+    } catch(e) {
+        container.innerHTML = `<div class="text-red-500 text-sm">Error loading students: ${escapeHtml(e.message)}</div>`;
     }
 }
 
 async function msgProcessSend(modal) {
-    const type = modal.querySelector('.type-option.selected').dataset.type;
-    const subject = modal.querySelector('#msg-subject').value;
-    const content = modal.querySelector('#msg-content').value;
+    const type    = modal.querySelector('.type-option.selected').dataset.type;
+    const subject = modal.querySelector('#msg-subject').value.trim();
+    const content = modal.querySelector('#msg-content').value.trim();
     const isUrgent = modal.querySelector('#msg-urgent').checked;
-    const tutor = window.tutorData;
+    const imgFile  = modal.querySelector('#msg-image-file').files[0];
+    const tutor   = window.tutorData;
 
-    if (!subject || !content) {
-        alert("Please fill in subject and content.");
-        return;
-    }
+    if (!content && !imgFile) { showCustomAlert('Please type a message or attach an image.'); return; }
 
-    let targets = [];
+    let targets = []; // { id, name }
+    const loader = modal.querySelector('#recipient-loader');
+
     if (type === 'individual') {
         const sel = modal.querySelector('#sel-recipient');
-        if (sel.value) targets.push({ phone: sel.value, name: sel.options[sel.selectedIndex].dataset.name });
+        if (!sel?.value) { showCustomAlert('Please select a student.'); return; }
+        targets.push({ id: sel.value, name: sel.options[sel.selectedIndex].dataset.name });
     } else if (type === 'group') {
-        modal.querySelectorAll('.chk-recipient:checked').forEach(c => {
-            targets.push({ phone: c.value, name: c.dataset.name });
-        });
-    } else if (type === 'all') {
-        const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-        const snap = await getDocs(q);
-        const map = new Map();
-        snap.forEach(d => {
-            const s = d.data();
-            map.set(s.parentPhone, s.parentName);
-        });
-        map.forEach((name, phone) => targets.push({ phone, name }));
-    }
-
-    if (targets.length === 0 && type !== 'management') {
-        alert("No recipients selected.");
-        return;
+        modal.querySelectorAll('.chk-recipient:checked').forEach(c => targets.push({ id: c.value, name: c.dataset.name }));
+        if (!targets.length) { showCustomAlert('Please select at least one student.'); return; }
+    } else {
+        targets = JSON.parse(loader.dataset.allStudents || '[]');
     }
 
     const btn = modal.querySelector('#btn-send-initial');
-    btn.innerText = "Sending...";
-    btn.disabled = true;
-    
+    btn.textContent = 'Sending…'; btn.disabled = true;
+
     try {
-        // Send loop
+        // Optional: upload image to Cloudinary
+        let imageUrl = null;
+        if (imgFile) {
+            btn.textContent = 'Uploading image…';
+            const fd = new FormData();
+            fd.append('file', imgFile);
+            fd.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+            fd.append('folder', 'chat_images');
+            const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/upload`, { method:'POST', body:fd });
+            const data = await res.json();
+            imageUrl = data.secure_url || null;
+        }
+
+        btn.textContent = 'Sending…';
+        const now = new Date();
+
         for (const target of targets) {
-            const convId = msgGenerateConvId(tutor.id, target.phone);
-            const now = new Date(); // USE NATIVE DATE
-            
-            // Manual Increment Logic: Read -> Calculate -> Write
-            const convRef = doc(db, "conversations", convId);
-            const convSnap = await getDoc(convRef); // New dependency: getDoc (usually available)
-            
-            let newCount = 1;
-            if (convSnap.exists()) {
-                const data = convSnap.data();
-                // If the last sender was me, reset count. If not, increment.
-                // Logic: I am sending now, so for the RECIPIENT, it increments.
-                // But since I am the tutor, and I'm sending to Parent, I want to update THEIR unread count?
-                // Actually, this unreadCount field is shared. A better schema splits it, but for now:
-                // We just increment it.
-                newCount = (data.unreadCount || 0) + 1;
-            }
+            const convId  = msgGenerateConvId(tutor.id, target.id);
+            const convRef = doc(db, 'conversations', convId);
+            const convSnap = await getDoc(convRef);
+            const prevCount = convSnap.exists() ? (convSnap.data().unreadCount || 0) : 0;
 
             await setDoc(convRef, {
-                participants: [tutor.id, target.phone],
+                participants: [tutor.id, target.id],
                 participantDetails: {
-                    [tutor.id]: { name: tutor.name, role: 'tutor' },
-                    [target.phone]: { name: target.name, role: 'parent' }
+                    [tutor.id]:  { name: tutor.name,  role: 'tutor' },
+                    [target.id]: { name: target.name, role: 'student' }
                 },
-                lastMessage: content,
+                lastMessage: imageUrl ? '📷 Image' : content,
                 lastMessageTimestamp: now,
                 lastSenderId: tutor.id,
-                unreadCount: newCount
+                unreadCount: prevCount + 1,
+                tutorId: tutor.id,
+                studentId: target.id
             }, { merge: true });
 
-            await addDoc(collection(db, "conversations", convId, "messages"), {
-                content: content,
-                subject: subject,
+            await addDoc(collection(db, 'conversations', convId, 'messages'), {
+                content: content || '',
+                subject,
+                imageUrl: imageUrl || null,
                 senderId: tutor.id,
                 senderName: tutor.name,
-                isUrgent: isUrgent,
+                senderRole: 'tutor',
+                isUrgent,
                 createdAt: now,
                 read: false
             });
         }
-        
+
         modal.remove();
-        alert("Message Sent!");
-    } catch (e) {
+        showCustomAlert(`✅ Message sent to ${targets.length} student${targets.length !== 1 ? 's' : ''}!`);
+    } catch(e) {
         console.error(e);
-        // Fallback if getDoc is missing, try blind write
-        alert("Error sending: " + e.message);
-        btn.innerText = "Try Again";
-        btn.disabled = false;
+        showCustomAlert('Error sending message: ' + e.message);
+        btn.textContent = 'Send'; btn.disabled = false;
     }
 }
 
-// --- FEATURE 2: INBOX MODAL ---
-
+// --- INBOX MODAL ---
 function showInboxModal() {
     document.querySelectorAll('.inbox-modal').forEach(e => e.remove());
-
     const modal = document.createElement('div');
     modal.className = 'modal-overlay inbox-modal';
-    modal.onclick = (e) => { if (e.target === modal) closeInbox(modal); };
+    modal.onclick = e => { if (e.target === modal) closeInbox(modal); };
 
     modal.innerHTML = `
-        <div class="modal-content inbox-content">
-            <button class="close-modal-absolute">&times;</button>
-            <div class="inbox-container">
-                <div class="inbox-list-col">
-                    <div class="inbox-header">
-                        <h4>Inbox</h4>
-                        <button id="refresh-inbox" class="btn-icon">🔄</button>
+        <div class="modal-content" style="max-width:820px;height:85vh;display:flex;flex-direction:column;padding:0">
+            <div style="display:flex;flex:1;overflow:hidden">
+                <!-- LEFT: conversation list -->
+                <div style="width:260px;border-right:1px solid #e5e7eb;display:flex;flex-direction:column">
+                    <div style="padding:12px 16px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">
+                        <h4 style="font-weight:700;font-size:0.95rem">📨 Inbox</h4>
+                        <button id="refresh-inbox" style="background:none;border:none;cursor:pointer;font-size:1rem">🔄</button>
                     </div>
-                    <div id="inbox-list" class="inbox-list">
-                        <div class="spinner"></div>
-                    </div>
+                    <div id="inbox-list" style="flex:1;overflow-y:auto"><div class="spinner" style="margin:20px auto"></div></div>
                 </div>
-                <div class="inbox-chat-col">
-                    <div id="chat-view-header" class="chat-header hidden">
-                        <div class="chat-title" id="chat-title">Select a chat</div>
+                <!-- RIGHT: chat view -->
+                <div style="flex:1;display:flex;flex-direction:column">
+                    <div id="chat-view-header" style="padding:12px 16px;border-bottom:1px solid #e5e7eb;font-weight:600;background:#f9fafb">
+                        Select a conversation
                     </div>
-                    <div id="chat-messages" class="chat-messages">
-                        <div class="empty-state">Select a conversation</div>
+                    <div id="chat-messages" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px">
+                        <div style="text-align:center;color:#9ca3af;margin:auto">Select a chat to view messages</div>
                     </div>
-                    <div id="chat-inputs" class="chat-inputs hidden">
-                        <input type="text" id="chat-input-text" placeholder="Type a message...">
-                        <button id="chat-send-btn">➤</button>
+                    <div id="chat-inputs" style="padding:10px 12px;border-top:1px solid #e5e7eb;display:none;gap:6px;align-items:center">
+                        <label style="cursor:pointer;font-size:1.2rem" title="Send image">
+                            📷<input type="file" id="chat-img-input" accept="image/*" style="display:none">
+                        </label>
+                        <input type="text" id="chat-input-text" placeholder="Type a message…" style="flex:1;border:1px solid #d1d5db;border-radius:8px;padding:8px 12px;font-size:0.875rem">
+                        <button id="chat-send-btn" style="background:#2563eb;color:white;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:1rem">➤</button>
                     </div>
                 </div>
             </div>
-        </div>
-    `;
+            <div style="padding:8px 16px;border-top:1px solid #e5e7eb;text-align:right">
+                <button onclick="this.closest('.inbox-modal').remove()" style="background:none;border:1px solid #d1d5db;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.875rem">Close</button>
+            </div>
+        </div>`;
 
     document.body.appendChild(modal);
-    modal.querySelector('.close-modal-absolute').onclick = () => closeInbox(modal);
+    modal.querySelector('#refresh-inbox').onclick = () => msgStartInboxListener(modal);
     msgStartInboxListener(modal);
 }
 
 function closeInbox(modal) {
     if (unsubInboxListener) unsubInboxListener();
     if (unsubChatListener) unsubChatListener();
-    modal.remove();
+    modal?.remove();
 }
 
 function msgStartInboxListener(modal) {
     const tutorId = window.tutorData.id;
     const listEl = modal.querySelector('#inbox-list');
-    
     if (unsubInboxListener) unsubInboxListener();
 
-    const q = query(
-        collection(db, "conversations"),
-        where("participants", "array-contains", tutorId)
-    );
-
-    unsubInboxListener = onSnapshot(q, (snapshot) => {
-        const convs = [];
-        snapshot.forEach(doc => convs.push({ id: doc.id, ...doc.data() }));
-
-        convs.sort((a, b) => {
-            const timeA = a.lastMessageTimestamp?.toDate ? a.lastMessageTimestamp.toDate() : new Date(a.lastMessageTimestamp || 0);
-            const timeB = b.lastMessageTimestamp?.toDate ? b.lastMessageTimestamp.toDate() : new Date(b.lastMessageTimestamp || 0);
-            return timeB - timeA; 
-        });
-
+    const q = query(collection(db,'conversations'), where('participants','array-contains',tutorId));
+    unsubInboxListener = onSnapshot(q, snap => {
+        const convs = snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .sort((a,b) => {
+                const ta = a.lastMessageTimestamp?.toDate ? a.lastMessageTimestamp.toDate() : new Date(a.lastMessageTimestamp||0);
+                const tb = b.lastMessageTimestamp?.toDate ? b.lastMessageTimestamp.toDate() : new Date(b.lastMessageTimestamp||0);
+                return tb - ta;
+            });
         msgRenderInboxList(convs, listEl, modal, tutorId);
     });
 }
 
 function msgRenderInboxList(conversations, container, modal, tutorId) {
     container.innerHTML = '';
-    
-    if (conversations.length === 0) {
-        container.innerHTML = '<div class="p-4 text-gray-500 text-center">No messages found.</div>';
+    if (!conversations.length) {
+        container.innerHTML = '<div style="padding:16px;color:#9ca3af;text-align:center">No messages yet.</div>';
         return;
     }
-
     conversations.forEach(conv => {
-        const otherId = conv.participants.find(p => p !== tutorId);
-        const otherName = conv.participantDetails?.[otherId]?.name || "Parent";
-        const isUnread = conv.unreadCount > 0 && conv.lastSenderId !== tutorId;
+        const otherId   = conv.participants.find(p => p !== tutorId);
+        const otherName = conv.participantDetails?.[otherId]?.name || 'Student';
+        const hasUnread = conv.unreadCount > 0 && conv.lastSenderId !== tutorId;
+        const timeStr   = msgFormatTime(conv.lastMessageTimestamp);
+        const preview   = conv.lastMessage || 'No messages';
 
-        const el = document.createElement('div');
-        el.className = `inbox-item ${isUnread ? 'unread' : ''}`;
-        el.innerHTML = `
-            <div class="avatar">${escapeHtml(otherName.charAt(0))}</div>
-            <div class="info">
-                <div class="name">${escapeHtml(otherName)}</div>
-                <div class="preview">
-                    ${conv.lastSenderId === tutorId ? 'You: ' : ''}${escapeHtml(conv.lastMessage || '')}
-                </div>
+        const item = document.createElement('div');
+        item.style.cssText = `padding:10px 14px;cursor:pointer;border-bottom:1px solid #f3f4f6;${hasUnread ? 'background:#eff6ff' : ''}`;
+        item.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-weight:${hasUnread?'700':'600'};font-size:0.875rem">${msgEscapeHtml(otherName)}</span>
+                <span style="font-size:0.7rem;color:#9ca3af">${msgEscapeHtml(timeStr)}</span>
             </div>
-            <div class="meta">
-                <div class="time">${escapeHtml(msgFormatTime(conv.lastMessageTimestamp))}</div>
-                ${isUnread ? `<div class="badge">${conv.unreadCount}</div>` : ''}
-            </div>
-        `;
-        el.onclick = () => msgLoadChat(conv.id, otherName, modal, tutorId);
-        container.appendChild(el);
+            <div style="font-size:0.75rem;color:#6b7280;margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${msgEscapeHtml(preview)}</div>
+            ${hasUnread ? `<span style="display:inline-block;background:#2563eb;color:white;border-radius:9999px;font-size:0.65rem;padding:1px 6px;margin-top:2px">${conv.unreadCount} new</span>` : ''}`;
+
+        item.onclick = () => {
+            container.querySelectorAll('div').forEach(d => d.style.background = '');
+            item.style.background = '#dbeafe';
+            msgOpenChat(conv.id, otherName, modal, tutorId);
+        };
+        container.appendChild(item);
     });
 }
 
-function msgLoadChat(convId, name, modal, tutorId) {
-    modal.querySelector('#chat-view-header').classList.remove('hidden');
-    modal.querySelector('#chat-inputs').classList.remove('hidden');
-    modal.querySelector('#chat-title').innerText = name;
-    
-    const msgContainer = modal.querySelector('#chat-messages');
-    msgContainer.innerHTML = '<div class="spinner"></div>';
+function msgOpenChat(convId, otherName, modal, tutorId) {
+    const header = modal.querySelector('#chat-view-header');
+    const msgs   = modal.querySelector('#chat-messages');
+    const inputs = modal.querySelector('#chat-inputs');
 
-    updateDoc(doc(db, "conversations", convId), { unreadCount: 0 });
+    header.textContent = `💬 ${otherName}`;
+    msgs.innerHTML = '<div style="text-align:center;color:#9ca3af">Loading…</div>';
+    inputs.style.display = 'flex';
+
+    // Mark as read
+    updateDoc(doc(db,'conversations',convId), { unreadCount: 0 }).catch(()=>{});
 
     if (unsubChatListener) unsubChatListener();
-
-    const q = query(collection(db, "conversations", convId, "messages"));
-
-    unsubChatListener = onSnapshot(q, (snapshot) => {
-        let msgs = [];
-        snapshot.forEach(doc => msgs.push(doc.data()));
-        
-        msgs.sort((a,b) => {
-            const tA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-            const tB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
-            return tA - tB;
-        });
-
-        msgContainer.innerHTML = '';
-        msgs.forEach(msg => {
-            const isMe = msg.senderId === tutorId;
+    const q = query(collection(db,'conversations',convId,'messages'), orderBy('createdAt','asc'));
+    unsubChatListener = onSnapshot(q, snap => {
+        msgs.innerHTML = '';
+        snap.forEach(d => {
+            const m = d.data();
+            const isMe = m.senderId === tutorId;
             const bubble = document.createElement('div');
-            bubble.className = `chat-bubble ${isMe ? 'me' : 'them'}`;
-            bubble.innerHTML = `
-                ${msg.subject ? `<strong>${escapeHtml(msg.subject)}</strong><br>` : ''}
-                ${escapeHtml(msg.content)}
-                <div class="timestamp">${escapeHtml(msgFormatTime(msg.createdAt))}</div>
-            `;
-            msgContainer.appendChild(bubble);
+            bubble.style.cssText = `max-width:72%;word-break:break-word;padding:8px 12px;border-radius:${isMe?'18px 18px 4px 18px':'18px 18px 18px 4px'};background:${isMe?'#2563eb':'#f3f4f6'};color:${isMe?'white':'#1f2937'};align-self:${isMe?'flex-end':'flex-start'}`;
+            let inner = '';
+            if (m.imageUrl) inner += `<img src="${msgEscapeHtml(m.imageUrl)}" style="max-width:200px;border-radius:8px;display:block;margin-bottom:4px">`;
+            if (m.content) inner += `<span style="font-size:0.875rem">${msgEscapeHtml(m.content)}</span>`;
+            inner += `<div style="font-size:0.65rem;opacity:0.7;margin-top:3px;text-align:right">${msgFormatTime(m.createdAt)}</div>`;
+            bubble.innerHTML = inner;
+            msgs.appendChild(bubble);
         });
-        msgContainer.scrollTop = msgContainer.scrollHeight;
+        msgs.scrollTop = msgs.scrollHeight;
     });
 
-    const btn = modal.querySelector('#chat-send-btn');
-    const input = modal.querySelector('#chat-input-text');
-    
-    const newBtn = btn.cloneNode(true);
-    btn.parentNode.replaceChild(newBtn, btn);
+    // Send handler
+    const input   = modal.querySelector('#chat-input-text');
+    const sendBtn = modal.querySelector('#chat-send-btn');
+    const imgInp  = modal.querySelector('#chat-img-input');
 
-    newBtn.onclick = async () => {
-        const txt = input.value.trim();
-        if (!txt) return;
+    // Clone to remove old listeners
+    const newSend = sendBtn.cloneNode(true);
+    sendBtn.replaceWith(newSend);
+    const newImg = imgInp.cloneNode(true);
+    imgInp.replaceWith(newImg);
+
+    async function sendMsg() {
+        const text = input.value.trim();
+        const imgFile = modal.querySelector('#chat-img-input').files[0];
+        if (!text && !imgFile) return;
+
+        newSend.disabled = true;
         input.value = '';
-
         const now = new Date();
+        let imageUrl = null;
 
-        // 1. Send Message
-        await addDoc(collection(db, "conversations", convId, "messages"), {
-            content: txt,
-            senderId: tutorId,
-            createdAt: now,
-            read: false
+        if (imgFile) {
+            try {
+                const fd = new FormData();
+                fd.append('file', imgFile);
+                fd.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+                fd.append('folder', 'chat_images');
+                const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/upload`,{method:'POST',body:fd});
+                const data = await res.json();
+                imageUrl = data.secure_url || null;
+                modal.querySelector('#chat-img-input').value = '';
+            } catch(e) { console.error('Image upload error:', e); }
+        }
+
+        await addDoc(collection(db,'conversations',convId,'messages'), {
+            content: text, imageUrl, senderId: tutorId,
+            senderName: window.tutorData.name, senderRole:'tutor',
+            createdAt: now, read: false
         });
 
-        // 2. Manual Increment for Metadata
-        const convRef = doc(db, "conversations", convId);
-        // We do a quick read to get current count to be safe
-        getDoc(convRef).then(snap => {
-            const current = snap.exists() ? (snap.data().unreadCount || 0) : 0;
-            updateDoc(convRef, {
-                lastMessage: txt,
-                lastMessageTimestamp: now,
-                lastSenderId: tutorId,
-                unreadCount: current + 1
-            });
+        const convRef = doc(db,'conversations',convId);
+        getDoc(convRef).then(s => {
+            const c = s.exists() ? (s.data().unreadCount||0) : 0;
+            updateDoc(convRef, { lastMessage: imageUrl ? '📷 Image' : text, lastMessageTimestamp: now, lastSenderId: tutorId, unreadCount: c+1 });
         });
-    };
-    
-    input.onkeypress = (e) => { if (e.key === 'Enter') newBtn.click(); };
+
+        newSend.disabled = false;
+    }
+
+    newSend.onclick = sendMsg;
+    input.onkeypress = e => { if (e.key === 'Enter') sendMsg(); };
 }
-
-// Styles removed – now in HTML.
 
 // --- AUTO-INIT ---
 initializeFloatingMessagingButton();
@@ -2467,169 +2446,185 @@ let studentCache = [];
 function renderScheduleManagement(container, tutor) {
     updateActiveTab('navScheduleManagement');
 
-    const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-    const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
-    const todayName = lagosNow.toLocaleDateString('en-US', { weekday:'long', timeZone:'Africa/Lagos' });
-
     container.innerHTML = `
-        <div style="background:linear-gradient(135deg,#1e40af,#4338ca);color:#fff;border-radius:1rem;padding:1.2rem 1.5rem;margin-bottom:1.2rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
-            <div>
-                <h1 style="font-size:1.2rem;font-weight:900;margin:0">📅 Schedule Management</h1>
-                <p style="font-size:.8rem;opacity:.85;margin:.2rem 0 0">Manage, view and update your students\' class schedules</p>
+        ${tabClockBarHTML('sched-lagos-clock')}
+        <div class="hero-section">
+            <h1 class="hero-title">📅 Schedule Management</h1>
+            <p class="hero-subtitle">Set up, view and manage class schedules across all your students</p>
+        </div>
+
+        <!-- Action Buttons Row -->
+        <div class="flex flex-wrap gap-3 mb-6">
+            <button id="view-full-calendar-btn" class="btn btn-info flex items-center gap-2">📆 Full Calendar View</button>
+            <button id="setup-all-schedules-btn" class="btn btn-primary flex items-center gap-2">⚙️ Set Up / Edit Schedules</button>
+            <button id="refresh-schedule-btn" class="btn btn-secondary flex items-center gap-2">🔄 Refresh</button>
+        </div>
+
+        <!-- Weekly Overview (always visible) -->
+        <div class="card mb-6">
+            <div class="card-header flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">🗓️</span>
+                    <h3 class="font-bold text-lg">This Week's Schedule</h3>
+                </div>
+                <span id="sched-week-label" class="text-sm text-gray-500"></span>
             </div>
-            <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
-                <button id="view-full-calendar-btn" style="background:rgba(255,255,255,.2);color:#fff;border:none;padding:.5rem .9rem;border-radius:.6rem;font-size:.8rem;font-weight:700;cursor:pointer;">📆 Weekly View</button>
-                <button id="setup-all-schedules-btn" style="background:#fff;color:#1e40af;border:none;padding:.5rem .9rem;border-radius:.6rem;font-size:.8rem;font-weight:700;cursor:pointer;">⚙️ Quick Setup</button>
+            <div class="card-body p-0" id="weekly-schedule-grid">
+                <div class="text-center py-6"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading schedule…</p></div>
             </div>
         </div>
 
-        <div class="card mb-4">
+        <!-- Today's Classes -->
+        <div class="card">
             <div class="card-header flex items-center gap-2">
-                <span style="display:inline-block;width:.55rem;height:.55rem;border-radius:50%;background:#4ade80;"></span>
-                <h3 class="font-bold">Today — ${escapeHtml(todayName)}</h3>
+                <span class="text-xl">⏰</span>
+                <h3 class="font-bold text-lg">Today's Classes</h3>
             </div>
             <div class="card-body" id="todays-schedule-inline">
-                <div class="text-center py-4"><div class="spinner mx-auto mb-2"></div><p class="text-gray-500 text-sm">Loading today…</p></div>
+                <div class="text-center py-4"><div class="spinner mx-auto"></div></div>
             </div>
-        </div>
-
-        <div class="card mb-4">
-            <div class="card-header flex items-center justify-between">
-                <h3 class="font-bold">🗓️ Full Week Overview</h3>
-                <span class="text-xs text-gray-400">Nigeria Time (WAT)</span>
-            </div>
-            <div class="card-body" style="overflow-x:auto;">
-                <div id="week-grid-container"><div class="text-center py-4"><div class="spinner mx-auto mb-2"></div><p class="text-gray-500 text-sm">Building grid…</p></div></div>
-            </div>
-        </div>
-
-        <div class="mb-3 flex items-center justify-between">
-            <h3 class="text-lg font-bold text-gray-800">👥 Student Schedules</h3>
-            <span class="text-xs text-gray-400" id="sched-student-count">Loading…</span>
-        </div>
-        <div id="student-schedule-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;">
-            <div class="card"><div class="card-body text-center py-6"><div class="spinner mx-auto mb-2"></div></div></div>
         </div>
     `;
 
+    // Start tab clock
+    startTabClock('sched-lagos-clock');
+
+    // Week label
+    const now = new Date();
+    const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay() + 1);
+    const weekEnd   = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
+    const el = document.getElementById('sched-week-label');
+    if (el) el.textContent = `${weekStart.toLocaleDateString('en-NG',{day:'numeric',month:'short'})} – ${weekEnd.toLocaleDateString('en-NG',{day:'numeric',month:'short',year:'numeric'})}`;
+
+    // View calendar button
     document.getElementById('view-full-calendar-btn')?.addEventListener('click', showScheduleCalendarModal);
+
+    // Setup schedules button
     document.getElementById('setup-all-schedules-btn')?.addEventListener('click', async () => {
-        const firebaseDeps = { db, methods: { getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc, getDoc } };
-        if (!window.scheduleManager) window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
-        await window.scheduleManager.openManualManager();
+        try {
+            if (!window.scheduleManager) {
+                const firebaseDeps = { db, methods: { getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc, getDoc } };
+                window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
+            }
+            await window.scheduleManager.openManualManager();
+        } catch (error) {
+            console.error(error);
+            showCustomAlert('Error opening schedule manager.');
+        }
     });
 
-    (async () => {
-        try {
-            const snap = await getDocs(query(collection(db, 'students'), where('tutorEmail', '==', tutor.email)));
-            const students = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s =>
-                !['archived','graduated','transferred'].includes(s.status)
-            );
+    // Refresh
+    document.getElementById('refresh-schedule-btn')?.addEventListener('click', () => {
+        renderScheduleManagement(container, tutor);
+    });
 
-            document.getElementById('sched-student-count').textContent = `${students.length} student${students.length !== 1 ? 's' : ''}`;
-
-            // TODAY STRIP
-            const todayEl = document.getElementById('todays-schedule-inline');
-            const todaySlots = [];
-            students.forEach(s => {
-                (s.schedule || []).forEach(sl => {
-                    if (sl.day === todayName) todaySlots.push({ ...sl, studentName: s.studentName });
-                });
-            });
-            todaySlots.sort((a,b) => (a.start||'').localeCompare(b.start||''));
-            if (todaySlots.length === 0) {
-                todayEl.innerHTML = `<div class="text-center py-4">🌿 <span class="text-gray-500">No classes today</span></div>`;
-            } else {
-                todayEl.innerHTML = `<div class="space-y-2">${todaySlots.map(sl => `
-                    <div class="flex items-center gap-3 p-3 rounded-xl" style="background:#f0fdf4;border:1px solid #bbf7d0;">
-                        <div style="width:2.2rem;height:2.2rem;border-radius:.75rem;background:#86efac;color:#14532d;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0">${escapeHtml((sl.studentName||'?').charAt(0))}</div>
-                        <div style="flex:1;min-width:0;">
-                            <p style="font-weight:700;font-size:.875rem;margin:0;">${escapeHtml(sl.studentName||'')}</p>
-                            ${sl.subject ? `<p style="font-size:.75rem;color:#6b7280;margin:0;">${escapeHtml(sl.subject)}</p>` : ''}
-                        </div>
-                        <div style="text-align:right;">
-                            <p style="font-size:.85rem;font-weight:700;color:#15803d;font-variant-numeric:tabular-nums;">${escapeHtml(formatScheduleTime(sl.start))} – ${escapeHtml(formatScheduleTime(sl.end))}</p>
-                        </div>
-                    </div>`).join('')}</div>`;
-            }
-
-            // WEEK GRID
-            const gridEl = document.getElementById('week-grid-container');
-            const byDay = {};
-            DAYS.forEach(d => { byDay[d] = []; });
-            students.forEach(s => {
-                (s.schedule || []).forEach(sl => {
-                    if (byDay[sl.day]) byDay[sl.day].push({ ...sl, studentName: s.studentName });
-                });
-            });
-            DAYS.forEach(d => byDay[d].sort((a,b) => (a.start||'').localeCompare(b.start||'')));
-
-            const maxSlots = Math.max(1, ...DAYS.map(d => byDay[d].length));
-            gridEl.innerHTML = `<table style="min-width:660px;border-collapse:collapse;width:100%;font-size:.72rem;">
-                <thead><tr>${DAYS.map(d => `<th style="padding:8px 5px;text-align:center;font-weight:700;color:${d===todayName?'#1d4ed8':'#6b7280'};background:${d===todayName?'#eff6ff':'#f9fafb'};border:1px solid #e5e7eb;">${d.slice(0,3).toUpperCase()}${d===todayName?' ●':''}</th>`).join('')}</tr></thead>
-                <tbody>${Array.from({length:maxSlots}).map((_,i) => `<tr>${DAYS.map(d => {
-                    const sl = byDay[d][i];
-                    return sl
-                        ? `<td style="padding:4px;border:1px solid #e5e7eb;background:${d===todayName?'#eff6ff':'#fff'}"><div style="background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;border-radius:7px;padding:5px 6px;"><div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:85px;">${escapeHtml(sl.studentName||'')}</div><div style="opacity:.85">${escapeHtml(formatScheduleTime(sl.start))}–${escapeHtml(formatScheduleTime(sl.end))}</div></div></td>`
-                        : `<td style="padding:4px;border:1px solid #f3f4f6;background:${d===todayName?'#f0f9ff':'#fafafa'}">&nbsp;</td>`;
-                }).join('')}</tr>`).join('')}</tbody>
-            </table>`;
-
-            // PER-STUDENT CARDS
-            const cardsEl = document.getElementById('student-schedule-cards');
-            if (students.length === 0) {
-                cardsEl.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:2rem;color:#9ca3af;">No active students found.</div>`;
-                return;
-            }
-            cardsEl.innerHTML = students.map(s => {
-                const slots = s.schedule || [];
-                const slotsHtml = slots.length === 0
-                    ? `<p style="font-size:.75rem;color:#9ca3af;font-style:italic;margin:.5rem 0 0;">No schedule set yet</p>`
-                    : slots.map(sl => `<div style="display:flex;align-items:center;gap:.5rem;font-size:.75rem;padding:.35rem 0;border-bottom:1px solid #f3f4f6;">
-                        <span style="width:2rem;text-align:center;font-weight:700;color:#4f46e5;">${sl.day?.slice(0,3)||'?'}</span>
-                        <span style="color:#374151;font-variant-numeric:tabular-nums;">${escapeHtml(formatScheduleTime(sl.start))} – ${escapeHtml(formatScheduleTime(sl.end))}</span>
-                        ${sl.subject ? `<span style="margin-left:auto;color:#9ca3af;">${escapeHtml(sl.subject)}</span>` : ''}
-                    </div>`).join('');
-                return `<div style="background:#fff;border-radius:1rem;border:1px solid #e5e7eb;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden;">
-                    <div style="display:flex;align-items:center;gap:.75rem;padding:1rem;border-bottom:1px solid #f3f4f6;">
-                        <div style="width:2.5rem;height:2.5rem;border-radius:.75rem;background:linear-gradient(135deg,#818cf8,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">${escapeHtml((s.studentName||'?').charAt(0))}</div>
-                        <div style="flex:1;min-width:0;">
-                            <p style="font-weight:700;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(s.studentName||'')}</p>
-                            <p style="font-size:.72rem;color:#6b7280;margin:0;">Grade ${escapeHtml(s.grade||'?')} · ${slots.length} session${slots.length!==1?'s':''}/wk</p>
-                        </div>
-                        <button class="edit-sched-btn" data-sid="${escapeHtml(s.id)}" style="font-size:.72rem;background:#eff6ff;color:#1d4ed8;border:none;padding:.35rem .7rem;border-radius:.5rem;font-weight:700;cursor:pointer;">✏️ Edit</button>
-                    </div>
-                    <div style="padding:.75rem 1rem;">${slotsHtml}</div>
-                </div>`;
-            }).join('');
-
-            cardsEl.querySelectorAll('.edit-sched-btn').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    const sid = btn.dataset.sid;
-                    const student = students.find(s => s.id === sid);
-                    if (!student) return;
-                    const firebaseDeps = { db, methods: { getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc, getDoc } };
-                    if (!window.scheduleManager) window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
-                    window.scheduleManager.students = students;
-                    window.scheduleManager.scheduledStudentIds = new Set(students.filter(s => s.schedule?.length).map(s => s.id));
-                    window.scheduleManager.openModal([student]);
-                });
-            });
-
-        } catch(err) {
-            console.error("Schedule load error:", err);
-            document.getElementById('student-schedule-cards').innerHTML = `<div style="grid-column:1/-1;color:#dc2626;text-align:center;padding:2rem;">Failed to load schedules.</div>`;
-        }
-    })();
+    // Load weekly grid and today's classes
+    loadWeeklyScheduleGrid(tutor);
 }
 
+async function loadWeeklyScheduleGrid(tutor) {
+    const gridEl  = document.getElementById('weekly-schedule-grid');
+    const todayEl = document.getElementById('todays-schedule-inline');
+    const todayName = new Date().toLocaleDateString('en-US', { weekday:'long' });
+
+    try {
+        const snap = await getDocs(query(collection(db,'students'), where('tutorEmail','==',tutor.email)));
+        const activeStudents = snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(s => !['archived','graduated','transferred'].includes(s.status));
+
+        // Build schedule map by day
+        const byDay = {};
+        DAYS_OF_WEEK.forEach(d => { byDay[d] = []; });
+
+        activeStudents.forEach(s => {
+            (s.schedule || []).forEach(slot => {
+                if (!byDay[slot.day]) return;
+                byDay[slot.day].push({
+                    student: s.studentName, grade: s.grade, subjects: s.subjects || [],
+                    start: slot.start, end: slot.end, isOvernight: slot.isOvernight,
+                    studentId: s.id, onBreak: s.summerBreak, isTransitioning: s.isTransitioning
+                });
+            });
+        });
+
+        // Sort each day by start time
+        DAYS_OF_WEEK.forEach(d => byDay[d].sort((a,b) => (a.start||'').localeCompare(b.start||'')));
+
+        // --- RENDER WEEKLY GRID ---
+        if (!gridEl) return;
+        gridEl.innerHTML = `
+            <div style="overflow-x:auto">
+                <div style="display:grid;grid-template-columns:repeat(7,minmax(120px,1fr));gap:1px;background:#e5e7eb;min-width:700px">
+                    ${DAYS_OF_WEEK.map(day => {
+                        const events = byDay[day];
+                        const isToday = day === todayName;
+                        return `
+                        <div style="background:${isToday?'#eff6ff':'white'};padding:10px;min-height:140px">
+                            <div style="font-size:0.75rem;font-weight:700;color:${isToday?'#2563eb':'#6b7280'};text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;border-bottom:2px solid ${isToday?'#2563eb':'#e5e7eb'};padding-bottom:4px">
+                                ${day.substring(0,3)} ${isToday?'· Today':''}
+                            </div>
+                            ${events.length === 0
+                                ? `<div style="font-size:0.7rem;color:#d1d5db;text-align:center;margin-top:12px">No classes</div>`
+                                : events.map(e => `
+                                    <div style="background:${isToday?'#dbeafe':'#f3f4f6'};border-left:3px solid ${isToday?'#2563eb':'#94a3b8'};border-radius:6px;padding:5px 7px;margin-bottom:5px;font-size:0.72rem">
+                                        <div style="font-weight:700;color:#1f2937;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(e.student)}</div>
+                                        <div style="color:#6b7280">${escapeHtml(formatScheduleTime(e.start))} – ${escapeHtml(formatScheduleTime(e.end))}${e.isOvernight?' 🌙':''}</div>
+                                        <div style="color:#9ca3af;font-size:0.65rem">${escapeHtml(e.grade||'')}</div>
+                                        ${e.onBreak ? '<div style="color:#f59e0b;font-size:0.65rem">⛱ On Break</div>' : ''}
+                                        ${e.isTransitioning ? '<div style="color:#8b5cf6;font-size:0.65rem">🔄 Transitioning</div>' : ''}
+                                    </div>`).join('')
+                            }
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>
+            <div style="padding:8px 12px;font-size:0.75rem;color:#9ca3af;background:#f9fafb;border-top:1px solid #e5e7eb">
+                Total weekly sessions: <strong>${Object.values(byDay).reduce((s,d)=>s+d.length,0)}</strong> · Active students: <strong>${activeStudents.filter(s=>!s.summerBreak).length}</strong> of <strong>${activeStudents.length}</strong>
+            </div>`;
+
+        // --- RENDER TODAY ---
+        if (!todayEl) return;
+        const todayClasses = byDay[todayName] || [];
+        if (!todayClasses.length) {
+            todayEl.innerHTML = `<div class="text-center py-4"><div class="text-3xl mb-2">🌿</div><p class="text-gray-500">No classes today (${todayName}).</p></div>`;
+        } else {
+            todayEl.innerHTML = `
+                <p class="text-sm font-semibold text-gray-500 mb-3 uppercase tracking-wide">${todayName} — ${todayClasses.length} class${todayClasses.length!==1?'es':''}</p>
+                <div class="space-y-3">
+                    ${todayClasses.map(c => `
+                    <div class="flex items-center gap-4 p-3 rounded-xl border border-green-200 bg-green-50 hover:bg-green-100 transition-all">
+                        <div class="w-10 h-10 rounded-xl bg-green-100 text-green-700 flex items-center justify-center font-bold text-sm flex-shrink-0 border border-green-200">
+                            ${escapeHtml((c.student||'?').charAt(0).toUpperCase())}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-semibold text-gray-800">${escapeHtml(c.student)}</p>
+                            <p class="text-sm text-gray-500">${escapeHtml(c.grade||'')} ${c.subjects.length ? '· '+escapeHtml(c.subjects.slice(0,2).join(', ')) : ''}</p>
+                        </div>
+                        <div class="text-right flex-shrink-0">
+                            <p class="text-sm font-bold text-green-700">${escapeHtml(formatScheduleTime(c.start))} – ${escapeHtml(formatScheduleTime(c.end))}</p>
+                            ${c.isOvernight ? '<p class="text-xs text-purple-500">🌙 Overnight</p>' : ''}
+                        </div>
+                    </div>`).join('')}
+                </div>`;
+        }
+    } catch (err) {
+        if (gridEl) gridEl.innerHTML = '<p class="text-red-500 text-center py-4">Failed to load schedule.</p>';
+        console.error(err);
+    }
+}
+
+/*******************************************************************************
+ * ACADEMIC TAB — Enhanced with monthly archive
+ ******************************************************************************/
 function renderAcademic(container, tutor) {
     updateActiveTab('navAcademic');
 
     container.innerHTML = `
+        ${tabClockBarHTML('academic-lagos-clock')}
         <div class="hero-section">
             <h1 class="hero-title">🎓 Academic</h1>
-            <p class="hero-subtitle">Record topics, assign homework, review submissions & view your archive</p>
+            <p class="hero-subtitle">Record topics, assign homework, review submissions &amp; view your archive</p>
         </div>
 
         <!-- Action Cards -->
@@ -2689,6 +2684,7 @@ function renderAcademic(container, tutor) {
     `;
 
     loadStudentDropdowns(tutor.email);
+    startTabClock('academic-lagos-clock');
 
     const addTopicBtn = document.getElementById('add-topic-btn');
     if (addTopicBtn) addTopicBtn.addEventListener('click', () => {
@@ -2718,102 +2714,159 @@ function renderAcademic(container, tutor) {
     document.getElementById('load-archive-btn')?.addEventListener('click', () => loadAcademicArchive(tutor));
 }
 
-// Load and render the academic archive grouped by month
+// Load and render the academic archive — per-student card with monthly accordion
 async function loadAcademicArchive(tutor) {
     const container = document.getElementById('academic-archive-container');
     if (!container) return;
     container.innerHTML = `<div class="text-center py-6"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading archive…</p></div>`;
 
     try {
-        const [topicsSnap, hwSnap] = await Promise.all([
+        const [topicsSnap, hwSnap, studentsSnap] = await Promise.all([
             getDocs(query(collection(db, 'daily_topics'), where('tutorEmail', '==', tutor.email))),
-            getDocs(query(collection(db, 'homework_assignments'), where('tutorEmail', '==', tutor.email)))
+            getDocs(query(collection(db, 'homework_assignments'), where('tutorEmail', '==', tutor.email))),
+            getDocs(query(collection(db, 'students'), where('tutorEmail', '==', tutor.email)))
         ]);
 
-        // Organise by month
-        const months = {}; // 'YYYY-MM' → { topics:[], hw:[] }
+        // Build student name map
+        const studentNames = {};
+        studentsSnap.docs.forEach(d => { studentNames[d.id] = d.data().studentName || 'Unknown'; });
+
+        // Organise by studentId → month
+        const byStudent = {}; // studentId → { name, months: { 'YYYY-MM': { topics:[], hw:[] } } }
 
         topicsSnap.docs.forEach(d => {
             const data = d.data();
+            const sid  = data.studentId || 'unknown';
             const date = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || '');
             if (isNaN(date.getTime())) return;
             const mk = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
-            if (!months[mk]) months[mk] = { topics:[], hw:[] };
-            months[mk].topics.push({ date, text: data.topics || '', studentId: data.studentId });
+            if (!byStudent[sid]) byStudent[sid] = { name: studentNames[sid] || sid, months: {} };
+            if (!byStudent[sid].months[mk]) byStudent[sid].months[mk] = { topics:[], hw:[] };
+            byStudent[sid].months[mk].topics.push({ date, text: data.topics || data.topicText || '' });
         });
 
         hwSnap.docs.forEach(d => {
             const data = d.data();
-            const raw = data.assignedAt || data.createdAt || data.uploadedAt;
+            const sid  = data.studentId || 'unknown';
+            const raw  = data.assignedAt || data.assignedDate || data.createdAt || data.uploadedAt;
             const date = raw?.toDate ? raw.toDate() : new Date(raw || '');
             if (isNaN(date.getTime())) return;
             const mk = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
-            if (!months[mk]) months[mk] = { topics:[], hw:[] };
-            months[mk].hw.push({ date, title: data.title || 'Homework', studentName: data.studentName || '', score: data.score, feedback: data.feedback, status: data.status });
+            if (!byStudent[sid]) byStudent[sid] = { name: data.studentName || studentNames[sid] || sid, months: {} };
+            if (!byStudent[sid].months[mk]) byStudent[sid].months[mk] = { topics:[], hw:[] };
+            byStudent[sid].months[mk].hw.push({
+                date, id: d.id,
+                title:       data.title       || 'Homework',
+                studentName: data.studentName || '',
+                score:       data.score,
+                feedback:    data.feedback,
+                status:      data.status,
+                fileUrl:     data.fileUrl      || data.attachments?.[0]?.url || null,
+                dueDate:     data.dueDate
+            });
         });
 
-        const sortedMonths = Object.keys(months).sort((a,b) => b.localeCompare(a));
+        const studentIds = Object.keys(byStudent).sort((a,b) => byStudent[a].name.localeCompare(byStudent[b].name));
 
-        if (sortedMonths.length === 0) {
+        if (!studentIds.length) {
             container.innerHTML = '<p class="text-center text-gray-400 py-6">No academic records found yet.</p>';
             return;
         }
 
-        container.innerHTML = `<div class="space-y-2" id="archive-accordion"></div>`;
-        const accordion = document.getElementById('archive-accordion');
+        container.innerHTML = '<div class="space-y-4" id="archive-students"></div>';
+        const root = document.getElementById('archive-students');
 
-        sortedMonths.forEach(mk => {
-            const { topics, hw } = months[mk];
-            const [y, m] = mk.split('-');
-            const label = new Date(parseInt(y), parseInt(m)-1, 1).toLocaleString('en-NG', { month:'long', year:'numeric' });
+        studentIds.forEach(sid => {
+            const { name, months } = byStudent[sid];
+            const totalHw     = Object.values(months).reduce((s,m) => s + m.hw.length, 0);
+            const totalTopics = Object.values(months).reduce((s,m) => s + m.topics.length, 0);
+            const sortedMonths = Object.keys(months).sort((a,b) => b.localeCompare(a));
 
-            const item = document.createElement('details');
-            item.className = 'bg-white border border-gray-200 rounded-xl overflow-hidden';
-            item.innerHTML = `
-            <summary class="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 list-none">
-                <div class="flex-1">
-                    <span class="font-semibold text-gray-800">${escapeHtml(label)}</span>
+            // Student card
+            const card = document.createElement('div');
+            card.className = 'bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm';
+
+            // Card header
+            const header = document.createElement('div');
+            header.className = 'flex items-center gap-3 p-4 bg-gray-50 border-b border-gray-100 cursor-pointer select-none';
+            header.innerHTML = `
+                <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                    ${escapeHtml((name||'?').charAt(0).toUpperCase())}
                 </div>
-                <div class="flex gap-3 flex-shrink-0">
-                    <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-bold">${topics.length} topics</span>
-                    <span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs font-bold">${hw.length} H/W</span>
+                <div class="flex-1 min-w-0">
+                    <p class="font-bold text-gray-800">${escapeHtml(name)}</p>
+                    <p class="text-xs text-gray-500">${totalTopics} topic entries · ${totalHw} assignments</p>
                 </div>
-                <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
-            </summary>
-            <div class="border-t border-gray-100 divide-y divide-gray-50">
-                <!-- Topics -->
-                ${topics.length > 0 ? `
-                <div class="p-3">
-                    <h4 class="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">📚 Topics Entered</h4>
-                    <div class="space-y-1.5">
-                        ${topics.sort((a,b) => b.date-a.date).map(t => `
-                        <div class="flex items-start gap-2 bg-blue-50 rounded-lg px-3 py-2">
-                            <span class="text-xs text-gray-400 flex-shrink-0 mt-0.5">${t.date.toLocaleDateString('en-NG', {day:'2-digit',month:'short'})}</span>
-                            <span class="text-sm text-gray-700">${escapeHtml(t.text)}</span>
-                        </div>`).join('')}
-                    </div>
-                </div>` : ''}
-                <!-- Homework -->
-                ${hw.length > 0 ? `
-                <div class="p-3">
-                    <h4 class="text-xs font-bold text-amber-600 uppercase tracking-wide mb-2">📝 Homework Assigned</h4>
-                    <div class="space-y-1.5">
-                        ${hw.sort((a,b) => b.date-a.date).map(h => `
-                        <div class="flex items-start justify-between bg-amber-50 rounded-lg px-3 py-2 gap-2">
-                            <div class="flex items-start gap-2 min-w-0">
-                                <span class="text-xs text-gray-400 flex-shrink-0 mt-0.5">${h.date.toLocaleDateString('en-NG', {day:'2-digit',month:'short'})}</span>
-                                <div class="min-w-0">
-                                    <span class="text-sm text-gray-700 font-medium">${escapeHtml(h.title)}</span>
-                                    ${h.studentName ? `<div class="text-xs text-gray-400">${escapeHtml(h.studentName)}</div>` : ''}
-                                    ${h.feedback ? `<div class="text-xs text-gray-500 italic mt-0.5">"${escapeHtml(h.feedback)}"</div>` : ''}
-                                </div>
+                <span class="student-card-chevron text-gray-400 text-lg transition-transform">▼</span>`;
+
+            const body = document.createElement('div');
+            body.className = 'student-card-body hidden p-4 space-y-3';
+
+            // Month accordion inside body
+            sortedMonths.forEach(mk => {
+                const { topics, hw } = months[mk];
+                const [y, m] = mk.split('-');
+                const monthLabel = new Date(parseInt(y), parseInt(m)-1, 1)
+                    .toLocaleString('en-NG', { month:'long', year:'numeric' });
+
+                const mItem = document.createElement('details');
+                mItem.className = 'border border-gray-100 rounded-xl overflow-hidden';
+                mItem.innerHTML = `
+                    <summary class="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50 list-none">
+                        <span class="font-semibold text-gray-700 text-sm">${escapeHtml(monthLabel)}</span>
+                        <div class="flex gap-2">
+                            <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs">${topics.length} topics</span>
+                            <span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">${hw.length} H/W</span>
+                        </div>
+                    </summary>
+                    <div class="border-t border-gray-100 divide-y divide-gray-50">
+                        ${topics.length ? `
+                        <div class="p-3">
+                            <h5 class="text-xs font-bold text-blue-600 uppercase mb-2">📚 Topics</h5>
+                            <div class="space-y-1">
+                                ${topics.sort((a,b)=>b.date-a.date).map(t=>`
+                                <div class="flex gap-2 bg-blue-50 rounded-lg px-3 py-2">
+                                    <span class="text-xs text-gray-400 flex-shrink-0">${t.date.toLocaleDateString('en-NG',{day:'2-digit',month:'short'})}</span>
+                                    <span class="text-sm text-gray-700">${escapeHtml(t.text)}</span>
+                                </div>`).join('')}
                             </div>
-                            ${h.score ? `<span class="bg-white border border-amber-200 text-amber-700 px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0">${escapeHtml(String(h.score))}/100</span>` : ''}
-                        </div>`).join('')}
-                    </div>
-                </div>` : ''}
-            </div>`;
-            accordion.appendChild(item);
+                        </div>` : ''}
+                        ${hw.length ? `
+                        <div class="p-3">
+                            <h5 class="text-xs font-bold text-amber-600 uppercase mb-2">📝 Assignments</h5>
+                            <div class="space-y-1">
+                                ${hw.sort((a,b)=>b.date-a.date).map(h=>`
+                                <div class="flex items-start justify-between bg-amber-50 rounded-lg px-3 py-2 gap-2">
+                                    <div class="min-w-0">
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <span class="text-xs text-gray-400">${h.date.toLocaleDateString('en-NG',{day:'2-digit',month:'short'})}</span>
+                                            <span class="text-sm font-medium text-gray-800">${escapeHtml(h.title)}</span>
+                                            ${h.status === 'graded' ? '<span class="text-green-600 text-xs">✅ Graded</span>' : h.status === 'submitted' ? '<span class="text-blue-600 text-xs">📤 Submitted</span>' : '<span class="text-gray-400 text-xs">⏳ Pending</span>'}
+                                        </div>
+                                        ${h.dueDate ? `<div class="text-xs text-gray-500 mt-0.5">Due: ${escapeHtml(h.dueDate)}</div>` : ''}
+                                        ${h.feedback ? `<div class="text-xs text-gray-500 italic mt-1">"${escapeHtml(h.feedback)}"</div>` : ''}
+                                    </div>
+                                    <div class="flex items-center gap-1 flex-shrink-0">
+                                        ${h.score != null && h.score !== '' ? `<span class="bg-white border border-amber-200 text-amber-700 px-2 py-0.5 rounded-full text-xs font-bold">${escapeHtml(String(h.score))}/100</span>` : ''}
+                                        ${h.fileUrl ? `<a href="${escapeHtml(h.fileUrl)}" target="_blank" class="text-blue-500 text-xs hover:underline">View</a>` : ''}
+                                    </div>
+                                </div>`).join('')}
+                            </div>
+                        </div>` : ''}
+                    </div>`;
+                body.appendChild(mItem);
+            });
+
+            // Toggle student card body
+            header.onclick = () => {
+                const isOpen = !body.classList.contains('hidden');
+                body.classList.toggle('hidden', isOpen);
+                header.querySelector('.student-card-chevron').style.transform = isOpen ? '' : 'rotate(180deg)';
+            };
+
+            card.appendChild(header);
+            card.appendChild(body);
+            root.appendChild(card);
         });
 
     } catch (err) {
@@ -2821,6 +2874,7 @@ async function loadAcademicArchive(tutor) {
         container.innerHTML = `<p class="text-red-500 text-center py-4">Error loading archive: ${escapeHtml(err.message)}</p>`;
     }
 }
+
 
 /*******************************************************************************
  * DASHBOARD TAB
@@ -3032,6 +3086,7 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
         const activeStudentMap = {};
         activeStudentsSnap.docs.forEach(d => {
             const s = d.data();
+            // Exclude: break students, transitioning students, and archived/graduated/transferred
             if (!s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status)) {
                 activeStudentIds.add(d.id);
                 activeStudentMap[d.id] = s;
@@ -3613,7 +3668,8 @@ async function renderStudentDatabase(container, tutor) {
                 }
             }
         }
-        container.innerHTML = `<div id="student-list-view" class="bg-white p-6 rounded-lg shadow-md">${studentsHTML}</div>`;
+        container.innerHTML = `${tabClockBarHTML('students-lagos-clock')}<div id="student-list-view" class="bg-white p-6 rounded-lg shadow-md">${studentsHTML}</div>`;
+        startTabClock('students-lagos-clock');
         attachEventListeners();
     }
 
@@ -4153,49 +4209,6 @@ const GAMIFICATION_CONFIG = {
 
 // --- STATE MANAGEMENT ---
 let currentTutorScore = 0;
-
-/**
- * Starts a persistent Lagos clock injected into the page header.
- * Called once after auth — survives all tab switches because it
- * targets an element OUTSIDE #mainContent.
- */
-function startGlobalTutorClock() {
-    function formatLagosFull() {
-        return new Intl.DateTimeFormat('en-NG', {
-            weekday:'short', day:'numeric', month:'short', year:'numeric',
-            hour:'2-digit', minute:'2-digit', second:'2-digit',
-            hour12:true, timeZone:'Africa/Lagos'
-        }).format(new Date());
-    }
-
-    // Try to find a persistent element outside mainContent
-    // We'll create a fixed element in the page header or inject one
-    let clockWrapper = document.getElementById('global-tutor-clock-bar');
-    if (!clockWrapper) {
-        clockWrapper = document.createElement('div');
-        clockWrapper.id = 'global-tutor-clock-bar';
-        clockWrapper.style.cssText = `
-            position:fixed; top:0; right:0; z-index:9000;
-            background:linear-gradient(135deg,#1e40af,#2563eb);
-            color:#fff; font-size:0.72rem; font-weight:600;
-            padding:4px 14px 4px 10px; border-radius:0 0 0 10px;
-            display:flex; align-items:center; gap:6px; box-shadow:0 2px 8px rgba(0,0,0,.18);
-        `;
-        clockWrapper.innerHTML = `
-            <span style="opacity:.75">📍 Lagos, Nigeria (WAT)</span>
-            <span id="global-tutor-clock-time" style="font-variant-numeric:tabular-nums; letter-spacing:.02em">--:--:-- --</span>
-        `;
-        document.body.appendChild(clockWrapper);
-    }
-
-    const tickEl = () => {
-        const el = document.getElementById('global-tutor-clock-time');
-        if (el) el.textContent = formatLagosFull();
-    };
-    tickEl();
-    if (window._globalTutorClockInterval) clearInterval(window._globalTutorClockInterval);
-    window._globalTutorClockInterval = setInterval(tickEl, 1000);
-}
 let isTutorOfTheMonth = false;
 
 /**
@@ -4204,98 +4217,86 @@ let isTutorOfTheMonth = false;
  */
 async function initGamification(tutorId) {
     try {
-        const tutorEmail = window.tutorData?.email;
-        if (!tutorEmail) { console.warn("initGamification: no tutorEmail"); return; }
+        // ── PRIMARY SOURCE: Listen to tutor doc (management.js writes here after grading) ──
+        const tutorRef = doc(db, "tutors", tutorId);
+        onSnapshot(tutorRef, async (docSnap) => {
+            if (!docSnap.exists()) return;
+            const data = docSnap.data();
 
-        // Lagos month key
-        const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
-        const currentMonthKey = `${lagosNow.getFullYear()}-${String(lagosNow.getMonth()+1).padStart(2,'0')}`;
+            // Build initial breakdown from tutor doc fields
+            let qaScore  = data.qaScore  ?? null;
+            let qcScore  = data.qcScore  ?? null;
+            let qaAdvice = data.qaAdvice || '';
+            let qcAdvice = data.qcAdvice || '';
+            let qaGraderName = data.qaGradedByName || '';
+            let qcGraderName = data.qcGradedByName || '';
+            let perfMonth    = data.performanceMonth || '';
+            let qaBreakdown  = null;
+            let qcBreakdown  = null;
 
-        // ── Single-field query (no composite index needed) ──
-        // We query only by tutorEmail, then filter month client-side.
-        // Two-field queries require a Firestore composite index which may not exist.
-        const gradesQ = query(
-            collection(db, 'tutor_grades'),
-            where('tutorEmail', '==', tutorEmail)
-        );
-
-        if (window._gamifUnsubscribe) window._gamifUnsubscribe();
-
-        window._gamifUnsubscribe = onSnapshot(gradesQ, (snapshot) => {
-            // Find the doc for the current month (client-side filter)
-            let gradeDoc = null;
-            snapshot.forEach(d => {
-                const dd = d.data();
-                if (dd.month === currentMonthKey) gradeDoc = dd;
-            });
-
-            if (!gradeDoc) {
-                // Also try tutorId field match in case email differs from tutorId field
-                snapshot.forEach(d => {
-                    const dd = d.data();
-                    if (!gradeDoc && dd.month === currentMonthKey &&
-                        (dd.tutorId === tutorEmail || dd.tutorId === tutorId)) {
-                        gradeDoc = dd;
+            // ── SECONDARY SOURCE: tutor_grades collection for full breakdown & notes ──
+            try {
+                const monthKey = perfMonth || (() => {
+                    const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+                    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+                })();
+                const gradeQ = query(
+                    collection(db, 'tutor_grades'),
+                    where('tutorId', '==', tutorId),
+                    where('month', '==', monthKey)
+                );
+                const gradeSnap = await getDocs(gradeQ);
+                if (!gradeSnap.empty) {
+                    const gd = gradeSnap.docs[0].data();
+                    // Override with richer data from tutor_grades
+                    if (gd.qa) {
+                        qaScore      = gd.qa.score      ?? qaScore;
+                        qaAdvice     = gd.qa.notes      || qaAdvice;
+                        qaGraderName = gd.qa.gradedByName || qaGraderName;
+                        qaBreakdown  = gd.qa.breakdown  || null;
                     }
-                });
+                    if (gd.qc) {
+                        qcScore      = gd.qc.score      ?? qcScore;
+                        qcAdvice     = gd.qc.notes      || qcAdvice;
+                        qcGraderName = gd.qc.gradedByName || qcGraderName;
+                        qcBreakdown  = gd.qc.breakdown  || null;
+                    }
+                    if (gd.month) perfMonth = gd.month;
+                }
+            } catch (gradeErr) {
+                console.warn('tutor_grades fetch fallback:', gradeErr);
             }
 
-            if (!gradeDoc) {
-                updateScoreDisplay(0, { noGrade: true });
-                return;
-            }
-
-            const qa = gradeDoc.qa?.score  ?? null;
-            const qc = gradeDoc.qc?.score  ?? null;
-
-            let combined = 0;
-            if (qa !== null && qc !== null) combined = Math.round((qa + qc) / 2);
-            else if (qa !== null) combined = qa;
-            else if (qc !== null) combined = qc;
+            // Compute combined score
+            let combined = data.performanceScore || 0;
+            if (qaScore !== null && qcScore !== null) combined = Math.round((qaScore + qcScore) / 2);
+            else if (qaScore !== null) combined = qaScore;
+            else if (qcScore !== null) combined = qcScore;
 
             currentTutorScore = combined;
 
+            // Persist to window.tutorData for other UI reads
             if (window.tutorData) {
-                window.tutorData.qaScore          = qa;
-                window.tutorData.qcScore          = qc;
-                window.tutorData.qaAdvice         = gradeDoc.qa?.notes || '';
-                window.tutorData.qcAdvice         = gradeDoc.qc?.notes || '';
-                window.tutorData.qaGradedByName   = gradeDoc.qa?.gradedByName || '';
-                window.tutorData.qcGradedByName   = gradeDoc.qc?.gradedByName || '';
-                window.tutorData.performanceMonth = gradeDoc.month || currentMonthKey;
+                Object.assign(window.tutorData, {
+                    qaScore, qcScore, qaAdvice, qcAdvice,
+                    qaGradedByName: qaGraderName,
+                    qcGradedByName: qcGraderName,
+                    performanceMonth: perfMonth,
+                    qaBreakdown, qcBreakdown
+                });
             }
 
-            updateScoreDisplay(combined, {
-                qaScore:          qa,
-                qcScore:          qc,
-                qaAdvice:         gradeDoc.qa?.notes || '',
-                qcAdvice:         gradeDoc.qc?.notes || '',
-                qaGradedByName:   gradeDoc.qa?.gradedByName || '',
-                qcGradedByName:   gradeDoc.qc?.gradedByName || '',
-                performanceMonth: gradeDoc.month || currentMonthKey,
-                qaBreakdown:      gradeDoc.qa?.breakdown || {},
-                qcBreakdown:      gradeDoc.qc?.breakdown || {},
-                noGrade:          false
+            updateScoreDisplay(currentTutorScore, {
+                qaScore, qcScore, qaAdvice, qcAdvice,
+                qaGradedByName: qaGraderName,
+                qcGradedByName: qcGraderName,
+                performanceMonth: perfMonth,
+                qaBreakdown, qcBreakdown
             });
-        }, (err) => {
-            console.error("tutor_grades snapshot error:", err);
-            // Graceful fallback: try reading from tutors doc (also updated by management)
-            getDoc(doc(db, 'tutors', tutorId)).then(tSnap => {
-                if (!tSnap.exists()) return;
-                const td = tSnap.data();
-                if (!td.qaScore && !td.qcScore) return;
-                const combined = td.performanceScore || Math.round(((td.qaScore||0)+(td.qcScore||0))/2);
-                updateScoreDisplay(combined, {
-                    qaScore: td.qaScore||null, qcScore: td.qcScore||null,
-                    qaAdvice: td.qaAdvice||'', qcAdvice: td.qcAdvice||'',
-                    qaGradedByName: td.qaGradedByName||'',
-                    qcGradedByName: td.qcGradedByName||'',
-                    performanceMonth: td.performanceMonth||currentMonthKey
-                });
-            }).catch(()=>{});
         });
 
         checkWinnerStatus(tutorId);
+
     } catch (error) {
         console.error("Gamification Error:", error);
     }
@@ -4345,22 +4346,10 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
     const scoreWidget = document.getElementById('performance-widget');
     if (!scoreWidget) return;
 
-    // If no grade yet — show a friendly placeholder
-    if (breakdown.noGrade) {
-        scoreWidget.innerHTML = `
-            <div class="bg-white rounded-2xl shadow-sm border border-dashed border-gray-200 p-4 text-center">
-                <div class="text-3xl mb-2">📊</div>
-                <h3 class="font-bold text-gray-700 mb-1">Performance Score</h3>
-                <p class="text-sm text-gray-400">No grade recorded yet this month.<br>Your QA &amp; QC scores will appear here once management grades you.</p>
-            </div>`;
-        return;
-    }
-
     let scoreColor = 'text-red-500', barColor = 'from-red-400 to-red-500';
     if (totalScore >= 65) { scoreColor = 'text-yellow-500'; barColor = 'from-yellow-400 to-yellow-500'; }
     if (totalScore >= 85) { scoreColor = 'text-green-600'; barColor = 'from-green-400 to-green-600'; }
 
-    // Accept grading details either via breakdown param (real-time) or window.tutorData (fallback)
     const td = window.tutorData || {};
     const qaScore      = breakdown.qaScore      ?? td.qaScore      ?? null;
     const qcScore      = breakdown.qcScore      ?? td.qcScore      ?? null;
@@ -4369,8 +4358,18 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
     const qaGraderName = breakdown.qaGradedByName ?? td.qaGradedByName ?? '';
     const qcGraderName = breakdown.qcGradedByName ?? td.qcGradedByName ?? '';
     const perfMonth    = breakdown.performanceMonth ?? td.performanceMonth ?? '';
+    const qaBreakdown  = breakdown.qaBreakdown  ?? td.qaBreakdown  ?? null;
+    const qcBreakdown  = breakdown.qcBreakdown  ?? td.qcBreakdown  ?? null;
 
-    function scoreBadge(score, label, graderName, advice, themeClass) {
+    function buildBreakdownTable(breakdownObj) {
+        if (!breakdownObj || Object.keys(breakdownObj).length === 0) return '';
+        const rows = Object.entries(breakdownObj)
+            .map(([key, val]) => `<tr><td class="pr-3 text-gray-500 capitalize">${escapeHtml(key.replace(/_/g,' '))}</td><td class="font-bold text-gray-700">${val}</td></tr>`)
+            .join('');
+        return `<table class="text-xs mt-2 w-full">${rows}</table>`;
+    }
+
+    function scoreBadge(score, label, graderName, advice, themeClass, bkd) {
         if (score === null || score === undefined) return `
             <div class="bg-gray-50 rounded-xl p-3 border border-gray-100">
                 <div class="text-xs font-bold ${themeClass} uppercase tracking-wide mb-1">${label}</div>
@@ -4385,11 +4384,12 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
                     <div class="text-xs font-bold ${themeClass} uppercase tracking-wide">${label}</div>
                     ${graderName ? `<span class="text-xs text-gray-400">by ${escapeHtml(graderName)}</span>` : ''}
                 </div>
-                <div class="text-2xl font-black ${sc}">${score}<span class="text-sm">%</span></div>
+                <div class="text-2xl font-black ${sc}">${score}<span class="text-sm font-normal text-gray-400">%</span></div>
                 <div class="w-full bg-gray-100 rounded-full h-1.5 mt-1.5">
-                    <div class="h-1.5 rounded-full bg-current transition-all duration-700 ${sc}" style="width:${score}%"></div>
+                    <div class="h-1.5 rounded-full transition-all duration-700 ${score >= 85 ? 'bg-green-500' : score >= 65 ? 'bg-yellow-500' : 'bg-red-400'}" style="width:${score}%"></div>
                 </div>
-                ${advice ? `<div class="mt-2 text-xs text-gray-600 italic bg-gray-50 rounded-lg p-2 border border-gray-100">"${escapeHtml(advice)}"</div>` : ''}
+                ${buildBreakdownTable(bkd)}
+                ${advice ? `<div class="mt-2 text-xs text-gray-600 italic bg-gray-50 rounded-lg p-2 border border-gray-100">📝 "${escapeHtml(advice)}"</div>` : ''}
             </div>`;
     }
 
@@ -4397,7 +4397,7 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden cursor-pointer" id="perf-card-inner">
             ${isTutorOfTheMonth ? '<div class="absolute top-0 right-0 bg-yellow-400 text-xs font-black px-2 py-1 rounded-bl-xl text-white">👑 TOP TUTOR</div>' : ''}
             <div class="p-4">
-                <h3 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Performance Score ${perfMonth ? '· ' + perfMonth : ''}</h3>
+                <h3 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Performance Score ${perfMonth ? '· ' + escapeHtml(perfMonth) : ''}</h3>
                 <div class="flex items-end gap-2 mb-3">
                     <span class="text-5xl font-black ${scoreColor}">${totalScore}</span>
                     <span class="text-gray-400 text-sm mb-1">/ 100%</span>
@@ -4405,13 +4405,13 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
                 <div class="w-full bg-gray-100 rounded-full h-2.5 mb-1">
                     <div class="bg-gradient-to-r ${barColor} h-2.5 rounded-full transition-all duration-1000" style="width:${Math.min(totalScore,100)}%"></div>
                 </div>
-                <p class="text-xs text-gray-400 text-right mb-3">Tap to see full breakdown ↓</p>
+                <p class="text-xs text-gray-400 text-right mb-3">Tap to see QA &amp; QC breakdown ↓</p>
             </div>
             <!-- Expandable breakdown -->
             <div id="perf-breakdown" class="hidden border-t border-gray-100 p-4 space-y-3 bg-gray-50">
-                <div class="grid grid-cols-2 gap-3">
-                    ${scoreBadge(qaScore, 'QA – Session', qaGraderName, qaAdvice, 'text-purple-600')}
-                    ${scoreBadge(qcScore, 'QC – Lesson Plan', qcGraderName, qcAdvice, 'text-amber-600')}
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    ${scoreBadge(qaScore, 'QA – Session Quality', qaGraderName, qaAdvice, 'text-purple-600', qaBreakdown)}
+                    ${scoreBadge(qcScore, 'QC – Lesson Plan', qcGraderName, qcAdvice, 'text-amber-600', qcBreakdown)}
                 </div>
                 <p class="text-xs text-gray-400 text-center">Combined score = (QA + QC) ÷ 2</p>
             </div>
@@ -4510,6 +4510,7 @@ async function renderCourses(container, tutor) {
     updateActiveTab('navCourses');
     
     container.innerHTML = `
+        ${tabClockBarHTML('courses-lagos-clock')}
         <div class="hero-section">
             <h1 class="hero-title">📚 Course Materials</h1>
             <p class="hero-subtitle">Upload and manage learning resources for your students</p>
@@ -4568,6 +4569,7 @@ async function renderCourses(container, tutor) {
 
     // Load students into dropdown
     await loadStudentDropdownCourses(tutor.email);
+    startTabClock('courses-lagos-clock');
 
     const studentSelect = document.getElementById('material-student-select');
     const uploadForm = document.getElementById('upload-form-container');
@@ -4813,9 +4815,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 
                 window.tutorData = tutorData;
-
-                // Start persistent Lagos clock in page header (survives all tab switches)
-                startGlobalTutorClock();
                 
                 if (shouldShowEmploymentPopup(tutorData)) {
                     showEmploymentDatePopup(tutorData);
@@ -4974,136 +4973,86 @@ function getHomeworkCutoffDate() {
 async function loadHomeworkInbox(tutorEmail) {
     const container = document.getElementById('homework-inbox-container');
     if (!container) return;
-    container.innerHTML = '<div class="text-center py-4"><div class="spinner mx-auto mb-2"></div><p class="text-xs text-gray-400">Loading homework data…</p></div>';
+    container.innerHTML = '<div class="spinner mx-auto"></div>';
 
     try {
-        // Fetch ALL homework assigned by this tutor (sent + submitted + graded)
-        const [allHwSnap, studentsSnap] = await Promise.all([
-            getDocs(query(collection(db, 'homework_assignments'), where('tutorEmail', '==', tutorEmail))),
-            getDocs(query(collection(db, 'students'), where('tutorEmail', '==', tutorEmail)))
-        ]);
+        // Query by Tutor Name OR Email to be safe
+        let q = query(
+            collection(db, "homework_assignments"),
+            where("tutorName", "==", window.tutorData.name),
+            where("status", "==", "submitted")
+        );
+        let snapshot = await getDocs(q);
 
-        const studentMap = {};
-        studentsSnap.docs.forEach(d => { studentMap[d.id] = d.data().studentName || d.id; });
+        if (snapshot.empty) {
+            // Fallback query using email
+            q = query(
+                collection(db, "homework_assignments"),
+                where("tutorEmail", "==", tutorEmail),
+                where("status", "==", "submitted")
+            );
+            snapshot = await getDocs(q);
+        }
 
-        // Group homework by studentId (fallback to studentName)
-        const byStudent = {};  // key = studentName → { sent: [], submitted: [], graded: [] }
-        allHwSnap.docs.forEach(d => {
-            const hw = { id: d.id, ...d.data() };
-            const key = hw.studentName || hw.studentId || 'Unknown';
-            if (!byStudent[key]) byStudent[key] = { sent: [], submitted: [], graded: [] };
-            if (hw.status === 'submitted') byStudent[key].submitted.push(hw);
-            else if (hw.status === 'graded') byStudent[key].graded.push(hw);
-            else byStudent[key].sent.push(hw);
+        // ---------- AUTO‑CLEAR LOGIC (4th day of month) ----------
+        const cutoffDate = getHomeworkCutoffDate();
+        const visibleSubmissions = snapshot.docs.filter(doc => {
+            const data = doc.data();
+            const submitted = data.submittedAt;
+            if (!submitted || typeof submitted.seconds !== 'number') return false;
+            const submittedDate = new Date(submitted.seconds * 1000);
+            return submittedDate >= cutoffDate;
         });
+        // ---------------------------------------------------------
 
-        const studentKeys = Object.keys(byStudent).sort();
-        const inboxCountEl = document.getElementById('inbox-count');
-        const totalSubmitted = Object.values(byStudent).reduce((a,b) => a + b.submitted.length, 0);
-        if (inboxCountEl) inboxCountEl.textContent = totalSubmitted > 0 ? `${totalSubmitted} pending` : 'All clear';
-
-        if (studentKeys.length === 0) {
-            container.innerHTML = `<div class="text-center py-6"><div class="text-3xl mb-2">📬</div><p class="text-gray-500 text-sm">No homework assigned yet.</p></div>`;
+        if (visibleSubmissions.length === 0) {
+            container.innerHTML = `<div class="text-center py-6">
+                <div class="text-3xl mb-2">🎉</div>
+                <p class="text-gray-500 text-sm">No pending homework from this month.</p>
+            </div>`;
             return;
         }
 
-        // Build tab interface: "Submitted (needs grading)" | "All by Student"
-        container.innerHTML = `
-            <div style="display:flex;gap:.5rem;margin-bottom:1rem;border-bottom:2px solid #f3f4f6;padding-bottom:.5rem;">
-                <button id="hw-tab-pending" onclick="hwSwitchTab('pending')" style="font-size:.8rem;font-weight:700;padding:.3rem .8rem;border-radius:.5rem;background:#3b82f6;color:#fff;border:none;cursor:pointer;">📥 Needs Grading (${totalSubmitted})</button>
-                <button id="hw-tab-archive" onclick="hwSwitchTab('archive')" style="font-size:.8rem;font-weight:700;padding:.3rem .8rem;border-radius:.5rem;background:#f3f4f6;color:#374151;border:none;cursor:pointer;">📂 Archive by Student</button>
-            </div>
+        let html = '<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">';
+        visibleSubmissions.forEach(doc => {
+            const data = doc.data();
+            
+            // ✅ SAFE date formatting
+            const submitted = data.submittedAt;
+            let date = 'Unknown';
+            if (submitted && typeof submitted.seconds === 'number') {
+                date = new Date(submitted.seconds * 1000).toLocaleDateString();
+            }
 
-            <!-- PENDING TAB -->
-            <div id="hw-panel-pending">
-                ${totalSubmitted === 0 ? `<div class="text-center py-6"><div class="text-3xl mb-2">🎉</div><p class="text-gray-500 text-sm">All caught up — nothing pending!</p></div>` : 
-                    `<div style="border:1px solid #e5e7eb;border-radius:.75rem;overflow:hidden;">
-                        ${allHwSnap.docs.filter(d => d.data().status === 'submitted').map(d => {
-                            const hw = d.data();
-                            const submittedRaw = hw.submittedAt;
-                            const submittedDate = submittedRaw?.seconds ? new Date(submittedRaw.seconds * 1000) : null;
-                            const dateStr = submittedDate ? submittedDate.toLocaleDateString('en-NG', { day:'numeric', month:'short', year:'numeric' }) : 'Unknown date';
-                            return `<div class="gc-inbox-item" onclick="openGradingModal('${escapeHtml(d.id)}')" style="cursor:pointer;">
-                                <div style="display:flex;align-items:center;gap:.75rem;">
-                                    <div style="width:2.5rem;height:2.5rem;border-radius:50%;background:#dbeafe;color:#2563eb;display:flex;align-items:center;justify-content:center;font-weight:700;">${escapeHtml((hw.studentName||'?').charAt(0))}</div>
-                                    <div>
-                                        <div style="font-weight:600;font-size:.875rem;">${escapeHtml(hw.studentName||'Unknown')}</div>
-                                        <div style="font-size:.75rem;color:#6b7280;">${escapeHtml(hw.title||'Untitled')}</div>
-                                    </div>
-                                </div>
-                                <div style="text-align:right;">
-                                    <div style="font-size:.7rem;font-weight:700;color:#f59e0b;text-transform:uppercase;">Awaiting Grade</div>
-                                    <div style="font-size:.7rem;color:#9ca3af;">${escapeHtml(dateStr)}</div>
-                                </div>
-                            </div>`;
-                        }).join('')}
-                    </div>`}
-            </div>
+            const isLate = data.dueDate && new Date(data.dueDate) < new Date(submitted?.seconds * 1000 || 0);
 
-            <!-- ARCHIVE TAB -->
-            <div id="hw-panel-archive" style="display:none;">
-                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.75rem;">
-                    ${studentKeys.map(sName => {
-                        const { sent, submitted, graded } = byStudent[sName];
-                        const all = [...sent, ...submitted, ...graded].sort((a,b) => {
-                            const tA = (a.assignedAt?.seconds || a.createdAt?.seconds || 0);
-                            const tB = (b.assignedAt?.seconds || b.createdAt?.seconds || 0);
-                            return tB - tA;
-                        });
-                        return `<details style="background:#fff;border:1px solid #e5e7eb;border-radius:.85rem;overflow:hidden;">
-                            <summary style="display:flex;align-items:center;gap:.6rem;padding:.75rem 1rem;cursor:pointer;list-style:none;user-select:none;">
-                                <div style="width:2rem;height:2rem;border-radius:.5rem;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;flex-shrink:0;">${escapeHtml(sName.charAt(0))}</div>
-                                <div style="flex:1;min-width:0;">
-                                    <p style="font-weight:700;font-size:.85rem;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(sName)}</p>
-                                    <p style="font-size:.7rem;color:#6b7280;margin:0;">${all.length} assignment${all.length!==1?'s':''} · ${submitted.length} pending</p>
-                                </div>
-                                ${submitted.length > 0 ? `<span style="background:#fef3c7;color:#d97706;font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:.4rem;">${submitted.length} to grade</span>` : ''}
-                            </summary>
-                            <div style="border-top:1px solid #f3f4f6;padding:.5rem .75rem;">
-                                ${all.length === 0 ? '<p style="font-size:.75rem;color:#9ca3af;padding:.5rem 0;">No assignments yet</p>' :
-                                    all.map(hw => {
-                                        const ts = hw.assignedAt?.seconds || hw.createdAt?.seconds;
-                                        const dateStr = ts ? new Date(ts*1000).toLocaleDateString('en-NG',{day:'numeric',month:'short'}) : '';
-                                        const statusColor = hw.status==='graded'?'#16a34a':hw.status==='submitted'?'#d97706':'#6b7280';
-                                        const statusLabel = hw.status==='graded'?'Graded':hw.status==='submitted'?'Submitted':'Assigned';
-                                        return `<div style="display:flex;align-items:center;gap:.5rem;padding:.4rem 0;border-bottom:1px solid #f9fafb;font-size:.78rem;" ${hw.status==='submitted'?`onclick="openGradingModal('${escapeHtml(hw.id)}')" style="cursor:pointer;display:flex;align-items:center;gap:.5rem;padding:.4rem 0;border-bottom:1px solid #f9fafb;font-size:.78rem;"`:''}>
-                                            <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#374151;">${escapeHtml(hw.title||'Untitled')}</div>
-                                            <span style="flex-shrink:0;font-size:.65rem;color:${statusColor};font-weight:700;">${statusLabel}</span>
-                                            ${dateStr ? `<span style="flex-shrink:0;font-size:.65rem;color:#9ca3af;">${escapeHtml(dateStr)}</span>` : ''}
-                                            ${hw.score ? `<span style="flex-shrink:0;font-size:.65rem;font-weight:700;color:#1d4ed8;">${hw.score}/100</span>` : ''}
-                                        </div>`;
-                                    }).join('')}
-                            </div>
-                        </details>`;
-                    }).join('')}
-                </div>
-            </div>
-        `;
+            html += `
+                <div class="gc-inbox-item" onclick="openGradingModal('${escapeHtml(doc.id)}')">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                            ${escapeHtml(data.studentName?.charAt(0) || '?')}
+                        </div>
+                        <div>
+                            <div class="font-medium text-gray-800">${escapeHtml(data.studentName || 'Unknown')}</div>
+                            <div class="text-xs text-gray-500">${escapeHtml(data.title || 'Untitled')}</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs font-bold ${isLate ? 'text-red-600' : 'text-green-600'} uppercase tracking-wide">
+                            ${isLate ? 'Done Late' : 'Turned In'}
+                        </div>
+                        <div class="text-xs text-gray-400">${escapeHtml(date)}</div>
+                    </div>
+                </div>`;
+        });
+        html += '</div>';
+        container.innerHTML = html;
 
     } catch (error) {
         console.error("Inbox Error:", error);
-        container.innerHTML = '<p class="text-red-500 text-center py-4">Error loading homework data.</p>';
+        container.innerHTML = '<p class="text-red-500 text-center">Error loading inbox.</p>';
     }
 }
-
-window.hwSwitchTab = function(tab) {
-    const pendingPanel = document.getElementById('hw-panel-pending');
-    const archivePanel = document.getElementById('hw-panel-archive');
-    const pendingBtn = document.getElementById('hw-tab-pending');
-    const archiveBtn = document.getElementById('hw-tab-archive');
-    if (!pendingPanel || !archivePanel) return;
-    if (tab === 'pending') {
-        pendingPanel.style.display = '';
-        archivePanel.style.display = 'none';
-        if (pendingBtn) { pendingBtn.style.background = '#3b82f6'; pendingBtn.style.color = '#fff'; }
-        if (archiveBtn) { archiveBtn.style.background = '#f3f4f6'; archiveBtn.style.color = '#374151'; }
-    } else {
-        pendingPanel.style.display = 'none';
-        archivePanel.style.display = '';
-        if (pendingBtn) { pendingBtn.style.background = '#f3f4f6'; pendingBtn.style.color = '#374151'; }
-        if (archiveBtn) { archiveBtn.style.background = '#3b82f6'; archiveBtn.style.color = '#fff'; }
-    }
-};
 
 // ==========================================
 // 3. OPEN GRADING MODAL (unchanged – safe)
