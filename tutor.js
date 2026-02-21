@@ -427,19 +427,29 @@ function showCustomAlert(message) {
     document.getElementById('alert-ok-btn').addEventListener('click', () => alertModal.remove());
 }
 
-// Update active tab
+// Update active tab with smooth fade transition
 function updateActiveTab(activeTabId) {
-    const navTabs = ['navDashboard', 'navStudentDatabase', 'navAutoStudents', 'navScheduleManagement', 'navAcademic'];
+    const navTabs = ['navDashboard', 'navStudentDatabase', 'navAutoStudents', 'navScheduleManagement', 'navAcademic', 'navCourses'];
     navTabs.forEach(tabId => {
         const tab = document.getElementById(tabId);
         if (tab) {
-            if (tabId === activeTabId) {
-                tab.classList.add('active');
-            } else {
-                tab.classList.remove('active');
-            }
+            tab.classList.toggle('active', tabId === activeTabId);
         }
     });
+
+    // Fade in main content on tab switch
+    const mainContent = document.getElementById('mainContent');
+    if (mainContent) {
+        mainContent.style.opacity = '0';
+        mainContent.style.transform = 'translateY(6px)';
+        mainContent.style.transition = 'opacity 0.22s ease, transform 0.22s ease';
+        requestAnimationFrame(() => {
+            setTimeout(() => {
+                mainContent.style.opacity = '1';
+                mainContent.style.transform = 'translateY(0)';
+            }, 30);
+        });
+    }
 }
 
 /*******************************************************************************
@@ -2581,7 +2591,7 @@ function renderScheduleManagement(container, tutor) {
 }
 
 /*******************************************************************************
- * ACADEMIC TAB
+ * ACADEMIC TAB — Enhanced with monthly archive
  ******************************************************************************/
 function renderAcademic(container, tutor) {
     updateActiveTab('navAcademic');
@@ -2589,9 +2599,10 @@ function renderAcademic(container, tutor) {
     container.innerHTML = `
         <div class="hero-section">
             <h1 class="hero-title">🎓 Academic</h1>
-            <p class="hero-subtitle">Record today's topics, assign homework, and review student submissions</p>
+            <p class="hero-subtitle">Record topics, assign homework, review submissions & view your archive</p>
         </div>
 
+        <!-- Action Cards -->
         <div class="student-actions-container">
             <div class="student-action-card">
                 <div class="flex items-center gap-3 mb-3">
@@ -2599,9 +2610,7 @@ function renderAcademic(container, tutor) {
                     <h3 class="font-bold text-lg">Today's Topic</h3>
                 </div>
                 <p class="text-sm text-gray-600 mb-4">Record topics covered in today's classes.</p>
-                <select id="select-student-topic" class="form-input mb-3">
-                    <option value="">Select a student...</option>
-                </select>
+                <select id="select-student-topic" class="form-input mb-3"><option value="">Select a student...</option></select>
                 <button id="add-topic-btn" class="btn btn-secondary w-full" disabled>Add Today's Topic</button>
             </div>
 
@@ -2611,77 +2620,176 @@ function renderAcademic(container, tutor) {
                     <h3 class="font-bold text-lg">Assign Homework</h3>
                 </div>
                 <p class="text-sm text-gray-600 mb-4">Assign homework to your students.</p>
-                <select id="select-student-hw" class="form-input mb-3">
-                    <option value="">Select a student...</option>
-                </select>
+                <select id="select-student-hw" class="form-input mb-3"><option value="">Select a student...</option></select>
                 <button id="assign-hw-btn" class="btn btn-warning w-full" disabled>Assign Homework</button>
             </div>
         </div>
 
+        <!-- Homework Inbox -->
         <div class="card mt-4">
             <div class="card-header flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <span class="text-xl">📨</span>
                     <h3 class="font-bold text-lg">Homework Inbox</h3>
+                    <span class="badge badge-info text-xs" id="inbox-count">…</span>
                 </div>
                 <button id="refresh-inbox-btn" class="btn btn-secondary btn-sm">🔄 Refresh</button>
             </div>
             <div class="card-body" id="homework-inbox-container">
                 <div class="text-center py-6">
                     <div class="spinner mx-auto mb-3"></div>
-                    <p class="text-gray-500">Loading homework submissions...</p>
+                    <p class="text-gray-500">Loading submissions...</p>
                 </div>
+            </div>
+        </div>
+
+        <!-- Monthly Archive Accordion -->
+        <div class="card mt-4">
+            <div class="card-header flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">🗄️</span>
+                    <h3 class="font-bold text-lg">Academic Archive</h3>
+                </div>
+                <button id="load-archive-btn" class="btn btn-secondary btn-sm">📂 Load Archive</button>
+            </div>
+            <div class="card-body" id="academic-archive-container">
+                <p class="text-center text-gray-400 text-sm py-4">Click "Load Archive" to view your past topics & homework by month.</p>
             </div>
         </div>
     `;
 
-    // Load student dropdowns
     loadStudentDropdowns(tutor.email);
 
-    // Today's topic button
     const addTopicBtn = document.getElementById('add-topic-btn');
-    if (addTopicBtn) {
-        addTopicBtn.addEventListener('click', () => {
-            const studentId = document.getElementById('select-student-topic').value;
-            const student = getStudentFromCache(studentId);
-            if (student) showDailyTopicModal(student);
-        });
-    }
+    if (addTopicBtn) addTopicBtn.addEventListener('click', () => {
+        const sid = document.getElementById('select-student-topic').value;
+        const s = getStudentFromCache(sid);
+        if (s) showDailyTopicModal(s);
+    });
 
-    // Assign homework button
     const assignHwBtn = document.getElementById('assign-hw-btn');
-    if (assignHwBtn) {
-        assignHwBtn.addEventListener('click', () => {
-            const studentId = document.getElementById('select-student-hw').value;
-            const student = getStudentFromCache(studentId);
-            if (student) showHomeworkModal(student);
-        });
-    }
+    if (assignHwBtn) assignHwBtn.addEventListener('click', () => {
+        const sid = document.getElementById('select-student-hw').value;
+        const s = getStudentFromCache(sid);
+        if (s) showHomeworkModal(s);
+    });
 
-    // Enable topic button on selection
-    const topicSelect = document.getElementById('select-student-topic');
-    if (topicSelect) {
-        topicSelect.addEventListener('change', (e) => {
-            document.getElementById('add-topic-btn').disabled = !e.target.value;
-        });
-    }
+    document.getElementById('select-student-topic')?.addEventListener('change', e => {
+        document.getElementById('add-topic-btn').disabled = !e.target.value;
+    });
+    document.getElementById('select-student-hw')?.addEventListener('change', e => {
+        document.getElementById('assign-hw-btn').disabled = !e.target.value;
+    });
 
-    // Enable homework button on selection
-    const hwSelect = document.getElementById('select-student-hw');
-    if (hwSelect) {
-        hwSelect.addEventListener('change', (e) => {
-            document.getElementById('assign-hw-btn').disabled = !e.target.value;
-        });
-    }
-
-    // Refresh inbox button
-    const refreshInboxBtn = document.getElementById('refresh-inbox-btn');
-    if (refreshInboxBtn) {
-        refreshInboxBtn.addEventListener('click', () => loadHomeworkInbox(tutor.email));
-    }
-
-    // Load homework inbox
+    document.getElementById('refresh-inbox-btn')?.addEventListener('click', () => loadHomeworkInbox(tutor.email));
     loadHomeworkInbox(tutor.email);
+
+    // Archive loader
+    document.getElementById('load-archive-btn')?.addEventListener('click', () => loadAcademicArchive(tutor));
+}
+
+// Load and render the academic archive grouped by month
+async function loadAcademicArchive(tutor) {
+    const container = document.getElementById('academic-archive-container');
+    if (!container) return;
+    container.innerHTML = `<div class="text-center py-6"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading archive…</p></div>`;
+
+    try {
+        const [topicsSnap, hwSnap] = await Promise.all([
+            getDocs(query(collection(db, 'daily_topics'), where('tutorEmail', '==', tutor.email))),
+            getDocs(query(collection(db, 'homework_assignments'), where('tutorEmail', '==', tutor.email)))
+        ]);
+
+        // Organise by month
+        const months = {}; // 'YYYY-MM' → { topics:[], hw:[] }
+
+        topicsSnap.docs.forEach(d => {
+            const data = d.data();
+            const date = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || '');
+            if (isNaN(date.getTime())) return;
+            const mk = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+            if (!months[mk]) months[mk] = { topics:[], hw:[] };
+            months[mk].topics.push({ date, text: data.topics || '', studentId: data.studentId });
+        });
+
+        hwSnap.docs.forEach(d => {
+            const data = d.data();
+            const raw = data.assignedAt || data.createdAt || data.uploadedAt;
+            const date = raw?.toDate ? raw.toDate() : new Date(raw || '');
+            if (isNaN(date.getTime())) return;
+            const mk = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+            if (!months[mk]) months[mk] = { topics:[], hw:[] };
+            months[mk].hw.push({ date, title: data.title || 'Homework', studentName: data.studentName || '', score: data.score, feedback: data.feedback, status: data.status });
+        });
+
+        const sortedMonths = Object.keys(months).sort((a,b) => b.localeCompare(a));
+
+        if (sortedMonths.length === 0) {
+            container.innerHTML = '<p class="text-center text-gray-400 py-6">No academic records found yet.</p>';
+            return;
+        }
+
+        container.innerHTML = `<div class="space-y-2" id="archive-accordion"></div>`;
+        const accordion = document.getElementById('archive-accordion');
+
+        sortedMonths.forEach(mk => {
+            const { topics, hw } = months[mk];
+            const [y, m] = mk.split('-');
+            const label = new Date(parseInt(y), parseInt(m)-1, 1).toLocaleString('en-NG', { month:'long', year:'numeric' });
+
+            const item = document.createElement('details');
+            item.className = 'bg-white border border-gray-200 rounded-xl overflow-hidden';
+            item.innerHTML = `
+            <summary class="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 list-none">
+                <div class="flex-1">
+                    <span class="font-semibold text-gray-800">${escapeHtml(label)}</span>
+                </div>
+                <div class="flex gap-3 flex-shrink-0">
+                    <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-bold">${topics.length} topics</span>
+                    <span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs font-bold">${hw.length} H/W</span>
+                </div>
+                <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+            </summary>
+            <div class="border-t border-gray-100 divide-y divide-gray-50">
+                <!-- Topics -->
+                ${topics.length > 0 ? `
+                <div class="p-3">
+                    <h4 class="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">📚 Topics Entered</h4>
+                    <div class="space-y-1.5">
+                        ${topics.sort((a,b) => b.date-a.date).map(t => `
+                        <div class="flex items-start gap-2 bg-blue-50 rounded-lg px-3 py-2">
+                            <span class="text-xs text-gray-400 flex-shrink-0 mt-0.5">${t.date.toLocaleDateString('en-NG', {day:'2-digit',month:'short'})}</span>
+                            <span class="text-sm text-gray-700">${escapeHtml(t.text)}</span>
+                        </div>`).join('')}
+                    </div>
+                </div>` : ''}
+                <!-- Homework -->
+                ${hw.length > 0 ? `
+                <div class="p-3">
+                    <h4 class="text-xs font-bold text-amber-600 uppercase tracking-wide mb-2">📝 Homework Assigned</h4>
+                    <div class="space-y-1.5">
+                        ${hw.sort((a,b) => b.date-a.date).map(h => `
+                        <div class="flex items-start justify-between bg-amber-50 rounded-lg px-3 py-2 gap-2">
+                            <div class="flex items-start gap-2 min-w-0">
+                                <span class="text-xs text-gray-400 flex-shrink-0 mt-0.5">${h.date.toLocaleDateString('en-NG', {day:'2-digit',month:'short'})}</span>
+                                <div class="min-w-0">
+                                    <span class="text-sm text-gray-700 font-medium">${escapeHtml(h.title)}</span>
+                                    ${h.studentName ? `<div class="text-xs text-gray-400">${escapeHtml(h.studentName)}</div>` : ''}
+                                    ${h.feedback ? `<div class="text-xs text-gray-500 italic mt-0.5">"${escapeHtml(h.feedback)}"</div>` : ''}
+                                </div>
+                            </div>
+                            ${h.score ? `<span class="bg-white border border-amber-200 text-amber-700 px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0">${escapeHtml(String(h.score))}/100</span>` : ''}
+                        </div>`).join('')}
+                    </div>
+                </div>` : ''}
+            </div>`;
+            accordion.appendChild(item);
+        });
+
+    } catch (err) {
+        console.error('Archive error:', err);
+        container.innerHTML = `<p class="text-red-500 text-center py-4">Error loading archive: ${escapeHtml(err.message)}</p>`;
+    }
 }
 
 /*******************************************************************************
@@ -2835,31 +2943,39 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
     if (!pendingReportsContainer) return;
     
     pendingReportsContainer.innerHTML = `
-        <div class="card">
-            <div class="card-body text-center">
-                <div class="spinner mx-auto mb-2"></div>
-                <p class="text-gray-500">Loading submissions...</p>
-            </div>
-        </div>
-    `;
+        <div class="card"><div class="card-body text-center">
+            <div class="spinner mx-auto mb-2"></div>
+            <p class="text-gray-500">Loading submissions...</p>
+        </div></div>`;
     
     if (gradedReportsContainer) {
         gradedReportsContainer.innerHTML = `
-            <div class="card">
-                <div class="card-body text-center">
-                    <div class="spinner mx-auto mb-2"></div>
-                    <p class="text-gray-500">Loading graded submissions...</p>
-                </div>
-            </div>
-        `;
+            <div class="card"><div class="card-body text-center">
+                <div class="spinner mx-auto mb-2"></div>
+                <p class="text-gray-500">Loading graded submissions...</p>
+            </div></div>`;
     }
 
     try {
+        // Fetch active students (not on break) to use as a filter
+        const activeStudentsSnap = await getDocs(query(
+            collection(db, 'students'),
+            where('tutorEmail', '==', tutorEmail)
+        ));
+        const activeStudentIds = new Set();
+        const activeStudentMap = {};
+        activeStudentsSnap.docs.forEach(d => {
+            const s = d.data();
+            if (!s.summerBreak && !['archived','graduated','transferred'].includes(s.status)) {
+                activeStudentIds.add(d.id);
+                activeStudentMap[d.id] = s;
+            }
+        });
+
         let assessmentsQuery = query(
             collection(db, "student_results"), 
             where("tutorEmail", "==", tutorEmail)
         );
-
         if (parentName) {
             assessmentsQuery = query(assessmentsQuery, where("parentName", "==", parentName));
         }
@@ -2869,7 +2985,6 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
             where("tutorEmail", "==", tutorEmail),
             where("type", "==", "creative_writing")
         );
-
         if (parentName) {
             creativeWritingQuery = query(creativeWritingQuery, where("parentName", "==", parentName));
         }
@@ -2879,270 +2994,170 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
             getDocs(creativeWritingQuery)
         ]);
 
-        let pendingHTML = '';
+        let pendingItems = []; // { studentName, grade } — simple list
         let gradedHTML = '';
         let pendingCount = 0;
         let gradedCount = 0;
 
-        assessmentsSnapshot.forEach(doc => {
-            const data = doc.data();
+        assessmentsSnapshot.forEach(docSnap => {
+            const data = docSnap.data();
+            // Skip break / inactive students
+            if (data.studentId && !activeStudentIds.has(data.studentId)) return;
+
             const needsFeedback = data.answers && data.answers.some(answer => 
                 answer.type === 'creative-writing' && 
                 (!answer.tutorReport || answer.tutorReport.trim() === '')
             );
 
-            const reportCard = `
-                <div class="card">
-                    <div class="card-body">
-                        <div class="flex justify-between items-start mb-4">
-                            <div>
-                                <h4 class="font-bold text-lg">${escapeHtml(data.studentName)}</h4>
-                                <p class="text-gray-600">${escapeHtml(data.parentName || 'N/A')} • ${escapeHtml(data.grade)}</p>
-                            </div>
-                            <span class="badge ${needsFeedback ? 'badge-warning' : 'badge-success'}">
-                                ${needsFeedback ? 'Pending Review' : 'Graded'}
-                            </span>
-                        </div>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                            <div class="bg-gray-50 p-3 rounded">
-                                <span class="text-sm text-gray-500">Type:</span>
-                                <p class="font-medium">Multiple-Choice Test</p>
-                            </div>
-                            <div class="bg-gray-50 p-3 rounded">
-                                <span class="text-sm text-gray-500">Submitted:</span>
-                                <p class="font-medium">${escapeHtml(new Date(data.submittedAt.seconds * 1000).toLocaleDateString())}</p>
-                            </div>
-                            <div class="bg-gray-50 p-3 rounded">
-                                <span class="text-sm text-gray-500">Status:</span>
-                                <p class="font-medium">${needsFeedback ? 'Needs Feedback' : 'Completed'}</p>
-                            </div>
-                        </div>
-
-                        <div class="border-t pt-4">
-                            <h5 class="font-semibold mb-2">Assessment Details:</h5>
-                            ${data.answers ? data.answers.map((answer, index) => {
-                                if (answer.type === 'creative-writing') {
-                                    return `
-                                        <div class="mb-4 p-4 bg-blue-50 rounded-lg">
-                                            <div class="flex justify-between items-start mb-2">
-                                                <h6 class="font-semibold">Creative Writing</h6>
-                                                <span class="badge ${answer.tutorReport ? 'badge-success' : 'badge-warning'}">
-                                                    ${answer.tutorReport ? 'Graded' : 'Pending'}
-                                                </span>
-                                            </div>
-                                            <p class="italic text-gray-700 mb-3">${escapeHtml(answer.textAnswer || "No response")}</p>
-                                            ${answer.fileUrl ? `
-                                                <a href="${escapeHtml(answer.fileUrl)}" target="_blank" class="btn btn-secondary btn-sm">
-                                                    📎 Download File
-                                                </a>
-                                            ` : ''}
-                                            
-                                            ${!answer.tutorReport ? `
-                                                <div class="mt-3">
-                                                    <label class="form-label">Your Feedback</label>
-                                                    <textarea class="form-input form-textarea tutor-report" rows="3" placeholder="Write your feedback here..."></textarea>
-                                                    <button class="btn btn-primary mt-2 submit-report-btn" 
-                                                            data-doc-id="${escapeHtml(doc.id)}" 
-                                                            data-collection="student_results" 
-                                                            data-answer-index="${index}">
-                                                        Submit Feedback
-                                                    </button>
-                                                </div>
-                                            ` : `
-                                                <div class="mt-3 bg-white p-3 rounded border">
-                                                    <label class="form-label">Your Feedback:</label>
-                                                    <p class="text-gray-700">${escapeHtml(answer.tutorReport || 'N/A')}</p>
-                                                </div>
-                                            `}
-                                        </div>
-                                    `;
-                                }
-                                return '';
-                            }).join('') : '<p class="text-gray-500">No assessment data available.</p>'}
-                        </div>
-                    </div>
-                </div>
-            `;
-
             if (needsFeedback) {
                 if (!statusFilter || statusFilter === 'pending') {
-                    pendingHTML += reportCard;
+                    pendingItems.push({ studentName: data.studentName || 'Unknown', grade: data.grade || 'N/A' });
                     pendingCount++;
                 }
             } else {
                 if (!statusFilter || statusFilter === 'graded') {
-                    gradedHTML += reportCard;
+                    gradedHTML += buildReportCard(docSnap, data, false);
                     gradedCount++;
                 }
             }
         });
 
-        creativeWritingSnapshot.forEach(doc => {
-            const data = doc.data();
+        creativeWritingSnapshot.forEach(docSnap => {
+            const data = docSnap.data();
+            if (data.studentId && !activeStudentIds.has(data.studentId)) return;
+
             const needsFeedback = !data.tutorReport || data.tutorReport.trim() === '';
 
-            const creativeWritingCard = `
-                <div class="card border-l-4 border-blue-500">
-                    <div class="card-body">
-                        <div class="flex justify-between items-start mb-4">
-                            <div>
-                                <h4 class="font-bold text-lg">${escapeHtml(data.studentName)}</h4>
-                                <p class="text-gray-600">${escapeHtml(data.parentName || 'N/A')} • ${escapeHtml(data.grade)}</p>
-                            </div>
-                            <span class="badge ${needsFeedback ? 'badge-warning' : 'badge-success'}">
-                                ${needsFeedback ? 'Pending Review' : 'Graded'}
-                            </span>
-                        </div>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                            <div class="bg-blue-50 p-3 rounded">
-                                <span class="text-sm text-blue-500">Type:</span>
-                                <p class="font-medium">Creative Writing</p>
-                            </div>
-                            <div class="bg-blue-50 p-3 rounded">
-                                <span class="text-sm text-blue-500">Submitted:</span>
-                                <p class="font-medium">${escapeHtml(new Date(data.submittedAt.seconds * 1000).toLocaleDateString())}</p>
-                            </div>
-                            <div class="bg-blue-50 p-3 rounded">
-                                <span class="text-sm text-blue-500">Status:</span>
-                                <p class="font-medium">${needsFeedback ? 'Needs Review' : 'Completed'}</p>
-                            </div>
-                        </div>
-
-                        <div class="border-t pt-4">
-                            <h5 class="font-semibold mb-2">Writing Assignment:</h5>
-                            <div class="mb-4 p-4 bg-blue-50 rounded-lg">
-                                <p class="font-medium mb-2">${escapeHtml(data.questionText || 'Creative Writing Assignment')}</p>
-                                <p class="italic text-gray-700 bg-white p-3 rounded border">${escapeHtml(data.textAnswer || "No response")}</p>
-                                ${data.fileUrl ? `
-                                    <a href="${escapeHtml(data.fileUrl)}" target="_blank" class="btn btn-secondary btn-sm mt-3">
-                                        📎 Download Attachment
-                                    </a>
-                                ` : ''}
-                            </div>
-                            
-                            ${!data.tutorReport ? `
-                                <div class="mt-4">
-                                    <label class="form-label">Your Feedback</label>
-                                    <textarea class="form-input form-textarea tutor-report" rows="4" placeholder="Provide constructive feedback on the student's writing..."></textarea>
-                                    <button class="btn btn-primary mt-3 submit-report-btn" 
-                                            data-doc-id="${escapeHtml(doc.id)}" 
-                                            data-collection="tutor_submissions">
-                                        Submit Feedback
-                                    </button>
-                                </div>
-                            ` : `
-                                <div class="mt-4 bg-white p-4 rounded border">
-                                    <label class="form-label">Your Feedback:</label>
-                                    <p class="text-gray-700">${escapeHtml(data.tutorReport || 'N/A')}</p>
-                                </div>
-                            `}
-                        </div>
-                    </div>
-                </div>
-            `;
-
             if (needsFeedback) {
                 if (!statusFilter || statusFilter === 'pending') {
-                    pendingHTML += creativeWritingCard;
+                    pendingItems.push({ studentName: data.studentName || 'Unknown', grade: data.grade || 'N/A' });
                     pendingCount++;
                 }
             } else {
                 if (!statusFilter || statusFilter === 'graded') {
-                    gradedHTML += creativeWritingCard;
+                    gradedHTML += buildCreativeWritingCard(docSnap, data);
                     gradedCount++;
                 }
             }
         });
 
-        const pendingCountElement = document.getElementById('pending-count');
-        if (pendingCountElement) {
-            pendingCountElement.textContent = `${pendingCount} Pending`;
-        }
-        
-        pendingReportsContainer.innerHTML = pendingHTML || `
-            <div class="card">
-                <div class="card-body text-center">
-                    <div class="text-gray-400 text-4xl mb-3">📭</div>
-                    <h4 class="font-bold text-gray-600 mb-2">No Pending Submissions</h4>
-                    <p class="text-gray-500">All caught up! No submissions need your review.</p>
-                </div>
-            </div>
-        `;
-        
-        if (gradedReportsContainer) {
-            gradedReportsContainer.innerHTML = gradedHTML || `
+        // Render pending list — compact, name + grade only
+        const pendingCountEl = document.getElementById('pending-count');
+        if (pendingCountEl) pendingCountEl.textContent = pendingCount;
+
+        if (pendingItems.length === 0) {
+            pendingReportsContainer.innerHTML = `
+                <div class="card"><div class="card-body text-center">
+                    <div class="text-4xl mb-2">🎉</div>
+                    <p class="text-gray-500">All caught up! No pending submissions.</p>
+                </div></div>`;
+        } else {
+            pendingReportsContainer.innerHTML = `
                 <div class="card">
-                    <div class="card-body text-center">
-                        <div class="text-gray-400 text-4xl mb-3">✅</div>
-                        <h4 class="font-bold text-gray-600 mb-2">No Graded Submissions</h4>
-                        <p class="text-gray-500">No submissions have been graded yet.</p>
+                    <div class="card-body p-0">
+                        <div class="divide-y divide-gray-100">
+                            ${pendingItems.map(item => `
+                            <div class="flex items-center justify-between px-4 py-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-sm">
+                                        ${escapeHtml((item.studentName||'?').charAt(0))}
+                                    </div>
+                                    <span class="font-medium text-gray-800">${escapeHtml(item.studentName)}</span>
+                                </div>
+                                <span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">${escapeHtml(item.grade)}</span>
+                            </div>`).join('')}
+                        </div>
                     </div>
-                </div>
-            `;
+                </div>`;
         }
 
-        document.querySelectorAll('.submit-report-btn').forEach(button => {
-            button.addEventListener('click', async (e) => {
-                const docId = e.target.getAttribute('data-doc-id');
-                const collectionName = e.target.getAttribute('data-collection');
-                const answerIndex = e.target.getAttribute('data-answer-index');
-                const reportTextarea = e.target.closest('.mb-4, .mt-4').querySelector('.tutor-report');
-                const tutorReport = reportTextarea.value.trim();
-                
-                if (tutorReport) {
-                    try {
-                        const docRef = doc(db, collectionName, docId);
-                        
-                        if (collectionName === "student_results" && answerIndex !== null) {
-                            const docSnap = await getDoc(docRef);
-                            const currentData = docSnap.data();
-                            
-                            const updatedAnswers = [...currentData.answers];
-                            updatedAnswers[parseInt(answerIndex)] = {
-                                ...updatedAnswers[parseInt(answerIndex)],
-                                tutorReport: tutorReport,
-                                gradedAt: new Date()
-                            };
-                            
-                            await updateDoc(docRef, { 
-                                answers: updatedAnswers,
-                                hasTutorFeedback: true
-                            });
-                        } else {
-                            await updateDoc(docRef, { 
-                                tutorReport: tutorReport,
-                                gradedAt: new Date(),
-                                status: "graded"
-                            });
-                        }
-                        
-                        showCustomAlert('✅ Feedback submitted successfully!');
-                        loadTutorReports(tutorEmail, parentName, statusFilter);
-                    } catch (error) {
-                        console.error("Error submitting feedback:", error);
-                        showCustomAlert('❌ Failed to submit feedback. Please try again.');
-                    }
-                } else {
-                    showCustomAlert('Please write some feedback before submitting.');
-                }
-            });
-        });
+        if (gradedReportsContainer) {
+            gradedReportsContainer.innerHTML = gradedHTML ||
+                `<div class="card"><div class="card-body text-center text-gray-500">No graded submissions yet.</div></div>`;
+        }
+
+        // Attach submit feedback listeners
+        attachSubmitReportListeners();
+
     } catch (error) {
-        console.error("Error loading tutor reports:", error);
-        pendingReportsContainer.innerHTML = `
-            <div class="card">
-                <div class="card-body text-center">
-                    <div class="text-red-400 text-4xl mb-3">⚠️</div>
-                    <h4 class="font-bold text-red-600 mb-2">Failed to Load Reports</h4>
-                    <p class="text-gray-500">Please check your connection and try again.</p>
-                    <button class="btn btn-primary mt-3" onclick="location.reload()">Retry</button>
-                </div>
-            </div>
-        `;
+        console.error("Error loading reports:", error);
+        if (pendingReportsContainer) pendingReportsContainer.innerHTML =
+            `<div class="card"><div class="card-body text-center text-red-500">Error loading submissions.</div></div>`;
     }
 }
+
+// Helper: Build a standard report card HTML string
+function buildReportCard(docRef, data, needsFeedback) {
+    return `
+    <div class="card">
+        <div class="card-body">
+            <div class="flex justify-between items-start mb-3">
+                <div>
+                    <h4 class="font-bold">${escapeHtml(data.studentName)}</h4>
+                    <p class="text-gray-500 text-sm">${escapeHtml(data.grade)}</p>
+                </div>
+                <span class="badge badge-success">Graded</span>
+            </div>
+            ${data.answers ? data.answers.filter(a => a.type === 'creative-writing').map((answer, index) => `
+                <div class="p-3 bg-blue-50 rounded-lg mb-2">
+                    <p class="italic text-gray-700 text-sm mb-2">${escapeHtml(answer.textAnswer || "No response")}</p>
+                    <div class="bg-white p-2 rounded border">
+                        <span class="text-xs font-semibold text-gray-500">Feedback:</span>
+                        <p class="text-sm">${escapeHtml(answer.tutorReport || 'N/A')}</p>
+                    </div>
+                </div>`).join('') : ''}
+        </div>
+    </div>`;
+}
+
+function buildCreativeWritingCard(docRef, data) {
+    return `
+    <div class="card border-l-4 border-blue-500">
+        <div class="card-body">
+            <div class="flex justify-between items-start mb-3">
+                <div>
+                    <h4 class="font-bold">${escapeHtml(data.studentName)}</h4>
+                    <p class="text-gray-500 text-sm">${escapeHtml(data.grade)}</p>
+                </div>
+                <span class="badge badge-success">Graded</span>
+            </div>
+            <div class="bg-blue-50 p-3 rounded-lg">
+                <p class="italic text-gray-700 text-sm">${escapeHtml(data.textAnswer || "No response")}</p>
+                <div class="mt-2 bg-white p-2 rounded border">
+                    <span class="text-xs font-semibold">Your Feedback:</span>
+                    <p class="text-sm">${escapeHtml(data.tutorReport || 'N/A')}</p>
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+function attachSubmitReportListeners() {
+    document.querySelectorAll('.submit-report-btn').forEach(button => {
+        button.addEventListener('click', async (e) => {
+            const docId = e.target.dataset.docId;
+            const collectionName = e.target.dataset.collection;
+            const answerIndex = parseInt(e.target.dataset.answerIndex);
+            const feedback = e.target.closest('.mb-4').querySelector('.tutor-report').value.trim();
+            if (!feedback) { showCustomAlert('Please write feedback before submitting.'); return; }
+            try {
+                e.target.disabled = true; e.target.textContent = 'Submitting…';
+                const docRef2 = doc(db, collectionName, docId);
+                const docSnap2 = await getDoc(docRef2);
+                if (docSnap2.exists()) {
+                    const answers = [...(docSnap2.data().answers || [])];
+                    if (answers[answerIndex]) { answers[answerIndex].tutorReport = feedback; }
+                    await updateDoc(docRef2, { answers });
+                    showCustomAlert('✅ Feedback submitted!');
+                    loadTutorReports(window.tutorData?.email);
+                }
+            } catch (err) { console.error(err); showCustomAlert('❌ Error submitting feedback.'); }
+        });
+    });
+}
+
+/*******************************************************************************
+ * SECTION 12: STUDENT DATABASE MANAGEMENT
 
 /*******************************************************************************
  * SECTION 12: STUDENT DATABASE MANAGEMENT (FINAL FIXED VERSION WITH NEW FEATURES)
@@ -4080,19 +4095,32 @@ let isTutorOfTheMonth = false;
  */
 async function initGamification(tutorId) {
     try {
-        // 1. Get Current Tutor's Score
         const tutorRef = doc(db, "tutors", tutorId);
-        // We use onSnapshot for REAL-TIME updates. 
-        // If Admin updates score, Tutor sees it instantly.
         onSnapshot(tutorRef, (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                currentTutorScore = data.performanceScore || 0;
-                updateScoreDisplay(currentTutorScore, data.scoreBreakdown);
+                // Store detailed grade data on window.tutorData for scorecard
+                if (window.tutorData) {
+                    window.tutorData.qaScore        = data.qaScore        ?? null;
+                    window.tutorData.qcScore        = data.qcScore        ?? null;
+                    window.tutorData.qaAdvice       = data.qaAdvice       || '';
+                    window.tutorData.qcAdvice       = data.qcAdvice       || '';
+                    window.tutorData.qaGradedByName = data.qaGradedByName || '';
+                    window.tutorData.qcGradedByName = data.qcGradedByName || '';
+                    window.tutorData.performanceMonth = data.performanceMonth || '';
+                }
+                // Combined score = average of QA + QC if both exist
+                const qa = data.qaScore ?? null;
+                const qc = data.qcScore ?? null;
+                let combined = data.performanceScore || 0;
+                if (qa !== null && qc !== null) combined = Math.round((qa + qc) / 2);
+                else if (qa !== null) combined = qa;
+                else if (qc !== null) combined = qc;
+                currentTutorScore = combined;
+                updateScoreDisplay(currentTutorScore, data.scoreBreakdown || {});
             }
         });
 
-        // 2. Check "Tutor of the Month" Status
         checkWinnerStatus(tutorId);
 
     } catch (error) {
@@ -4105,22 +4133,32 @@ async function initGamification(tutorId) {
  */
 async function checkWinnerStatus(tutorId) {
     try {
-        // We assume a central document 'gamification/current_cycle' holds the winner info
         const cycleRef = doc(db, "gamification", "current_cycle");
         const cycleSnap = await getDoc(cycleRef);
 
         if (cycleSnap.exists()) {
             const data = cycleSnap.data();
-            // Data structure: { winnerId: "xyz", month: "October", year: 2023 }
-            
             if (data.winnerId === tutorId) {
                 isTutorOfTheMonth = true;
-                renderWinnerBadge(data.month);
+                renderWinnerBadge(data.monthLabel || data.month);
+
+                // Confetti only on first 5 days of the month
+                const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+                const dayOfMonth = lagosNow.getDate();
+                const currentMonthKey = `${lagosNow.getFullYear()}-${String(lagosNow.getMonth()+1).padStart(2,'0')}`;
+                const winnerMonth = data.month || '';
                 
-                // Logic: Blow confetti if it's the start of the month OR weekly reminder
-                // For now, we blow it on every login if they are the winner (High Dopamine)
-                triggerConfetti(); 
-                showCustomAlert(`🏆 You are the ${escapeHtml(data.month)} Tutor of the Month!`);
+                // Only show celebration if within first 5 days of the matching month
+                if (dayOfMonth <= 5 && (currentMonthKey === winnerMonth || winnerMonth === '')) {
+                    const celebKey = `confetti_shown_${currentMonthKey}_${tutorId}`;
+                    if (!sessionStorage.getItem(celebKey)) {
+                        sessionStorage.setItem(celebKey, 'true');
+                        setTimeout(() => {
+                            triggerConfetti();
+                            showCustomAlert(`🏆 Congratulations! You are the ${escapeHtml(data.monthLabel || data.month)} Tutor of the Month!`);
+                        }, 800);
+                    }
+                }
             }
         }
     } catch (error) {
@@ -4131,34 +4169,76 @@ async function checkWinnerStatus(tutorId) {
 // --- UI RENDERING FUNCTIONS ---
 
 function updateScoreDisplay(totalScore, breakdown = {}) {
-    // Locate the dashboard widget (Create this div in your HTML)
     const scoreWidget = document.getElementById('performance-widget');
     if (!scoreWidget) return;
 
-    // Calculate color based on score
-    let scoreColor = 'text-red-500';
-    if (totalScore > 50) scoreColor = 'text-yellow-500';
-    if (totalScore > 80) scoreColor = 'text-green-500';
+    let scoreColor = 'text-red-500', barColor = 'from-red-400 to-red-500';
+    if (totalScore >= 65) { scoreColor = 'text-yellow-500'; barColor = 'from-yellow-400 to-yellow-500'; }
+    if (totalScore >= 85) { scoreColor = 'text-green-600'; barColor = 'from-green-400 to-green-600'; }
+
+    // Pull QA/QC details stored on the tutor doc
+    const tutorData = window.tutorData || {};
+    const qaScore    = tutorData.qaScore    ?? null;
+    const qcScore    = tutorData.qcScore    ?? null;
+    const qaAdvice   = tutorData.qaAdvice   || '';
+    const qcAdvice   = tutorData.qcAdvice   || '';
+    const qaGraderName = tutorData.qaGradedByName || '';
+    const qcGraderName = tutorData.qcGradedByName || '';
+    const perfMonth  = tutorData.performanceMonth || '';
+
+    function scoreBadge(score, label, graderName, advice, themeClass) {
+        if (score === null || score === undefined) return `
+            <div class="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                <div class="text-xs font-bold ${themeClass} uppercase tracking-wide mb-1">${label}</div>
+                <div class="text-gray-400 text-sm">Not graded yet</div>
+            </div>`;
+        let sc = 'text-red-500';
+        if (score >= 65) sc = 'text-yellow-500';
+        if (score >= 85) sc = 'text-green-600';
+        return `
+            <div class="bg-white rounded-xl p-3 border border-gray-200">
+                <div class="flex justify-between items-center mb-1">
+                    <div class="text-xs font-bold ${themeClass} uppercase tracking-wide">${label}</div>
+                    ${graderName ? `<span class="text-xs text-gray-400">by ${escapeHtml(graderName)}</span>` : ''}
+                </div>
+                <div class="text-2xl font-black ${sc}">${score}<span class="text-sm">%</span></div>
+                <div class="w-full bg-gray-100 rounded-full h-1.5 mt-1.5">
+                    <div class="h-1.5 rounded-full bg-current transition-all duration-700 ${sc}" style="width:${score}%"></div>
+                </div>
+                ${advice ? `<div class="mt-2 text-xs text-gray-600 italic bg-gray-50 rounded-lg p-2 border border-gray-100">"${escapeHtml(advice)}"</div>` : ''}
+            </div>`;
+    }
 
     scoreWidget.innerHTML = `
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
-            ${isTutorOfTheMonth ? '<div class="absolute top-0 right-0 bg-yellow-400 text-xs font-bold px-2 py-1 rounded-bl-lg">👑 REIGNING CHAMPION</div>' : ''}
-            
-            <h3 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Performance Score</h3>
-            
-            <div class="flex items-end gap-2 mb-3">
-                <span class="text-4xl font-black ${scoreColor}">${escapeHtml(totalScore)}</span>
-                <span class="text-gray-400 text-sm mb-1">/ 100 pts</span>
-            </div>
-            
-            <div class="space-y-2">
-                <div class="w-full bg-gray-100 rounded-full h-2">
-                    <div class="bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full transition-all duration-1000" style="width: ${totalScore}%"></div>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden cursor-pointer" id="perf-card-inner">
+            ${isTutorOfTheMonth ? '<div class="absolute top-0 right-0 bg-yellow-400 text-xs font-black px-2 py-1 rounded-bl-xl text-white">👑 TOP TUTOR</div>' : ''}
+            <div class="p-4">
+                <h3 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Performance Score ${perfMonth ? '· ' + perfMonth : ''}</h3>
+                <div class="flex items-end gap-2 mb-3">
+                    <span class="text-5xl font-black ${scoreColor}">${totalScore}</span>
+                    <span class="text-gray-400 text-sm mb-1">/ 100%</span>
                 </div>
-                <p class="text-xs text-gray-400 text-right">Updated by Management</p>
+                <div class="w-full bg-gray-100 rounded-full h-2.5 mb-1">
+                    <div class="bg-gradient-to-r ${barColor} h-2.5 rounded-full transition-all duration-1000" style="width:${Math.min(totalScore,100)}%"></div>
+                </div>
+                <p class="text-xs text-gray-400 text-right mb-3">Tap to see full breakdown ↓</p>
+            </div>
+            <!-- Expandable breakdown -->
+            <div id="perf-breakdown" class="hidden border-t border-gray-100 p-4 space-y-3 bg-gray-50">
+                <div class="grid grid-cols-2 gap-3">
+                    ${scoreBadge(qaScore, 'QA – Session', qaGraderName, qaAdvice, 'text-purple-600')}
+                    ${scoreBadge(qcScore, 'QC – Lesson Plan', qcGraderName, qcAdvice, 'text-amber-600')}
+                </div>
+                <p class="text-xs text-gray-400 text-center">Combined score = (QA + QC) ÷ 2</p>
             </div>
         </div>
     `;
+
+    // Toggle breakdown on click
+    document.getElementById('perf-card-inner')?.addEventListener('click', () => {
+        const bd = document.getElementById('perf-breakdown');
+        if (bd) bd.classList.toggle('hidden');
+    });
 }
 
 function renderWinnerBadge(month) {
@@ -4912,6 +4992,3 @@ window.showScheduleCalendarModal = showScheduleCalendarModal;
 window.renderCourses = renderCourses;
 window.loadCourseMaterials = loadCourseMaterials;
 window.uploadCourseMaterial = uploadCourseMaterial;
-
-
-
