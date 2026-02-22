@@ -148,6 +148,10 @@
                 <a href="#" onclick="switchTab('games')" id="nav-games" class="nav-item flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
                     <i class="fas fa-gamepad w-6"></i> Educational Games
                 </a>
+                <a href="#" onclick="switchTab('messaging')" id="nav-messaging" class="nav-item flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+                    <i class="fas fa-comment-dots w-6"></i> Messages
+                    <span id="msg-unread-badge" class="ml-auto bg-blue-500 text-white py-0.5 px-2 rounded-full text-xs font-bold shadow-sm hidden">0</span>
+                </a>
             </nav>
         </div>
 
@@ -185,15 +189,33 @@
         <header class="flex justify-between items-center mb-8">
             <div>
                 <h1 id="page-title" class="text-2xl font-bold text-gray-900">Dashboard Overview</h1>
-                <p id="page-date" class="text-sm text-gray-500 mt-1">Welcome back, ready to learn?</p>
+                <div class="flex items-center gap-3 mt-1 flex-wrap">
+                    <p id="page-date" class="text-sm text-gray-500">Welcome back, ready to learn?</p>
+                    <span id="student-local-clock" class="text-xs font-mono font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-lg whitespace-nowrap">--:-- --</span>
+                    <span id="student-location-badge" class="text-xs text-gray-400">📍 Locating...</span>
+                </div>
             </div>
-            <div class="flex items-center gap-4">
-                <button class="p-2 text-gray-400 hover:text-brand-primary transition-colors relative">
-                    <i class="fas fa-bell text-xl"></i>
-                    <span id="notification-badge" class="absolute top-1 right-1 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white hidden"></span>
-                </button>
-                <button id="join-class-btn" class="hidden md:block bg-brand-primary hover:bg-brand-dark text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-lg shadow-emerald-200 transition-all transform hover:-translate-y-0.5">
-                    <i class="fas fa-plus mr-2"></i> Join Class
+            <div class="flex items-center gap-3 relative">
+                <!-- Bell Notifications -->
+                <div class="relative">
+                    <button id="bell-btn" onclick="toggleNotificationPanel()" class="p-2 text-gray-400 hover:text-brand-primary transition-colors relative">
+                        <i class="fas fa-bell text-xl"></i>
+                        <span id="notification-badge" class="absolute top-1 right-1 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white hidden"></span>
+                    </button>
+                    <!-- Notification dropdown panel -->
+                    <div id="notification-panel" class="hidden absolute right-0 top-12 w-80 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50">
+                            <span class="font-bold text-gray-800 text-sm">🔔 Notifications</span>
+                            <button onclick="markAllNotificationsRead()" class="text-xs text-blue-600 hover:underline font-semibold">Mark all read</button>
+                        </div>
+                        <div id="notification-list" class="divide-y divide-gray-50 max-h-80 overflow-y-auto">
+                            <div class="p-4 text-center text-gray-400 text-sm">Loading…</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Messages shortcut button -->
+                <button onclick="switchTab('messaging')" class="hidden md:flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium shadow-md transition-all">
+                    <i class="fas fa-comment-dots"></i> Messages
                 </button>
             </div>
         </header>
@@ -382,6 +404,53 @@
             </div>
         </div>
 
+        <!-- ========== SECTION 17: MESSAGING VIEW ========== -->
+        <div id="view-messaging" class="view-section hidden fade-in">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden" style="height:calc(100vh - 200px);min-height:400px;">
+                <div class="flex h-full">
+                    <!-- Conversation list -->
+                    <div class="w-72 border-r border-gray-100 flex flex-col flex-shrink-0">
+                        <div class="p-4 border-b border-gray-100 bg-gray-50">
+                            <h3 class="font-bold text-gray-800 text-sm">💬 Messages</h3>
+                        </div>
+                        <div id="msg-conv-list" class="flex-1 overflow-y-auto divide-y divide-gray-50">
+                            <div class="p-6 text-center text-gray-400 text-sm">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>Loading conversations…</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Chat area -->
+                    <div class="flex-1 flex flex-col min-w-0">
+                        <div id="msg-chat-header" class="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-full bg-brand-primary flex items-center justify-center text-white text-sm font-bold">T</div>
+                            <div>
+                                <p class="font-bold text-gray-800 text-sm">Your Tutor</p>
+                                <p class="text-xs text-gray-400">Messages are private</p>
+                            </div>
+                        </div>
+                        <div id="msg-chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+                            <div class="text-center text-gray-400 text-sm py-8">
+                                <i class="fas fa-comments text-3xl mb-3 text-gray-200"></i>
+                                <p>Select a conversation to start chatting</p>
+                            </div>
+                        </div>
+                        <!-- Input area -->
+                        <div id="msg-input-area" class="p-4 border-t border-gray-100 bg-white flex items-center gap-3">
+                            <input type="text" id="msg-text-input" placeholder="Type a message…" class="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" onkeydown="if(event.key==='Enter') sendStudentMessage()">
+                            <input type="file" id="msg-img-input" accept="image/*" class="hidden" onchange="sendStudentImageMsg(this)">
+                            <button onclick="document.getElementById('msg-img-input').click()" class="p-2.5 text-gray-400 hover:text-blue-600 transition-colors" title="Send image">
+                                <i class="fas fa-image text-lg"></i>
+                            </button>
+                            <button onclick="sendStudentMessage()" class="bg-brand-primary hover:bg-brand-dark text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors">
+                                Send
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <!-- ========== SECTION 17: MAIN APPLICATION LOGIC ========== -->
@@ -395,6 +464,42 @@
             const dateElement = document.getElementById('page-date');
             const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
             dateElement.innerText = new Date().toLocaleDateString('en-US', options);
+
+            // ── Real-time local clock ──
+            (function startStudentClock() {
+                function tick() {
+                    const el = document.getElementById('student-local-clock');
+                    if (!el) return;
+                    el.textContent = new Date().toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true });
+                }
+                tick();
+                setInterval(tick, 1000);
+            })();
+
+            // ── Geolocation → location badge ──
+            (function fetchLocation() {
+                const badge = document.getElementById('student-location-badge');
+                if (!badge) return;
+                if (!navigator.geolocation) { badge.textContent = '📍 Location unavailable'; return; }
+                navigator.geolocation.getCurrentPosition(async pos => {
+                    try {
+                        const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`);
+                        const data = await r.json();
+                        const city = data.address?.city || data.address?.town || data.address?.village || '';
+                        const country = data.address?.country || '';
+                        badge.textContent = `📍 ${[city,country].filter(Boolean).join(', ')}`;
+                    } catch { badge.textContent = '📍 Location'; }
+                }, () => { badge.textContent = '📍 Location unavailable'; });
+            })();
+
+            // ── Close notification panel on outside click ──
+            document.addEventListener('click', e => {
+                const panel = document.getElementById('notification-panel');
+                const btn   = document.getElementById('bell-btn');
+                if (panel && !panel.classList.contains('hidden') && !panel.contains(e.target) && btn && !btn.contains(e.target)) {
+                    panel.classList.add('hidden');
+                }
+            });
             
             // Initialize chart
             initializeChart();
@@ -1507,6 +1612,218 @@
             // ========== SUBSECTION 17.20: UTILITY FUNCTIONS ==========
             // Make functions globally available
             window.switchTab = switchTab;
+
+            // ── NOTIFICATION PANEL ──
+            window.toggleNotificationPanel = function() {
+                const panel = document.getElementById('notification-panel');
+                if (!panel) return;
+                const isHidden = panel.classList.contains('hidden');
+                panel.classList.toggle('hidden', !isHidden);
+                if (isHidden) loadNotifications();
+            };
+
+            window.markAllNotificationsRead = function() {
+                document.getElementById('notification-badge')?.classList.add('hidden');
+                const list = document.getElementById('notification-list');
+                if (list) list.querySelectorAll('.notif-unread').forEach(el => el.classList.remove('notif-unread','bg-blue-50'));
+            };
+
+            async function loadNotifications() {
+                const list = document.getElementById('notification-list');
+                const badge = document.getElementById('notification-badge');
+                if (!list) return;
+                const s = window.currentStudent;
+                if (!s) { list.innerHTML = '<p class="p-4 text-gray-400 text-sm">Log in to see notifications.</p>'; return; }
+
+                const { db, collection, query, where, getDocs } = window.firebaseModules;
+                const now = new Date();
+                const day = now.getDate();
+                const items = [];
+
+                // Welcome message
+                const firstName = (s.name||'Student').split(' ')[0];
+                items.push({ icon:'👋', text:`Welcome back, ${firstName}! Keep up the great work this week.`, unread:false });
+
+                // Weekly reminder
+                items.push({ icon:'📚', text:'Remember to read for at least 20 minutes today and complete any pending homework.', unread:false });
+
+                // Automated monthly messages
+                if (day <= 2) items.push({ icon:'🎯', text:'New Month, New Goals! Set your learning targets for this month.', unread:true });
+                if (day >= 13 && day <= 15) items.push({ icon:'📊', text:'Mid-Month Check-In! How are your studies going? Stay on track!', unread:true });
+
+                try {
+                    // Pending homework
+                    const hwSnap = await getDocs(query(collection(db,'homework_assignments'), where('studentId','==',s.id), where('status','==','assigned')));
+                    if (!hwSnap.empty) items.push({ icon:'📝', text:`You have ${hwSnap.size} pending assignment${hwSnap.size>1?'s':''} to complete.`, unread:true });
+
+                    // Unread messages from tutor
+                    const convSnap = await getDocs(query(collection(db,'conversations'), where('participants','array-contains',s.id)));
+                    const unreadMsgs = convSnap.docs.reduce((acc,d) => acc + (d.data().unreadCount || 0), 0);
+                    if (unreadMsgs > 0) items.push({ icon:'💬', text:`You have ${unreadMsgs} unread message${unreadMsgs>1?'s':''} from your tutor.`, unread:true });
+
+                    // New course materials
+                    const matSnap = await getDocs(query(collection(db,'course_materials'), where('studentId','==',s.id)));
+                    if (!matSnap.empty) items.push({ icon:'📁', text:`${matSnap.size} course material${matSnap.size>1?'s':''} available in My Courses.`, unread:false });
+                } catch(e) { console.warn('Notification load error:', e); }
+
+                const hasUrgent = items.some(i => i.unread);
+                if (hasUrgent && badge) badge.classList.remove('hidden');
+
+                list.innerHTML = items.map(i => `
+                    <div class="flex items-start gap-3 p-3 hover:bg-gray-50 transition-colors ${i.unread ? 'notif-unread bg-blue-50' : ''}">
+                        <span class="text-xl flex-shrink-0 mt-0.5">${i.icon}</span>
+                        <p class="text-sm text-gray-700 leading-snug">${i.text}</p>
+                    </div>`).join('');
+            }
+
+            // ── MESSAGING ──
+            let _activeConvId = null;
+            let _msgUnsub = null;
+
+            async function loadStudentMessaging() {
+                const convList = document.getElementById('msg-conv-list');
+                if (!convList) return;
+                convList.innerHTML = '<div class="p-4 text-center text-gray-400 text-sm"><i class="fas fa-spinner fa-spin"></i></div>';
+
+                const s = window.currentStudent;
+                if (!s) { convList.innerHTML = '<p class="p-4 text-gray-400 text-sm">Not logged in.</p>'; return; }
+
+                const { db, collection, query, where, getDocs, addDoc, onSnapshot, orderBy, serverTimestamp, doc, updateDoc } = window.firebaseModules;
+
+                try {
+                    let convSnap = await getDocs(query(collection(db,'conversations'), where('participants','array-contains', s.id)));
+
+                    // Create default tutor conversation if none exists
+                    if (convSnap.empty && s.tutorEmail) {
+                        await addDoc(collection(db,'conversations'), {
+                            participants: [s.id, s.tutorEmail],
+                            studentId: s.id, studentName: s.name,
+                            tutorEmail: s.tutorEmail, tutorName: s.tutorName || 'Your Tutor',
+                            lastMessage: '', lastAt: serverTimestamp(), unreadCount: 0
+                        });
+                        convSnap = await getDocs(query(collection(db,'conversations'), where('participants','array-contains', s.id)));
+                    }
+
+                    if (convSnap.empty) {
+                        convList.innerHTML = '<p class="p-4 text-gray-400 text-sm text-center">No conversations yet.</p>';
+                        return;
+                    }
+
+                    convList.innerHTML = '';
+                    convSnap.docs.forEach(convDoc => {
+                        const c = convDoc.data();
+                        const name = c.tutorName || c.tutorEmail || 'Tutor';
+                        const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+                        const item = document.createElement('button');
+                        item.className = 'w-full text-left flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors';
+                        item.dataset.convId = convDoc.id;
+                        item.innerHTML = `
+                            <div class="w-10 h-10 rounded-full bg-brand-primary flex items-center justify-center text-white font-bold text-sm flex-shrink-0">${initials}</div>
+                            <div class="flex-1 min-w-0">
+                                <p class="font-semibold text-gray-800 text-sm truncate">${name}</p>
+                                <p class="text-xs text-gray-400 truncate">${c.lastMessage || 'Start the conversation'}</p>
+                            </div>
+                            ${c.unreadCount > 0 ? `<span class="bg-blue-500 text-white text-xs rounded-full px-2 py-0.5 font-bold">${c.unreadCount}</span>` : ''}
+                        `;
+                        item.onclick = () => openStudentConv(convDoc.id, name, s, { db, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc });
+                        convList.appendChild(item);
+                    });
+
+                    // Auto-open first conversation
+                    if (convSnap.docs.length > 0) convList.querySelector('button')?.click();
+
+                } catch (err) {
+                    console.error('Messaging load error:', err);
+                    convList.innerHTML = '<p class="p-4 text-red-400 text-sm">Error loading messages.</p>';
+                }
+            }
+
+            function openStudentConv(convId, otherName, s, fb) {
+                _activeConvId = convId;
+                const header = document.getElementById('msg-chat-header');
+                if (header) {
+                    const initials = otherName.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+                    header.innerHTML = `<div class="w-9 h-9 rounded-full bg-brand-primary flex items-center justify-center text-white text-sm font-bold flex-shrink-0">${initials}</div>
+                        <div><p class="font-bold text-gray-800 text-sm">${otherName}</p><p class="text-xs text-gray-400">Messages are private</p></div>`;
+                }
+                const msgArea = document.getElementById('msg-chat-messages');
+                if (msgArea) msgArea.innerHTML = '<div class="text-center text-gray-300 text-sm py-6"><i class="fas fa-spinner fa-spin text-2xl"></i></div>';
+
+                if (_msgUnsub) { _msgUnsub(); _msgUnsub = null; }
+
+                const { db, collection, query, orderBy, onSnapshot, doc, updateDoc } = fb;
+                _msgUnsub = onSnapshot(
+                    query(collection(fb.db, 'conversations', convId, 'messages'), orderBy('createdAt','asc')),
+                    snap => {
+                        if (!msgArea) return;
+                        if (snap.empty) { msgArea.innerHTML = '<p class="text-center text-gray-300 text-sm py-8">No messages yet. Say hello! 👋</p>'; return; }
+                        msgArea.innerHTML = snap.docs.map(d => {
+                            const m = d.data();
+                            const isMine = m.senderId === s.id;
+                            const time = m.createdAt?.toDate ? m.createdAt.toDate().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true}) : '';
+                            if (m.type === 'image') {
+                                return `<div class="flex ${isMine ? 'justify-end' : 'justify-start'}">
+                                    <div class="max-w-xs"><img src="${m.content}" class="rounded-xl max-h-56 object-cover cursor-pointer" onclick="window.open('${m.content}','_blank')">
+                                    <p class="text-xs text-gray-400 mt-1 ${isMine ? 'text-right' : ''}">${time}</p></div></div>`;
+                            }
+                            return `<div class="flex ${isMine ? 'justify-end' : 'justify-start'}">
+                                <div class="max-w-xs lg:max-w-md px-4 py-2.5 rounded-2xl text-sm ${isMine ? 'bg-brand-primary text-white rounded-br-none' : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'}">
+                                    ${m.content || ''}
+                                    <p class="text-xs ${isMine ? 'text-green-200' : 'text-gray-400'} mt-1">${time}</p>
+                                </div></div>`;
+                        }).join('');
+                        msgArea.scrollTop = msgArea.scrollHeight;
+                        // Mark as read
+                        updateDoc(doc(fb.db, 'conversations', convId), { unreadCount: 0 }).catch(()=>{});
+                    }
+                );
+            }
+
+            window.sendStudentMessage = async function() {
+                const input = document.getElementById('msg-text-input');
+                const text = input?.value?.trim();
+                if (!text || !_activeConvId) return;
+                input.value = '';
+                const s = window.currentStudent;
+                const { db, collection, addDoc, serverTimestamp, doc, updateDoc } = window.firebaseModules;
+                try {
+                    await addDoc(collection(db, 'conversations', _activeConvId, 'messages'), {
+                        content: text, type: 'text',
+                        senderId: s.id, senderName: s.name,
+                        createdAt: serverTimestamp()
+                    });
+                    await updateDoc(doc(db, 'conversations', _activeConvId), {
+                        lastMessage: text, lastAt: serverTimestamp()
+                    });
+                } catch(e) { console.error('Send error:', e); }
+            };
+
+            window.sendStudentImageMsg = async function(fileInput) {
+                const file = fileInput?.files?.[0];
+                if (!file || !_activeConvId) return;
+                const s = window.currentStudent;
+                const { db, collection, addDoc, serverTimestamp, doc, updateDoc } = window.firebaseModules;
+                try {
+                    // Upload to Cloudinary
+                    const fd = new FormData();
+                    fd.append('file', file);
+                    fd.append('upload_preset', 'chat_images');
+                    const r = await fetch('https://api.cloudinary.com/v1_1/YOUR_CLOUD_NAME/image/upload', { method:'POST', body:fd });
+                    const data = await r.json();
+                    const url = data.secure_url;
+                    await addDoc(collection(db, 'conversations', _activeConvId, 'messages'), {
+                        content: url, type: 'image',
+                        senderId: s.id, senderName: s.name,
+                        createdAt: serverTimestamp()
+                    });
+                    await updateDoc(doc(db, 'conversations', _activeConvId), {
+                        lastMessage: '📷 Image', lastAt: serverTimestamp()
+                    });
+                } catch(e) { console.error('Image send error:', e); }
+                fileInput.value = '';
+            };
+
+            window.loadStudentMessaging = loadStudentMessaging;
             window.viewCourse = (link) => {
                 if (link && link !== '#') {
                     window.open(link, '_blank');
@@ -2076,9 +2393,11 @@
                 'assignments': 'Homework & Tasks',
                 'results': 'Academic Performance',
                 'calendar': 'Class Schedule',
-                'games': 'Educational Games'
+                'games': 'Educational Games',
+                'messaging': 'Messages'
             };
             document.getElementById('page-title').innerText = titles[tabName] || 'Portal';
+            if (tabName === 'messaging') loadStudentMessaging();
         }
         
         // ========== SECTION 20: MOBILE MENU ========== -->
