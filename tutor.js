@@ -428,6 +428,39 @@ function showCustomAlert(message) {
 }
 
 // Update active tab with smooth fade transition
+// ── Persistent Lagos clock (renders on every tab, top-right fixed bar) ──
+function ensureGlobalClock() {
+    const CLOCK_ID = 'global-tutor-clock-bar';
+    if (document.getElementById(CLOCK_ID)) return; // already mounted
+
+    function formatLagosDT() {
+        return new Intl.DateTimeFormat('en-NG', {
+            weekday:'short', day:'numeric', month:'short', year:'numeric',
+            hour:'2-digit', minute:'2-digit', second:'2-digit',
+            hour12:true, timeZone:'Africa/Lagos'
+        }).format(new Date()) + ' WAT';
+    }
+
+    const bar = document.createElement('div');
+    bar.id = CLOCK_ID;
+    bar.style.cssText = [
+        'position:fixed', 'top:0', 'right:0', 'z-index:99999',
+        'background:linear-gradient(90deg,#1e40af,#1d4ed8)',
+        'color:#fff', 'font-size:11px', 'font-weight:600',
+        'padding:4px 14px', 'border-bottom-left-radius:10px',
+        'letter-spacing:.4px', 'box-shadow:0 2px 8px rgba(0,0,0,.25)',
+        'font-family:monospace', 'white-space:nowrap', 'pointer-events:none'
+    ].join(';');
+    bar.textContent = '📍 Lagos · ' + formatLagosDT();
+    document.body.appendChild(bar);
+
+    if (window._globalClockInterval) clearInterval(window._globalClockInterval);
+    window._globalClockInterval = setInterval(() => {
+        const el = document.getElementById(CLOCK_ID);
+        if (el) el.textContent = '📍 Lagos · ' + formatLagosDT();
+    }, 1000);
+}
+
 function updateActiveTab(activeTabId) {
     const navTabs = ['navDashboard', 'navStudentDatabase', 'navAutoStudents', 'navScheduleManagement', 'navAcademic', 'navCourses'];
     navTabs.forEach(tabId => {
@@ -436,6 +469,9 @@ function updateActiveTab(activeTabId) {
             tab.classList.toggle('active', tabId === activeTabId);
         }
     });
+
+    // Ensure persistent clock on every tab
+    ensureGlobalClock();
 
     // Fade in main content on tab switch
     const mainContent = document.getElementById('mainContent');
@@ -2467,205 +2503,210 @@ let studentCache = [];
 function renderScheduleManagement(container, tutor) {
     updateActiveTab('navScheduleManagement');
 
+    const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
     container.innerHTML = `
-        ${clockBarHTML('schedule-clock')}
+        <div class="hero-section">
+            <h1 class="hero-title">📅 Schedule Management</h1>
+            <p class="hero-subtitle">A complete view of all your students' weekly classes</p>
+        </div>
 
-        <!-- Header with action buttons -->
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                    <h1 class="text-xl font-black text-gray-800">📅 Schedule Management</h1>
-                    <p class="text-sm text-gray-400">Manage and view class schedules for all your students</p>
-                </div>
-                <div class="flex gap-2 flex-wrap">
-                    <button id="setup-all-schedules-btn" class="btn btn-primary btn-sm">⚙️ Set Up / Edit Schedules</button>
-                    <button id="view-full-calendar-btn" class="btn btn-secondary btn-sm">🗓 Full Calendar</button>
-                    <button id="reload-schedule-btn" class="btn btn-secondary btn-sm">🔄 Reload</button>
+        <!-- Action buttons row -->
+        <div class="flex flex-wrap gap-3 mb-5">
+            <button id="view-full-calendar-btn" class="btn btn-info">📆 Full Calendar</button>
+            <button id="setup-all-schedules-btn" class="btn btn-primary">⚙️ Set Up / Edit Schedules</button>
+            <button id="refresh-schedule-btn" class="btn btn-secondary">🔄 Refresh</button>
+        </div>
+
+        <!-- Week Grid -->
+        <div class="card mb-4 overflow-x-auto">
+            <div class="card-header flex items-center gap-2">
+                <span class="text-xl">📊</span>
+                <h3 class="font-bold text-lg">Weekly Overview</h3>
+                <span class="text-xs text-gray-400 ml-2">All students' recurring classes</span>
+            </div>
+            <div class="card-body p-0">
+                <div id="week-grid-container" class="p-4">
+                    <div class="flex justify-center py-6"><div class="spinner"></div></div>
                 </div>
             </div>
         </div>
 
-        <!-- Today's classes — highlighted row -->
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4">
-            <div class="flex items-center gap-2 mb-3">
-                <span class="text-lg">📌</span>
-                <h2 class="font-bold text-gray-800">Today's Classes</h2>
-                <span id="today-day-label" class="text-xs text-gray-400 ml-1"></span>
+        <!-- Student Cards -->
+        <div class="card">
+            <div class="card-header flex items-center gap-2">
+                <span class="text-xl">👥</span>
+                <h3 class="font-bold text-lg">Students & Their Schedules</h3>
             </div>
-            <div id="todays-schedule-inline">
-                <div class="flex justify-center py-6"><div class="spinner"></div></div>
-            </div>
-        </div>
-
-        <!-- Full weekly grid (inline, no modal) -->
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4">
-            <div class="flex items-center gap-2 mb-4">
-                <span class="text-lg">📆</span>
-                <h2 class="font-bold text-gray-800">Weekly Overview</h2>
-            </div>
-            <div id="weekly-schedule-grid">
+            <div class="card-body" id="student-schedule-cards">
                 <div class="flex justify-center py-6"><div class="spinner"></div></div>
             </div>
         </div>
     `;
 
-    // Button wiring
+    // Buttons
     document.getElementById('view-full-calendar-btn')?.addEventListener('click', showScheduleCalendarModal);
-    document.getElementById('reload-schedule-btn')?.addEventListener('click', () => loadScheduleData(tutor));
-
-    const setupBtn = document.getElementById('setup-all-schedules-btn');
-    if (setupBtn) {
-        setupBtn.addEventListener('click', async () => {
-            try {
-                if (window.scheduleManager) {
-                    await window.scheduleManager.openManualManager();
-                } else {
-                    const firebaseDeps = {
-                        db: db,
-                        methods: { getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc, getDoc }
-                    };
-                    window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
-                    await window.scheduleManager.openManualManager();
-                }
-            } catch (error) {
-                console.error("Error opening schedule manager:", error);
-                showCustomAlert('Error opening schedule manager. Please try again.');
+    document.getElementById('setup-all-schedules-btn')?.addEventListener('click', async () => {
+        try {
+            if (window.scheduleManager) {
+                await window.scheduleManager.openManualManager();
+            } else {
+                const firebaseDeps = { db, methods: { getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc, getDoc } };
+                window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
+                await window.scheduleManager.openManualManager();
             }
-        });
-    }
+        } catch (err) {
+            console.error(err);
+            showCustomAlert('Error opening schedule manager. Please try again.');
+        }
+    });
+    document.getElementById('refresh-schedule-btn')?.addEventListener('click', () => loadScheduleData());
 
-    // Start tab clock
-    startTabClock('schedule-clock');
+    // Day colors
+    const dayColors = ['bg-blue-50 border-blue-200','bg-purple-50 border-purple-200','bg-amber-50 border-amber-200',
+        'bg-green-50 border-green-200','bg-rose-50 border-rose-200','bg-indigo-50 border-indigo-200','bg-teal-50 border-teal-200'];
+    const dayTextColors = ['text-blue-700','text-purple-700','text-amber-700','text-green-700','text-rose-700','text-indigo-700','text-teal-700'];
 
-    // Load schedule data
-    loadScheduleData(tutor);
-}
+    const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Africa/Lagos' });
 
-// Shared schedule data loader used by the Schedule tab
-async function loadScheduleData(tutor) {
-    const todayContainer  = document.getElementById('todays-schedule-inline');
-    const weeklyContainer = document.getElementById('weekly-schedule-grid');
-    const dayLabel        = document.getElementById('today-day-label');
-    if (!todayContainer || !weeklyContainer) return;
+    async function loadScheduleData() {
+        const gridContainer    = document.getElementById('week-grid-container');
+        const cardsContainer   = document.getElementById('student-schedule-cards');
+        if (gridContainer) gridContainer.innerHTML = '<div class="flex justify-center py-6"><div class="spinner"></div></div>';
+        if (cardsContainer) cardsContainer.innerHTML = '<div class="flex justify-center py-6"><div class="spinner"></div></div>';
 
-    try {
-        const lagosNow  = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
-        const todayName = lagosNow.toLocaleDateString('en-US', { weekday: 'long' });
-        if (dayLabel) dayLabel.textContent = `(${todayName})`;
+        try {
+            const snap = await getDocs(query(collection(db, 'students'), where('tutorEmail', '==', tutor.email)));
+            const students = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                .filter(s => !['archived','graduated','transferred'].includes(s.status));
 
-        const snapshot = await getDocs(query(collection(db, "students"), where("tutorEmail", "==", tutor.email)));
-
-        // Build schedule-by-day map
-        const scheduleByDay = {};
-        DAYS_OF_WEEK.forEach(d => scheduleByDay[d] = []);
-
-        snapshot.forEach(docSnap => {
-            const s = { id: docSnap.id, ...docSnap.data() };
-            if (!s.schedule || !Array.isArray(s.schedule)) return;
-            s.schedule.forEach(slot => {
-                if (!slot.day) return;
-                scheduleByDay[slot.day] = scheduleByDay[slot.day] || [];
-                scheduleByDay[slot.day].push({
-                    studentName: s.studentName,
-                    studentId:   s.id,
-                    grade:       s.grade || '',
-                    start:       slot.start,
-                    end:         slot.end,
-                    isOvernight: slot.isOvernight || false
+            // Build day → classes map
+            const dayMap = {}; // day → [{student, slot}]
+            students.forEach(s => {
+                if (!Array.isArray(s.schedule)) return;
+                s.schedule.forEach(slot => {
+                    const d = slot.day;
+                    if (!d) return;
+                    if (!dayMap[d]) dayMap[d] = [];
+                    dayMap[d].push({ student: s, slot });
                 });
             });
-        });
-        DAYS_OF_WEEK.forEach(d => scheduleByDay[d].sort((a,b) => (a.start||'').localeCompare(b.start||'')));
 
-        // ── TODAY'S CLASSES ──────────────────────────────────────────────
-        const todayClasses = scheduleByDay[todayName] || [];
-        if (todayClasses.length === 0) {
-            todayContainer.innerHTML = `
-                <div class="text-center py-6">
-                    <div class="text-3xl mb-2">🌿</div>
-                    <p class="text-gray-500">No classes scheduled for today.</p>
-                </div>`;
-        } else {
-            const now = lagosNow.getHours() * 60 + lagosNow.getMinutes();
-            todayContainer.innerHTML = `<div class="space-y-2">
-                ${todayClasses.map(c => {
-                    const [sh, sm] = (c.start || '00:00').split(':').map(Number);
-                    const [eh, em] = (c.end   || '00:00').split(':').map(Number);
-                    const startMin = sh * 60 + sm;
-                    const endMin   = eh * 60 + em;
-                    const ongoing = now >= startMin && now < endMin;
-                    const done    = now >= endMin;
-                    let ringCls = 'border-gray-200 bg-gray-50';
-                    let badge   = '';
-                    if (ongoing) { ringCls = 'border-green-400 bg-green-50'; badge = `<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700 animate-pulse">🟢 Now</span>`; }
-                    else if (done) { ringCls = 'border-gray-200 bg-gray-50 opacity-60'; }
+            // Sort each day's classes by start time
+            DAYS.forEach(d => {
+                if (dayMap[d]) dayMap[d].sort((a,b) => (a.slot.start||'').localeCompare(b.slot.start||''));
+            });
 
-                    return `<div class="flex items-center gap-3 p-3 rounded-xl border ${ringCls} transition-all">
-                        <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
-                            ${escapeHtml((c.studentName || '?').charAt(0))}
-                        </div>
+            // ── Render Week Grid ──
+            if (gridContainer) {
+                if (students.length === 0) {
+                    gridContainer.innerHTML = '<p class="text-center text-gray-400 py-6">No students found. Add students and set up their schedules.</p>';
+                } else {
+                    const totalClasses = Object.values(dayMap).reduce((s,v) => s + v.length, 0);
+                    let gridHtml = `<p class="text-xs text-gray-400 mb-3">${totalClasses} class slot${totalClasses !== 1 ? 's' : ''} per week across ${students.length} student${students.length !== 1 ? 's' : ''}</p>`;
+                    gridHtml += '<div class="grid grid-cols-7 gap-2 min-w-max w-full">';
+
+                    // Header row
+                    DAYS.forEach((day, i) => {
+                        const isToday = day === todayName;
+                        gridHtml += `<div class="text-center">
+                            <div class="text-xs font-bold ${isToday ? 'text-white bg-blue-600 rounded-lg px-2 py-1' : dayTextColors[i] + ' px-2 py-1'} uppercase tracking-wide">
+                                ${day.slice(0,3)}${isToday ? ' ◀' : ''}
+                            </div>
+                        </div>`;
+                    });
+
+                    // Class cells
+                    DAYS.forEach((day, i) => {
+                        const classes = dayMap[day] || [];
+                        const isToday = day === todayName;
+                        if (classes.length === 0) {
+                            gridHtml += `<div class="min-h-16 rounded-xl border ${isToday ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-100'} flex items-center justify-center">
+                                <span class="text-xs text-gray-300">—</span>
+                            </div>`;
+                        } else {
+                            gridHtml += `<div class="space-y-1.5 min-h-16">`;
+                            classes.forEach(({ student, slot }) => {
+                                gridHtml += `<div class="rounded-xl border ${isToday ? 'bg-blue-100 border-blue-300' : dayColors[i]} p-2 cursor-pointer hover:shadow-sm transition-all text-center"
+                                    title="${escapeHtml(student.studentName)} · ${escapeHtml(formatScheduleTime(slot.start))}–${escapeHtml(formatScheduleTime(slot.end))}">
+                                    <p class="text-xs font-bold ${dayTextColors[i]} truncate">${escapeHtml((student.studentName||'?').split(' ')[0])}</p>
+                                    <p class="text-xs ${dayTextColors[i]} opacity-80">${escapeHtml(formatScheduleTime(slot.start))}</p>
+                                    ${slot.subject ? `<p class="text-xs text-gray-500 truncate">${escapeHtml(slot.subject)}</p>` : ''}
+                                </div>`;
+                            });
+                            gridHtml += '</div>';
+                        }
+                    });
+
+                    gridHtml += '</div>';
+                    gridContainer.innerHTML = gridHtml;
+                }
+            }
+
+            // ── Render Student Cards ──
+            if (cardsContainer) {
+                if (students.length === 0) {
+                    cardsContainer.innerHTML = '<p class="text-center text-gray-400 py-6">No students found.</p>';
+                    return;
+                }
+
+                const sortedStudents = [...students].sort((a,b) => (a.studentName||'').localeCompare(b.studentName||''));
+                const cardsHtml = sortedStudents.map(s => {
+                    const slots = Array.isArray(s.schedule) ? s.schedule : [];
+                    const initials = (s.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+                    const hasToday = slots.some(sl => sl.day === todayName);
+                    const statusBadge = s.summerBreak
+                        ? '<span class="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full font-semibold">☀️ Break</span>'
+                        : s.isTransitioning
+                        ? '<span class="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full font-semibold">🔄 Transitioning</span>'
+                        : '';
+                    const todayBadge = hasToday ? '<span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">📅 Today</span>' : '';
+
+                    const slotsHtml = slots.length === 0
+                        ? '<span class="text-xs text-gray-400">No schedule set up yet</span>'
+                        : slots.sort((a,b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day)).map(sl => {
+                            const di = DAYS.indexOf(sl.day);
+                            const cc = di >= 0 ? dayColors[di] : 'bg-gray-100 border-gray-200';
+                            const tc = di >= 0 ? dayTextColors[di] : 'text-gray-600';
+                            const isToday = sl.day === todayName;
+                            return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-semibold ${isToday ? 'bg-blue-600 text-white border-blue-700' : cc + ' ' + tc}">
+                                ${escapeHtml(sl.day?.slice(0,3)||'?')} ${escapeHtml(formatScheduleTime(sl.start))}${sl.subject ? ' · '+escapeHtml(sl.subject) : ''}
+                            </span>`;
+                        }).join('');
+
+                    return `<div class="flex items-start gap-4 p-4 rounded-2xl border ${hasToday ? 'border-blue-200 bg-blue-50' : 'border-gray-100 bg-white'} hover:shadow-sm transition-all">
+                        <div class="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0"
+                             style="background:linear-gradient(135deg,#6366f1,#4f46e5)">${escapeHtml(initials)}</div>
                         <div class="flex-1 min-w-0">
-                            <p class="font-semibold text-gray-800">${escapeHtml(c.studentName)}</p>
-                            <p class="text-xs text-gray-400">${escapeHtml(c.grade)}</p>
+                            <div class="flex items-center gap-2 flex-wrap mb-2">
+                                <p class="font-bold text-gray-800">${escapeHtml(s.studentName||'Unknown')}</p>
+                                <span class="text-xs text-gray-400">${escapeHtml(s.grade||'')}</span>
+                                ${statusBadge}${todayBadge}
+                            </div>
+                            <div class="flex flex-wrap gap-1.5">${slotsHtml}</div>
                         </div>
-                        <div class="text-right flex-shrink-0">
-                            <p class="text-sm font-bold text-blue-700">${escapeHtml(formatScheduleTime(c.start))} – ${escapeHtml(formatScheduleTime(c.end))}</p>
-                            ${badge}
-                            ${c.isOvernight ? `<span class="text-xs text-indigo-500">🌙 Overnight</span>` : ''}
-                        </div>
+                        <button onclick="(async () => {
+                            if (!window.scheduleManager) {
+                                const fd = { db, methods: { getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc, getDoc } };
+                                window.scheduleManager = new ScheduleManager(${JSON.stringify({ email: tutor.email, name: tutor.name })}, fd);
+                            }
+                            await window.scheduleManager.openManualManager();
+                        })()" class="flex-shrink-0 btn btn-secondary btn-sm">✏️ Edit</button>
                     </div>`;
-                }).join('')}
-            </div>`;
+                }).join('');
+
+                cardsContainer.innerHTML = `<div class="space-y-3">${cardsHtml}</div>`;
+            }
+
+        } catch (err) {
+            console.error('Schedule load error:', err);
+            const msg = `<p class="text-red-500 text-center py-4">Error loading schedule.</p>`;
+            if (gridContainer) gridContainer.innerHTML = msg;
+            if (cardsContainer) cardsContainer.innerHTML = msg;
         }
-
-        // ── WEEKLY GRID ──────────────────────────────────────────────────
-        const totalWeekly = DAYS_OF_WEEK.reduce((n, d) => n + scheduleByDay[d].length, 0);
-        if (totalWeekly === 0) {
-            weeklyContainer.innerHTML = `
-                <div class="text-center py-6">
-                    <div class="text-3xl mb-2">📭</div>
-                    <p class="text-gray-500">No schedules set up yet.</p>
-                    <button class="btn btn-primary mt-3" onclick="document.getElementById('setup-all-schedules-btn').click()">Set Up Schedules</button>
-                </div>`;
-            return;
-        }
-
-        // Responsive: cards per day
-        weeklyContainer.innerHTML = `
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
-                ${DAYS_OF_WEEK.map(day => {
-                    const events  = scheduleByDay[day];
-                    const isToday = day === todayName;
-                    const headerCls = isToday
-                        ? 'bg-blue-600 text-white font-black'
-                        : 'bg-gray-100 text-gray-600 font-semibold';
-
-                    return `<div class="rounded-xl border ${isToday ? 'border-blue-300 shadow-md' : 'border-gray-200'} overflow-hidden">
-                        <div class="px-3 py-2 text-xs uppercase tracking-wide text-center ${headerCls}">
-                            ${day.slice(0,3)}${isToday ? ' ✦' : ''}
-                        </div>
-                        <div class="divide-y divide-gray-50 ${events.length === 0 ? 'p-3' : ''}">
-                            ${events.length === 0
-                                ? `<p class="text-xs text-gray-300 text-center">—</p>`
-                                : events.map(e => `
-                                    <div class="p-2 hover:bg-blue-50 transition-colors">
-                                        <p class="text-xs font-semibold text-gray-800 truncate">${escapeHtml(e.studentName)}</p>
-                                        <p class="text-xs text-blue-600">${escapeHtml(formatScheduleTime(e.start))} – ${escapeHtml(formatScheduleTime(e.end))}</p>
-                                        <p class="text-xs text-gray-400">${escapeHtml(e.grade)}</p>
-                                    </div>`).join('')}
-                        </div>
-                    </div>`;
-                }).join('')}
-            </div>
-            <div class="mt-3 flex items-center gap-4 text-xs text-gray-400">
-                <span>Total: <strong class="text-gray-600">${totalWeekly} class${totalWeekly !== 1 ? 'es' : ''}/week</strong></span>
-            </div>`;
-
-    } catch (err) {
-        console.error('Schedule load error:', err);
-        if (todayContainer)  todayContainer.innerHTML  = '<p class="text-red-500 text-center">Failed to load schedule.</p>';
-        if (weeklyContainer) weeklyContainer.innerHTML = '<p class="text-red-500 text-center">Failed to load schedule.</p>';
     }
+
+    loadScheduleData();
 }
 
 /*******************************************************************************
@@ -2675,7 +2716,6 @@ function renderAcademic(container, tutor) {
     updateActiveTab('navAcademic');
 
     container.innerHTML = `
-        ${clockBarHTML('academic-clock')}
         <div class="hero-section">
             <h1 class="hero-title">🎓 Academic</h1>
             <p class="hero-subtitle">Record topics, assign homework, review submissions & view your archive</p>
@@ -2704,12 +2744,12 @@ function renderAcademic(container, tutor) {
             </div>
         </div>
 
-        <!-- Homework Archive: per-student cards -->
+        <!-- Homework Inbox -->
         <div class="card mt-4">
             <div class="card-header flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <span class="text-xl">📨</span>
-                    <h3 class="font-bold text-lg">Homework Archive</h3>
+                    <h3 class="font-bold text-lg">Homework Inbox</h3>
                     <span class="badge badge-info text-xs" id="inbox-count">…</span>
                 </div>
                 <button id="refresh-inbox-btn" class="btn btn-secondary btn-sm">🔄 Refresh</button>
@@ -2717,30 +2757,27 @@ function renderAcademic(container, tutor) {
             <div class="card-body" id="homework-inbox-container">
                 <div class="text-center py-6">
                     <div class="spinner mx-auto mb-3"></div>
-                    <p class="text-gray-500">Loading homework archive...</p>
+                    <p class="text-gray-500">Loading submissions...</p>
                 </div>
             </div>
         </div>
 
-        <!-- Topics Archive: monthly accordion per student -->
+        <!-- Monthly Archive Accordion -->
         <div class="card mt-4">
             <div class="card-header flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                    <span class="text-xl">📚</span>
-                    <h3 class="font-bold text-lg">Topics Archive</h3>
+                    <span class="text-xl">🗄️</span>
+                    <h3 class="font-bold text-lg">Academic Archive</h3>
                 </div>
                 <button id="load-archive-btn" class="btn btn-secondary btn-sm">📂 Load Archive</button>
             </div>
             <div class="card-body" id="academic-archive-container">
-                <p class="text-center text-gray-400 text-sm py-4">Click "Load Archive" to view past topics by month.</p>
+                <p class="text-center text-gray-400 text-sm py-4">Click "Load Archive" to view your past topics & homework by month.</p>
             </div>
         </div>
     `;
 
     loadStudentDropdowns(tutor.email);
-
-    // Start tab clock
-    startTabClock('academic-clock');
 
     const addTopicBtn = document.getElementById('add-topic-btn');
     if (addTopicBtn) addTopicBtn.addEventListener('click', () => {
@@ -2770,141 +2807,108 @@ function renderAcademic(container, tutor) {
     document.getElementById('load-archive-btn')?.addEventListener('click', () => loadAcademicArchive(tutor));
 }
 
-// Load and render the topics archive grouped by month (topics only — homework is in its own section)
+// Load and render the academic archive grouped by month
 async function loadAcademicArchive(tutor) {
     const container = document.getElementById('academic-archive-container');
     if (!container) return;
     container.innerHTML = `<div class="text-center py-6"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading archive…</p></div>`;
 
     try {
-        const topicsSnap = await getDocs(
-            query(collection(db, 'daily_topics'), where('tutorEmail', '==', tutor.email))
-        );
+        const [topicsSnap, hwSnap] = await Promise.all([
+            getDocs(query(collection(db, 'daily_topics'), where('tutorEmail', '==', tutor.email))),
+            getDocs(query(collection(db, 'homework_assignments'), where('tutorEmail', '==', tutor.email)))
+        ]);
 
-        // Organise by studentId → monthKey → topics[]
-        const studentMonths = {}; // studentId → { name, months: { mk: [topics] } }
+        // Organise by month
+        const months = {}; // 'YYYY-MM' → { topics:[], hw:[] }
 
         topicsSnap.docs.forEach(d => {
             const data = d.data();
             const date = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || '');
             if (isNaN(date.getTime())) return;
             const mk = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
-            const sid = data.studentId || 'unknown';
-            const sName = data.studentName || 'Unknown Student';
-
-            if (!studentMonths[sid]) studentMonths[sid] = { name: sName, months: {} };
-            if (!studentMonths[sid].months[mk]) studentMonths[sid].months[mk] = [];
-            studentMonths[sid].months[mk].push({ date, text: data.topics || '' });
+            if (!months[mk]) months[mk] = { topics:[], hw:[] };
+            months[mk].topics.push({ date, text: data.topics || '', studentId: data.studentId });
         });
 
-        const sids = Object.keys(studentMonths);
+        hwSnap.docs.forEach(d => {
+            const data = d.data();
+            const raw = data.assignedAt || data.createdAt || data.uploadedAt;
+            const date = raw?.toDate ? raw.toDate() : new Date(raw || '');
+            if (isNaN(date.getTime())) return;
+            const mk = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+            if (!months[mk]) months[mk] = { topics:[], hw:[] };
+            months[mk].hw.push({ date, title: data.title || 'Homework', studentName: data.studentName || '', score: data.score, feedback: data.feedback, status: data.status });
+        });
 
-        if (sids.length === 0) {
-            container.innerHTML = '<p class="text-center text-gray-400 py-6">No topics recorded yet.</p>';
+        const sortedMonths = Object.keys(months).sort((a,b) => b.localeCompare(a));
+
+        if (sortedMonths.length === 0) {
+            container.innerHTML = '<p class="text-center text-gray-400 py-6">No academic records found yet.</p>';
             return;
         }
 
-        let html = `<div class="space-y-4">`;
+        container.innerHTML = `<div class="space-y-2" id="archive-accordion"></div>`;
+        const accordion = document.getElementById('archive-accordion');
 
-        sids.forEach(sid => {
-            const { name, months } = studentMonths[sid];
-            const sortedMonths = Object.keys(months).sort((a,b) => b.localeCompare(a));
-            const totalTopics = Object.values(months).reduce((n, arr) => n + arr.length, 0);
-            const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+        sortedMonths.forEach(mk => {
+            const { topics, hw } = months[mk];
+            const [y, m] = mk.split('-');
+            const label = new Date(parseInt(y), parseInt(m)-1, 1).toLocaleString('en-NG', { month:'long', year:'numeric' });
 
-            html += `
-                <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                    <button class="w-full text-left p-4 flex items-center gap-3 hover:bg-gray-50 topics-student-toggle">
-                        <div class="w-9 h-9 rounded-xl flex items-center justify-center font-black text-white text-xs flex-shrink-0"
-                             style="background:linear-gradient(135deg,#3b82f6,#6366f1);">
-                            ${escapeHtml(initials)}
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="font-bold text-gray-800">${escapeHtml(name)}</p>
-                            <p class="text-xs text-gray-400">${totalTopics} topic${totalTopics !== 1 ? 's' : ''} across ${sortedMonths.length} month${sortedMonths.length !== 1 ? 's' : ''}</p>
-                        </div>
-                        <i class="fas fa-chevron-down text-gray-400 text-xs topics-chevron transition-transform"></i>
-                    </button>
-                    <div class="topics-student-body hidden border-t border-gray-100 p-3 space-y-2 bg-gray-50">
-                        ${sortedMonths.map((mk, mIdx) => {
-                            const [y, m] = mk.split('-');
-                            const label = new Date(parseInt(y), parseInt(m)-1, 1)
-                                .toLocaleString('en-NG', { month:'long', year:'numeric' });
-                            const items = months[mk].sort((a,b) => b.date - a.date);
-                            return `
-                                <details class="border border-gray-200 rounded-xl overflow-hidden" ${mIdx === 0 ? 'open' : ''}>
-                                    <summary class="flex items-center justify-between p-3 cursor-pointer hover:bg-white list-none select-none">
-                                        <span class="font-semibold text-gray-700 text-sm">${escapeHtml(label)}</span>
-                                        <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-bold">${items.length} topic${items.length !== 1 ? 's' : ''}</span>
-                                    </summary>
-                                    <div class="p-3 space-y-1.5 border-t border-gray-100 bg-white">
-                                        ${items.map(t => `
-                                            <div class="flex items-start gap-2 bg-blue-50 rounded-lg px-3 py-2">
-                                                <span class="text-xs text-gray-400 flex-shrink-0 mt-0.5 whitespace-nowrap">
-                                                    ${t.date.toLocaleDateString('en-NG', {day:'2-digit', month:'short'})}
-                                                </span>
-                                                <span class="text-sm text-gray-700">${escapeHtml(t.text)}</span>
-                                            </div>`).join('')}
-                                    </div>
-                                </details>`;
-                        }).join('')}
+            const item = document.createElement('details');
+            item.className = 'bg-white border border-gray-200 rounded-xl overflow-hidden';
+            item.innerHTML = `
+            <summary class="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 list-none">
+                <div class="flex-1">
+                    <span class="font-semibold text-gray-800">${escapeHtml(label)}</span>
+                </div>
+                <div class="flex gap-3 flex-shrink-0">
+                    <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-bold">${topics.length} topics</span>
+                    <span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs font-bold">${hw.length} H/W</span>
+                </div>
+                <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+            </summary>
+            <div class="border-t border-gray-100 divide-y divide-gray-50">
+                <!-- Topics -->
+                ${topics.length > 0 ? `
+                <div class="p-3">
+                    <h4 class="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">📚 Topics Entered</h4>
+                    <div class="space-y-1.5">
+                        ${topics.sort((a,b) => b.date-a.date).map(t => `
+                        <div class="flex items-start gap-2 bg-blue-50 rounded-lg px-3 py-2">
+                            <span class="text-xs text-gray-400 flex-shrink-0 mt-0.5">${t.date.toLocaleDateString('en-NG', {day:'2-digit',month:'short'})}</span>
+                            <span class="text-sm text-gray-700">${escapeHtml(t.text)}</span>
+                        </div>`).join('')}
                     </div>
-                </div>`;
-        });
-
-        html += `</div>`;
-        container.innerHTML = html;
-
-        // Toggle student rows
-        container.querySelectorAll('.topics-student-toggle').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const body  = btn.nextElementSibling;
-                const arrow = btn.querySelector('.topics-chevron');
-                body.classList.toggle('hidden');
-                if (arrow) arrow.style.transform = body.classList.contains('hidden') ? '' : 'rotate(180deg)';
-            });
+                </div>` : ''}
+                <!-- Homework -->
+                ${hw.length > 0 ? `
+                <div class="p-3">
+                    <h4 class="text-xs font-bold text-amber-600 uppercase tracking-wide mb-2">📝 Homework Assigned</h4>
+                    <div class="space-y-1.5">
+                        ${hw.sort((a,b) => b.date-a.date).map(h => `
+                        <div class="flex items-start justify-between bg-amber-50 rounded-lg px-3 py-2 gap-2">
+                            <div class="flex items-start gap-2 min-w-0">
+                                <span class="text-xs text-gray-400 flex-shrink-0 mt-0.5">${h.date.toLocaleDateString('en-NG', {day:'2-digit',month:'short'})}</span>
+                                <div class="min-w-0">
+                                    <span class="text-sm text-gray-700 font-medium">${escapeHtml(h.title)}</span>
+                                    ${h.studentName ? `<div class="text-xs text-gray-400">${escapeHtml(h.studentName)}</div>` : ''}
+                                    ${h.feedback ? `<div class="text-xs text-gray-500 italic mt-0.5">"${escapeHtml(h.feedback)}"</div>` : ''}
+                                </div>
+                            </div>
+                            ${h.score ? `<span class="bg-white border border-amber-200 text-amber-700 px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0">${escapeHtml(String(h.score))}/100</span>` : ''}
+                        </div>`).join('')}
+                    </div>
+                </div>` : ''}
+            </div>`;
+            accordion.appendChild(item);
         });
 
     } catch (err) {
         console.error('Archive error:', err);
         container.innerHTML = `<p class="text-red-500 text-center py-4">Error loading archive: ${escapeHtml(err.message)}</p>`;
     }
-}
-
-/*******************************************************************************
- * SHARED CLOCK UTILITY (used on every tab)
- ******************************************************************************/
-function formatLagosDateTime() {
-    return new Intl.DateTimeFormat('en-NG', {
-        weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-        hour12: true, timeZone: 'Africa/Lagos'
-    }).format(new Date());
-}
-
-/** Returns the HTML snippet for a clock bar with a given element id */
-function clockBarHTML(id) {
-    return `
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 mb-4 flex items-center justify-between gap-3">
-            <div class="flex items-center gap-2 text-gray-400 text-xs">
-                <span>📍 Lagos, Nigeria (WAT)</span>
-            </div>
-            <div id="${id}" class="text-sm font-semibold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 whitespace-nowrap">Loading time…</div>
-        </div>`;
-}
-
-/** Starts a 1-second interval clock for a given element id */
-function startTabClock(elementId) {
-    // Clear any pre-existing clock for this element
-    const key = '_clock_' + elementId;
-    if (window[key]) clearInterval(window[key]);
-    const tick = () => {
-        const el = document.getElementById(elementId);
-        if (el) el.textContent = formatLagosDateTime();
-        else clearInterval(window[key]);
-    };
-    tick();
-    window[key] = setInterval(tick, 1000);
 }
 
 /*******************************************************************************
@@ -3018,10 +3022,30 @@ function renderTutorDashboard(container, tutor) {
 
     loadTutorReports(tutor.email);
 
-    // Start Lagos clock on dashboard (shared helper)
-    startTabClock('tutor-lagos-clock');
+    // Start Lagos clock on dashboard
+    (function startTutorClock() {
+        function getLagosTime() {
+            return new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+        }
+        function formatLagosDT() {
+            const opts = { weekday:'short', day:'numeric', month:'short', year:'numeric',
+                           hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true, timeZone:'Africa/Lagos' };
+            return new Intl.DateTimeFormat('en-NG', opts).format(new Date());
+        }
+        const clockEl = document.getElementById('tutor-lagos-clock');
+        if (clockEl) {
+            clockEl.textContent = formatLagosDT();
+            // Store interval id so it can be cleared on tab switch
+            if (window._tutorClockInterval) clearInterval(window._tutorClockInterval);
+            window._tutorClockInterval = setInterval(() => {
+                const el = document.getElementById('tutor-lagos-clock');
+                if (el) el.textContent = formatLagosDT();
+                else clearInterval(window._tutorClockInterval);
+            }, 1000);
+        }
+    })();
 
-    // Init performance scorecard (real-time listener to tutor doc + tutor_grades)
+    // Init performance scorecard (real-time listener to tutor doc)
     if (tutor.id) initGamification(tutor.id);
 }
 
@@ -4224,108 +4248,119 @@ let isTutorOfTheMonth = false;
  * Initializes the gamification dashboard widget.
  * Call this function when the dashboard loads.
  */
-// QA/QC area definitions (mirrors management.js exactly)
-const QA_AREAS = [
-    { id: 'preparation',    label: 'Lesson Preparation & Resources', max: 15 },
-    { id: 'delivery',       label: 'Teaching Delivery & Clarity',    max: 15 },
-    { id: 'engagement',     label: 'Student Engagement',             max: 15 },
-    { id: 'differentiation',label: 'Differentiation & Adaptation',   max: 15 },
-    { id: 'assessment',     label: 'In-class Assessment',            max: 10 },
-    { id: 'classroom',      label: 'Classroom Management',           max: 15 },
-    { id: 'professionalism',label: 'Professionalism & Attitude',     max: 15 },
-];
-const QC_AREAS = [
-    { id: 'objectives',     label: 'Clear Learning Objectives',      max: 10 },
-    { id: 'structure',      label: 'Lesson Structure & Flow',        max: 10 },
-    { id: 'differentiation',label: 'Differentiation Strategies',     max: 10 },
-    { id: 'resources',      label: 'Resource Quality',               max: 10 },
-    { id: 'assessment',     label: 'Assessment Plan',                max: 10 },
-    { id: 'timing',         label: 'Timing & Pacing',                max: 10 },
-    { id: 'curriculum',     label: 'Curriculum Alignment',           max: 10 },
-    { id: 'innovation',     label: 'Innovation & Creativity',        max: 10 },
-    { id: 'feedback',       label: 'Feedback Mechanism',             max: 10 },
-    { id: 'documentation',  label: 'Documentation & Completeness',   max: 10 },
-];
-
-function getLagosMonthKey() {
-    const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-}
-
 async function initGamification(tutorId) {
     try {
-        // 1. Real-time listener on tutor doc for winner status & live score updates
+        // ── Step 1: Listen to the tutors doc for winner/badge info ──
         const tutorRef = doc(db, "tutors", tutorId);
-        onSnapshot(tutorRef, async (docSnap) => {
-            if (!docSnap.exists()) return;
-            const data = docSnap.data();
-
-            // 2. Fetch the full grade document from tutor_grades for the current month
-            const monthKey = getLagosMonthKey();
-            const tutorEmail = data.email || window.tutorData?.email || '';
-
-            let gradeDoc = null;
-            try {
-                // Try by tutorId first, then by tutorEmail as fallback
-                const gradesByIdSnap = await getDocs(query(
-                    collection(db, 'tutor_grades'),
-                    where('tutorId', '==', tutorId),
-                    where('month', '==', monthKey)
-                ));
-                if (!gradesByIdSnap.empty) {
-                    gradeDoc = gradesByIdSnap.docs[0].data();
-                } else if (tutorEmail) {
-                    const gradesByEmailSnap = await getDocs(query(
-                        collection(db, 'tutor_grades'),
-                        where('tutorEmail', '==', tutorEmail),
-                        where('month', '==', monthKey)
-                    ));
-                    if (!gradesByEmailSnap.empty) {
-                        gradeDoc = gradesByEmailSnap.docs[0].data();
-                    }
+        onSnapshot(tutorRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                // Keep gamification score on tutorData for winner badge (legacy)
+                if (window.tutorData) {
+                    window.tutorData._tutorDocScore = data.performanceScore || 0;
                 }
-            } catch (gradeErr) {
-                console.warn('Could not load tutor_grades:', gradeErr);
             }
+        });
 
-            // 3. Extract full QA/QC data
-            const qa = gradeDoc?.qa ?? null;
-            const qc = gradeDoc?.qc ?? null;
-            const qaScore = qa?.score ?? (data.qaScore ?? null);
-            const qcScore = qc?.score ?? (data.qcScore ?? null);
+        // ── Step 2: Read from tutor_grades (the real grading collection) ──
+        // tutor_grades doc structure:
+        //   { tutorId, tutorEmail, month, totalScore,
+        //     qa: { score, notes, gradedBy, gradedByName, gradedAt },
+        //     qc: { score, notes, gradedBy, gradedByName, gradedAt } }
+        const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+        const currentMonthKey = `${lagosNow.getFullYear()}-${String(lagosNow.getMonth() + 1).padStart(2, '0')}`;
 
-            let combined = 0;
-            if (qaScore !== null && qcScore !== null) combined = Math.round((qaScore + qcScore) / 2);
-            else if (qaScore !== null) combined = qaScore;
-            else if (qcScore !== null) combined = qcScore;
-            else combined = data.performanceScore || 0;
+        const tutorEmail = window.tutorData?.email || '';
+
+        // Build two queries (by tutorId OR tutorEmail) and pick first match
+        const gradesQueries = [
+            query(collection(db, 'tutor_grades'), where('month', '==', currentMonthKey), where('tutorId', '==', tutorId)),
+            ...(tutorEmail ? [query(collection(db, 'tutor_grades'), where('month', '==', currentMonthKey), where('tutorEmail', '==', tutorEmail))] : [])
+        ];
+
+        let gradeDoc = null;
+        for (const q of gradesQueries) {
+            const snap = await getDocs(q);
+            if (!snap.empty) { gradeDoc = snap.docs[0].data(); break; }
+        }
+
+        if (gradeDoc) {
+            const qaScore = gradeDoc.qa?.score ?? null;
+            const qcScore = gradeDoc.qc?.score ?? null;
+            const combined = (qaScore !== null && qcScore !== null)
+                ? Math.round((qaScore + qcScore) / 2)
+                : (qaScore !== null ? qaScore : (qcScore !== null ? qcScore : gradeDoc.totalScore || 0));
 
             currentTutorScore = combined;
 
-            if (window.tutorData) {
-                window.tutorData.qaScore        = qaScore;
-                window.tutorData.qcScore        = qcScore;
-                window.tutorData.qaAdvice       = qa?.notes       || data.qaAdvice       || '';
-                window.tutorData.qcAdvice       = qc?.notes       || data.qcAdvice       || '';
-                window.tutorData.qaGradedByName = qa?.gradedByName || data.qaGradedByName || '';
-                window.tutorData.qcGradedByName = qc?.gradedByName || data.qcGradedByName || '';
-                window.tutorData.performanceMonth = gradeDoc?.month || data.performanceMonth || '';
-                window.tutorData.qaBreakdown    = qa?.breakdown   || {};
-                window.tutorData.qcBreakdown    = qc?.breakdown   || {};
-            }
-
-            updateScoreDisplay(currentTutorScore, {
+            const breakdown = {
                 qaScore,
                 qcScore,
-                qaAdvice:       qa?.notes       || data.qaAdvice       || '',
-                qcAdvice:       qc?.notes       || data.qcAdvice       || '',
-                qaGradedByName: qa?.gradedByName || data.qaGradedByName || '',
-                qcGradedByName: qc?.gradedByName || data.qcGradedByName || '',
-                performanceMonth: gradeDoc?.month || data.performanceMonth || monthKey,
-                qaBreakdown:    qa?.breakdown   || {},
-                qcBreakdown:    qc?.breakdown   || {},
+                qaAdvice:       gradeDoc.qa?.notes       || '',
+                qcAdvice:       gradeDoc.qc?.notes       || '',
+                qaGradedByName: gradeDoc.qa?.gradedByName || '',
+                qcGradedByName: gradeDoc.qc?.gradedByName || '',
+                performanceMonth: gradeDoc.month || currentMonthKey
+            };
+
+            // Cache on tutorData
+            if (window.tutorData) Object.assign(window.tutorData, breakdown);
+
+            updateScoreDisplay(combined, breakdown);
+
+            // Set up a real-time listener so scorecard updates if management grades live
+            const gradesRef = query(collection(db, 'tutor_grades'), where('month', '==', currentMonthKey), where('tutorId', '==', tutorId));
+            onSnapshot(gradesRef, (snap) => {
+                if (!snap.empty) {
+                    const d = snap.docs[0].data();
+                    const qa2 = d.qa?.score ?? null;
+                    const qc2 = d.qc?.score ?? null;
+                    const comb2 = (qa2 !== null && qc2 !== null)
+                        ? Math.round((qa2 + qc2) / 2)
+                        : (qa2 !== null ? qa2 : (qc2 !== null ? qc2 : d.totalScore || 0));
+                    currentTutorScore = comb2;
+                    const bd = {
+                        qaScore: qa2, qcScore: qc2,
+                        qaAdvice: d.qa?.notes || '', qcAdvice: d.qc?.notes || '',
+                        qaGradedByName: d.qa?.gradedByName || '',
+                        qcGradedByName: d.qc?.gradedByName || '',
+                        performanceMonth: d.month || currentMonthKey
+                    };
+                    if (window.tutorData) Object.assign(window.tutorData, bd);
+                    updateScoreDisplay(comb2, bd);
+                }
             });
-        });
+        } else {
+            // No grade document yet for this month – show empty scorecard
+            updateScoreDisplay(0, {
+                qaScore: null, qcScore: null,
+                qaAdvice: '', qcAdvice: '',
+                qaGradedByName: '', qcGradedByName: '',
+                performanceMonth: currentMonthKey
+            });
+            // Still watch for when management adds a grade
+            const gradesRef = query(collection(db, 'tutor_grades'), where('month', '==', currentMonthKey), where('tutorId', '==', tutorId));
+            onSnapshot(gradesRef, (snap) => {
+                if (!snap.empty) {
+                    const d = snap.docs[0].data();
+                    const qa2 = d.qa?.score ?? null;
+                    const qc2 = d.qc?.score ?? null;
+                    const comb2 = (qa2 !== null && qc2 !== null)
+                        ? Math.round((qa2 + qc2) / 2)
+                        : (qa2 !== null ? qa2 : (qc2 !== null ? qc2 : d.totalScore || 0));
+                    currentTutorScore = comb2;
+                    const bd = {
+                        qaScore: qa2, qcScore: qc2,
+                        qaAdvice: d.qa?.notes || '', qcAdvice: d.qc?.notes || '',
+                        qaGradedByName: d.qa?.gradedByName || '',
+                        qcGradedByName: d.qc?.gradedByName || '',
+                        performanceMonth: d.month || currentMonthKey
+                    };
+                    if (window.tutorData) Object.assign(window.tutorData, bd);
+                    updateScoreDisplay(comb2, bd);
+                }
+            });
+        }
 
         checkWinnerStatus(tutorId);
 
@@ -4382,116 +4417,68 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
     if (totalScore >= 65) { scoreColor = 'text-yellow-500'; barColor = 'from-yellow-400 to-yellow-500'; }
     if (totalScore >= 85) { scoreColor = 'text-green-600'; barColor = 'from-green-400 to-green-600'; }
 
+    // Accept grading details either via breakdown param (real-time) or window.tutorData (fallback)
     const td = window.tutorData || {};
-    const qaScore        = breakdown.qaScore        ?? td.qaScore        ?? null;
-    const qcScore        = breakdown.qcScore        ?? td.qcScore        ?? null;
-    const qaAdvice       = breakdown.qaAdvice       ?? td.qaAdvice       ?? '';
-    const qcAdvice       = breakdown.qcAdvice       ?? td.qcAdvice       ?? '';
-    const qaGraderName   = breakdown.qaGradedByName ?? td.qaGradedByName ?? '';
-    const qcGraderName   = breakdown.qcGradedByName ?? td.qcGradedByName ?? '';
-    const perfMonth      = breakdown.performanceMonth ?? td.performanceMonth ?? '';
-    const qaBreakdown    = breakdown.qaBreakdown    ?? td.qaBreakdown    ?? {};
-    const qcBreakdown    = breakdown.qcBreakdown    ?? td.qcBreakdown    ?? {};
+    const qaScore      = breakdown.qaScore      ?? td.qaScore      ?? null;
+    const qcScore      = breakdown.qcScore      ?? td.qcScore      ?? null;
+    const qaAdvice     = breakdown.qaAdvice     ?? td.qaAdvice     ?? '';
+    const qcAdvice     = breakdown.qcAdvice     ?? td.qcAdvice     ?? '';
+    const qaGraderName = breakdown.qaGradedByName ?? td.qaGradedByName ?? '';
+    const qcGraderName = breakdown.qcGradedByName ?? td.qcGradedByName ?? '';
+    const perfMonth    = breakdown.performanceMonth ?? td.performanceMonth ?? '';
 
-    // Color helpers
-    function sc(score) {
-        if (score >= 85) return { text: 'text-green-600', bar: 'bg-green-500', bg: 'bg-green-50' };
-        if (score >= 65) return { text: 'text-yellow-600', bar: 'bg-yellow-500', bg: 'bg-yellow-50' };
-        if (score >= 45) return { text: 'text-orange-500', bar: 'bg-orange-400', bg: 'bg-orange-50' };
-        return { text: 'text-red-500', bar: 'bg-red-400', bg: 'bg-red-50' };
-    }
-
-    // Build per-area breakdown table for QA or QC
-    function buildAreaTable(areas, brk) {
-        if (!brk || Object.keys(brk).length === 0) {
-            return `<p class="text-xs text-gray-400 italic text-center py-2">No area data available</p>`;
-        }
-        return `<div class="space-y-1.5 mt-2">
-            ${areas.map(a => {
-                const raw = brk[a.id];
-                const val = raw !== undefined ? Number(raw) : null;
-                if (val === null) return '';
-                const pct = Math.round((val / a.max) * 100);
-                const c = sc(pct);
-                return `<div>
-                    <div class="flex justify-between items-center mb-0.5">
-                        <span class="text-xs text-gray-600">${escapeHtml(a.label)}</span>
-                        <span class="text-xs font-bold ${c.text}">${val}/${a.max}</span>
-                    </div>
-                    <div class="w-full bg-gray-100 rounded-full h-1">
-                        <div class="${c.bar} h-1 rounded-full transition-all duration-700" style="width:${pct}%"></div>
-                    </div>
-                </div>`;
-            }).filter(Boolean).join('')}
-        </div>`;
-    }
-
-    // Build a full section card for QA or QC
-    function sectionCard(score, label, icon, graderName, advice, areas, brk, themeText, themeBorder, sectionId) {
+    function scoreBadge(score, label, graderName, advice, themeClass) {
         if (score === null || score === undefined) return `
             <div class="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                <div class="text-xs font-bold ${themeText} uppercase tracking-wide mb-1">${icon} ${label}</div>
-                <div class="text-gray-400 text-sm">Not graded yet this month</div>
+                <div class="text-xs font-bold ${themeClass} uppercase tracking-wide mb-1">${label}</div>
+                <div class="text-gray-400 text-sm">Not graded yet</div>
             </div>`;
-        const c = sc(score);
+        let sc = 'text-red-500';
+        if (score >= 65) sc = 'text-yellow-500';
+        if (score >= 85) sc = 'text-green-600';
         return `
-            <div class="bg-white rounded-xl border ${themeBorder} overflow-hidden">
-                <div class="p-3">
-                    <div class="flex justify-between items-start mb-1">
-                        <div class="text-xs font-bold ${themeText} uppercase tracking-wide">${icon} ${label}</div>
-                        ${graderName ? `<span class="text-xs text-gray-400">by ${escapeHtml(graderName)}</span>` : ''}
-                    </div>
-                    <div class="text-3xl font-black ${c.text} mb-1">${score}<span class="text-sm font-normal">%</span></div>
-                    <div class="w-full bg-gray-100 rounded-full h-1.5">
-                        <div class="${c.bar} h-1.5 rounded-full transition-all duration-700" style="width:${score}%"></div>
-                    </div>
-                    ${advice ? `<div class="mt-2 text-xs text-gray-600 italic ${c.bg} rounded-lg p-2 border border-gray-100">💬 "${escapeHtml(advice)}"</div>` : ''}
-                    <!-- Area breakdown toggle -->
-                    <button class="mt-2 text-xs ${themeText} hover:underline" onclick="
-                        var el=document.getElementById('${sectionId}');
-                        if(el){el.classList.toggle('hidden');this.textContent=el.classList.contains('hidden')?'▶ Show area breakdown':'▲ Hide area breakdown';}
-                    ">▶ Show area breakdown</button>
-                    <div id="${sectionId}" class="hidden">
-                        ${buildAreaTable(areas, brk)}
-                    </div>
+            <div class="bg-white rounded-xl p-3 border border-gray-200">
+                <div class="flex justify-between items-center mb-1">
+                    <div class="text-xs font-bold ${themeClass} uppercase tracking-wide">${label}</div>
+                    ${graderName ? `<span class="text-xs text-gray-400">by ${escapeHtml(graderName)}</span>` : ''}
                 </div>
+                <div class="text-2xl font-black ${sc}">${score}<span class="text-sm">%</span></div>
+                <div class="w-full bg-gray-100 rounded-full h-1.5 mt-1.5">
+                    <div class="h-1.5 rounded-full bg-current transition-all duration-700 ${sc}" style="width:${score}%"></div>
+                </div>
+                ${advice ? `<div class="mt-2 text-xs text-gray-600 italic bg-gray-50 rounded-lg p-2 border border-gray-100">"${escapeHtml(advice)}"</div>` : ''}
             </div>`;
     }
 
-    const noScore = totalScore === 0 && qaScore === null && qcScore === null;
-
     scoreWidget.innerHTML = `
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden" id="perf-card-inner">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden cursor-pointer" id="perf-card-inner">
             ${isTutorOfTheMonth ? '<div class="absolute top-0 right-0 bg-yellow-400 text-xs font-black px-2 py-1 rounded-bl-xl text-white">👑 TOP TUTOR</div>' : ''}
-            <!-- Summary row (always visible) -->
-            <div class="p-4 cursor-pointer select-none" id="perf-card-toggle">
-                <h3 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">
-                    📊 Performance Score${perfMonth ? ' · ' + escapeHtml(perfMonth) : ''}
-                </h3>
-                ${noScore ? `
-                    <p class="text-gray-400 text-sm">Not graded yet this month.</p>` : `
-                    <div class="flex items-end gap-2 mb-3">
-                        <span class="text-5xl font-black ${scoreColor}">${totalScore}</span>
-                        <span class="text-gray-400 text-sm mb-1">/ 100%</span>
-                    </div>
-                    <div class="w-full bg-gray-100 rounded-full h-2.5 mb-1">
-                        <div class="bg-gradient-to-r ${barColor} h-2.5 rounded-full transition-all duration-1000" style="width:${Math.min(totalScore,100)}%"></div>
-                    </div>
-                    <p class="text-xs text-gray-400 text-right">Tap to see full breakdown ↓</p>`}
+            <div class="p-4">
+                <h3 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Performance Score ${perfMonth ? '· ' + perfMonth : ''}</h3>
+                <div class="flex items-end gap-2 mb-3">
+                    <span class="text-5xl font-black ${scoreColor}">${totalScore}</span>
+                    <span class="text-gray-400 text-sm mb-1">/ 100%</span>
+                </div>
+                <div class="w-full bg-gray-100 rounded-full h-2.5 mb-1">
+                    <div class="bg-gradient-to-r ${barColor} h-2.5 rounded-full transition-all duration-1000" style="width:${Math.min(totalScore,100)}%"></div>
+                </div>
+                <p class="text-xs text-gray-400 text-right mb-3">Tap to see full breakdown ↓</p>
             </div>
-            <!-- Expandable full breakdown -->
+            <!-- Expandable breakdown -->
             <div id="perf-breakdown" class="hidden border-t border-gray-100 p-4 space-y-3 bg-gray-50">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    ${sectionCard(qaScore, 'QA — Session Observation', '📋', qaGraderName, qaAdvice, QA_AREAS, qaBreakdown, 'text-purple-600', 'border-purple-100', 'qa-area-breakdown')}
-                    ${sectionCard(qcScore, 'QC — Lesson Plan', '📐', qcGraderName, qcAdvice, QC_AREAS, qcBreakdown, 'text-amber-600', 'border-amber-100', 'qc-area-breakdown')}
+                <div class="grid grid-cols-2 gap-3">
+                    ${scoreBadge(qaScore, 'QA – Session', qaGraderName, qaAdvice, 'text-purple-600')}
+                    ${scoreBadge(qcScore, 'QC – Lesson Plan', qcGraderName, qcAdvice, 'text-amber-600')}
                 </div>
                 <p class="text-xs text-gray-400 text-center">Combined score = (QA + QC) ÷ 2</p>
             </div>
         </div>
     `;
 
-    document.getElementById('perf-card-toggle')?.addEventListener('click', () => {
-        document.getElementById('perf-breakdown')?.classList.toggle('hidden');
+    // Toggle breakdown on click
+    document.getElementById('perf-card-inner')?.addEventListener('click', () => {
+        const bd = document.getElementById('perf-breakdown');
+        if (bd) bd.classList.toggle('hidden');
     });
 }
 
@@ -4580,7 +4567,6 @@ async function renderCourses(container, tutor) {
     updateActiveTab('navCourses');
     
     container.innerHTML = `
-        ${clockBarHTML('courses-clock')}
         <div class="hero-section">
             <h1 class="hero-title">📚 Course Materials</h1>
             <p class="hero-subtitle">Upload and manage learning resources for your students</p>
@@ -4639,9 +4625,6 @@ async function renderCourses(container, tutor) {
 
     // Load students into dropdown
     await loadStudentDropdownCourses(tutor.email);
-
-    // Start tab clock
-    startTabClock('courses-clock');
 
     const studentSelect = document.getElementById('material-student-select');
     const uploadForm = document.getElementById('upload-form-container');
@@ -5015,196 +4998,177 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
     }, 500);
-});
+});;
+
 
 
 /*******************************************************************************
- * SECTION 16: GOOGLE CLASSROOM GRADING INTERFACE
+ * SECTION 16: GOOGLE CLASSROOM GRADING INTERFACE (FINAL)
+ * UPDATES:
+ *   - Fixed "Cannot read properties of undefined (reading 'seconds')" error.
+ *   - Inbox now auto‑clears on the 4th day of the month – tutors only see
+ *     submissions from the current month that are on/after the 4th.
  ******************************************************************************/
 
 // ==========================================
-// 2. LOAD HOMEWORK ARCHIVE (per-student cards with monthly accordion)
+// 1. HELPER: Homework Cutoff Date (4th of current month)
 // ==========================================
+/**
+ * Returns the cutoff date: 4th day of current month at 00:00:00.
+ * Submissions BEFORE this date are hidden from the inbox.
+ */
+function getHomeworkCutoffDate() {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 4, 0, 0, 0);
+}
+
+// ==========================================
+// 2. LOAD HOMEWORK INBOX (with auto‑clear & safe date handling)
+// ==========================================
+// ==========================================
+// HOMEWORK INBOX — Student cards + accordion
+// ==========================================
+// Shows ALL assignments (any status) grouped by student.
+// Each student card expands to show assignments grouped by month.
+// Submitted (ungraded) items are highlighted so the tutor can act on them.
 async function loadHomeworkInbox(tutorEmail) {
     const container = document.getElementById('homework-inbox-container');
     if (!container) return;
     container.innerHTML = '<div class="flex justify-center py-8"><div class="spinner"></div></div>';
 
     try {
-        // Fetch ALL homework assignments for this tutor (all statuses, all time)
+        // Fetch ALL homework for this tutor (by email OR name, whichever returns data)
         let snap = await getDocs(query(
-            collection(db, "homework_assignments"),
-            where("tutorEmail", "==", tutorEmail)
+            collection(db, 'homework_assignments'),
+            where('tutorEmail', '==', tutorEmail)
         ));
-
-        // Fallback: try by tutorName if email search returns nothing
         if (snap.empty && window.tutorData?.name) {
             snap = await getDocs(query(
-                collection(db, "homework_assignments"),
-                where("tutorName", "==", window.tutorData.name)
+                collection(db, 'homework_assignments'),
+                where('tutorName', '==', window.tutorData.name)
             ));
         }
 
         if (snap.empty) {
-            container.innerHTML = `
-                <div class="text-center py-10">
-                    <div class="text-4xl mb-3">📭</div>
-                    <p class="text-gray-500 font-medium">No homework assigned yet.</p>
-                    <p class="text-gray-400 text-sm mt-1">Use "Assign Homework" above to get started.</p>
-                </div>`;
-            const badge = document.getElementById('inbox-count');
-            if (badge) badge.textContent = '0';
+            container.innerHTML = `<div class="text-center py-10">
+                <div class="text-4xl mb-3">📭</div>
+                <p class="text-gray-500 font-medium">No homework records found.</p>
+            </div>`;
             return;
         }
 
-        // Group by studentId → monthKey → assignments[]
-        const studentMap = {}; // studentId → { name, assignments: [] }
-
+        // Group by student
+        const byStudent = {}; // studentId → { name, items[] }
         snap.docs.forEach(d => {
-            const data = d.data();
-            const sid = data.studentId || 'unknown';
-            const sName = data.studentName || 'Unknown Student';
-            const rawDate = data.assignedAt || data.createdAt || data.uploadedAt;
-            const date = rawDate?.toDate ? rawDate.toDate() : new Date(rawDate || 0);
-
-            if (!studentMap[sid]) studentMap[sid] = { name: sName, assignments: [] };
-            studentMap[sid].assignments.push({ id: d.id, date, ...data });
+            const hw = { id: d.id, ...d.data() };
+            const sid = hw.studentId || hw.studentName || 'unknown';
+            if (!byStudent[sid]) byStudent[sid] = { name: hw.studentName || 'Unknown Student', items: [] };
+            byStudent[sid].items.push(hw);
         });
 
-        const studentIds = Object.keys(studentMap);
-        const totalCount = snap.size;
-        const badge = document.getElementById('inbox-count');
-        if (badge) badge.textContent = totalCount;
+        const students = Object.values(byStudent).sort((a, b) => a.name.localeCompare(b.name));
 
-        // Status badge helper
-        function statusBadge(status) {
-            if (status === 'graded')    return `<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">✅ Graded</span>`;
-            if (status === 'submitted') return `<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">📤 Submitted</span>`;
-            return `<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700">⏳ Pending</span>`;
-        }
+        // Update inbox count badge
+        const totalSubmitted = snap.docs.filter(d => d.data().status === 'submitted').length;
+        const countBadge = document.getElementById('inbox-count');
+        if (countBadge) countBadge.textContent = totalSubmitted > 0 ? `${totalSubmitted} pending` : '✓ all graded';
 
-        // Build per-student cards
-        let html = `<div class="space-y-4" id="hw-archive-students">`;
+        // ── Render student cards ──
+        const wrapper = document.createElement('div');
+        wrapper.className = 'space-y-3';
 
-        studentIds.forEach(sid => {
-            const { name, assignments } = studentMap[sid];
-            assignments.sort((a, b) => b.date - a.date);
+        students.forEach(({ name, items }) => {
+            const pendingCount = items.filter(i => i.status === 'submitted').length;
+            const initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
 
-            // Group assignments by month
-            const monthGroups = {}; // 'YYYY-MM' → []
-            assignments.forEach(a => {
-                const mk = `${a.date.getFullYear()}-${String(a.date.getMonth()+1).padStart(2,'0')}`;
-                if (!monthGroups[mk]) monthGroups[mk] = [];
-                monthGroups[mk].push(a);
+            // Group items by month for this student
+            const byMonth = {};
+            items.forEach(hw => {
+                const raw = hw.assignedAt || hw.createdAt || hw.uploadedAt;
+                const date = raw?.toDate ? raw.toDate() : (raw?.seconds ? new Date(raw.seconds * 1000) : new Date(raw || ''));
+                const mk = isNaN(date) ? 'Unknown' : `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+                if (!byMonth[mk]) byMonth[mk] = [];
+                byMonth[mk].push({ ...hw, _date: date });
             });
-            const sortedMonths = Object.keys(monthGroups).sort((a,b) => b.localeCompare(a));
 
-            const submittedCount = assignments.filter(a => a.status === 'submitted' || a.status === 'graded').length;
-            const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+            const sortedMonths = Object.keys(byMonth).sort((a,b) => b.localeCompare(a));
 
-            // Build monthly accordion sections
-            const monthsHTML = sortedMonths.map((mk, mIdx) => {
-                const group = monthGroups[mk];
-                const [y, m] = mk.split('-');
-                const monthLabel = new Date(parseInt(y), parseInt(m)-1, 1)
-                    .toLocaleString('en-NG', { month: 'long', year: 'numeric' });
+            // Build month accordions HTML
+            const monthsHtml = sortedMonths.map(mk => {
+                const [y, m] = mk === 'Unknown' ? ['?','?'] : mk.split('-');
+                const monthLabel = mk === 'Unknown' ? 'Unknown Date' :
+                    new Date(parseInt(y), parseInt(m)-1, 1).toLocaleString('en-NG', { month:'long', year:'numeric' });
+                const mItems = byMonth[mk].sort((a,b) => (b._date - a._date));
 
-                const assignmentsHTML = group.map(hw => {
-                    const dateStr = hw.date.toLocaleDateString('en-NG', { day:'2-digit', month:'short', year:'numeric' });
-                    const dueStr  = hw.dueDate ? new Date(hw.dueDate).toLocaleDateString('en-NG', { day:'2-digit', month:'short' }) : '';
-                    const canReview = hw.status === 'submitted' || hw.status === 'graded';
+                const itemsHtml = mItems.map(hw => {
+                    const statusColors = {
+                        submitted: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+                        graded:    'bg-green-100  text-green-800  border-green-200',
+                        assigned:  'bg-blue-100   text-blue-800   border-blue-200'
+                    };
+                    const statusColor = statusColors[hw.status] || 'bg-gray-100 text-gray-600 border-gray-200';
+                    const statusLabel = { submitted:'⏳ Submitted', graded:'✅ Graded', assigned:'📋 Assigned' }[hw.status] || hw.status;
+                    const dateStr = hw._date && !isNaN(hw._date) ? hw._date.toLocaleDateString('en-NG', {day:'2-digit', month:'short', year:'numeric'}) : '—';
+                    const isSubmitted = hw.status === 'submitted';
 
-                    return `
-                        <div class="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                            <div class="flex items-start justify-between gap-2 flex-wrap">
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex items-center gap-2 flex-wrap">
-                                        <span class="font-semibold text-gray-800 text-sm">${escapeHtml(hw.title || 'Untitled')}</span>
-                                        ${statusBadge(hw.status)}
-                                        ${hw.score ? `<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">${escapeHtml(String(hw.score))}/100</span>` : ''}
-                                    </div>
-                                    ${hw.description ? `<p class="text-xs text-gray-500 mt-1 line-clamp-2">${escapeHtml(hw.description)}</p>` : ''}
-                                    <div class="flex gap-3 mt-1.5 flex-wrap">
-                                        <span class="text-xs text-gray-400">📅 Assigned: ${escapeHtml(dateStr)}</span>
-                                        ${dueStr ? `<span class="text-xs text-gray-400">⏰ Due: ${escapeHtml(dueStr)}</span>` : ''}
-                                    </div>
-                                    ${hw.feedback ? `<div class="mt-1.5 text-xs text-gray-600 italic bg-white rounded-lg px-2 py-1 border border-gray-200">💬 "${escapeHtml(hw.feedback)}"</div>` : ''}
-                                    <div class="flex gap-2 mt-1.5 flex-wrap">
-                                        ${hw.fileUrl ? `<a href="${escapeHtml(hw.fileUrl)}" target="_blank" class="text-xs text-blue-600 hover:underline">📎 Reference</a>` : ''}
-                                        ${hw.submissionUrl ? `<a href="${escapeHtml(hw.submissionUrl)}" target="_blank" class="text-xs text-green-600 hover:underline">📤 Submission</a>` : ''}
-                                    </div>
-                                </div>
-                                ${canReview ? `
-                                <button class="hw-grade-btn btn btn-sm flex-shrink-0 ${hw.status === 'graded' ? 'btn-secondary' : 'btn-primary'}"
-                                        data-hw-id="${escapeHtml(hw.id)}">
-                                    ${hw.status === 'graded' ? '👁 Review' : '✏️ Grade'}
-                                </button>` : ''}
-                            </div>
-                        </div>`;
+                    return `<div class="flex items-center gap-3 p-3 rounded-xl ${isSubmitted ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50 border border-gray-100'} hover:shadow-sm transition-all">
+                        <div class="flex-1 min-w-0">
+                            <p class="font-semibold text-gray-800 text-sm truncate">${escapeHtml(hw.title || 'Untitled')}</p>
+                            <p class="text-xs text-gray-400">${dateStr}${hw.score != null ? ` · Score: ${hw.score}/100` : ''}</p>
+                        </div>
+                        <div class="flex items-center gap-2 flex-shrink-0">
+                            <span class="text-xs font-bold px-2 py-0.5 rounded-full border ${statusColor}">${statusLabel}</span>
+                            ${isSubmitted ? `<button onclick="openGradingModal('${escapeHtml(hw.id)}')" class="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 font-semibold transition-colors">Grade</button>` :
+                              hw.status === 'graded' ? `<button onclick="openGradingModal('${escapeHtml(hw.id)}')" class="text-xs border border-gray-300 text-gray-600 px-3 py-1 rounded-lg hover:bg-gray-50 font-semibold transition-colors">Review</button>` : ''}
+                        </div>
+                    </div>`;
                 }).join('');
 
-                return `
-                    <details class="border border-gray-200 rounded-xl overflow-hidden" ${mIdx === 0 ? 'open' : ''}>
-                        <summary class="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50 list-none select-none">
-                            <span class="font-semibold text-gray-700 text-sm">${escapeHtml(monthLabel)}</span>
-                            <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-bold">${group.length} assignment${group.length !== 1 ? 's' : ''}</span>
-                        </summary>
-                        <div class="p-3 space-y-2 border-t border-gray-100 bg-white">
-                            ${assignmentsHTML}
-                        </div>
-                    </details>`;
+                const monthPending = mItems.filter(i => i.status === 'submitted').length;
+                return `<details class="border border-gray-100 rounded-xl overflow-hidden mt-2">
+                    <summary class="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 list-none select-none bg-white">
+                        <span class="text-sm font-semibold text-gray-700 flex-1">${escapeHtml(monthLabel)}</span>
+                        ${monthPending > 0 ? `<span class="bg-yellow-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">${monthPending} pending</span>` : ''}
+                        <span class="text-xs text-gray-400">${mItems.length} item${mItems.length !== 1 ? 's' : ''}</span>
+                        <i class="fas fa-chevron-down text-gray-300 text-xs ml-1"></i>
+                    </summary>
+                    <div class="p-3 space-y-2 bg-white border-t border-gray-100">${itemsHtml}</div>
+                </details>`;
             }).join('');
 
-            html += `
-                <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                    <!-- Student card header -->
-                    <button class="w-full text-left p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors hw-student-toggle">
-                        <div class="w-10 h-10 rounded-xl flex items-center justify-center font-black text-white text-sm flex-shrink-0"
-                             style="background:linear-gradient(135deg,#3b82f6,#4f46e5);">
-                            ${escapeHtml(initials)}
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="font-bold text-gray-800">${escapeHtml(name)}</p>
-                            <p class="text-xs text-gray-400">${assignments.length} assignments · ${submittedCount} submitted/graded</p>
-                        </div>
-                        <i class="fas fa-chevron-down text-gray-400 text-xs hw-chevron transition-transform"></i>
-                    </button>
-                    <!-- Collapsible months accordion -->
-                    <div class="hw-student-body hidden border-t border-gray-100 p-3 space-y-2 bg-gray-50">
-                        ${monthsHTML}
+            // Student card (outer accordion)
+            const card = document.createElement('details');
+            card.className = 'bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all';
+            if (pendingCount > 0) card.open = true; // auto-expand if has pending
+            card.innerHTML = `
+                <summary class="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 list-none select-none">
+                    <div class="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0"
+                         style="background:linear-gradient(135deg,#3b82f6,#1d4ed8)">${escapeHtml(initials)}</div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-bold text-gray-800">${escapeHtml(name)}</p>
+                        <p class="text-xs text-gray-400">${items.length} total assignment${items.length !== 1 ? 's' : ''}</p>
                     </div>
-                </div>`;
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        ${pendingCount > 0 ? `<span class="bg-yellow-500 text-white text-xs px-3 py-1 rounded-full font-bold">⏳ ${pendingCount} to grade</span>` : '<span class="text-xs text-green-600 font-semibold">✓ All reviewed</span>'}
+                        <i class="fas fa-chevron-down text-gray-300 text-xs"></i>
+                    </div>
+                </summary>
+                <div class="px-4 pb-4 border-t border-gray-100 bg-gray-50">${monthsHtml}</div>
+            `;
+            wrapper.appendChild(card);
         });
 
-        html += `</div>`;
-        container.innerHTML = html;
-
-        // Toggle student cards open/closed
-        container.querySelectorAll('.hw-student-toggle').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const body = btn.nextElementSibling;
-                const arrow = btn.querySelector('.hw-chevron');
-                body.classList.toggle('hidden');
-                if (arrow) arrow.style.transform = body.classList.contains('hidden') ? '' : 'rotate(180deg)';
-            });
-        });
-
-        // Grade/Review buttons
-        container.querySelectorAll('.hw-grade-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                openGradingModal(btn.dataset.hwId);
-            });
-        });
+        container.innerHTML = '';
+        container.appendChild(wrapper);
 
     } catch (error) {
-        console.error("Homework Archive Error:", error);
-        container.innerHTML = '<p class="text-red-500 text-center py-6">Error loading homework archive.</p>';
+        console.error('Inbox Error:', error);
+        container.innerHTML = `<p class="text-red-500 text-center py-6">Error loading inbox: ${escapeHtml(error.message)}</p>`;
     }
 }
 
 // ==========================================
-// 3. OPEN GRADING MODAL
+// 3. OPEN GRADING MODAL (unchanged – safe)
 // ==========================================
 async function openGradingModal(homeworkId) {
     let hwData;
@@ -5291,9 +5255,33 @@ async function openGradingModal(homeworkId) {
     };
 }
 
+// ==========================================
+// 4. DASHBOARD WIDGET INJECTOR (unchanged)
+// ==========================================
+const inboxObserver = new MutationObserver(() => {
+    // Only run if we are on the Dashboard tab (unique element present)
+    if (!document.getElementById('pendingReportsContainer')) return;
+
+    const hero = document.querySelector('.hero-section');
+    if (hero && !document.getElementById('homework-inbox-section')) {
+        const div = document.createElement('div');
+        div.id = 'homework-inbox-section';
+        div.className = 'mt-6 mb-8 fade-in';
+        div.innerHTML = `
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-gray-800">📥 Homework Inbox</h3>
+                <button onclick="loadHomeworkInbox(window.tutorData.email)" class="text-sm text-blue-600 hover:underline">Refresh</button>
+            </div>
+            <div id="homework-inbox-container"></div>
+        `;
+        hero.after(div);
+        if (window.tutorData) loadHomeworkInbox(window.tutorData.email);
+    }
+});
+inboxObserver.observe(document.body, { childList: true, subtree: true });
 
 // ==========================================
-// 4. EXPOSE FUNCTIONS TO WINDOW (for onclick handlers)
+// 5. EXPOSE FUNCTIONS TO WINDOW (for onclick handlers)
 // ==========================================
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
@@ -5303,4 +5291,3 @@ window.showScheduleCalendarModal = showScheduleCalendarModal;
 window.renderCourses = renderCourses;
 window.loadCourseMaterials = loadCourseMaterials;
 window.uploadCourseMaterial = uploadCourseMaterial;
-window.loadScheduleData = loadScheduleData;
