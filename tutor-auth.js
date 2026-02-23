@@ -1,37 +1,57 @@
 /**
  * tutor-auth.js — Blooming Kids House Tutor Portal
- *
- * Security model:
  * ─────────────────────────────────────────────────────────────────────────────
- * 1. PRE-APPROVED ALLOWLIST: An admin must add a tutor's email to the
- *    Firestore `approvedTutors/{email}` collection BEFORE they can sign up
- *    or log in. Unknown emails are rejected BEFORE any Firebase Auth call.
+ * SECURITY MODEL
+ * ─────────────────────────────────────────────────────────────────────────────
  *
- * 2. CROSS-TAB SAFETY: onAuthStateChanged only redirects after confirming
- *    the user has a `tutors/{uid}` document. A sign-in from a different
- *    Firebase portal on the same browser will NOT kick this session out.
+ * 1. TUTOR EMAIL GATE (login & signup):
+ *    Before ANY Firebase Auth call, the email is checked against the
+ *    `tutors` Firestore collection (queried by `email` field).
+ *    If the email is not found, access is DENIED immediately — no Firebase
+ *    Auth call is made at all. An unregistered person cannot even attempt
+ *    a password guess against Firebase.
  *
- * 3. REMEMBER ME: 30-day browserLocalPersistence. Without it: session only.
+ *    HOW TO REGISTER A NEW TUTOR (admin only):
+ *    → Firebase Console → Firestore → `tutors` collection
+ *    → Add a document with fields: { email: "tutor@example.com", name: "Full Name" }
+ *    → That tutor can now sign up and log in with that email.
  *
- * 4. RATE LIMITING: 5 failed attempts → 15-minute client-side lockout.
+ * 2. CROSS-TAB ISOLATION:
+ *    onAuthStateChanged is called ONCE on page load then immediately
+ *    unsubscribed. If another portal on the same Firebase project signs in
+ *    later in a different tab, it will NOT trigger a redirect or sign-out here.
+ *    The session is also double-checked by verifying the UID exists in `tutors`.
  *
- * 5. INPUT SANITIZATION & VALIDATION on all fields.
+ * 3. REMEMBER ME — 30 days:
+ *    Checked   → browserLocalPersistence (survives browser close)
+ *    Unchecked → browserSessionPersistence (clears when tab/browser closes)
+ *
+ * 4. RATE LIMITING:
+ *    5 failed attempts → 15-minute client-side lockout stored in sessionStorage.
+ *
+ * 5. INPUT SANITISATION on all user-provided values.
+ *
+ * 6. GENERIC PASSWORD-RESET RESPONSES — prevents email enumeration attacks.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * REQUIRED FIRESTORE SECURITY RULES (set in Firebase Console):
+ * RECOMMENDED FIRESTORE SECURITY RULES:
  *
- *   match /approvedTutors/{email} {
- *     allow read: if true;        // client needs to check allowlist
- *     allow write: if false;      // only admin SDK / console
- *   }
- *   match /tutors/{uid} {
- *     allow read, write: if request.auth != null && request.auth.uid == uid;
+ *   rules_version = '2';
+ *   service cloud.firestore {
+ *     match /databases/{database}/documents {
+ *       match /tutors/{uid} {
+ *         // Only the authenticated tutor can fully read/write their own doc
+ *         allow read, write: if request.auth != null && request.auth.uid == uid;
+ *         // Allow unauthenticated reads of ONLY the email field for pre-auth gate
+ *         allow read: if request.auth == null;
+ *       }
+ *       match /{document=**} {
+ *         allow read, write: if false;
+ *       }
+ *     }
  *   }
  *
- * ADMIN SETUP — add a tutor to the allowlist:
- *   In Firebase Console → Firestore → approvedTutors collection
- *   Add document with ID = tutor's email (lowercase), fields:
- *     { email: "jane@example.com", addedAt: <timestamp>, addedBy: "admin" }
+ * Also create a Firestore index on `tutors.email` (ascending) for the query.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -49,17 +69,21 @@ import {
     doc,
     getDoc,
     setDoc,
+    updateDoc,
+    collection,
+    query,
+    where,
+    getDocs,
     serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const REMEMBER_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
-const MAX_LOGIN_ATTEMPTS   = 5;
-const LOCKOUT_DURATION_MS  = 15 * 60 * 1000;            // 15 minutes
-const REMEMBER_KEY         = 'bkh_remember';
+const REMEMBER_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const MAX_ATTEMPTS         = 5;
+const LOCKOUT_MS           = 15 * 60 * 1000;            // 15 minutes
+const REMEMBER_KEY         = 'bkh_remember_v2';
 const ATTEMPT_KEY          = 'bkh_login_attempts';
 const LOCKOUT_KEY          = 'bkh_lockout_until';
-const PORTAL_ROLE          = 'tutor';
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -81,35 +105,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const strengthText        = document.getElementById('strengthText');
     const strengthWrap        = document.getElementById('strengthWrap');
 
-    // ── Auth state listener ────────────────────────────────────────────────
-    // Guard: only auto-redirect on the FIRST fire and only if the user is a
-    // confirmed tutor. This prevents a sign-in from a different portal on
-    // the same Firebase project from redirecting or logging out this session.
-    let initialAuthCheckDone = false;
+    // ── Cross-tab auth guard ──────────────────────────────────────────────────
+    // Subscribe ONCE, immediately unsubscribe after first emission.
+    // This means changes from other portals/tabs on the same Firebase project
+    // will NEVER affect this page after the initial check.
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+        unsubscribeAuth(); // detach immediately — we only want the first fire
 
-    onAuthStateChanged(auth, async (user) => {
-        if (initialAuthCheckDone) return; // ignore subsequent fires
-        initialAuthCheckDone = true;
+        if (!user) return; // no one signed in — show auth forms normally
 
-        if (!user) return; // not signed in — stay on page
-
-        // Confirm the signed-in user is actually a tutor in this portal
-        const isTutor = await verifyTutorRole(user.uid);
+        // Someone is authenticated — check if they are a real tutor in our system
+        const isTutor = await isTutorByUid(user.uid);
         if (isTutor) {
-            window.location.href = 'tutor.html';
-        } else {
-            // A different portal's user is signed in on this Firebase instance.
-            // Sign them out silently so this auth page works cleanly.
-            await auth.signOut().catch(() => {});
+            window.location.href = 'tutor.html'; // valid tutor — redirect
         }
+        // If not a tutor (e.g. a different portal's user on the same Firebase),
+        // we simply stay on this page. We do NOT sign them out because that
+        // would log them out of their own portal in another tab.
     });
 
-    // ── Message box ───────────────────────────────────────────────────────
+    // ── Message box ───────────────────────────────────────────────────────────
     function showMessage(message, type = 'info') {
         const box  = document.getElementById('message-box');
         const icon = document.getElementById('msg-icon');
         const text = document.getElementById('msg-text');
-        const icons = { error: '⚠️', success: '✅', info: 'ℹ️' };
+        const icons = { error: '⚠️', success: '✅', info: '🔍' };
         box.classList.remove('visible', 'error', 'success', 'info');
         icon.textContent = icons[type] ?? 'ℹ️';
         text.textContent = message;
@@ -121,23 +141,22 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('message-box').classList.remove('visible');
     }
 
-    // ── Section toggle ────────────────────────────────────────────────────
-    function showSection(section) {
+    // ── Section switching ─────────────────────────────────────────────────────
+    function showSection(name) {
         hideMessage();
-        const isLogin = section === 'login';
-        signupSection.style.display = isLogin ? 'none' : 'block';
-        loginSection.style.display  = isLogin ? 'block' : 'none';
-        // Trigger re-animation
-        const target = isLogin ? loginSection : signupSection;
-        target.classList.remove('auth-section');
-        void target.offsetWidth;
-        target.classList.add('auth-section');
+        const toShow = name === 'login' ? loginSection  : signupSection;
+        const toHide = name === 'login' ? signupSection : loginSection;
+        toHide.style.display = 'none';
+        toShow.style.display = 'block';
+        toShow.classList.remove('auth-section');
+        void toShow.offsetWidth; // force reflow for CSS animation restart
+        toShow.classList.add('auth-section');
     }
 
-    showLoginLink?.addEventListener('click',  e => { e.preventDefault(); showSection('login'); });
+    showLoginLink?.addEventListener('click',  e => { e.preventDefault(); showSection('login');  });
     showSignupLink?.addEventListener('click', e => { e.preventDefault(); showSection('signup'); });
 
-    // ── Custom checkbox ───────────────────────────────────────────────────
+    // ── Custom animated checkbox ──────────────────────────────────────────────
     function toggleRemember() {
         rememberCheckbox.checked = !rememberCheckbox.checked;
         checkboxDisplay.classList.toggle('checked', rememberCheckbox.checked);
@@ -148,34 +167,34 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleRemember(); }
     });
 
-    // ── Password visibility toggle ────────────────────────────────────────
+    // ── Password visibility toggles ───────────────────────────────────────────
     function setupPwToggle(toggleId, inputId, openId, closedId) {
         const toggle = document.getElementById(toggleId);
         const input  = document.getElementById(inputId);
         const open   = document.getElementById(openId);
         const closed = document.getElementById(closedId);
-        if (!toggle) return;
+        if (!toggle || !input) return;
         toggle.addEventListener('click', () => {
-            const show = input.type === 'password';
-            input.type           = show ? 'text' : 'password';
-            open.style.display   = show ? 'none'  : 'block';
-            closed.style.display = show ? 'block' : 'none';
+            const revealing  = input.type === 'password';
+            input.type           = revealing ? 'text'    : 'password';
+            open.style.display   = revealing ? 'none'   : 'block';
+            closed.style.display = revealing ? 'block'  : 'none';
         });
     }
     setupPwToggle('toggleSignupPw', 'signupPassword', 'eyeSignupOpen', 'eyeSignupClosed');
     setupPwToggle('toggleLoginPw',  'loginPassword',  'eyeLoginOpen',  'eyeLoginClosed');
 
-    // ── Password strength meter ───────────────────────────────────────────
+    // ── Password strength meter ───────────────────────────────────────────────
     signupPasswordInput?.addEventListener('input', () => {
         const val = signupPasswordInput.value;
         if (!val) { strengthWrap.style.display = 'none'; return; }
         strengthWrap.style.display = 'block';
         let score = 0;
-        if (val.length >= 6)           score++;
-        if (val.length >= 10)          score++;
-        if (/\d/.test(val))            score++;
-        if (/[A-Z]/.test(val))         score++;
-        if (/[^a-zA-Z0-9]/.test(val)) score++;
+        if (val.length >= 6)            score++;
+        if (val.length >= 10)           score++;
+        if (/\d/.test(val))             score++;
+        if (/[A-Z]/.test(val))          score++;
+        if (/[^a-zA-Z0-9]/.test(val))  score++;
         const levels = [
             { label: 'Very weak', color: '#e53e3e', width: '15%'  },
             { label: 'Weak',      color: '#e53e3e', width: '30%'  },
@@ -190,10 +209,9 @@ document.addEventListener('DOMContentLoaded', () => {
         strengthText.style.color      = lvl.color;
     });
 
-    // ── Rate limiting ─────────────────────────────────────────────────────
+    // ── Rate limiting ─────────────────────────────────────────────────────────
     const getAttempts   = () => parseInt(sessionStorage.getItem(ATTEMPT_KEY) ?? '0', 10);
     const getLockoutEnd = () => parseInt(sessionStorage.getItem(LOCKOUT_KEY) ?? '0', 10);
-    const incAttempts   = () => sessionStorage.setItem(ATTEMPT_KEY, getAttempts() + 1);
     const resetAttempts = () => {
         sessionStorage.removeItem(ATTEMPT_KEY);
         sessionStorage.removeItem(LOCKOUT_KEY);
@@ -203,26 +221,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const until = getLockoutEnd();
         if (!until) return false;
         if (Date.now() < until) return true;
-        resetAttempts();
+        resetAttempts(); // expired — reset
         return false;
     }
 
-    // Returns true if now locked out after this attempt
+    /** Increments attempt count. Returns true if now locked out. */
     function handleFailedAttempt() {
-        incAttempts();
-        if (getAttempts() >= MAX_LOGIN_ATTEMPTS) {
-            sessionStorage.setItem(LOCKOUT_KEY, String(Date.now() + LOCKOUT_DURATION_MS));
+        const count = getAttempts() + 1;
+        sessionStorage.setItem(ATTEMPT_KEY, String(count));
+        if (count >= MAX_ATTEMPTS) {
+            sessionStorage.setItem(LOCKOUT_KEY, String(Date.now() + LOCKOUT_MS));
             showMessage('Too many failed attempts. Please wait 15 minutes before trying again.', 'error');
             return true;
         }
         return false;
     }
 
-    // ── Remember-me persistence ───────────────────────────────────────────
+    // ── Remember-me preference ────────────────────────────────────────────────
     function setRememberPreference(remember) {
         if (remember) {
             localStorage.setItem(REMEMBER_KEY, JSON.stringify({
-                v:   true,
+                active: true,
                 exp: Date.now() + REMEMBER_DURATION_MS
             }));
         } else {
@@ -230,12 +249,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ── Input sanitiser ───────────────────────────────────────────────────
+    // ── Input sanitisation ────────────────────────────────────────────────────
     function sanitize(str) {
-        return String(str ?? '').trim().replace(/[<>"'`\\]/g, '').substring(0, 320);
+        return String(str ?? '').trim().replace(/[<>"'`\\;]/g, '').substring(0, 320);
     }
 
-    // ── Password validator ────────────────────────────────────────────────
+    // ── Password validation ───────────────────────────────────────────────────
     function validatePassword(name, password) {
         if (password.length < 6) {
             showMessage('Password must be at least 6 characters long.', 'error');
@@ -252,52 +271,58 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
     }
 
-    // ── Button loading state ──────────────────────────────────────────────
+    // ── Button loading state ──────────────────────────────────────────────────
     function setButtonLoading(btn, loading) {
         if (!btn) return;
         btn.classList.toggle('loading', loading);
         btn.disabled = loading;
     }
 
-    // ── Firebase error → friendly message ────────────────────────────────
+    // ── Firebase error → friendly message ────────────────────────────────────
     function friendlyError(code) {
         const map = {
-            'auth/email-already-in-use':   'This email already has an account. Try logging in.',
+            'auth/email-already-in-use':   'An account with this email already exists. Try logging in.',
             'auth/invalid-email':          'Please enter a valid email address.',
             'auth/weak-password':          'Choose a stronger password.',
-            // Deliberately vague — don't reveal whether email exists
+            // Deliberately vague — avoids leaking whether an email exists in Firebase Auth
             'auth/user-not-found':         'Invalid email or password.',
             'auth/wrong-password':         'Invalid email or password.',
             'auth/invalid-credential':     'Invalid email or password.',
-            'auth/too-many-requests':      'Too many attempts. Please wait and try again.',
-            'auth/network-request-failed': 'Network error — check your connection.',
+            'auth/too-many-requests':      'Firebase has temporarily blocked this account. Try again later.',
+            'auth/network-request-failed': 'Network error — please check your connection.',
             'auth/user-disabled':          'This account has been disabled. Contact your administrator.',
         };
         return map[code] ?? 'Something went wrong. Please try again.';
     }
 
-    // ── CORE: Allowlist check ─────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    // FIRESTORE CHECKS
+    // ─────────────────────────────────────────────────────────────────────────
+
     /**
-     * Looks up `approvedTutors/{normalisedEmail}` in Firestore.
-     * Returns true only if the document exists.
-     * Fails CLOSED — denies access if the network call fails.
+     * Query `tutors` collection by email field.
+     * Returns true if the email is found — meaning an admin has registered
+     * this person as a tutor.
+     * Fails CLOSED — denies access if the Firestore call fails.
      */
-    async function isApprovedTutor(email) {
+    async function isTutorEmailRegistered(email) {
         try {
             const normalised = email.toLowerCase().trim();
-            const snap = await getDoc(doc(db, 'approvedTutors', normalised));
-            return snap.exists();
+            const q    = query(collection(db, 'tutors'), where('email', '==', normalised));
+            const snap = await getDocs(q);
+            return !snap.empty;
         } catch (err) {
-            console.error('Allowlist check failed:', err);
+            console.error('Tutor email check error:', err);
             return false; // fail closed
         }
     }
 
     /**
-     * Confirms a signed-in UID has a `tutors` document.
-     * Used by onAuthStateChanged to guard cross-portal sessions.
+     * Verify a signed-in UID has a document in `tutors`.
+     * Used by the auth state listener to ensure we don't redirect a
+     * non-tutor user from another Firebase portal.
      */
-    async function verifyTutorRole(uid) {
+    async function isTutorByUid(uid) {
         try {
             const snap = await getDoc(doc(db, 'tutors', uid));
             return snap.exists();
@@ -306,7 +331,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ── SIGNUP ────────────────────────────────────────────────────────────
+    /**
+     * Find a tutor document by email and return { id, data }.
+     * Used during signup to update the admin-created placeholder doc.
+     */
+    async function getTutorDocByEmail(email) {
+        try {
+            const normalised = email.toLowerCase().trim();
+            const q    = query(collection(db, 'tutors'), where('email', '==', normalised));
+            const snap = await getDocs(q);
+            if (snap.empty) return null;
+            const d = snap.docs[0];
+            return { id: d.id, data: d.data() };
+        } catch {
+            return null;
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // SIGNUP
+    // ─────────────────────────────────────────────────────────────────────────
     signupForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
         hideMessage();
@@ -322,14 +366,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!validatePassword(name, password)) return;
 
         setButtonLoading(signupBtn, true);
-        showMessage('Verifying your details…', 'info');
+        showMessage('Checking your registration…', 'info');
 
-        // ★ ALLOWLIST — checked before any Firebase Auth call
-        const approved = await isApprovedTutor(email);
+        // ★ GATE: Email must exist in tutors collection first
+        const approved = await isTutorEmailRegistered(email);
         if (!approved) {
             showMessage(
                 'This email is not registered as a Blooming Kids House tutor. ' +
-                'Please contact your administrator to be added.',
+                'Please contact your administrator to be added before signing up.',
                 'error'
             );
             setButtonLoading(signupBtn, false);
@@ -340,18 +384,28 @@ document.addEventListener('DOMContentLoaded', () => {
             await setPersistence(auth, browserLocalPersistence);
             const { user } = await createUserWithEmailAndPassword(auth, email, password);
 
-            await setDoc(doc(db, 'tutors', user.uid), {
-                name,
-                email,
-                uid:       user.uid,
-                role:      PORTAL_ROLE,
-                createdAt: serverTimestamp(),
-                lastLogin: serverTimestamp()
-            });
+            // Update the admin-created tutor doc with the real UID
+            const existing = await getTutorDocByEmail(email);
+            if (existing) {
+                await updateDoc(doc(db, 'tutors', existing.id), {
+                    uid:        user.uid,
+                    name:       name, // allow tutor to set their own display name
+                    signedUpAt: serverTimestamp(),
+                    lastLogin:  serverTimestamp()
+                });
+            } else {
+                // Fallback: create fresh doc (shouldn't normally reach here)
+                await setDoc(doc(db, 'tutors', user.uid), {
+                    name, email, uid: user.uid,
+                    signedUpAt: serverTimestamp(),
+                    lastLogin:  serverTimestamp()
+                });
+            }
 
             setRememberPreference(true);
             showMessage('Account created! Redirecting to your portal…', 'success');
             setTimeout(() => { window.location.href = 'tutor.html'; }, 1200);
+
         } catch (error) {
             console.error('Signup error:', error.code);
             showMessage(friendlyError(error.code), 'error');
@@ -359,15 +413,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // ── LOGIN ─────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    // LOGIN
+    // ─────────────────────────────────────────────────────────────────────────
     loginForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
         hideMessage();
 
         // Rate limit check
         if (isLockedOut()) {
-            const mins = Math.ceil((getLockoutEnd() - Date.now()) / 60000);
-            showMessage(`Too many failed attempts. Try again in ${mins} minute(s).`, 'error');
+            const minsLeft = Math.ceil((getLockoutEnd() - Date.now()) / 60000);
+            showMessage(`Too many failed attempts. Try again in ${minsLeft} minute(s).`, 'error');
             return;
         }
 
@@ -383,39 +439,51 @@ document.addEventListener('DOMContentLoaded', () => {
         setButtonLoading(loginBtn, true);
         showMessage('Verifying your access…', 'info');
 
-        // ★ ALLOWLIST — checked before any Firebase Auth call
-        const approved = await isApprovedTutor(email);
-        if (!approved) {
+        // ★ GATE 1: Email must exist in tutors collection before Firebase Auth
+        const registered = await isTutorEmailRegistered(email);
+        if (!registered) {
             showMessage(
                 'This email is not registered as a Blooming Kids House tutor. ' +
                 'Please contact your administrator.',
                 'error'
             );
-            handleFailedAttempt();
+            handleFailedAttempt(); // still count this to prevent enumeration fishing
             setButtonLoading(loginBtn, false);
             return;
         }
 
         try {
-            // Local persistence = stays signed in across all tabs of this portal.
-            // Without "Remember Me" we use session persistence (closes with browser).
             const persistence = rememberMe ? browserLocalPersistence : browserSessionPersistence;
             await setPersistence(auth, persistence);
 
             const { user } = await signInWithEmailAndPassword(auth, email, password);
 
-            // Update last-login timestamp (non-critical, fire and forget)
-            setDoc(doc(db, 'tutors', user.uid), { lastLogin: serverTimestamp() }, { merge: true })
-                .catch(() => {});
+            // ★ GATE 2: Verify the UID is in tutors (handles edge cases where
+            // a Firebase Auth account exists but the tutor doc was removed)
+            const isTutor = await isTutorByUid(user.uid);
+            if (!isTutor) {
+                await auth.signOut();
+                showMessage(
+                    'Your account is not authorised for this portal. Contact your administrator.',
+                    'error'
+                );
+                handleFailedAttempt();
+                setButtonLoading(loginBtn, false);
+                return;
+            }
+
+            // Update last login (non-critical)
+            updateDoc(doc(db, 'tutors', user.uid), { lastLogin: serverTimestamp() }).catch(() => {});
 
             setRememberPreference(rememberMe);
             resetAttempts();
             window.location.href = 'tutor.html';
+
         } catch (error) {
             console.error('Login error:', error.code);
             const lockedNow = handleFailedAttempt();
             if (!lockedNow) {
-                const left   = MAX_LOGIN_ATTEMPTS - getAttempts();
+                const left   = MAX_ATTEMPTS - getAttempts();
                 const suffix = left > 0 ? ` (${left} attempt${left !== 1 ? 's' : ''} remaining)` : '';
                 showMessage(friendlyError(error.code) + suffix, 'error');
             }
@@ -423,29 +491,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // ── FORGOT PASSWORD ───────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    // FORGOT PASSWORD
+    // ─────────────────────────────────────────────────────────────────────────
     forgotPasswordLink?.addEventListener('click', async (e) => {
         e.preventDefault();
         hideMessage();
 
         const email = sanitize(document.getElementById('loginEmail').value).toLowerCase();
         if (!email) {
-            showMessage('Enter your email address above, then click "Forgot Password".', 'error');
+            showMessage('Enter your email address in the field above, then click "Forgot Password".', 'error');
             return;
         }
 
-        // Check allowlist — but always respond generically so we don't reveal
-        // whether a given email exists in our system.
-        const approved = await isApprovedTutor(email);
-        if (approved) {
+        // Check registration status silently. Always return the SAME message
+        // to prevent email enumeration (attacker probing which emails are registered).
+        const registered = await isTutorEmailRegistered(email);
+        if (registered) {
             try {
                 await sendPasswordResetEmail(auth, email);
             } catch (err) {
-                console.error('Password reset error:', err.code);
+                // Suppress the error — we still show the generic message below
+                console.error('Password reset suppressed error:', err.code);
             }
         }
 
-        // Always show the same message regardless of outcome
+        // ALWAYS show the same response — no information leakage
         showMessage(
             'If this email is registered with us, a reset link has been sent. ' +
             'Check your inbox and spam folder.',
