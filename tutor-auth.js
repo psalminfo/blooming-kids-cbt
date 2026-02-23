@@ -464,20 +464,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         setButtonLoading(loginBtn, true);
-        showMessage('Verifying your access…', 'info');
-
-        // ★ GATE 1: Email must exist in tutors collection before Firebase Auth
-        const registered = await isTutorEmailRegistered(email);
-        if (!registered) {
-            showMessage(
-                'This email is not registered as a Blooming Kids House tutor. ' +
-                'Please contact your administrator.',
-                'error'
-            );
-            handleFailedAttempt(); // still count this to prevent enumeration fishing
-            setButtonLoading(loginBtn, false);
-            return;
-        }
 
         try {
             const persistence = rememberMe ? browserLocalPersistence : browserSessionPersistence;
