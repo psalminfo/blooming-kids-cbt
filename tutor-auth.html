@@ -3,11 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tutor Portal - Blooming Kids House</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-    <link rel="stylesheet" href="style.css" />
+    <title>Tutor Portal — Blooming Kids House</title>
     
-    <!-- Google Analytics Script -->
+    <!-- Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-NBTVEGH1SL"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
@@ -15,50 +13,602 @@
         gtag('js', new Date());
         gtag('config', 'G-NBTVEGH1SL');
     </script>
-    <!-- End Google Analytics Script -->
-</head>
-<body class="bg-green-50 min-h-screen flex items-center justify-center">
-    <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
-        <!-- The logo is added here, before the authentication forms -->
-        <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="w-48 mx-auto mb-6">
-        
-        <!-- Message box for displaying success or error messages -->
-        <div id="message-box" class="text-center py-2 px-4 rounded-lg mb-4 hidden"></div>
 
-        <div id="authForms">
-            <div id="signupSection">
-                <h2 class="text-2xl font-bold text-green-800 text-center mb-6">Tutor Signup</h2>
-                <form id="tutorSignupForm" class="space-y-4">
-                    <input type="text" id="signupName" placeholder="Full Name" required class="w-full px-4 py-2 border rounded" autocomplete="name" />
-                    <input type="email" id="signupEmail" placeholder="Email" required class="w-full px-4 py-2 border rounded" autocomplete="email" />
-                    <input type="password" id="signupPassword" placeholder="Password (at least 6 characters with a number)" required class="w-full px-4 py-2 border rounded" autocomplete="new-password" />
-                    <button type="submit" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Sign Up</button>
-                </form>
-                <p class="text-xs text-center mt-4 text-gray-600">
-                    Already have an account? <a href="#" id="showLogin" class="text-blue-500">Log in</a>
-                </p>
-            </div>
-            <div id="loginSection" class="hidden">
-                <h2 class="text-2xl font-bold text-green-800 text-center mb-6">Tutor Login</h2>
-                <form id="tutorLoginForm" class="space-y-4">
-                    <input type="email" id="loginEmail" placeholder="Email" required class="w-full px-4 py-2 border rounded" autocomplete="email" />
-                    <input type="password" id="loginPassword" placeholder="Password" required class="w-full px-4 py-2 border rounded" autocomplete="current-password" />
-                    <div class="flex items-center">
-                        <input type="checkbox" id="rememberMe" class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
-                        <label for="rememberMe" class="ml-2 block text-sm text-gray-900">Remember Me</label>
-                    </div>
-                    <button type="submit" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Log In</button>
-                </form>
-                <!-- This is the new "Forgot Password?" link -->
-                <p class="text-xs text-center mt-4 text-gray-600">
-                    <a href="#" id="forgotPasswordLink" class="text-blue-500 hover:text-blue-700">Forgot Password?</a>
-                </p>
-                <p class="text-xs text-center mt-4 text-gray-600">
-                    Don't have an account? <a href="#" id="showSignup" class="text-blue-500">Sign up</a>
-                </p>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --sage: #4a7c59;
+            --sage-dark: #2f5240;
+            --sage-light: #e8f0ea;
+            --gold: #c9a84c;
+            --gold-light: #f5e8c8;
+            --cream: #faf8f4;
+            --ink: #1a1f1c;
+            --muted: #6b7873;
+            --border: #dde5de;
+            --white: #ffffff;
+            --error: #b94040;
+            --error-bg: #fdf0f0;
+            --success: #3a7a52;
+            --success-bg: #edf7f1;
+        }
+
+        html, body {
+            min-height: 100vh;
+            font-family: 'DM Sans', sans-serif;
+            background: var(--cream);
+            color: var(--ink);
+        }
+
+        /* Decorative background */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: 
+                radial-gradient(ellipse 80% 60% at 10% 20%, rgba(74,124,89,0.07) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 80% at 90% 80%, rgba(201,168,76,0.06) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Subtle grid lines */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(74,124,89,0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(74,124,89,0.04) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .page-wrapper {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        /* LEFT PANEL */
+        .brand-panel {
+            background: linear-gradient(160deg, var(--sage-dark) 0%, var(--sage) 60%, #5d9970 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 60px 48px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .brand-panel::before {
+            content: '';
+            position: absolute;
+            width: 500px; height: 500px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.08);
+            top: -150px; right: -150px;
+        }
+        .brand-panel::after {
+            content: '';
+            position: absolute;
+            width: 350px; height: 350px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.06);
+            bottom: -100px; left: -100px;
+        }
+
+        .brand-inner { position: relative; z-index: 1; text-align: center; }
+
+        .brand-logo {
+            width: 140px;
+            margin-bottom: 40px;
+            filter: brightness(0) invert(1);
+            opacity: 0.95;
+        }
+
+        .brand-tagline {
+            font-family: 'DM Serif Display', serif;
+            font-size: 2.6rem;
+            line-height: 1.15;
+            color: #fff;
+            margin-bottom: 20px;
+            letter-spacing: -0.5px;
+        }
+
+        .brand-tagline em {
+            font-style: italic;
+            color: var(--gold-light);
+        }
+
+        .brand-sub {
+            color: rgba(255,255,255,0.65);
+            font-size: 0.95rem;
+            font-weight: 300;
+            line-height: 1.6;
+            max-width: 280px;
+            margin: 0 auto 48px;
+        }
+
+        .brand-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .brand-pill {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.85);
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 6px 14px;
+            border-radius: 99px;
+            letter-spacing: 0.3px;
+            backdrop-filter: blur(4px);
+        }
+
+        /* Decorative dots pattern */
+        .dots {
+            position: absolute;
+            bottom: 48px;
+            right: 48px;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            opacity: 0.25;
+        }
+        .dot {
+            width: 4px; height: 4px;
+            border-radius: 50%;
+            background: white;
+        }
+
+        /* RIGHT PANEL */
+        .form-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 60px 48px;
+            background: var(--white);
+        }
+
+        .form-container { width: 100%; max-width: 400px; }
+
+        /* Section header */
+        .section-header { margin-bottom: 36px; }
+        .section-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--gold);
+            margin-bottom: 10px;
+        }
+        .section-title {
+            font-family: 'DM Serif Display', serif;
+            font-size: 2rem;
+            color: var(--ink);
+            line-height: 1.2;
+        }
+        .section-title span { color: var(--sage); }
+
+        /* Message box */
+        .msg-box {
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+            display: none;
+            align-items: flex-start;
+            gap: 10px;
+            line-height: 1.5;
+            border: 1px solid transparent;
+        }
+        .msg-box.visible { display: flex; }
+        .msg-box.error { background: var(--error-bg); color: var(--error); border-color: #f0c8c8; }
+        .msg-box.success { background: var(--success-bg); color: var(--success); border-color: #bde0cc; }
+        .msg-box.info { background: var(--sage-light); color: var(--sage-dark); border-color: var(--border); }
+        .msg-icon { flex-shrink: 0; margin-top: 1px; font-size: 1rem; }
+
+        /* Form */
+        .form-group {
+            position: relative;
+            margin-bottom: 18px;
+        }
+        .form-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--muted);
+            margin-bottom: 7px;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+        .input-wrap { position: relative; }
+        .input-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--muted);
+            pointer-events: none;
+            opacity: 0.5;
+        }
+        .form-input {
+            width: 100%;
+            padding: 13px 14px 13px 42px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.9rem;
+            color: var(--ink);
+            background: var(--cream);
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            outline: none;
+            transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+        }
+        .form-input:focus {
+            border-color: var(--sage);
+            background: var(--white);
+            box-shadow: 0 0 0 4px rgba(74,124,89,0.08);
+        }
+        .form-input::placeholder { color: #b0bab4; }
+
+        /* Password toggle */
+        .pw-toggle {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: var(--muted);
+            opacity: 0.5;
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 1rem;
+            transition: opacity 0.2s;
+        }
+        .pw-toggle:hover { opacity: 0.9; }
+
+        /* Remember me */
+        .remember-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 22px;
+        }
+        .remember-row input[type="checkbox"] { display: none; }
+        .custom-checkbox {
+            width: 18px; height: 18px;
+            border: 2px solid var(--border);
+            border-radius: 5px;
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .custom-checkbox.checked {
+            background: var(--sage);
+            border-color: var(--sage);
+        }
+        .custom-checkbox svg { display: none; }
+        .custom-checkbox.checked svg { display: block; }
+        .remember-label {
+            font-size: 0.83rem;
+            color: var(--muted);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        /* Strength bar */
+        .strength-bar-wrap {
+            margin-top: 8px;
+            display: none;
+        }
+        .strength-bar-track {
+            height: 3px;
+            background: var(--border);
+            border-radius: 99px;
+            overflow: hidden;
+        }
+        .strength-bar-fill {
+            height: 100%;
+            border-radius: 99px;
+            transition: width 0.4s, background 0.4s;
+            width: 0%;
+        }
+        .strength-text {
+            font-size: 0.7rem;
+            margin-top: 5px;
+            color: var(--muted);
+        }
+
+        /* Buttons */
+        .btn-primary {
+            width: 100%;
+            padding: 14px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: white;
+            background: linear-gradient(135deg, var(--sage) 0%, var(--sage-dark) 100%);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+            letter-spacing: 0.3px;
+        }
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 60%);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(47,82,64,0.3); }
+        .btn-primary:hover::before { opacity: 1; }
+        .btn-primary:active { transform: translateY(0); }
+
+        .btn-primary.loading {
+            pointer-events: none;
+        }
+        .btn-primary.loading .btn-text { opacity: 0; }
+        .btn-primary.loading .btn-spinner { display: block; }
+        .btn-spinner {
+            display: none;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px; height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+
+        /* Links */
+        .form-footer {
+            margin-top: 22px;
+            text-align: center;
+        }
+        .form-footer p {
+            font-size: 0.82rem;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+        .text-link {
+            color: var(--sage);
+            font-weight: 500;
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        .text-link:hover { border-color: var(--sage); }
+        .text-link.gold { color: var(--gold); }
+        .text-link.gold:hover { border-color: var(--gold); }
+
+        /* Section animation */
+        .auth-section {
+            animation: fadeIn 0.35s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Divider */
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 24px 0;
+        }
+        .divider-line { flex: 1; height: 1px; background: var(--border); }
+        .divider-text { font-size: 0.75rem; color: var(--muted); }
+
+        /* Security badge */
+        .security-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-size: 0.72rem;
+            color: var(--muted);
+            margin-top: 28px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .page-wrapper { grid-template-columns: 1fr; }
+            .brand-panel {
+                padding: 40px 24px;
+                min-height: 220px;
+            }
+            .brand-tagline { font-size: 1.8rem; }
+            .brand-logo { width: 100px; margin-bottom: 20px; }
+            .brand-pills { display: none; }
+            .dots { display: none; }
+            .form-panel { padding: 40px 24px; }
+        }
+    </style>
+</head>
+<body>
+<div class="page-wrapper">
+
+    <!-- LEFT: Brand Panel -->
+    <div class="brand-panel">
+        <div class="brand-inner">
+            <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="brand-logo">
+            <h1 class="brand-tagline">Where <em>every</em> child truly blossoms</h1>
+            <p class="brand-sub">Your dedicated tutor portal for managing sessions, tracking progress, and making a difference.</p>
+            <div class="brand-pills">
+                <span class="brand-pill">🌱 Holistic Learning</span>
+                <span class="brand-pill">📚 Progress Tracking</span>
+                <span class="brand-pill">🔒 Secure Portal</span>
+                <span class="brand-pill">🌟 Expert Tutors</span>
             </div>
         </div>
+        <!-- Decorative dot grid -->
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
     </div>
-    <script type="module" src="tutor-auth.js"></script>
+
+    <!-- RIGHT: Form Panel -->
+    <div class="form-panel">
+        <div class="form-container">
+
+            <!-- Message Box -->
+            <div id="message-box" class="msg-box" role="alert">
+                <span class="msg-icon" id="msg-icon"></span>
+                <span id="msg-text"></span>
+            </div>
+
+            <!-- SIGNUP -->
+            <div id="signupSection" class="auth-section">
+                <div class="section-header">
+                    <p class="section-label">New here?</p>
+                    <h2 class="section-title">Create your <span>account</span></h2>
+                </div>
+
+                <form id="tutorSignupForm" novalidate>
+                    <div class="form-group">
+                        <label class="form-label" for="signupName">Full Name</label>
+                        <div class="input-wrap">
+                            <span class="input-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            </span>
+                            <input type="text" id="signupName" class="form-input" placeholder="e.g. Jane Adeyemi" required autocomplete="name">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="signupEmail">Email Address</label>
+                        <div class="input-wrap">
+                            <span class="input-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                            </span>
+                            <input type="email" id="signupEmail" class="form-input" placeholder="you@example.com" required autocomplete="email">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="signupPassword">Password</label>
+                        <div class="input-wrap">
+                            <span class="input-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            </span>
+                            <input type="password" id="signupPassword" class="form-input" placeholder="Min 6 chars + a number" required autocomplete="new-password">
+                            <button type="button" class="pw-toggle" id="toggleSignupPw" aria-label="Toggle password">
+                                <svg id="eyeSignupOpen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                <svg id="eyeSignupClosed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" x2="23" y1="1" y2="23"/></svg>
+                            </button>
+                        </div>
+                        <div class="strength-bar-wrap" id="strengthWrap">
+                            <div class="strength-bar-track">
+                                <div class="strength-bar-fill" id="strengthFill"></div>
+                            </div>
+                            <p class="strength-text" id="strengthText"></p>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary" id="signupBtn">
+                        <span class="btn-text">Create Account</span>
+                        <span class="btn-spinner"></span>
+                    </button>
+                </form>
+
+                <div class="form-footer">
+                    <p>Already have an account? <a href="#" id="showLogin" class="text-link">Log in here</a></p>
+                </div>
+            </div>
+
+            <!-- LOGIN -->
+            <div id="loginSection" class="auth-section" style="display:none">
+                <div class="section-header">
+                    <p class="section-label">Welcome back</p>
+                    <h2 class="section-title">Sign in to your <span>portal</span></h2>
+                </div>
+
+                <form id="tutorLoginForm" novalidate>
+                    <div class="form-group">
+                        <label class="form-label" for="loginEmail">Email Address</label>
+                        <div class="input-wrap">
+                            <span class="input-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                            </span>
+                            <input type="email" id="loginEmail" class="form-input" placeholder="you@example.com" required autocomplete="email">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="loginPassword">Password</label>
+                        <div class="input-wrap">
+                            <span class="input-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            </span>
+                            <input type="password" id="loginPassword" class="form-input" placeholder="Your password" required autocomplete="current-password">
+                            <button type="button" class="pw-toggle" id="toggleLoginPw" aria-label="Toggle password">
+                                <svg id="eyeLoginOpen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                <svg id="eyeLoginClosed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" x2="23" y1="1" y2="23"/></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="remember-row">
+                        <input type="checkbox" id="rememberMe">
+                        <div class="custom-checkbox" id="checkboxDisplay" role="checkbox" aria-checked="false" tabindex="0">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        </div>
+                        <label class="remember-label" for="rememberMe">Remember me for 30 days</label>
+                    </div>
+
+                    <button type="submit" class="btn-primary" id="loginBtn">
+                        <span class="btn-text">Sign In</span>
+                        <span class="btn-spinner"></span>
+                    </button>
+                </form>
+
+                <div class="form-footer">
+                    <p><a href="#" id="forgotPasswordLink" class="text-link gold">Forgot your password?</a></p>
+                    <p>Don't have an account? <a href="#" id="showSignup" class="text-link">Sign up free</a></p>
+                </div>
+            </div>
+
+            <!-- Security footer -->
+            <div class="security-badge">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                256-bit encrypted · Secured by Firebase Auth
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script type="module" src="tutor-auth.js"></script>
 </body>
 </html>
