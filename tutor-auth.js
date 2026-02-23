@@ -115,8 +115,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!user) return; // no one signed in — show auth forms normally
 
         // Someone is authenticated — check if they are a real tutor in our system
-        const isTutor = await isTutorByUid(user.uid);
-        if (isTutor) {
+        const tutorDoc = await getTutorDocForUser(user);
+        if (tutorDoc) {
             window.location.href = 'tutor.html'; // valid tutor — redirect
         }
         // If not a tutor (e.g. a different portal's user on the same Firebase),
@@ -318,17 +318,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * Verify a signed-in UID has a document in `tutors`.
-     * Used by the auth state listener to ensure we don't redirect a
-     * non-tutor user from another Firebase portal.
+     * Verify a signed-in user is a registered tutor.
+     * Supports three document structures:
+     *   1. tutors/{uid}          — doc ID is the Firebase UID (new style)
+     *   2. tutors/{email}        — doc ID is the email (old/admin-created style)
+     *   3. tutors/{anyId} where doc has email field matching user.email
+     * Returns the Firestore doc snapshot if found, null otherwise.
      */
-    async function isTutorByUid(uid) {
+    async function getTutorDocForUser(user) {
         try {
-            const snap = await getDoc(doc(db, 'tutors', uid));
-            return snap.exists();
-        } catch {
-            return false;
+            // 1. Try UID as doc ID (fastest)
+            const byUid = await getDoc(doc(db, 'tutors', user.uid));
+            if (byUid.exists()) return byUid;
+
+            // 2. Try email as doc ID (admin-created docs use this)
+            if (user.email) {
+                const byEmail = await getDoc(doc(db, 'tutors', user.email.toLowerCase().trim()));
+                if (byEmail.exists()) return byEmail;
+            }
+
+            // 3. Query by email field (any doc structure)
+            if (user.email) {
+                const q    = query(collection(db, 'tutors'), where('email', '==', user.email.toLowerCase().trim()));
+                const snap = await getDocs(q);
+                if (!snap.empty) return snap.docs[0];
+            }
+
+            return null;
+        } catch (err) {
+            console.error('getTutorDocForUser error:', err);
+            return null;
         }
+    }
+
+    async function isTutorByUid(uid, email = null) {
+        // Build a minimal user-like object for getTutorDocForUser
+        const userLike = { uid, email };
+        const d = await getTutorDocForUser(userLike);
+        return d !== null;
     }
 
     /**
@@ -458,10 +485,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const { user } = await signInWithEmailAndPassword(auth, email, password);
 
-            // ★ GATE 2: Verify the UID is in tutors (handles edge cases where
-            // a Firebase Auth account exists but the tutor doc was removed)
-            const isTutor = await isTutorByUid(user.uid);
-            if (!isTutor) {
+            // ★ GATE 2: Verify the signed-in user is actually a registered tutor.
+            // Works regardless of whether the doc uses UID, email, or a custom ID.
+            const tutorDoc = await getTutorDocForUser(user);
+            if (!tutorDoc) {
                 await auth.signOut();
                 showMessage(
                     'Your account is not authorised for this portal. Contact your administrator.',
@@ -472,8 +499,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Update last login (non-critical)
-            updateDoc(doc(db, 'tutors', user.uid), { lastLogin: serverTimestamp() }).catch(() => {});
+            // Stamp UID onto the doc if it's missing (e.g. admin-created email-keyed docs).
+            // This makes future UID lookups instant.
+            const docData = tutorDoc.data ? tutorDoc.data() : tutorDoc.data;
+            if (!docData?.uid) {
+                updateDoc(tutorDoc.ref, { uid: user.uid, lastLogin: serverTimestamp() }).catch(() => {});
+            } else {
+                updateDoc(tutorDoc.ref, { lastLogin: serverTimestamp() }).catch(() => {});
+            }
 
             setRememberPreference(rememberMe);
             resetAttempts();
