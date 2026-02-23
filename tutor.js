@@ -428,39 +428,6 @@ function showCustomAlert(message) {
 }
 
 // Update active tab with smooth fade transition
-// ── Persistent Lagos clock (renders on every tab, top-right fixed bar) ──
-function ensureGlobalClock() {
-    const CLOCK_ID = 'global-tutor-clock-bar';
-    if (document.getElementById(CLOCK_ID)) return; // already mounted
-
-    function formatLagosDT() {
-        return new Intl.DateTimeFormat('en-NG', {
-            weekday:'short', day:'numeric', month:'short', year:'numeric',
-            hour:'2-digit', minute:'2-digit', second:'2-digit',
-            hour12:true, timeZone:'Africa/Lagos'
-        }).format(new Date()) + ' WAT';
-    }
-
-    const bar = document.createElement('div');
-    bar.id = CLOCK_ID;
-    bar.style.cssText = [
-        'position:fixed', 'top:0', 'right:0', 'z-index:99999',
-        'background:linear-gradient(90deg,#1e40af,#1d4ed8)',
-        'color:#fff', 'font-size:11px', 'font-weight:600',
-        'padding:4px 14px', 'border-bottom-left-radius:10px',
-        'letter-spacing:.4px', 'box-shadow:0 2px 8px rgba(0,0,0,.25)',
-        'font-family:monospace', 'white-space:nowrap', 'pointer-events:none'
-    ].join(';');
-    bar.textContent = '📍 Lagos · ' + formatLagosDT();
-    document.body.appendChild(bar);
-
-    if (window._globalClockInterval) clearInterval(window._globalClockInterval);
-    window._globalClockInterval = setInterval(() => {
-        const el = document.getElementById(CLOCK_ID);
-        if (el) el.textContent = '📍 Lagos · ' + formatLagosDT();
-    }, 1000);
-}
-
 function updateActiveTab(activeTabId) {
     const navTabs = ['navDashboard', 'navStudentDatabase', 'navAutoStudents', 'navScheduleManagement', 'navAcademic', 'navCourses'];
     navTabs.forEach(tabId => {
@@ -469,9 +436,6 @@ function updateActiveTab(activeTabId) {
             tab.classList.toggle('active', tabId === activeTabId);
         }
     });
-
-    // Ensure persistent clock on every tab
-    ensureGlobalClock();
 
     // Fade in main content on tab switch
     const mainContent = document.getElementById('mainContent');
@@ -486,6 +450,47 @@ function updateActiveTab(activeTabId) {
             }, 30);
         });
     }
+}
+
+/*******************************************************************************
+ * SECTION 4B: PERSISTENT CLOCK (shows on every tab)
+ ******************************************************************************/
+
+/**
+ * Injects or updates the Lagos time clock in a fixed top-right bar.
+ * Survives tab switches because it lives in the body, not in mainContent.
+ * Call this from every renderXxx function.
+ */
+function startPersistentClock() {
+    let clockBar = document.getElementById('tutor-persistent-clock-bar');
+    if (!clockBar) {
+        clockBar = document.createElement('div');
+        clockBar.id = 'tutor-persistent-clock-bar';
+        clockBar.style.cssText = [
+            'position:fixed','top:0','right:0','z-index:9999',
+            'background:rgba(37,99,235,0.92)','color:#fff',
+            'padding:4px 14px','font-size:0.78rem','font-weight:600',
+            'border-bottom-left-radius:8px','letter-spacing:0.02em',
+            'backdrop-filter:blur(4px)','pointer-events:none'
+        ].join(';');
+        document.body.appendChild(clockBar);
+    }
+
+    function formatLagos() {
+        return new Intl.DateTimeFormat('en-NG', {
+            weekday:'short', day:'numeric', month:'short', year:'numeric',
+            hour:'2-digit', minute:'2-digit', second:'2-digit',
+            hour12: true, timeZone:'Africa/Lagos'
+        }).format(new Date()) + ' (WAT)';
+    }
+
+    clockBar.textContent = formatLagos();
+    if (window._persistentClockInterval) clearInterval(window._persistentClockInterval);
+    window._persistentClockInterval = setInterval(() => {
+        const el = document.getElementById('tutor-persistent-clock-bar');
+        if (el) el.textContent = formatLagos();
+        else clearInterval(window._persistentClockInterval);
+    }, 1000);
 }
 
 /*******************************************************************************
@@ -1709,7 +1714,8 @@ function updateFloatingBadges() {
     updateBadge(btnFloatingInbox);
 }
 
-// --- FEATURE 1: SEND MESSAGE MODAL ---
+// --- FEATURE 1: SEND MESSAGE MODAL (UPDATED) ---
+// Conv ID format: tutorId_studentId  (student portal also uses this format)
 
 function showEnhancedMessagingModal() {
     document.querySelectorAll('.enhanced-messaging-modal').forEach(e => e.remove());
@@ -1719,37 +1725,30 @@ function showEnhancedMessagingModal() {
     modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
 
     modal.innerHTML = `
-        <div class="modal-content messaging-modal-content">
+        <div class="modal-content messaging-modal-content" style="max-width:520px;">
             <div class="modal-header">
-                <h3>💬 Send Message</h3>
+                <h3>💬 New Message</h3>
                 <button type="button" class="close-modal-btn text-2xl font-bold">&times;</button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body space-y-3">
                 <div class="message-type-grid">
-                    <div class="type-option selected" data-type="individual">
-                        <div class="icon">👤</div><div>Individual</div>
-                    </div>
-                    <div class="type-option" data-type="group">
-                        <div class="icon">👨‍👩‍👧‍👦</div><div>Group</div>
-                    </div>
-                    <div class="type-option" data-type="management">
-                        <div class="icon">🏢</div><div>Admin</div>
-                    </div>
-                    <div class="type-option" data-type="all">
-                        <div class="icon">📢</div><div>All Parents</div>
-                    </div>
+                    <div class="type-option selected" data-type="individual"><div class="icon">👤</div><div>Student</div></div>
+                    <div class="type-option" data-type="group"><div class="icon">👨‍👩‍👧‍👦</div><div>Group</div></div>
+                    <div class="type-option" data-type="management"><div class="icon">🏢</div><div>Admin</div></div>
+                    <div class="type-option" data-type="all"><div class="icon">📢</div><div>All</div></div>
                 </div>
-
                 <div id="recipient-loader" class="recipient-area"></div>
-
-                <input type="text" id="msg-subject" class="form-input" placeholder="Subject">
-                <textarea id="msg-content" class="form-input" rows="5" placeholder="Type your message..."></textarea>
-                
-                <div class="flex-row-spaced mt-2">
-                     <label class="urgent-toggle">
-                        <input type="checkbox" id="msg-urgent">
-                        <span class="text-red-500 font-bold">Mark as Urgent</span>
-                     </label>
+                <input type="text" id="msg-subject" class="form-input" placeholder="Subject (optional)">
+                <textarea id="msg-content" class="form-input" rows="4" placeholder="Type your message..."></textarea>
+                <div class="flex items-center gap-3">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="file" id="msg-image-file" accept="image/*" class="hidden">
+                        <span class="btn btn-secondary btn-sm" onclick="document.getElementById('msg-image-file').click()">📎 Attach Image</span>
+                    </label>
+                    <span id="msg-image-name" class="text-xs text-gray-500"></span>
+                    <label class="ml-auto flex items-center gap-1 text-sm text-red-600 font-semibold cursor-pointer">
+                        <input type="checkbox" id="msg-urgent"> Urgent
+                    </label>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1761,156 +1760,165 @@ function showEnhancedMessagingModal() {
 
     document.body.appendChild(modal);
 
-    msgLoadRecipients('individual', modal.querySelector('#recipient-loader'));
+    // Show selected image name
+    modal.querySelector('#msg-image-file').addEventListener('change', (e) => {
+        const f = e.target.files[0];
+        modal.querySelector('#msg-image-name').textContent = f ? f.name : '';
+    });
+
+    msgLoadRecipientsByStudentId('individual', modal.querySelector('#recipient-loader'));
 
     modal.querySelectorAll('.type-option').forEach(opt => {
         opt.onclick = () => {
             modal.querySelectorAll('.type-option').forEach(o => o.classList.remove('selected'));
             opt.classList.add('selected');
-            msgLoadRecipients(opt.dataset.type, modal.querySelector('#recipient-loader'));
+            msgLoadRecipientsByStudentId(opt.dataset.type, modal.querySelector('#recipient-loader'));
         };
     });
 
-    const closeBtns = modal.querySelectorAll('.close-modal-btn');
-    closeBtns.forEach(btn => btn.onclick = () => modal.remove());
-    
-    const sendBtn = modal.querySelector('#btn-send-initial');
-    sendBtn.onclick = () => msgProcessSend(modal);
+    modal.querySelectorAll('.close-modal-btn').forEach(btn => { btn.onclick = () => modal.remove(); });
+    modal.querySelector('#btn-send-initial').onclick = () => msgProcessSendToStudents(modal);
 }
 
-async function msgLoadRecipients(type, container) {
+/** Load recipients keyed by studentId (not parentPhone) so convId matches student portal */
+async function msgLoadRecipientsByStudentId(type, container) {
     container.innerHTML = '<div class="spinner"></div>';
     const tutorEmail = window.tutorData?.email;
 
     try {
         const q = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
         const snap = await getDocs(q);
-        const students = snap.docs.map(d => d.data());
+        // Only active students
+        const students = snap.docs
+            .filter(d => { const s = d.data(); return !s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status); })
+            .map(d => ({ id: d.id, ...d.data() }));
 
         if (type === 'individual') {
             container.innerHTML = `
                 <select id="sel-recipient" class="form-input">
-                    <option value="">Select Parent...</option>
-                    ${students.map(s => `<option value="${escapeHtml(s.parentPhone)}" data-name="${escapeHtml(s.parentName)}">${escapeHtml(s.parentName)} (${escapeHtml(s.studentName)})</option>`).join('')}
-                </select>
-            `;
+                    <option value="">Select student...</option>
+                    ${students.map(s => `<option value="${escapeHtml(s.id)}" data-name="${escapeHtml(s.studentName)}">${escapeHtml(s.studentName)} (${escapeHtml(s.grade)})</option>`).join('')}
+                </select>`;
         } else if (type === 'group') {
             container.innerHTML = `
-                <div class="checklist-box">
+                <div class="checklist-box max-h-40 overflow-y-auto border rounded p-2">
                     ${students.map(s => `
-                        <label class="checklist-item">
-                            <input type="checkbox" class="chk-recipient" value="${escapeHtml(s.parentPhone)}" data-name="${escapeHtml(s.parentName)}">
-                            <span>${escapeHtml(s.parentName)} <small>(${escapeHtml(s.studentName)})</small></span>
-                        </label>
-                    `).join('')}
-                </div>
-            `;
+                        <label class="flex items-center gap-2 py-1 cursor-pointer">
+                            <input type="checkbox" class="chk-recipient" value="${escapeHtml(s.id)}" data-name="${escapeHtml(s.studentName)}">
+                            <span class="text-sm">${escapeHtml(s.studentName)} <small class="text-gray-400">(${escapeHtml(s.grade)})</small></span>
+                        </label>`).join('')}
+                </div>`;
         } else if (type === 'all') {
-            container.innerHTML = `<div class="info-box">Sending to all ${students.length} parents.</div>`;
+            container.innerHTML = `<div class="p-3 bg-blue-50 rounded text-sm text-blue-700">📢 Sending to all ${students.length} active students.</div>`;
+            // Store for send
+            container.dataset.allStudents = JSON.stringify(students.map(s => ({ id: s.id, name: s.studentName })));
         } else {
-            container.innerHTML = `<div class="info-box">Sending to Management/Admin.</div>`;
+            container.innerHTML = `<div class="p-3 bg-gray-50 rounded text-sm text-gray-600">🏢 Sending to Management/Admin.</div>`;
         }
     } catch (e) {
-        container.innerHTML = `<div class="error-box">Error loading students: ${escapeHtml(e.message)}</div>`;
+        container.innerHTML = `<div class="text-red-500 text-sm p-2">Error: ${escapeHtml(e.message)}</div>`;
     }
 }
 
-async function msgProcessSend(modal) {
+async function msgProcessSendToStudents(modal) {
     const type = modal.querySelector('.type-option.selected').dataset.type;
-    const subject = modal.querySelector('#msg-subject').value;
-    const content = modal.querySelector('#msg-content').value;
+    const subject = (modal.querySelector('#msg-subject').value || '').trim();
+    const content = (modal.querySelector('#msg-content').value || '').trim();
     const isUrgent = modal.querySelector('#msg-urgent').checked;
+    const imageFile = modal.querySelector('#msg-image-file').files[0] || null;
     const tutor = window.tutorData;
 
-    if (!subject || !content) {
-        alert("Please fill in subject and content.");
-        return;
-    }
+    if (!content && !imageFile) { showCustomAlert('Please type a message or attach an image.'); return; }
 
-    let targets = [];
+    let targets = []; // { id: studentId, name: studentName }
+
     if (type === 'individual') {
         const sel = modal.querySelector('#sel-recipient');
-        if (sel.value) targets.push({ phone: sel.value, name: sel.options[sel.selectedIndex].dataset.name });
+        if (!sel.value) { showCustomAlert('Please select a student.'); return; }
+        targets.push({ id: sel.value, name: sel.options[sel.selectedIndex].dataset.name });
     } else if (type === 'group') {
-        modal.querySelectorAll('.chk-recipient:checked').forEach(c => {
-            targets.push({ phone: c.value, name: c.dataset.name });
-        });
+        modal.querySelectorAll('.chk-recipient:checked').forEach(c => targets.push({ id: c.value, name: c.dataset.name }));
+        if (!targets.length) { showCustomAlert('Please select at least one student.'); return; }
     } else if (type === 'all') {
-        const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-        const snap = await getDocs(q);
-        const map = new Map();
-        snap.forEach(d => {
-            const s = d.data();
-            map.set(s.parentPhone, s.parentName);
-        });
-        map.forEach((name, phone) => targets.push({ phone, name }));
-    }
-
-    if (targets.length === 0 && type !== 'management') {
-        alert("No recipients selected.");
-        return;
+        try { targets = JSON.parse(modal.querySelector('#recipient-loader').dataset.allStudents || '[]'); } catch(e) {}
+        if (!targets.length) { showCustomAlert('No active students found.'); return; }
+    } else if (type === 'management') {
+        targets = [{ id: 'management', name: 'Admin' }];
     }
 
     const btn = modal.querySelector('#btn-send-initial');
-    btn.innerText = "Sending...";
-    btn.disabled = true;
-    
+    btn.innerText = 'Sending...'; btn.disabled = true;
+
     try {
-        // Send loop
+        // Upload image if attached
+        let imageUrl = null;
+        if (imageFile) {
+            const fd = new FormData();
+            fd.append('file', imageFile);
+            fd.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+            fd.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
+            const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`, { method: 'POST', body: fd });
+            const data = await res.json();
+            imageUrl = data.secure_url || null;
+        }
+
+        const now = new Date();
+        const lastMsg = imageUrl ? (content || '📷 Image') : content;
+
         for (const target of targets) {
-            const convId = msgGenerateConvId(tutor.id, target.phone);
-            const now = new Date(); // USE NATIVE DATE
-            
-            // Manual Increment Logic: Read -> Calculate -> Write
+            // Use tutorId_studentId as convId — matches student portal
+            const convId = `${tutor.id}_${target.id}`;
             const convRef = doc(db, "conversations", convId);
-            const convSnap = await getDoc(convRef); // New dependency: getDoc (usually available)
-            
-            let newCount = 1;
-            if (convSnap.exists()) {
-                const data = convSnap.data();
-                // If the last sender was me, reset count. If not, increment.
-                // Logic: I am sending now, so for the RECIPIENT, it increments.
-                // But since I am the tutor, and I'm sending to Parent, I want to update THEIR unread count?
-                // Actually, this unreadCount field is shared. A better schema splits it, but for now:
-                // We just increment it.
-                newCount = (data.unreadCount || 0) + 1;
-            }
 
             await setDoc(convRef, {
-                participants: [tutor.id, target.phone],
+                participants: [tutor.id, target.id],
                 participantDetails: {
-                    [tutor.id]: { name: tutor.name, role: 'tutor' },
-                    [target.phone]: { name: target.name, role: 'parent' }
+                    [tutor.id]: { name: tutor.name, role: 'tutor', email: tutor.email },
+                    [target.id]: { name: target.name, role: 'student' }
                 },
-                lastMessage: content,
+                tutorId: tutor.id,
+                tutorEmail: tutor.email,
+                tutorName: tutor.name,
+                studentId: target.id,
+                studentName: target.name,
+                lastMessage: lastMsg,
                 lastMessageTimestamp: now,
                 lastSenderId: tutor.id,
-                unreadCount: newCount
+                unreadCount: 1
             }, { merge: true });
 
             await addDoc(collection(db, "conversations", convId, "messages"), {
-                content: content,
+                content: content || '',
                 subject: subject,
+                imageUrl: imageUrl || null,
                 senderId: tutor.id,
                 senderName: tutor.name,
+                senderRole: 'tutor',
                 isUrgent: isUrgent,
                 createdAt: now,
                 read: false
             });
         }
-        
         modal.remove();
-        alert("Message Sent!");
+        showCustomAlert(`✅ Message sent to ${targets.length} student${targets.length !== 1 ? 's' : ''}!`);
     } catch (e) {
-        console.error(e);
-        // Fallback if getDoc is missing, try blind write
-        alert("Error sending: " + e.message);
-        btn.innerText = "Try Again";
-        btn.disabled = false;
+        console.error('Messaging error:', e);
+        showCustomAlert('❌ Error: ' + e.message);
+        btn.innerText = 'Try Again'; btn.disabled = false;
     }
 }
 
-// --- FEATURE 2: INBOX MODAL ---
+async function msgLoadRecipients(type, container) {
+    // Alias kept for backwards-compatibility – delegates to new function
+    return msgLoadRecipientsByStudentId(type, container);
+}
+
+async function msgProcessSend(modal) {
+    // Alias kept for backwards-compatibility – delegates to new function
+    return msgProcessSendToStudents(modal);
+}
+
+// --- FEATURE 2: INBOX MODAL (UPDATED – student-centric, image support) ---
 
 function showInboxModal() {
     document.querySelectorAll('.inbox-modal').forEach(e => e.remove());
@@ -1920,28 +1928,36 @@ function showInboxModal() {
     modal.onclick = (e) => { if (e.target === modal) closeInbox(modal); };
 
     modal.innerHTML = `
-        <div class="modal-content inbox-content">
-            <button class="close-modal-absolute">&times;</button>
-            <div class="inbox-container">
-                <div class="inbox-list-col">
-                    <div class="inbox-header">
-                        <h4>Inbox</h4>
-                        <button id="refresh-inbox" class="btn-icon">🔄</button>
+        <div class="modal-content inbox-content" style="max-width:820px;height:85vh;display:flex;flex-direction:column;padding:0;overflow:hidden;">
+            <div class="inbox-container" style="display:flex;flex:1;overflow:hidden;">
+                <!-- Left: conversation list -->
+                <div style="width:280px;min-width:220px;border-right:1px solid #e5e7eb;display:flex;flex-direction:column;background:#fafafa;">
+                    <div style="padding:14px 16px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;">
+                        <h4 style="font-weight:700;font-size:1rem;color:#1f2937;">💬 Messages</h4>
+                        <div style="display:flex;gap:6px;">
+                            <button onclick="this.closest('.inbox-modal').querySelector('#inbox-list').innerHTML='<div class=spinner></div>';window._msgStartInboxListener && window._msgStartInboxListener()" style="background:none;border:none;cursor:pointer;font-size:1rem;" title="Refresh">🔄</button>
+                            <button class="close-modal-absolute" style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:#6b7280;">&times;</button>
+                        </div>
                     </div>
-                    <div id="inbox-list" class="inbox-list">
-                        <div class="spinner"></div>
-                    </div>
+                    <div id="inbox-list" style="flex:1;overflow-y:auto;"></div>
                 </div>
-                <div class="inbox-chat-col">
-                    <div id="chat-view-header" class="chat-header hidden">
-                        <div class="chat-title" id="chat-title">Select a chat</div>
+                <!-- Right: chat -->
+                <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+                    <div id="chat-view-header" style="padding:12px 16px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap-10px;background:#fff;">
+                        <div id="chat-title" style="font-weight:700;color:#1f2937;font-size:0.95rem;">Select a conversation</div>
                     </div>
-                    <div id="chat-messages" class="chat-messages">
-                        <div class="empty-state">Select a conversation</div>
+                    <div id="chat-messages" style="flex:1;overflow-y:auto;padding:14px 16px;background:#f9fafb;display:flex;flex-direction:column;gap:8px;">
+                        <div style="text-align:center;color:#9ca3af;margin-top:40px;">← Select a conversation</div>
                     </div>
-                    <div id="chat-inputs" class="chat-inputs hidden">
-                        <input type="text" id="chat-input-text" placeholder="Type a message...">
-                        <button id="chat-send-btn">➤</button>
+                    <div id="chat-inputs" style="border-top:1px solid #e5e7eb;padding:10px 14px;background:#fff;display:none;gap:8px;align-items:flex-end;">
+                        <textarea id="chat-input-text" rows="2" placeholder="Type a message..." style="flex:1;border:1px solid #d1d5db;border-radius:8px;padding:8px;resize:none;font-size:0.875rem;"></textarea>
+                        <div style="display:flex;flex-direction:column;gap:6px;">
+                            <label style="cursor:pointer;font-size:1.2rem;" title="Attach image">
+                                <input type="file" id="chat-image-file" accept="image/*" style="display:none;">
+                                📎
+                            </label>
+                            <button id="chat-send-btn" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:700;">➤</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1950,19 +1966,30 @@ function showInboxModal() {
 
     document.body.appendChild(modal);
     modal.querySelector('.close-modal-absolute').onclick = () => closeInbox(modal);
+
+    // Image preview label
+    modal.querySelector('#chat-image-file').addEventListener('change', (e) => {
+        const f = e.target.files[0];
+        const lbl = modal.querySelector('#chat-inputs label');
+        if (lbl) lbl.title = f ? f.name : 'Attach image';
+    });
+
+    // Store starter so refresh button can call it
+    window._msgStartInboxListener = () => msgStartInboxListener(modal);
     msgStartInboxListener(modal);
 }
 
 function closeInbox(modal) {
-    if (unsubInboxListener) unsubInboxListener();
-    if (unsubChatListener) unsubChatListener();
+    if (unsubInboxListener) { unsubInboxListener(); unsubInboxListener = null; }
+    if (unsubChatListener)  { unsubChatListener();  unsubChatListener  = null; }
     modal.remove();
 }
 
 function msgStartInboxListener(modal) {
     const tutorId = window.tutorData.id;
     const listEl = modal.querySelector('#inbox-list');
-    
+    listEl.innerHTML = '<div class="spinner" style="margin:16px auto;"></div>';
+
     if (unsubInboxListener) unsubInboxListener();
 
     const q = query(
@@ -1972,126 +1999,150 @@ function msgStartInboxListener(modal) {
 
     unsubInboxListener = onSnapshot(q, (snapshot) => {
         const convs = [];
-        snapshot.forEach(doc => convs.push({ id: doc.id, ...doc.data() }));
-
+        snapshot.forEach(d => convs.push({ id: d.id, ...d.data() }));
         convs.sort((a, b) => {
-            const timeA = a.lastMessageTimestamp?.toDate ? a.lastMessageTimestamp.toDate() : new Date(a.lastMessageTimestamp || 0);
-            const timeB = b.lastMessageTimestamp?.toDate ? b.lastMessageTimestamp.toDate() : new Date(b.lastMessageTimestamp || 0);
-            return timeB - timeA; 
+            const tA = a.lastMessageTimestamp?.toDate ? a.lastMessageTimestamp.toDate() : new Date(a.lastMessageTimestamp || 0);
+            const tB = b.lastMessageTimestamp?.toDate ? b.lastMessageTimestamp.toDate() : new Date(b.lastMessageTimestamp || 0);
+            return tB - tA;
         });
-
         msgRenderInboxList(convs, listEl, modal, tutorId);
     });
 }
 
 function msgRenderInboxList(conversations, container, modal, tutorId) {
     container.innerHTML = '';
-    
     if (conversations.length === 0) {
-        container.innerHTML = '<div class="p-4 text-gray-500 text-center">No messages found.</div>';
+        container.innerHTML = '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:0.875rem;">No messages yet.</div>';
         return;
     }
-
     conversations.forEach(conv => {
         const otherId = conv.participants.find(p => p !== tutorId);
-        const otherName = conv.participantDetails?.[otherId]?.name || "Parent";
+        const otherName = conv.studentName || conv.participantDetails?.[otherId]?.name || 'Student';
         const isUnread = conv.unreadCount > 0 && conv.lastSenderId !== tutorId;
+        const lastMsg = conv.lastMessage || '';
+        const lastTime = msgFormatTime(conv.lastMessageTimestamp);
 
         const el = document.createElement('div');
-        el.className = `inbox-item ${isUnread ? 'unread' : ''}`;
+        el.style.cssText = `padding:12px 14px;border-bottom:1px solid #f3f4f6;cursor:pointer;display:flex;align-items:center;gap:10px;${isUnread ? 'background:#eff6ff;' : 'background:#fff;'}`;
         el.innerHTML = `
-            <div class="avatar">${escapeHtml(otherName.charAt(0))}</div>
-            <div class="info">
-                <div class="name">${escapeHtml(otherName)}</div>
-                <div class="preview">
-                    ${conv.lastSenderId === tutorId ? 'You: ' : ''}${escapeHtml(conv.lastMessage || '')}
-                </div>
+            <div style="width:38px;height:38px;border-radius:50%;background:${isUnread ? '#059669' : '#e5e7eb'};color:${isUnread ? '#fff' : '#6b7280'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;flex-shrink:0;">
+                ${escapeHtml(otherName.charAt(0).toUpperCase())}
             </div>
-            <div class="meta">
-                <div class="time">${escapeHtml(msgFormatTime(conv.lastMessageTimestamp))}</div>
-                ${isUnread ? `<div class="badge">${conv.unreadCount}</div>` : ''}
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:${isUnread ? '700' : '600'};font-size:0.875rem;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(otherName)}</div>
+                <div style="font-size:0.75rem;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${conv.lastSenderId === tutorId ? 'You: ' : ''}${escapeHtml(lastMsg.substring(0,50))}${lastMsg.length > 50 ? '…' : ''}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+                <div style="font-size:0.7rem;color:#9ca3af;">${escapeHtml(lastTime)}</div>
+                ${isUnread ? `<div style="background:#059669;color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;margin-left:auto;margin-top:2px;">${conv.unreadCount > 9 ? '9+' : conv.unreadCount}</div>` : ''}
             </div>
         `;
+        el.onmouseover = () => { el.style.background = '#f0fdf4'; };
+        el.onmouseout  = () => { el.style.background = isUnread ? '#eff6ff' : '#fff'; };
         el.onclick = () => msgLoadChat(conv.id, otherName, modal, tutorId);
         container.appendChild(el);
     });
 }
 
 function msgLoadChat(convId, name, modal, tutorId) {
-    modal.querySelector('#chat-view-header').classList.remove('hidden');
-    modal.querySelector('#chat-inputs').classList.remove('hidden');
-    modal.querySelector('#chat-title').innerText = name;
-    
+    modal.querySelector('#chat-title').textContent = name;
     const msgContainer = modal.querySelector('#chat-messages');
-    msgContainer.innerHTML = '<div class="spinner"></div>';
+    msgContainer.innerHTML = '<div style="text-align:center;margin:20px;"><div class="spinner" style="margin:auto;"></div></div>';
+    modal.querySelector('#chat-inputs').style.display = 'flex';
 
-    updateDoc(doc(db, "conversations", convId), { unreadCount: 0 });
+    // Mark as read
+    updateDoc(doc(db, "conversations", convId), { unreadCount: 0 }).catch(() => {});
 
     if (unsubChatListener) unsubChatListener();
 
-    const q = query(collection(db, "conversations", convId, "messages"));
+    const q = query(collection(db, "conversations", convId, "messages"), orderBy("createdAt", "asc"));
 
     unsubChatListener = onSnapshot(q, (snapshot) => {
-        let msgs = [];
-        snapshot.forEach(doc => msgs.push(doc.data()));
-        
-        msgs.sort((a,b) => {
-            const tA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-            const tB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
-            return tA - tB;
-        });
-
         msgContainer.innerHTML = '';
-        msgs.forEach(msg => {
+        snapshot.forEach(d => {
+            const msg = d.data();
             const isMe = msg.senderId === tutorId;
             const bubble = document.createElement('div');
-            bubble.className = `chat-bubble ${isMe ? 'me' : 'them'}`;
-            bubble.innerHTML = `
-                ${msg.subject ? `<strong>${escapeHtml(msg.subject)}</strong><br>` : ''}
-                ${escapeHtml(msg.content)}
-                <div class="timestamp">${escapeHtml(msgFormatTime(msg.createdAt))}</div>
-            `;
+            bubble.style.cssText = `display:flex;flex-direction:column;align-items:${isMe ? 'flex-end' : 'flex-start'};`;
+            const inner = document.createElement('div');
+            inner.style.cssText = `max-width:72%;background:${isMe ? '#059669' : '#fff'};color:${isMe ? '#fff' : '#1f2937'};border:1px solid ${isMe ? 'transparent' : '#e5e7eb'};border-radius:${isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px'};padding:8px 12px;font-size:0.875rem;`;
+            let html = '';
+            if (msg.subject) html += `<div style="font-weight:700;font-size:0.78rem;margin-bottom:4px;opacity:0.85;">${escapeHtml(msg.subject)}</div>`;
+            if (msg.content) html += `<div>${escapeHtml(msg.content)}</div>`;
+            if (msg.imageUrl) html += `<img src="${escapeHtml(msg.imageUrl)}" style="max-width:200px;border-radius:8px;margin-top:6px;cursor:pointer;" onclick="window.open('${escapeHtml(msg.imageUrl)}','_blank')">`;
+            html += `<div style="font-size:0.65rem;opacity:0.7;margin-top:4px;text-align:right;">${escapeHtml(msgFormatTime(msg.createdAt))}${msg.isUrgent ? ' 🔴' : ''}</div>`;
+            inner.innerHTML = html;
+            bubble.appendChild(inner);
             msgContainer.appendChild(bubble);
         });
         msgContainer.scrollTop = msgContainer.scrollHeight;
     });
 
-    const btn = modal.querySelector('#chat-send-btn');
+    // Send button
+    const sendBtn = modal.querySelector('#chat-send-btn');
     const input = modal.querySelector('#chat-input-text');
-    
-    const newBtn = btn.cloneNode(true);
-    btn.parentNode.replaceChild(newBtn, btn);
+    const imageInput = modal.querySelector('#chat-image-file');
+
+    const newBtn = sendBtn.cloneNode(true);
+    sendBtn.parentNode.replaceChild(newBtn, sendBtn);
 
     newBtn.onclick = async () => {
         const txt = input.value.trim();
-        if (!txt) return;
-        input.value = '';
+        const imgFile = imageInput.files[0] || null;
+        if (!txt && !imgFile) return;
 
-        const now = new Date();
+        newBtn.disabled = true;
+        newBtn.textContent = '…';
 
-        // 1. Send Message
-        await addDoc(collection(db, "conversations", convId, "messages"), {
-            content: txt,
-            senderId: tutorId,
-            createdAt: now,
-            read: false
-        });
+        try {
+            let imageUrl = null;
+            if (imgFile) {
+                const fd = new FormData();
+                fd.append('file', imgFile);
+                fd.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+                fd.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
+                const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`, { method: 'POST', body: fd });
+                const data = await res.json();
+                imageUrl = data.secure_url || null;
+                imageInput.value = '';
+            }
 
-        // 2. Manual Increment for Metadata
-        const convRef = doc(db, "conversations", convId);
-        // We do a quick read to get current count to be safe
-        getDoc(convRef).then(snap => {
-            const current = snap.exists() ? (snap.data().unreadCount || 0) : 0;
-            updateDoc(convRef, {
-                lastMessage: txt,
+            const now = new Date();
+            const lastMsg = imageUrl ? (txt || '📷 Image') : txt;
+
+            await addDoc(collection(db, "conversations", convId, "messages"), {
+                content: txt,
+                imageUrl: imageUrl,
+                senderId: tutorId,
+                senderName: window.tutorData.name,
+                senderRole: 'tutor',
+                createdAt: now,
+                read: false
+            });
+
+            const convRef = doc(db, "conversations", convId);
+            const snap = await getDoc(convRef);
+            const cur = snap.exists() ? (snap.data().unreadCount || 0) : 0;
+            await updateDoc(convRef, {
+                lastMessage: lastMsg,
                 lastMessageTimestamp: now,
                 lastSenderId: tutorId,
-                unreadCount: current + 1
+                unreadCount: cur + 1
             });
-        });
+
+            input.value = '';
+        } catch (e) {
+            console.error('Send error:', e);
+            showCustomAlert('Failed to send message: ' + e.message);
+        } finally {
+            newBtn.disabled = false;
+            newBtn.textContent = '➤';
+        }
     };
-    
-    input.onkeypress = (e) => { if (e.key === 'Enter') newBtn.click(); };
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); newBtn.click(); }
+    });
 }
 
 // Styles removed – now in HTML.
@@ -2502,51 +2553,50 @@ let studentCache = [];
  ******************************************************************************/
 function renderScheduleManagement(container, tutor) {
     updateActiveTab('navScheduleManagement');
-
-    const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    startPersistentClock(); // ← clock on every tab
 
     container.innerHTML = `
         <div class="hero-section">
             <h1 class="hero-title">📅 Schedule Management</h1>
-            <p class="hero-subtitle">A complete view of all your students' weekly classes</p>
+            <p class="hero-subtitle">View, set up, and edit weekly class times for all your students</p>
         </div>
 
-        <!-- Action buttons row -->
-        <div class="flex flex-wrap gap-3 mb-5">
-            <button id="view-full-calendar-btn" class="btn btn-info">📆 Full Calendar</button>
+        <!-- Action buttons -->
+        <div class="flex flex-wrap gap-3 mb-6">
             <button id="setup-all-schedules-btn" class="btn btn-primary">⚙️ Set Up / Edit Schedules</button>
-            <button id="refresh-schedule-btn" class="btn btn-secondary">🔄 Refresh</button>
+            <button id="view-full-calendar-btn"  class="btn btn-info">📆 Calendar View</button>
+            <button id="print-schedule-btn"      class="btn btn-secondary">🖨️ Print Week</button>
         </div>
 
-        <!-- Week Grid -->
-        <div class="card mb-4 overflow-x-auto">
+        <!-- Today's snapshot -->
+        <div class="card mb-6">
             <div class="card-header flex items-center gap-2">
                 <span class="text-xl">📊</span>
-                <h3 class="font-bold text-lg">Weekly Overview</h3>
-                <span class="text-xs text-gray-400 ml-2">All students' recurring classes</span>
+                <h3 class="font-bold text-lg">Today's Classes</h3>
+                <span id="today-day-label" class="ml-auto text-xs font-semibold text-gray-400"></span>
             </div>
-            <div class="card-body p-0">
-                <div id="week-grid-container" class="p-4">
-                    <div class="flex justify-center py-6"><div class="spinner"></div></div>
-                </div>
+            <div class="card-body" id="todays-schedule-inline">
+                <div class="text-center py-6"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading…</p></div>
             </div>
         </div>
 
-        <!-- Student Cards -->
+        <!-- Full week grid -->
         <div class="card">
             <div class="card-header flex items-center gap-2">
-                <span class="text-xl">👥</span>
-                <h3 class="font-bold text-lg">Students & Their Schedules</h3>
+                <span class="text-xl">🗓️</span>
+                <h3 class="font-bold text-lg">Full Week Overview</h3>
+                <span class="text-xs text-gray-400 ml-auto">Sorted by time</span>
             </div>
-            <div class="card-body" id="student-schedule-cards">
-                <div class="flex justify-center py-6"><div class="spinner"></div></div>
+            <div class="card-body p-0" id="week-grid-container">
+                <div class="text-center py-8"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading week…</p></div>
             </div>
         </div>
     `;
 
-    // Buttons
-    document.getElementById('view-full-calendar-btn')?.addEventListener('click', showScheduleCalendarModal);
-    document.getElementById('setup-all-schedules-btn')?.addEventListener('click', async () => {
+    // Wire buttons
+    document.getElementById('view-full-calendar-btn').addEventListener('click', showScheduleCalendarModal);
+    document.getElementById('print-schedule-btn').addEventListener('click', printCalendar);
+    document.getElementById('setup-all-schedules-btn').addEventListener('click', async () => {
         try {
             if (window.scheduleManager) {
                 await window.scheduleManager.openManualManager();
@@ -2557,156 +2607,102 @@ function renderScheduleManagement(container, tutor) {
             }
         } catch (err) {
             console.error(err);
-            showCustomAlert('Error opening schedule manager. Please try again.');
+            showCustomAlert('Error opening schedule manager.');
         }
     });
-    document.getElementById('refresh-schedule-btn')?.addEventListener('click', () => loadScheduleData());
 
-    // Day colors
-    const dayColors = ['bg-blue-50 border-blue-200','bg-purple-50 border-purple-200','bg-amber-50 border-amber-200',
-        'bg-green-50 border-green-200','bg-rose-50 border-rose-200','bg-indigo-50 border-indigo-200','bg-teal-50 border-teal-200'];
-    const dayTextColors = ['text-blue-700','text-purple-700','text-amber-700','text-green-700','text-rose-700','text-indigo-700','text-teal-700'];
-
-    const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Africa/Lagos' });
-
-    async function loadScheduleData() {
-        const gridContainer    = document.getElementById('week-grid-container');
-        const cardsContainer   = document.getElementById('student-schedule-cards');
-        if (gridContainer) gridContainer.innerHTML = '<div class="flex justify-center py-6"><div class="spinner"></div></div>';
-        if (cardsContainer) cardsContainer.innerHTML = '<div class="flex justify-center py-6"><div class="spinner"></div></div>';
-
+    // Load inline views
+    (async () => {
         try {
-            const snap = await getDocs(query(collection(db, 'students'), where('tutorEmail', '==', tutor.email)));
-            const students = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-                .filter(s => !['archived','graduated','transferred'].includes(s.status));
+            const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Africa/Lagos' });
+            document.getElementById('today-day-label').textContent = todayName;
 
-            // Build day → classes map
-            const dayMap = {}; // day → [{student, slot}]
-            students.forEach(s => {
-                if (!Array.isArray(s.schedule)) return;
-                s.schedule.forEach(slot => {
-                    const d = slot.day;
-                    if (!d) return;
-                    if (!dayMap[d]) dayMap[d] = [];
-                    dayMap[d].push({ student: s, slot });
+            const snap = await getDocs(query(collection(db, "students"), where("tutorEmail", "==", tutor.email)));
+            const allStudents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const active = allStudents.filter(s => !s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status));
+
+            // Today's classes
+            const todayInline = document.getElementById('todays-schedule-inline');
+            const todayClasses = [];
+            active.forEach(s => {
+                (s.schedule || []).forEach(slot => {
+                    if (slot.day === todayName) todayClasses.push({ studentName: s.studentName, grade: s.grade, subjects: s.subjects, ...slot });
                 });
             });
+            todayClasses.sort((a, b) => (a.start || '').localeCompare(b.start || ''));
 
-            // Sort each day's classes by start time
-            DAYS.forEach(d => {
-                if (dayMap[d]) dayMap[d].sort((a,b) => (a.slot.start||'').localeCompare(b.slot.start||''));
-            });
-
-            // ── Render Week Grid ──
-            if (gridContainer) {
-                if (students.length === 0) {
-                    gridContainer.innerHTML = '<p class="text-center text-gray-400 py-6">No students found. Add students and set up their schedules.</p>';
-                } else {
-                    const totalClasses = Object.values(dayMap).reduce((s,v) => s + v.length, 0);
-                    let gridHtml = `<p class="text-xs text-gray-400 mb-3">${totalClasses} class slot${totalClasses !== 1 ? 's' : ''} per week across ${students.length} student${students.length !== 1 ? 's' : ''}</p>`;
-                    gridHtml += '<div class="grid grid-cols-7 gap-2 min-w-max w-full">';
-
-                    // Header row
-                    DAYS.forEach((day, i) => {
-                        const isToday = day === todayName;
-                        gridHtml += `<div class="text-center">
-                            <div class="text-xs font-bold ${isToday ? 'text-white bg-blue-600 rounded-lg px-2 py-1' : dayTextColors[i] + ' px-2 py-1'} uppercase tracking-wide">
-                                ${day.slice(0,3)}${isToday ? ' ◀' : ''}
+            if (todayClasses.length === 0) {
+                todayInline.innerHTML = `<div class="text-center py-6"><div class="text-3xl mb-2">🌿</div><p class="text-gray-500">No classes today (${todayName}).</p></div>`;
+            } else {
+                todayInline.innerHTML = `
+                    <div class="space-y-2">
+                        ${todayClasses.map(c => `
+                        <div class="flex items-center gap-4 p-3 rounded-xl border border-gray-100 bg-gray-50 hover:bg-green-50 hover:border-green-200 transition-all">
+                            <div class="w-10 h-10 rounded-xl bg-green-100 text-green-700 flex items-center justify-center font-bold text-sm flex-shrink-0">${escapeHtml((c.studentName||'?').charAt(0))}</div>
+                            <div class="flex-1 min-w-0">
+                                <p class="font-semibold text-gray-800">${escapeHtml(c.studentName)}</p>
+                                <p class="text-xs text-gray-400">${escapeHtml(c.grade || '')}${c.subjects?.length ? ' · ' + escapeHtml(c.subjects.join(', ')) : ''}</p>
                             </div>
-                        </div>`;
-                    });
-
-                    // Class cells
-                    DAYS.forEach((day, i) => {
-                        const classes = dayMap[day] || [];
-                        const isToday = day === todayName;
-                        if (classes.length === 0) {
-                            gridHtml += `<div class="min-h-16 rounded-xl border ${isToday ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-100'} flex items-center justify-center">
-                                <span class="text-xs text-gray-300">—</span>
-                            </div>`;
-                        } else {
-                            gridHtml += `<div class="space-y-1.5 min-h-16">`;
-                            classes.forEach(({ student, slot }) => {
-                                gridHtml += `<div class="rounded-xl border ${isToday ? 'bg-blue-100 border-blue-300' : dayColors[i]} p-2 cursor-pointer hover:shadow-sm transition-all text-center"
-                                    title="${escapeHtml(student.studentName)} · ${escapeHtml(formatScheduleTime(slot.start))}–${escapeHtml(formatScheduleTime(slot.end))}">
-                                    <p class="text-xs font-bold ${dayTextColors[i]} truncate">${escapeHtml((student.studentName||'?').split(' ')[0])}</p>
-                                    <p class="text-xs ${dayTextColors[i]} opacity-80">${escapeHtml(formatScheduleTime(slot.start))}</p>
-                                    ${slot.subject ? `<p class="text-xs text-gray-500 truncate">${escapeHtml(slot.subject)}</p>` : ''}
-                                </div>`;
-                            });
-                            gridHtml += '</div>';
-                        }
-                    });
-
-                    gridHtml += '</div>';
-                    gridContainer.innerHTML = gridHtml;
-                }
-            }
-
-            // ── Render Student Cards ──
-            if (cardsContainer) {
-                if (students.length === 0) {
-                    cardsContainer.innerHTML = '<p class="text-center text-gray-400 py-6">No students found.</p>';
-                    return;
-                }
-
-                const sortedStudents = [...students].sort((a,b) => (a.studentName||'').localeCompare(b.studentName||''));
-                const cardsHtml = sortedStudents.map(s => {
-                    const slots = Array.isArray(s.schedule) ? s.schedule : [];
-                    const initials = (s.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-                    const hasToday = slots.some(sl => sl.day === todayName);
-                    const statusBadge = s.summerBreak
-                        ? '<span class="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full font-semibold">☀️ Break</span>'
-                        : s.isTransitioning
-                        ? '<span class="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full font-semibold">🔄 Transitioning</span>'
-                        : '';
-                    const todayBadge = hasToday ? '<span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">📅 Today</span>' : '';
-
-                    const slotsHtml = slots.length === 0
-                        ? '<span class="text-xs text-gray-400">No schedule set up yet</span>'
-                        : slots.sort((a,b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day)).map(sl => {
-                            const di = DAYS.indexOf(sl.day);
-                            const cc = di >= 0 ? dayColors[di] : 'bg-gray-100 border-gray-200';
-                            const tc = di >= 0 ? dayTextColors[di] : 'text-gray-600';
-                            const isToday = sl.day === todayName;
-                            return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-semibold ${isToday ? 'bg-blue-600 text-white border-blue-700' : cc + ' ' + tc}">
-                                ${escapeHtml(sl.day?.slice(0,3)||'?')} ${escapeHtml(formatScheduleTime(sl.start))}${sl.subject ? ' · '+escapeHtml(sl.subject) : ''}
-                            </span>`;
-                        }).join('');
-
-                    return `<div class="flex items-start gap-4 p-4 rounded-2xl border ${hasToday ? 'border-blue-200 bg-blue-50' : 'border-gray-100 bg-white'} hover:shadow-sm transition-all">
-                        <div class="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0"
-                             style="background:linear-gradient(135deg,#6366f1,#4f46e5)">${escapeHtml(initials)}</div>
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-center gap-2 flex-wrap mb-2">
-                                <p class="font-bold text-gray-800">${escapeHtml(s.studentName||'Unknown')}</p>
-                                <span class="text-xs text-gray-400">${escapeHtml(s.grade||'')}</span>
-                                ${statusBadge}${todayBadge}
+                            <div class="text-right flex-shrink-0">
+                                <p class="text-sm font-bold text-green-700">${escapeHtml(formatScheduleTime(c.start))} – ${escapeHtml(formatScheduleTime(c.end))}</p>
+                                ${c.isOvernight ? '<p class="text-xs text-indigo-500">🌙 Overnight</p>' : ''}
                             </div>
-                            <div class="flex flex-wrap gap-1.5">${slotsHtml}</div>
-                        </div>
-                        <button onclick="(async () => {
-                            if (!window.scheduleManager) {
-                                const fd = { db, methods: { getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc, getDoc } };
-                                window.scheduleManager = new ScheduleManager(${JSON.stringify({ email: tutor.email, name: tutor.name })}, fd);
-                            }
-                            await window.scheduleManager.openManualManager();
-                        })()" class="flex-shrink-0 btn btn-secondary btn-sm">✏️ Edit</button>
+                        </div>`).join('')}
                     </div>`;
-                }).join('');
-
-                cardsContainer.innerHTML = `<div class="space-y-3">${cardsHtml}</div>`;
             }
+
+            // Week grid
+            const weekContainer = document.getElementById('week-grid-container');
+            const scheduleByDay = {};
+            DAYS_OF_WEEK.forEach(d => { scheduleByDay[d] = []; });
+            active.forEach(s => {
+                (s.schedule || []).forEach(slot => {
+                    if (scheduleByDay[slot.day]) {
+                        scheduleByDay[slot.day].push({ studentName: s.studentName, grade: s.grade, subjects: s.subjects, ...slot });
+                    }
+                });
+            });
+            DAYS_OF_WEEK.forEach(d => scheduleByDay[d].sort((a, b) => (a.start || '').localeCompare(b.start || '')));
+
+            const totalClasses = Object.values(scheduleByDay).reduce((t, arr) => t + arr.length, 0);
+
+            let gridHtml = `<div class="overflow-x-auto"><div style="display:grid;grid-template-columns:repeat(7,minmax(120px,1fr));border-left:1px solid #e5e7eb;">`;
+            DAYS_OF_WEEK.forEach(day => {
+                const isToday = day === todayName;
+                const classes = scheduleByDay[day];
+                gridHtml += `
+                    <div style="border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;">
+                        <div style="padding:8px 10px;font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em;background:${isToday ? '#ecfdf5' : '#f9fafb'};color:${isToday ? '#059669' : '#6b7280'};border-bottom:1px solid #e5e7eb;">
+                            ${escapeHtml(day.substring(0,3))} ${isToday ? '◀' : ''}
+                            <span style="float:right;background:${isToday ? '#059669' : '#e5e7eb'};color:${isToday ? '#fff' : '#6b7280'};border-radius:999px;padding:0 6px;font-size:0.7rem;">${classes.length}</span>
+                        </div>
+                        <div style="padding:6px;min-height:80px;">
+                            ${classes.length === 0 ? '<div style="color:#d1d5db;font-size:0.7rem;text-align:center;padding:12px 4px;">No class</div>' :
+                              classes.map(c => `
+                                <div style="background:${isToday ? '#ecfdf5' : '#f3f4f6'};border:1px solid ${isToday ? '#bbf7d0' : '#e5e7eb'};border-radius:6px;padding:5px 7px;margin-bottom:4px;font-size:0.73rem;">
+                                    <div style="font-weight:700;color:#1f2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.studentName)}</div>
+                                    <div style="color:#6b7280;">${escapeHtml(formatScheduleTime(c.start))}–${escapeHtml(formatScheduleTime(c.end))}</div>
+                                    ${c.subjects?.length ? `<div style="color:#9ca3af;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.subjects.slice(0,2).join(', '))}</div>` : ''}
+                                </div>`).join('')}
+                        </div>
+                    </div>`;
+            });
+            gridHtml += `</div></div>
+            <div style="padding:12px 16px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:0.8rem;color:#6b7280;display:flex;gap:24px;flex-wrap:wrap;">
+                <span>👥 <b>${active.length}</b> active students</span>
+                <span>📚 <b>${totalClasses}</b> classes per week</span>
+                <span>🗓️ Busiest: <b>${getMostScheduledDay(scheduleByDay)}</b></span>
+                <span>⏰ Earliest: <b>${getEarliestClass(scheduleByDay)}</b></span>
+            </div>`;
+
+            weekContainer.innerHTML = gridHtml;
 
         } catch (err) {
-            console.error('Schedule load error:', err);
-            const msg = `<p class="text-red-500 text-center py-4">Error loading schedule.</p>`;
-            if (gridContainer) gridContainer.innerHTML = msg;
-            if (cardsContainer) cardsContainer.innerHTML = msg;
+            console.error(err);
+            document.getElementById('todays-schedule-inline').innerHTML = '<p class="text-red-500 text-center">Failed to load schedule.</p>';
+            document.getElementById('week-grid-container').innerHTML = '<p class="text-red-500 text-center">Failed to load week view.</p>';
         }
-    }
-
-    loadScheduleData();
+    })();
 }
 
 /*******************************************************************************
@@ -2714,6 +2710,7 @@ function renderScheduleManagement(container, tutor) {
  ******************************************************************************/
 function renderAcademic(container, tutor) {
     updateActiveTab('navAcademic');
+    startPersistentClock(); // ← clock on every tab
 
     container.innerHTML = `
         <div class="hero-section">
@@ -2917,6 +2914,7 @@ async function loadAcademicArchive(tutor) {
 function renderTutorDashboard(container, tutor) {
     // Update active tab
     updateActiveTab('navDashboard');
+    startPersistentClock(); // ← clock on every tab
     
     container.innerHTML = `
         <!-- Top bar: greeting + Lagos clock + Performance scorecard -->
@@ -3121,6 +3119,7 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
         const activeStudentMap = {};
         activeStudentsSnap.docs.forEach(d => {
             const s = d.data();
+            // Exclude: on break, archived/graduated/transferred, OR actively transitioning
             if (!s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status)) {
                 activeStudentIds.add(d.id);
                 activeStudentMap[d.id] = s;
@@ -3535,6 +3534,7 @@ function showEditStudentModal(student) {
 async function renderStudentDatabase(container, tutor) {
     // REMOVED early return check for window.fixedMonthSystemInitialized
     if (!container) return;
+    startPersistentClock(); // ← clock on every tab
 
     // Load Reports
     let savedReports = await loadReportsFromFirestore(tutor.email);
@@ -4089,6 +4089,7 @@ async function renderStudentDatabase(container, tutor) {
 
 // Auto-Registered Students Functions
 function renderAutoRegisteredStudents(container, tutor) {
+    startPersistentClock(); // ← clock on every tab
     container.innerHTML = `
         <div class="card">
             <div class="card-header">
@@ -4250,117 +4251,85 @@ let isTutorOfTheMonth = false;
  */
 async function initGamification(tutorId) {
     try {
-        // ── Step 1: Listen to the tutors doc for winner/badge info ──
         const tutorRef = doc(db, "tutors", tutorId);
-        onSnapshot(tutorRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                // Keep gamification score on tutorData for winner badge (legacy)
-                if (window.tutorData) {
-                    window.tutorData._tutorDocScore = data.performanceScore || 0;
+
+        // ── Primary: live listener on tutor doc (written by management after grading) ──
+        onSnapshot(tutorRef, async (docSnap) => {
+            if (!docSnap.exists()) return;
+            const data = docSnap.data();
+
+            // ── Authoritative: also query tutor_grades for current month directly ──
+            const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+            const monthKey = `${lagosNow.getFullYear()}-${String(lagosNow.getMonth()+1).padStart(2,'0')}`;
+            const tutorEmail = data.email || (window.tutorData && window.tutorData.email) || '';
+
+            let qaScore = null, qcScore = null;
+            let qaAdvice = '', qcAdvice = '';
+            let qaGradedByName = '', qcGradedByName = '';
+            let perfMonth = monthKey;
+
+            try {
+                const gradesSnap = await getDocs(
+                    query(collection(db, 'tutor_grades'),
+                        where('tutorEmail', '==', tutorEmail),
+                        where('month', '==', monthKey))
+                );
+
+                if (!gradesSnap.empty) {
+                    // Use tutor_grades as source-of-truth
+                    const g = gradesSnap.docs[0].data();
+                    qaScore        = (g.qa && g.qa.score != null)  ? g.qa.score  : null;
+                    qcScore        = (g.qc && g.qc.score != null)  ? g.qc.score  : null;
+                    qaAdvice       = (g.qa && g.qa.notes)          ? g.qa.notes  : '';
+                    qcAdvice       = (g.qc && g.qc.notes)          ? g.qc.notes  : '';
+                    qaGradedByName = (g.qa && g.qa.gradedByName)   ? g.qa.gradedByName : '';
+                    qcGradedByName = (g.qc && g.qc.gradedByName)   ? g.qc.gradedByName : '';
+                    perfMonth      = g.month || monthKey;
+                } else {
+                    // Fallback: use cached values from tutor doc
+                    qaScore        = data.qaScore        ?? null;
+                    qcScore        = data.qcScore        ?? null;
+                    qaAdvice       = data.qaAdvice       || '';
+                    qcAdvice       = data.qcAdvice       || '';
+                    qaGradedByName = data.qaGradedByName || '';
+                    qcGradedByName = data.qcGradedByName || '';
+                    perfMonth      = data.performanceMonth || '';
                 }
+            } catch (gradeErr) {
+                // Index not ready or permission issue – fall back to tutor doc
+                console.warn('tutor_grades query failed, using tutor doc cache:', gradeErr.message);
+                qaScore        = data.qaScore        ?? null;
+                qcScore        = data.qcScore        ?? null;
+                qaAdvice       = data.qaAdvice       || '';
+                qcAdvice       = data.qcAdvice       || '';
+                qaGradedByName = data.qaGradedByName || '';
+                qcGradedByName = data.qcGradedByName || '';
+                perfMonth      = data.performanceMonth || '';
             }
-        });
 
-        // ── Step 2: Read from tutor_grades (the real grading collection) ──
-        // tutor_grades doc structure:
-        //   { tutorId, tutorEmail, month, totalScore,
-        //     qa: { score, notes, gradedBy, gradedByName, gradedAt },
-        //     qc: { score, notes, gradedBy, gradedByName, gradedAt } }
-        const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
-        const currentMonthKey = `${lagosNow.getFullYear()}-${String(lagosNow.getMonth() + 1).padStart(2, '0')}`;
+            // Merge into window.tutorData
+            if (window.tutorData) {
+                window.tutorData.qaScore          = qaScore;
+                window.tutorData.qcScore          = qcScore;
+                window.tutorData.qaAdvice         = qaAdvice;
+                window.tutorData.qcAdvice         = qcAdvice;
+                window.tutorData.qaGradedByName   = qaGradedByName;
+                window.tutorData.qcGradedByName   = qcGradedByName;
+                window.tutorData.performanceMonth = perfMonth;
+            }
 
-        const tutorEmail = window.tutorData?.email || '';
-
-        // Build two queries (by tutorId OR tutorEmail) and pick first match
-        const gradesQueries = [
-            query(collection(db, 'tutor_grades'), where('month', '==', currentMonthKey), where('tutorId', '==', tutorId)),
-            ...(tutorEmail ? [query(collection(db, 'tutor_grades'), where('month', '==', currentMonthKey), where('tutorEmail', '==', tutorEmail))] : [])
-        ];
-
-        let gradeDoc = null;
-        for (const q of gradesQueries) {
-            const snap = await getDocs(q);
-            if (!snap.empty) { gradeDoc = snap.docs[0].data(); break; }
-        }
-
-        if (gradeDoc) {
-            const qaScore = gradeDoc.qa?.score ?? null;
-            const qcScore = gradeDoc.qc?.score ?? null;
-            const combined = (qaScore !== null && qcScore !== null)
-                ? Math.round((qaScore + qcScore) / 2)
-                : (qaScore !== null ? qaScore : (qcScore !== null ? qcScore : gradeDoc.totalScore || 0));
+            let combined = 0;
+            if (qaScore !== null && qcScore !== null) combined = Math.round((qaScore + qcScore) / 2);
+            else if (qaScore !== null) combined = qaScore;
+            else if (qcScore !== null) combined = qcScore;
 
             currentTutorScore = combined;
-
-            const breakdown = {
-                qaScore,
-                qcScore,
-                qaAdvice:       gradeDoc.qa?.notes       || '',
-                qcAdvice:       gradeDoc.qc?.notes       || '',
-                qaGradedByName: gradeDoc.qa?.gradedByName || '',
-                qcGradedByName: gradeDoc.qc?.gradedByName || '',
-                performanceMonth: gradeDoc.month || currentMonthKey
-            };
-
-            // Cache on tutorData
-            if (window.tutorData) Object.assign(window.tutorData, breakdown);
-
-            updateScoreDisplay(combined, breakdown);
-
-            // Set up a real-time listener so scorecard updates if management grades live
-            const gradesRef = query(collection(db, 'tutor_grades'), where('month', '==', currentMonthKey), where('tutorId', '==', tutorId));
-            onSnapshot(gradesRef, (snap) => {
-                if (!snap.empty) {
-                    const d = snap.docs[0].data();
-                    const qa2 = d.qa?.score ?? null;
-                    const qc2 = d.qc?.score ?? null;
-                    const comb2 = (qa2 !== null && qc2 !== null)
-                        ? Math.round((qa2 + qc2) / 2)
-                        : (qa2 !== null ? qa2 : (qc2 !== null ? qc2 : d.totalScore || 0));
-                    currentTutorScore = comb2;
-                    const bd = {
-                        qaScore: qa2, qcScore: qc2,
-                        qaAdvice: d.qa?.notes || '', qcAdvice: d.qc?.notes || '',
-                        qaGradedByName: d.qa?.gradedByName || '',
-                        qcGradedByName: d.qc?.gradedByName || '',
-                        performanceMonth: d.month || currentMonthKey
-                    };
-                    if (window.tutorData) Object.assign(window.tutorData, bd);
-                    updateScoreDisplay(comb2, bd);
-                }
+            updateScoreDisplay(combined, {
+                qaScore, qcScore, qaAdvice, qcAdvice,
+                qaGradedByName, qcGradedByName,
+                performanceMonth: perfMonth
             });
-        } else {
-            // No grade document yet for this month – show empty scorecard
-            updateScoreDisplay(0, {
-                qaScore: null, qcScore: null,
-                qaAdvice: '', qcAdvice: '',
-                qaGradedByName: '', qcGradedByName: '',
-                performanceMonth: currentMonthKey
-            });
-            // Still watch for when management adds a grade
-            const gradesRef = query(collection(db, 'tutor_grades'), where('month', '==', currentMonthKey), where('tutorId', '==', tutorId));
-            onSnapshot(gradesRef, (snap) => {
-                if (!snap.empty) {
-                    const d = snap.docs[0].data();
-                    const qa2 = d.qa?.score ?? null;
-                    const qc2 = d.qc?.score ?? null;
-                    const comb2 = (qa2 !== null && qc2 !== null)
-                        ? Math.round((qa2 + qc2) / 2)
-                        : (qa2 !== null ? qa2 : (qc2 !== null ? qc2 : d.totalScore || 0));
-                    currentTutorScore = comb2;
-                    const bd = {
-                        qaScore: qa2, qcScore: qc2,
-                        qaAdvice: d.qa?.notes || '', qcAdvice: d.qc?.notes || '',
-                        qaGradedByName: d.qa?.gradedByName || '',
-                        qcGradedByName: d.qc?.gradedByName || '',
-                        performanceMonth: d.month || currentMonthKey
-                    };
-                    if (window.tutorData) Object.assign(window.tutorData, bd);
-                    updateScoreDisplay(comb2, bd);
-                }
-            });
-        }
+        });
 
         checkWinnerStatus(tutorId);
 
@@ -4565,6 +4534,7 @@ onSnapshot(settingsDocRef, (docSnap) => {
  */
 async function renderCourses(container, tutor) {
     updateActiveTab('navCourses');
+    startPersistentClock(); // ← clock on every tab
     
     container.innerHTML = `
         <div class="hero-section">
@@ -5023,147 +4993,162 @@ function getHomeworkCutoffDate() {
 }
 
 // ==========================================
-// 2. LOAD HOMEWORK INBOX (with auto‑clear & safe date handling)
+// 2. LOAD HOMEWORK INBOX – per-student card format with accordion
 // ==========================================
-// ==========================================
-// HOMEWORK INBOX — Student cards + accordion
-// ==========================================
-// Shows ALL assignments (any status) grouped by student.
-// Each student card expands to show assignments grouped by month.
-// Submitted (ungraded) items are highlighted so the tutor can act on them.
 async function loadHomeworkInbox(tutorEmail) {
     const container = document.getElementById('homework-inbox-container');
     if (!container) return;
-    container.innerHTML = '<div class="flex justify-center py-8"><div class="spinner"></div></div>';
+    container.innerHTML = '<div class="text-center py-6"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading submissions…</p></div>';
 
     try {
-        // Fetch ALL homework for this tutor (by email OR name, whichever returns data)
-        let snap = await getDocs(query(
-            collection(db, 'homework_assignments'),
-            where('tutorEmail', '==', tutorEmail)
-        ));
-        if (snap.empty && window.tutorData?.name) {
-            snap = await getDocs(query(
-                collection(db, 'homework_assignments'),
-                where('tutorName', '==', window.tutorData.name)
-            ));
+        // Query all homework by this tutor (both name and email)
+        let q = query(
+            collection(db, "homework_assignments"),
+            where("tutorName", "==", window.tutorData.name)
+        );
+        let snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+            q = query(collection(db, "homework_assignments"), where("tutorEmail", "==", tutorEmail));
+            snapshot = await getDocs(q);
         }
 
-        if (snap.empty) {
-            container.innerHTML = `<div class="text-center py-10">
-                <div class="text-4xl mb-3">📭</div>
-                <p class="text-gray-500 font-medium">No homework records found.</p>
-            </div>`;
+        if (snapshot.empty) {
+            container.innerHTML = `<div class="text-center py-6"><div class="text-3xl mb-2">📭</div><p class="text-gray-500">No homework assignments sent yet.</p></div>`;
+            const badge = document.getElementById('inbox-count');
+            if (badge) badge.textContent = '0';
             return;
         }
 
-        // Group by student
-        const byStudent = {}; // studentId → { name, items[] }
-        snap.docs.forEach(d => {
-            const hw = { id: d.id, ...d.data() };
-            const sid = hw.studentId || hw.studentName || 'unknown';
-            if (!byStudent[sid]) byStudent[sid] = { name: hw.studentName || 'Unknown Student', items: [] };
-            byStudent[sid].items.push(hw);
+        // Group all assignments by studentId
+        const studentMap = {}; // { studentId: { name, assignments: [] } }
+        snapshot.forEach(d => {
+            const data = { id: d.id, ...d.data() };
+            const sid = data.studentId || data.studentName || 'unknown';
+            if (!studentMap[sid]) {
+                studentMap[sid] = { name: data.studentName || 'Unknown', assignments: [] };
+            }
+            studentMap[sid].assignments.push(data);
         });
 
-        const students = Object.values(byStudent).sort((a, b) => a.name.localeCompare(b.name));
+        // Count pending submissions
+        let pendingTotal = 0;
+        Object.values(studentMap).forEach(s => {
+            s.assignments.forEach(a => { if (a.status === 'submitted') pendingTotal++; });
+            // Sort newest first
+            s.assignments.sort((a, b) => {
+                const getTs = x => x.assignedDate?.toDate ? x.assignedDate.toDate() : new Date(x.assignedDate || x.createdAt || 0);
+                return getTs(b) - getTs(a);
+            });
+        });
 
-        // Update inbox count badge
-        const totalSubmitted = snap.docs.filter(d => d.data().status === 'submitted').length;
-        const countBadge = document.getElementById('inbox-count');
-        if (countBadge) countBadge.textContent = totalSubmitted > 0 ? `${totalSubmitted} pending` : '✓ all graded';
+        const badge = document.getElementById('inbox-count');
+        if (badge) badge.textContent = pendingTotal > 0 ? pendingTotal : '✓';
 
-        // ── Render student cards ──
-        const wrapper = document.createElement('div');
-        wrapper.className = 'space-y-3';
+        // Render per-student cards
+        const sortedStudents = Object.entries(studentMap).sort((a, b) => {
+            // Students with pending submissions first
+            const aPending = a[1].assignments.filter(x => x.status === 'submitted').length;
+            const bPending = b[1].assignments.filter(x => x.status === 'submitted').length;
+            return bPending - aPending;
+        });
 
-        students.forEach(({ name, items }) => {
-            const pendingCount = items.filter(i => i.status === 'submitted').length;
-            const initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+        let html = '<div class="space-y-3">';
+        sortedStudents.forEach(([sid, student]) => {
+            const pending = student.assignments.filter(a => a.status === 'submitted').length;
+            const graded  = student.assignments.filter(a => a.status === 'graded').length;
+            const total   = student.assignments.length;
 
-            // Group items by month for this student
+            // Group by month for accordion
             const byMonth = {};
-            items.forEach(hw => {
-                const raw = hw.assignedAt || hw.createdAt || hw.uploadedAt;
-                const date = raw?.toDate ? raw.toDate() : (raw?.seconds ? new Date(raw.seconds * 1000) : new Date(raw || ''));
-                const mk = isNaN(date) ? 'Unknown' : `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+            student.assignments.forEach(a => {
+                const raw = a.assignedDate || a.createdAt;
+                const d = raw?.toDate ? raw.toDate() : new Date(raw || 0);
+                if (isNaN(d.getTime())) return;
+                const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
                 if (!byMonth[mk]) byMonth[mk] = [];
-                byMonth[mk].push({ ...hw, _date: date });
+                byMonth[mk].push(a);
             });
 
-            const sortedMonths = Object.keys(byMonth).sort((a,b) => b.localeCompare(a));
+            const monthKeys = Object.keys(byMonth).sort((a,b) => b.localeCompare(a));
 
-            // Build month accordions HTML
-            const monthsHtml = sortedMonths.map(mk => {
-                const [y, m] = mk === 'Unknown' ? ['?','?'] : mk.split('-');
-                const monthLabel = mk === 'Unknown' ? 'Unknown Date' :
-                    new Date(parseInt(y), parseInt(m)-1, 1).toLocaleString('en-NG', { month:'long', year:'numeric' });
-                const mItems = byMonth[mk].sort((a,b) => (b._date - a._date));
-
-                const itemsHtml = mItems.map(hw => {
-                    const statusColors = {
-                        submitted: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-                        graded:    'bg-green-100  text-green-800  border-green-200',
-                        assigned:  'bg-blue-100   text-blue-800   border-blue-200'
-                    };
-                    const statusColor = statusColors[hw.status] || 'bg-gray-100 text-gray-600 border-gray-200';
-                    const statusLabel = { submitted:'⏳ Submitted', graded:'✅ Graded', assigned:'📋 Assigned' }[hw.status] || hw.status;
-                    const dateStr = hw._date && !isNaN(hw._date) ? hw._date.toLocaleDateString('en-NG', {day:'2-digit', month:'short', year:'numeric'}) : '—';
-                    const isSubmitted = hw.status === 'submitted';
-
-                    return `<div class="flex items-center gap-3 p-3 rounded-xl ${isSubmitted ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50 border border-gray-100'} hover:shadow-sm transition-all">
-                        <div class="flex-1 min-w-0">
-                            <p class="font-semibold text-gray-800 text-sm truncate">${escapeHtml(hw.title || 'Untitled')}</p>
-                            <p class="text-xs text-gray-400">${dateStr}${hw.score != null ? ` · Score: ${hw.score}/100` : ''}</p>
-                        </div>
-                        <div class="flex items-center gap-2 flex-shrink-0">
-                            <span class="text-xs font-bold px-2 py-0.5 rounded-full border ${statusColor}">${statusLabel}</span>
-                            ${isSubmitted ? `<button onclick="openGradingModal('${escapeHtml(hw.id)}')" class="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 font-semibold transition-colors">Grade</button>` :
-                              hw.status === 'graded' ? `<button onclick="openGradingModal('${escapeHtml(hw.id)}')" class="text-xs border border-gray-300 text-gray-600 px-3 py-1 rounded-lg hover:bg-gray-50 font-semibold transition-colors">Review</button>` : ''}
-                        </div>
-                    </div>`;
-                }).join('');
-
-                const monthPending = mItems.filter(i => i.status === 'submitted').length;
-                return `<details class="border border-gray-100 rounded-xl overflow-hidden mt-2">
-                    <summary class="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 list-none select-none bg-white">
-                        <span class="text-sm font-semibold text-gray-700 flex-1">${escapeHtml(monthLabel)}</span>
-                        ${monthPending > 0 ? `<span class="bg-yellow-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">${monthPending} pending</span>` : ''}
-                        <span class="text-xs text-gray-400">${mItems.length} item${mItems.length !== 1 ? 's' : ''}</span>
-                        <i class="fas fa-chevron-down text-gray-300 text-xs ml-1"></i>
-                    </summary>
-                    <div class="p-3 space-y-2 bg-white border-t border-gray-100">${itemsHtml}</div>
-                </details>`;
-            }).join('');
-
-            // Student card (outer accordion)
-            const card = document.createElement('details');
-            card.className = 'bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all';
-            if (pendingCount > 0) card.open = true; // auto-expand if has pending
-            card.innerHTML = `
+            html += `
+            <details class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                 <summary class="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 list-none select-none">
-                    <div class="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0"
-                         style="background:linear-gradient(135deg,#3b82f6,#1d4ed8)">${escapeHtml(initials)}</div>
-                    <div class="flex-1 min-w-0">
-                        <p class="font-bold text-gray-800">${escapeHtml(name)}</p>
-                        <p class="text-xs text-gray-400">${items.length} total assignment${items.length !== 1 ? 's' : ''}</p>
+                    <div class="w-10 h-10 rounded-full ${pending > 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'} flex items-center justify-center font-bold text-base flex-shrink-0">
+                        ${escapeHtml((student.name||'?').charAt(0))}
                     </div>
-                    <div class="flex items-center gap-2 flex-shrink-0">
-                        ${pendingCount > 0 ? `<span class="bg-yellow-500 text-white text-xs px-3 py-1 rounded-full font-bold">⏳ ${pendingCount} to grade</span>` : '<span class="text-xs text-green-600 font-semibold">✓ All reviewed</span>'}
-                        <i class="fas fa-chevron-down text-gray-300 text-xs"></i>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-semibold text-gray-800">${escapeHtml(student.name)}</div>
+                        <div class="text-xs text-gray-400">${total} assignment${total!==1?'s':''} · ${graded} graded</div>
+                    </div>
+                    <div class="flex gap-2 flex-shrink-0">
+                        ${pending > 0 ? `<span class="bg-amber-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">${pending} to review</span>` : '<span class="bg-green-100 text-green-700 text-xs font-bold px-2.5 py-1 rounded-full">All clear</span>'}
                     </div>
                 </summary>
-                <div class="px-4 pb-4 border-t border-gray-100 bg-gray-50">${monthsHtml}</div>
-            `;
-            wrapper.appendChild(card);
-        });
 
-        container.innerHTML = '';
-        container.appendChild(wrapper);
+                <!-- Per-month accordion inside -->
+                <div class="border-t border-gray-100">
+                    ${monthKeys.map(mk => {
+                        const [y, m] = mk.split('-');
+                        const label = new Date(parseInt(y), parseInt(m)-1, 1).toLocaleString('en-NG', { month:'long', year:'numeric' });
+                        const items = byMonth[mk];
+                        return `
+                        <details class="border-b border-gray-50 last:border-0">
+                            <summary class="flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-gray-50 list-none select-none">
+                                <span class="text-sm font-semibold text-gray-600">${escapeHtml(label)}</span>
+                                <span class="ml-auto text-xs text-gray-400">${items.length} item${items.length!==1?'s':''}</span>
+                                <i class="fas fa-chevron-right text-gray-300 text-xs ml-1"></i>
+                            </summary>
+                            <div class="px-5 pb-4 space-y-2 bg-gray-50">
+                                ${items.map(a => {
+                                    const assignedDate = (() => {
+                                        const raw = a.assignedDate || a.createdAt;
+                                        const d = raw?.toDate ? raw.toDate() : new Date(raw || 0);
+                                        return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleDateString('en-NG');
+                                    })();
+                                    const submittedDate = (() => {
+                                        if (!a.submittedAt) return null;
+                                        const d = a.submittedAt?.toDate ? a.submittedAt.toDate() : new Date(a.submittedAt);
+                                        return isNaN(d.getTime()) ? null : d.toLocaleDateString('en-NG');
+                                    })();
+                                    const statusColor = a.status === 'graded' ? 'text-green-700 bg-green-100' :
+                                                        a.status === 'submitted' ? 'text-amber-700 bg-amber-100' : 'text-gray-600 bg-gray-100';
+                                    const statusLabel = a.status === 'graded' ? 'Graded' :
+                                                        a.status === 'submitted' ? 'Submitted — Needs Review' : 'Assigned';
+                                    return `
+                                    <div class="bg-white border border-gray-200 rounded-lg p-3">
+                                        <div class="flex items-start justify-between gap-2">
+                                            <div class="flex-1 min-w-0">
+                                                <div class="font-medium text-gray-800 text-sm">${escapeHtml(a.title || 'Untitled')}</div>
+                                                ${a.description ? `<div class="text-xs text-gray-500 mt-0.5 line-clamp-2">${escapeHtml(a.description)}</div>` : ''}
+                                                <div class="flex gap-3 mt-1.5 text-xs text-gray-400 flex-wrap">
+                                                    <span>Assigned: ${escapeHtml(assignedDate)}</span>
+                                                    <span>Due: ${escapeHtml(a.dueDate || '—')}</span>
+                                                    ${submittedDate ? `<span>Submitted: ${escapeHtml(submittedDate)}</span>` : ''}
+                                                    ${a.score != null ? `<span class="font-bold text-blue-600">Score: ${escapeHtml(String(a.score))}/100</span>` : ''}
+                                                </div>
+                                            </div>
+                                            <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
+                                                <span class="text-xs font-bold px-2 py-0.5 rounded-full ${statusColor}">${statusLabel}</span>
+                                                ${a.status === 'submitted' ? `<button onclick="openGradingModal('${escapeHtml(a.id)}')" class="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">Review</button>` : ''}
+                                                ${a.fileUrl ? `<a href="${escapeHtml(a.fileUrl)}" target="_blank" class="text-xs text-blue-500 hover:underline">View File</a>` : ''}
+                                            </div>
+                                        </div>
+                                    </div>`;
+                                }).join('')}
+                            </div>
+                        </details>`;
+                    }).join('')}
+                </div>
+            </details>`;
+        });
+        html += '</div>';
+        container.innerHTML = html;
 
     } catch (error) {
-        console.error('Inbox Error:', error);
-        container.innerHTML = `<p class="text-red-500 text-center py-6">Error loading inbox: ${escapeHtml(error.message)}</p>`;
+        console.error("Inbox Error:", error);
+        container.innerHTML = '<p class="text-red-500 text-center py-4">Error loading homework archive.</p>';
     }
 }
 
