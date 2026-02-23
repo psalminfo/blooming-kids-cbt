@@ -5575,90 +5575,126 @@ window.openGradingModal = openGradingModal;
 
 
 /*******************************************************************************
- * SECTION 15A: STEALTH BYPASS FOR MONTH SUBMISSION ISSUE
+ * SECTION 15A: STEALTH BYPASS FOR MONTH SUBMISSION ISSUE (RELIABLE VERSION)
  * 
  * INVISIBLE FIX: Works underground without showing any buttons
  * No UI changes - tutors won't know it's there
  ******************************************************************************/
 
-console.log("🕵️ STEALTH BYPASS ACTIVE - Working underground");
+console.log("🕵️ STEALTH BYPASS (Reliable) initializing...");
 
-// ============================================
-// 1. STEALTH OVERRIDE - NO VISIBLE CHANGES
-// ============================================
+(function() {
+    'use strict';
 
-// Store original function stealthily
-if (!window._originalRenderStudentDatabase) {
-    window._originalRenderStudentDatabase = window.renderStudentDatabase;
-}
-
-// Create stealth version
-window.renderStudentDatabase = async function(container, tutor) {
-    // Call original function
-    const result = await window._originalRenderStudentDatabase.call(this, container, tutor);
-    
-    // Stealthily fix submit button after render
-    setTimeout(() => {
-        stealthFixSubmitButton(tutor.email);
-    }, 300);
-    
-    return result;
-};
-
-// ============================================
-// 2. STEALTH FIX FUNCTION - NO UI CHANGES
-// ============================================
-
-async function stealthFixSubmitButton(tutorEmail) {
-    try {
-        // Load saved reports silently
-        const savedReports = await loadReportsFromFirestore(tutorEmail);
-        const savedCount = Object.keys(savedReports).length;
-        
-        if (savedCount === 0) return;
-        
-        // Check existing submit button
-        const existingBtn = document.getElementById('submit-all-reports-btn');
-        
-        if (existingBtn) {
-            // Button exists - just enable it if disabled
-            if (existingBtn.disabled) {
-                existingBtn.disabled = false;
-                existingBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                existingBtn.classList.add('hover:bg-green-800');
-                
-                // Log quietly (only in console)
-                console.log("🕵️ Stealth: Enabled existing submit button");
+    // ============================================
+    // 1. Wait for global functions to be available
+    // ============================================
+    function waitFor(condition, callback, interval = 200, maxAttempts = 30) {
+        let attempts = 0;
+        const timer = setInterval(() => {
+            attempts++;
+            if (condition()) {
+                clearInterval(timer);
+                callback();
+            } else if (maxAttempts && attempts >= maxAttempts) {
+                clearInterval(timer);
+                console.warn("🕵️ Wait condition timed out");
             }
-        } else {
-            // Button doesn't exist - inject it stealthily
-            stealthInjectSubmitButton(savedCount, savedReports);
-        }
-        
-    } catch (error) {
-        // Silent fail - don't show errors to users
-        console.error("Stealth fix error:", error);
+        }, interval);
     }
-}
 
-// ============================================
-// 3. STEALTH INJECTION - BLENDS WITH EXISTING UI
-// ============================================
+    // ============================================
+    // 2. Override renderStudentDatabase (after it exists)
+    // ============================================
+    function overrideRender() {
+        if (!window.renderStudentDatabase) return;
+        if (window._originalRenderStudentDatabase) return; // already stored
 
-function stealthInjectSubmitButton(savedCount, savedReports) {
-    // Find the exact spot where original button should be
-    const studentListView = document.getElementById('student-list-view');
-    if (!studentListView) return;
-    
-    // Look for the table container
-    const tableContainer = studentListView.querySelector('.overflow-x-auto');
-    if (!tableContainer) return;
-    
-    // Check if there's already a submit section (look for similar structure)
-    const existingSubmitSection = studentListView.querySelector('.mt-6.text-right');
-    
-    if (!existingSubmitSection) {
-        // Create button that looks exactly like the original
+        window._originalRenderStudentDatabase = window.renderStudentDatabase;
+
+        window.renderStudentDatabase = async function(container, tutor) {
+            const result = await window._originalRenderStudentDatabase.call(this, container, tutor);
+            setTimeout(() => stealthFixSubmitButton(tutor.email), 300);
+            return result;
+        };
+        console.log("🕵️ renderStudentDatabase overridden");
+    }
+
+    waitFor(() => typeof window.renderStudentDatabase === 'function', overrideRender);
+
+    // ============================================
+    // 3. Override month check (submittedStudentIds)
+    // ============================================
+    function overrideMonthCheck() {
+        if (!(window.submittedStudentIds instanceof Set)) return;
+
+        window._originalSubmittedIds = window.submittedStudentIds;
+
+        Object.defineProperty(window, 'submittedStudentIds', {
+            get: function() {
+                return new Set(); // always return empty
+            },
+            set: function(val) {
+                window._originalSubmittedIds = val;
+            },
+            configurable: true
+        });
+        console.log("🕵️ Month check overridden");
+    }
+
+    waitFor(() => window.submittedStudentIds instanceof Set, overrideMonthCheck);
+
+    // ============================================
+    // 4. Core fix function (enables/injects button)
+    // ============================================
+    async function stealthFixSubmitButton(tutorEmail) {
+        try {
+            const savedReports = await loadReportsFromFirestore(tutorEmail);
+            const savedCount = Object.keys(savedReports).length;
+            if (savedCount === 0) return;
+
+            const existingBtn = document.getElementById('submit-all-reports-btn');
+
+            if (existingBtn) {
+                // Enable if disabled
+                if (existingBtn.disabled) {
+                    existingBtn.disabled = false;
+                    existingBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    existingBtn.classList.add('hover:bg-green-800');
+                    console.log("🕵️ Enabled existing submit button");
+                }
+                // Attach our own click handler (replace any existing)
+                existingBtn.replaceWith(existingBtn.cloneNode(true));
+                const newBtn = document.getElementById('submit-all-reports-btn');
+                newBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const reportsArray = Object.values(savedReports);
+                    if (window.showAccountDetailsModal) {
+                        window.showAccountDetailsModal(reportsArray);
+                    } else {
+                        alert("No submission modal available");
+                    }
+                });
+            } else {
+                // Inject button if missing
+                stealthInjectSubmitButton(savedReports);
+            }
+        } catch (error) {
+            console.error("🕵️ Fix error:", error);
+        }
+    }
+
+    function stealthInjectSubmitButton(savedReports) {
+        const studentListView = document.getElementById('student-list-view');
+        if (!studentListView) return;
+
+        const tableContainer = studentListView.querySelector('.overflow-x-auto');
+        if (!tableContainer) return;
+
+        // Avoid duplicate injection
+        if (studentListView.querySelector('#submit-all-reports-btn')) return;
+
         const buttonHTML = `
             <div class="mt-6 text-right">
                 <button id="submit-all-reports-btn" 
@@ -5667,143 +5703,78 @@ function stealthInjectSubmitButton(savedCount, savedReports) {
                 </button>
             </div>
         `;
-        
-        // Insert after the table
         tableContainer.insertAdjacentHTML('afterend', buttonHTML);
-        
-        // Add stealth click handler
+
         document.getElementById('submit-all-reports-btn').addEventListener('click', function(e) {
             e.preventDefault();
             const reportsArray = Object.values(savedReports);
-            showAccountDetailsModal(reportsArray);
+            window.showAccountDetailsModal(reportsArray);
         });
-        
-        console.log("🕵️ Stealth: Injected submit button");
+
+        console.log("🕵️ Injected submit button");
     }
-}
 
-// ============================================
-// 4. MONTH CHECK BYPASS - SILENT OVERRIDE
-// ============================================
+    // ============================================
+    // 5. Auto-run when tutor data appears
+    // ============================================
+    function watchTutorData() {
+        waitFor(() => window.tutorData && window.tutorData.email, () => {
+            const email = window.tutorData.email;
+            // Run immediately and then periodically
+            stealthFixSubmitButton(email);
+            setInterval(() => stealthFixSubmitButton(email), 3000);
+        });
+    }
+    watchTutorData();
 
-// Intercept the submission checking logic
-function stealthOverrideMonthCheck() {
-    // This runs after page loads to find and patch month checking
-    setTimeout(() => {
-        // Look for the problematic variable
-        if (window.submittedStudentIds && window.submittedStudentIds instanceof Set) {
-            // Store original
-            window._originalSubmittedIds = window.submittedStudentIds;
-            
-            // Create proxy that always returns empty for current month
-            Object.defineProperty(window, 'submittedStudentIds', {
-                get: function() {
-                    // Return empty set for current month checks
-                    // This allows submissions regardless of previous submissions
-                    return new Set();
-                },
-                set: function(value) {
-                    // Still allow setting, but store separately
-                    window._originalSubmittedIds = value;
-                },
-                configurable: true
-            });
-            
-            console.log("🕵️ Stealth: Overrode month checking");
-        }
-    }, 2000);
-}
-
-// ============================================
-// 5. AUTO-ENABLE ON PAGE LOAD
-// ============================================
-
-// Silent initialization
-(function() {
-    console.log("🕵️ Stealth bypass initializing...");
-    
-    // Start stealth override
-    stealthOverrideMonthCheck();
-    
-    // Auto-fix when tutor data is available
-    const checkInterval = setInterval(() => {
-        if (window.tutorData) {
-            clearInterval(checkInterval);
-            
-            // Initial fix
-            setTimeout(() => stealthFixSubmitButton(window.tutorData.email), 1000);
-            
-            // Periodic checks (every 2 seconds for 10 seconds)
-            let checks = 0;
-            const periodicCheck = setInterval(() => {
-                stealthFixSubmitButton(window.tutorData.email);
-                checks++;
-                if (checks >= 5) clearInterval(periodicCheck);
-            }, 2000);
-        }
-    }, 500);
-    
-    // Also fix on any button clicks (capture phase)
-    document.addEventListener('click', function(e) {
-        // If any report-related button is clicked, re-check submit button
-        if (e.target.matches('.enter-report-btn, .submit-single-report-btn, [id*="report"]')) {
-            setTimeout(() => {
-                if (window.tutorData) {
+    // ============================================
+    // 6. MutationObserver to catch button changes
+    // ============================================
+    const observer = new MutationObserver((mutations) => {
+        for (const mut of mutations) {
+            if (mut.type === 'attributes' && mut.target.id === 'submit-all-reports-btn') {
+                if (window.tutorData) stealthFixSubmitButton(window.tutorData.email);
+            }
+            if (mut.addedNodes.length) {
+                if (document.getElementById('submit-all-reports-btn') && window.tutorData) {
                     stealthFixSubmitButton(window.tutorData.email);
                 }
+            }
+        }
+    });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'class'] });
+
+    // ============================================
+    // 7. Click listener for report-related buttons
+    // ============================================
+    document.addEventListener('click', function(e) {
+        if (e.target.matches('.enter-report-btn, .submit-single-report-btn, [id*="report"]')) {
+            setTimeout(() => {
+                if (window.tutorData) stealthFixSubmitButton(window.tutorData.email);
             }, 500);
         }
     }, true);
-    
-    console.log("🕵️ Stealth bypass ready");
+
+    // ============================================
+    // 8. Debug helpers (console only)
+    // ============================================
+    window._stealthDebug = function() {
+        console.group("🕵️ STEALTH DEBUG (Reliable)");
+        console.log("Tutor:", window.tutorData ? window.tutorData.email : "Not loaded");
+        console.log("Original function stored:", !!window._originalRenderStudentDatabase);
+        console.log("Month override active:", window.submittedStudentIds instanceof Set && window._originalSubmittedIds !== undefined);
+        const btn = document.getElementById('submit-all-reports-btn');
+        console.log("Submit button exists:", !!btn);
+        if (btn) {
+            console.log("Button disabled:", btn.disabled);
+            console.log("Button classes:", btn.className);
+        }
+        console.groupEnd();
+    };
+
+    window._stealthForceFix = function() {
+        if (window.tutorData) stealthFixSubmitButton(window.tutorData.email);
+    };
+
+    console.log("🕵️ Stealth bypass (reliable) ready");
 })();
-
-// ============================================
-// 6. STEALTH DEBUGGING (CONSOLE ONLY)
-// ============================================
-
-// Hidden debug commands (only in console)
-window._stealthDebug = function() {
-    console.group("🕵️ STEALTH DEBUG (Hidden from users)");
-    console.log("Status: ACTIVE");
-    console.log("Tutor:", window.tutorData ? window.tutorData.email : "Not loaded");
-    console.log("Saved reports:", window.savedReports ? Object.keys(window.savedReports).length : 0);
-    console.log("Original function saved:", !!window._originalRenderStudentDatabase);
-    console.log("Submit button exists:", !!document.getElementById('submit-all-reports-btn'));
-    console.groupEnd();
-};
-
-window._stealthForceFix = function() {
-    if (window.tutorData) {
-        stealthFixSubmitButton(window.tutorData.email);
-        console.log("🕵️ Manual fix triggered");
-    }
-};
-
-// ============================================
-// 7. CLEANUP ON UNLOAD
-// ============================================
-
-// Restore original on page unload (if needed)
-window.addEventListener('beforeunload', function() {
-    // Can restore original function here if needed
-    // window.renderStudentDatabase = window._originalRenderStudentDatabase;
-});
-
-/*******************************************************************************
- * END OF STEALTH BYPASS
- * 
- * FEATURES:
- * - No visible UI changes
- * - No floating buttons
- * - Works automatically
- * - Tutors won't know it's there
- * - Easy to remove (just delete this section)
- * 
- * TO REMOVE: Simply delete this entire SECTION 15A
- * 
- * DEBUGGING (console only):
- * _stealthDebug() - Show status
- * _stealthForceFix() - Manual trigger
- ******************************************************************************/
-
