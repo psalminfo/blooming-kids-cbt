@@ -429,7 +429,7 @@ function showCustomAlert(message) {
 
 // Update active tab with smooth fade transition
 function updateActiveTab(activeTabId) {
-    const navTabs = ['navDashboard', 'navStudentDatabase', 'navAutoStudents', 'navScheduleManagement', 'navAcademic', 'navCourses'];
+    const navTabs = ['navDashboard', 'navStudentDatabase', 'navScheduleManagement', 'navAcademic', 'navCourses'];
     navTabs.forEach(tabId => {
         const tab = document.getElementById(tabId);
         if (tab) {
@@ -3117,12 +3117,16 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
         ));
         const activeStudentIds = new Set();
         const activeStudentMap = {};
+        const breakOrTransitionNames = new Set(); // extra name-based guard
         activeStudentsSnap.docs.forEach(d => {
             const s = d.data();
             // Exclude: on break, archived/graduated/transferred, OR actively transitioning
             if (!s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status)) {
                 activeStudentIds.add(d.id);
                 activeStudentMap[d.id] = s;
+            } else {
+                // Track names of excluded students so we can also filter by name
+                if (s.studentName) breakOrTransitionNames.add(s.studentName.trim().toLowerCase());
             }
         });
 
@@ -3155,8 +3159,9 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
 
         assessmentsSnapshot.forEach(docSnap => {
             const data = docSnap.data();
-            // Skip break / inactive students
+            // Skip break / inactive students — by ID or by name fallback
             if (data.studentId && !activeStudentIds.has(data.studentId)) return;
+            if (!data.studentId && data.studentName && breakOrTransitionNames.has(data.studentName.trim().toLowerCase())) return;
 
             const needsFeedback = data.answers && data.answers.some(answer => 
                 answer.type === 'creative-writing' && 
@@ -3179,6 +3184,7 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
         creativeWritingSnapshot.forEach(docSnap => {
             const data = docSnap.data();
             if (data.studentId && !activeStudentIds.has(data.studentId)) return;
+            if (!data.studentId && data.studentName && breakOrTransitionNames.has(data.studentName.trim().toLowerCase())) return;
 
             const needsFeedback = !data.tutorReport || data.tutorReport.trim() === '';
 
@@ -3534,6 +3540,7 @@ function showEditStudentModal(student) {
 async function renderStudentDatabase(container, tutor) {
     // REMOVED early return check for window.fixedMonthSystemInitialized
     if (!container) return;
+    updateActiveTab('navStudentDatabase');
     startPersistentClock(); // ← clock on every tab
 
     // Load Reports
@@ -4815,6 +4822,15 @@ async function loadCourseMaterials(studentId, container, tutor) {
 // Main App Initialization
 document.addEventListener('DOMContentLoaded', async () => {
     onAuthStateChanged(auth, async (user) => {
+        // Remove any full-page loading overlay that the HTML might inject
+        const loadingOverlay = document.getElementById('loading-overlay') ||
+                               document.getElementById('auth-loading') ||
+                               document.getElementById('page-loader') ||
+                               document.querySelector('.loading-screen, .app-loader, .splash-screen, [data-loading]');
+        if (loadingOverlay) {
+            loadingOverlay.style.display = 'none';
+            loadingOverlay.remove();
+        }
         if (user) {
             const tutorQuery = query(collection(db, "tutors"), where("email", "==", user.email.trim()));
             const querySnapshot = await getDocs(tutorQuery);
@@ -4840,6 +4856,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 
                 window.tutorData = tutorData;
+                
+                // Expose Firebase config so the grading-tab can initialise its own Firebase instance
+                if (!window.__firebaseConfig) {
+                    // Try to read the config from the already-initialised Firebase app
+                    try {
+                        const _app = (await import('./firebaseConfig.js')).default || {};
+                        window.__firebaseConfig = _app.options || null;
+                    } catch(_) {
+                        // Will be null – the grading tab will log a warning
+                    }
+                }
                 
                 if (shouldShowEmploymentPopup(tutorData)) {
                     showEmploymentDatePopup(tutorData);
@@ -4913,11 +4940,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     addNavListener('navDashboard', renderTutorDashboard);
     addNavListener('navStudentDatabase', renderStudentDatabase);
-    addNavListener('navAutoStudents', renderAutoRegisteredStudents);
+    // navAutoStudents removed – tab is disabled
     addNavListener('navScheduleManagement', renderScheduleManagement);
     addNavListener('navAcademic', renderAcademic);
     // NEW: Courses tab listener
     addNavListener('navCourses', renderCourses);
+    
+    // ── Game window helper ─────────────────────────────────────────────────
+    // Call window.openGameWindow(url) from HTML game buttons.
+    // Uses focus() to ensure the new tab appears in front, not behind.
+    window.openGameWindow = function(url) {
+        const gw = window.open(url, 'tutorGameWindow', 'noopener');
+        if (gw) { gw.focus(); } else { window.location.href = url; }
+    };
     
     // Add inbox navigation to the sidebar if it doesn't exist
     setTimeout(() => {
@@ -5153,7 +5188,7 @@ async function loadHomeworkInbox(tutorEmail) {
 }
 
 // ==========================================
-// 3. OPEN GRADING MODAL (unchanged – safe)
+// 3. OPEN GRADING TAB (opens in a new browser tab)
 // ==========================================
 async function openGradingModal(homeworkId) {
     let hwData;
@@ -5163,81 +5198,236 @@ async function openGradingModal(homeworkId) {
         hwData = { id: docSnap.id, ...docSnap.data() };
     } catch (e) { return alert("Error loading assignment"); }
 
-    const modal = document.createElement('div');
-    modal.className = 'gc-grading-overlay';
-    
-    const hasFile = hwData.submissionUrl && hwData.submissionUrl.length > 5;
-    const fileArea = hasFile ? 
-        `<div class="gc-file-preview"><div class="gc-file-icon">📄</div><div class="mb-2 font-medium">Student Submission</div><a href="${escapeHtml(hwData.submissionUrl)}" target="_blank" class="gc-download-btn">View File</a></div>` : 
-        `<div class="gc-file-preview"><div class="gc-file-icon">⚠️</div><div class="text-gray-500">No file attached</div></div>`;
+    // ── Serialise what the new tab needs ─────────────────────────────────
+    const submissionUrl  = hwData.submissionUrl  || '';
+    const referenceUrl   = hwData.fileUrl        || '';
+    const studentName    = hwData.studentName    || '';
+    const title          = hwData.title          || 'Untitled';
+    const description    = hwData.description    || '';
+    const existingScore  = hwData.score          != null ? hwData.score  : '';
+    const existingFeedback = hwData.feedback     || '';
+    const tutorEmail     = window.tutorData?.email || '';
+    const tutorName      = window.tutorData?.name  || '';
 
-    modal.innerHTML = `
-        <div class="gc-grading-container">
-            <header class="gc-grading-header">
-                <div class="flex items-center">
-                    <button class="mr-4 text-gray-500 hover:text-gray-800 text-2xl" onclick="this.closest('.gc-grading-overlay').remove()">✕</button>
-                    <div><span class="gc-student-name">${escapeHtml(hwData.studentName)}</span><span class="gc-assignment-title"> ➤ ${escapeHtml(hwData.title)}</span></div>
-                </div>
-            </header>
-            <div class="gc-grading-body">
-                <div class="gc-work-panel">
-                    ${fileArea}
-                    <div class="w-full max-w-2xl mt-6 border-t pt-4">
-                        <div class="text-xs font-bold text-gray-500 uppercase mb-2">Original Instructions</div>
-                        <div class="text-gray-700 text-sm">${escapeHtml(hwData.description)}</div>
-                        ${hwData.fileUrl ? `<div class="mt-2"><a href="${escapeHtml(hwData.fileUrl)}" target="_blank" class="text-blue-600 text-xs hover:underline">View Assignment Reference</a></div>` : ''}
-                    </div>
-                </div>
-                <div class="gc-grading-sidebar">
-                    <div class="mb-6">
-                        <label class="font-medium text-gray-700 block mb-2">Grade</label>
-                        <div class="flex items-center gap-2">
-                            <input type="number" id="gc-score-input" class="gc-grade-input" min="0" max="100" value="${escapeHtml(hwData.score || '')}">
-                            <span class="text-gray-500 text-sm">/ 100</span>
-                        </div>
-                    </div>
-                    <div class="flex-1 flex flex-col">
-                        <label class="font-medium text-gray-700">Private Comments</label>
-                        <textarea id="gc-feedback-input" class="gc-comment-box" placeholder="Add feedback...">${escapeHtml(hwData.feedback || '')}</textarea>
-                    </div>
-                    <div class="gc-action-footer">
-                        <button id="gc-return-btn" class="gc-return-btn">Return</button>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-
-    document.body.appendChild(modal);
-
-    modal.querySelector('#gc-return-btn').onclick = async function() {
-        const btn = this;
-        const score = modal.querySelector('#gc-score-input').value;
-        const feedback = modal.querySelector('#gc-feedback-input').value;
-
-        if (!score && !confirm("Return without a numerical grade?")) return;
-
-        btn.innerText = "Returning...";
-        btn.disabled = true;
-
-        try {
-            await updateDoc(doc(db, "homework_assignments", homeworkId), {
-                score: score,
-                feedback: feedback,
-                status: 'graded',
-                gradedAt: new Date(),
-                tutorEmail: window.tutorData.email // Ensure this is tracked for history
-            });
-
-            modal.remove();
-            showCustomAlert(`✅ Returned to ${escapeHtml(hwData.studentName)}`);
-            loadHomeworkInbox(window.tutorData.email); // Refresh inbox
-        } catch (error) {
-            console.error(error);
-            showCustomAlert("Error returning assignment");
-            btn.innerText = "Return";
-            btn.disabled = false;
+    // ── Determine file type for preview ─────────────────────────────────
+    const ext = submissionUrl.split('?')[0].split('.').pop().toLowerCase();
+    const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
+    const isPDF   = ext === 'pdf';
+    let previewHTML = '';
+    if (submissionUrl) {
+        if (isImage) {
+            previewHTML = `<img src="${submissionUrl}" alt="Student submission" style="max-width:100%;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.12);">`;
+        } else if (isPDF) {
+            previewHTML = `<iframe src="${submissionUrl}" style="width:100%;height:100%;min-height:520px;border:none;border-radius:8px;"></iframe>`;
+        } else {
+            previewHTML = `<div style="text-align:center;padding:40px 20px;background:#f9fafb;border-radius:12px;border:2px dashed #d1d5db;">
+                <div style="font-size:3rem;margin-bottom:12px;">📄</div>
+                <p style="font-weight:600;color:#374151;margin-bottom:8px;">Student Submission</p>
+                <a href="${submissionUrl}" target="_blank" style="display:inline-block;background:#2563eb;color:#fff;padding:8px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Open File ↗</a>
+            </div>`;
         }
-    };
+    } else {
+        previewHTML = `<div style="text-align:center;padding:40px;background:#fef9c3;border-radius:12px;border:2px dashed #fde047;">
+            <div style="font-size:2.5rem;">⚠️</div>
+            <p style="color:#92400e;font-weight:600;margin-top:12px;">No submission file attached</p>
+        </div>`;
+    }
+
+    // ── Firebase config – passed via window object on new tab ────────────
+    const fbConfig = JSON.stringify({
+        apiKey: window.__fbApiKey || '',  // resolved at runtime if set
+    });
+
+    // ── Build the full-page HTML ─────────────────────────────────────────
+    const pageHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Review: ${studentName} — ${title}</title>
+<script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-app-compat.js"></scr${'ipt'}
+<script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore-compat.js"></scr${'ipt'}
+<script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-auth-compat.js"></scr${'ipt'}
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;min-height:100vh;display:flex;flex-direction:column}
+  header{background:#1d4ed8;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+  header h1{font-size:1rem;font-weight:700}
+  header .meta{font-size:.8rem;opacity:.8}
+  .layout{display:grid;grid-template-columns:1fr 340px;gap:0;flex:1;overflow:hidden}
+  @media(max-width:900px){.layout{grid-template-columns:1fr;grid-template-rows:auto 1fr}}
+  .work-panel{padding:20px;overflow-y:auto;max-height:calc(100vh - 60px)}
+  .sidebar{background:#fff;border-left:1px solid #e5e7eb;padding:20px;display:flex;flex-direction:column;gap:16px;overflow-y:auto;max-height:calc(100vh - 60px)}
+  .sidebar h2{font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:4px}
+  .section-box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px}
+  .instructions-text{font-size:.875rem;color:#374151;line-height:1.6;white-space:pre-wrap}
+  label{display:block;font-weight:600;font-size:.875rem;color:#374151;margin-bottom:6px}
+  input[type=number]{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:1rem;font-weight:700}
+  textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:.875rem;resize:vertical;min-height:120px;font-family:inherit;line-height:1.5}
+  .annotation-area{border:1px solid #d1d5db;border-radius:8px;background:#fff;min-height:160px;padding:10px;font-size:.875rem;line-height:1.6;outline:none;overflow-y:auto;white-space:pre-wrap;color:#1f2937}
+  .annotation-area[placeholder]:empty:before{content:attr(placeholder);color:#9ca3af}
+  .btn-return{background:#059669;color:#fff;border:none;border-radius:10px;padding:13px 0;font-size:1rem;font-weight:700;cursor:pointer;width:100%;transition:background .2s}
+  .btn-return:hover{background:#047857}
+  .btn-return:disabled{background:#9ca3af;cursor:not-allowed}
+  .score-row{display:flex;align-items:center;gap:8px}
+  .score-row span{color:#6b7280;font-size:.85rem}
+  .ref-link{font-size:.8rem;color:#2563eb;text-decoration:none}
+  .ref-link:hover{text-decoration:underline}
+  .status-banner{padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;text-align:center}
+  .status-success{background:#d1fae5;color:#065f46}
+  .status-error{background:#fee2e2;color:#991b1b}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.75rem;font-weight:700}
+  .badge-submitted{background:#fef3c7;color:#92400e}
+  .already-graded{background:#ecfdf5;border:1px solid #6ee7b7;border-radius:10px;padding:10px;font-size:.85rem;color:#065f46;margin-bottom:8px;display:none}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>📝 Reviewing Homework — <span style="font-weight:900">${studentName}</span></h1>
+    <div class="meta">${title} <span class="badge badge-submitted">Needs Review</span></div>
+  </div>
+</header>
+<div class="layout">
+  <!-- Left: Submission viewer -->
+  <div class="work-panel">
+    <div style="margin-bottom:16px">
+      ${referenceUrl ? `<a href="${referenceUrl}" target="_blank" class="ref-link">📎 View Original Assignment Reference ↗</a>` : ''}
+    </div>
+    ${previewHTML}
+    <div class="section-box" style="margin-top:20px">
+      <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:8px">Original Instructions</div>
+      <div class="instructions-text">${description.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+    </div>
+  </div>
+
+  <!-- Right: Grading sidebar -->
+  <div class="sidebar">
+    <div class="already-graded" id="already-graded-banner">✅ Previously graded</div>
+
+    <div>
+      <h2>Annotations / Written Feedback</h2>
+      <p style="font-size:.8rem;color:#6b7280;margin-bottom:8px">Type your detailed comments below. This will be visible to the student.</p>
+      <div id="annotation-box" class="annotation-area" contenteditable="true" placeholder="Write your annotations and comments here...">${ existingFeedback.replace(/</g,'&lt;').replace(/>/g,'&gt;') }</div>
+    </div>
+
+    <div>
+      <h2>Grade</h2>
+      <div class="score-row">
+        <input type="number" id="score-input" min="0" max="100" value="${existingScore}" placeholder="0">
+        <span>/ 100</span>
+      </div>
+    </div>
+
+    <div id="status-banner" class="status-banner" style="display:none"></div>
+
+    <button id="return-btn" class="btn-return">✅ Return to Student</button>
+    <p style="font-size:.75rem;color:#9ca3af;text-align:center">The grade and feedback will be saved and the student will be able to see them.</p>
+  </div>
+</div>
+
+<script>
+// ── Receive data from opener ──────────────────────────────────────────────
+const homeworkId  = window.__homeworkId;
+const tutorEmail  = window.__tutorEmail;
+const tutorName   = window.__tutorName;
+const firebaseConfig = window.__firebaseConfig;
+
+let db;
+function initFirebase() {
+    try {
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        db = firebase.firestore();
+        console.log('Firebase ready');
+    } catch(e) {
+        console.error('Firebase init failed:', e);
+    }
+}
+initFirebase();
+
+// Already graded banner
+if (${existingScore !== '' ? 'true' : 'false'}) {
+    document.getElementById('already-graded-banner').style.display = 'block';
+}
+
+document.getElementById('return-btn').addEventListener('click', async function() {
+    const btn = this;
+    const annotationBox = document.getElementById('annotation-box');
+    const feedback = annotationBox.innerText.trim();
+    const scoreVal  = document.getElementById('score-input').value.trim();
+    const statusBanner = document.getElementById('status-banner');
+
+    if (!feedback && !scoreVal) {
+        if (!confirm('Return without any grade or feedback?')) return;
+    }
+    if (!db) {
+        statusBanner.style.display='block';
+        statusBanner.className='status-banner status-error';
+        statusBanner.textContent='❌ Firebase not initialised. Please close and reopen this tab.';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    statusBanner.style.display='none';
+
+    try {
+        await db.collection('homework_assignments').doc(homeworkId).update({
+            score: scoreVal,
+            feedback: feedback,
+            tutorAnnotations: feedback,
+            status: 'graded',
+            gradedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            tutorEmail: tutorEmail,
+            tutorName: tutorName
+        });
+        statusBanner.style.display='block';
+        statusBanner.className='status-banner status-success';
+        statusBanner.textContent='✅ Grade returned to student successfully!';
+        btn.textContent='✅ Returned';
+        // Notify opener to refresh inbox
+        if (window.opener && !window.opener.closed) {
+            try { window.opener.loadHomeworkInbox(tutorEmail); } catch(e) {}
+        }
+    } catch(err) {
+        console.error(err);
+        statusBanner.style.display='block';
+        statusBanner.className='status-banner status-error';
+        statusBanner.textContent='❌ Error: ' + err.message;
+        btn.disabled = false;
+        btn.textContent='✅ Return to Student';
+    }
+});
+</script>
+</body>
+</html>`;
+
+    // ── Open new tab and inject page ──────────────────────────────────────
+    const gradingTab = window.open('', '_blank');
+    if (!gradingTab) {
+        showCustomAlert('⚠️ Popup was blocked. Please allow popups for this site and try again.');
+        return;
+    }
+
+    // Pass runtime values through the new window object before writing HTML
+    gradingTab.__homeworkId    = homeworkId;
+    gradingTab.__tutorEmail    = tutorEmail;
+    gradingTab.__tutorName     = tutorName;
+    gradingTab.__firebaseConfig = window.__firebaseConfig || null;
+
+    gradingTab.document.open();
+    gradingTab.document.write(pageHTML);
+    gradingTab.document.close();
+    gradingTab.focus();
+
+    // If __firebaseConfig was not pre-set in the main app, warn in console
+    if (!window.__firebaseConfig) {
+        console.warn('[GradingTab] window.__firebaseConfig is not set. ' +
+            'Add: window.__firebaseConfig = { apiKey:..., projectId:..., ... } ' +
+            'to your firebaseConfig.js or index HTML so the grading tab can save to Firestore.');
+    }
 }
 
 // ==========================================
