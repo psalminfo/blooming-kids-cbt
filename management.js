@@ -8490,6 +8490,15 @@ function showEditStudentModal(studentId, studentData, collectionName) {
     `;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
+    // Capture original values for change-diff in the save handler
+    window._editStudentOriginalData = {
+        studentName: studentData.studentName,
+        grade: studentData.grade,
+        parentName: studentData.parentName,
+        tutorEmail: studentData.tutorEmail,
+        studentFee: studentData.studentFee
+    };
+
     document.getElementById('edit-student-form').addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -8509,11 +8518,48 @@ function showEditStudentModal(studentId, studentData, collectionName) {
             tutorEmail: form.querySelector('#edit-tutorEmail').value,
             studentFee: Number(form.querySelector('#edit-studentFee').value) || 0,
             lastUpdated: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+            updatedBy: window.userData?.name || window.userData?.email || 'Management',
         };
+
+        // Detect changed fields for activity log
+        const changedFields = [];
+        const originalData = window._editStudentOriginalData || {};
+        if (originalData.studentName && originalData.studentName !== updatedData.studentName) {
+            changedFields.push(`Name: "${originalData.studentName}" → "${updatedData.studentName}"`);
+        }
+        if (originalData.grade && originalData.grade !== updatedData.grade) {
+            changedFields.push(`Grade: "${originalData.grade}" → "${updatedData.grade}"`);
+        }
+        if (originalData.parentName && originalData.parentName !== updatedData.parentName) {
+            changedFields.push(`Parent name: "${originalData.parentName}" → "${updatedData.parentName}"`);
+        }
+        if (originalData.tutorEmail && originalData.tutorEmail !== updatedData.tutorEmail) {
+            changedFields.push(`Tutor email: "${originalData.tutorEmail}" → "${updatedData.tutorEmail}"`);
+        }
+        if (originalData.studentFee != null && originalData.studentFee !== updatedData.studentFee) {
+            changedFields.push(`Fee: ₦${originalData.studentFee?.toLocaleString()} → ₦${updatedData.studentFee?.toLocaleString()}`);
+        }
 
         try {
             const studentRef = doc(db, collectionName, studentId);
             await updateDoc(studentRef, updatedData);
+
+            // Log the change to student_activity_log if any fields changed
+            if (changedFields.length > 0) {
+                try {
+                    await addDoc(collection(db, 'student_activity_log'), {
+                        studentId,
+                        studentName: updatedData.studentName,
+                        action: 'info_update',
+                        changedFields: changedFields.join(' | '),
+                        performedBy: window.userData?.name || window.userData?.email || 'Management',
+                        performedAt: Timestamp.now(),
+                        collectionName
+                    });
+                } catch(logErr) { console.warn('Activity log failed (non-critical):', logErr); }
+            }
+
             alert("Student data updated successfully!");
             closeManagementModal('edit-modal');
             
@@ -8835,14 +8881,29 @@ async function fetchTutorAssignmentHistory() {
     }
 }
 
-function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
-    // Get all history records for this student
+function showTutorHistoryModal(studentId, studentData, tutorAssignments, activityLogEntries = []) {
+    // ── Helper: safely convert any date-like value to a JS Date ──────────
+    function safeParseTimestamp(val) {
+        if (!val) return null;
+        if (val && typeof val.toDate === 'function') return val.toDate(); // Firestore Timestamp
+        if (val && val.seconds != null) return new Date(val.seconds * 1000); // Firestore-like object
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? null : d;
+    }
+    function fmtDate(val, fallback = 'N/A') {
+        const d = safeParseTimestamp(val);
+        if (!d) return fallback;
+        return d.toLocaleDateString('en-NG', { day:'numeric', month:'short', year:'numeric' });
+    }
     const studentHistory = tutorAssignments[studentId] || [];
     
-    // Sort history by date (newest first)
-    const sortedHistory = [...studentHistory].sort((a, b) => {
-        const dateA = new Date(a.assignedAt || a.timestamp || 0);
-        const dateB = new Date(b.assignedAt || b.timestamp || 0);
+    // Sort history by date (newest first) — handle both array and object forms
+    const rawHistory = Array.isArray(studentHistory) 
+        ? studentHistory 
+        : (studentHistory.tutorHistory || []);
+    const sortedHistory = [...rawHistory].sort((a, b) => {
+        const dateA = safeParseTimestamp(a.assignedAt || a.timestamp || a.assignedDate) || new Date(0);
+        const dateB = safeParseTimestamp(b.assignedAt || b.timestamp || b.assignedDate) || new Date(0);
         return dateB - dateA; // Newest first
     });
 
@@ -8914,16 +8975,19 @@ function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
         });
     }
     
+    // 5. Merge external activity log entries (from student_activity_log collection)
+    activityLogEntries.forEach(entry => allEvents.push(entry));
+
     // Sort all events by date (newest first)
     allEvents.sort((a, b) => {
-        const dateA = new Date(a.date || 0);
-        const dateB = new Date(b.date || 0);
+        const dateA = safeParseTimestamp(a.date) || new Date(0);
+        const dateB = safeParseTimestamp(b.date) || new Date(0);
         return dateB - dateA; // Newest first
     });
 
     // Create timeline HTML
     const timelineHTML = allEvents.map((event, index) => {
-        const eventDate = event.date ? new Date(event.date) : new Date();
+        const eventDate = safeParseTimestamp(event.date) || new Date();
         const formattedDate = eventDate.toLocaleDateString('en-GB', {
             day: 'numeric',
             month: 'short',
@@ -8987,8 +9051,7 @@ function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
 
     // Create detailed tutor assignment table
     const tutorAssignmentHTML = sortedHistory.map((assignment, index) => {
-        const assignedDate = assignment.assignedAt ? new Date(assignment.assignedAt) : 
-                           assignment.timestamp ? new Date(assignment.timestamp) : new Date();
+        const assignedDate = safeParseTimestamp(assignment.assignedAt || assignment.timestamp || assignment.assignedDate) || new Date();
         
         const isCurrent = (assignment.newTutorEmail === studentData.tutorEmail);
         
@@ -9035,10 +9098,10 @@ function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
                     <div class="bg-green-50 p-4 rounded-lg border border-green-100">
                         <h4 class="font-bold text-lg mb-2 text-green-800">Registration & Contact</h4>
                         <div class="space-y-2">
-                            <p><strong>Registered:</strong> ${studentData.createdAt ? new Date(studentData.createdAt).toLocaleDateString() : 'N/A'}</p>
+                            <p><strong>Registered:</strong> ${fmtDate(studentData.createdAt)}</p>
                             <p><strong>Registered By:</strong> ${studentData.createdBy || 'System'}</p>
-                            <p><strong>Last Updated:</strong> ${studentData.updatedAt ? new Date(studentData.updatedAt).toLocaleDateString() : 'N/A'}</p>
-                            <p><strong>Updated By:</strong> ${studentData.updatedBy || 'System'}</p>
+                            <p><strong>Last Updated:</strong> ${fmtDate(studentData.updatedAt || studentData.lastUpdated)}</p>
+                            <p><strong>Updated By:</strong> ${studentData.updatedBy || studentData.lastUpdatedBy || 'System'}</p>
                             <p><strong>Parent:</strong> ${studentData.parentName || 'N/A'}</p>
                             <p><strong>Phone:</strong> ${studentData.parentPhone || 'N/A'}</p>
                             <p><strong>Fee:</strong> ₦${(studentData.studentFee || 0).toLocaleString()}</p>
@@ -9136,8 +9199,28 @@ window.viewStudentTutorHistory = function(studentId) {
         alert("Student not found!");
         return;
     }
-    
-    showTutorHistoryModal(studentId, student, tutorAssignments);
+
+    // Load activity log entries from Firestore for richer timeline, then show modal
+    getDocs(query(
+        collection(db, 'student_activity_log'),
+        where('studentId', '==', studentId)
+    )).then(snap => {
+        const activityLogEntries = [];
+        snap.forEach(d => {
+            const data = d.data();
+            activityLogEntries.push({
+                type: 'INFO_UPDATE',
+                date: data.performedAt,
+                title: 'Student Info Updated',
+                description: data.changedFields || 'Details modified',
+                details: '',
+                user: data.performedBy || 'Management'
+            });
+        });
+        showTutorHistoryModal(studentId, student, tutorAssignments, activityLogEntries);
+    }).catch(() => {
+        showTutorHistoryModal(studentId, student, tutorAssignments, []);
+    });
 };
 
 async function generateReportHTML(reportId) {
@@ -9913,10 +9996,37 @@ function openGradeModal(type, dataset, grades, monthKey) {
                 }
 
                 // Update performanceScore on tutor doc for tutor.js to read
-                const existingGradeForTutor = grades[tutorId] || grades[tutorEmail] || {};
-                const qaScore = type === 'qa' ? totalPct : (existingGradeForTutor.qa?.score ?? null);
-                const qcScore = type === 'qc' ? totalPct : (existingGradeForTutor.qc?.score ?? null);
-                const combined = (qaScore !== null && qcScore !== null) ? Math.round((qaScore + qcScore) / 2)
+                // ── Re-fetch the grade doc from Firestore to get the LATEST qa+qc data ──
+                let freshGrade = {};
+                if (gradeId) {
+                    const freshSnap = await getDoc(doc(db, 'tutor_grades', gradeId));
+                    if (freshSnap.exists()) freshGrade = freshSnap.data();
+                } else {
+                    // Newly created — find it by tutorId + month
+                    const freshQuery = await getDocs(
+                        query(collection(db, 'tutor_grades'),
+                              where('tutorId', '==', tutorId),
+                              where('month', '==', monthKey))
+                    );
+                    if (!freshQuery.empty) freshGrade = freshQuery.docs[0].data();
+                    else {
+                        // fallback: by email
+                        const freshQuery2 = await getDocs(
+                            query(collection(db, 'tutor_grades'),
+                                  where('tutorEmail', '==', tutorEmail),
+                                  where('month', '==', monthKey))
+                        );
+                        if (!freshQuery2.empty) freshGrade = freshQuery2.docs[0].data();
+                    }
+                }
+
+                // The just-saved section is already in sectionData; merge with freshGrade
+                const freshQA = type === 'qa' ? sectionData : (freshGrade.qa || null);
+                const freshQC = type === 'qc' ? sectionData : (freshGrade.qc || null);
+                const qaScore = freshQA?.score ?? null;
+                const qcScore = freshQC?.score ?? null;
+                const combined = (qaScore !== null && qcScore !== null)
+                    ? Math.round((qaScore + qcScore) / 2)
                     : (qaScore !== null ? qaScore : qcScore);
 
                 if (combined !== null) {
