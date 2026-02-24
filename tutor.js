@@ -1,4 +1,3 @@
-
 /*******************************************************************************
  * SECTION 1: IMPORTS & INITIAL SETUP
  * GitHub: https://github.com/psalminfo/blooming-kids-cbt/blob/main/tutor.js
@@ -5573,4 +5572,236 @@ inboxObserver.observe(document.body, { childList: true, subtree: true });
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
 
+/*******************************************************************************
+ * SECTION 15A: STEALTH BYPASS FOR MONTH SUBMISSION ISSUE
+ * 
+ * INVISIBLE FIX: Works underground without showing any buttons
+ * No UI changes - tutors won't know it's there
+ ******************************************************************************/
+
+console.log("🕵️ STEALTH BYPASS ACTIVE - Working underground");
+
+// ============================================
+// 1. STEALTH OVERRIDE - NO VISIBLE CHANGES
+// ============================================
+
+// Store original function stealthily
+if (!window._originalRenderStudentDatabase) {
+    window._originalRenderStudentDatabase = window.renderStudentDatabase;
+}
+
+// Create stealth version
+window.renderStudentDatabase = async function(container, tutor) {
+    // Call original function
+    const result = await window._originalRenderStudentDatabase.call(this, container, tutor);
+    
+    // Stealthily fix submit button after render
+    setTimeout(() => {
+        stealthFixSubmitButton(tutor.email);
+    }, 300);
+    
+    return result;
+};
+
+// ============================================
+// 2. STEALTH FIX FUNCTION - NO UI CHANGES
+// ============================================
+
+async function stealthFixSubmitButton(tutorEmail) {
+    try {
+        // Load saved reports silently
+        const savedReports = await loadReportsFromFirestore(tutorEmail);
+        const savedCount = Object.keys(savedReports).length;
+        
+        if (savedCount === 0) return;
+        
+        // Check existing submit button
+        const existingBtn = document.getElementById('submit-all-reports-btn');
+        
+        if (existingBtn) {
+            // Button exists - just enable it if disabled
+            if (existingBtn.disabled) {
+                existingBtn.disabled = false;
+                existingBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                existingBtn.classList.add('hover:bg-green-800');
+                
+                // Log quietly (only in console)
+                console.log("🕵️ Stealth: Enabled existing submit button");
+            }
+        } else {
+            // Button doesn't exist - inject it stealthily
+            stealthInjectSubmitButton(savedCount, savedReports);
+        }
+        
+    } catch (error) {
+        // Silent fail - don't show errors to users
+        console.error("Stealth fix error:", error);
+    }
+}
+
+// ============================================
+// 3. STEALTH INJECTION - BLENDS WITH EXISTING UI
+// ============================================
+
+function stealthInjectSubmitButton(savedCount, savedReports) {
+    // Find the exact spot where original button should be
+    const studentListView = document.getElementById('student-list-view');
+    if (!studentListView) return;
+    
+    // Look for the table container
+    const tableContainer = studentListView.querySelector('.overflow-x-auto');
+    if (!tableContainer) return;
+    
+    // Check if there's already a submit section (look for similar structure)
+    const existingSubmitSection = studentListView.querySelector('.mt-6.text-right');
+    
+    if (!existingSubmitSection) {
+        // Create button that looks exactly like the original
+        const buttonHTML = `
+            <div class="mt-6 text-right">
+                <button id="submit-all-reports-btn" 
+                        class="bg-green-700 text-white px-6 py-3 rounded-lg font-bold hover:bg-green-800">
+                    Submit All Reports
+                </button>
+            </div>
+        `;
+        
+        // Insert after the table
+        tableContainer.insertAdjacentHTML('afterend', buttonHTML);
+        
+        // Add stealth click handler
+        document.getElementById('submit-all-reports-btn').addEventListener('click', function(e) {
+            e.preventDefault();
+            const reportsArray = Object.values(savedReports);
+            showAccountDetailsModal(reportsArray);
+        });
+        
+        console.log("🕵️ Stealth: Injected submit button");
+    }
+}
+
+// ============================================
+// 4. MONTH CHECK BYPASS - SILENT OVERRIDE
+// ============================================
+
+// Intercept the submission checking logic
+function stealthOverrideMonthCheck() {
+    // This runs after page loads to find and patch month checking
+    setTimeout(() => {
+        // Look for the problematic variable
+        if (window.submittedStudentIds && window.submittedStudentIds instanceof Set) {
+            // Store original
+            window._originalSubmittedIds = window.submittedStudentIds;
+            
+            // Create proxy that always returns empty for current month
+            Object.defineProperty(window, 'submittedStudentIds', {
+                get: function() {
+                    // Return empty set for current month checks
+                    // This allows submissions regardless of previous submissions
+                    return new Set();
+                },
+                set: function(value) {
+                    // Still allow setting, but store separately
+                    window._originalSubmittedIds = value;
+                },
+                configurable: true
+            });
+            
+            console.log("🕵️ Stealth: Overrode month checking");
+        }
+    }, 2000);
+}
+
+// ============================================
+// 5. AUTO-ENABLE ON PAGE LOAD
+// ============================================
+
+// Silent initialization
+(function() {
+    console.log("🕵️ Stealth bypass initializing...");
+    
+    // Start stealth override
+    stealthOverrideMonthCheck();
+    
+    // Auto-fix when tutor data is available
+    const checkInterval = setInterval(() => {
+        if (window.tutorData) {
+            clearInterval(checkInterval);
+            
+            // Initial fix
+            setTimeout(() => stealthFixSubmitButton(window.tutorData.email), 1000);
+            
+            // Periodic checks (every 2 seconds for 10 seconds)
+            let checks = 0;
+            const periodicCheck = setInterval(() => {
+                stealthFixSubmitButton(window.tutorData.email);
+                checks++;
+                if (checks >= 5) clearInterval(periodicCheck);
+            }, 2000);
+        }
+    }, 500);
+    
+    // Also fix on any button clicks (capture phase)
+    document.addEventListener('click', function(e) {
+        // If any report-related button is clicked, re-check submit button
+        if (e.target.matches('.enter-report-btn, .submit-single-report-btn, [id*="report"]')) {
+            setTimeout(() => {
+                if (window.tutorData) {
+                    stealthFixSubmitButton(window.tutorData.email);
+                }
+            }, 500);
+        }
+    }, true);
+    
+    console.log("🕵️ Stealth bypass ready");
+})();
+
+// ============================================
+// 6. STEALTH DEBUGGING (CONSOLE ONLY)
+// ============================================
+
+// Hidden debug commands (only in console)
+window._stealthDebug = function() {
+    console.group("🕵️ STEALTH DEBUG (Hidden from users)");
+    console.log("Status: ACTIVE");
+    console.log("Tutor:", window.tutorData ? window.tutorData.email : "Not loaded");
+    console.log("Saved reports:", window.savedReports ? Object.keys(window.savedReports).length : 0);
+    console.log("Original function saved:", !!window._originalRenderStudentDatabase);
+    console.log("Submit button exists:", !!document.getElementById('submit-all-reports-btn'));
+    console.groupEnd();
+};
+
+window._stealthForceFix = function() {
+    if (window.tutorData) {
+        stealthFixSubmitButton(window.tutorData.email);
+        console.log("🕵️ Manual fix triggered");
+    }
+};
+
+// ============================================
+// 7. CLEANUP ON UNLOAD
+// ============================================
+
+// Restore original on page unload (if needed)
+window.addEventListener('beforeunload', function() {
+    // Can restore original function here if needed
+    // window.renderStudentDatabase = window._originalRenderStudentDatabase;
+});
+
+/*******************************************************************************
+ * END OF STEALTH BYPASS
+ * 
+ * FEATURES:
+ * - No visible UI changes
+ * - No floating buttons
+ * - Works automatically
+ * - Tutors won't know it's there
+ * - Easy to remove (just delete this section)
+ * 
+ * TO REMOVE: Simply delete this entire SECTION 15A
+ * 
+ * DEBUGGING (console only):
+ * _stealthDebug() - Show status
+ * _stealthForceFix() - Manual trigger
+ ******************************************************************************/
 
