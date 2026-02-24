@@ -388,33 +388,44 @@
             font-weight: 800;
         }
 
-        /* ── Floating Buttons ───────────────────────────── */
+        /* ── Floating Messaging Buttons (Redesigned Pill Style) ── */
         .floating-messaging-btn,
         .floating-inbox-btn {
             position: fixed;
-            right: 22px;
-            width: 58px; height: 58px;
-            border-radius: 50%;
-            background: linear-gradient(145deg, var(--primary-light), var(--primary-xdark));
-            color: white;
+            right: 20px;
+            border-radius: 999px;
             border: none;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.22), 0 0 0 2.5px rgba(255,255,255,0.3);
             cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.6rem;
-            transition: var(--transition);
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            font-size: .875rem; font-weight: 700;
+            padding: 0 20px;
+            height: 52px;
+            white-space: nowrap;
+            transition: all 0.22s cubic-bezier(0.22, 1, 0.36, 1);
             z-index: 999;
+            letter-spacing: -0.01em;
+            box-shadow: 0 8px 28px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.12);
         }
-        .floating-messaging-btn { bottom: 98px; }
-        .floating-inbox-btn    { bottom: 26px; }
-
-        .floating-messaging-btn:hover,
+        .floating-messaging-btn {
+            bottom: 90px;
+            background: linear-gradient(135deg, #7c3aed, #6d28d9);
+            color: white;
+        }
+        .floating-inbox-btn {
+            bottom: 26px;
+            background: linear-gradient(135deg, #16a34a, #15803d);
+            color: white;
+        }
+        .floating-messaging-btn:hover {
+            transform: translateY(-3px) scale(1.03);
+            box-shadow: 0 14px 36px rgba(109,40,217,0.45), 0 4px 12px rgba(0,0,0,0.15);
+        }
         .floating-inbox-btn:hover {
-            transform: scale(1.12) translateY(-3px);
-            box-shadow: 0 14px 36px rgba(0,0,0,0.28), var(--shadow-green);
+            transform: translateY(-3px) scale(1.03);
+            box-shadow: 0 14px 36px rgba(22,163,74,0.45), 0 4px 12px rgba(0,0,0,0.15);
         }
-
-        .floating-btn-text { display: none; }
+        .floating-btn-icon { font-size: 1.1rem; }
+        .floating-btn-text { font-size: .82rem; font-weight: 700; }
 
         .unread-badge {
             position: absolute;
@@ -447,9 +458,12 @@
         /* ── Responsive ─────────────────────────────────── */
         @media (max-width: 640px) {
             .floating-messaging-btn,
-            .floating-inbox-btn { width: 50px; height: 50px; font-size: 1.35rem; }
-            .floating-messaging-btn { bottom: 88px; }
+            .floating-inbox-btn { padding: 0 14px; height: 46px; font-size: .8rem; }
+            .floating-messaging-btn { bottom: 82px; }
             .floating-inbox-btn    { bottom: 22px; }
+            .floating-btn-text { display: none; }
+            .floating-messaging-btn, .floating-inbox-btn { width: 46px; border-radius: 50%; padding: 0; }
+            .floating-btn-icon { font-size: 1.3rem; }
             .nav-tab-modern { padding: 0.55rem 1.1rem; font-size: 0.8rem; }
         }
 
@@ -1028,7 +1042,7 @@
                     <button id="navScheduleManagement" class="nav-tab-modern"><i class="fas fa-calendar-alt"></i>Schedule Management</button>
                     <button id="navAcademic" class="nav-tab-modern"><i class="fas fa-graduation-cap"></i>Academic</button>
                     <!-- NEW TABS -->
-                    <button id="navAutoStudents" class="nav-tab-modern"><i class="fas fa-user-plus"></i>Auto Students</button>
+
                     <button id="navCourses" class="nav-tab-modern"><i class="fas fa-book"></i>Courses</button>
                 </div>
             </nav>
@@ -1187,19 +1201,8 @@
                 
                 document.getElementById('todayClassesCount').textContent = todayClassesCount;
 
-                // Count pending homework submissions (status='submitted', not yet graded)
-                let pendingReports = 0;
-                try {
-                    const hwQuery = query(
-                        collection(db, 'homework_assignments'),
-                        where('tutorEmail', '==', tutor.email),
-                        where('status', '==', 'submitted')
-                    );
-                    const hwSnap = await getDocs(hwQuery);
-                    pendingReports = hwSnap.size;
-                } catch(hwErr) {
-                    console.warn('Could not load homework count:', hwErr.message);
-                }
+                // Count active students eligible for report entry (not on break/transitioning)
+                const pendingReports = allStudents.filter(s => !s.summerBreak && !s.isTransitioning).length;
                 document.getElementById('pendingReportsCount').textContent = pendingReports;
 
                 // Performance score is managed by the gamification system (initGamification in tutor.js)
@@ -1359,53 +1362,56 @@
                 });
             });
 
-            // ----- Pending Reports Card Click -----
+            // ----- Pending Reports Card Click — shows eligible students for report entry -----
             document.getElementById('pendingReportsCard').addEventListener('click', async () => {
-                // Show pending homework submissions awaiting grading
-                let pendingHW = [];
+                let eligibleStudents = [];
                 try {
-                    const hwQ = query(collection(db, 'homework_assignments'),
-                        where('tutorEmail', '==', tutor.email),
-                        where('status', '==', 'submitted'));
-                    const hwSnap = await getDocs(hwQ);
-                    hwSnap.forEach(d => pendingHW.push({ id: d.id, ...d.data() }));
-                    pendingHW.sort((a,b) => (b.submittedAt?.seconds||0)-(a.submittedAt?.seconds||0));
-                } catch(e) { console.warn('HW fetch error:', e); }
+                    const studQ = query(collection(db, 'students'), where('tutorEmail', '==', tutor.email));
+                    const studSnap = await getDocs(studQ);
+                    studSnap.forEach(d => {
+                        const s = { id: d.id, ...d.data() };
+                        // Eligible: active, not on summer break, not transitioning, not archived/graduated/transferred
+                        if (!s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status)) {
+                            eligibleStudents.push(s);
+                        }
+                    });
+                    eligibleStudents.sort((a,b) => (a.studentName||'').localeCompare(b.studentName||''));
+                } catch(e) { console.warn('Student fetch error:', e); }
 
                 const ACOLORS = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
 
                 let html = `<div style="position:fixed;inset:0;background:rgba(15,23,42,.6);backdrop-filter:blur(6px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;" id="pendingReportsModal">
                     <div style="background:#fff;border-radius:20px;width:100%;max-width:600px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.35);overflow:hidden;">
-                        <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);padding:18px 22px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+                        <div style="background:linear-gradient(135deg,#065f46,#16a34a);padding:18px 22px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
                             <div>
-                                <div style="color:#fff;font-weight:800;font-size:1.05rem;">📥 Pending Homework Reviews</div>
-                                <div style="color:#93c5fd;font-size:.78rem;margin-top:2px;">${pendingHW.length} submission${pendingHW.length!==1?'s':''} awaiting your review</div>
+                                <div style="color:#fff;font-weight:800;font-size:1.05rem;">📋 Pending Reports</div>
+                                <div style="color:#bbf7d0;font-size:.78rem;margin-top:2px;">${eligibleStudents.length} student${eligibleStudents.length!==1?'s':''} eligible for report entry</div>
                             </div>
                             <button class="close-modal" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:1.1rem;cursor:pointer;">&times;</button>
                         </div>
-                        <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">`;
+                        <div style="background:#f0fdf4;border-bottom:1px solid #dcfce7;padding:8px 18px;font-size:.75rem;color:#15803d;font-weight:600;">
+                            ℹ️ Students on break, transitioning, or inactive are excluded
+                        </div>
+                        <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;">`;
 
-                if (pendingHW.length === 0) {
+                if (eligibleStudents.length === 0) {
                     html += `<div style="text-align:center;padding:40px 20px;">
-                        <div style="font-size:3rem;margin-bottom:12px;">🎉</div>
-                        <p style="font-weight:700;color:#065f46;">All caught up!</p>
-                        <p style="color:#94a3b8;font-size:.875rem;margin-top:4px;">No pending homework submissions.</p>
+                        <div style="font-size:3rem;margin-bottom:12px;">✅</div>
+                        <p style="font-weight:700;color:#065f46;">No eligible students</p>
+                        <p style="color:#94a3b8;font-size:.875rem;margin-top:4px;">All students are on break or inactive.</p>
                     </div>`;
                 } else {
-                    pendingHW.forEach(hw => {
-                        const color = ACOLORS[(hw.studentName||'').charCodeAt(0) % ACOLORS.length];
-                        const initials = (hw.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-                        const submittedDate = hw.submittedAt ? new Date(hw.submittedAt.seconds*1000).toLocaleDateString('en-NG',{day:'numeric',month:'short'}) : 'Unknown date';
-                        html += `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:#f8fafc;border-radius:12px;border:1px solid #f1f5f9;transition:background .15s;">
+                    eligibleStudents.forEach(s => {
+                        const color = ACOLORS[(s.studentName||'').charCodeAt(0) % ACOLORS.length];
+                        const initials = (s.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+                        const subjects = Array.isArray(s.subjects) ? s.subjects.join(', ') : (s.subjects || '');
+                        html += `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:#f8fafc;border-radius:12px;border:1px solid #f1f5f9;">
                             <div style="width:40px;height:40px;border-radius:12px;background:${color};color:#fff;font-weight:800;font-size:.8rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml(initials)}</div>
                             <div style="flex:1;min-width:0;">
-                                <div style="font-weight:700;color:#1e293b;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(hw.studentName||'Student')}</div>
-                                <div style="font-size:.75rem;color:#64748b;margin-top:2px;">${escapeHtml(hw.title||'Homework')} · Submitted ${submittedDate}</div>
+                                <div style="font-weight:700;color:#1e293b;font-size:.9rem;">${escapeHtml(s.studentName||'Student')}</div>
+                                <div style="font-size:.72rem;color:#64748b;margin-top:2px;">${escapeHtml(s.grade||'')}${subjects?' · '+escapeHtml(subjects):''}</div>
                             </div>
-                            <button onclick="window.openGradingModal('${escapeHtml(hw.id)}');document.getElementById('pendingReportsModal').remove();document.body.style.overflow=''"
-                                style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;padding:8px 14px;border-radius:10px;font-size:.78rem;font-weight:700;cursor:pointer;flex-shrink:0;">
-                                Review ↗
-                            </button>
+                            <span style="background:#dcfce7;color:#15803d;font-size:.68rem;font-weight:800;padding:3px 10px;border-radius:999px;">ELIGIBLE</span>
                         </div>`;
                     });
                 }
@@ -1459,7 +1465,6 @@
                         <div style="background:${color}22;border-radius:999px;height:8px;overflow:hidden;">
                             <div style="height:8px;border-radius:999px;background:linear-gradient(90deg,${color}88,${color});width:${bp}%;transition:width 1s;"></div>
                         </div>
-                        ${grader?`<div style="font-size:.68rem;color:#94a3b8;margin-top:4px;">Graded by ${escapeHtml(grader)}</div>`:''}
                     </div>`;
                 }
 
