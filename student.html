@@ -492,9 +492,13 @@
             }
         });
 
+        // --- FIXED LOGOUT: Always go to tutor.html, even if clearTestSession tries to redirect elsewhere ---
         window.logout = () => {
             clearTestSession(true);
-            window.location.href = 'tutor.html';  // Redirect to tutor dashboard
+            // Use a tiny delay to override any other redirect that might be triggered by clearTestSession
+            setTimeout(() => {
+                window.location.href = 'tutor.html';
+            }, 50);
         };
     </script>
 </body>
