@@ -183,6 +183,18 @@ function escapeHtml(unsafe) {
         .replace(/'/g, "&#039;");
 }
 
+// ----- PLACEMENT TEST ELIGIBILITY (Grades 3-12 only) -----
+/**
+ * Returns true if the student's grade is within the placement-test range (3–12).
+ * Handles formats such as "Grade 5", "grade5", "5", "Grade 12", "Pre-College", etc.
+ */
+function isPlacementTestEligible(grade) {
+    if (!grade) return false;
+    const normalized = String(grade).toLowerCase().replace('grade', '').trim();
+    const num = parseInt(normalized, 10);
+    return !isNaN(num) && num >= 3 && num <= 12;
+}
+
 // Phone Number Normalization Function
 function normalizePhoneNumber(phone) {
     if (!phone) return '';
@@ -313,13 +325,6 @@ function cleanGradeString(grade) {
     } else {
         return `Grade ${grade}`;
     }
-}
-
-// Extract numeric grade value from any grade string format ("Grade 5", "5", "Grade 10", etc.)
-function extractGradeNumber(gradeStr) {
-    if (!gradeStr) return 0;
-    const match = String(gradeStr).match(/\d+/);
-    return match ? parseInt(match[0], 10) : 0;
 }
 
 // Get current month and year
@@ -581,6 +586,38 @@ function clearAllReportsFromLocalStorage(tutorEmail) {
 }
 
 /*******************************************************************************
+ * SECTION 5B: STUDENT FETCH HELPER
+ * Management assigns students by writing tutorId. Tutor portal queries tutorEmail.
+ * This helper runs BOTH queries and merges, so both methods work.
+ ******************************************************************************/
+
+async function fetchStudentsForTutor(tutor, col) {
+    col = col || "students";
+    try {
+        var colRef = collection(db, col);
+        var byIdPromise = tutor.id
+            ? getDocs(query(colRef, where("tutorId", "==", tutor.id)))
+            : Promise.resolve({ docs: [] });
+        var snaps = await Promise.all([
+            getDocs(query(colRef, where("tutorEmail", "==", tutor.email))),
+            byIdPromise
+        ]);
+        var seen = new Set();
+        var results = [];
+        snaps[0].docs.concat(snaps[1].docs).forEach(function(d) {
+            if (!seen.has(d.id)) {
+                seen.add(d.id);
+                results.push(Object.assign({ id: d.id, collection: col }, d.data()));
+            }
+        });
+        return results;
+    } catch (err) {
+        console.error("fetchStudentsForTutor error:", err);
+        return [];
+    }
+}
+
+/*******************************************************************************
  * SECTION 6: EMPLOYMENT & TIN MANAGEMENT
  ******************************************************************************/
 
@@ -773,19 +810,17 @@ class ScheduleManager {
     async loadStudents() {
         try {
             const { query, collection, where, getDocs } = this.methods;
-            const q = query(collection(this.db, "students"), where("tutorEmail", "==", this.tutor.email));
-            const snapshot = await getDocs(q);
+            // Fetch by tutorEmail AND tutorId (management assigns via tutorId)
+            const fetchedStudents = await fetchStudentsForTutor(this.tutor, "students");
             
             this.students = [];
             this.scheduledStudentIds.clear();
 
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                const student = { id: doc.id, ...data };
+            fetchedStudents.forEach(student => {
                 this.students.push(student);
                 
-                if (data.schedule && Array.isArray(data.schedule) && data.schedule.length > 0) {
-                    this.scheduledStudentIds.add(doc.id);
+                if (student.schedule && Array.isArray(student.schedule) && student.schedule.length > 0) {
+                    this.scheduledStudentIds.add(student.id);
                 }
             });
         } catch (error) {
@@ -1793,12 +1828,12 @@ async function msgLoadRecipientsByStudentId(type, container) {
     const tutorEmail = window.tutorData?.email;
 
     try {
-        const q = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
-        const snap = await getDocs(q);
+        // Fetch by tutorEmail AND tutorId (management assigns via tutorId)
+        const tutorObj = window.tutorData || { email: tutorEmail, id: null };
+        const allStudentDocs = await fetchStudentsForTutor(tutorObj, "students");
         // Only active students
-        const students = snap.docs
-            .filter(d => { const s = d.data(); return !s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status); })
-            .map(d => ({ id: d.id, ...d.data() }));
+        const students = allStudentDocs
+            .filter(s => !s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status));
 
         if (type === 'individual') {
             container.innerHTML = `
@@ -2624,8 +2659,7 @@ function renderScheduleManagement(container, tutor) {
             const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Africa/Lagos' });
             document.getElementById('today-day-label').textContent = todayName;
 
-            const snap = await getDocs(query(collection(db, "students"), where("tutorEmail", "==", tutor.email)));
-            const allStudents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const allStudents = await fetchStudentsForTutor(tutor, "students");
             const active = allStudents.filter(s => !s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status));
 
             // Today's classes
@@ -3056,13 +3090,14 @@ function renderTutorDashboard(container, tutor) {
 
 async function loadStudentDropdowns(tutorEmail) {
     try {
-        const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
-        const studentsSnapshot = await getDocs(studentsQuery);
+        // Fetch by tutorEmail AND tutorId (management assigns via tutorId)
+        const tutorObj = window.tutorData || { email: tutorEmail, id: null };
+        const studentDocs = await fetchStudentsForTutor(tutorObj, "students");
         
         studentCache = [];
         const students = [];
-        studentsSnapshot.forEach(doc => {
-            const student = { id: doc.id, ...doc.data() };
+        studentDocs.forEach(student => {
+            // student already has id and data merged by fetchStudentsForTutor
             // Filter out archived students
             if (!['archived', 'graduated', 'transferred'].includes(student.status)) {
                 students.push(student);
@@ -3569,28 +3604,24 @@ async function renderStudentDatabase(container, tutor) {
         return total;
     }
     
-    // Queries - REMOVED pendingStudentQuery (Tutors only see approved students)
-    const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+    // Queries - fetch by tutorEmail OR tutorId (management assigns via tutorId)
     const allSubmissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutor.email));
-    
-    const [studentsSnapshot, allSubmissionsSnapshot] = await Promise.all([
-        getDocs(studentQuery), getDocs(allSubmissionsQuery)  // Only approved students and submissions
+
+    const [allStudentDocs, allSubmissionsSnapshot] = await Promise.all([
+        fetchStudentsForTutor(tutor, "students"),
+        getDocs(allSubmissionsQuery)
     ]);
 
     // Process Students - ONLY APPROVED STUDENTS
-    let approvedStudents = studentsSnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data(), collection: "students" }))
+    let approvedStudents = allStudentDocs
         .filter(student => !student.status || student.status === 'active' || student.status === 'approved' || !['archived', 'graduated', 'transferred'].includes(student.status));
 
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     const submittedStudentIds = new Set();
-    // Track ALL-TIME submissions (for "new student" detection)
-    const everSubmittedStudentIds = new Set();
     allSubmissionsSnapshot.forEach(doc => {
         const subData = doc.data();
-        everSubmittedStudentIds.add(subData.studentId); // all-time
         const subDate = subData.submittedAt.toDate();
         if (subDate.getMonth() === currentMonth && subDate.getFullYear() === currentYear) {
             submittedStudentIds.add(subData.studentId);
@@ -3616,55 +3647,6 @@ async function renderStudentDatabase(container, tutor) {
     }
 
     const studentsCount = students.length;
-
-    // ── ASSESSMENT STATUS FETCH ──────────────────────────────────────────────
-    // Build sets: which students have a completed assessment (globally, catches reassigned)
-    // and which have an in-progress assessment session started by this tutor.
-    const assessmentCompletedNames = new Set(); // keyed by studentName (global check)
-    const assessmentSessionMap = {};            // studentId → session doc data
-
-    if (students.length > 0) {
-        const studentNames = students.map(s => s.studentName);
-        const studentIds   = students.map(s => s.id);
-
-        // Batch into chunks of 30 (Firestore 'in' limit)
-        const nameChunks = [];
-        const idChunks   = [];
-        for (let i = 0; i < studentNames.length; i += 30) {
-            nameChunks.push(studentNames.slice(i, i + 30));
-        }
-        for (let i = 0; i < studentIds.length; i += 30) {
-            idChunks.push(studentIds.slice(i, i + 30));
-        }
-
-        // 1. student_results: global lookup by studentName to catch reassigned students
-        const resultPromises = nameChunks.map(chunk =>
-            getDocs(query(collection(db, "student_results"), where("studentName", "in", chunk)))
-        );
-        // 2. assessment_sessions: lookup by studentId for this tutor
-        const sessionPromises = idChunks.map(chunk =>
-            getDocs(query(collection(db, "assessment_sessions"), where("studentId", "in", chunk), where("tutorEmail", "==", tutor.email)))
-        );
-
-        const [resultSnaps, sessionSnaps] = await Promise.all([
-            Promise.all(resultPromises),
-            Promise.all(sessionPromises)
-        ]);
-
-        resultSnaps.forEach(snap => {
-            snap.forEach(d => {
-                const name = d.data().studentName;
-                if (name) assessmentCompletedNames.add(name.trim().toLowerCase());
-            });
-        });
-        sessionSnaps.forEach(snap => {
-            snap.forEach(d => {
-                const data = d.data();
-                if (data.studentId) assessmentSessionMap[data.studentId] = data;
-            });
-        });
-    }
-    // ── END ASSESSMENT STATUS FETCH ──────────────────────────────────────────
 
     // --- RENDER UI (UPDATED) ---
     function renderUI() {
@@ -3721,37 +3703,7 @@ async function renderStudentDatabase(container, tutor) {
                 } else {
                     const transIndicator = student.isTransitioning ? `<span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full ml-2">Transitioning</span>` : '';
                     statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>${transIndicator}`;
-
-                    // ── ASSESSMENT BUTTON LOGIC ──────────────────────────────────────
-                    // Show for truly new students: no all-time monthly report AND no completed assessment
-                    const studentNameKey = (student.studentName || '').trim().toLowerCase();
-                    const hasCompletedAssessment = assessmentCompletedNames.has(studentNameKey);
-                    const hasEverSubmittedReport = everSubmittedStudentIds.has(student.id);
-                    const isNewStudent = !hasCompletedAssessment && !hasEverSubmittedReport;
-
-                    if (isNewStudent) {
-                        const session = assessmentSessionMap[student.id];
-                        const sessionLaunched = session && session.status === 'launched';
-                        const assessBtnLabel = sessionLaunched ? '📋 Continue Assessment' : '🚀 Launch Student Assessment';
-                        const assessBtnClass = sessionLaunched
-                            ? 'launch-assessment-btn bg-orange-500 text-white px-3 py-1 rounded text-sm font-semibold'
-                            : 'launch-assessment-btn bg-purple-600 text-white px-3 py-1 rounded text-sm font-semibold';
-                        actionsHTML += `<button class="${assessBtnClass}" 
-                            data-student-id="${escapeHtml(student.id)}"
-                            data-student-name="${escapeHtml(student.studentName)}"
-                            data-grade="${escapeHtml(student.grade)}"
-                            data-parent-email="${escapeHtml(student.parentEmail || '')}"
-                            data-parent-name="${escapeHtml(student.parentName || '')}"
-                            data-parent-phone="${escapeHtml(student.parentPhone || '')}"
-                            data-tutor-email="${escapeHtml(student.tutorEmail || tutor.email)}"
-                            data-country="${escapeHtml(student.country || '')}"
-                            data-referral-code="${escapeHtml(student.referralCode || '')}"
-                            >${assessBtnLabel}</button>`;
-                        // Add a visual badge to status
-                        statusHTML += `<span class="ml-2 bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full font-semibold">New Student</span>`;
-                    }
-                    // ── END ASSESSMENT BUTTON LOGIC ──────────────────────────────────
-
+                    
                     // BREAK/RECALL LOGIC with status checking
                     if (isSummerBreakEnabled) {
                         const recallStatus = window.recallStatusCache ? window.recallStatusCache[student.id] : null;
@@ -3781,6 +3733,22 @@ async function renderStudentDatabase(container, tutor) {
                     if (showEditDeleteButtons && !student.summerBreak) {
                         actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Edit</button>`;
                         actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Delete</button>`;
+                    }
+
+                    // ── PLACEMENT TEST LAUNCH (Grades 3–12 only) ──────────────────────────────
+                    if (isPlacementTestEligible(student.grade)) {
+                        actionsHTML += `<button
+                            class="launch-placement-btn bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 text-sm font-semibold"
+                            data-student-id="${escapeHtml(student.id)}"
+                            data-student-name="${escapeHtml(student.studentName)}"
+                            data-grade="${escapeHtml(student.grade)}"
+                            data-parent-email="${escapeHtml(student.parentEmail || '')}"
+                            data-parent-name="${escapeHtml(student.parentName || '')}"
+                            data-parent-phone="${escapeHtml(student.parentPhone || '')}"
+                            data-tutor-email="${escapeHtml(tutor.email)}"
+                            data-tutor-name="${escapeHtml(tutor.name || '')}">
+                            🎯 Placement Test
+                        </button>`;
                     }
                 }
                 studentsHTML += `<tr><td class="px-6 py-4 whitespace-nowrap">${escapeHtml(student.studentName)} (${escapeHtml(cleanGradeString ? cleanGradeString(student.grade) : student.grade)})<div class="text-xs text-gray-500">Subjects: ${escapeHtml(subjects)} | Days: ${escapeHtml(days)}</div>${feeDisplay}</td><td class="px-6 py-4 whitespace-nowrap">${statusHTML}</td><td class="px-6 py-4 whitespace-nowrap space-x-2">${actionsHTML}</td></tr>`;
@@ -4037,63 +4005,6 @@ async function renderStudentDatabase(container, tutor) {
             });
         });
 
-        // ── LAUNCH / CONTINUE ASSESSMENT ────────────────────────────────────
-        document.querySelectorAll('.launch-assessment-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const studentId   = btn.dataset.studentId;
-                const studentName = btn.dataset.studentName;
-                const gradeRaw    = btn.dataset.grade;
-                const gradeNum    = extractGradeNumber(gradeRaw);
-                const parentEmail = btn.dataset.parentEmail;
-                const parentName  = btn.dataset.parentName;
-                const parentPhone = btn.dataset.parentPhone;
-                const tutorEmail  = btn.dataset.tutorEmail;
-                const country     = btn.dataset.country;
-                const referralCode = btn.dataset.referralCode;
-
-                if (!gradeNum) {
-                    showCustomAlert(`⚠️ Could not read grade for ${studentName}. Please check the student record.`);
-                    return;
-                }
-                if (!parentEmail) {
-                    showCustomAlert(`⚠️ No parent email on file for ${studentName}. Please add it to the student record before launching the assessment.`);
-                    return;
-                }
-
-                // Persist a session doc so we can show "Continue Assessment" if not yet done
-                try {
-                    await setDoc(doc(db, "assessment_sessions", studentId), {
-                        studentId,
-                        studentName,
-                        grade: gradeRaw,
-                        tutorEmail,
-                        status: 'launched',
-                        launchedAt: new Date()
-                    });
-                } catch (e) {
-                    console.warn('Could not write assessment session:', e);
-                }
-
-                // Pack student data into localStorage exactly as subject-select.html expects
-                const assessmentStudentData = {
-                    studentName,
-                    parentEmail,
-                    parentName,
-                    parentPhone,
-                    grade: String(gradeNum),   // numeric string – subject-select.html parses this
-                    tutorEmail,
-                    country,
-                    referralCode
-                };
-                localStorage.setItem('assessmentStudentData', JSON.stringify(assessmentStudentData));
-                localStorage.setItem('assessmentStudentId', studentId);
-
-                // Navigate to subject-select with a flag so it knows this is a tutor-launched assessment
-                window.open(`subject-select.html?source=tutor_assessment`, '_blank');
-            });
-        });
-        // ── END LAUNCH / CONTINUE ASSESSMENT ────────────────────────────────
-
         // Summer break button
         document.querySelectorAll('.summer-break-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
@@ -4231,7 +4142,58 @@ async function renderStudentDatabase(container, tutor) {
                 renderStudentDatabase(container, tutor);
             } catch (error) { console.error("Error adding student:", error); showCustomAlert(`An error occurred: ${error.message}`); }
         }
-    }
+
+        // ── PLACEMENT TEST — event delegation for .launch-placement-btn ──────────────
+        document.querySelectorAll('.launch-placement-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const studentId   = btn.getAttribute('data-student-id');
+                const studentName = btn.getAttribute('data-student-name');
+                const grade       = btn.getAttribute('data-grade');
+                const parentEmail = btn.getAttribute('data-parent-email');
+                const parentName  = btn.getAttribute('data-parent-name');
+                const parentPhone = btn.getAttribute('data-parent-phone');
+                const tutorEmail  = btn.getAttribute('data-tutor-email');
+                const tutorName   = btn.getAttribute('data-tutor-name');
+
+                if (!studentName || !grade) {
+                    showCustomAlert('⚠️ Missing student data. Cannot launch placement test.');
+                    return;
+                }
+
+                // Build the structured hand-off payload.
+                // subject-select.js reads 'studentData' to bypass the student login gate.
+                // studentUid (= Firestore doc ID) is preserved so test results are appended
+                // to the EXISTING student record, preventing duplicate student entries.
+                const payload = {
+                    studentUid:   studentId,    // Firestore doc ID — critical for dedup
+                    studentName:  studentName,
+                    grade:        grade,
+                    studentEmail: parentEmail,  // subject-select reads key 'studentEmail'
+                    parentName:   parentName,
+                    parentPhone:  parentPhone,
+                    tutorEmail:   tutorEmail,
+                    tutorName:    tutorName,
+                    launchedBy:   'tutor',      // sentinel consumed by subject-select.js
+                    launchedAt:   Date.now()    // used for the 2-hour stale guard
+                };
+
+                try {
+                    localStorage.setItem('studentData',  JSON.stringify(payload));
+                    // Also mirror individual keys for any CBT page that reads them directly
+                    localStorage.setItem('studentName',  studentName);
+                    localStorage.setItem('studentEmail', parentEmail);
+                    localStorage.setItem('grade',        grade);
+                    localStorage.setItem('studentUid',   studentId);
+                } catch (e) {
+                    showCustomAlert('⚠️ Could not save to localStorage. Check browser privacy settings.');
+                    return;
+                }
+
+                // Open in a new tab so the tutor dashboard stays accessible
+                window.open('subject-select.html', '_blank');
+            });
+        });
+    }  // ── end of attachEventListeners
 
     renderUI();
 }
@@ -4827,17 +4789,17 @@ async function renderCourses(container, tutor) {
  */
 async function loadStudentDropdownCourses(tutorEmail) {
     try {
-        const q = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
-        const snapshot = await getDocs(q);
+        // Fetch by tutorEmail AND tutorId (management assigns via tutorId)
+        const tutorObj = window.tutorData || { email: tutorEmail, id: null };
+        const studentDocs = await fetchStudentsForTutor(tutorObj, "students");
         const select = document.getElementById('material-student-select');
         
         // Keep the first placeholder option
         select.innerHTML = '<option value="">— Choose a student —</option>';
         
-        snapshot.forEach(doc => {
-            const student = doc.data();
+        studentDocs.forEach(student => {
             const option = document.createElement('option');
-            option.value = doc.id;
+            option.value = student.id;
             option.textContent = `${student.studentName} (${student.grade})`;
             select.appendChild(option);
         });
