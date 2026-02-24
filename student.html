@@ -478,6 +478,23 @@
                                 console.error("Referral logic failed (non-critical):", referralError);
                             }
                         }
+
+                        // ── PLACEMENT TEST STATUS: write back to Firestore so the tutor
+                        //    dashboard can show "✅ Test Completed" and clear after 1 hour ──
+                        try {
+                            const storedData = JSON.parse(localStorage.getItem("studentData") || '{}');
+                            const studentUid = storedData.studentUid || '';
+                            if (studentUid) {
+                                await db.collection('students').doc(studentUid).update({
+                                    placementTestStatus:      'completed',
+                                    placementTestCompletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                    placementTestSubject:     subject
+                                });
+                                console.log("Placement test status written to Firestore for:", studentUid);
+                            }
+                        } catch (statusError) {
+                            console.error("Could not update placement test status (non-critical):", statusError);
+                        }
                         
                         clearTestSession(false);
                         
