@@ -230,8 +230,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
 </head>
-<body class="bg-green-50 min-h-screen"> <!-- body background overridden by CSS, but kept for fallback -->
-    <!-- added "test-container" class for modern card, kept original Tailwind classes -->
+<body class="bg-green-50 min-h-screen">
     <div class="test-container max-w-4xl mx-auto p-6">
         <div class="flex justify-between items-center mb-4">
             <h1 class="text-xl font-bold text-green-800">Blooming Kids House Test</h1>
@@ -239,7 +238,7 @@
         </div>
 
         <div id="question-container" class="space-y-4">
-            <p class="text-gray-600">Loading questions</p>
+            <p class="text-gray-600">Loading questions...</p>
         </div>
 
         <div id="submit-button-container" class="mt-6 flex justify-center" style="display: none;">
@@ -250,7 +249,7 @@
     </div>
 
     <script type="module">
-        // --- START: FIREBASE INITIALIZATION (exactly as before) ---
+        // --- FIREBASE INITIALIZATION ---
         if (typeof firebase !== 'undefined' && !firebase.apps.length) {
             firebase.initializeApp({
                 apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
@@ -263,18 +262,23 @@
         }
         const db = firebase.firestore();
         const REFERRAL_REWARD_AMOUNT = 5000;
-        // --- END: FIREBASE INITIALIZATION ---
 
-        // --- START: MODULE IMPORTS (KEEP submitAnswers.js) ---
-        import { loadQuestions, getAnswerData, getAllLoadedQuestions, clearTestSession } from './autoQuestionGen.js';
+        // --- MODULE IMPORTS (only what we need) ---
+        import { loadQuestions, clearTestSession } from './autoQuestionGen.js';
         import { submitTestToFirebase } from './submitAnswers.js';
-        // --- END: MODULE IMPORTS ---
 
-        // --- START: NEW REFERRAL & STUDENT REGISTRATION LOGIC (unchanged) ---
-        
-        /**
-         * Validates referral code and logs a pending transaction.
-         */
+        // --- HELPER: Escape HTML (prevent XSS) ---
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return unsafe
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // --- REFERRAL LOGIC (unchanged but with better comments) ---
         async function handleReferralLogic(code, studentName, studentUid) {
             const cleanCode = code.trim().toUpperCase();
             if (!cleanCode || cleanCode.length < 9) {
@@ -283,7 +287,6 @@
             }
 
             try {
-                // 1. Find the parent who owns this referral code
                 const parentQuery = await db.collection('parent_users')
                     .where('referralCode', '==', cleanCode)
                     .limit(1)
@@ -297,7 +300,6 @@
                 const parentDoc = parentQuery.docs[0];
                 const referringParentUid = parentDoc.id;
 
-                // 2. Log the Pending Transaction
                 await db.collection('referral_transactions').add({
                     referringParentUid: referringParentUid,
                     referredStudentUid: studentUid,
@@ -310,45 +312,57 @@
                 });
 
                 console.log(`Referral transaction logged successfully for Parent UID: ${referringParentUid}`);
-                
             } catch (error) {
                 console.error("Error during referral logic execution:", error);
             }
         }
 
-        /**
-         * Creates permanent student record in Firebase (NEW ADDITION)
-         */
-        async function createPermanentStudentRecord(studentName, parentEmail, parentPhone, tutorEmail, grade, country, referralCode) {
-            try {
-                const studentData = {
-                    studentName: studentName,
-                    parentEmail: parentEmail,
-                    parentPhone: parentPhone,
-                    tutorEmail: tutorEmail,
+        // --- UPDATED: Get or create student record (prevents duplicates) ---
+        async function getOrCreateStudentRecord(studentName, parentEmail, parentPhone, tutorEmail, grade, country, referralCode) {
+            const studentsRef = db.collection('students');
+            // Look for existing student with same parentEmail and studentName
+            const q = studentsRef
+                .where('parentEmail', '==', parentEmail)
+                .where('studentName', '==', studentName)
+                .limit(1);
+            const snapshot = await q.get();
+
+            if (!snapshot.empty) {
+                // Student exists – update lastActive and possibly tutorEmail
+                const existingDoc = snapshot.docs[0];
+                await existingDoc.ref.update({
+                    lastActive: firebase.firestore.FieldValue.serverTimestamp(),
+                    tutorEmail: tutorEmail, // in case tutor changed
+                    // Optionally update other fields if needed (grade, country)
                     grade: grade,
-                    country: country,
-                    referralCodeUsed: referralCode.toUpperCase(),
+                    country: country
+                });
+                console.log("Reusing existing student record with ID:", existingDoc.id);
+                return existingDoc.id;
+            } else {
+                // Create new student record
+                const studentData = {
+                    studentName,
+                    parentEmail,
+                    parentPhone,
+                    tutorEmail,
+                    grade,
+                    country,
+                    referralCodeUsed: referralCode ? referralCode.toUpperCase() : null,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     lastActive: firebase.firestore.FieldValue.serverTimestamp()
                 };
-                
-                // Create permanent student record
-                const studentRef = await db.collection('students').add(studentData);
-                const studentUid = studentRef.id;
-                
-                console.log("Permanent student record created with ID:", studentUid);
-                return studentUid;
-                
-            } catch (error) {
-                console.error("Error creating student record:", error);
-                throw error;
+                const docRef = await studentsRef.add(studentData);
+                console.log("Created new student record with ID:", docRef.id);
+                return docRef.id;
             }
         }
-        // --- END: NEW REFERRAL & STUDENT REGISTRATION LOGIC ---
 
+        // --- MAIN ---
         document.addEventListener('DOMContentLoaded', async () => {
             const urlParams = new URLSearchParams(window.location.search);
+            
+            // Extract and escape parameters (for safety, though we only use them in logic)
             const subject = urlParams.get('subject');
             const grade = urlParams.get('grade');
             const studentName = urlParams.get('studentName');
@@ -358,13 +372,14 @@
             const referralCode = urlParams.get('referralCode') || '';
             const state = urlParams.get('state') || (subject === 'ela' ? 'creative-writing' : 'mcq');
 
+            // Validate required fields
             if (!subject || !grade || !studentName || !parentEmail || !tutorEmail || !studentCountry) {
-                alert("Missing student info. Redirecting...");
+                alert("Missing student information. Redirecting to login.");
                 window.location.href = "index.html";
                 return;
             }
 
-            // Get parentPhone from localStorage (from the login form)
+            // Retrieve parentPhone from localStorage (set during student login)
             let parentPhone = '';
             try {
                 const studentData = JSON.parse(localStorage.getItem("studentData") || '{}');
@@ -373,9 +388,16 @@
                 console.log("Could not retrieve parentPhone from localStorage");
             }
 
+            // Parent phone is required
+            if (!parentPhone) {
+                alert("Parent phone number is missing. Please log in again.");
+                window.location.href = "index.html";
+                return;
+            }
+
             try {
-                // STEP 1: Create permanent student record FIRST
-                const studentUid = await createPermanentStudentRecord(
+                // STEP 1: Get or create student record (returns the document ID)
+                const studentUid = await getOrCreateStudentRecord(
                     studentName, parentEmail, parentPhone, tutorEmail, grade, studentCountry, referralCode
                 );
 
@@ -394,7 +416,7 @@
                     `<p class="text-red-600">Error loading test. Please try again.</p>`;
             }
 
-            // Setup submit button - USING ORIGINAL submitAnswers.js SYSTEM
+            // Setup submit button
             const submitBtn = document.getElementById("submit-test-btn");
             if (submitBtn) {
                 submitBtn.addEventListener('click', async () => {
@@ -402,13 +424,13 @@
                     submitBtn.textContent = 'Submitting...';
 
                     try {
-                        // STEP 3: Use ORIGINAL submitAnswers.js for test answers
+                        // STEP 3: Use original submitAnswers.js for test answers
                         await submitTestToFirebase(
                             subject, grade, studentName, parentEmail, 
                             tutorEmail, studentCountry, parentPhone
                         );
                         
-                        // STEP 4: Handle referral logic after successful submission
+                        // STEP 4: Handle referral logic after successful submission (if code provided)
                         if (referralCode) {
                             try {
                                 const studentData = JSON.parse(localStorage.getItem("studentData") || '{}');
