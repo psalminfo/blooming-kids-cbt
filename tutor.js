@@ -586,6 +586,38 @@ function clearAllReportsFromLocalStorage(tutorEmail) {
 }
 
 /*******************************************************************************
+ * SECTION 5B: STUDENT FETCH HELPER
+ * Management assigns students by writing tutorId. Tutor portal queries tutorEmail.
+ * This helper runs BOTH queries and merges, so both methods work.
+ ******************************************************************************/
+
+async function fetchStudentsForTutor(tutor, col) {
+    col = col || "students";
+    try {
+        var colRef = collection(db, col);
+        var byIdPromise = tutor.id
+            ? getDocs(query(colRef, where("tutorId", "==", tutor.id)))
+            : Promise.resolve({ docs: [] });
+        var snaps = await Promise.all([
+            getDocs(query(colRef, where("tutorEmail", "==", tutor.email))),
+            byIdPromise
+        ]);
+        var seen = new Set();
+        var results = [];
+        snaps[0].docs.concat(snaps[1].docs).forEach(function(d) {
+            if (!seen.has(d.id)) {
+                seen.add(d.id);
+                results.push(Object.assign({ id: d.id, collection: col }, d.data()));
+            }
+        });
+        return results;
+    } catch (err) {
+        console.error("fetchStudentsForTutor error:", err);
+        return [];
+    }
+}
+
+/*******************************************************************************
  * SECTION 6: EMPLOYMENT & TIN MANAGEMENT
  ******************************************************************************/
 
@@ -778,19 +810,17 @@ class ScheduleManager {
     async loadStudents() {
         try {
             const { query, collection, where, getDocs } = this.methods;
-            const q = query(collection(this.db, "students"), where("tutorEmail", "==", this.tutor.email));
-            const snapshot = await getDocs(q);
+            // Fetch by tutorEmail AND tutorId (management assigns via tutorId)
+            const fetchedStudents = await fetchStudentsForTutor(this.tutor, "students");
             
             this.students = [];
             this.scheduledStudentIds.clear();
 
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                const student = { id: doc.id, ...data };
+            fetchedStudents.forEach(student => {
                 this.students.push(student);
                 
-                if (data.schedule && Array.isArray(data.schedule) && data.schedule.length > 0) {
-                    this.scheduledStudentIds.add(doc.id);
+                if (student.schedule && Array.isArray(student.schedule) && student.schedule.length > 0) {
+                    this.scheduledStudentIds.add(student.id);
                 }
             });
         } catch (error) {
@@ -1798,12 +1828,12 @@ async function msgLoadRecipientsByStudentId(type, container) {
     const tutorEmail = window.tutorData?.email;
 
     try {
-        const q = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
-        const snap = await getDocs(q);
+        // Fetch by tutorEmail AND tutorId (management assigns via tutorId)
+        const tutorObj = window.tutorData || { email: tutorEmail, id: null };
+        const allStudentDocs = await fetchStudentsForTutor(tutorObj, "students");
         // Only active students
-        const students = snap.docs
-            .filter(d => { const s = d.data(); return !s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status); })
-            .map(d => ({ id: d.id, ...d.data() }));
+        const students = allStudentDocs
+            .filter(s => !s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status));
 
         if (type === 'individual') {
             container.innerHTML = `
@@ -2629,8 +2659,7 @@ function renderScheduleManagement(container, tutor) {
             const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Africa/Lagos' });
             document.getElementById('today-day-label').textContent = todayName;
 
-            const snap = await getDocs(query(collection(db, "students"), where("tutorEmail", "==", tutor.email)));
-            const allStudents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const allStudents = await fetchStudentsForTutor(tutor, "students");
             const active = allStudents.filter(s => !s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status));
 
             // Today's classes
@@ -3061,13 +3090,14 @@ function renderTutorDashboard(container, tutor) {
 
 async function loadStudentDropdowns(tutorEmail) {
     try {
-        const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
-        const studentsSnapshot = await getDocs(studentsQuery);
+        // Fetch by tutorEmail AND tutorId (management assigns via tutorId)
+        const tutorObj = window.tutorData || { email: tutorEmail, id: null };
+        const studentDocs = await fetchStudentsForTutor(tutorObj, "students");
         
         studentCache = [];
         const students = [];
-        studentsSnapshot.forEach(doc => {
-            const student = { id: doc.id, ...doc.data() };
+        studentDocs.forEach(student => {
+            // student already has id and data merged by fetchStudentsForTutor
             // Filter out archived students
             if (!['archived', 'graduated', 'transferred'].includes(student.status)) {
                 students.push(student);
@@ -3574,17 +3604,16 @@ async function renderStudentDatabase(container, tutor) {
         return total;
     }
     
-    // Queries - REMOVED pendingStudentQuery (Tutors only see approved students)
-    const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+    // Queries - fetch by tutorEmail OR tutorId (management assigns via tutorId)
     const allSubmissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutor.email));
-    
-    const [studentsSnapshot, allSubmissionsSnapshot] = await Promise.all([
-        getDocs(studentQuery), getDocs(allSubmissionsQuery)  // Only approved students and submissions
+
+    const [allStudentDocs, allSubmissionsSnapshot] = await Promise.all([
+        fetchStudentsForTutor(tutor, "students"),
+        getDocs(allSubmissionsQuery)
     ]);
 
     // Process Students - ONLY APPROVED STUDENTS
-    let approvedStudents = studentsSnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data(), collection: "students" }))
+    let approvedStudents = allStudentDocs
         .filter(student => !student.status || student.status === 'active' || student.status === 'approved' || !['archived', 'graduated', 'transferred'].includes(student.status));
 
     const now = new Date();
@@ -4760,17 +4789,17 @@ async function renderCourses(container, tutor) {
  */
 async function loadStudentDropdownCourses(tutorEmail) {
     try {
-        const q = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
-        const snapshot = await getDocs(q);
+        // Fetch by tutorEmail AND tutorId (management assigns via tutorId)
+        const tutorObj = window.tutorData || { email: tutorEmail, id: null };
+        const studentDocs = await fetchStudentsForTutor(tutorObj, "students");
         const select = document.getElementById('material-student-select');
         
         // Keep the first placeholder option
         select.innerHTML = '<option value="">— Choose a student —</option>';
         
-        snapshot.forEach(doc => {
-            const student = doc.data();
+        studentDocs.forEach(student => {
             const option = document.createElement('option');
-            option.value = doc.id;
+            option.value = student.id;
             option.textContent = `${student.studentName} (${student.grade})`;
             select.appendChild(option);
         });
