@@ -773,6 +773,7 @@ class ScheduleManager {
     async loadStudents() {
         try {
             const { query, collection, where, getDocs } = this.methods;
+            if (!this.tutor || !this.tutor.email) { console.error("ScheduleManager.loadStudents: tutor or tutor.email is undefined. Aborting."); return; }
             const q = query(collection(this.db, "students"), where("tutorEmail", "==", this.tutor.email));
             const snapshot = await getDocs(q);
             
@@ -1270,6 +1271,7 @@ async function deleteTopic(topicId, studentId) {
 async function loadDailyTopicHistory(studentId) {
     const container = document.getElementById('topic-history');
     if (!container) return;
+    if (!studentId) { console.error("loadDailyTopicHistory: studentId is undefined. Aborting."); return; }
     try {
         const now = new Date();
         const q = query(collection(db, "daily_topics"), where("studentId", "==", studentId));
@@ -3357,6 +3359,7 @@ function attachSubmitReportListeners() {
 
 // --- Helper function to check recall request status ---
 async function checkRecallRequestStatus(studentId) {
+    if (!studentId) { console.error("checkRecallRequestStatus: studentId is undefined. Aborting."); return null; }
     try {
         const recallQuery = query(
             collection(db, "recall_requests"),
@@ -4935,6 +4938,7 @@ async function uploadCourseMaterial(file, studentId, tutor, title, description) 
  */
 async function loadCourseMaterials(studentId, container, tutor) {
     container.innerHTML = '<div class="text-center py-6"><div class="spinner mx-auto"></div><p class="text-gray-500 mt-2">Loading materials...</p></div>';
+    if (!studentId) { console.error("loadCourseMaterials: studentId is undefined. Aborting."); container.innerHTML = '<div class="text-center py-6 text-red-500">Error: Student ID is missing.</div>'; return; }
 
     try {
         const q = query(
@@ -5229,15 +5233,21 @@ async function loadHomeworkInbox(tutorEmail) {
     container.innerHTML = '<div class="text-center py-6"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading submissions…</p></div>';
 
     try {
-        // Query all homework by this tutor (both name and email)
-        let q = query(
-            collection(db, "homework_assignments"),
-            where("tutorName", "==", window.tutorData && window.tutorData.name ? window.tutorData.name : "")
-        );
-        let snapshot = await getDocs(q);
+        // Query all homework by this tutor (by name first, fall back to email)
+        const tutorName = window.tutorData && window.tutorData.name ? window.tutorData.name : null;
+        let snapshot;
 
-        if (snapshot.empty) {
-            q = query(collection(db, "homework_assignments"), where("tutorEmail", "==", tutorEmail));
+        if (tutorName) {
+            let q = query(
+                collection(db, "homework_assignments"),
+                where("tutorName", "==", tutorName)
+            );
+            snapshot = await getDocs(q);
+        }
+
+        if (!snapshot || snapshot.empty) {
+            if (!tutorEmail) { console.error("loadHomeworkInbox: tutorEmail is also undefined, cannot fall back."); throw new Error("no tutorEmail"); }
+            const q = query(collection(db, "homework_assignments"), where("tutorEmail", "==", tutorEmail));
             snapshot = await getDocs(q);
         }
 
