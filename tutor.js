@@ -2300,17 +2300,21 @@ function showScheduleCalendarModal() {
     overlay.id = 'calendar-overlay';
     overlay.style.cssText = 'position:fixed;inset:0;z-index:8000;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:12px;';
     overlay.innerHTML = `
-        <div style="background:#f8fafc;width:98vw;max-width:1400px;height:92vh;border-radius:20px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.4);">
+        <div style="background:#f8fafc;width:98vw;max-width:1400px;height:92vh;border-radius:22px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.45);">
             <!-- Header -->
-            <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-                <div>
-                    <div style="color:#fff;font-weight:800;font-size:1.1rem;">📆 Weekly Schedule Calendar</div>
-                    <div style="color:#93c5fd;font-size:.78rem;margin-top:2px;">All active students · tap any class card to edit</div>
+            <div style="background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 65%,#0891b2 100%);padding:18px 26px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:relative;overflow:hidden;">
+                <div style="position:absolute;inset:0;background:url('data:image/svg+xml,%3Csvg width=40 height=40 viewBox=%220 0 40 40%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg fill=%22none%22 fill-rule=%22evenodd%22%3E%3Cg fill=%22%23ffffff%22 fill-opacity=%220.05%22%3E%3Cpath d=%22M20 20c0-5.523-4.477-10-10-10S0 14.477 0 20s4.477 10 10 10 10-4.477 10-10zm10 0c0 5.523 4.477 10 10 10s10-4.477 10-10-4.477-10-10-10-10 4.477-10 10z%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');pointer-events:none;"></div>
+                <div style="position:relative;display:flex;align-items:center;gap:12px;">
+                    <div style="width:44px;height:44px;background:rgba(255,255,255,.2);border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;border:1.5px solid rgba(255,255,255,.3);">📆</div>
+                    <div>
+                        <div style="color:#fff;font-weight:900;font-size:1.15rem;letter-spacing:-.01em;">Weekly Schedule Calendar</div>
+                        <div style="color:#bfdbfe;font-size:.78rem;margin-top:2px;">All active students · tap any class card to edit schedule</div>
+                    </div>
                 </div>
-                <div style="display:flex;gap:8px;">
-                    <button id="cal-print-btn" style="background:rgba(255,255,255,.15);border:none;color:#fff;padding:8px 14px;border-radius:10px;font-size:.8rem;font-weight:600;cursor:pointer;">📄 Print</button>
-                    <button id="cal-edit-btn" style="background:rgba(255,255,255,.25);border:none;color:#fff;padding:8px 14px;border-radius:10px;font-size:.8rem;font-weight:700;cursor:pointer;">⚙️ Edit Schedules</button>
-                    <button id="cal-close-btn" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:1.1rem;cursor:pointer;">✕</button>
+                <div style="display:flex;gap:8px;position:relative;">
+                    <button id="cal-print-btn" style="background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);color:#fff;padding:9px 16px;border-radius:10px;font-size:.8rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s;" onmouseover="this.style.background='rgba(255,255,255,.25)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">📄 Print</button>
+                    <button id="cal-edit-btn" style="background:rgba(255,255,255,.95);border:none;color:#1e3a8a;padding:9px 16px;border-radius:10px;font-size:.8rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 4px 12px rgba(0,0,0,.2);transition:all .2s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform=''">⚙️ Edit Schedules</button>
+                    <button id="cal-close-btn" style="background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.25);color:#fff;width:38px;height:38px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;" onmouseover="this.style.background='rgba(255,255,255,.25)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">✕</button>
                 </div>
             </div>
             <!-- Body -->
@@ -2660,39 +2664,52 @@ function renderScheduleManagement(container, tutor) {
     startPersistentClock(); // ← clock on every tab
 
     container.innerHTML = `
-        <div class="hero-section">
-            <h1 class="hero-title">📅 Schedule Management</h1>
-            <p class="hero-subtitle">View, set up, and edit weekly class times for all your students</p>
+        <!-- Hero banner -->
+        <div style="background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 60%,#0891b2 100%);border-radius:20px;padding:28px 28px 24px;margin-bottom:24px;position:relative;overflow:hidden;">
+            <div style="position:absolute;inset:0;background:url('data:image/svg+xml,%3Csvg width=60 height=60 viewBox=%220 0 60 60%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg fill=%22none%22 fill-rule=%22evenodd%22%3E%3Cg fill=%22%23ffffff%22 fill-opacity=%220.05%22%3E%3Cpath d=%22M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');pointer-events:none;"></div>
+            <div style="position:relative;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div style="width:48px;height:48px;background:rgba(255,255,255,.18);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;border:1.5px solid rgba(255,255,255,.3);">📅</div>
+                    <div>
+                        <h2 style="color:#fff;font-weight:900;font-size:1.5rem;margin:0;letter-spacing:-.02em;">Schedule Management</h2>
+                        <p style="color:#bfdbfe;font-size:.82rem;margin:2px 0 0;">View, set up &amp; edit weekly class times for all your students</p>
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                    <button id="setup-all-schedules-btn" style="background:#fff;color:#1e3a8a;border:none;padding:11px 20px;border-radius:12px;font-weight:800;font-size:.875rem;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(0,0,0,.22);transition:all .2s;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 22px rgba(0,0,0,.28)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 14px rgba(0,0,0,.22)'">
+                        <span style="font-size:1rem;">⚙️</span> Set Up / Edit Schedules
+                    </button>
+                    <button id="view-full-calendar-btn" style="background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.45);padding:11px 20px;border-radius:12px;font-weight:700;font-size:.875rem;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .2s;backdrop-filter:blur(8px);" onmouseover="this.style.background='rgba(255,255,255,.28)'" onmouseout="this.style.background='rgba(255,255,255,.18)'">
+                        <span>📆</span> Calendar View
+                    </button>
+                    <button id="print-schedule-btn" style="background:rgba(255,255,255,.1);color:#bfdbfe;border:1.5px solid rgba(255,255,255,.2);padding:11px 16px;border-radius:12px;font-weight:600;font-size:.85rem;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s;" onmouseover="this.style.background='rgba(255,255,255,.2)'" onmouseout="this.style.background='rgba(255,255,255,.1)'">
+                        🖨️ Print
+                    </button>
+                </div>
+            </div>
         </div>
 
-        <!-- Action buttons -->
-        <div class="flex flex-wrap gap-3 mb-6">
-            <button id="setup-all-schedules-btn" class="btn btn-primary">⚙️ Set Up / Edit Schedules</button>
-            <button id="view-full-calendar-btn"  class="btn btn-info">📆 Calendar View</button>
-            <button id="print-schedule-btn"      class="btn btn-secondary">🖨️ Print Week</button>
-        </div>
-
-        <!-- Today's snapshot -->
-        <div class="card mb-6">
-            <div class="card-header flex items-center gap-2">
-                <span class="text-xl">📊</span>
-                <h3 class="font-bold text-lg">Today's Classes</h3>
-                <span id="today-day-label" class="ml-auto text-xs font-semibold text-gray-400"></span>
+        <!-- Today's snapshot card -->
+        <div style="background:#fff;border-radius:18px;box-shadow:0 2px 14px rgba(0,0,0,.07);border:1px solid #f1f5f9;margin-bottom:20px;overflow:hidden;">
+            <div style="background:linear-gradient(90deg,#ecfdf5,#f0fdf4);border-bottom:2px solid #dcfce7;padding:14px 20px;display:flex;align-items:center;gap:10px;">
+                <div style="width:38px;height:38px;background:linear-gradient(135deg,#22c55e,#16a34a);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.1rem;box-shadow:0 3px 10px rgba(22,163,74,.3);">📊</div>
+                <h3 style="font-weight:800;font-size:1rem;color:#15803d;margin:0;flex:1;">Today's Classes</h3>
+                <span id="today-day-label" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-size:.7rem;font-weight:800;padding:4px 12px;border-radius:999px;text-transform:uppercase;letter-spacing:.05em;box-shadow:0 2px 6px rgba(22,163,74,.3);"></span>
             </div>
-            <div class="card-body" id="todays-schedule-inline">
-                <div class="text-center py-6"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading…</p></div>
+            <div style="padding:16px;" id="todays-schedule-inline">
+                <div style="text-align:center;padding:24px;"><div class="spinner mx-auto mb-2"></div><p style="color:#94a3b8;font-size:.875rem;">Loading…</p></div>
             </div>
         </div>
 
-        <!-- Full week grid -->
-        <div class="card">
-            <div class="card-header flex items-center gap-2">
-                <span class="text-xl">🗓️</span>
-                <h3 class="font-bold text-lg">Full Week Overview</h3>
-                <span class="text-xs text-gray-400 ml-auto">Sorted by time</span>
+        <!-- Full week grid card -->
+        <div style="background:#fff;border-radius:18px;box-shadow:0 2px 14px rgba(0,0,0,.07);border:1px solid #f1f5f9;overflow:hidden;">
+            <div style="background:linear-gradient(90deg,#eff6ff,#f0f9ff);border-bottom:2px solid #dbeafe;padding:14px 20px;display:flex;align-items:center;gap:10px;">
+                <div style="width:38px;height:38px;background:linear-gradient(135deg,#60a5fa,#2563eb);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.1rem;box-shadow:0 3px 10px rgba(37,99,235,.3);">🗓️</div>
+                <h3 style="font-weight:800;font-size:1rem;color:#1d4ed8;margin:0;flex:1;">Full Week Overview</h3>
+                <span style="color:#94a3b8;font-size:.72rem;font-weight:600;background:#f1f5f9;padding:3px 10px;border-radius:999px;">Sorted by time</span>
             </div>
-            <div class="card-body p-0" id="week-grid-container">
-                <div class="text-center py-8"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading week…</p></div>
+            <div id="week-grid-container">
+                <div style="text-align:center;padding:32px;"><div class="spinner mx-auto mb-2"></div><p style="color:#94a3b8;font-size:.875rem;">Loading week…</p></div>
             </div>
         </div>
     `;
@@ -4655,6 +4672,19 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
     const scoreWidget = document.getElementById('performance-widget');
     if (!scoreWidget) return;
 
+    // Also update the header stat card
+    const statScoreEl = document.getElementById('performanceScore');
+    if (statScoreEl) {
+        const td2 = window.tutorData || {};
+        const qa2 = breakdown.qaScore ?? td2.qaScore ?? null;
+        const qc2 = breakdown.qcScore ?? td2.qcScore ?? null;
+        let hdrScore = 0;
+        if (qa2 !== null && qc2 !== null) hdrScore = qa2 + qc2;
+        else if (qa2 !== null) hdrScore = qa2;
+        else if (qc2 !== null) hdrScore = qc2;
+        statScoreEl.textContent = hdrScore > 0 ? hdrScore : '–';
+    }
+
     const td = window.tutorData || {};
     const qaScore      = breakdown.qaScore       ?? td.qaScore       ?? null;
     const qcScore      = breakdown.qcScore       ?? td.qcScore       ?? null;
@@ -5538,11 +5568,26 @@ async function openGradingModal(homeworkId) {
     if (submissionUrl) {
         if (isImage) {
             previewHTML = `
-                <div style="text-align:center;">
-                    <img src="${escapeHtml(submissionUrl)}" alt="Student submission"
-                        style="max-width:100%;max-height:65vh;border-radius:10px;box-shadow:0 4px 24px rgba(0,0,0,.15);cursor:zoom-in;"
-                        onclick="window.open('${escapeHtml(submissionUrl)}','_blank')">
-                    <p style="font-size:.72rem;color:#9ca3af;margin-top:8px;">Click to open full size ↗</p>
+                <div>
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+                        <span style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">✏️ Annotate Submission</span>
+                        <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;" id="anno-tools">
+                            <button onclick="annoSetTool('pen')" id="tool-pen" style="padding:5px 10px;border-radius:8px;border:1.5px solid #3b82f6;background:#eff6ff;color:#2563eb;font-size:.75rem;font-weight:700;cursor:pointer;">✏️ Pen</button>
+                            <button onclick="annoSetTool('highlight')" id="tool-highlight" style="padding:5px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.75rem;font-weight:700;cursor:pointer;">🟡 Highlight</button>
+                            <button onclick="annoSetTool('arrow')" id="tool-arrow" style="padding:5px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.75rem;font-weight:700;cursor:pointer;">➡️ Arrow</button>
+                            <input type="color" id="anno-color" value="#ef4444" title="Pen color" style="width:32px;height:32px;padding:2px;border-radius:8px;border:1.5px solid #e2e8f0;cursor:pointer;">
+                            <button onclick="annoUndo()" style="padding:5px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.75rem;font-weight:700;cursor:pointer;">↩️ Undo</button>
+                            <button onclick="annoClear()" style="padding:5px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.75rem;font-weight:700;cursor:pointer;">🗑️ Clear</button>
+                            <button onclick="annoSave()" style="padding:5px 10px;border-radius:8px;border:none;background:linear-gradient(135deg,#059669,#047857);color:#fff;font-size:.75rem;font-weight:700;cursor:pointer;">💾 Save Image</button>
+                        </div>
+                    </div>
+                    <div style="position:relative;display:inline-block;width:100%;border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.15);">
+                        <img id="anno-base-img" src="${escapeHtml(submissionUrl)}" alt="Student submission"
+                            style="max-width:100%;display:block;user-select:none;" crossorigin="anonymous"
+                            onload="initAnnotationCanvas(this)">
+                        <canvas id="anno-canvas" style="position:absolute;top:0;left:0;cursor:crosshair;touch-action:none;"></canvas>
+                    </div>
+                    <p style="font-size:.72rem;color:#9ca3af;margin-top:6px;text-align:center;">Draw directly on the image · annotations are saved with your feedback</p>
                 </div>`;
         } else if (isPDF) {
             previewHTML = `<iframe src="${escapeHtml(submissionUrl)}" title="Student submission"
@@ -5590,11 +5635,33 @@ async function openGradingModal(homeworkId) {
 
             <!-- LEFT: document viewer -->
             <div style="overflow-y:auto;padding:20px;background:#f1f5f9;">
-                ${referenceUrl && referenceUrl !== submissionUrl ? `
-                <a href="${escapeHtml(referenceUrl)}" target="_blank"
-                    style="display:inline-flex;align-items:center;gap:6px;color:#2563eb;font-size:.8rem;text-decoration:none;margin-bottom:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:6px 12px;">
-                    📎 View Original Assignment Reference ↗
-                </a>` : ''}
+                ${referenceUrl && referenceUrl !== submissionUrl ? (() => {
+                    const refExt = (referenceUrl.split('?')[0].split('.').pop() || '').toLowerCase();
+                    const refIsImg = ['jpg','jpeg','png','gif','webp','svg'].includes(refExt);
+                    const refIsPDF = refExt === 'pdf';
+                    if (refIsImg) {
+                        return `<div style="margin-bottom:14px;border:1.5px solid #bfdbfe;border-radius:10px;overflow:hidden;background:#eff6ff;">
+                            <div style="background:#eff6ff;padding:7px 12px;font-size:.72rem;font-weight:700;color:#1d4ed8;display:flex;align-items:center;justify-content:space-between;">
+                                <span>📎 Original Assignment Reference</span>
+                                <a href="${escapeHtml(referenceUrl)}" target="_blank" style="color:#2563eb;text-decoration:none;font-size:.7rem;">Open full size ↗</a>
+                            </div>
+                            <img src="${escapeHtml(referenceUrl)}" alt="Assignment reference" style="width:100%;max-height:260px;object-fit:contain;background:#fff;display:block;">
+                        </div>`;
+                    } else if (refIsPDF) {
+                        return `<div style="margin-bottom:14px;border:1.5px solid #bfdbfe;border-radius:10px;overflow:hidden;">
+                            <div style="background:#eff6ff;padding:7px 12px;font-size:.72rem;font-weight:700;color:#1d4ed8;display:flex;align-items:center;justify-content:space-between;">
+                                <span>📎 Original Assignment Reference (PDF)</span>
+                                <a href="${escapeHtml(referenceUrl)}" target="_blank" style="color:#2563eb;text-decoration:none;font-size:.7rem;">Open in tab ↗</a>
+                            </div>
+                            <iframe src="${escapeHtml(referenceUrl)}" style="width:100%;height:260px;border:none;display:block;background:#f9fafb;"></iframe>
+                        </div>`;
+                    } else {
+                        return `<a href="${escapeHtml(referenceUrl)}" target="_blank"
+                            style="display:inline-flex;align-items:center;gap:6px;color:#2563eb;font-size:.8rem;text-decoration:none;margin-bottom:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:6px 12px;">
+                            📎 Open Original Assignment Reference ↗
+                        </a>`;
+                    }
+                })() : ''}
                 ${previewHTML}
                 ${description ? `
                 <div style="margin-top:16px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
@@ -5646,6 +5713,98 @@ async function openGradingModal(homeworkId) {
             </div>
         </div>
     </div>`;
+
+    // ── Annotation canvas system ────────────────────────────────
+    let annoTool = 'pen';
+    let annoDrawing = false;
+    let annoHistory = []; // snapshots for undo
+    let annoCtx = null;
+    let annoStartX = 0, annoStartY = 0;
+    let annoTempSnap = null;
+
+    window.initAnnotationCanvas = function(img) {
+        const canvas = document.getElementById('anno-canvas');
+        if (!canvas || !img) return;
+        canvas.width  = img.naturalWidth  || img.offsetWidth;
+        canvas.height = img.naturalHeight || img.offsetHeight;
+        canvas.style.width  = img.offsetWidth  + 'px';
+        canvas.style.height = img.offsetHeight + 'px';
+        annoCtx = canvas.getContext('2d');
+
+        function getPos(e) {
+            const r = canvas.getBoundingClientRect();
+            const scaleX = canvas.width  / r.width;
+            const scaleY = canvas.height / r.height;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return { x: (clientX - r.left) * scaleX, y: (clientY - r.top) * scaleY };
+        }
+
+        canvas.addEventListener('mousedown',  e => { annoDrawing=true; const p=getPos(e); annoStartX=p.x; annoStartY=p.y; annoTempSnap=annoCtx.getImageData(0,0,canvas.width,canvas.height); if(annoTool==='pen'||annoTool==='highlight'){annoCtx.beginPath();annoCtx.moveTo(p.x,p.y);} });
+        canvas.addEventListener('mousemove',  e => { if(!annoDrawing)return; const p=getPos(e); if(annoTool==='pen'){annoCtx.strokeStyle=document.getElementById('anno-color')?.value||'#ef4444';annoCtx.lineWidth=3;annoCtx.lineCap='round';annoCtx.globalAlpha=1;annoCtx.lineTo(p.x,p.y);annoCtx.stroke();} else if(annoTool==='highlight'){annoCtx.strokeStyle='#fef08a';annoCtx.lineWidth=18;annoCtx.lineCap='round';annoCtx.globalAlpha=0.5;annoCtx.lineTo(p.x,p.y);annoCtx.stroke();} else if(annoTool==='arrow'){annoCtx.putImageData(annoTempSnap,0,0);drawArrow(annoCtx,annoStartX,annoStartY,p.x,p.y,document.getElementById('anno-color')?.value||'#ef4444');} });
+        canvas.addEventListener('mouseup',    e => { if(!annoDrawing)return; annoDrawing=false; annoCtx.globalAlpha=1; annoHistory.push(annoCtx.getImageData(0,0,canvas.width,canvas.height)); });
+        canvas.addEventListener('mouseleave', e => { if(annoDrawing){annoDrawing=false;annoCtx.globalAlpha=1;annoHistory.push(annoCtx.getImageData(0,0,canvas.width,canvas.height));} });
+        canvas.addEventListener('touchstart', e => { e.preventDefault(); const p=getPos(e); canvas.dispatchEvent(new MouseEvent('mousedown',{clientX:p.x,clientY:p.y})); }, {passive:false});
+        canvas.addEventListener('touchmove',  e => { e.preventDefault(); const p=getPos(e); canvas.dispatchEvent(new MouseEvent('mousemove',{clientX:e.touches[0].clientX,clientY:e.touches[0].clientY})); }, {passive:false});
+        canvas.addEventListener('touchend',   e => { canvas.dispatchEvent(new MouseEvent('mouseup',{})); }, {passive:false});
+    };
+
+    function drawArrow(ctx, x1, y1, x2, y2, color) {
+        const hw=12, hl=18;
+        const angle=Math.atan2(y2-y1,x2-x1);
+        ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=3; ctx.globalAlpha=1;
+        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x2,y2);
+        ctx.lineTo(x2-hl*Math.cos(angle-Math.PI/7),y2-hl*Math.sin(angle-Math.PI/7));
+        ctx.lineTo(x2-hl*Math.cos(angle+Math.PI/7),y2-hl*Math.sin(angle+Math.PI/7));
+        ctx.closePath(); ctx.fill();
+    }
+
+    window.annoSetTool = function(t) {
+        annoTool = t;
+        ['pen','highlight','arrow'].forEach(tt => {
+            const btn = document.getElementById('tool-'+tt);
+            if (btn) { btn.style.background=t===tt?'#eff6ff':'#f8fafc'; btn.style.border=t===tt?'1.5px solid #3b82f6':'1.5px solid #e2e8f0'; btn.style.color=t===tt?'#2563eb':'#64748b'; }
+        });
+    };
+
+    window.annoUndo = function() {
+        const canvas = document.getElementById('anno-canvas');
+        if (!canvas || !annoCtx) return;
+        annoHistory.pop();
+        if (annoHistory.length > 0) {
+            annoCtx.putImageData(annoHistory[annoHistory.length-1], 0, 0);
+        } else {
+            annoCtx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    };
+
+    window.annoClear = function() {
+        const canvas = document.getElementById('anno-canvas');
+        if (!canvas || !annoCtx) return;
+        annoCtx.clearRect(0, 0, canvas.width, canvas.height);
+        annoHistory = [];
+    };
+
+    window.annoSave = function() {
+        const canvas = document.getElementById('anno-canvas');
+        const img = document.getElementById('anno-base-img');
+        if (!canvas || !img || !annoCtx) return;
+        // Composite: draw base image + annotations onto a new canvas
+        const merged = document.createElement('canvas');
+        merged.width = canvas.width; merged.height = canvas.height;
+        const mc = merged.getContext('2d');
+        mc.drawImage(img, 0, 0, canvas.width, canvas.height);
+        mc.drawImage(canvas, 0, 0);
+        const link = document.createElement('a');
+        link.download = 'annotated_submission.png';
+        link.href = merged.toDataURL('image/png');
+        link.click();
+        // Also store dataURL in a hidden field so the save handler can optionally upload it
+        window._annoDataURL = merged.toDataURL('image/png');
+    };
+    // ── End annotation canvas system ─────────────────────────
 
     // Grade emoji live update
     const scoreInput = overlay.querySelector('#grading-score');
