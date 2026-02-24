@@ -183,18 +183,6 @@ function escapeHtml(unsafe) {
         .replace(/'/g, "&#039;");
 }
 
-// ----- PLACEMENT TEST ELIGIBILITY (Grades 3-12 only) -----
-/**
- * Returns true if the student's grade is within the placement-test range (3–12).
- * Handles formats such as "Grade 5", "grade5", "5", "Grade 12", "Pre-College", etc.
- */
-function isPlacementTestEligible(grade) {
-    if (!grade) return false;
-    const normalized = String(grade).toLowerCase().replace('grade', '').trim();
-    const num = parseInt(normalized, 10);
-    return !isNaN(num) && num >= 3 && num <= 12;
-}
-
 // Phone Number Normalization Function
 function normalizePhoneNumber(phone) {
     if (!phone) return '';
@@ -586,38 +574,6 @@ function clearAllReportsFromLocalStorage(tutorEmail) {
 }
 
 /*******************************************************************************
- * SECTION 5B: STUDENT FETCH HELPER
- * Management assigns students by writing tutorId. Tutor portal queries tutorEmail.
- * This helper runs BOTH queries and merges, so both methods work.
- ******************************************************************************/
-
-async function fetchStudentsForTutor(tutor, col) {
-    col = col || "students";
-    try {
-        var colRef = collection(db, col);
-        var byIdPromise = tutor.id
-            ? getDocs(query(colRef, where("tutorId", "==", tutor.id)))
-            : Promise.resolve({ docs: [] });
-        var snaps = await Promise.all([
-            getDocs(query(colRef, where("tutorEmail", "==", tutor.email))),
-            byIdPromise
-        ]);
-        var seen = new Set();
-        var results = [];
-        snaps[0].docs.concat(snaps[1].docs).forEach(function(d) {
-            if (!seen.has(d.id)) {
-                seen.add(d.id);
-                results.push(Object.assign({ id: d.id, collection: col }, d.data()));
-            }
-        });
-        return results;
-    } catch (err) {
-        console.error("fetchStudentsForTutor error:", err);
-        return [];
-    }
-}
-
-/*******************************************************************************
  * SECTION 6: EMPLOYMENT & TIN MANAGEMENT
  ******************************************************************************/
 
@@ -810,17 +766,19 @@ class ScheduleManager {
     async loadStudents() {
         try {
             const { query, collection, where, getDocs } = this.methods;
-            // Fetch by tutorEmail AND tutorId (management assigns via tutorId)
-            const fetchedStudents = await fetchStudentsForTutor(this.tutor, "students");
+            const q = query(collection(this.db, "students"), where("tutorEmail", "==", this.tutor.email));
+            const snapshot = await getDocs(q);
             
             this.students = [];
             this.scheduledStudentIds.clear();
 
-            fetchedStudents.forEach(student => {
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const student = { id: doc.id, ...data };
                 this.students.push(student);
                 
-                if (student.schedule && Array.isArray(student.schedule) && student.schedule.length > 0) {
-                    this.scheduledStudentIds.add(student.id);
+                if (data.schedule && Array.isArray(data.schedule) && data.schedule.length > 0) {
+                    this.scheduledStudentIds.add(doc.id);
                 }
             });
         } catch (error) {
@@ -1828,12 +1786,12 @@ async function msgLoadRecipientsByStudentId(type, container) {
     const tutorEmail = window.tutorData?.email;
 
     try {
-        // Fetch by tutorEmail AND tutorId (management assigns via tutorId)
-        const tutorObj = window.tutorData || { email: tutorEmail, id: null };
-        const allStudentDocs = await fetchStudentsForTutor(tutorObj, "students");
+        const q = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
+        const snap = await getDocs(q);
         // Only active students
-        const students = allStudentDocs
-            .filter(s => !s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status));
+        const students = snap.docs
+            .filter(d => { const s = d.data(); return !s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status); })
+            .map(d => ({ id: d.id, ...d.data() }));
 
         if (type === 'individual') {
             container.innerHTML = `
@@ -2659,7 +2617,8 @@ function renderScheduleManagement(container, tutor) {
             const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Africa/Lagos' });
             document.getElementById('today-day-label').textContent = todayName;
 
-            const allStudents = await fetchStudentsForTutor(tutor, "students");
+            const snap = await getDocs(query(collection(db, "students"), where("tutorEmail", "==", tutor.email)));
+            const allStudents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             const active = allStudents.filter(s => !s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status));
 
             // Today's classes
@@ -3090,14 +3049,13 @@ function renderTutorDashboard(container, tutor) {
 
 async function loadStudentDropdowns(tutorEmail) {
     try {
-        // Fetch by tutorEmail AND tutorId (management assigns via tutorId)
-        const tutorObj = window.tutorData || { email: tutorEmail, id: null };
-        const studentDocs = await fetchStudentsForTutor(tutorObj, "students");
+        const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
+        const studentsSnapshot = await getDocs(studentsQuery);
         
         studentCache = [];
         const students = [];
-        studentDocs.forEach(student => {
-            // student already has id and data merged by fetchStudentsForTutor
+        studentsSnapshot.forEach(doc => {
+            const student = { id: doc.id, ...doc.data() };
             // Filter out archived students
             if (!['archived', 'graduated', 'transferred'].includes(student.status)) {
                 students.push(student);
@@ -3604,16 +3562,17 @@ async function renderStudentDatabase(container, tutor) {
         return total;
     }
     
-    // Queries - fetch by tutorEmail OR tutorId (management assigns via tutorId)
+    // Queries - REMOVED pendingStudentQuery (Tutors only see approved students)
+    const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
     const allSubmissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutor.email));
-
-    const [allStudentDocs, allSubmissionsSnapshot] = await Promise.all([
-        fetchStudentsForTutor(tutor, "students"),
-        getDocs(allSubmissionsQuery)
+    
+    const [studentsSnapshot, allSubmissionsSnapshot] = await Promise.all([
+        getDocs(studentQuery), getDocs(allSubmissionsQuery)  // Only approved students and submissions
     ]);
 
     // Process Students - ONLY APPROVED STUDENTS
-    let approvedStudents = allStudentDocs
+    let approvedStudents = studentsSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data(), collection: "students" }))
         .filter(student => !student.status || student.status === 'active' || student.status === 'approved' || !['archived', 'graduated', 'transferred'].includes(student.status));
 
     const now = new Date();
@@ -3735,20 +3694,10 @@ async function renderStudentDatabase(container, tutor) {
                         actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Delete</button>`;
                     }
 
-                    // ── PLACEMENT TEST LAUNCH (Grades 3–12 only) ──────────────────────────────
-                    if (isPlacementTestEligible(student.grade)) {
-                        actionsHTML += `<button
-                            class="launch-placement-btn bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 text-sm font-semibold"
-                            data-student-id="${escapeHtml(student.id)}"
-                            data-student-name="${escapeHtml(student.studentName)}"
-                            data-grade="${escapeHtml(student.grade)}"
-                            data-parent-email="${escapeHtml(student.parentEmail || '')}"
-                            data-parent-name="${escapeHtml(student.parentName || '')}"
-                            data-parent-phone="${escapeHtml(student.parentPhone || '')}"
-                            data-tutor-email="${escapeHtml(tutor.email)}"
-                            data-tutor-name="${escapeHtml(tutor.name || '')}">
-                            🎯 Placement Test
-                        </button>`;
+                    // Launch Assessment button (Grades 3–12 only)
+                    const gradeNum = parseInt((student.grade || '').replace(/[^0-9]/g, ''));
+                    if (!isNaN(gradeNum) && gradeNum >= 3 && gradeNum <= 12) {
+                        actionsHTML += `<button class="launch-assessment-btn bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700" onclick="launchStudentAssessment(${JSON.stringify({id: student.id, studentName: student.studentName, parentEmail: student.parentEmail || '', grade: student.grade, country: student.country || 'N/A'}).replace(/"/g, '&quot;')})">🚀 Launch Assessment</button>`;
                     }
                 }
                 studentsHTML += `<tr><td class="px-6 py-4 whitespace-nowrap">${escapeHtml(student.studentName)} (${escapeHtml(cleanGradeString ? cleanGradeString(student.grade) : student.grade)})<div class="text-xs text-gray-500">Subjects: ${escapeHtml(subjects)} | Days: ${escapeHtml(days)}</div>${feeDisplay}</td><td class="px-6 py-4 whitespace-nowrap">${statusHTML}</td><td class="px-6 py-4 whitespace-nowrap space-x-2">${actionsHTML}</td></tr>`;
@@ -4142,58 +4091,7 @@ async function renderStudentDatabase(container, tutor) {
                 renderStudentDatabase(container, tutor);
             } catch (error) { console.error("Error adding student:", error); showCustomAlert(`An error occurred: ${error.message}`); }
         }
-
-        // ── PLACEMENT TEST — event delegation for .launch-placement-btn ──────────────
-        document.querySelectorAll('.launch-placement-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const studentId   = btn.getAttribute('data-student-id');
-                const studentName = btn.getAttribute('data-student-name');
-                const grade       = btn.getAttribute('data-grade');
-                const parentEmail = btn.getAttribute('data-parent-email');
-                const parentName  = btn.getAttribute('data-parent-name');
-                const parentPhone = btn.getAttribute('data-parent-phone');
-                const tutorEmail  = btn.getAttribute('data-tutor-email');
-                const tutorName   = btn.getAttribute('data-tutor-name');
-
-                if (!studentName || !grade) {
-                    showCustomAlert('⚠️ Missing student data. Cannot launch placement test.');
-                    return;
-                }
-
-                // Build the structured hand-off payload.
-                // subject-select.js reads 'studentData' to bypass the student login gate.
-                // studentUid (= Firestore doc ID) is preserved so test results are appended
-                // to the EXISTING student record, preventing duplicate student entries.
-                const payload = {
-                    studentUid:   studentId,    // Firestore doc ID — critical for dedup
-                    studentName:  studentName,
-                    grade:        grade,
-                    studentEmail: parentEmail,  // subject-select reads key 'studentEmail'
-                    parentName:   parentName,
-                    parentPhone:  parentPhone,
-                    tutorEmail:   tutorEmail,
-                    tutorName:    tutorName,
-                    launchedBy:   'tutor',      // sentinel consumed by subject-select.js
-                    launchedAt:   Date.now()    // used for the 2-hour stale guard
-                };
-
-                try {
-                    localStorage.setItem('studentData',  JSON.stringify(payload));
-                    // Also mirror individual keys for any CBT page that reads them directly
-                    localStorage.setItem('studentName',  studentName);
-                    localStorage.setItem('studentEmail', parentEmail);
-                    localStorage.setItem('grade',        grade);
-                    localStorage.setItem('studentUid',   studentId);
-                } catch (e) {
-                    showCustomAlert('⚠️ Could not save to localStorage. Check browser privacy settings.');
-                    return;
-                }
-
-                // Open in a new tab so the tutor dashboard stays accessible
-                window.open('subject-select.html', '_blank');
-            });
-        });
-    }  // ── end of attachEventListeners
+    }
 
     renderUI();
 }
@@ -4789,17 +4687,17 @@ async function renderCourses(container, tutor) {
  */
 async function loadStudentDropdownCourses(tutorEmail) {
     try {
-        // Fetch by tutorEmail AND tutorId (management assigns via tutorId)
-        const tutorObj = window.tutorData || { email: tutorEmail, id: null };
-        const studentDocs = await fetchStudentsForTutor(tutorObj, "students");
+        const q = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
+        const snapshot = await getDocs(q);
         const select = document.getElementById('material-student-select');
         
         // Keep the first placeholder option
         select.innerHTML = '<option value="">— Choose a student —</option>';
         
-        studentDocs.forEach(student => {
+        snapshot.forEach(doc => {
+            const student = doc.data();
             const option = document.createElement('option');
-            option.value = student.id;
+            option.value = doc.id;
             option.textContent = `${student.studentName} (${student.grade})`;
             select.appendChild(option);
         });
@@ -5566,6 +5464,26 @@ inboxObserver.observe(document.body, { childList: true, subtree: true });
 // ==========================================
 // 5. EXPOSE FUNCTIONS TO WINDOW (for onclick handlers)
 // ==========================================
+
+// ── Launch Student Assessment ──────────────────────────────────────────────
+window.launchStudentAssessment = function(student) {
+    // 1. Prepare the data to match what subject-select.html expects
+    const assessmentData = {
+        studentName: student.name || student.studentName,
+        parentEmail: student.parentEmail,
+        grade: student.grade,
+        tutorEmail: window.tutorData ? window.tutorData.email : '',
+        country: student.country || 'N/A',
+        studentUid: student.id  // Critical: keeps the same Firestore record
+    };
+
+    // 2. Save to localStorage so subject-select.html picks it up directly
+    localStorage.setItem('studentData', JSON.stringify(assessmentData));
+
+    // 3. Open the assessment in a new tab
+    window.open('subject-select.html', '_blank');
+};
+
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
 window.showDailyTopicModal = showDailyTopicModal;
