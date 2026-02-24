@@ -92,13 +92,22 @@
 
     // Initial load logic
     document.addEventListener('DOMContentLoaded', () => {
+        // Check if data was injected from the Tutor Portal
         const storedData = localStorage.getItem('studentData');
         if (storedData) {
             studentData = JSON.parse(storedData);
-            loadSubjects(parseInt(studentData.grade));
+            const grade = parseInt(studentData.grade);
+
+            // Only allow Grades 3–12
+            if (grade >= 3 && grade <= 12) {
+                loadSubjects(grade);
+            } else {
+                alert("Assessments are currently only available for Grades 3 to 12.");
+                window.location.href = 'index.html';
+            }
         } else {
-            // If no data is found, redirect to login
-            alert("Session expired or missing data. Please log in again.");
+            // Fallback if they try to access the page directly without a session
+            alert("No active session found. Please log in or have your tutor launch the test.");
             window.location.href = 'index.html';
         }
     });
