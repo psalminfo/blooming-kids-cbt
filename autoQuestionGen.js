@@ -1,9 +1,10 @@
 import { db } from './firebaseConfig.js';
-import { collection, getDocs, query, where, documentId, doc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, query, where, documentId, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 let loadedQuestions = [];
 let currentSessionId = null;
 let saveTimeout = null;
+let saveTextTimeout = null;
 
 /**
  * Convert test subject to admin_questions subject format
@@ -37,7 +38,7 @@ function generateSessionId(grade, subject, state) {
     // Only reuse session if it's for the EXACT same test AND state
     if (existingSessionId && existingSessionId === testSessionKey) {
         console.log("Reusing session for current test and state:", testSessionKey);
-        return existingSessionId;
+        return testSessionKey; // FIX: return testSessionKey, not existingSessionId (same value but semantically correct)
     }
     
     // New test session - clear any old sessions for different states
@@ -147,7 +148,7 @@ function selectELAQuestions(allQuestions, passagesMap) {
     
     if (availableNonPassageQuestions >= questionsNeeded) {
         // We have enough non-passage questions to reach 15 - use them
-        const shuffledNonPassage = questionsWithoutPassages.sort(() => 0.5 - Math.random());
+        const shuffledNonPassage = [...questionsWithoutPassages].sort(() => Math.random() - 0.5);
         const additionalQuestions = shuffledNonPassage.slice(0, questionsNeeded);
         selectedQuestions.push(...additionalQuestions);
         console.log(`Added ${additionalQuestions.length} non-passage questions to reach 15 total`);
@@ -163,7 +164,7 @@ function selectELAQuestions(allQuestions, passagesMap) {
             // If we still have room after second passage, add available non-passage questions
             const remainingSlots = 15 - selectedQuestions.length;
             if (remainingSlots > 0 && questionsWithoutPassages.length > 0) {
-                const shuffledNonPassage = questionsWithoutPassages.sort(() => 0.5 - Math.random());
+                const shuffledNonPassage = [...questionsWithoutPassages].sort(() => Math.random() - 0.5);
                 const finalQuestions = shuffledNonPassage.slice(0, remainingSlots);
                 selectedQuestions.push(...finalQuestions);
                 console.log(`Added ${finalQuestions.length} non-passage questions after second passage`);
@@ -171,7 +172,7 @@ function selectELAQuestions(allQuestions, passagesMap) {
         }
     } else {
         // Only one passage available - add whatever non-passage questions we have
-        const shuffledNonPassage = questionsWithoutPassages.sort(() => 0.5 - Math.random());
+        const shuffledNonPassage = [...questionsWithoutPassages].sort(() => Math.random() - 0.5);
         const additionalQuestions = shuffledNonPassage.slice(0, availableNonPassageQuestions);
         selectedQuestions.push(...additionalQuestions);
         console.log(`Added ${additionalQuestions.length} non-passage questions (only one passage available)`);
@@ -416,7 +417,7 @@ export async function loadQuestions(subject, grade, state) {
                 selectedQuestions = selectELAQuestions(filteredQuestions, passagesMap);
             } else {
                 // For other subjects: Just take 15 random questions
-                selectedQuestions = filteredQuestions.sort(() => 0.5 - Math.random()).slice(0, 15);
+                selectedQuestions = [...filteredQuestions].sort(() => Math.random() - 0.5).slice(0, 15);
             }
             
             loadedQuestions = selectedQuestions.map((q, index) => ({ 
@@ -543,8 +544,8 @@ function saveAnswer(questionId, answer) {
  * Save text answer to storage (debounced)
  */
 function saveTextAnswer(questionId, answer) {
-    clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => {
+    clearTimeout(saveTextTimeout);
+    saveTextTimeout = setTimeout(() => {
         try {
             const savedAnswers = sessionStorage.getItem(`${currentSessionId}-answers`) || '{}';
             const answers = JSON.parse(savedAnswers);
@@ -566,21 +567,25 @@ function displayQuestionsBasedOnState(questions, state) {
         const creativeWritingQuestion = questions.find(q => q.type === 'creative-writing');
         if (creativeWritingQuestion) {
             displayCreativeWriting(creativeWritingQuestion);
+        } else {
+            console.warn('No creative writing question found in session; cannot restore state.');
+            const container = document.getElementById('question-container');
+            if (container) container.innerHTML = '<p class="text-red-600">Could not restore creative writing question. Please refresh the page.</p>';
         }
     } else {
         displayMCQQuestions(questions, passagesMap);
     }
 }
 
-export function getLoadedQuestions() {
-    return loadedQuestions;
-}
+// Alias for backwards compatibility
+export { getAllLoadedQuestions as getLoadedQuestions };
 
 /**
  * Escape HTML to prevent XSS
  */
 function escapeHtml(unsafe) {
-    if (typeof unsafe !== 'string') return unsafe;
+    if (unsafe === null || unsafe === undefined) return '';
+    if (typeof unsafe !== 'string') return String(unsafe);
     return unsafe
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
@@ -798,13 +803,17 @@ function createQuestionElement(q, displayIndex) {
     const safeOptions = questionOptions.map(opt => escapeHtml(opt));
     
     try {
+        // Store imageUrl as data attribute to avoid XSS in onclick
+        const safeImageUrl = escapeHtml(q.imageUrl || '');
+        const safeOptimizedUrl = escapeHtml(optimizedImageUrl || '');
+
         questionElement.innerHTML = `
             ${showImageBefore ? `
                 <div class="image-container mb-3">
-                    <img src="${optimizedImageUrl}" 
-                         class="max-w-full h-auto rounded-lg border cursor-pointer hover:opacity-90 transition-opacity"
+                    <img src="${safeOptimizedUrl}" 
+                         class="max-w-full h-auto rounded-lg border cursor-pointer hover:opacity-90 transition-opacity js-open-image"
                          alt="Question image"
-                         onclick="window.open('${q.imageUrl}', '_blank')"/>
+                         data-full-url="${safeImageUrl}"/>
                     <p class="text-xs text-gray-500 text-center mt-1">Click image to view full size</p>
                 </div>
             ` : ''}
@@ -816,10 +825,10 @@ function createQuestionElement(q, displayIndex) {
             
             ${showImageAfter ? `
                 <div class="image-container mt-3">
-                    <img src="${optimizedImageUrl}" 
-                         class="max-w-full h-auto rounded-lg border cursor-pointer hover:opacity-90 transition-opacity"
+                    <img src="${safeOptimizedUrl}" 
+                         class="max-w-full h-auto rounded-lg border cursor-pointer hover:opacity-90 transition-opacity js-open-image"
                          alt="Question image"
-                         onclick="window.open('${q.imageUrl}', '_blank')"/>
+                         data-full-url="${safeImageUrl}"/>
                     <p class="text-xs text-gray-500 text-center mt-1">Click image to view full size</p>
                 </div>
             ` : ''}
@@ -866,6 +875,14 @@ function createQuestionElement(q, displayIndex) {
                 });
             }
         }
+
+        // Safe image open — uses data attribute instead of inline onclick
+        questionElement.querySelectorAll('.js-open-image').forEach(img => {
+            img.addEventListener('click', () => {
+                const url = img.getAttribute('data-full-url');
+                if (url) window.open(url, '_blank');
+            });
+        });
         
         return questionElement;
     } catch (error) {
