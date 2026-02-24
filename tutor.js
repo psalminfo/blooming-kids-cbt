@@ -196,93 +196,53 @@ function isPlacementTestEligible(grade) {
 }
 
 // ----- COUNTRY FROM PHONE NUMBER (detects country via dialing code) -----
-/**
- * Derives a country name from a phone number's international dialing code.
- * Supports the most common country codes worldwide; falls back to empty string.
- */
 function getCountryFromPhone(phone) {
     if (!phone) return '';
-    // Strip spaces, dashes, parentheses; ensure it starts with +
     const cleaned = phone.toString().trim().replace(/[\s\-().]/g, '');
-    let withPlus = cleaned;
-    if (!withPlus.startsWith('+')) {
-        // Nigerian local numbers starting with 0 → +234
-        if (withPlus.startsWith('0') && withPlus.length >= 10) {
-            withPlus = '+234' + withPlus.substring(1);
-        } else if (withPlus.startsWith('234') && withPlus.length >= 12) {
-            withPlus = '+' + withPlus;
-        } else {
-            withPlus = '+' + withPlus;
-        }
+    let w = cleaned;
+    if (!w.startsWith('+')) {
+        if (w.startsWith('0') && w.length >= 10) w = '+234' + w.substring(1);
+        else if (w.startsWith('234') && w.length >= 12) w = '+' + w;
+        else w = '+' + w;
     }
-
-    // Order matters: longer codes must be checked before shorter prefixes
-    const CODE_MAP = [
-        // 3-digit codes (check first)
-        ['+355', 'Albania'],       ['+213', 'Algeria'],      ['+376', 'Andorra'],
-        ['+244', 'Angola'],        ['+374', 'Armenia'],      ['+994', 'Azerbaijan'],
-        ['+973', 'Bahrain'],       ['+880', 'Bangladesh'],   ['+375', 'Belarus'],
-        ['+501', 'Belize'],        ['+229', 'Benin'],        ['+975', 'Bhutan'],
-        ['+591', 'Bolivia'],       ['+387', 'Bosnia'],       ['+267', 'Botswana'],
-        ['+673', 'Brunei'],        ['+226', 'Burkina Faso'], ['+257', 'Burundi'],
-        ['+855', 'Cambodia'],      ['+237', 'Cameroon'],     ['+238', 'Cape Verde'],
-        ['+236', 'CAR'],           ['+235', 'Chad'],         ['+562', 'Chile'],
-        ['+269', 'Comoros'],       ['+242', 'Congo'],        ['+243', 'DR Congo'],
-        ['+506', 'Costa Rica'],    ['+385', 'Croatia'],      ['+357', 'Cyprus'],
-        ['+253', 'Djibouti'],      ['+593', 'Ecuador'],      ['+503', 'El Salvador'],
-        ['+240', 'Equatorial Guinea'],['+291', 'Eritrea'],   ['+372', 'Estonia'],
-        ['+268', 'Eswatini'],      ['+251', 'Ethiopia'],     ['+679', 'Fiji'],
-        ['+241', 'Gabon'],         ['+220', 'Gambia'],       ['+995', 'Georgia'],
-        ['+233', 'Ghana'],         ['+502', 'Guatemala'],    ['+224', 'Guinea'],
-        ['+245', 'Guinea-Bissau'], ['+592', 'Guyana'],       ['+509', 'Haiti'],
-        ['+504', 'Honduras'],      ['+354', 'Iceland'],      ['+964', 'Iraq'],
-        ['+972', 'Israel'],        ['+962', 'Jordan'],       ['+254', 'Kenya'],
-        ['+686', 'Kiribati'],      ['+965', 'Kuwait'],       ['+996', 'Kyrgyzstan'],
-        ['+856', 'Laos'],          ['+371', 'Latvia'],       ['+961', 'Lebanon'],
-        ['+266', 'Lesotho'],       ['+231', 'Liberia'],      ['+218', 'Libya'],
-        ['+423', 'Liechtenstein'], ['+370', 'Lithuania'],    ['+352', 'Luxembourg'],
-        ['+261', 'Madagascar'],    ['+265', 'Malawi'],       ['+960', 'Maldives'],
-        ['+223', 'Mali'],          ['+356', 'Malta'],        ['+692', 'Marshall Islands'],
-        ['+222', 'Mauritania'],    ['+230', 'Mauritius'],    ['+373', 'Moldova'],
-        ['+976', 'Mongolia'],      ['+382', 'Montenegro'],   ['+212', 'Morocco'],
-        ['+258', 'Mozambique'],    ['+264', 'Namibia'],      ['+977', 'Nepal'],
-        ['+505', 'Nicaragua'],     ['+227', 'Niger'],        ['+234', 'Nigeria'],
-        ['+389', 'North Macedonia'],['+968', 'Oman'],        ['+970', 'Palestine'],
-        ['+507', 'Panama'],        ['+675', 'Papua New Guinea'],['+595', 'Paraguay'],
-        ['+974', 'Qatar'],         ['+250', 'Rwanda'],       ['+685', 'Samoa'],
-        ['+239', 'São Tomé'],      ['+966', 'Saudi Arabia'], ['+221', 'Senegal'],
-        ['+381', 'Serbia'],        ['+232', 'Sierra Leone'], ['+421', 'Slovakia'],
-        ['+386', 'Slovenia'],      ['+677', 'Solomon Islands'],['+252', 'Somalia'],
-        ['+211', 'South Sudan'],   ['+249', 'Sudan'],        ['+597', 'Suriname'],
-        ['+992', 'Tajikistan'],    ['+255', 'Tanzania'],     ['+670', 'Timor-Leste'],
-        ['+228', 'Togo'],          ['+676', 'Tonga'],        ['+868', 'Trinidad & Tobago'],
-        ['+216', 'Tunisia'],       ['+993', 'Turkmenistan'], ['+688', 'Tuvalu'],
-        ['+256', 'Uganda'],        ['+971', 'UAE'],          ['+598', 'Uruguay'],
-        ['+998', 'Uzbekistan'],    ['+678', 'Vanuatu'],      ['+967', 'Yemen'],
-        ['+260', 'Zambia'],        ['+263', 'Zimbabwe'],
-        // 2-digit codes
-        ['+20', 'Egypt'],          ['+27', 'South Africa'],  ['+30', 'Greece'],
-        ['+31', 'Netherlands'],    ['+32', 'Belgium'],       ['+33', 'France'],
-        ['+34', 'Spain'],          ['+36', 'Hungary'],       ['+39', 'Italy'],
-        ['+40', 'Romania'],        ['+41', 'Switzerland'],   ['+43', 'Austria'],
-        ['+44', 'United Kingdom'], ['+45', 'Denmark'],       ['+46', 'Sweden'],
-        ['+47', 'Norway'],         ['+48', 'Poland'],        ['+49', 'Germany'],
-        ['+51', 'Peru'],           ['+52', 'Mexico'],        ['+54', 'Argentina'],
-        ['+55', 'Brazil'],         ['+56', 'Chile'],         ['+57', 'Colombia'],
-        ['+58', 'Venezuela'],      ['+60', 'Malaysia'],      ['+61', 'Australia'],
-        ['+62', 'Indonesia'],      ['+63', 'Philippines'],   ['+64', 'New Zealand'],
-        ['+65', 'Singapore'],      ['+66', 'Thailand'],      ['+81', 'Japan'],
-        ['+82', 'South Korea'],    ['+84', 'Vietnam'],       ['+86', 'China'],
-        ['+90', 'Turkey'],         ['+91', 'India'],         ['+92', 'Pakistan'],
-        ['+93', 'Afghanistan'],    ['+94', 'Sri Lanka'],     ['+95', 'Myanmar'],
-        ['+98', 'Iran'],
-        // 1-digit codes (last)
-        ['+1', 'United States'],   ['+7', 'Russia'],
+    const MAP = [
+        ['+355','Albania'],['+213','Algeria'],['+244','Angola'],['+374','Armenia'],
+        ['+994','Azerbaijan'],['+973','Bahrain'],['+880','Bangladesh'],['+375','Belarus'],
+        ['+229','Benin'],['+591','Bolivia'],['+387','Bosnia'],['+267','Botswana'],
+        ['+673','Brunei'],['+226','Burkina Faso'],['+855','Cambodia'],['+237','Cameroon'],
+        ['+236','CAR'],['+235','Chad'],['+269','Comoros'],['+243','DR Congo'],
+        ['+242','Congo'],['+506','Costa Rica'],['+385','Croatia'],['+357','Cyprus'],
+        ['+253','Djibouti'],['+593','Ecuador'],['+503','El Salvador'],['+291','Eritrea'],
+        ['+372','Estonia'],['+268','Eswatini'],['+251','Ethiopia'],['+679','Fiji'],
+        ['+241','Gabon'],['+220','Gambia'],['+995','Georgia'],['+233','Ghana'],
+        ['+502','Guatemala'],['+224','Guinea'],['+245','Guinea-Bissau'],['+592','Guyana'],
+        ['+509','Haiti'],['+504','Honduras'],['+354','Iceland'],['+964','Iraq'],
+        ['+972','Israel'],['+962','Jordan'],['+254','Kenya'],['+965','Kuwait'],
+        ['+996','Kyrgyzstan'],['+856','Laos'],['+371','Latvia'],['+961','Lebanon'],
+        ['+266','Lesotho'],['+231','Liberia'],['+218','Libya'],['+370','Lithuania'],
+        ['+352','Luxembourg'],['+261','Madagascar'],['+265','Malawi'],['+960','Maldives'],
+        ['+223','Mali'],['+356','Malta'],['+222','Mauritania'],['+230','Mauritius'],
+        ['+373','Moldova'],['+976','Mongolia'],['+382','Montenegro'],['+212','Morocco'],
+        ['+258','Mozambique'],['+264','Namibia'],['+977','Nepal'],['+505','Nicaragua'],
+        ['+227','Niger'],['+234','Nigeria'],['+968','Oman'],['+507','Panama'],
+        ['+595','Paraguay'],['+974','Qatar'],['+250','Rwanda'],['+966','Saudi Arabia'],
+        ['+221','Senegal'],['+381','Serbia'],['+232','Sierra Leone'],['+252','Somalia'],
+        ['+211','South Sudan'],['+249','Sudan'],['+255','Tanzania'],['+228','Togo'],
+        ['+216','Tunisia'],['+256','Uganda'],['+971','UAE'],['+598','Uruguay'],
+        ['+998','Uzbekistan'],['+967','Yemen'],['+260','Zambia'],['+263','Zimbabwe'],
+        ['+20','Egypt'],['+27','South Africa'],['+30','Greece'],['+31','Netherlands'],
+        ['+32','Belgium'],['+33','France'],['+34','Spain'],['+36','Hungary'],
+        ['+39','Italy'],['+40','Romania'],['+41','Switzerland'],['+43','Austria'],
+        ['+44','United Kingdom'],['+45','Denmark'],['+46','Sweden'],['+47','Norway'],
+        ['+48','Poland'],['+49','Germany'],['+51','Peru'],['+52','Mexico'],
+        ['+54','Argentina'],['+55','Brazil'],['+56','Chile'],['+57','Colombia'],
+        ['+58','Venezuela'],['+60','Malaysia'],['+61','Australia'],['+62','Indonesia'],
+        ['+63','Philippines'],['+64','New Zealand'],['+65','Singapore'],['+66','Thailand'],
+        ['+81','Japan'],['+82','South Korea'],['+84','Vietnam'],['+86','China'],
+        ['+90','Turkey'],['+91','India'],['+92','Pakistan'],['+94','Sri Lanka'],
+        ['+95','Myanmar'],['+98','Iran'],['+1','United States'],['+7','Russia'],
     ];
-
-    for (const [code, country] of CODE_MAP) {
-        if (withPlus.startsWith(code)) return country;
-    }
+    for (const [code, country] of MAP) { if (w.startsWith(code)) return country; }
     return '';
 }
 
@@ -2798,31 +2758,56 @@ function renderScheduleManagement(container, tutor) {
 
             const totalClasses = Object.values(scheduleByDay).reduce((t, arr) => t + arr.length, 0);
 
-            let gridHtml = `<div class="overflow-x-auto"><div style="display:grid;grid-template-columns:repeat(7,minmax(120px,1fr));border-left:1px solid #e5e7eb;">`;
-            DAYS_OF_WEEK.forEach(day => {
+            let gridHtml = `
+            <div class="overflow-x-auto">
+              <div style="display:grid;grid-template-columns:repeat(7,minmax(130px,1fr));min-width:700px;">`;
+
+            const DAY_COLORS = {
+                Monday:    { bg:'#eff6ff', border:'#bfdbfe', hdr:'#1d4ed8', dot:'#3b82f6' },
+                Tuesday:   { bg:'#f5f3ff', border:'#ddd6fe', hdr:'#6d28d9', dot:'#8b5cf6' },
+                Wednesday: { bg:'#ecfdf5', border:'#bbf7d0', hdr:'#065f46', dot:'#10b981' },
+                Thursday:  { bg:'#fff7ed', border:'#fed7aa', hdr:'#9a3412', dot:'#f97316' },
+                Friday:    { bg:'#fdf4ff', border:'#e9d5ff', hdr:'#6b21a8', dot:'#a855f7' },
+                Saturday:  { bg:'#fef9c3', border:'#fde68a', hdr:'#92400e', dot:'#eab308' },
+                Sunday:    { bg:'#fff1f2', border:'#fecdd3', hdr:'#9f1239', dot:'#ef4444' },
+            };
+
+            DAYS_OF_WEEK.forEach((day, idx) => {
                 const isToday = day === todayName;
                 const classes = scheduleByDay[day];
+                const col = DAY_COLORS[day] || { bg:'#f9fafb', border:'#e5e7eb', hdr:'#374151', dot:'#6b7280' };
+                const borderL = idx === 0 ? '' : `border-left:1px solid #e5e7eb;`;
+
                 gridHtml += `
-                    <div style="border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;">
-                        <div style="padding:8px 10px;font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em;background:${isToday ? '#ecfdf5' : '#f9fafb'};color:${isToday ? '#059669' : '#6b7280'};border-bottom:1px solid #e5e7eb;">
-                            ${escapeHtml(day.substring(0,3))} ${isToday ? '◀' : ''}
-                            <span style="float:right;background:${isToday ? '#059669' : '#e5e7eb'};color:${isToday ? '#fff' : '#6b7280'};border-radius:999px;padding:0 6px;font-size:0.7rem;">${classes.length}</span>
-                        </div>
-                        <div style="padding:6px;min-height:80px;">
-                            ${classes.length === 0 ? '<div style="color:#d1d5db;font-size:0.7rem;text-align:center;padding:12px 4px;">No class</div>' :
-                              classes.map(c => `
-                                <div style="background:${isToday ? '#ecfdf5' : '#f3f4f6'};border:1px solid ${isToday ? '#bbf7d0' : '#e5e7eb'};border-radius:6px;padding:5px 7px;margin-bottom:4px;font-size:0.73rem;">
-                                    <div style="font-weight:700;color:#1f2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.studentName)}</div>
-                                    <div style="color:#6b7280;">${escapeHtml(formatScheduleTime(c.start))}–${escapeHtml(formatScheduleTime(c.end))}</div>
-                                    ${c.subjects?.length ? `<div style="color:#9ca3af;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.subjects.slice(0,2).join(', '))}</div>` : ''}
-                                </div>`).join('')}
-                        </div>
-                    </div>`;
+                <div style="${borderL}border-bottom:1px solid #e5e7eb;">
+                    <div style="padding:8px 10px;font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;
+                        background:${isToday ? col.hdr : col.bg};
+                        color:${isToday ? '#fff' : col.hdr};
+                        border-bottom:2px solid ${isToday ? col.dot : col.border};
+                        display:flex;align-items:center;justify-content:space-between;">
+                        <span>${day.substring(0,3)}${isToday ? ' ◀' : ''}</span>
+                        <span style="background:${isToday ? 'rgba(255,255,255,0.25)' : col.border};color:${isToday ? '#fff' : col.hdr};
+                            border-radius:999px;padding:0 7px;font-size:0.7rem;font-weight:800;">${classes.length}</span>
+                    </div>
+                    <div style="padding:6px;min-height:90px;background:#fff;">
+                        ${classes.length === 0
+                            ? `<div style="color:#d1d5db;font-size:0.7rem;text-align:center;padding:14px 4px;font-style:italic;">No class</div>`
+                            : classes.map(c => `
+                            <div style="background:${col.bg};border:1px solid ${col.border};border-left:3px solid ${col.dot};
+                                border-radius:7px;padding:6px 8px;margin-bottom:5px;font-size:0.73rem;cursor:default;">
+                                <div style="font-weight:700;color:#1f2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.studentName)}</div>
+                                <div style="color:${col.hdr};font-weight:600;margin-top:1px;">${escapeHtml(formatScheduleTime(c.start))}–${escapeHtml(formatScheduleTime(c.end))}</div>
+                                ${c.subjects?.length ? `<div style="color:#9ca3af;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.68rem;margin-top:1px;">${escapeHtml(c.subjects.slice(0,2).join(', '))}</div>` : ''}
+                                ${c.isOvernight ? '<div style="color:#818cf8;font-size:0.67rem;">🌙 Overnight</div>' : ''}
+                            </div>`).join('')}
+                    </div>
+                </div>`;
             });
+
             gridHtml += `</div></div>
             <div style="padding:12px 16px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:0.8rem;color:#6b7280;display:flex;gap:24px;flex-wrap:wrap;">
                 <span>👥 <b>${active.length}</b> active students</span>
-                <span>📚 <b>${totalClasses}</b> classes per week</span>
+                <span>📚 <b>${totalClasses}</b> classes/week</span>
                 <span>🗓️ Busiest: <b>${getMostScheduledDay(scheduleByDay)}</b></span>
                 <span>⏰ Earliest: <b>${getEarliestClass(scheduleByDay)}</b></span>
             </div>`;
@@ -3348,18 +3333,12 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
             pendingReportsContainer.innerHTML = `
                 <div class="card">
                     <div class="card-body p-0">
-                        <div class="divide-y divide-gray-100">
+                        <ul class="divide-y divide-gray-100">
                             ${pendingItems.map(item => `
-                            <div class="flex items-center justify-between px-4 py-3">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-sm">
-                                        ${escapeHtml((item.studentName||'?').charAt(0))}
-                                    </div>
-                                    <span class="font-medium text-gray-800">${escapeHtml(item.studentName)}</span>
-                                </div>
-                                <span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">${escapeHtml(item.grade)}</span>
-                            </div>`).join('')}
-                        </div>
+                            <li class="px-5 py-3 text-sm font-medium text-gray-800 hover:bg-gray-50 transition-colors">
+                                ${escapeHtml(item.studentName)}
+                            </li>`).join('')}
+                        </ul>
                     </div>
                 </div>`;
         }
@@ -3774,80 +3753,73 @@ async function renderStudentDatabase(container, tutor) {
         if (studentsCount === 0) {
             studentsHTML += `<p class="text-gray-500">You are not assigned to any students yet.</p>`;
         } else {
-            studentsHTML += `
-                <div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">
-                <thead><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student Name</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th></tr></thead>
-                <tbody class="bg-white divide-y divide-gray-200">`;
-            
+            studentsHTML += `<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mt-2">`;
+
             students.forEach(student => {
                 const hasSubmitted = submittedStudentIds.has(student.id);
                 const isReportSaved = savedReports[student.id];
-                const feeDisplay = showStudentFees ? `<div class="text-xs text-gray-500">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
-                let statusHTML = '', actionsHTML = '';
+                const feeDisplay = showStudentFees ? `<div class="text-xs text-indigo-600 font-semibold mt-0.5">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
+                let statusBadge = '', actionsHTML = '';
                 const subjects = student.subjects ? student.subjects.join(', ') : 'N/A';
-                const days = student.days ? `${student.days} days/week` : 'N/A';
+                const days = student.days ? `${student.days} day${student.days !== '1' ? 's' : ''}/wk` : 'N/A';
+                const initial = (student.studentName || '?').charAt(0).toUpperCase();
 
-                // FIXED: No pending student check - tutors only see approved students
-                if (hasSubmitted) {
-                    statusHTML = `<span class="status-indicator text-blue-600 font-semibold">Report Sent</span>`;
-                    actionsHTML = `<span class="text-gray-400">Submitted this month</span>`;
+                let cardAccent = 'border-gray-200';
+                if (student.summerBreak) {
+                    statusBadge = `<span class="bg-yellow-100 text-yellow-700 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">☀️ On Break</span>`;
+                    cardAccent = 'border-yellow-200';
+                } else if (student.isTransitioning) {
+                    statusBadge = `<span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">🔄 Transitioning</span>`;
+                    cardAccent = 'border-orange-200';
+                } else if (hasSubmitted) {
+                    statusBadge = `<span class="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">✅ Report Sent</span>`;
+                    cardAccent = 'border-blue-200';
+                } else if (isReportSaved) {
+                    statusBadge = `<span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">💾 Saved</span>`;
+                    cardAccent = 'border-green-200';
                 } else {
-                    const transIndicator = student.isTransitioning ? `<span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full ml-2">Transitioning</span>` : '';
-                    statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>${transIndicator}`;
-                    
-                    // BREAK/RECALL LOGIC with status checking
+                    statusBadge = `<span class="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">📋 Pending</span>`;
+                }
+
+                if (hasSubmitted) {
+                    actionsHTML = `<span class="text-gray-400 text-xs">Submitted this month</span>`;
+                } else {
                     if (isSummerBreakEnabled) {
                         const recallStatus = window.recallStatusCache ? window.recallStatusCache[student.id] : null;
-                        
                         if (student.summerBreak) {
-                            // Student is on break - show appropriate recall button/status
                             if (recallStatus === 'pending') {
-                                actionsHTML += `<span class="bg-purple-200 text-purple-800 px-3 py-1 rounded text-sm">Recall Requested</span>`;
+                                actionsHTML += `<span class="bg-purple-200 text-purple-800 px-2 py-1 rounded text-xs">Recall Requested</span>`;
                             } else {
-                                actionsHTML += `<button class="recall-from-break-btn bg-purple-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}">Recall</button>`;
+                                actionsHTML += `<button class="recall-from-break-btn bg-purple-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}">Recall</button>`;
                             }
                         } else {
-                            // Student is active - show Break button
-                            actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}">Break</button>`;
+                            actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}">Break</button>`;
                         }
                     }
-
                     if (isSubmissionEnabled && !student.summerBreak) {
                         if (approvedStudents.length === 1) {
-                            actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="${student.isTransitioning}">Submit Report</button>`;
+                            actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="${student.isTransitioning}">Submit Report</button>`;
                         } else {
-                            actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="${student.isTransitioning}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
+                            actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="${student.isTransitioning}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
                         }
                     } else if (!student.summerBreak) {
-                        actionsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
+                        actionsHTML += `<span class="text-gray-400 text-xs">Submission Disabled</span>`;
                     }
                     if (showEditDeleteButtons && !student.summerBreak) {
-                        actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Edit</button>`;
-                        actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Delete</button>`;
+                        actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Edit</button>`;
+                        actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Delete</button>`;
                     }
-
-                    // ── PLACEMENT TEST LAUNCH (Grades 3–12 only) ──────────────────────────────
+                    // Placement Test
                     if (isPlacementTestEligible(student.grade)) {
-                        const ptStatus    = student.placementTestStatus || '';
+                        const ptStatus      = student.placementTestStatus || '';
                         const ptCompletedAt = student.placementTestCompletedAt
-                            ? (student.placementTestCompletedAt.toDate
-                                ? student.placementTestCompletedAt.toDate()
-                                : new Date(student.placementTestCompletedAt))
-                            : null;
+                            ? (student.placementTestCompletedAt.toDate ? student.placementTestCompletedAt.toDate() : new Date(student.placementTestCompletedAt)) : null;
                         const ONE_HOUR_MS = 60 * 60 * 1000;
                         const withinOneHour = ptCompletedAt && (Date.now() - ptCompletedAt.getTime() < ONE_HOUR_MS);
-
                         if (ptStatus === 'completed' && withinOneHour) {
-                            // Test completed within the last hour — show "Completed" badge, no button
-                            actionsHTML += `<span
-                                class="inline-block bg-green-100 text-green-800 border border-green-300 px-3 py-1 rounded text-sm font-semibold"
-                                title="Placement test was completed. Button clears after 1 hour.">
-                                ✅ Test Completed
-                            </span>`;
+                            actionsHTML += `<span class="inline-block bg-green-100 text-green-800 border border-green-300 px-2 py-1 rounded text-xs font-semibold">✅ Test Completed</span>`;
                         } else if (ptStatus !== 'completed') {
-                            // No test taken yet — show the launch button
-                            actionsHTML += `<button
-                                class="launch-placement-btn bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 text-sm font-semibold"
+                            actionsHTML += `<button class="launch-placement-btn bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 text-xs font-semibold"
                                 data-student-id="${escapeHtml(student.id)}"
                                 data-student-name="${escapeHtml(student.studentName)}"
                                 data-grade="${escapeHtml(student.grade)}"
@@ -3855,16 +3827,33 @@ async function renderStudentDatabase(container, tutor) {
                                 data-parent-name="${escapeHtml(student.parentName || '')}"
                                 data-parent-phone="${escapeHtml(student.parentPhone || '')}"
                                 data-tutor-email="${escapeHtml(tutor.email)}"
-                                data-tutor-name="${escapeHtml(tutor.name || '')}">
-                                🎯 Placement Test
-                            </button>`;
+                                data-tutor-name="${escapeHtml(tutor.name || '')}">🎯 Placement Test</button>`;
                         }
-                        // If ptStatus === 'completed' but more than 1 hour ago → render nothing (button cleared)
                     }
                 }
-                studentsHTML += `<tr><td class="px-6 py-4 whitespace-nowrap">${escapeHtml(student.studentName)} (${escapeHtml(cleanGradeString ? cleanGradeString(student.grade) : student.grade)})<div class="text-xs text-gray-500">Subjects: ${escapeHtml(subjects)} | Days: ${escapeHtml(days)}</div>${feeDisplay}</td><td class="px-6 py-4 whitespace-nowrap">${statusHTML}</td><td class="px-6 py-4 whitespace-nowrap space-x-2">${actionsHTML}</td></tr>`;
+
+                studentsHTML += `
+                <div class="bg-white border ${cardAccent} rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 rounded-xl flex items-center justify-center font-black text-lg flex-shrink-0 ${student.summerBreak ? 'bg-yellow-100 text-yellow-700' : student.isTransitioning ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}">${escapeHtml(initial)}</div>
+                        <div class="min-w-0 flex-1">
+                            <div class="font-bold text-gray-800 truncate">${escapeHtml(student.studentName)}</div>
+                            <div class="text-xs text-gray-400">${escapeHtml(cleanGradeString ? cleanGradeString(student.grade) : student.grade)}</div>
+                            ${feeDisplay}
+                        </div>
+                        ${statusBadge}
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                        <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg text-xs">📚 ${escapeHtml(subjects)}</span>
+                        <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg text-xs">📅 ${escapeHtml(days)}</span>
+                    </div>
+                    <div class="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+                        ${actionsHTML || '<span class="text-gray-400 text-xs">No actions available</span>'}
+                    </div>
+                </div>`;
             });
-            studentsHTML += `</tbody></table></div>`;
+
+            studentsHTML += `</div>`;
             
             if (tutor.isManagementStaff) {
                 studentsHTML += `<div class="bg-green-50 p-4 rounded-lg shadow-md mt-6"><h3 class="text-lg font-bold text-green-800 mb-2">Management Fee</h3><div class="flex items-center space-x-2"><label class="font-semibold">Fee (₦):</label><input type="number" id="management-fee-input" class="p-2 border rounded w-full" value="${escapeHtml(tutor.managementFee || 0)}"><button id="save-management-fee-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Save Fee</button></div></div>`;
@@ -4272,28 +4261,24 @@ async function renderStudentDatabase(container, tutor) {
                 }
 
                 // Build the structured hand-off payload.
-                // subject-select.js reads 'studentData' to bypass the student login gate.
-                // studentUid (= Firestore doc ID) is preserved so test results are appended
-                // to the EXISTING student record, preventing duplicate student entries.
                 const derivedCountry = getCountryFromPhone(parentPhone) || '';
                 const payload = {
-                    studentUid:   studentId,    // Firestore doc ID — critical for dedup
+                    studentUid:   studentId,
                     studentName:  studentName,
                     grade:        grade,
-                    parentEmail:  parentEmail,  // FIXED: correct key name read by subject-select
-                    studentEmail: parentEmail,  // legacy mirror (kept for any old code paths)
+                    parentEmail:  parentEmail,   // FIXED: correct key read by subject-select
+                    studentEmail: parentEmail,   // legacy mirror
                     parentName:   parentName,
                     parentPhone:  parentPhone,
-                    country:      derivedCountry, // FIXED: derived from phone's country code
+                    country:      derivedCountry, // FIXED: derived from phone code
                     tutorEmail:   tutorEmail,
                     tutorName:    tutorName,
-                    launchedBy:   'tutor',      // sentinel consumed by subject-select.js
-                    launchedAt:   Date.now()    // used for the 2-hour stale guard
+                    launchedBy:   'tutor',
+                    launchedAt:   Date.now()
                 };
 
                 try {
                     localStorage.setItem('studentData',  JSON.stringify(payload));
-                    // Also mirror individual keys for any CBT page that reads them directly
                     localStorage.setItem('studentName',  studentName);
                     localStorage.setItem('studentEmail', parentEmail);
                     localStorage.setItem('grade',        grade);
@@ -4305,6 +4290,37 @@ async function renderStudentDatabase(container, tutor) {
 
                 // Open in a new tab so the tutor dashboard stays accessible
                 window.open('subject-select.html', '_blank');
+
+                // ── Live listener: update button DOM when student completes the test ──
+                // This handles the case where the tutor keeps the dashboard open.
+                const ONE_HOUR_MS = 60 * 60 * 1000;
+                const unsubPlacement = onSnapshot(
+                    doc(db, 'students', studentId),
+                    (snap) => {
+                        if (!snap.exists()) { unsubPlacement(); return; }
+                        const d = snap.data();
+                        if (d.placementTestStatus === 'completed') {
+                            const ptTime = d.placementTestCompletedAt?.toDate
+                                ? d.placementTestCompletedAt.toDate()
+                                : null;
+                            const still = ptTime && (Date.now() - ptTime.getTime() < ONE_HOUR_MS);
+                            const launchBtn = document.querySelector(`.launch-placement-btn[data-student-id="${studentId}"]`);
+                            if (launchBtn) {
+                                if (still) {
+                                    launchBtn.outerHTML = `<span
+                                        class="inline-block bg-green-100 text-green-800 border border-green-300 px-3 py-1 rounded text-sm font-semibold"
+                                        title="Test completed. Clears after 1 hour.">
+                                        ✅ Test Completed
+                                    </span>`;
+                                } else {
+                                    launchBtn.remove();
+                                }
+                            }
+                            unsubPlacement();
+                        }
+                    },
+                    (err) => { console.warn('Placement onSnapshot error:', err); unsubPlacement(); }
+                );
             });
         });
     }  // ── end of attachEventListeners
@@ -4548,7 +4564,7 @@ async function initGamification(tutorId) {
             }
 
             let combined = 0;
-            if (qaScore !== null && qcScore !== null) combined = Math.round((qaScore + qcScore) / 2);
+            if (qaScore !== null && qcScore !== null) combined = qaScore + qcScore;
             else if (qaScore !== null) combined = qaScore;
             else if (qcScore !== null) combined = qcScore;
 
@@ -4558,6 +4574,16 @@ async function initGamification(tutorId) {
                 qaGradedByName, qcGradedByName,
                 performanceMonth: perfMonth
             });
+
+            // 🎉 Trigger confetti the first time grades appear this session
+            if (combined > 0 && (qaScore !== null || qcScore !== null)) {
+                const gradeKey = `confetti_grades_${monthKey}_${tutorId}`;
+                if (!sessionStorage.getItem(gradeKey)) {
+                    sessionStorage.setItem(gradeKey, 'true');
+                    // Slight delay so the widget renders first
+                    setTimeout(() => triggerConfetti(), 600);
+                }
+            }
         });
 
         checkWinnerStatus(tutorId);
@@ -4611,11 +4637,11 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
     const scoreWidget = document.getElementById('performance-widget');
     if (!scoreWidget) return;
 
-    let scoreColor = 'text-red-500', barColor = 'from-red-400 to-red-500';
-    if (totalScore >= 65) { scoreColor = 'text-yellow-500'; barColor = 'from-yellow-400 to-yellow-500'; }
-    if (totalScore >= 85) { scoreColor = 'text-green-600'; barColor = 'from-green-400 to-green-600'; }
+    let scoreColor = 'text-red-500', barColor = 'from-red-400 to-red-500', scoreLbl = '⚠️ Needs Improvement';
+    if (totalScore >= 50)  { scoreColor = 'text-yellow-500'; barColor = 'from-yellow-400 to-yellow-500'; scoreLbl = '👍 Good Progress'; }
+    if (totalScore >= 75)  { scoreColor = 'text-blue-600';   barColor = 'from-blue-400 to-blue-600';   scoreLbl = '🌟 Great Work'; }
+    if (totalScore >= 90)  { scoreColor = 'text-green-600';  barColor = 'from-green-400 to-green-600';  scoreLbl = '🏆 Excellent!'; }
 
-    // Accept grading details either via breakdown param (real-time) or window.tutorData (fallback)
     const td = window.tutorData || {};
     const qaScore      = breakdown.qaScore      ?? td.qaScore      ?? null;
     const qcScore      = breakdown.qcScore      ?? td.qcScore      ?? null;
@@ -4625,59 +4651,98 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
     const qcGraderName = breakdown.qcGradedByName ?? td.qcGradedByName ?? '';
     const perfMonth    = breakdown.performanceMonth ?? td.performanceMonth ?? '';
 
-    function scoreBadge(score, label, graderName, advice, themeClass) {
+    // Max bar percent — cap at 100 visually
+    const barPct = Math.min(Math.max(totalScore, 0), 100);
+
+    function scorePill(score, label, graderName, themeClass) {
         if (score === null || score === undefined) return `
-            <div class="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                <div class="text-xs font-bold ${themeClass} uppercase tracking-wide mb-1">${label}</div>
-                <div class="text-gray-400 text-sm">Not graded yet</div>
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-bold ${themeClass} uppercase">${label}</span>
+                <span class="text-xs text-gray-400 italic">Not graded yet</span>
             </div>`;
         let sc = 'text-red-500';
-        if (score >= 65) sc = 'text-yellow-500';
-        if (score >= 85) sc = 'text-green-600';
+        if (score >= 25) sc = 'text-yellow-500';
+        if (score >= 40) sc = 'text-green-600';
         return `
-            <div class="bg-white rounded-xl p-3 border border-gray-200">
-                <div class="flex justify-between items-center mb-1">
-                    <div class="text-xs font-bold ${themeClass} uppercase tracking-wide">${label}</div>
-                    ${graderName ? `<span class="text-xs text-gray-400">by ${escapeHtml(graderName)}</span>` : ''}
-                </div>
-                <div class="text-2xl font-black ${sc}">${score}<span class="text-sm">%</span></div>
-                <div class="w-full bg-gray-100 rounded-full h-1.5 mt-1.5">
-                    <div class="h-1.5 rounded-full bg-current transition-all duration-700 ${sc}" style="width:${score}%"></div>
-                </div>
-                ${advice ? `<div class="mt-2 text-xs text-gray-600 italic bg-gray-50 rounded-lg p-2 border border-gray-100">"${escapeHtml(advice)}"</div>` : ''}
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-bold ${themeClass} uppercase">${label}</span>
+                <span class="font-black ${sc} text-base">${score} pts ${graderName ? `<span class="text-xs text-gray-400 font-normal">· ${escapeHtml(graderName)}</span>` : ''}</span>
             </div>`;
     }
 
+    const hasAnyGrade = qaScore !== null || qcScore !== null;
+    const bothNotes = [
+        qaAdvice  ? `<div class="bg-purple-50 border border-purple-100 rounded-lg px-3 py-2 text-xs text-purple-800"><span class="font-bold">QA:</span> "${escapeHtml(qaAdvice)}"</div>`  : '',
+        qcAdvice  ? `<div class="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 text-xs text-amber-800"><span class="font-bold">QC:</span> "${escapeHtml(qcAdvice)}"</div>` : ''
+    ].filter(Boolean).join('');
+
     scoreWidget.innerHTML = `
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden cursor-pointer" id="perf-card-inner">
-            ${isTutorOfTheMonth ? '<div class="absolute top-0 right-0 bg-yellow-400 text-xs font-black px-2 py-1 rounded-bl-xl text-white">👑 TOP TUTOR</div>' : ''}
-            <div class="p-4">
-                <h3 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Performance Score ${perfMonth ? '· ' + perfMonth : ''}</h3>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden" id="perf-card-inner">
+            ${isTutorOfTheMonth ? '<div class="bg-gradient-to-r from-yellow-400 to-amber-500 text-white text-xs font-black px-4 py-1.5 text-center tracking-wide">👑 TUTOR OF THE MONTH</div>' : ''}
+            <div class="p-5">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <h3 class="text-gray-500 text-xs font-bold uppercase tracking-wider">Performance Score ${perfMonth ? '· ' + perfMonth : ''}</h3>
+                        ${hasAnyGrade ? `<div class="text-xs text-gray-400 mt-0.5">${scoreLbl}</div>` : ''}
+                    </div>
+                    <button id="perf-toggle-btn" class="text-xs text-blue-500 hover:underline flex-shrink-0">Details ↕</button>
+                </div>
+                ${hasAnyGrade ? `
                 <div class="flex items-end gap-2 mb-3">
                     <span class="text-5xl font-black ${scoreColor}">${totalScore}</span>
-                    <span class="text-gray-400 text-sm mb-1">/ 100%</span>
+                    <span class="text-gray-400 text-sm mb-1">pts total</span>
                 </div>
-                <div class="w-full bg-gray-100 rounded-full h-2.5 mb-1">
-                    <div class="bg-gradient-to-r ${barColor} h-2.5 rounded-full transition-all duration-1000" style="width:${Math.min(totalScore,100)}%"></div>
+                <div class="w-full bg-gray-100 rounded-full h-2.5 mb-3">
+                    <div class="bg-gradient-to-r ${barColor} h-2.5 rounded-full transition-all duration-1000" style="width:${barPct}%"></div>
                 </div>
-                <p class="text-xs text-gray-400 text-right mb-3">Tap to see full breakdown ↓</p>
+                <div class="space-y-1.5 mb-3">
+                    ${scorePill(qaScore, 'QA – Session Quality', qaGraderName, 'text-purple-600')}
+                    ${scorePill(qcScore, 'QC – Lesson Quality', qcGraderName, 'text-amber-600')}
+                </div>
+                ${bothNotes ? `<div class="space-y-2 mt-2">${bothNotes}</div>` : ''}
+                ` : `
+                <div class="py-4 text-center text-gray-400 text-sm">No performance grades yet this month.</div>
+                `}
             </div>
-            <!-- Expandable breakdown -->
-            <div id="perf-breakdown" class="hidden border-t border-gray-100 p-4 space-y-3 bg-gray-50">
+            <!-- Expandable full breakdown -->
+            <div id="perf-breakdown" class="hidden border-t border-gray-100 p-4 bg-gray-50 space-y-3">
+                <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Full Breakdown</p>
                 <div class="grid grid-cols-2 gap-3">
-                    ${scoreBadge(qaScore, 'QA – Session', qaGraderName, qaAdvice, 'text-purple-600')}
-                    ${scoreBadge(qcScore, 'QC – Lesson Plan', qcGraderName, qcAdvice, 'text-amber-600')}
+                    ${buildScoreBadge(qaScore, 'QA – Session', qaGraderName, qaAdvice, 'text-purple-600')}
+                    ${buildScoreBadge(qcScore, 'QC – Lesson Plan', qcGraderName, qcAdvice, 'text-amber-600')}
                 </div>
-                <p class="text-xs text-gray-400 text-center">Combined score = (QA + QC) ÷ 2</p>
+                <p class="text-xs text-gray-400 text-center">Combined score = QA pts + QC pts</p>
             </div>
         </div>
     `;
 
-    // Toggle breakdown on click
-    document.getElementById('perf-card-inner')?.addEventListener('click', () => {
+    document.getElementById('perf-toggle-btn')?.addEventListener('click', () => {
         const bd = document.getElementById('perf-breakdown');
         if (bd) bd.classList.toggle('hidden');
     });
+}
+
+function buildScoreBadge(score, label, graderName, advice, themeClass) {
+    if (score === null || score === undefined) return `
+        <div class="bg-gray-50 rounded-xl p-3 border border-gray-100">
+            <div class="text-xs font-bold ${themeClass} uppercase tracking-wide mb-1">${label}</div>
+            <div class="text-gray-400 text-sm">Not graded yet</div>
+        </div>`;
+    let sc = 'text-red-500';
+    if (score >= 25) sc = 'text-yellow-500';
+    if (score >= 40) sc = 'text-green-600';
+    return `
+        <div class="bg-white rounded-xl p-3 border border-gray-200">
+            <div class="flex justify-between items-center mb-1">
+                <div class="text-xs font-bold ${themeClass} uppercase tracking-wide">${label}</div>
+                ${graderName ? `<span class="text-xs text-gray-400">by ${escapeHtml(graderName)}</span>` : ''}
+            </div>
+            <div class="text-2xl font-black ${sc}">${score}<span class="text-sm text-gray-400"> pts</span></div>
+            <div class="w-full bg-gray-100 rounded-full h-1.5 mt-1.5">
+                <div class="h-1.5 rounded-full ${sc.replace('text-','bg-')} transition-all duration-700" style="width:${Math.min(score*2,100)}%"></div>
+            </div>
+            ${advice ? `<div class="mt-2 text-xs text-gray-600 italic bg-gray-50 rounded-lg p-2 border border-gray-100">"${escapeHtml(advice)}"</div>` : ''}
+        </div>`;
 }
 
 function renderWinnerBadge(month) {
@@ -4692,35 +4757,27 @@ function renderWinnerBadge(month) {
 }
 
 // --- VISUAL FX (Confetti Engine) ---
-// No external library needed - Raw Canvas implementation for speed
 function triggerConfetti() {
-    const duration = 3000;
-    const end = Date.now() + duration;
+    const duration = 3500;
+    function runConfetti() {
+        const end = Date.now() + duration;
+        (function frame() {
+            confetti({ particleCount: 3, angle: 60,  spread: 55, origin: { x: 0 } });
+            confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 } });
+            if (Date.now() < end) requestAnimationFrame(frame);
+        }());
+    }
 
-    // Simple confetti shim
-    (function frame() {
-        // Launch confetti from left and right edges
-        confetti({
-            particleCount: 2,
-            angle: 60,
-            spread: 55,
-            origin: { x: 0 }
-        });
-        confetti({
-            particleCount: 2,
-            angle: 120,
-            spread: 55,
-            origin: { x: 1 }
-        });
-
-        if (Date.now() < end) {
-            requestAnimationFrame(frame);
-        }
-    }());
+    if (typeof confetti === 'function') {
+        runConfetti();
+    } else {
+        // Dynamically inject canvas-confetti if not already in the page
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js';
+        s.onload = () => runConfetti();
+        document.head.appendChild(s);
+    }
 }
-
-// NOTE: You will need to include the lightweight canvas-confetti script in your HTML head for the FX to work:
-// <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
 /*******************************************************************************
  * SECTION 14: ADMIN SETTINGS LISTENER (UPDATED – NO REDECLARATION)
@@ -5455,9 +5512,14 @@ async function openGradingModal(homeworkId) {
         </div>`;
     }
 
-    // ── Firebase config – passed via window object on new tab ────────────
+    // ── Firebase config – hardcoded so grading tab always initialises ──────────
     const fbConfig = JSON.stringify({
-        apiKey: window.__fbApiKey || '',  // resolved at runtime if set
+        apiKey:            "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
+        authDomain:        "bloomingkidsassessment.firebaseapp.com",
+        projectId:         "bloomingkidsassessment",
+        storageBucket:     "bloomingkidsassessment.appspot.com",
+        messagingSenderId: "238975054977",
+        appId:             "1:238975054977:web:87c70b4db044998a204980"
     });
 
     // ── Build the full-page HTML ─────────────────────────────────────────
@@ -5549,20 +5611,20 @@ async function openGradingModal(homeworkId) {
 </div>
 
 <script>
-// ── Receive data from opener ──────────────────────────────────────────────
+// ── Firebase config embedded directly ────────────────────────────────────
+const __fbCfg = ${fbConfig};
 const homeworkId  = window.__homeworkId;
-const tutorEmail  = window.__tutorEmail;
-const tutorName   = window.__tutorName;
-const firebaseConfig = window.__firebaseConfig;
+const tutorEmail  = window.__tutorEmail  || '${escapeHtml(tutorEmail)}';
+const tutorName   = window.__tutorName   || '${escapeHtml(tutorName)}';
 
 let db;
 function initFirebase() {
     try {
         if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
+            firebase.initializeApp(__fbCfg);
         }
         db = firebase.firestore();
-        console.log('Firebase ready');
+        console.log('Grading tab Firebase ready — project:', __fbCfg.projectId);
     } catch(e) {
         console.error('Firebase init failed:', e);
     }
@@ -5570,56 +5632,72 @@ function initFirebase() {
 initFirebase();
 
 // Already graded banner
-if (${existingScore !== '' ? 'true' : 'false'}) {
-    document.getElementById('already-graded-banner').style.display = 'block';
+if (${existingScore !== ''}) {
+    const banner = document.getElementById('already-graded-banner');
+    if (banner) banner.style.display = 'block';
 }
 
 document.getElementById('return-btn').addEventListener('click', async function() {
     const btn = this;
     const annotationBox = document.getElementById('annotation-box');
-    const feedback = annotationBox.innerText.trim();
-    const scoreVal  = document.getElementById('score-input').value.trim();
+    const feedback  = annotationBox.innerText.trim();
+    const scoreRaw  = document.getElementById('score-input').value.trim();
+    const scoreVal  = scoreRaw !== '' ? parseInt(scoreRaw, 10) : null;
     const statusBanner = document.getElementById('status-banner');
 
-    if (!feedback && !scoreVal) {
+    if (scoreVal !== null && (isNaN(scoreVal) || scoreVal < 0 || scoreVal > 100)) {
+        statusBanner.style.display = 'block';
+        statusBanner.className = 'status-banner status-error';
+        statusBanner.textContent = '❌ Score must be a number between 0 and 100.';
+        return;
+    }
+    if (!feedback && scoreVal === null) {
         if (!confirm('Return without any grade or feedback?')) return;
     }
     if (!db) {
-        statusBanner.style.display='block';
-        statusBanner.className='status-banner status-error';
-        statusBanner.textContent='❌ Firebase not initialised. Please close and reopen this tab.';
+        statusBanner.style.display = 'block';
+        statusBanner.className = 'status-banner status-error';
+        statusBanner.textContent = '❌ Firebase not connected. Please close and reopen this tab.';
         return;
     }
 
     btn.disabled = true;
     btn.textContent = 'Saving…';
-    statusBanner.style.display='none';
+    statusBanner.style.display = 'none';
 
     try {
-        await db.collection('homework_assignments').doc(homeworkId).update({
-            score: scoreVal,
-            feedback: feedback,
+        const updateData = {
+            feedback:         feedback,
             tutorAnnotations: feedback,
-            status: 'graded',
-            gradedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            tutorEmail: tutorEmail,
-            tutorName: tutorName
-        });
-        statusBanner.style.display='block';
-        statusBanner.className='status-banner status-success';
-        statusBanner.textContent='✅ Grade returned to student successfully!';
-        btn.textContent='✅ Returned';
-        // Notify opener to refresh inbox
+            status:           'graded',
+            gradedAt:         firebase.firestore.FieldValue.serverTimestamp(),
+            tutorEmail:       tutorEmail,
+            tutorName:        tutorName
+        };
+        if (scoreVal !== null) updateData.score = scoreVal;
+
+        await db.collection('homework_assignments').doc(homeworkId).update(updateData);
+
+        statusBanner.style.display = 'block';
+        statusBanner.className = 'status-banner status-success';
+        statusBanner.textContent = '✅ Grade returned to student successfully!';
+        btn.textContent = '✅ Graded';
+
+        // Show previously-graded banner
+        const gb = document.getElementById('already-graded-banner');
+        if (gb) { gb.textContent = '✅ Graded successfully'; gb.style.display = 'block'; }
+
+        // Refresh tutor inbox in opener tab
         if (window.opener && !window.opener.closed) {
             try { window.opener.loadHomeworkInbox(tutorEmail); } catch(e) {}
         }
     } catch(err) {
         console.error(err);
-        statusBanner.style.display='block';
-        statusBanner.className='status-banner status-error';
-        statusBanner.textContent='❌ Error: ' + err.message;
+        statusBanner.style.display = 'block';
+        statusBanner.className = 'status-banner status-error';
+        statusBanner.textContent = '❌ Error saving: ' + err.message;
         btn.disabled = false;
-        btn.textContent='✅ Return to Student';
+        btn.textContent = '✅ Return to Student';
     }
 });
 </script>
