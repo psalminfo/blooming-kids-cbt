@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Management Portal — Blooming Kids House</title>
-
-    <!-- Google Analytics (optional, can be removed) -->
+    
+    <!-- Google Analytics (kept from tutor) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-NBTVEGH1SL"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
@@ -19,6 +19,9 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 
     <style>
+        /* ------------------------------------------------------------
+            EXACT same design system as tutor-auth.html (world‑class)
+        ------------------------------------------------------------ */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
@@ -57,7 +60,6 @@
             z-index: 0;
         }
 
-        /* Subtle grid lines */
         body::after {
             content: '';
             position: fixed;
@@ -158,7 +160,7 @@
             backdrop-filter: blur(4px);
         }
 
-        /* Decorative dots pattern */
+        /* Decorative dots */
         .dots {
             position: absolute;
             bottom: 48px;
@@ -204,25 +206,23 @@
         }
         .section-title span { color: var(--sage); }
 
-        /* Message box */
+        /* Message box (adapted for #error-message) */
         .msg-box {
             padding: 12px 16px;
             border-radius: 10px;
             font-size: 0.85rem;
             margin-bottom: 20px;
-            display: none;
+            display: none;  /* hidden by default */
             align-items: flex-start;
             gap: 10px;
             line-height: 1.5;
             border: 1px solid transparent;
         }
-        .msg-box.visible { display: flex; }
-        .msg-box.error { background: var(--error-bg); color: var(--error); border-color: #f0c8c8; }
-        .msg-box.success { background: var(--success-bg); color: var(--success); border-color: #bde0cc; }
-        .msg-box.info { background: var(--sage-light); color: var(--sage-dark); border-color: var(--border); }
-        .msg-icon { flex-shrink: 0; margin-top: 1px; font-size: 1rem; }
+        .msg-box.error { background: var(--error-bg); color: var(--error); border-color: #f0c8c8; display: flex; }
+        .msg-box.success { background: var(--success-bg); color: var(--success); border-color: #bde0cc; display: flex; }
+        .msg-box.info { background: var(--sage-light); color: var(--sage-dark); border-color: var(--border); display: flex; }
 
-        /* Form */
+        /* Form elements */
         .form-group {
             position: relative;
             margin-bottom: 18px;
@@ -282,7 +282,7 @@
         }
         .pw-toggle:hover { opacity: 0.9; }
 
-        /* Remember me */
+        /* Remember me (custom checkbox) */
         .remember-row {
             display: flex;
             align-items: center;
@@ -313,7 +313,7 @@
             user-select: none;
         }
 
-        /* Strength bar */
+        /* Strength bar (for signup) */
         .strength-bar-wrap {
             margin-top: 8px;
             display: none;
@@ -405,24 +405,14 @@
         .text-link.gold { color: var(--gold); }
         .text-link.gold:hover { border-color: var(--gold); }
 
-        /* Section animation */
-        .auth-section {
+        /* Containers toggle (signup / signin) */
+        .auth-container {
             animation: fadeIn 0.35s ease-out;
         }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-
-        /* Divider (unused but kept) */
-        .divider {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin: 24px 0;
-        }
-        .divider-line { flex: 1; height: 1px; background: var(--border); }
-        .divider-text { font-size: 0.75rem; color: var(--muted); }
 
         /* Security badge */
         .security-badge {
@@ -455,17 +445,17 @@
 <body>
 <div class="page-wrapper">
 
-    <!-- LEFT: Brand Panel (adapted for management) -->
+    <!-- LEFT: Brand Panel (management flavour) -->
     <div class="brand-panel">
         <div class="brand-inner">
             <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="brand-logo">
-            <h1 class="brand-tagline">Lead with insight, <em>nurture</em> with purpose</h1>
-            <p class="brand-sub">Your dedicated management portal for overseeing operations, tracking performance, and driving success.</p>
+            <h1 class="brand-tagline"><em>Lead</em> with insight</h1>
+            <p class="brand-sub">Management portal for scheduling, reporting & team coordination.</p>
             <div class="brand-pills">
-                <span class="brand-pill">📊 Oversight</span>
-                <span class="brand-pill">📈 Reporting</span>
+                <span class="brand-pill">📊 Analytics</span>
+                <span class="brand-pill">👥 Staff</span>
                 <span class="brand-pill">🔒 Secure</span>
-                <span class="brand-pill">🌟 Strategy</span>
+                <span class="brand-pill">📈 Reports</span>
             </div>
         </div>
         <!-- Decorative dot grid -->
@@ -478,56 +468,56 @@
         </div>
     </div>
 
-    <!-- RIGHT: Form Panel -->
+    <!-- RIGHT: Form Panel (management auth) -->
     <div class="form-panel">
         <div class="form-container">
 
-            <!-- Message Box -->
-            <div id="message-box" class="msg-box" role="alert">
-                <span class="msg-icon" id="msg-icon"></span>
-                <span id="msg-text"></span>
+            <!-- Message box (ID preserved for management-auth.js) -->
+            <div id="error-message" class="msg-box error" role="alert" style="display: none;">
+                <!-- JS will fill text, we keep structure simple: just text -->
             </div>
 
-            <!-- SIGNUP SECTION (visible by default) -->
-            <div id="signupSection" class="auth-section">
+            <!-- SIGNUP CONTAINER (initially visible) -->
+            <div id="signup-container" class="auth-container">
                 <div class="section-header">
                     <p class="section-label">New here?</p>
                     <h2 class="section-title">Create your <span>account</span></h2>
                 </div>
 
-                <form id="managementSignupForm" novalidate>
+                <form id="signup-form" novalidate>
                     <div class="form-group">
-                        <label class="form-label" for="signupName">Full Name</label>
+                        <label class="form-label" for="signup-name">Full Name</label>
                         <div class="input-wrap">
                             <span class="input-icon">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                             </span>
-                            <input type="text" id="signupName" class="form-input" placeholder="e.g. Alex Morgan" required autocomplete="name">
+                            <input type="text" id="signup-name" class="form-input" placeholder="e.g. Sarah Mensah" required autocomplete="name">
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label" for="signupEmail">Email Address</label>
+                        <label class="form-label" for="signup-email">Email Address</label>
                         <div class="input-wrap">
                             <span class="input-icon">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
                             </span>
-                            <input type="email" id="signupEmail" class="form-input" placeholder="you@example.com" required autocomplete="email">
+                            <input type="email" id="signup-email" class="form-input" placeholder="you@example.com" required autocomplete="email">
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label" for="signupPassword">Password</label>
+                        <label class="form-label" for="signup-password">Password</label>
                         <div class="input-wrap">
                             <span class="input-icon">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                             </span>
-                            <input type="password" id="signupPassword" class="form-input" placeholder="Min 6 chars + a number" required autocomplete="new-password">
+                            <input type="password" id="signup-password" class="form-input" placeholder="Min 6 chars + a number" required autocomplete="new-password">
                             <button type="button" class="pw-toggle" id="toggleSignupPw" aria-label="Toggle password">
-                                <svg id="eyeSignupOpen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                                <svg id="eyeSignupClosed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" x2="23" y1="1" y2="23"/></svg>
+                                <svg id="eyeSignupOpen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                <svg id="eyeSignupClosed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" x2="23" y1="1" y2="23"/></svg>
                             </button>
                         </div>
+                        <!-- strength bar (enhancement) -->
                         <div class="strength-bar-wrap" id="strengthWrap">
                             <div class="strength-bar-track">
                                 <div class="strength-bar-fill" id="strengthFill"></div>
@@ -536,72 +526,73 @@
                         </div>
                     </div>
 
-                    <button type="submit" class="btn-primary" id="signupBtn">
+                    <button type="submit" class="btn-primary" id="signup-btn">
                         <span class="btn-text">Create Account</span>
                         <span class="btn-spinner"></span>
                     </button>
                 </form>
 
                 <div class="form-footer">
-                    <p>Already have an account? <a href="#" id="showLogin" class="text-link">Log in here</a></p>
+                    <p>Already have an account? <a href="#" id="show-signin" class="text-link">Log in here</a></p>
                 </div>
             </div>
 
-            <!-- LOGIN SECTION (hidden by default) -->
-            <div id="loginSection" class="auth-section" style="display:none">
+            <!-- SIGNIN CONTAINER (initially hidden) -->
+            <div id="signin-container" class="auth-container" style="display: none;">
                 <div class="section-header">
                     <p class="section-label">Welcome back</p>
                     <h2 class="section-title">Sign in to <span>management</span></h2>
                 </div>
 
-                <form id="managementLoginForm" novalidate>
+                <form id="signin-form" novalidate>
                     <div class="form-group">
-                        <label class="form-label" for="loginEmail">Email Address</label>
+                        <label class="form-label" for="signin-email">Email Address</label>
                         <div class="input-wrap">
                             <span class="input-icon">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
                             </span>
-                            <input type="email" id="loginEmail" class="form-input" placeholder="you@example.com" required autocomplete="email">
+                            <input type="email" id="signin-email" class="form-input" placeholder="you@example.com" required autocomplete="email">
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label" for="loginPassword">Password</label>
+                        <label class="form-label" for="signin-password">Password</label>
                         <div class="input-wrap">
                             <span class="input-icon">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                             </span>
-                            <input type="password" id="loginPassword" class="form-input" placeholder="Your password" required autocomplete="current-password">
+                            <input type="password" id="signin-password" class="form-input" placeholder="Your password" required autocomplete="current-password">
                             <button type="button" class="pw-toggle" id="toggleLoginPw" aria-label="Toggle password">
-                                <svg id="eyeLoginOpen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                                <svg id="eyeLoginClosed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" x2="23" y1="1" y2="23"/></svg>
+                                <svg id="eyeLoginOpen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                <svg id="eyeLoginClosed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" x2="23" y1="1" y2="23"/></svg>
                             </button>
                         </div>
                     </div>
 
+                    <!-- Remember me (extra, but harmless) -->
                     <div class="remember-row">
                         <input type="checkbox" id="rememberMe">
                         <div class="custom-checkbox" id="checkboxDisplay" role="checkbox" aria-checked="false" tabindex="0">
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
                         </div>
                         <label class="remember-label" for="rememberMe">Remember me for 30 days</label>
                     </div>
 
-                    <button type="submit" class="btn-primary" id="loginBtn">
+                    <button type="submit" class="btn-primary" id="signin-btn">
                         <span class="btn-text">Sign In</span>
                         <span class="btn-spinner"></span>
                     </button>
                 </form>
 
                 <div class="form-footer">
-                    <p><a href="#" id="forgotPasswordLink" class="text-link gold">Forgot your password?</a></p>
-                    <p>Don't have an account? <a href="#" id="showSignup" class="text-link">Sign up free</a></p>
+                    <p><a href="#" id="forgot-password-link" class="text-link gold">Forgot your password?</a></p>
+                    <p>Don't have an account? <a href="#" id="show-signup" class="text-link">Sign up free</a></p>
                 </div>
             </div>
 
-            <!-- Security footer -->
+            <!-- Security badge (same as tutor) -->
             <div class="security-badge">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                 Your data is safe with us · Encrypted and secure
             </div>
 
@@ -609,236 +600,90 @@
     </div>
 </div>
 
-<!-- Embedded JavaScript for full interactivity (world‑class experience) -->
+<!-- Original management-auth.js (kept exactly) -->
+<script type="module" src="management-auth.js"></script>
+
+<!-- Additional UI enhancements: password toggle, strength, custom checkbox (non‑intrusive) -->
 <script>
     (function() {
-        // ----- DOM elements -----
-        const messageBox = document.getElementById('message-box');
-        const msgIcon = document.getElementById('msg-icon');
-        const msgText = document.getElementById('msg-text');
+        // Password visibility toggle
+        function setupPasswordToggle(btnId, openId, closedId, inputId) {
+            const btn = document.getElementById(btnId);
+            if (!btn) return;
+            const openIcon = document.getElementById(openId);
+            const closedIcon = document.getElementById(closedId);
+            const input = document.getElementById(inputId);
+            btn.addEventListener('click', function() {
+                const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+                input.setAttribute('type', type);
+                if (openIcon && closedIcon) {
+                    if (type === 'text') {
+                        openIcon.style.display = 'none';
+                        closedIcon.style.display = 'block';
+                    } else {
+                        openIcon.style.display = 'block';
+                        closedIcon.style.display = 'none';
+                    }
+                }
+            });
+        }
+        setupPasswordToggle('toggleSignupPw', 'eyeSignupOpen', 'eyeSignupClosed', 'signup-password');
+        setupPasswordToggle('toggleLoginPw', 'eyeLoginOpen', 'eyeLoginClosed', 'signin-password');
 
-        // Sections
-        const signupSection = document.getElementById('signupSection');
-        const loginSection = document.getElementById('loginSection');
-        const showLoginLink = document.getElementById('showLogin');
-        const showSignupLink = document.getElementById('showSignup');
-
-        // Forms & buttons
-        const signupForm = document.getElementById('managementSignupForm');
-        const loginForm = document.getElementById('managementLoginForm');
-        const signupBtn = document.getElementById('signupBtn');
-        const loginBtn = document.getElementById('loginBtn');
-
-        // Signup fields
-        const signupName = document.getElementById('signupName');
-        const signupEmail = document.getElementById('signupEmail');
-        const signupPassword = document.getElementById('signupPassword');
+        // Password strength meter (only for signup)
+        const pwdInput = document.getElementById('signup-password');
         const strengthWrap = document.getElementById('strengthWrap');
         const strengthFill = document.getElementById('strengthFill');
         const strengthText = document.getElementById('strengthText');
+        if (pwdInput && strengthWrap && strengthFill && strengthText) {
+            pwdInput.addEventListener('input', function() {
+                const val = pwdInput.value;
+                if (val.length === 0) {
+                    strengthWrap.style.display = 'none';
+                    return;
+                }
+                strengthWrap.style.display = 'block';
+                let strength = 0;
+                if (val.length >= 6) strength += 1;
+                if (/[0-9]/.test(val)) strength += 1;
+                if (/[^a-zA-Z0-9]/.test(val)) strength += 1;
+                const width = strength === 0 ? 5 : strength === 1 ? 30 : strength === 2 ? 60 : 100;
+                strengthFill.style.width = width + '%';
+                if (width <= 30) {
+                    strengthFill.style.background = '#b94040';
+                    strengthText.innerText = 'Weak — use at least 6 characters and a number';
+                } else if (width <= 60) {
+                    strengthFill.style.background = '#e68a2e';
+                    strengthText.innerText = 'Medium — add a special character for strong';
+                } else {
+                    strengthFill.style.background = '#3a7a52';
+                    strengthText.innerText = 'Strong password';
+                }
+            });
+        }
 
-        // Login fields
-        const loginEmail = document.getElementById('loginEmail');
-        const loginPassword = document.getElementById('loginPassword');
+        // Custom checkbox for "Remember me"
         const rememberCheck = document.getElementById('rememberMe');
-        const checkboxDisplay = document.getElementById('checkboxDisplay');
-
-        // Password toggles
-        const toggleSignupPw = document.getElementById('toggleSignupPw');
-        const toggleLoginPw = document.getElementById('toggleLoginPw');
-        const eyeSignupOpen = document.getElementById('eyeSignupOpen');
-        const eyeSignupClosed = document.getElementById('eyeSignupClosed');
-        const eyeLoginOpen = document.getElementById('eyeLoginOpen');
-        const eyeLoginClosed = document.getElementById('eyeLoginClosed');
-
-        // Forgot password link
-        const forgotLink = document.getElementById('forgotPasswordLink');
-
-        // ----- Helper: show message -----
-        function showMessage(type, text, icon = '•') {
-            messageBox.className = 'msg-box visible ' + type;
-            msgIcon.textContent = icon;
-            msgText.textContent = text;
+        const customBox = document.getElementById('checkboxDisplay');
+        if (rememberCheck && customBox) {
+            customBox.addEventListener('click', function() {
+                rememberCheck.checked = !rememberCheck.checked;
+                if (rememberCheck.checked) {
+                    customBox.classList.add('checked');
+                    customBox.setAttribute('aria-checked', 'true');
+                } else {
+                    customBox.classList.remove('checked');
+                    customBox.setAttribute('aria-checked', 'false');
+                }
+            });
+            // init
+            if (rememberCheck.checked) customBox.classList.add('checked');
         }
 
-        function hideMessage() {
-            messageBox.classList.remove('visible', 'error', 'success', 'info');
-        }
-
-        // ----- Toggle sections -----
-        function showSignup() {
-            signupSection.style.display = 'block';
-            loginSection.style.display = 'none';
-            hideMessage();
-        }
-        function showLogin() {
-            loginSection.style.display = 'block';
-            signupSection.style.display = 'none';
-            hideMessage();
-        }
-
-        showLoginLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            showLogin();
-        });
-        showSignupLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            showSignup();
-        });
-
-        // ----- Password strength meter (for signup) -----
-        function updateStrength(password) {
-            if (!password) {
-                strengthWrap.style.display = 'none';
-                return;
-            }
-            strengthWrap.style.display = 'block';
-
-            let strength = 0;
-            if (password.length >= 6) strength += 1;
-            if (/\d/.test(password)) strength += 1;
-            if (/[^a-zA-Z0-9]/.test(password)) strength += 1; // special char
-
-            let width = 0;
-            let bgColor = '#b94040'; // weak red
-            let text = 'Weak — add a number or special character';
-            if (strength === 1) {
-                width = 33;
-                bgColor = '#e68a2e'; // orange
-                text = 'Fair — add a number';
-            } else if (strength === 2) {
-                width = 66;
-                bgColor = '#f0c45a'; // medium gold
-                text = 'Good — add a special char for strong';
-            } else if (strength >= 3) {
-                width = 100;
-                bgColor = '#3a7a52'; // strong green
-                text = 'Strong password';
-            }
-            if (password.length < 6) {
-                width = 16;
-                bgColor = '#b94040';
-                text = 'Too short (min 6)';
-            }
-            strengthFill.style.width = width + '%';
-            strengthFill.style.background = bgColor;
-            strengthText.textContent = text;
-        }
-
-        signupPassword.addEventListener('input', (e) => {
-            updateStrength(e.target.value);
-        });
-
-        // ----- Password toggle functions -----
-        function togglePassword(input, openEye, closedEye) {
-            if (input.type === 'password') {
-                input.type = 'text';
-                openEye.style.display = 'none';
-                closedEye.style.display = 'block';
-            } else {
-                input.type = 'password';
-                openEye.style.display = 'block';
-                closedEye.style.display = 'none';
-            }
-        }
-
-        toggleSignupPw.addEventListener('click', () => {
-            togglePassword(signupPassword, eyeSignupOpen, eyeSignupClosed);
-        });
-        toggleLoginPw.addEventListener('click', () => {
-            togglePassword(loginPassword, eyeLoginOpen, eyeLoginClosed);
-        });
-
-        // ----- Custom checkbox "remember me" -----
-        function updateCheckboxDisplay() {
-            if (rememberCheck.checked) {
-                checkboxDisplay.classList.add('checked');
-                checkboxDisplay.setAttribute('aria-checked', 'true');
-            } else {
-                checkboxDisplay.classList.remove('checked');
-                checkboxDisplay.setAttribute('aria-checked', 'false');
-            }
-        }
-
-        checkboxDisplay.addEventListener('click', () => {
-            rememberCheck.checked = !rememberCheck.checked;
-            updateCheckboxDisplay();
-        });
-        rememberCheck.addEventListener('change', updateCheckboxDisplay);
-        // initial sync
-        updateCheckboxDisplay();
-
-        // ----- Loading spinner on buttons -----
-        function setLoading(button, isLoading) {
-            if (isLoading) {
-                button.classList.add('loading');
-            } else {
-                button.classList.remove('loading');
-            }
-        }
-
-        // ----- Simulate async submission (prevent actual submit) -----
-        function handleSignup(e) {
-            e.preventDefault();
-            // Basic validation
-            if (!signupName.value || !signupEmail.value || !signupPassword.value) {
-                showMessage('error', 'Please fill in all fields.', '⚠️');
-                return;
-            }
-            if (signupPassword.value.length < 6) {
-                showMessage('error', 'Password must be at least 6 characters.', '⚠️');
-                return;
-            }
-
-            setLoading(signupBtn, true);
-            hideMessage();
-
-            // Simulate network request
-            setTimeout(() => {
-                setLoading(signupBtn, false);
-                showMessage('success', 'Account created! (Demo) You can now log in.', '✓');
-                // Optionally switch to login after a moment
-                setTimeout(() => {
-                    showLogin();
-                }, 1500);
-            }, 1200);
-        }
-
-        function handleLogin(e) {
-            e.preventDefault();
-            if (!loginEmail.value || !loginPassword.value) {
-                showMessage('error', 'Please enter both email and password.', '⚠️');
-                return;
-            }
-
-            setLoading(loginBtn, true);
-            hideMessage();
-
-            setTimeout(() => {
-                setLoading(loginBtn, false);
-                showMessage('success', 'Login successful! (Demo redirect)', '✓');
-                // In a real app you would redirect
-            }, 1200);
-        }
-
-        signupForm.addEventListener('submit', handleSignup);
-        loginForm.addEventListener('submit', handleLogin);
-
-        // ----- Forgot password demo -----
-        forgotLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            showMessage('info', 'Password reset link would be sent (demo).', '🔐');
-        });
-
-        // ----- Extra: ensure password strength bar resets on section toggle (optional) -----
-        // Not necessary but nice: clear fields when switching? We'll keep it simple.
-
-        // ----- Small improvement: clear message when typing? (optional) -----
-        [signupName, signupEmail, signupPassword, loginEmail, loginPassword].forEach(field => {
-            field.addEventListener('input', hideMessage);
-        });
-
-        // ----- Start with signup visible, login hidden (already default) -----
+        // Ensure the original management-auth.js can still control visibility of containers.
+        // The IDs #signup-container and #signin-container are used by management-auth.js to toggle.
+        // We also keep #show-signup and #show-signin links.
+        // (no interference)
     })();
 </script>
 </body>
