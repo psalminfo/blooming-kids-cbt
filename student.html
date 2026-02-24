@@ -364,6 +364,7 @@
         }
 
         // --- GET OR CREATE STUDENT RECORD (prevents duplicates) ---
+        // Country is now optional; if not provided, we store an empty string.
         async function getOrCreateStudentRecord(studentName, parentEmail, parentPhone, tutorEmail, grade, country, referralCode) {
             const studentsRef = db.collection('students');
             const q = studentsRef
@@ -378,7 +379,7 @@
                     lastActive: firebase.firestore.FieldValue.serverTimestamp(),
                     tutorEmail: tutorEmail,
                     grade: grade,
-                    country: country
+                    country: country || ''   // store empty string if country missing
                 });
                 console.log("Reusing existing student record with ID:", existingDoc.id);
                 return existingDoc.id;
@@ -389,7 +390,7 @@
                     parentPhone,
                     tutorEmail,
                     grade,
-                    country,
+                    country: country || '',   // optional
                     referralCodeUsed: referralCode ? referralCode.toUpperCase() : null,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     lastActive: firebase.firestore.FieldValue.serverTimestamp()
@@ -409,12 +410,14 @@
             const studentName = urlParams.get('studentName');
             const parentEmail = urlParams.get('parentEmail');
             const tutorEmail = urlParams.get('tutorEmail');
-            const studentCountry = urlParams.get('country');
+            // Country is now optional – if missing, it will be undefined (handled as empty string)
+            const studentCountry = urlParams.get('country') || '';
             const referralCode = urlParams.get('referralCode') || '';
             const state = urlParams.get('state') || (subject === 'ela' ? 'creative-writing' : 'mcq');
 
-            if (!subject || !grade || !studentName || !parentEmail || !tutorEmail || !studentCountry) {
-                alert("Missing student information. Redirecting to login.");
+            // Only require essential fields (country is optional)
+            if (!subject || !grade || !studentName || !parentEmail || !tutorEmail) {
+                alert("Missing essential student information. Redirecting to login.");
                 window.location.href = "tutor.html";  // Redirect to tutor dashboard
                 return;
             }
@@ -495,7 +498,6 @@
         // --- FIXED LOGOUT: Always go to tutor.html, even if clearTestSession tries to redirect elsewhere ---
         window.logout = () => {
             clearTestSession(true);
-            // Use a tiny delay to override any other redirect that might be triggered by clearTestSession
             setTimeout(() => {
                 window.location.href = 'tutor.html';
             }, 50);
