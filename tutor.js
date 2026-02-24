@@ -1674,7 +1674,8 @@ function initializeFloatingMessagingButton() {
 // --- BACKGROUND LISTENERS ---
 
 function initializeUnreadListener() {
-    const tutorId = window.tutorData.id;
+    const tutorId = window.tutorData?.id;
+    if (!tutorId) { console.error("initializeUnreadListener: tutorId is undefined. Aborting."); return; }
     if (unsubUnreadListener) unsubUnreadListener();
 
     const q = query(
@@ -1999,7 +2000,8 @@ function closeInbox(modal) {
 }
 
 function msgStartInboxListener(modal) {
-    const tutorId = window.tutorData.id;
+    const tutorId = window.tutorData?.id;
+    if (!tutorId) { console.error("msgStartInboxListener: tutorId is undefined. Aborting."); return; }
     const listEl = modal.querySelector('#inbox-list');
     listEl.innerHTML = '<div class="spinner" style="margin:16px auto;"></div>';
 
@@ -2569,6 +2571,7 @@ let studentCache = [];
  * SCHEDULE MANAGEMENT TAB
  ******************************************************************************/
 function renderScheduleManagement(container, tutor) {
+    if (!tutor || !tutor.email) { console.error("renderScheduleManagement: tutor or tutor.email is undefined", tutor); return; }
     updateActiveTab('navScheduleManagement');
     startPersistentClock(); // ← clock on every tab
 
@@ -2825,6 +2828,7 @@ function renderAcademic(container, tutor) {
 async function loadAcademicArchive(tutor) {
     const container = document.getElementById('academic-archive-container');
     if (!container) return;
+    if (!tutor || !tutor.email) { console.error("loadAcademicArchive: tutor or tutor.email is undefined", tutor); return; }
     container.innerHTML = `<div class="text-center py-6"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading archive…</p></div>`;
 
     try {
@@ -3115,6 +3119,7 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
     const gradedReportsContainer = document.getElementById('gradedReportsContainer');
     
     if (!pendingReportsContainer) return;
+    if (!tutorEmail) { console.error("loadTutorReports: tutorEmail is undefined. Aborting."); return; }
     
     pendingReportsContainer.innerHTML = `
         <div class="card"><div class="card-body text-center">
@@ -3561,6 +3566,7 @@ function showEditStudentModal(student) {
 async function renderStudentDatabase(container, tutor) {
     // REMOVED early return check for window.fixedMonthSystemInitialized
     if (!container) return;
+    if (!tutor || !tutor.email) { console.error("renderStudentDatabase: tutor or tutor.email is undefined", tutor); return; }
     updateActiveTab('navStudentDatabase');
     startPersistentClock(); // ← clock on every tab
 
@@ -4453,6 +4459,7 @@ async function initGamification(tutorId) {
             let perfMonth = monthKey;
 
             try {
+                if (!tutorEmail) { console.warn("initGamification: tutorEmail is empty, skipping tutor_grades query."); throw new Error("no tutorEmail"); }
                 const gradesSnap = await getDocs(
                     query(collection(db, 'tutor_grades'),
                         where('tutorEmail', '==', tutorEmail),
