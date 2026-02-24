@@ -11,19 +11,31 @@
 <body class="bg-green-50 min-h-screen flex items-center justify-center">
 
   <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
+
+    <!-- Assessment Mode Banner (shown only when launched from tutor portal) -->
+    <div id="assessmentBanner" class="hidden mb-5 bg-purple-50 border border-purple-200 rounded-lg p-4">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-purple-700 font-bold text-sm">🎓 Assessment Mode</span>
+        <span class="bg-purple-600 text-white text-xs px-2 py-0.5 rounded-full">Tutor Launch</span>
+      </div>
+      <p class="text-xs text-purple-600">Student: <strong id="assessmentStudentName"></strong> &nbsp;|&nbsp; Grade: <strong id="assessmentGradeLabel"></strong></p>
+      <p class="text-xs text-gray-500 mt-1">Select a subject to begin the assessment. Results will be saved automatically.</p>
+    </div>
+
     <div class="flex justify-between items-center mb-6">
       <h2 class="text-2xl font-bold text-green-800">Select a Subject</h2>
       <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 text-sm">Logout</button>
     </div>
 
     <div id="subjectButtons" class="space-y-4">
-      </div>
+    </div>
     <p class="text-xs text-center mt-8 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
   </div>
 
 <script>
     // Global variable to hold student data
     let studentData = null;
+    let isTutorAssessmentMode = false;
 
     // Subject data array
     const allSubjects = [
@@ -37,9 +49,8 @@
     // Function to load subjects based on grade
     function loadSubjects(grade) {
       const subjectButtons = document.getElementById('subjectButtons');
-      subjectButtons.innerHTML = ''; // Clear previous buttons
+      subjectButtons.innerHTML = '';
 
-      // Filter subjects based on grade
       let availableSubjects = allSubjects;
       if (grade <= 4) {
         availableSubjects = allSubjects.filter(s => s.id === 'math' || s.id === 'ela');
@@ -56,7 +67,6 @@
         subjectButtons.appendChild(button);
       });
 
-      // Show grade info
       const infoText = document.createElement('p');
       infoText.className = 'text-sm text-gray-600 text-center mt-4';
       if (grade <= 4) {
@@ -69,43 +79,72 @@
       subjectButtons.appendChild(infoText);
     }
 
-    // CRITICAL UPDATE: Function to pass data to student.html
+    // Navigate to student.html with all required params
     function goToSubject(subject) {
       const params = new URLSearchParams({
         subject: subject,
-        studentName: studentData.studentName,
-        parentEmail: studentData.parentEmail,
-        grade: studentData.grade,
-        tutorEmail: studentData.tutorEmail,
-        country: studentData.country,
-        // CRITICAL ADDITION: This line ensures the referral code is passed!
-        referralCode: studentData.referralCode || '' 
+        studentName:  studentData.studentName,
+        parentEmail:  studentData.parentEmail,
+        grade:        studentData.grade,
+        tutorEmail:   studentData.tutorEmail,
+        country:      studentData.country || '',
+        referralCode: studentData.referralCode || ''
       });
-      
+
       // AUTO-ADD creative-writing state for ELA
       if (subject === 'ela') {
         params.set('state', 'creative-writing');
       }
-      
+
+      // Flag so student.html / results page knows this is an assessment session
+      if (isTutorAssessmentMode) {
+        params.set('assessmentMode', 'true');
+      }
+
       window.location.href = `student.html?${params.toString()}`;
     }
 
     // Initial load logic
     document.addEventListener('DOMContentLoaded', () => {
-        const storedData = localStorage.getItem('studentData');
-        if (storedData) {
-            studentData = JSON.parse(storedData);
-            loadSubjects(parseInt(studentData.grade));
+        const urlParams = new URLSearchParams(window.location.search);
+        isTutorAssessmentMode = urlParams.get('source') === 'tutor_assessment';
+
+        if (isTutorAssessmentMode) {
+            // ── Tutor-launched assessment: read data from localStorage ──
+            const raw = localStorage.getItem('assessmentStudentData');
+            if (!raw) {
+                alert('Assessment data missing. Please launch the assessment again from the tutor portal.');
+                window.close();
+                return;
+            }
+            studentData = JSON.parse(raw);
+
+            // Show the assessment banner
+            const banner = document.getElementById('assessmentBanner');
+            if (banner) {
+                banner.classList.remove('hidden');
+                document.getElementById('assessmentStudentName').textContent = studentData.studentName || '—';
+                document.getElementById('assessmentGradeLabel').textContent  = `Grade ${studentData.grade}`;
+            }
+
         } else {
-            // If no data is found, redirect to login
-            alert("Session expired or missing data. Please log in again.");
-            window.location.href = 'index.html';
+            // ── Normal student login flow ──
+            const storedData = localStorage.getItem('studentData');
+            if (storedData) {
+                studentData = JSON.parse(storedData);
+            } else {
+                alert('Session expired or missing data. Please log in again.');
+                window.location.href = 'index.html';
+                return;
+            }
         }
+
+        loadSubjects(parseInt(studentData.grade, 10));
     });
 
-    // The logout function
+    // Logout
     window.logout = function() {
-      localStorage.clear(); // Clears the student's login data
+      localStorage.clear();
       window.location.href = 'index.html';
     };
 </script>
