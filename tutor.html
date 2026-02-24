@@ -1187,51 +1187,29 @@
                 
                 document.getElementById('todayClassesCount').textContent = todayClassesCount;
 
-                // Calculate pending reports (students without reports in last 7 days)
-                const oneWeekAgo = new Date();
-                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-                
+                // Count pending homework submissions (status='submitted', not yet graded)
                 let pendingReports = 0;
-                for (const student of allStudents) {
-                    if (!student.lastReportDate) {
-                        pendingReports++;
-                        continue;
-                    }
-                    
-                    // Check if last report date is older than 7 days
-                    const lastReport = student.lastReportDate?.toDate?.() || new Date(student.lastReportDate);
-                    if (lastReport < oneWeekAgo) {
-                        pendingReports++;
-                    }
+                try {
+                    const hwQuery = query(
+                        collection(db, 'homework_assignments'),
+                        where('tutorEmail', '==', tutor.email),
+                        where('status', '==', 'submitted')
+                    );
+                    const hwSnap = await getDocs(hwQuery);
+                    pendingReports = hwSnap.size;
+                } catch(hwErr) {
+                    console.warn('Could not load homework count:', hwErr.message);
                 }
-                
                 document.getElementById('pendingReportsCount').textContent = pendingReports;
 
-                // Calculate performance score (placeholder logic - can be customized)
-                const totalPossible = allStudents.length * 100;
-                let earnedScore = 0;
-                
-                allStudents.forEach(s => {
-                    // Base score from attendance
-                    if (s.attendanceRate) {
-                        earnedScore += s.attendanceRate;
-                    } else {
-                        earnedScore += 85; // Default score
-                    }
-                    
-                    // Bonus for completed reports
-                    if (s.lastReportDate) {
-                        const reportDate = s.lastReportDate?.toDate?.() || new Date(s.lastReportDate);
-                        const daysSinceReport = Math.floor((new Date() - reportDate) / (1000 * 60 * 60 * 24));
-                        if (daysSinceReport < 7) earnedScore += 15;
-                    }
-                });
-                
-                const performanceScore = allStudents.length > 0 
-                    ? Math.round((earnedScore / (allStudents.length * 100)) * 100)
-                    : 100;
-                
-                document.getElementById('performanceScore').textContent = performanceScore;
+                // Performance score is managed by the gamification system (initGamification in tutor.js)
+                // The performanceScore stat card header shows total pts from tutor_grades
+                // We update it here only if gamification hasn't set it yet
+                const scoreEl = document.getElementById('performanceScore');
+                if (scoreEl && (scoreEl.textContent === '0' || scoreEl.textContent === '')) {
+                    // Show pending state - gamification will update it when loaded
+                    scoreEl.textContent = '–';
+                }
 
             } catch (error) {
                 console.error("Error updating counters:", error);
@@ -1383,54 +1361,53 @@
 
             // ----- Pending Reports Card Click -----
             document.getElementById('pendingReportsCard').addEventListener('click', async () => {
-                const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-                const snapshot = await getDocs(q);
-                const students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                
-                const oneWeekAgo = new Date();
-                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-                
-                const pendingStudents = [];
-                for (const student of students) {
-                    if (!student.lastReportDate) {
-                        pendingStudents.push({ ...student, daysOverdue: 'No reports yet' });
-                        continue;
-                    }
-                    
-                    const lastReport = student.lastReportDate?.toDate?.() || new Date(student.lastReportDate);
-                    const daysSinceReport = Math.floor((new Date() - lastReport) / (1000 * 60 * 60 * 24));
-                    
-                    if (daysSinceReport > 7) {
-                        pendingStudents.push({ 
-                            ...student, 
-                            daysOverdue: `${daysSinceReport} days overdue` 
-                        });
-                    }
-                }
+                // Show pending homework submissions awaiting grading
+                let pendingHW = [];
+                try {
+                    const hwQ = query(collection(db, 'homework_assignments'),
+                        where('tutorEmail', '==', tutor.email),
+                        where('status', '==', 'submitted'));
+                    const hwSnap = await getDocs(hwQ);
+                    hwSnap.forEach(d => pendingHW.push({ id: d.id, ...d.data() }));
+                    pendingHW.sort((a,b) => (b.submittedAt?.seconds||0)-(a.submittedAt?.seconds||0));
+                } catch(e) { console.warn('HW fetch error:', e); }
 
-                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="pendingReportsModal">
-                    <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-2xl mx-auto">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">Pending Reports (${pendingStudents.length})</h3>
-                            <button class="text-2xl font-bold close-modal text-gray-700 dark:text-gray-300">&times;</button>
+                const ACOLORS = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
+
+                let html = `<div style="position:fixed;inset:0;background:rgba(15,23,42,.6);backdrop-filter:blur(6px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;" id="pendingReportsModal">
+                    <div style="background:#fff;border-radius:20px;width:100%;max-width:600px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.35);overflow:hidden;">
+                        <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);padding:18px 22px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+                            <div>
+                                <div style="color:#fff;font-weight:800;font-size:1.05rem;">📥 Pending Homework Reviews</div>
+                                <div style="color:#93c5fd;font-size:.78rem;margin-top:2px;">${pendingHW.length} submission${pendingHW.length!==1?'s':''} awaiting your review</div>
+                            </div>
+                            <button class="close-modal" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:1.1rem;cursor:pointer;">&times;</button>
                         </div>
-                        <div class="overflow-auto max-h-96">`;
+                        <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">`;
 
-                if (pendingStudents.length === 0) {
-                    html += '<p class="text-green-600 dark:text-green-400">All reports are up to date! 🎉</p>';
+                if (pendingHW.length === 0) {
+                    html += `<div style="text-align:center;padding:40px 20px;">
+                        <div style="font-size:3rem;margin-bottom:12px;">🎉</div>
+                        <p style="font-weight:700;color:#065f46;">All caught up!</p>
+                        <p style="color:#94a3b8;font-size:.875rem;margin-top:4px;">No pending homework submissions.</p>
+                    </div>`;
                 } else {
-                    html += '<div class="space-y-2">';
-                    pendingStudents.forEach(s => {
-                        const statusClass = s.daysOverdue.includes('No reports') ? 'text-yellow-600' : 'text-red-600';
-                        html += `<div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                            <p class="font-semibold text-gray-900 dark:text-white">${escapeHtml(s.studentName)}</p>
-                            <p class="text-sm ${statusClass}">${escapeHtml(s.daysOverdue)}</p>
-                            <button class="mt-2 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400" onclick="generateReport('${s.id}')">
-                                <i class="fas fa-plus-circle mr-1"></i>Create Report
+                    pendingHW.forEach(hw => {
+                        const color = ACOLORS[(hw.studentName||'').charCodeAt(0) % ACOLORS.length];
+                        const initials = (hw.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+                        const submittedDate = hw.submittedAt ? new Date(hw.submittedAt.seconds*1000).toLocaleDateString('en-NG',{day:'numeric',month:'short'}) : 'Unknown date';
+                        html += `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:#f8fafc;border-radius:12px;border:1px solid #f1f5f9;transition:background .15s;">
+                            <div style="width:40px;height:40px;border-radius:12px;background:${color};color:#fff;font-weight:800;font-size:.8rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml(initials)}</div>
+                            <div style="flex:1;min-width:0;">
+                                <div style="font-weight:700;color:#1e293b;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(hw.studentName||'Student')}</div>
+                                <div style="font-size:.75rem;color:#64748b;margin-top:2px;">${escapeHtml(hw.title||'Homework')} · Submitted ${submittedDate}</div>
+                            </div>
+                            <button onclick="window.openGradingModal('${escapeHtml(hw.id)}');document.getElementById('pendingReportsModal').remove();document.body.style.overflow=''"
+                                style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;padding:8px 14px;border-radius:10px;font-size:.78rem;font-weight:700;cursor:pointer;flex-shrink:0;">
+                                Review ↗
                             </button>
                         </div>`;
                     });
-                    html += '</div>';
                 }
 
                 html += `</div></div></div>`;
@@ -1448,33 +1425,81 @@
 
             // ----- Performance Score Card Click -----
             document.getElementById('achievementsCard').addEventListener('click', () => {
-                const performance = document.getElementById('performanceScore').textContent;
-                
-                let html = `<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" id="performanceModal">
-                    <div class="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md mx-auto">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">Performance Score</h3>
-                            <button class="text-2xl font-bold close-modal text-gray-700 dark:text-gray-300">&times;</button>
+                const td = window.tutorData || {};
+                const qaScore  = td.qaScore  ?? null;
+                const qcScore  = td.qcScore  ?? null;
+                const qaAdvice = td.qaAdvice || '';
+                const qcAdvice = td.qcAdvice || '';
+                const qaGrader = td.qaGradedByName || '';
+                const qcGrader = td.qcGradedByName || '';
+                const perfMonth= td.performanceMonth || '';
+                const QA_MAX = 35, QC_MAX = 55, TOTAL_MAX = 90;
+
+                let total = 0;
+                if (qaScore !== null && qcScore !== null) total = qaScore + qcScore;
+                else if (qaScore !== null) total = qaScore;
+                else if (qcScore !== null) total = qcScore;
+                const pct = Math.round(Math.min((total / TOTAL_MAX) * 100, 100));
+
+                let scoreColor = '#ef4444', barGrad = '#f87171,#ef4444', scoreLbl = '⚠️ Needs Improvement', badgeBg = '#fee2e2';
+                if (total >= 68) { scoreColor='#3b82f6'; barGrad='#60a5fa,#3b82f6'; scoreLbl='🌟 Great Work'; badgeBg='#dbeafe'; }
+                if (total >= 81) { scoreColor='#10b981'; barGrad='#34d399,#10b981'; scoreLbl='🏆 Excellent!'; badgeBg='#d1fae5'; }
+                if (total >= 45 && total < 68) { scoreColor='#f59e0b'; barGrad='#fbbf24,#f59e0b'; scoreLbl='👍 Good Progress'; badgeBg='#fef3c7'; }
+
+                const hasGrades = qaScore !== null || qcScore !== null;
+
+                function scoreBar(score, label, max, grader, color, lightBg) {
+                    if (score === null) return `<div style="padding:10px 14px;background:#f8fafc;border-radius:12px;border:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;"><span style="font-size:.75rem;font-weight:700;color:#94a3b8;text-transform:uppercase;">${label}</span><span style="font-size:.75rem;color:#cbd5e1;font-style:italic;">Not graded yet</span></div>`;
+                    const bp = Math.round(Math.min((score/max)*100,100));
+                    return `<div style="background:${lightBg};border-radius:12px;padding:12px 14px;border:1px solid ${color}33;">
+                        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+                            <span style="font-size:.75rem;font-weight:800;color:${color};text-transform:uppercase;">${label}</span>
+                            <span style="font-size:1.1rem;font-weight:900;color:${color};">${score}<span style="font-size:.7rem;font-weight:600;color:#94a3b8;"> / ${max}</span></span>
                         </div>
-                        <div class="text-center">
-                            <div class="w-32 h-32 mx-auto mb-4 relative">
-                                <svg class="w-full h-full" viewBox="0 0 100 100">
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#e5e7eb" stroke-width="10"/>
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#10b981" stroke-width="10" 
-                                        stroke-dasharray="${2 * Math.PI * 45}" 
-                                        stroke-dashoffset="${2 * Math.PI * 45 * (1 - performance/100)}"
-                                        stroke-linecap="round"
-                                        transform="rotate(-90 50 50)"/>
-                                </svg>
-                                <div class="absolute inset-0 flex items-center justify-center">
-                                    <span class="text-3xl font-bold text-gray-900 dark:text-white">${performance}</span>
-                                </div>
+                        <div style="background:${color}22;border-radius:999px;height:8px;overflow:hidden;">
+                            <div style="height:8px;border-radius:999px;background:linear-gradient(90deg,${color}88,${color});width:${bp}%;transition:width 1s;"></div>
+                        </div>
+                        ${grader?`<div style="font-size:.68rem;color:#94a3b8;margin-top:4px;">Graded by ${escapeHtml(grader)}</div>`:''}
+                    </div>`;
+                }
+
+                const notesHtml = [
+                    qaAdvice ? `<div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:10px 12px;"><div style="font-size:.68rem;font-weight:800;color:#7c3aed;text-transform:uppercase;margin-bottom:4px;">💬 QA Feedback</div><div style="font-size:.82rem;color:#4c1d95;line-height:1.5;">"${escapeHtml(qaAdvice)}"</div></div>` : '',
+                    qcAdvice ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 12px;"><div style="font-size:.68rem;font-weight:800;color:#b45309;text-transform:uppercase;margin-bottom:4px;">💬 QC Feedback</div><div style="font-size:.82rem;color:#78350f;line-height:1.5;">"${escapeHtml(qcAdvice)}"</div></div>` : '',
+                ].filter(Boolean).join('');
+
+                let html = `<div style="position:fixed;inset:0;background:rgba(15,23,42,.6);backdrop-filter:blur(6px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;" id="performanceModal">
+                    <div style="background:#fff;border-radius:20px;width:100%;max-width:480px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.35);overflow:hidden;">
+                        <div style="background:linear-gradient(135deg,#831843,#be185d);padding:18px 22px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+                            <div>
+                                <div style="color:#fff;font-weight:800;font-size:1.05rem;">⭐ Performance Scorecard</div>
+                                <div style="color:#fbcfe8;font-size:.78rem;margin-top:2px;">${perfMonth ? perfMonth + ' assessment' : 'Current month assessment'}</div>
                             </div>
-                            <p class="text-gray-600 dark:text-gray-300 mb-2">Overall performance rating</p>
-                            <div class="text-left space-y-2 mt-4">
-                                <p class="text-sm"><i class="fas fa-check-circle text-green-500 mr-2"></i>Attendance: Excellent</p>
-                                <p class="text-sm"><i class="fas fa-check-circle text-green-500 mr-2"></i>Reports: Up to date</p>
-                                <p class="text-sm"><i class="fas fa-check-circle text-green-500 mr-2"></i>Student engagement: High</p>
+                            <button class="close-modal" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:1.1rem;cursor:pointer;">&times;</button>
+                        </div>
+                        <div style="flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;">
+                            ${hasGrades ? `
+                            <div style="text-align:center;padding:16px 0 8px;">
+                                <div style="font-size:4rem;font-weight:900;color:${scoreColor};line-height:1;">${total}</div>
+                                <div style="font-size:.85rem;color:#94a3b8;margin-top:2px;">out of ${TOTAL_MAX} pts</div>
+                                <div style="background:${badgeBg};color:${scoreColor};font-size:.9rem;font-weight:800;padding:6px 18px;border-radius:999px;display:inline-block;margin-top:8px;">${pct}% · ${scoreLbl}</div>
+                            </div>
+                            <div style="background:#f1f5f9;border-radius:999px;height:10px;overflow:hidden;">
+                                <div style="height:10px;border-radius:999px;background:linear-gradient(90deg,${barGrad});width:${pct}%;transition:width 1.2s;"></div>
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:8px;">
+                                ${scoreBar(qaScore,'QA – Session Quality',QA_MAX,qaGrader,'#7c3aed','#f5f3ff')}
+                                ${scoreBar(qcScore,'QC – Lesson Plan Quality',QC_MAX,qcGrader,'#d97706','#fffbeb')}
+                            </div>
+                            ${notesHtml ? `<div style="display:flex;flex-direction:column;gap:8px;">${notesHtml}</div>` : ''}
+                            ` : `
+                            <div style="text-align:center;padding:40px 20px;">
+                                <div style="font-size:3rem;margin-bottom:12px;">📊</div>
+                                <p style="font-weight:700;color:#374151;font-size:1rem;">No grades yet this month</p>
+                                <p style="color:#94a3b8;font-size:.875rem;margin-top:6px;">Your QA and QC scores will appear here once management has graded your sessions.</p>
+                            </div>`}
+                            <div style="background:#f8fafc;border-radius:10px;padding:10px 14px;border:1px solid #f1f5f9;margin-top:4px;">
+                                <div style="font-size:.7rem;color:#94a3b8;text-align:center;">QA (${QA_MAX} pts) + QC (${QC_MAX} pts) = ${TOTAL_MAX} pts total maximum</div>
                             </div>
                         </div>
                     </div>
@@ -1510,4 +1535,3 @@
     </script>
 </body>
 </html>
-
