@@ -3,24 +3,243 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Student Test - Blooming Kids House</title>
+    <title>Student Test · Blooming Kids House</title>
     <link rel="icon" href="favicon.ico" />
+    <!-- Tailwind (kept for layout utilities, but we'll overlay modern custom styling) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
     <link rel="stylesheet" href="style.css" />
     
-    <!-- Firebase for referral system -->
+    <!-- modern custom CSS – fresh, airy, and refined -->
+    <style>
+        /* inter font – modern, clean, highly readable */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(145deg, #e6f7ec 0%, #d0efdb 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            margin: 0;
+        }
+
+        /* main test card – soft white, floating, with subtle depth */
+        .test-container {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(4px);
+            border-radius: 2.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 40, 20, 0.35), 0 0 0 1px rgba(180, 215, 170, 0.3) inset;
+            padding: 2rem 2.25rem;
+            width: 100%;
+            transition: box-shadow 0.2s ease;
+        }
+
+        /* header area – extra polish */
+        .test-container h1 {
+            font-weight: 600;
+            font-size: 1.8rem;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #1b4d3e, #2f6b4d);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* logout button – subtle but modern */
+        .logout-btn {
+            background: rgba(250, 240, 150, 0.9);
+            border: none;
+            color: #2d5a3a;
+            font-weight: 600;
+            padding: 0.6rem 1.4rem;
+            border-radius: 40px;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 8px 16px -8px rgba(150, 130, 30, 0.2);
+            transition: all 0.2s ease;
+            font-size: 0.95rem;
+            border: 1px solid rgba(255, 245, 200, 0.7);
+        }
+        .logout-btn:hover {
+            background: #f5e57a;
+            transform: scale(1.02);
+            box-shadow: 0 12px 20px -10px #b89e3c;
+            border-color: #ecd66e;
+        }
+
+        /* question container – gentle spacing */
+        #question-container {
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        /* each question card (dynamically added) */
+        #question-container > div {
+            background: white;
+            border-radius: 2rem;
+            padding: 1.8rem 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 8px 24px rgba(70, 110, 80, 0.08), 0 2px 4px rgba(0,0,0,0.02);
+            border: 1px solid rgba(180, 210, 170, 0.3);
+            transition: transform 0.15s, box-shadow 0.2s;
+        }
+        #question-container > div:hover {
+            box-shadow: 0 20px 30px -8px rgba(50, 100, 70, 0.15);
+            transform: translateY(-2px);
+        }
+
+        /* question text */
+        #question-container > div p:first-child {
+            font-weight: 600;
+            font-size: 1.25rem;
+            color: #1d3b2c;
+            margin-bottom: 1.2rem;
+            border-left: 5px solid #90c290;
+            padding-left: 1rem;
+        }
+
+        /* options – modern, spacious */
+        #question-container label {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin: 0.8rem 0;
+            padding: 0.5rem 1rem;
+            border-radius: 60px;
+            background: #f6fcf7;
+            border: 1px solid #d8ecd6;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+            font-size: 1.05rem;
+            color: #1f3d2b;
+        }
+        #question-container label:hover {
+            background: #ebf9eb;
+            border-color: #9fcca5;
+            box-shadow: 0 2px 8px rgba(110, 150, 100, 0.1);
+        }
+
+        /* radio / checkbox – enlarged, brand color */
+        #question-container input[type="radio"],
+        #question-container input[type="checkbox"] {
+            width: 1.3rem;
+            height: 1.3rem;
+            accent-color: #2e8b57;
+            margin-right: 0.25rem;
+            flex-shrink: 0;
+        }
+
+        /* textarea – for creative writing */
+        #question-container textarea {
+            width: 100%;
+            padding: 1rem 1.3rem;
+            border: 1.5px solid #c5e0c2;
+            border-radius: 30px;
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            resize: vertical;
+            background: white;
+            transition: border 0.15s, box-shadow 0.15s;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.02);
+        }
+        #question-container textarea:focus {
+            border-color: #5fa06d;
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(90, 170, 100, 0.2), inset 0 1px 3px #eee;
+        }
+
+        /* loading state – elegant minimalism */
+        #question-container p:only-child {
+            text-align: center;
+            font-size: 1.3rem;
+            font-weight: 400;
+            color: #487a5d;
+            background: rgba(255, 255, 255, 0.6);
+            padding: 2.5rem;
+            border-radius: 3rem;
+            backdrop-filter: blur(10px);
+            border: 1px dashed #9ec299;
+            letter-spacing: 0.3px;
+        }
+
+        /* subtle dots animation for loading */
+        #question-container p:only-child::after {
+            content: '...';
+            display: inline-block;
+            animation: dots 1.5s steps(4, end) infinite;
+            width: 1.8rem;
+            margin-left: 0.2rem;
+        }
+        @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+
+        /* submit button – lush gradient, smooth */
+        #submit-test-btn {
+            background: linear-gradient(115deg, #2a7250, #419966);
+            border: none;
+            color: white;
+            font-weight: 600;
+            font-size: 1.3rem;
+            padding: 1rem 3.2rem;
+            border-radius: 60px;
+            box-shadow: 0 18px 28px -12px #1a5f3a, 0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+            transition: all 0.2s ease;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            width: auto;
+            min-width: 260px;
+        }
+        #submit-test-btn:hover {
+            background: linear-gradient(115deg, #1f6a44, #358a55);
+            transform: scale(1.02);
+            box-shadow: 0 22px 34px -12px #12582e, 0 0 0 2px rgba(255, 255, 240, 0.5) inset;
+        }
+        #submit-test-btn:disabled {
+            opacity: 0.7;
+            transform: scale(0.98);
+            box-shadow: none;
+            background: #97bb9f;
+            cursor: not-allowed;
+        }
+
+        /* submit button container – extra air */
+        #submit-button-container {
+            margin: 2.8rem 0 0.8rem;
+        }
+
+        /* small adjustments for mobile */
+        @media (max-width: 500px) {
+            .test-container { padding: 1.5rem; }
+            #submit-test-btn { font-size: 1.2rem; padding: 0.9rem 2rem; min-width: 200px; }
+            #question-container > div { padding: 1.5rem; }
+        }
+    </style>
+    
+    <!-- Firebase (unchanged) -->
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
 </head>
-<body class="bg-green-50 min-h-screen">
-    <div class="max-w-4xl mx-auto p-6">
+<body class="bg-green-50 min-h-screen"> <!-- body background overridden by CSS, but kept for fallback -->
+    <!-- added "test-container" class for modern card, kept original Tailwind classes -->
+    <div class="test-container max-w-4xl mx-auto p-6">
         <div class="flex justify-between items-center mb-4">
             <h1 class="text-xl font-bold text-green-800">Blooming Kids House Test</h1>
-            <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
+            <button onclick="logout()" class="logout-btn bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
         </div>
 
         <div id="question-container" class="space-y-4">
-            <p class="text-gray-600">Loading questions...</p>
+            <p class="text-gray-600">Loading questions</p>
         </div>
 
         <div id="submit-button-container" class="mt-6 flex justify-center" style="display: none;">
@@ -31,7 +250,7 @@
     </div>
 
     <script type="module">
-        // --- START: FIREBASE INITIALIZATION ---
+        // --- START: FIREBASE INITIALIZATION (exactly as before) ---
         if (typeof firebase !== 'undefined' && !firebase.apps.length) {
             firebase.initializeApp({
                 apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
@@ -51,7 +270,7 @@
         import { submitTestToFirebase } from './submitAnswers.js';
         // --- END: MODULE IMPORTS ---
 
-        // --- START: NEW REFERRAL & STUDENT REGISTRATION LOGIC ---
+        // --- START: NEW REFERRAL & STUDENT REGISTRATION LOGIC (unchanged) ---
         
         /**
          * Validates referral code and logs a pending transaction.
