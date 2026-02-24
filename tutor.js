@@ -315,13 +315,6 @@ function cleanGradeString(grade) {
     }
 }
 
-// Extract numeric grade value from any grade string format ("Grade 5", "5", "Grade 10", etc.)
-function extractGradeNumber(gradeStr) {
-    if (!gradeStr) return 0;
-    const match = String(gradeStr).match(/\d+/);
-    return match ? parseInt(match[0], 10) : 0;
-}
-
 // Get current month and year
 function getCurrentMonthYear() {
     const now = new Date();
@@ -773,7 +766,6 @@ class ScheduleManager {
     async loadStudents() {
         try {
             const { query, collection, where, getDocs } = this.methods;
-            if (!this.tutor || !this.tutor.email) { console.error("ScheduleManager.loadStudents: tutor or tutor.email is undefined. Aborting."); return; }
             const q = query(collection(this.db, "students"), where("tutorEmail", "==", this.tutor.email));
             const snapshot = await getDocs(q);
             
@@ -1271,7 +1263,6 @@ async function deleteTopic(topicId, studentId) {
 async function loadDailyTopicHistory(studentId) {
     const container = document.getElementById('topic-history');
     if (!container) return;
-    if (!studentId) { console.error("loadDailyTopicHistory: studentId is undefined. Aborting."); return; }
     try {
         const now = new Date();
         const q = query(collection(db, "daily_topics"), where("studentId", "==", studentId));
@@ -1676,8 +1667,7 @@ function initializeFloatingMessagingButton() {
 // --- BACKGROUND LISTENERS ---
 
 function initializeUnreadListener() {
-    const tutorId = window.tutorData?.id;
-    if (!tutorId) { console.error("initializeUnreadListener: tutorId is undefined. Aborting."); return; }
+    const tutorId = window.tutorData.id;
     if (unsubUnreadListener) unsubUnreadListener();
 
     const q = query(
@@ -1794,12 +1784,6 @@ function showEnhancedMessagingModal() {
 async function msgLoadRecipientsByStudentId(type, container) {
     container.innerHTML = '<div class="spinner"></div>';
     const tutorEmail = window.tutorData?.email;
-
-    if (!tutorEmail) {
-        console.error("msgLoadRecipientsByStudentId: tutorEmail is undefined. Aborting query.");
-        container.innerHTML = '<p class="text-red-500">Error: Tutor data not available. Please refresh.</p>';
-        return;
-    }
 
     try {
         const q = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
@@ -2002,8 +1986,7 @@ function closeInbox(modal) {
 }
 
 function msgStartInboxListener(modal) {
-    const tutorId = window.tutorData?.id;
-    if (!tutorId) { console.error("msgStartInboxListener: tutorId is undefined. Aborting."); return; }
+    const tutorId = window.tutorData.id;
     const listEl = modal.querySelector('#inbox-list');
     listEl.innerHTML = '<div class="spinner" style="margin:16px auto;"></div>';
 
@@ -2222,10 +2205,6 @@ function showScheduleCalendarModal() {
 }
 
 async function loadScheduleCalendar() {
-    if (!window.tutorData || !window.tutorData.email) {
-        console.error("loadScheduleCalendar: window.tutorData or email is undefined. Aborting.");
-        return;
-    }
     try {
         const studentsQuery = query(
             collection(db, "students"), 
@@ -2573,7 +2552,6 @@ let studentCache = [];
  * SCHEDULE MANAGEMENT TAB
  ******************************************************************************/
 function renderScheduleManagement(container, tutor) {
-    if (!tutor || !tutor.email) { console.error("renderScheduleManagement: tutor or tutor.email is undefined", tutor); return; }
     updateActiveTab('navScheduleManagement');
     startPersistentClock(); // ← clock on every tab
 
@@ -2830,7 +2808,6 @@ function renderAcademic(container, tutor) {
 async function loadAcademicArchive(tutor) {
     const container = document.getElementById('academic-archive-container');
     if (!container) return;
-    if (!tutor || !tutor.email) { console.error("loadAcademicArchive: tutor or tutor.email is undefined", tutor); return; }
     container.innerHTML = `<div class="text-center py-6"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading archive…</p></div>`;
 
     try {
@@ -3071,10 +3048,6 @@ function renderTutorDashboard(container, tutor) {
 }
 
 async function loadStudentDropdowns(tutorEmail) {
-    if (!tutorEmail) {
-        console.error("loadStudentDropdowns: tutorEmail is undefined. Aborting query.");
-        return;
-    }
     try {
         const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
         const studentsSnapshot = await getDocs(studentsQuery);
@@ -3121,7 +3094,6 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
     const gradedReportsContainer = document.getElementById('gradedReportsContainer');
     
     if (!pendingReportsContainer) return;
-    if (!tutorEmail) { console.error("loadTutorReports: tutorEmail is undefined. Aborting."); return; }
     
     pendingReportsContainer.innerHTML = `
         <div class="card"><div class="card-body text-center">
@@ -3359,7 +3331,6 @@ function attachSubmitReportListeners() {
 
 // --- Helper function to check recall request status ---
 async function checkRecallRequestStatus(studentId) {
-    if (!studentId) { console.error("checkRecallRequestStatus: studentId is undefined. Aborting."); return null; }
     try {
         const recallQuery = query(
             collection(db, "recall_requests"),
@@ -3569,7 +3540,6 @@ function showEditStudentModal(student) {
 async function renderStudentDatabase(container, tutor) {
     // REMOVED early return check for window.fixedMonthSystemInitialized
     if (!container) return;
-    if (!tutor || !tutor.email) { console.error("renderStudentDatabase: tutor or tutor.email is undefined", tutor); return; }
     updateActiveTab('navStudentDatabase');
     startPersistentClock(); // ← clock on every tab
 
@@ -3609,11 +3579,8 @@ async function renderStudentDatabase(container, tutor) {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     const submittedStudentIds = new Set();
-    // Track ALL-TIME submissions (for "new student" detection)
-    const everSubmittedStudentIds = new Set();
     allSubmissionsSnapshot.forEach(doc => {
         const subData = doc.data();
-        everSubmittedStudentIds.add(subData.studentId); // all-time
         const subDate = subData.submittedAt.toDate();
         if (subDate.getMonth() === currentMonth && subDate.getFullYear() === currentYear) {
             submittedStudentIds.add(subData.studentId);
@@ -3639,55 +3606,6 @@ async function renderStudentDatabase(container, tutor) {
     }
 
     const studentsCount = students.length;
-
-    // ── ASSESSMENT STATUS FETCH ──────────────────────────────────────────────
-    // Build sets: which students have a completed assessment (globally, catches reassigned)
-    // and which have an in-progress assessment session started by this tutor.
-    const assessmentCompletedNames = new Set(); // keyed by studentName (global check)
-    const assessmentSessionMap = {};            // studentId → session doc data
-
-    if (students.length > 0) {
-        const studentNames = students.map(s => s.studentName);
-        const studentIds   = students.map(s => s.id);
-
-        // Batch into chunks of 30 (Firestore 'in' limit)
-        const nameChunks = [];
-        const idChunks   = [];
-        for (let i = 0; i < studentNames.length; i += 30) {
-            nameChunks.push(studentNames.slice(i, i + 30));
-        }
-        for (let i = 0; i < studentIds.length; i += 30) {
-            idChunks.push(studentIds.slice(i, i + 30));
-        }
-
-        // 1. student_results: global lookup by studentName to catch reassigned students
-        const resultPromises = nameChunks.map(chunk =>
-            getDocs(query(collection(db, "student_results"), where("studentName", "in", chunk)))
-        );
-        // 2. assessment_sessions: lookup by studentId for this tutor
-        const sessionPromises = idChunks.map(chunk =>
-            getDocs(query(collection(db, "assessment_sessions"), where("studentId", "in", chunk), where("tutorEmail", "==", tutor.email)))
-        );
-
-        const [resultSnaps, sessionSnaps] = await Promise.all([
-            Promise.all(resultPromises),
-            Promise.all(sessionPromises)
-        ]);
-
-        resultSnaps.forEach(snap => {
-            snap.forEach(d => {
-                const name = d.data().studentName;
-                if (name) assessmentCompletedNames.add(name.trim().toLowerCase());
-            });
-        });
-        sessionSnaps.forEach(snap => {
-            snap.forEach(d => {
-                const data = d.data();
-                if (data.studentId) assessmentSessionMap[data.studentId] = data;
-            });
-        });
-    }
-    // ── END ASSESSMENT STATUS FETCH ──────────────────────────────────────────
 
     // --- RENDER UI (UPDATED) ---
     function renderUI() {
@@ -3744,37 +3662,7 @@ async function renderStudentDatabase(container, tutor) {
                 } else {
                     const transIndicator = student.isTransitioning ? `<span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full ml-2">Transitioning</span>` : '';
                     statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>${transIndicator}`;
-
-                    // ── ASSESSMENT BUTTON LOGIC ──────────────────────────────────────
-                    // Show for truly new students: no all-time monthly report AND no completed assessment
-                    const studentNameKey = (student.studentName || '').trim().toLowerCase();
-                    const hasCompletedAssessment = assessmentCompletedNames.has(studentNameKey);
-                    const hasEverSubmittedReport = everSubmittedStudentIds.has(student.id);
-                    const isNewStudent = !hasCompletedAssessment && !hasEverSubmittedReport;
-
-                    if (isNewStudent) {
-                        const session = assessmentSessionMap[student.id];
-                        const sessionLaunched = session && session.status === 'launched';
-                        const assessBtnLabel = sessionLaunched ? '📋 Continue Assessment' : '🚀 Launch Student Assessment';
-                        const assessBtnClass = sessionLaunched
-                            ? 'launch-assessment-btn bg-orange-500 text-white px-3 py-1 rounded text-sm font-semibold'
-                            : 'launch-assessment-btn bg-purple-600 text-white px-3 py-1 rounded text-sm font-semibold';
-                        actionsHTML += `<button class="${assessBtnClass}" 
-                            data-student-id="${escapeHtml(student.id)}"
-                            data-student-name="${escapeHtml(student.studentName)}"
-                            data-grade="${escapeHtml(student.grade)}"
-                            data-parent-email="${escapeHtml(student.parentEmail || '')}"
-                            data-parent-name="${escapeHtml(student.parentName || '')}"
-                            data-parent-phone="${escapeHtml(student.parentPhone || '')}"
-                            data-tutor-email="${escapeHtml(student.tutorEmail || tutor.email)}"
-                            data-country="${escapeHtml(student.country || '')}"
-                            data-referral-code="${escapeHtml(student.referralCode || '')}"
-                            >${assessBtnLabel}</button>`;
-                        // Add a visual badge to status
-                        statusHTML += `<span class="ml-2 bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full font-semibold">New Student</span>`;
-                    }
-                    // ── END ASSESSMENT BUTTON LOGIC ──────────────────────────────────
-
+                    
                     // BREAK/RECALL LOGIC with status checking
                     if (isSummerBreakEnabled) {
                         const recallStatus = window.recallStatusCache ? window.recallStatusCache[student.id] : null;
@@ -4060,63 +3948,6 @@ async function renderStudentDatabase(container, tutor) {
             });
         });
 
-        // ── LAUNCH / CONTINUE ASSESSMENT ────────────────────────────────────
-        document.querySelectorAll('.launch-assessment-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const studentId   = btn.dataset.studentId;
-                const studentName = btn.dataset.studentName;
-                const gradeRaw    = btn.dataset.grade;
-                const gradeNum    = extractGradeNumber(gradeRaw);
-                const parentEmail = btn.dataset.parentEmail;
-                const parentName  = btn.dataset.parentName;
-                const parentPhone = btn.dataset.parentPhone;
-                const tutorEmail  = btn.dataset.tutorEmail;
-                const country     = btn.dataset.country;
-                const referralCode = btn.dataset.referralCode;
-
-                if (!gradeNum) {
-                    showCustomAlert(`⚠️ Could not read grade for ${studentName}. Please check the student record.`);
-                    return;
-                }
-                if (!parentEmail) {
-                    showCustomAlert(`⚠️ No parent email on file for ${studentName}. Please add it to the student record before launching the assessment.`);
-                    return;
-                }
-
-                // Persist a session doc so we can show "Continue Assessment" if not yet done
-                try {
-                    await setDoc(doc(db, "assessment_sessions", studentId), {
-                        studentId,
-                        studentName,
-                        grade: gradeRaw,
-                        tutorEmail,
-                        status: 'launched',
-                        launchedAt: new Date()
-                    });
-                } catch (e) {
-                    console.warn('Could not write assessment session:', e);
-                }
-
-                // Pack student data into localStorage exactly as subject-select.html expects
-                const assessmentStudentData = {
-                    studentName,
-                    parentEmail,
-                    parentName,
-                    parentPhone,
-                    grade: String(gradeNum),   // numeric string – subject-select.html parses this
-                    tutorEmail,
-                    country,
-                    referralCode
-                };
-                localStorage.setItem('assessmentStudentData', JSON.stringify(assessmentStudentData));
-                localStorage.setItem('assessmentStudentId', studentId);
-
-                // Navigate to subject-select with a flag so it knows this is a tutor-launched assessment
-                window.open(`subject-select.html?source=tutor_assessment`, '_blank');
-            });
-        });
-        // ── END LAUNCH / CONTINUE ASSESSMENT ────────────────────────────────
-
         // Summer break button
         document.querySelectorAll('.summer-break-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
@@ -4265,17 +4096,6 @@ async function renderStudentDatabase(container, tutor) {
 
 // Auto-Registered Students Functions
 function renderAutoRegisteredStudents(container, tutor) {
-    if (!tutor || !tutor.email) {
-        console.error("renderAutoRegisteredStudents: tutor or tutor.email is undefined", tutor);
-        container.innerHTML = `
-            <div class="card">
-                <div class="card-body">
-                    <p class="text-red-500">Error: Tutor data is not available. Please refresh the page.</p>
-                </div>
-            </div>
-        `;
-        return;
-    }
     startPersistentClock(); // ← clock on every tab
     container.innerHTML = `
         <div class="card">
@@ -4298,12 +4118,6 @@ function renderAutoRegisteredStudents(container, tutor) {
 }
 
 async function loadAutoRegisteredStudents(tutorEmail) {
-    if (!tutorEmail) {
-        console.error("loadAutoRegisteredStudents: tutorEmail is undefined. Aborting query.");
-        const listEl = document.getElementById("auto-students-list");
-        if (listEl) listEl.innerHTML = `<p class="text-red-500">Error: Could not load students — tutor email is missing.</p>`;
-        return;
-    }
     const studentsQuery = query(collection(db, "students"), 
         where("tutorEmail", "==", tutorEmail),
         where("autoRegistered", "==", true));
@@ -4462,7 +4276,6 @@ async function initGamification(tutorId) {
             let perfMonth = monthKey;
 
             try {
-                if (!tutorEmail) { console.warn("initGamification: tutorEmail is empty, skipping tutor_grades query."); throw new Error("no tutorEmail"); }
                 const gradesSnap = await getDocs(
                     query(collection(db, 'tutor_grades'),
                         where('tutorEmail', '==', tutorEmail),
@@ -4867,10 +4680,6 @@ async function renderCourses(container, tutor) {
  * Load students for the courses dropdown.
  */
 async function loadStudentDropdownCourses(tutorEmail) {
-    if (!tutorEmail) {
-        console.error("loadStudentDropdownCourses: tutorEmail is undefined. Aborting query.");
-        return;
-    }
     try {
         const q = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
         const snapshot = await getDocs(q);
@@ -4938,7 +4747,6 @@ async function uploadCourseMaterial(file, studentId, tutor, title, description) 
  */
 async function loadCourseMaterials(studentId, container, tutor) {
     container.innerHTML = '<div class="text-center py-6"><div class="spinner mx-auto"></div><p class="text-gray-500 mt-2">Loading materials...</p></div>';
-    if (!studentId) { console.error("loadCourseMaterials: studentId is undefined. Aborting."); container.innerHTML = '<div class="text-center py-6 text-red-500">Error: Student ID is missing.</div>'; return; }
 
     try {
         const q = query(
@@ -5225,29 +5033,18 @@ function getHomeworkCutoffDate() {
 async function loadHomeworkInbox(tutorEmail) {
     const container = document.getElementById('homework-inbox-container');
     if (!container) return;
-    if (!tutorEmail && (!window.tutorData || !window.tutorData.name)) {
-        console.error("loadHomeworkInbox: tutorEmail and window.tutorData are both undefined. Aborting.");
-        container.innerHTML = '<p class="text-red-500">Error: Tutor data is not available. Please refresh the page.</p>';
-        return;
-    }
     container.innerHTML = '<div class="text-center py-6"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading submissions…</p></div>';
 
     try {
-        // Query all homework by this tutor (by name first, fall back to email)
-        const tutorName = window.tutorData && window.tutorData.name ? window.tutorData.name : null;
-        let snapshot;
+        // Query all homework by this tutor (both name and email)
+        let q = query(
+            collection(db, "homework_assignments"),
+            where("tutorName", "==", window.tutorData.name)
+        );
+        let snapshot = await getDocs(q);
 
-        if (tutorName) {
-            let q = query(
-                collection(db, "homework_assignments"),
-                where("tutorName", "==", tutorName)
-            );
-            snapshot = await getDocs(q);
-        }
-
-        if (!snapshot || snapshot.empty) {
-            if (!tutorEmail) { console.error("loadHomeworkInbox: tutorEmail is also undefined, cannot fall back."); throw new Error("no tutorEmail"); }
-            const q = query(collection(db, "homework_assignments"), where("tutorEmail", "==", tutorEmail));
+        if (snapshot.empty) {
+            q = query(collection(db, "homework_assignments"), where("tutorEmail", "==", tutorEmail));
             snapshot = await getDocs(q);
         }
 
