@@ -195,6 +195,97 @@ function isPlacementTestEligible(grade) {
     return !isNaN(num) && num >= 3 && num <= 12;
 }
 
+// ----- COUNTRY FROM PHONE NUMBER (detects country via dialing code) -----
+/**
+ * Derives a country name from a phone number's international dialing code.
+ * Supports the most common country codes worldwide; falls back to empty string.
+ */
+function getCountryFromPhone(phone) {
+    if (!phone) return '';
+    // Strip spaces, dashes, parentheses; ensure it starts with +
+    const cleaned = phone.toString().trim().replace(/[\s\-().]/g, '');
+    let withPlus = cleaned;
+    if (!withPlus.startsWith('+')) {
+        // Nigerian local numbers starting with 0 → +234
+        if (withPlus.startsWith('0') && withPlus.length >= 10) {
+            withPlus = '+234' + withPlus.substring(1);
+        } else if (withPlus.startsWith('234') && withPlus.length >= 12) {
+            withPlus = '+' + withPlus;
+        } else {
+            withPlus = '+' + withPlus;
+        }
+    }
+
+    // Order matters: longer codes must be checked before shorter prefixes
+    const CODE_MAP = [
+        // 3-digit codes (check first)
+        ['+355', 'Albania'],       ['+213', 'Algeria'],      ['+376', 'Andorra'],
+        ['+244', 'Angola'],        ['+374', 'Armenia'],      ['+994', 'Azerbaijan'],
+        ['+973', 'Bahrain'],       ['+880', 'Bangladesh'],   ['+375', 'Belarus'],
+        ['+501', 'Belize'],        ['+229', 'Benin'],        ['+975', 'Bhutan'],
+        ['+591', 'Bolivia'],       ['+387', 'Bosnia'],       ['+267', 'Botswana'],
+        ['+673', 'Brunei'],        ['+226', 'Burkina Faso'], ['+257', 'Burundi'],
+        ['+855', 'Cambodia'],      ['+237', 'Cameroon'],     ['+238', 'Cape Verde'],
+        ['+236', 'CAR'],           ['+235', 'Chad'],         ['+562', 'Chile'],
+        ['+269', 'Comoros'],       ['+242', 'Congo'],        ['+243', 'DR Congo'],
+        ['+506', 'Costa Rica'],    ['+385', 'Croatia'],      ['+357', 'Cyprus'],
+        ['+253', 'Djibouti'],      ['+593', 'Ecuador'],      ['+503', 'El Salvador'],
+        ['+240', 'Equatorial Guinea'],['+291', 'Eritrea'],   ['+372', 'Estonia'],
+        ['+268', 'Eswatini'],      ['+251', 'Ethiopia'],     ['+679', 'Fiji'],
+        ['+241', 'Gabon'],         ['+220', 'Gambia'],       ['+995', 'Georgia'],
+        ['+233', 'Ghana'],         ['+502', 'Guatemala'],    ['+224', 'Guinea'],
+        ['+245', 'Guinea-Bissau'], ['+592', 'Guyana'],       ['+509', 'Haiti'],
+        ['+504', 'Honduras'],      ['+354', 'Iceland'],      ['+964', 'Iraq'],
+        ['+972', 'Israel'],        ['+962', 'Jordan'],       ['+254', 'Kenya'],
+        ['+686', 'Kiribati'],      ['+965', 'Kuwait'],       ['+996', 'Kyrgyzstan'],
+        ['+856', 'Laos'],          ['+371', 'Latvia'],       ['+961', 'Lebanon'],
+        ['+266', 'Lesotho'],       ['+231', 'Liberia'],      ['+218', 'Libya'],
+        ['+423', 'Liechtenstein'], ['+370', 'Lithuania'],    ['+352', 'Luxembourg'],
+        ['+261', 'Madagascar'],    ['+265', 'Malawi'],       ['+960', 'Maldives'],
+        ['+223', 'Mali'],          ['+356', 'Malta'],        ['+692', 'Marshall Islands'],
+        ['+222', 'Mauritania'],    ['+230', 'Mauritius'],    ['+373', 'Moldova'],
+        ['+976', 'Mongolia'],      ['+382', 'Montenegro'],   ['+212', 'Morocco'],
+        ['+258', 'Mozambique'],    ['+264', 'Namibia'],      ['+977', 'Nepal'],
+        ['+505', 'Nicaragua'],     ['+227', 'Niger'],        ['+234', 'Nigeria'],
+        ['+389', 'North Macedonia'],['+968', 'Oman'],        ['+970', 'Palestine'],
+        ['+507', 'Panama'],        ['+675', 'Papua New Guinea'],['+595', 'Paraguay'],
+        ['+974', 'Qatar'],         ['+250', 'Rwanda'],       ['+685', 'Samoa'],
+        ['+239', 'São Tomé'],      ['+966', 'Saudi Arabia'], ['+221', 'Senegal'],
+        ['+381', 'Serbia'],        ['+232', 'Sierra Leone'], ['+421', 'Slovakia'],
+        ['+386', 'Slovenia'],      ['+677', 'Solomon Islands'],['+252', 'Somalia'],
+        ['+211', 'South Sudan'],   ['+249', 'Sudan'],        ['+597', 'Suriname'],
+        ['+992', 'Tajikistan'],    ['+255', 'Tanzania'],     ['+670', 'Timor-Leste'],
+        ['+228', 'Togo'],          ['+676', 'Tonga'],        ['+868', 'Trinidad & Tobago'],
+        ['+216', 'Tunisia'],       ['+993', 'Turkmenistan'], ['+688', 'Tuvalu'],
+        ['+256', 'Uganda'],        ['+971', 'UAE'],          ['+598', 'Uruguay'],
+        ['+998', 'Uzbekistan'],    ['+678', 'Vanuatu'],      ['+967', 'Yemen'],
+        ['+260', 'Zambia'],        ['+263', 'Zimbabwe'],
+        // 2-digit codes
+        ['+20', 'Egypt'],          ['+27', 'South Africa'],  ['+30', 'Greece'],
+        ['+31', 'Netherlands'],    ['+32', 'Belgium'],       ['+33', 'France'],
+        ['+34', 'Spain'],          ['+36', 'Hungary'],       ['+39', 'Italy'],
+        ['+40', 'Romania'],        ['+41', 'Switzerland'],   ['+43', 'Austria'],
+        ['+44', 'United Kingdom'], ['+45', 'Denmark'],       ['+46', 'Sweden'],
+        ['+47', 'Norway'],         ['+48', 'Poland'],        ['+49', 'Germany'],
+        ['+51', 'Peru'],           ['+52', 'Mexico'],        ['+54', 'Argentina'],
+        ['+55', 'Brazil'],         ['+56', 'Chile'],         ['+57', 'Colombia'],
+        ['+58', 'Venezuela'],      ['+60', 'Malaysia'],      ['+61', 'Australia'],
+        ['+62', 'Indonesia'],      ['+63', 'Philippines'],   ['+64', 'New Zealand'],
+        ['+65', 'Singapore'],      ['+66', 'Thailand'],      ['+81', 'Japan'],
+        ['+82', 'South Korea'],    ['+84', 'Vietnam'],       ['+86', 'China'],
+        ['+90', 'Turkey'],         ['+91', 'India'],         ['+92', 'Pakistan'],
+        ['+93', 'Afghanistan'],    ['+94', 'Sri Lanka'],     ['+95', 'Myanmar'],
+        ['+98', 'Iran'],
+        // 1-digit codes (last)
+        ['+1', 'United States'],   ['+7', 'Russia'],
+    ];
+
+    for (const [code, country] of CODE_MAP) {
+        if (withPlus.startsWith(code)) return country;
+    }
+    return '';
+}
+
 // Phone Number Normalization Function
 function normalizePhoneNumber(phone) {
     if (!phone) return '';
@@ -3737,18 +3828,38 @@ async function renderStudentDatabase(container, tutor) {
 
                     // ── PLACEMENT TEST LAUNCH (Grades 3–12 only) ──────────────────────────────
                     if (isPlacementTestEligible(student.grade)) {
-                        actionsHTML += `<button
-                            class="launch-placement-btn bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 text-sm font-semibold"
-                            data-student-id="${escapeHtml(student.id)}"
-                            data-student-name="${escapeHtml(student.studentName)}"
-                            data-grade="${escapeHtml(student.grade)}"
-                            data-parent-email="${escapeHtml(student.parentEmail || '')}"
-                            data-parent-name="${escapeHtml(student.parentName || '')}"
-                            data-parent-phone="${escapeHtml(student.parentPhone || '')}"
-                            data-tutor-email="${escapeHtml(tutor.email)}"
-                            data-tutor-name="${escapeHtml(tutor.name || '')}">
-                            🎯 Placement Test
-                        </button>`;
+                        const ptStatus    = student.placementTestStatus || '';
+                        const ptCompletedAt = student.placementTestCompletedAt
+                            ? (student.placementTestCompletedAt.toDate
+                                ? student.placementTestCompletedAt.toDate()
+                                : new Date(student.placementTestCompletedAt))
+                            : null;
+                        const ONE_HOUR_MS = 60 * 60 * 1000;
+                        const withinOneHour = ptCompletedAt && (Date.now() - ptCompletedAt.getTime() < ONE_HOUR_MS);
+
+                        if (ptStatus === 'completed' && withinOneHour) {
+                            // Test completed within the last hour — show "Completed" badge, no button
+                            actionsHTML += `<span
+                                class="inline-block bg-green-100 text-green-800 border border-green-300 px-3 py-1 rounded text-sm font-semibold"
+                                title="Placement test was completed. Button clears after 1 hour.">
+                                ✅ Test Completed
+                            </span>`;
+                        } else if (ptStatus !== 'completed') {
+                            // No test taken yet — show the launch button
+                            actionsHTML += `<button
+                                class="launch-placement-btn bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 text-sm font-semibold"
+                                data-student-id="${escapeHtml(student.id)}"
+                                data-student-name="${escapeHtml(student.studentName)}"
+                                data-grade="${escapeHtml(student.grade)}"
+                                data-parent-email="${escapeHtml(student.parentEmail || '')}"
+                                data-parent-name="${escapeHtml(student.parentName || '')}"
+                                data-parent-phone="${escapeHtml(student.parentPhone || '')}"
+                                data-tutor-email="${escapeHtml(tutor.email)}"
+                                data-tutor-name="${escapeHtml(tutor.name || '')}">
+                                🎯 Placement Test
+                            </button>`;
+                        }
+                        // If ptStatus === 'completed' but more than 1 hour ago → render nothing (button cleared)
                     }
                 }
                 studentsHTML += `<tr><td class="px-6 py-4 whitespace-nowrap">${escapeHtml(student.studentName)} (${escapeHtml(cleanGradeString ? cleanGradeString(student.grade) : student.grade)})<div class="text-xs text-gray-500">Subjects: ${escapeHtml(subjects)} | Days: ${escapeHtml(days)}</div>${feeDisplay}</td><td class="px-6 py-4 whitespace-nowrap">${statusHTML}</td><td class="px-6 py-4 whitespace-nowrap space-x-2">${actionsHTML}</td></tr>`;
@@ -4164,13 +4275,16 @@ async function renderStudentDatabase(container, tutor) {
                 // subject-select.js reads 'studentData' to bypass the student login gate.
                 // studentUid (= Firestore doc ID) is preserved so test results are appended
                 // to the EXISTING student record, preventing duplicate student entries.
+                const derivedCountry = getCountryFromPhone(parentPhone) || '';
                 const payload = {
                     studentUid:   studentId,    // Firestore doc ID — critical for dedup
                     studentName:  studentName,
                     grade:        grade,
-                    studentEmail: parentEmail,  // subject-select reads key 'studentEmail'
+                    parentEmail:  parentEmail,  // FIXED: correct key name read by subject-select
+                    studentEmail: parentEmail,  // legacy mirror (kept for any old code paths)
                     parentName:   parentName,
                     parentPhone:  parentPhone,
+                    country:      derivedCountry, // FIXED: derived from phone's country code
                     tutorEmail:   tutorEmail,
                     tutorName:    tutorName,
                     launchedBy:   'tutor',      // sentinel consumed by subject-select.js
