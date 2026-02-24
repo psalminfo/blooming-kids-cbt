@@ -1797,7 +1797,7 @@ function initializeFloatingMessagingButton() {
 // --- BACKGROUND LISTENERS ---
 
 function initializeUnreadListener() {
-    const tutorId = window.tutorData.id;
+    const tutorId = window.tutorData.messagingId || window.tutorData.id;
     if (unsubUnreadListener) unsubUnreadListener();
 
     const q = query(
@@ -1861,9 +1861,11 @@ function showEnhancedMessagingModal() {
                 <button type="button" class="close-modal-btn text-2xl font-bold">&times;</button>
             </div>
             <div class="modal-body space-y-3">
-                <div class="message-type-grid">
+                <div class="message-type-grid" style="grid-template-columns:repeat(3,1fr);">
                     <div class="type-option selected" data-type="individual"><div class="icon">👤</div><div>Student</div></div>
                     <div class="type-option" data-type="group"><div class="icon">👨‍👩‍👧‍👦</div><div>Group</div></div>
+                    <div class="type-option" data-type="parent"><div class="icon">🏠</div><div>Parent</div></div>
+                    <div class="type-option" data-type="tutor"><div class="icon">🧑‍🏫</div><div>Tutor</div></div>
                     <div class="type-option" data-type="management"><div class="icon">🏢</div><div>Admin</div></div>
                     <div class="type-option" data-type="all"><div class="icon">📢</div><div>All</div></div>
                 </div>
@@ -1940,8 +1942,45 @@ async function msgLoadRecipientsByStudentId(type, container) {
                 </div>`;
         } else if (type === 'all') {
             container.innerHTML = `<div class="p-3 bg-blue-50 rounded text-sm text-blue-700">📢 Sending to all ${students.length} active students.</div>`;
-            // Store for send
             container.dataset.allStudents = JSON.stringify(students.map(s => ({ id: s.id, name: s.studentName })));
+        } else if (type === 'parent') {
+            // Load parents from parent_users collection
+            try {
+                const parentSnap = await getDocs(collection(db, 'parent_users'));
+                const parents = [];
+                parentSnap.forEach(d => {
+                    const p = d.data();
+                    if (p.uid || d.id) parents.push({ id: p.uid || d.id, name: p.name || p.displayName || p.email || 'Parent', email: p.email || '' });
+                });
+                container.innerHTML = `
+                    <select id="sel-recipient" class="form-input" data-recipient-type="parent">
+                        <option value="">Select parent...</option>
+                        ${parents.map(p => `<option value="${escapeHtml(p.id)}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)}${p.email ? ' ('+escapeHtml(p.email)+')' : ''}</option>`).join('')}
+                    </select>`;
+            } catch(e) {
+                container.innerHTML = `<div class="p-3 bg-red-50 text-red-600 text-sm rounded">Could not load parents: ${escapeHtml(e.message)}</div>`;
+            }
+        } else if (type === 'tutor') {
+            // Load other tutors for tutor-to-tutor messaging
+            try {
+                const tutorSnap = await getDocs(collection(db, 'tutors'));
+                const myId = window.tutorData?.messagingId || window.tutorData?.id;
+                const tutors = [];
+                tutorSnap.forEach(d => {
+                    const t = d.data();
+                    const tMsgId = t.tutorUid || d.id;
+                    if (tMsgId !== myId && t.status !== 'inactive') {
+                        tutors.push({ id: tMsgId, docId: d.id, name: t.name || t.email || 'Tutor', email: t.email || '' });
+                    }
+                });
+                container.innerHTML = `
+                    <select id="sel-recipient" class="form-input" data-recipient-type="tutor">
+                        <option value="">Select tutor...</option>
+                        ${tutors.map(t => `<option value="${escapeHtml(t.id)}" data-name="${escapeHtml(t.name)}">${escapeHtml(t.name)}${t.email ? ' ('+escapeHtml(t.email)+')' : ''}</option>`).join('')}
+                    </select>`;
+            } catch(e) {
+                container.innerHTML = `<div class="p-3 bg-red-50 text-red-600 text-sm rounded">Could not load tutors: ${escapeHtml(e.message)}</div>`;
+            }
         } else {
             container.innerHTML = `<div class="p-3 bg-gray-50 rounded text-sm text-gray-600">🏢 Sending to Management/Admin.</div>`;
         }
@@ -1972,6 +2011,10 @@ async function msgProcessSendToStudents(modal) {
     } else if (type === 'all') {
         try { targets = JSON.parse(modal.querySelector('#recipient-loader').dataset.allStudents || '[]'); } catch(e) {}
         if (!targets.length) { showCustomAlert('No active students found.'); return; }
+    } else if (type === 'parent' || type === 'tutor') {
+        const sel = modal.querySelector('#sel-recipient');
+        if (!sel || !sel.value) { showCustomAlert('Please select a recipient.'); return; }
+        targets.push({ id: sel.value, name: sel.options[sel.selectedIndex].dataset.name, recipientType: type });
     } else if (type === 'management') {
         targets = [{ id: 'management', name: 'Admin' }];
     }
@@ -1996,8 +2039,9 @@ async function msgProcessSendToStudents(modal) {
         const lastMsg = imageUrl ? (content || '📷 Image') : content;
 
         for (const target of targets) {
-            // Use tutorId_studentId as convId — matches student portal
-            const convId = `${tutor.id}_${target.id}`;
+            // Use messagingId_recipientId as convId — supports parent_users uid and tutor-to-tutor
+            const myMsgId = tutor.messagingId || tutor.id;
+            const convId = [myMsgId, target.id].sort().join('_');
             const convRef = doc(db, "conversations", convId);
 
             await setDoc(convRef, {
@@ -2615,7 +2659,10 @@ function showEditScheduleModal(student) {
 }
 
 function printCalendar() {
-    const calendarContent = document.getElementById('calendar-view').innerHTML;
+    // calendar-view lives inside the calendar overlay modal, not the main document
+    const calEl = document.querySelector('#calendar-overlay #calendar-view') || document.getElementById('calendar-view');
+    if (!calEl) { showCustomAlert('Please open the Calendar View first, then use Print.'); return; }
+    const calendarContent = calEl.innerHTML;
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
         <html>
@@ -3395,46 +3442,68 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
 
 // Helper: Build a standard report card HTML string
 function buildReportCard(docRef, data, needsFeedback) {
+    const dateStr = data.gradedAt ? (data.gradedAt.toDate ? data.gradedAt.toDate() : new Date(data.gradedAt)).toLocaleDateString('en-NG', {day:'numeric',month:'short',year:'numeric'}) :
+                    data.submittedAt ? (data.submittedAt.toDate ? data.submittedAt.toDate() : new Date(data.submittedAt)).toLocaleDateString('en-NG', {day:'numeric',month:'short',year:'numeric'}) : '';
+    const subject = data.subject || data.grade || '';
+    const ACOLORS = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
+    const color = ACOLORS[(data.studentName||'').charCodeAt(0) % ACOLORS.length];
+    const initials = (data.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
     return `
-    <div class="card">
-        <div class="card-body">
-            <div class="flex justify-between items-start mb-3">
-                <div>
-                    <h4 class="font-bold">${escapeHtml(data.studentName)}</h4>
-                    <p class="text-gray-500 text-sm">${escapeHtml(data.grade)}</p>
+    <div style="background:#fff;border-radius:14px;border:1px solid #f1f5f9;box-shadow:0 2px 8px rgba(0,0,0,.06);overflow:hidden;margin-bottom:10px;">
+        <div style="background:linear-gradient(90deg,#f8fafc,#f1f5f9);padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f1f5f9;">
+            <div style="width:36px;height:36px;border-radius:10px;background:${color};color:#fff;font-weight:800;font-size:.75rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml(initials)}</div>
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:700;color:#1e293b;font-size:.9rem;">${escapeHtml(data.studentName)}</div>
+                <div style="font-size:.72rem;color:#64748b;display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;">
+                    ${subject ? `<span>📚 ${escapeHtml(subject)}</span>` : ''}
+                    ${dateStr ? `<span>📅 ${dateStr}</span>` : ''}
                 </div>
-                <span class="badge badge-success">Graded</span>
             </div>
-            ${data.answers ? data.answers.filter(a => a.type === 'creative-writing').map((answer, index) => `
-                <div class="p-3 bg-blue-50 rounded-lg mb-2">
-                    <p class="italic text-gray-700 text-sm mb-2">${escapeHtml(answer.textAnswer || "No response")}</p>
-                    <div class="bg-white p-2 rounded border">
-                        <span class="text-xs font-semibold text-gray-500">Feedback:</span>
-                        <p class="text-sm">${escapeHtml(answer.tutorReport || 'N/A')}</p>
-                    </div>
+            <span style="background:#d1fae5;color:#065f46;font-size:.68rem;font-weight:800;padding:3px 10px;border-radius:999px;">✅ Graded</span>
+        </div>
+        <div style="padding:12px 16px;">
+            ${data.answers ? data.answers.filter(a => a.type === 'creative-writing').map(answer => `
+                <div style="background:#f0f9ff;border-radius:10px;padding:10px 12px;margin-bottom:8px;border-left:3px solid #60a5fa;">
+                    <div style="font-size:.75rem;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Student Response</div>
+                    <p style="font-style:italic;color:#334155;font-size:.875rem;line-height:1.5;">${escapeHtml(answer.textAnswer || "No response")}</p>
+                    ${answer.tutorReport ? `<div style="margin-top:8px;background:#fff;border-radius:8px;padding:8px 10px;border:1px solid #bae6fd;">
+                        <div style="font-size:.7rem;font-weight:700;color:#0891b2;text-transform:uppercase;margin-bottom:3px;">💬 Your Comment</div>
+                        <p style="font-size:.875rem;color:#0369a1;">${escapeHtml(answer.tutorReport)}</p>
+                    </div>` : ''}
                 </div>`).join('') : ''}
         </div>
     </div>`;
 }
 
 function buildCreativeWritingCard(docRef, data) {
+    const dateStr = data.gradedAt ? (data.gradedAt.toDate ? data.gradedAt.toDate() : new Date(data.gradedAt)).toLocaleDateString('en-NG', {day:'numeric',month:'short',year:'numeric'}) :
+                    data.submittedAt ? (data.submittedAt.toDate ? data.submittedAt.toDate() : new Date(data.submittedAt)).toLocaleDateString('en-NG', {day:'numeric',month:'short',year:'numeric'}) : '';
+    const subject = data.subject || data.type || 'Creative Writing';
+    const ACOLORS = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
+    const color = ACOLORS[(data.studentName||'').charCodeAt(0) % ACOLORS.length];
+    const initials = (data.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
     return `
-    <div class="card border-l-4 border-blue-500">
-        <div class="card-body">
-            <div class="flex justify-between items-start mb-3">
-                <div>
-                    <h4 class="font-bold">${escapeHtml(data.studentName)}</h4>
-                    <p class="text-gray-500 text-sm">${escapeHtml(data.grade)}</p>
-                </div>
-                <span class="badge badge-success">Graded</span>
-            </div>
-            <div class="bg-blue-50 p-3 rounded-lg">
-                <p class="italic text-gray-700 text-sm">${escapeHtml(data.textAnswer || "No response")}</p>
-                <div class="mt-2 bg-white p-2 rounded border">
-                    <span class="text-xs font-semibold">Your Feedback:</span>
-                    <p class="text-sm">${escapeHtml(data.tutorReport || 'N/A')}</p>
+    <div style="background:#fff;border-radius:14px;border:1px solid #f1f5f9;box-shadow:0 2px 8px rgba(0,0,0,.06);overflow:hidden;margin-bottom:10px;">
+        <div style="background:linear-gradient(90deg,#f8fafc,#fdf4ff);padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f3e8ff;">
+            <div style="width:36px;height:36px;border-radius:10px;background:${color};color:#fff;font-weight:800;font-size:.75rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml(initials)}</div>
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:700;color:#1e293b;font-size:.9rem;">${escapeHtml(data.studentName)}</div>
+                <div style="font-size:.72rem;color:#64748b;display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;">
+                    <span>✍️ ${escapeHtml(subject)}</span>
+                    ${dateStr ? `<span>📅 ${dateStr}</span>` : ''}
                 </div>
             </div>
+            <span style="background:#d1fae5;color:#065f46;font-size:.68rem;font-weight:800;padding:3px 10px;border-radius:999px;">✅ Graded</span>
+        </div>
+        <div style="padding:12px 16px;">
+            <div style="background:#fdf4ff;border-radius:10px;padding:10px 12px;border-left:3px solid #a855f7;">
+                <div style="font-size:.75rem;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Student Writing</div>
+                <p style="font-style:italic;color:#334155;font-size:.875rem;line-height:1.5;">${escapeHtml(data.textAnswer || "No response")}</p>
+            </div>
+            ${data.tutorReport ? `<div style="margin-top:8px;background:#fffbeb;border-radius:10px;padding:10px 12px;border:1px solid #fde68a;border-left:3px solid #f59e0b;">
+                <div style="font-size:.7rem;font-weight:700;color:#b45309;text-transform:uppercase;margin-bottom:3px;">💬 Your Comment</div>
+                <p style="font-size:.875rem;color:#92400e;">${escapeHtml(data.tutorReport)}</p>
+            </div>` : ''}
         </div>
     </div>`;
 }
@@ -3851,9 +3920,9 @@ async function renderStudentDatabase(container, tutor) {
                             ? (student.placementTestCompletedAt.toDate ? student.placementTestCompletedAt.toDate() : new Date(student.placementTestCompletedAt)) : null;
                         const ONE_HOUR_MS = 60 * 60 * 1000;
                         const withinOneHour = ptCompletedAt && (Date.now() - ptCompletedAt.getTime() < ONE_HOUR_MS);
-                        if (ptStatus === 'completed' && withinOneHour) {
-                            actionsHTML += `<span class="inline-block bg-green-100 text-green-800 border border-green-300 px-2 py-1 rounded text-xs font-semibold">✅ Test Completed</span>`;
-                        } else if (ptStatus !== 'completed') {
+                        if (ptStatus === 'completed') {
+                            // Hide the button permanently once test is completed - show nothing
+                        } else {
                             actionsHTML += `<button class="launch-placement-btn bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 text-xs font-semibold"
                                 data-student-id="${escapeHtml(student.id)}"
                                 data-student-name="${escapeHtml(student.studentName)}"
@@ -4633,6 +4702,28 @@ async function initGamification(tutorId) {
  */
 async function checkWinnerStatus(tutorId) {
     try {
+        // Also check by comparing all tutor grades for current month
+        try {
+            const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+            const monthKey = `${lagosNow.getFullYear()}-${String(lagosNow.getMonth()+1).padStart(2,'0')}`;
+            const allGradesSnap = await getDocs(query(collection(db, 'tutor_grades'), where('month', '==', monthKey)));
+            if (!allGradesSnap.empty) {
+                let topScore = -1, topTutorId = null;
+                allGradesSnap.forEach(d => {
+                    const g = d.data();
+                    const qa = g.qa?.score ?? 0;
+                    const qc = g.qc?.score ?? 0;
+                    const total = qa + qc;
+                    if (total > topScore) { topScore = total; topTutorId = g.tutorId || g.tutorEmail; }
+                });
+                // Match by tutorId or email
+                const myEmail = window.tutorData?.email || '';
+                if (topTutorId && (topTutorId === tutorId || topTutorId === myEmail) && topScore > 0) {
+                    isTutorOfTheMonth = true;
+                }
+            }
+        } catch(gErr) { /* ignore — index may not exist */ }
+
         const cycleRef = doc(db, "gamification", "current_cycle");
         const cycleSnap = await getDoc(cycleRef);
 
@@ -4722,7 +4813,7 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
                 <div style="background:${color}22;border-radius:999px;height:6px;overflow:hidden;">
                     <div style="height:6px;border-radius:999px;background:linear-gradient(90deg,${color}88,${color});width:${bp}%;transition:width 1s;"></div>
                 </div>
-                ${grader ? `<div style="font-size:.68rem;color:#94a3b8;margin-top:4px;">Graded by ${escapeHtml(grader)}</div>` : ''}
+                <!-- grader name hidden as requested -->
             </div>`;
     }
 
@@ -5192,6 +5283,26 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return;
                 }
                 
+                // Ensure every tutor has a stable UID for messaging (generates one if missing)
+                if (!tutorData.tutorUid) {
+                    const generatedUid = 'tutor_' + tutorDoc.id + '_' + Date.now();
+                    try {
+                        await updateDoc(doc(db, 'tutors', tutorDoc.id), { tutorUid: generatedUid });
+                        tutorData.tutorUid = generatedUid;
+                    } catch(e) { tutorData.tutorUid = tutorDoc.id; }
+                }
+                // Use tutorUid as the primary messaging ID (falls back to Firestore doc ID)
+                tutorData.messagingId = tutorData.tutorUid || tutorDoc.id;
+                
+                // Ensure every tutor has a stable UID for messaging (generates one if missing)
+                if (!tutorData.tutorUid) {
+                    const generatedUid = 'tutor_' + tutorDoc.id + '_' + Date.now();
+                    try {
+                        await updateDoc(doc(db, 'tutors', tutorDoc.id), { tutorUid: generatedUid });
+                        tutorData.tutorUid = generatedUid;
+                    } catch(e) { tutorData.tutorUid = tutorDoc.id; }
+                }
+                tutorData.messagingId = tutorData.tutorUid || tutorDoc.id;
                 window.tutorData = tutorData;
                 
                 // Expose Firebase config so the grading-tab can initialise its own Firebase instance
@@ -5503,7 +5614,7 @@ async function loadHomeworkInbox(tutorEmail) {
                                             </div>
                                             <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
                                                 <span class="text-xs font-bold px-2 py-0.5 rounded-full ${statusColor}">${statusLabel}</span>
-                                                ${a.status === 'submitted' ? `<button onclick="openGradingModal('${escapeHtml(a.id)}')" class="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">Review</button>` : ''}
+                                                ${a.status === 'submitted' ? `<button onclick="openGradingInNewTab('${escapeHtml(a.id)}')" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;padding:5px 12px;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;" title="Open full review in new tab">✏️ Review ↗</button>` : ''}
                                                 ${a.fileUrl ? `<a href="${escapeHtml(a.fileUrl)}" target="_blank" class="text-xs text-blue-500 hover:underline">View File</a>` : ''}
                                             </div>
                                         </div>
@@ -5903,6 +6014,187 @@ inboxObserver.observe(document.body, { childList: true, subtree: true });
 // ==========================================
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
+
+// Expose modular Firebase functions globally so games.js (classic script) can use them
+try {
+    window.__fbCollection = collection;
+    window.__fbAddDoc     = addDoc;
+    window.__fbGetDocs    = getDocs;
+    window.__fbQuery      = query;
+    window.__fbWhere      = where;
+    window.__fbOrderBy    = orderBy;
+    window.__fbLimit      = limit;
+} catch(_) {}
+
+// Opens grading in a dedicated new browser tab for full-screen annotation experience
+window.openGradingInNewTab = function(homeworkId) {
+    const params = new URLSearchParams({
+        hw: homeworkId,
+        tutor: window.tutorData?.email || '',
+        name: window.tutorData?.name || ''
+    });
+    // Store homework ID in sessionStorage so the new tab can pick it up
+    sessionStorage.setItem('grading_hw_id', homeworkId);
+    sessionStorage.setItem('grading_tutor_email', window.tutorData?.email || '');
+    // Open grading overlay in new tab — we embed the data via URL and also open the modal
+    const newTab = window.open('', '_blank');
+    if (!newTab) { openGradingModal(homeworkId); return; } // fallback if popup blocked
+    newTab.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Grading — Blooming Kids</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+* { margin:0;padding:0;box-sizing:border-box; }
+body { font-family:'Plus Jakarta Sans',sans-serif;background:#f1f5f9;min-height:100vh; }
+#loading { display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:16px; }
+.spinner { width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+#grading-root { width:100%;min-height:100vh; }
+</style>
+</head>
+<body>
+<div id="loading">
+  <div class="spinner"></div>
+  <p style="color:#64748b;font-size:.9rem;font-weight:600;">Loading assignment…</p>
+</div>
+<div id="grading-root"></div>
+<script type="module">
+import { auth, db } from './firebaseConfig.js';
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { doc, getDoc, updateDoc, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const hwId = '${escapeHtml(homeworkId)}';
+const tutorEmail = '${escapeHtml(window.tutorData?.email||'')}';
+const tutorName = '${escapeHtml(window.tutorData?.name||'')}';
+
+function escH(s){ if(!s)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+onAuthStateChanged(auth, async user => {
+    if (!user) { document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;"><p style="color:#ef4444;font-weight:700;">Not authenticated. Please log in first.</p></div>'; return; }
+    
+    const docSnap = await getDoc(doc(db, 'homework_assignments', hwId));
+    document.getElementById('loading').style.display = 'none';
+    
+    if (!docSnap.exists()) { document.getElementById('grading-root').innerHTML = '<div style="padding:40px;text-align:center;color:#ef4444;font-weight:700;">Assignment not found.</div>'; return; }
+    
+    const hw = { id: docSnap.id, ...docSnap.data() };
+    const submissionUrl = hw.submissionUrl || hw.fileUrl || '';
+    const referenceUrl  = hw.fileUrl || '';
+    const rawExt = (submissionUrl.split('?')[0].split('.').pop()||'').toLowerCase();
+    const isImg = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(rawExt);
+    const isPDF = rawExt === 'pdf';
+    const existingScore = hw.score != null ? String(hw.score) : '';
+    const existingFeedback = hw.feedback || hw.tutorAnnotations || '';
+    
+    let previewHTML = '';
+    if (submissionUrl) {
+        if (isImg) {
+            previewHTML = \`<div style="position:relative;display:inline-block;width:100%;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.15);">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;background:#fff;padding:10px 14px;border-radius:10px;border:1px solid #e2e8f0;">
+                    <span style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">✏️ Annotation Tools</span>
+                    <button onclick="annoSetTool('pen')" id="tool-pen" style="padding:5px 10px;border-radius:8px;border:1.5px solid #3b82f6;background:#eff6ff;color:#2563eb;font-size:.75rem;font-weight:700;cursor:pointer;">✏️ Pen</button>
+                    <button onclick="annoSetTool('highlight')" id="tool-highlight" style="padding:5px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.75rem;font-weight:700;cursor:pointer;">🟡 Highlight</button>
+                    <button onclick="annoSetTool('arrow')" id="tool-arrow" style="padding:5px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.75rem;font-weight:700;cursor:pointer;">➡️ Arrow</button>
+                    <input type="color" id="anno-color" value="#ef4444" style="width:32px;height:32px;padding:2px;border-radius:8px;border:1.5px solid #e2e8f0;cursor:pointer;">
+                    <button onclick="annoUndo()" style="padding:5px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.75rem;font-weight:700;cursor:pointer;">↩️ Undo</button>
+                    <button onclick="annoClear()" style="padding:5px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.75rem;font-weight:700;cursor:pointer;">🗑️ Clear</button>
+                    <a href="\${escH(submissionUrl)}" target="_blank" style="padding:5px 10px;border-radius:8px;background:#f8fafc;border:1.5px solid #e2e8f0;color:#64748b;text-decoration:none;font-size:.75rem;font-weight:700;">↗ Full Size</a>
+                </div>
+                <div style="position:relative;display:inline-block;width:100%;">
+                    <img id="anno-base-img" src="\${escH(submissionUrl)}" crossorigin="anonymous" style="max-width:100%;display:block;user-select:none;border-radius:10px;" onload="initAnnoCanvas(this)">
+                    <canvas id="anno-canvas" style="position:absolute;top:0;left:0;cursor:crosshair;touch-action:none;border-radius:10px;"></canvas>
+                </div>
+            </div>\`;
+        } else if (isPDF) {
+            previewHTML = \`<iframe src="\${escH(submissionUrl)}" style="width:100%;height:75vh;border:none;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.12);display:block;"></iframe>\`;
+        } else {
+            previewHTML = \`<div style="display:flex;flex-direction:column;align-items:center;padding:60px 20px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border-radius:12px;border:2px dashed #7dd3fc;"><div style="font-size:4rem;margin-bottom:16px;">📎</div><p style="font-weight:700;color:#0369a1;font-size:1.1rem;margin-bottom:6px;">\${escH(hw.fileName||'Submitted File')}</p><a href="\${escH(submissionUrl)}" target="_blank" style="background:#0369a1;color:#fff;padding:12px 28px;border-radius:10px;text-decoration:none;font-weight:700;margin-top:12px;">📂 Open File ↗</a></div>\`;
+        }
+    } else {
+        previewHTML = \`<div style="text-align:center;padding:60px 20px;background:#fef9c3;border-radius:12px;border:2px dashed #fde047;"><div style="font-size:3rem;margin-bottom:12px;">⚠️</div><p style="color:#92400e;font-weight:700;">No file attached</p></div>\`;
+    }
+
+    const refBlock = (referenceUrl && referenceUrl !== submissionUrl) ? \`<div style="margin-bottom:14px;border:1.5px solid #bfdbfe;border-radius:10px;overflow:hidden;"><div style="background:#eff6ff;padding:7px 12px;font-size:.72rem;font-weight:700;color:#1d4ed8;display:flex;align-items:center;justify-content:space-between;"><span>📎 Original Assignment Reference</span><a href="\${escH(referenceUrl)}" target="_blank" style="color:#2563eb;text-decoration:none;">Open ↗</a></div><iframe src="\${escH(referenceUrl)}" style="width:100%;height:200px;border:none;display:block;"></iframe></div>\` : '';
+
+    document.getElementById('grading-root').innerHTML = \`
+    <div style="display:grid;grid-template-columns:1fr 380px;height:100vh;overflow:hidden;">
+        <div style="overflow-y:auto;padding:24px;background:#f1f5f9;">
+            <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);padding:16px 20px;border-radius:14px;margin-bottom:20px;display:flex;align-items:center;gap:12px;">
+                <div style="flex:1;">
+                    <div style="color:#fff;font-weight:800;font-size:1rem;">📝 Reviewing: <span style="color:#bfdbfe;">\${escH(hw.studentName||'Student')}</span></div>
+                    <div style="color:#93c5fd;font-size:.78rem;margin-top:2px;">\${escH(hw.title||'Untitled')}\${hw.dueDate?' · Due: '+escH(hw.dueDate):''}</div>
+                </div>
+                \${hw.status==='graded'?'<span style="background:rgba(52,211,153,.3);color:#d1fae5;border-radius:999px;padding:3px 12px;font-size:.72rem;font-weight:700;">✅ Previously Graded</span>':''}
+            </div>
+            \${refBlock}
+            \${previewHTML}
+            \${hw.description ? \`<div style="margin-top:16px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;"><div style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#94a3b8;margin-bottom:8px;">Assignment Instructions</div><div style="font-size:.875rem;color:#334155;line-height:1.7;white-space:pre-wrap;">\${escH(hw.description)}</div></div>\` : ''}
+        </div>
+        <div style="background:#fff;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden;">
+            <div style="flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px;">
+                <div>
+                    <label style="display:block;font-size:.73rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:8px;">✏️ Annotations / Feedback</label>
+                    <div id="grading-annotation" contenteditable="true" style="min-height:200px;max-height:320px;overflow-y:auto;border:2px solid #e2e8f0;border-radius:10px;padding:12px;font-size:.875rem;line-height:1.7;color:#1e293b;outline:none;white-space:pre-wrap;background:#fafafa;" onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#e2e8f0'">\${escH(existingFeedback)}</div>
+                </div>
+                <div>
+                    <label style="display:block;font-size:.73rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:8px;">🎯 Grade (out of 100)</label>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <input type="number" id="grading-score" min="0" max="100" value="\${escH(existingScore)}" placeholder="–" style="width:90px;padding:10px 14px;border:2px solid #e2e8f0;border-radius:10px;font-size:1.4rem;font-weight:800;color:#1e293b;outline:none;text-align:center;" onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#e2e8f0'">
+                        <span style="color:#94a3b8;font-size:.9rem;">/ 100</span>
+                        <span id="grade-emoji" style="font-size:1.5rem;"></span>
+                    </div>
+                </div>
+                <div id="grading-status" style="display:none;"></div>
+            </div>
+            <div style="padding:14px 20px;border-top:1px solid #e2e8f0;display:flex;flex-direction:column;gap:10px;background:#f8fafc;flex-shrink:0;">
+                <button id="grading-save-btn" style="background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;border-radius:12px;padding:14px;font-size:1rem;font-weight:700;cursor:pointer;">✅ Save & Return to Student</button>
+                <button onclick="window.close()" style="background:none;border:1px solid #e2e8f0;color:#64748b;border-radius:10px;padding:10px;font-size:.875rem;cursor:pointer;">Close Tab</button>
+            </div>
+        </div>
+    </div>\`;
+
+    // Score emoji
+    const scoreInp = document.getElementById('grading-score');
+    const emojiEl = document.getElementById('grade-emoji');
+    function upEmoji(){ const v=parseInt(scoreInp.value,10); if(isNaN(v)){emojiEl.textContent='';return;} emojiEl.textContent=v>=90?'🏆':v>=75?'⭐':v>=60?'👍':v>=40?'📝':'🔄'; }
+    scoreInp.addEventListener('input', upEmoji); upEmoji();
+
+    // Annotation
+    let annoTool='pen',annoDrawing=false,annoHistory=[],annoCtx=null,annoStartX=0,annoStartY=0,annoTempSnap=null;
+    window.initAnnoCanvas = function(img){ const c=document.getElementById('anno-canvas'); if(!c||!img)return; c.width=img.naturalWidth||img.offsetWidth; c.height=img.naturalHeight||img.offsetHeight; c.style.width=img.offsetWidth+'px'; c.style.height=img.offsetHeight+'px'; annoCtx=c.getContext('2d'); function gp(e){const r=c.getBoundingClientRect();const sx=c.width/r.width,sy=c.height/r.height;const cx=e.touches?e.touches[0].clientX:e.clientX,cy=e.touches?e.touches[0].clientY:e.clientY;return{x:(cx-r.left)*sx,y:(cy-r.top)*sy};} c.addEventListener('mousedown',e=>{annoDrawing=true;const p=gp(e);annoStartX=p.x;annoStartY=p.y;annoTempSnap=annoCtx.getImageData(0,0,c.width,c.height);if(annoTool!=='arrow'){annoCtx.beginPath();annoCtx.moveTo(p.x,p.y);}}); c.addEventListener('mousemove',e=>{if(!annoDrawing)return;const p=gp(e);if(annoTool==='pen'){annoCtx.strokeStyle=document.getElementById('anno-color').value;annoCtx.lineWidth=3;annoCtx.lineCap='round';annoCtx.globalAlpha=1;annoCtx.lineTo(p.x,p.y);annoCtx.stroke();}else if(annoTool==='highlight'){annoCtx.strokeStyle='#fef08a';annoCtx.lineWidth=18;annoCtx.lineCap='round';annoCtx.globalAlpha=0.5;annoCtx.lineTo(p.x,p.y);annoCtx.stroke();}else if(annoTool==='arrow'){annoCtx.putImageData(annoTempSnap,0,0);drawArrow(annoCtx,annoStartX,annoStartY,p.x,p.y,document.getElementById('anno-color').value);}}); c.addEventListener('mouseup',e=>{if(!annoDrawing)return;annoDrawing=false;annoCtx.globalAlpha=1;annoHistory.push(annoCtx.getImageData(0,0,c.width,c.height));}); };
+    function drawArrow(ctx,x1,y1,x2,y2,color){const hw=12,hl=18,angle=Math.atan2(y2-y1,x2-x1);ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=3;ctx.globalAlpha=1;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();ctx.beginPath();ctx.moveTo(x2,y2);ctx.lineTo(x2-hl*Math.cos(angle-Math.PI/7),y2-hl*Math.sin(angle-Math.PI/7));ctx.lineTo(x2-hl*Math.cos(angle+Math.PI/7),y2-hl*Math.sin(angle+Math.PI/7));ctx.closePath();ctx.fill();}
+    window.annoSetTool=function(t){annoTool=t;['pen','highlight','arrow'].forEach(tt=>{const b=document.getElementById('tool-'+tt);if(b){b.style.background=t===tt?'#eff6ff':'#f8fafc';b.style.border=t===tt?'1.5px solid #3b82f6':'1.5px solid #e2e8f0';b.style.color=t===tt?'#2563eb':'#64748b';}});};
+    window.annoUndo=function(){const c=document.getElementById('anno-canvas');if(!c||!annoCtx)return;annoHistory.pop();if(annoHistory.length>0)annoCtx.putImageData(annoHistory[annoHistory.length-1],0,0);else annoCtx.clearRect(0,0,c.width,c.height);};
+    window.annoClear=function(){const c=document.getElementById('anno-canvas');if(!c||!annoCtx)return;annoCtx.clearRect(0,0,c.width,c.height);annoHistory=[];};
+
+    // Save
+    document.getElementById('grading-save-btn').addEventListener('click', async () => {
+        const saveBtn = document.getElementById('grading-save-btn');
+        const statusEl = document.getElementById('grading-status');
+        const feedback = document.getElementById('grading-annotation').innerText.trim();
+        const scoreRaw = document.getElementById('grading-score').value.trim();
+        const scoreVal = scoreRaw !== '' ? parseInt(scoreRaw, 10) : null;
+        function showSt(msg,ok){ statusEl.style.display='block'; statusEl.style.cssText=\`display:block;padding:10px 14px;border-radius:10px;font-size:.875rem;font-weight:600;text-align:center;background:\${ok?'#d1fae5':'#fee2e2'};color:\${ok?'#065f46':'#991b1b'};\`; statusEl.textContent=msg; }
+        if (scoreVal !== null && (isNaN(scoreVal)||scoreVal<0||scoreVal>100)) { showSt('❌ Score must be 0–100.',false); return; }
+        saveBtn.disabled=true; saveBtn.textContent='⏳ Saving…'; statusEl.style.display='none';
+        try {
+            const update = { feedback, tutorAnnotations:feedback, status:'graded', gradedAt:new Date(), tutorEmail, tutorName };
+            if (scoreVal!==null) update.score=scoreVal;
+            await updateDoc(doc(db,'homework_assignments',hwId), update);
+            showSt('✅ Saved! You can close this tab.',true);
+            saveBtn.textContent='✅ Saved!'; saveBtn.style.background='linear-gradient(135deg,#6366f1,#4f46e5)';
+        } catch(err) { showSt('❌ '+err.message,false); saveBtn.disabled=false; saveBtn.textContent='✅ Save & Return to Student'; }
+    });
+});
+<\/script>
+</body>
+</html>\`);
+    newTab.document.close();
+};
 window.showDailyTopicModal = showDailyTopicModal;
 window.showHomeworkModal = showHomeworkModal;
 window.showScheduleCalendarModal = showScheduleCalendarModal;
