@@ -315,6 +315,13 @@ function cleanGradeString(grade) {
     }
 }
 
+// Extract numeric grade value from any grade string format ("Grade 5", "5", "Grade 10", etc.)
+function extractGradeNumber(gradeStr) {
+    if (!gradeStr) return 0;
+    const match = String(gradeStr).match(/\d+/);
+    return match ? parseInt(match[0], 10) : 0;
+}
+
 // Get current month and year
 function getCurrentMonthYear() {
     const now = new Date();
@@ -3579,8 +3586,11 @@ async function renderStudentDatabase(container, tutor) {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     const submittedStudentIds = new Set();
+    // Track ALL-TIME submissions (for "new student" detection)
+    const everSubmittedStudentIds = new Set();
     allSubmissionsSnapshot.forEach(doc => {
         const subData = doc.data();
+        everSubmittedStudentIds.add(subData.studentId); // all-time
         const subDate = subData.submittedAt.toDate();
         if (subDate.getMonth() === currentMonth && subDate.getFullYear() === currentYear) {
             submittedStudentIds.add(subData.studentId);
@@ -3606,6 +3616,55 @@ async function renderStudentDatabase(container, tutor) {
     }
 
     const studentsCount = students.length;
+
+    // ── ASSESSMENT STATUS FETCH ──────────────────────────────────────────────
+    // Build sets: which students have a completed assessment (globally, catches reassigned)
+    // and which have an in-progress assessment session started by this tutor.
+    const assessmentCompletedNames = new Set(); // keyed by studentName (global check)
+    const assessmentSessionMap = {};            // studentId → session doc data
+
+    if (students.length > 0) {
+        const studentNames = students.map(s => s.studentName);
+        const studentIds   = students.map(s => s.id);
+
+        // Batch into chunks of 30 (Firestore 'in' limit)
+        const nameChunks = [];
+        const idChunks   = [];
+        for (let i = 0; i < studentNames.length; i += 30) {
+            nameChunks.push(studentNames.slice(i, i + 30));
+        }
+        for (let i = 0; i < studentIds.length; i += 30) {
+            idChunks.push(studentIds.slice(i, i + 30));
+        }
+
+        // 1. student_results: global lookup by studentName to catch reassigned students
+        const resultPromises = nameChunks.map(chunk =>
+            getDocs(query(collection(db, "student_results"), where("studentName", "in", chunk)))
+        );
+        // 2. assessment_sessions: lookup by studentId for this tutor
+        const sessionPromises = idChunks.map(chunk =>
+            getDocs(query(collection(db, "assessment_sessions"), where("studentId", "in", chunk), where("tutorEmail", "==", tutor.email)))
+        );
+
+        const [resultSnaps, sessionSnaps] = await Promise.all([
+            Promise.all(resultPromises),
+            Promise.all(sessionPromises)
+        ]);
+
+        resultSnaps.forEach(snap => {
+            snap.forEach(d => {
+                const name = d.data().studentName;
+                if (name) assessmentCompletedNames.add(name.trim().toLowerCase());
+            });
+        });
+        sessionSnaps.forEach(snap => {
+            snap.forEach(d => {
+                const data = d.data();
+                if (data.studentId) assessmentSessionMap[data.studentId] = data;
+            });
+        });
+    }
+    // ── END ASSESSMENT STATUS FETCH ──────────────────────────────────────────
 
     // --- RENDER UI (UPDATED) ---
     function renderUI() {
@@ -3662,7 +3721,37 @@ async function renderStudentDatabase(container, tutor) {
                 } else {
                     const transIndicator = student.isTransitioning ? `<span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full ml-2">Transitioning</span>` : '';
                     statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>${transIndicator}`;
-                    
+
+                    // ── ASSESSMENT BUTTON LOGIC ──────────────────────────────────────
+                    // Show for truly new students: no all-time monthly report AND no completed assessment
+                    const studentNameKey = (student.studentName || '').trim().toLowerCase();
+                    const hasCompletedAssessment = assessmentCompletedNames.has(studentNameKey);
+                    const hasEverSubmittedReport = everSubmittedStudentIds.has(student.id);
+                    const isNewStudent = !hasCompletedAssessment && !hasEverSubmittedReport;
+
+                    if (isNewStudent) {
+                        const session = assessmentSessionMap[student.id];
+                        const sessionLaunched = session && session.status === 'launched';
+                        const assessBtnLabel = sessionLaunched ? '📋 Continue Assessment' : '🚀 Launch Student Assessment';
+                        const assessBtnClass = sessionLaunched
+                            ? 'launch-assessment-btn bg-orange-500 text-white px-3 py-1 rounded text-sm font-semibold'
+                            : 'launch-assessment-btn bg-purple-600 text-white px-3 py-1 rounded text-sm font-semibold';
+                        actionsHTML += `<button class="${assessBtnClass}" 
+                            data-student-id="${escapeHtml(student.id)}"
+                            data-student-name="${escapeHtml(student.studentName)}"
+                            data-grade="${escapeHtml(student.grade)}"
+                            data-parent-email="${escapeHtml(student.parentEmail || '')}"
+                            data-parent-name="${escapeHtml(student.parentName || '')}"
+                            data-parent-phone="${escapeHtml(student.parentPhone || '')}"
+                            data-tutor-email="${escapeHtml(student.tutorEmail || tutor.email)}"
+                            data-country="${escapeHtml(student.country || '')}"
+                            data-referral-code="${escapeHtml(student.referralCode || '')}"
+                            >${assessBtnLabel}</button>`;
+                        // Add a visual badge to status
+                        statusHTML += `<span class="ml-2 bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full font-semibold">New Student</span>`;
+                    }
+                    // ── END ASSESSMENT BUTTON LOGIC ──────────────────────────────────
+
                     // BREAK/RECALL LOGIC with status checking
                     if (isSummerBreakEnabled) {
                         const recallStatus = window.recallStatusCache ? window.recallStatusCache[student.id] : null;
@@ -3692,12 +3781,6 @@ async function renderStudentDatabase(container, tutor) {
                     if (showEditDeleteButtons && !student.summerBreak) {
                         actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Edit</button>`;
                         actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Delete</button>`;
-                    }
-
-                    // Launch Assessment button (Grades 3–12 only)
-                    const gradeNum = parseInt((student.grade || '').replace(/[^0-9]/g, ''));
-                    if (!isNaN(gradeNum) && gradeNum >= 3 && gradeNum <= 12) {
-                        actionsHTML += `<button class="launch-assessment-btn bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700" onclick="launchStudentAssessment(${JSON.stringify({id: student.id, studentName: student.studentName, parentEmail: student.parentEmail || '', grade: student.grade, country: student.country || 'N/A'}).replace(/"/g, '&quot;')})">🚀 Launch Assessment</button>`;
                     }
                 }
                 studentsHTML += `<tr><td class="px-6 py-4 whitespace-nowrap">${escapeHtml(student.studentName)} (${escapeHtml(cleanGradeString ? cleanGradeString(student.grade) : student.grade)})<div class="text-xs text-gray-500">Subjects: ${escapeHtml(subjects)} | Days: ${escapeHtml(days)}</div>${feeDisplay}</td><td class="px-6 py-4 whitespace-nowrap">${statusHTML}</td><td class="px-6 py-4 whitespace-nowrap space-x-2">${actionsHTML}</td></tr>`;
@@ -3953,6 +4036,63 @@ async function renderStudentDatabase(container, tutor) {
                 showReportModal(s);
             });
         });
+
+        // ── LAUNCH / CONTINUE ASSESSMENT ────────────────────────────────────
+        document.querySelectorAll('.launch-assessment-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const studentId   = btn.dataset.studentId;
+                const studentName = btn.dataset.studentName;
+                const gradeRaw    = btn.dataset.grade;
+                const gradeNum    = extractGradeNumber(gradeRaw);
+                const parentEmail = btn.dataset.parentEmail;
+                const parentName  = btn.dataset.parentName;
+                const parentPhone = btn.dataset.parentPhone;
+                const tutorEmail  = btn.dataset.tutorEmail;
+                const country     = btn.dataset.country;
+                const referralCode = btn.dataset.referralCode;
+
+                if (!gradeNum) {
+                    showCustomAlert(`⚠️ Could not read grade for ${studentName}. Please check the student record.`);
+                    return;
+                }
+                if (!parentEmail) {
+                    showCustomAlert(`⚠️ No parent email on file for ${studentName}. Please add it to the student record before launching the assessment.`);
+                    return;
+                }
+
+                // Persist a session doc so we can show "Continue Assessment" if not yet done
+                try {
+                    await setDoc(doc(db, "assessment_sessions", studentId), {
+                        studentId,
+                        studentName,
+                        grade: gradeRaw,
+                        tutorEmail,
+                        status: 'launched',
+                        launchedAt: new Date()
+                    });
+                } catch (e) {
+                    console.warn('Could not write assessment session:', e);
+                }
+
+                // Pack student data into localStorage exactly as subject-select.html expects
+                const assessmentStudentData = {
+                    studentName,
+                    parentEmail,
+                    parentName,
+                    parentPhone,
+                    grade: String(gradeNum),   // numeric string – subject-select.html parses this
+                    tutorEmail,
+                    country,
+                    referralCode
+                };
+                localStorage.setItem('assessmentStudentData', JSON.stringify(assessmentStudentData));
+                localStorage.setItem('assessmentStudentId', studentId);
+
+                // Navigate to subject-select with a flag so it knows this is a tutor-launched assessment
+                window.open(`subject-select.html?source=tutor_assessment`, '_blank');
+            });
+        });
+        // ── END LAUNCH / CONTINUE ASSESSMENT ────────────────────────────────
 
         // Summer break button
         document.querySelectorAll('.summer-break-btn').forEach(btn => {
@@ -5464,26 +5604,6 @@ inboxObserver.observe(document.body, { childList: true, subtree: true });
 // ==========================================
 // 5. EXPOSE FUNCTIONS TO WINDOW (for onclick handlers)
 // ==========================================
-
-// ── Launch Student Assessment ──────────────────────────────────────────────
-window.launchStudentAssessment = function(student) {
-    // 1. Prepare the data to match what subject-select.html expects
-    const assessmentData = {
-        studentName: student.name || student.studentName,
-        parentEmail: student.parentEmail,
-        grade: student.grade,
-        tutorEmail: window.tutorData ? window.tutorData.email : '',
-        country: student.country || 'N/A',
-        studentUid: student.id  // Critical: keeps the same Firestore record
-    };
-
-    // 2. Save to localStorage so subject-select.html picks it up directly
-    localStorage.setItem('studentData', JSON.stringify(assessmentData));
-
-    // 3. Open the assessment in a new tab
-    window.open('subject-select.html', '_blank');
-};
-
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
 window.showDailyTopicModal = showDailyTopicModal;
