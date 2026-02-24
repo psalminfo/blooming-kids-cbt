@@ -183,6 +183,18 @@ function escapeHtml(unsafe) {
         .replace(/'/g, "&#039;");
 }
 
+// ----- PLACEMENT TEST ELIGIBILITY (Grades 3-12 only) -----
+/**
+ * Returns true if the student's grade is within the placement-test range (3–12).
+ * Handles formats such as "Grade 5", "grade5", "5", "Grade 12", "Pre-College", etc.
+ */
+function isPlacementTestEligible(grade) {
+    if (!grade) return false;
+    const normalized = String(grade).toLowerCase().replace('grade', '').trim();
+    const num = parseInt(normalized, 10);
+    return !isNaN(num) && num >= 3 && num <= 12;
+}
+
 // Phone Number Normalization Function
 function normalizePhoneNumber(phone) {
     if (!phone) return '';
@@ -3693,6 +3705,22 @@ async function renderStudentDatabase(container, tutor) {
                         actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Edit</button>`;
                         actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Delete</button>`;
                     }
+
+                    // ── PLACEMENT TEST LAUNCH (Grades 3–12 only) ──────────────────────────────
+                    if (isPlacementTestEligible(student.grade)) {
+                        actionsHTML += `<button
+                            class="launch-placement-btn bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 text-sm font-semibold"
+                            data-student-id="${escapeHtml(student.id)}"
+                            data-student-name="${escapeHtml(student.studentName)}"
+                            data-grade="${escapeHtml(student.grade)}"
+                            data-parent-email="${escapeHtml(student.parentEmail || '')}"
+                            data-parent-name="${escapeHtml(student.parentName || '')}"
+                            data-parent-phone="${escapeHtml(student.parentPhone || '')}"
+                            data-tutor-email="${escapeHtml(tutor.email)}"
+                            data-tutor-name="${escapeHtml(tutor.name || '')}">
+                            🎯 Placement Test
+                        </button>`;
+                    }
                 }
                 studentsHTML += `<tr><td class="px-6 py-4 whitespace-nowrap">${escapeHtml(student.studentName)} (${escapeHtml(cleanGradeString ? cleanGradeString(student.grade) : student.grade)})<div class="text-xs text-gray-500">Subjects: ${escapeHtml(subjects)} | Days: ${escapeHtml(days)}</div>${feeDisplay}</td><td class="px-6 py-4 whitespace-nowrap">${statusHTML}</td><td class="px-6 py-4 whitespace-nowrap space-x-2">${actionsHTML}</td></tr>`;
             });
@@ -4085,7 +4113,58 @@ async function renderStudentDatabase(container, tutor) {
                 renderStudentDatabase(container, tutor);
             } catch (error) { console.error("Error adding student:", error); showCustomAlert(`An error occurred: ${error.message}`); }
         }
-    }
+
+        // ── PLACEMENT TEST — event delegation for .launch-placement-btn ──────────────
+        document.querySelectorAll('.launch-placement-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const studentId   = btn.getAttribute('data-student-id');
+                const studentName = btn.getAttribute('data-student-name');
+                const grade       = btn.getAttribute('data-grade');
+                const parentEmail = btn.getAttribute('data-parent-email');
+                const parentName  = btn.getAttribute('data-parent-name');
+                const parentPhone = btn.getAttribute('data-parent-phone');
+                const tutorEmail  = btn.getAttribute('data-tutor-email');
+                const tutorName   = btn.getAttribute('data-tutor-name');
+
+                if (!studentName || !grade) {
+                    showCustomAlert('⚠️ Missing student data. Cannot launch placement test.');
+                    return;
+                }
+
+                // Build the structured hand-off payload.
+                // subject-select.js reads 'studentData' to bypass the student login gate.
+                // studentUid (= Firestore doc ID) is preserved so test results are appended
+                // to the EXISTING student record, preventing duplicate student entries.
+                const payload = {
+                    studentUid:   studentId,    // Firestore doc ID — critical for dedup
+                    studentName:  studentName,
+                    grade:        grade,
+                    studentEmail: parentEmail,  // subject-select reads key 'studentEmail'
+                    parentName:   parentName,
+                    parentPhone:  parentPhone,
+                    tutorEmail:   tutorEmail,
+                    tutorName:    tutorName,
+                    launchedBy:   'tutor',      // sentinel consumed by subject-select.js
+                    launchedAt:   Date.now()    // used for the 2-hour stale guard
+                };
+
+                try {
+                    localStorage.setItem('studentData',  JSON.stringify(payload));
+                    // Also mirror individual keys for any CBT page that reads them directly
+                    localStorage.setItem('studentName',  studentName);
+                    localStorage.setItem('studentEmail', parentEmail);
+                    localStorage.setItem('grade',        grade);
+                    localStorage.setItem('studentUid',   studentId);
+                } catch (e) {
+                    showCustomAlert('⚠️ Could not save to localStorage. Check browser privacy settings.');
+                    return;
+                }
+
+                // Open in a new tab so the tutor dashboard stays accessible
+                window.open('subject-select.html', '_blank');
+            });
+        });
+    }  // ── end of attachEventListeners
 
     renderUI();
 }
