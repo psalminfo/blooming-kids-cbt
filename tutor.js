@@ -1792,6 +1792,12 @@ async function msgLoadRecipientsByStudentId(type, container) {
     container.innerHTML = '<div class="spinner"></div>';
     const tutorEmail = window.tutorData?.email;
 
+    if (!tutorEmail) {
+        console.error("msgLoadRecipientsByStudentId: tutorEmail is undefined. Aborting query.");
+        container.innerHTML = '<p class="text-red-500">Error: Tutor data not available. Please refresh.</p>';
+        return;
+    }
+
     try {
         const q = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
         const snap = await getDocs(q);
@@ -2212,6 +2218,10 @@ function showScheduleCalendarModal() {
 }
 
 async function loadScheduleCalendar() {
+    if (!window.tutorData || !window.tutorData.email) {
+        console.error("loadScheduleCalendar: window.tutorData or email is undefined. Aborting.");
+        return;
+    }
     try {
         const studentsQuery = query(
             collection(db, "students"), 
@@ -3055,6 +3065,10 @@ function renderTutorDashboard(container, tutor) {
 }
 
 async function loadStudentDropdowns(tutorEmail) {
+    if (!tutorEmail) {
+        console.error("loadStudentDropdowns: tutorEmail is undefined. Aborting query.");
+        return;
+    }
     try {
         const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
         const studentsSnapshot = await getDocs(studentsQuery);
@@ -4242,6 +4256,17 @@ async function renderStudentDatabase(container, tutor) {
 
 // Auto-Registered Students Functions
 function renderAutoRegisteredStudents(container, tutor) {
+    if (!tutor || !tutor.email) {
+        console.error("renderAutoRegisteredStudents: tutor or tutor.email is undefined", tutor);
+        container.innerHTML = `
+            <div class="card">
+                <div class="card-body">
+                    <p class="text-red-500">Error: Tutor data is not available. Please refresh the page.</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
     startPersistentClock(); // ← clock on every tab
     container.innerHTML = `
         <div class="card">
@@ -4264,6 +4289,12 @@ function renderAutoRegisteredStudents(container, tutor) {
 }
 
 async function loadAutoRegisteredStudents(tutorEmail) {
+    if (!tutorEmail) {
+        console.error("loadAutoRegisteredStudents: tutorEmail is undefined. Aborting query.");
+        const listEl = document.getElementById("auto-students-list");
+        if (listEl) listEl.innerHTML = `<p class="text-red-500">Error: Could not load students — tutor email is missing.</p>`;
+        return;
+    }
     const studentsQuery = query(collection(db, "students"), 
         where("tutorEmail", "==", tutorEmail),
         where("autoRegistered", "==", true));
@@ -4826,6 +4857,10 @@ async function renderCourses(container, tutor) {
  * Load students for the courses dropdown.
  */
 async function loadStudentDropdownCourses(tutorEmail) {
+    if (!tutorEmail) {
+        console.error("loadStudentDropdownCourses: tutorEmail is undefined. Aborting query.");
+        return;
+    }
     try {
         const q = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
         const snapshot = await getDocs(q);
@@ -5179,13 +5214,18 @@ function getHomeworkCutoffDate() {
 async function loadHomeworkInbox(tutorEmail) {
     const container = document.getElementById('homework-inbox-container');
     if (!container) return;
+    if (!tutorEmail && (!window.tutorData || !window.tutorData.name)) {
+        console.error("loadHomeworkInbox: tutorEmail and window.tutorData are both undefined. Aborting.");
+        container.innerHTML = '<p class="text-red-500">Error: Tutor data is not available. Please refresh the page.</p>';
+        return;
+    }
     container.innerHTML = '<div class="text-center py-6"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading submissions…</p></div>';
 
     try {
         // Query all homework by this tutor (both name and email)
         let q = query(
             collection(db, "homework_assignments"),
-            where("tutorName", "==", window.tutorData.name)
+            where("tutorName", "==", window.tutorData && window.tutorData.name ? window.tutorData.name : "")
         );
         let snapshot = await getDocs(q);
 
