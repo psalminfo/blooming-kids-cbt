@@ -3692,6 +3692,13 @@ async function renderStudentDatabase(container, tutor) {
                     if (showEditDeleteButtons && !student.summerBreak) {
                         actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Edit</button>`;
                         actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Delete</button>`;
+                        // Launch Placement Test button for grades 3-12
+                        if (student.grade && student.grade.includes('Grade')) {
+                            const gradeNum = parseInt(student.grade.replace('Grade', '').trim());
+                            if (!isNaN(gradeNum) && gradeNum >= 3 && gradeNum <= 12) {
+                                actionsHTML += `<button class="launch-test-btn bg-purple-600 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}">Launch Test</button>`;
+                            }
+                        }
                     }
                 }
                 studentsHTML += `<tr><td class="px-6 py-4 whitespace-nowrap">${escapeHtml(student.studentName)} (${escapeHtml(cleanGradeString ? cleanGradeString(student.grade) : student.grade)})<div class="text-xs text-gray-500">Subjects: ${escapeHtml(subjects)} | Days: ${escapeHtml(days)}</div>${feeDisplay}</td><td class="px-6 py-4 whitespace-nowrap">${statusHTML}</td><td class="px-6 py-4 whitespace-nowrap space-x-2">${actionsHTML}</td></tr>`;
@@ -4045,6 +4052,17 @@ async function renderStudentDatabase(container, tutor) {
             });
         });
 
+        // Launch Placement Test
+        document.querySelectorAll('.launch-test-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const student = students.find(s => s.id === studentId);
+                if (student) {
+                    launchPlacementTest(student);
+                }
+            });
+        });
+
         async function addTransitioningStudent() {
             // 🆕 Guard – button should be hidden, but double‑check
             if (!isTransitionAddEnabled) {
@@ -4085,6 +4103,24 @@ async function renderStudentDatabase(container, tutor) {
                 renderStudentDatabase(container, tutor);
             } catch (error) { console.error("Error adding student:", error); showCustomAlert(`An error occurred: ${error.message}`); }
         }
+    }
+
+    /**
+     * Saves the student's data to localStorage and redirects to the assessment subject selector.
+     * @param {Object} student - The student object (must contain id, studentName, grade, parentEmail, etc.)
+     */
+    function launchPlacementTest(student) {
+        const assessmentData = {
+            studentId: student.id,
+            studentName: student.studentName,
+            grade: student.grade,
+            parentEmail: student.parentEmail,
+            parentPhone: student.parentPhone,
+            tutorEmail: student.tutorEmail,
+            tutorName: student.tutorName
+        };
+        localStorage.setItem('assessmentStudentData', JSON.stringify(assessmentData));
+        window.location.href = 'subject-select.html';   // adjust if your file name differs
     }
 
     renderUI();
