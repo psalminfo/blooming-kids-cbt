@@ -195,6 +195,57 @@ function isPlacementTestEligible(grade) {
     return !isNaN(num) && num >= 3 && num <= 12;
 }
 
+// ----- COUNTRY FROM PHONE NUMBER (detects country via dialing code) -----
+function getCountryFromPhone(phone) {
+    if (!phone) return '';
+    const cleaned = phone.toString().trim().replace(/[\s\-().]/g, '');
+    let w = cleaned;
+    if (!w.startsWith('+')) {
+        if (w.startsWith('0') && w.length >= 10) w = '+234' + w.substring(1);
+        else if (w.startsWith('234') && w.length >= 12) w = '+' + w;
+        else w = '+' + w;
+    }
+    const MAP = [
+        ['+355','Albania'],['+213','Algeria'],['+244','Angola'],['+374','Armenia'],
+        ['+994','Azerbaijan'],['+973','Bahrain'],['+880','Bangladesh'],['+375','Belarus'],
+        ['+229','Benin'],['+591','Bolivia'],['+387','Bosnia'],['+267','Botswana'],
+        ['+673','Brunei'],['+226','Burkina Faso'],['+855','Cambodia'],['+237','Cameroon'],
+        ['+236','CAR'],['+235','Chad'],['+269','Comoros'],['+243','DR Congo'],
+        ['+242','Congo'],['+506','Costa Rica'],['+385','Croatia'],['+357','Cyprus'],
+        ['+253','Djibouti'],['+593','Ecuador'],['+503','El Salvador'],['+291','Eritrea'],
+        ['+372','Estonia'],['+268','Eswatini'],['+251','Ethiopia'],['+679','Fiji'],
+        ['+241','Gabon'],['+220','Gambia'],['+995','Georgia'],['+233','Ghana'],
+        ['+502','Guatemala'],['+224','Guinea'],['+245','Guinea-Bissau'],['+592','Guyana'],
+        ['+509','Haiti'],['+504','Honduras'],['+354','Iceland'],['+964','Iraq'],
+        ['+972','Israel'],['+962','Jordan'],['+254','Kenya'],['+965','Kuwait'],
+        ['+996','Kyrgyzstan'],['+856','Laos'],['+371','Latvia'],['+961','Lebanon'],
+        ['+266','Lesotho'],['+231','Liberia'],['+218','Libya'],['+370','Lithuania'],
+        ['+352','Luxembourg'],['+261','Madagascar'],['+265','Malawi'],['+960','Maldives'],
+        ['+223','Mali'],['+356','Malta'],['+222','Mauritania'],['+230','Mauritius'],
+        ['+373','Moldova'],['+976','Mongolia'],['+382','Montenegro'],['+212','Morocco'],
+        ['+258','Mozambique'],['+264','Namibia'],['+977','Nepal'],['+505','Nicaragua'],
+        ['+227','Niger'],['+234','Nigeria'],['+968','Oman'],['+507','Panama'],
+        ['+595','Paraguay'],['+974','Qatar'],['+250','Rwanda'],['+966','Saudi Arabia'],
+        ['+221','Senegal'],['+381','Serbia'],['+232','Sierra Leone'],['+252','Somalia'],
+        ['+211','South Sudan'],['+249','Sudan'],['+255','Tanzania'],['+228','Togo'],
+        ['+216','Tunisia'],['+256','Uganda'],['+971','UAE'],['+598','Uruguay'],
+        ['+998','Uzbekistan'],['+967','Yemen'],['+260','Zambia'],['+263','Zimbabwe'],
+        ['+20','Egypt'],['+27','South Africa'],['+30','Greece'],['+31','Netherlands'],
+        ['+32','Belgium'],['+33','France'],['+34','Spain'],['+36','Hungary'],
+        ['+39','Italy'],['+40','Romania'],['+41','Switzerland'],['+43','Austria'],
+        ['+44','United Kingdom'],['+45','Denmark'],['+46','Sweden'],['+47','Norway'],
+        ['+48','Poland'],['+49','Germany'],['+51','Peru'],['+52','Mexico'],
+        ['+54','Argentina'],['+55','Brazil'],['+56','Chile'],['+57','Colombia'],
+        ['+58','Venezuela'],['+60','Malaysia'],['+61','Australia'],['+62','Indonesia'],
+        ['+63','Philippines'],['+64','New Zealand'],['+65','Singapore'],['+66','Thailand'],
+        ['+81','Japan'],['+82','South Korea'],['+84','Vietnam'],['+86','China'],
+        ['+90','Turkey'],['+91','India'],['+92','Pakistan'],['+94','Sri Lanka'],
+        ['+95','Myanmar'],['+98','Iran'],['+1','United States'],['+7','Russia'],
+    ];
+    for (const [code, country] of MAP) { if (w.startsWith(code)) return country; }
+    return '';
+}
+
 // Phone Number Normalization Function
 function normalizePhoneNumber(phone) {
     if (!phone) return '';
@@ -876,52 +927,50 @@ class ScheduleManager {
         this.abortController = new AbortController();
         const signal = { signal: this.abortController.signal };
 
-        // Avatar details
+        // Avatar colour keyed by first char of name
+        const AVATAR_PALETTE = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed','#db2777'];
+        const avatarBg = AVATAR_PALETTE[(this.activeStudent.studentName||'').charCodeAt(0) % AVATAR_PALETTE.length];
         const initials = (this.activeStudent.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-        const avatarPalette = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed','#db2777'];
-        const avatarBg = avatarPalette[(this.activeStudent.studentName||'').charCodeAt(0) % avatarPalette.length];
 
         // Construct HTML (escape student name)
         const html = `
             <div style="position:fixed;inset:0;z-index:9000;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:16px;" id="schedule-modal">
                 <div style="background:#fff;border-radius:20px;width:100%;max-width:600px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.4);overflow:hidden;">
 
-                    <!-- Header -->
+                    <!-- Gradient header with avatar -->
                     <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:20px 24px;display:flex;align-items:center;gap:14px;flex-shrink:0;">
                         <div style="width:46px;height:46px;border-radius:14px;background:${avatarBg};color:#fff;font-weight:800;font-size:1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.3);">${escapeHtml(initials)}</div>
                         <div style="flex:1;min-width:0;">
                             <div style="color:#fff;font-weight:800;font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(this.activeStudent.studentName)}</div>
-                            <div style="color:#93c5fd;font-size:.78rem;margin-top:2px;">${escapeHtml(this.activeStudent.grade || '')}${this.activeStudent.subjects?.length ? ' · ' + escapeHtml(this.activeStudent.subjects.join(', ')) : ''}</div>
+                            <div style="color:#93c5fd;font-size:.78rem;margin-top:2px;">${escapeHtml(this.activeStudent.grade||'')}${this.activeStudent.subjects?.length?' · '+escapeHtml(this.activeStudent.subjects.join(', ')):''}</div>
                         </div>
                         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-                            ${remaining > 1 ? '<span style="background:rgba(255,255,255,.2);color:#fff;font-size:.73rem;font-weight:700;padding:4px 10px;border-radius:999px;">' + remaining + ' in queue</span>' : ''}
-                            <button class="close-trigger" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">✕</button>
+                            ${remaining>1?`<span style="background:rgba(255,255,255,.2);color:#fff;font-size:.73rem;font-weight:700;padding:4px 10px;border-radius:999px;">${remaining} in queue</span>`:''}
+                            <button class="close-trigger" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
                         </div>
                     </div>
 
-                    <!-- Info bar -->
-                    <div style="background:#f0f9ff;border-bottom:1px solid #bae6fd;padding:9px 22px;font-size:.8rem;color:#0369a1;font-weight:600;display:flex;align-items:center;gap:8px;flex-shrink:0;">
-                        📅 Set weekly class times for this student. Multiple slots allowed.
+                    <!-- Info strip -->
+                    <div style="background:#f0f9ff;border-bottom:1px solid #bae6fd;padding:9px 22px;font-size:.8rem;color:#0369a1;font-weight:600;flex-shrink:0;">
+                        📅 Set weekly class times for this student — multiple slots allowed
                     </div>
 
-                    <!-- Time slots -->
+                    <!-- Scrollable time slots -->
                     <div id="schedule-entries" style="flex:1;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:10px;"></div>
 
-                    <!-- Add slot -->
+                    <!-- Add slot button -->
                     <div style="padding:0 18px 12px;flex-shrink:0;">
-                        <button id="add-time-btn" style="width:100%;padding:11px;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px;color:#475569;font-size:.875rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
-                            ＋ Add Another Time Slot
-                        </button>
+                        <button id="add-time-btn" style="width:100%;padding:11px;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px;color:#475569;font-size:.875rem;font-weight:600;cursor:pointer;">＋ Add Another Time Slot</button>
                     </div>
 
-                    <!-- Footer -->
+                    <!-- Footer actions -->
                     <div style="border-top:1px solid #f1f5f9;padding:14px 18px;display:grid;grid-template-columns:auto 1fr 1fr;gap:8px;align-items:center;background:#f8fafc;flex-shrink:0;">
                         <div style="display:flex;gap:6px;">
-                            <button id="delete-sched-btn" title="Delete schedule" style="background:#fee2e2;border:none;color:#dc2626;padding:10px 14px;border-radius:10px;font-size:.85rem;font-weight:700;cursor:pointer;">🗑️</button>
+                            <button id="delete-sched-btn" title="Delete schedule" style="background:#fee2e2;border:none;color:#dc2626;padding:10px 14px;border-radius:10px;font-size:.9rem;cursor:pointer;">🗑️</button>
                             <button id="skip-btn" style="background:#f1f5f9;border:none;color:#64748b;padding:10px 14px;border-radius:10px;font-size:.8rem;font-weight:600;cursor:pointer;">Skip →</button>
                         </div>
                         <button id="save-btn" style="background:#f1f5f9;border:1px solid #e2e8f0;color:#374151;padding:11px;border-radius:12px;font-size:.875rem;font-weight:700;cursor:pointer;">💾 Save</button>
-                        <button id="save-next-btn" style="background:linear-gradient(135deg,#059669,#047857);border:none;color:#fff;padding:11px;border-radius:12px;font-size:.875rem;font-weight:700;cursor:pointer;">${remaining > 1 ? '✅ Save & Next →' : '✅ Save & Done'}</button>
+                        <button id="save-next-btn" style="background:linear-gradient(135deg,#059669,#047857);border:none;color:#fff;padding:11px;border-radius:12px;font-size:.875rem;font-weight:700;cursor:pointer;">${remaining>1?'✅ Save & Next →':'✅ Save & Done'}</button>
                     </div>
                 </div>
             </div>
@@ -982,50 +1031,47 @@ class ScheduleManager {
         };
 
         const S = DAY_STYLES[day] || { bg:'#f8fafc', border:'#e2e8f0', dot:'#94a3b8', accent:'#475569' };
-
-        const selectSt = 'width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.85rem;font-weight:600;color:#1e293b;background:#fff;outline:none;cursor:pointer;';
-
-        const dayOpts  = this.DAYS.map(d => `<option value="${escapeHtml(d)}" ${d === day ? 'selected' : ''}>${escapeHtml(d)}</option>`).join('');
-        const timeOpts = (sel) => this.TIME_SLOTS.map(s => `<option value="${escapeHtml(s.value)}" ${s.value === sel ? 'selected' : ''}>${escapeHtml(s.label)}</option>`).join('');
+        const selSt = 'width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.85rem;font-weight:600;color:#1e293b;background:#fff;outline:none;cursor:pointer;';
+        const dayOpts  = this.DAYS.map(d=>`<option value="${escapeHtml(d)}" ${d===day?'selected':''}>${escapeHtml(d)}</option>`).join('');
+        const timeOpts = sel => this.TIME_SLOTS.map(s=>`<option value="${escapeHtml(s.value)}" ${s.value===sel?'selected':''}>${escapeHtml(s.label)}</option>`).join('');
 
         const row = document.createElement('div');
         row.style.cssText = `background:${S.bg};border:1.5px solid ${S.border};border-radius:14px;padding:13px 15px;transition:all .15s;`;
         row.innerHTML = `
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
                 <div style="display:flex;align-items:center;gap:7px;">
-                    <span class="row-dot" style="width:9px;height:9px;border-radius:50%;background:${S.dot};display:inline-block;"></span>
+                    <span class="row-dot" style="width:9px;height:9px;border-radius:50%;background:${S.dot};display:inline-block;flex-shrink:0;"></span>
                     <span class="row-day-lbl" style="font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:${S.accent};">${escapeHtml(day)}</span>
                 </div>
-                <button class="remove-row-btn" style="background:#fee2e2;border:none;color:#ef4444;width:28px;height:28px;border-radius:8px;font-size:.8rem;cursor:pointer;font-weight:700;display:flex;align-items:center;justify-content:center;">✕</button>
+                <button class="remove-row-btn" style="background:#fee2e2;border:none;color:#ef4444;width:28px;height:28px;border-radius:8px;font-size:.8rem;cursor:pointer;font-weight:700;">✕</button>
             </div>
             <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:10px;">
                 <div>
                     <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Day</label>
-                    <select class="day-select" style="${selectSt}">${dayOpts}</select>
+                    <select class="day-select" style="${selSt}">${dayOpts}</select>
                 </div>
                 <div>
                     <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Starts</label>
-                    <select class="start-select" style="${selectSt}">${timeOpts(start)}</select>
+                    <select class="start-select" style="${selSt}">${timeOpts(start)}</select>
                 </div>
                 <div>
                     <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Ends</label>
-                    <select class="end-select" style="${selectSt}">${timeOpts(end)}</select>
+                    <select class="end-select" style="${selSt}">${timeOpts(end)}</select>
                 </div>
             </div>
         `;
 
-        // Live day colour update
-        const updateColor = (d) => {
-            const s = DAY_STYLES[d] || { bg:'#f8fafc', border:'#e2e8f0', dot:'#94a3b8', accent:'#475569' };
-            row.style.background = s.bg;
-            row.style.borderColor = s.border;
-            row.querySelector('.row-dot').style.background = s.dot;
-            row.querySelector('.row-day-lbl').style.color = s.accent;
-            row.querySelector('.row-day-lbl').textContent = d;
-        };
-
+        // Live day colour update on select change
         const daySelect = row.querySelector('.day-select');
-        daySelect.addEventListener('change', () => updateColor(daySelect.value));
+        daySelect.addEventListener('change', () => {
+            const d = daySelect.value;
+            const s = DAY_STYLES[d] || { bg:'#f8fafc', border:'#e2e8f0', dot:'#94a3b8', accent:'#475569' };
+            row.style.background   = s.bg;
+            row.style.borderColor  = s.border;
+            row.querySelector('.row-dot').style.background    = s.dot;
+            row.querySelector('.row-day-lbl').style.color     = s.accent;
+            row.querySelector('.row-day-lbl').textContent     = d;
+        });
 
         container.appendChild(row);
 
@@ -2238,7 +2284,7 @@ initializeFloatingMessagingButton();
  * SECTION 10: SCHEDULE CALENDAR VIEW
  ******************************************************************************/
 
-// View Schedule Calendar for All Students
+// View Schedule Calendar for All Students — fully self-contained overlay
 function showScheduleCalendarModal() {
     const DAY_PAL = {
         Monday:    { bg:'#eff6ff', hdr:'#1d4ed8', light:'#dbeafe', dot:'#3b82f6', text:'#1e40af' },
@@ -2255,17 +2301,19 @@ function showScheduleCalendarModal() {
     overlay.style.cssText = 'position:fixed;inset:0;z-index:8000;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:12px;';
     overlay.innerHTML = `
         <div style="background:#f8fafc;width:98vw;max-width:1400px;height:92vh;border-radius:20px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.4);">
+            <!-- Header -->
             <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
                 <div>
                     <div style="color:#fff;font-weight:800;font-size:1.1rem;">📆 Weekly Schedule Calendar</div>
-                    <div style="color:#93c5fd;font-size:.78rem;margin-top:2px;">All active students · tap any class to edit</div>
+                    <div style="color:#93c5fd;font-size:.78rem;margin-top:2px;">All active students · tap any class card to edit</div>
                 </div>
                 <div style="display:flex;gap:8px;">
                     <button id="cal-print-btn" style="background:rgba(255,255,255,.15);border:none;color:#fff;padding:8px 14px;border-radius:10px;font-size:.8rem;font-weight:600;cursor:pointer;">📄 Print</button>
-                    <button id="cal-edit-btn" style="background:rgba(255,255,255,.25);border:none;color:#fff;padding:8px 14px;border-radius:10px;font-size:.8rem;font-weight:700;cursor:pointer;">✏️ Edit Schedules</button>
+                    <button id="cal-edit-btn" style="background:rgba(255,255,255,.25);border:none;color:#fff;padding:8px 14px;border-radius:10px;font-size:.8rem;font-weight:700;cursor:pointer;">⚙️ Edit Schedules</button>
                     <button id="cal-close-btn" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:1.1rem;cursor:pointer;">✕</button>
                 </div>
             </div>
+            <!-- Body -->
             <div style="flex:1;overflow:auto;padding:20px;" id="cal-body">
                 <div id="calendar-loading" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;gap:12px;">
                     <div class="spinner"></div>
@@ -2273,7 +2321,8 @@ function showScheduleCalendarModal() {
                 </div>
                 <div id="calendar-view" style="display:none;"></div>
             </div>
-            <div id="cal-stats" style="display:none;border-top:1px solid #e2e8f0;padding:11px 24px;background:#fff;font-size:.8rem;color:#64748b;flex-shrink:0;"></div>
+            <!-- Stats footer -->
+            <div id="cal-stats" style="display:none;border-top:1px solid #e2e8f0;padding:11px 24px;background:#fff;font-size:.8rem;color:#64748b;flex-shrink:0;gap:20px;flex-wrap:wrap;"></div>
         </div>
     `;
     document.body.appendChild(overlay);
@@ -2284,10 +2333,17 @@ function showScheduleCalendarModal() {
     overlay.querySelector('#cal-close-btn').addEventListener('click', closeCalModal);
     overlay.addEventListener('click', e => { if (e.target === overlay) closeCalModal(); });
     overlay.querySelector('#cal-edit-btn').addEventListener('click', () => {
-        closeCalModal(); if (window.tutorData) checkAndShowSchedulePopup(window.tutorData);
+        closeCalModal();
+        if (window.tutorData) checkAndShowSchedulePopup(window.tutorData);
     });
-    overlay.querySelector('#cal-print-btn').addEventListener('click', () => printCalendar());
+    overlay.querySelector('#cal-print-btn').addEventListener('click', () => {
+        const content = overlay.querySelector('#calendar-view').innerHTML;
+        const w = window.open('', '_blank');
+        w.document.write(`<html><head><title>Schedule</title><style>body{font-family:sans-serif;padding:20px}.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}</style></head><body>${content}</body></html>`);
+        w.document.close(); w.print();
+    });
 
+    // Async data load
     (async () => {
         try {
             const snap = await getDocs(query(collection(db, 'students'), where('tutorEmail', '==', window.tutorData.email)));
@@ -2306,10 +2362,11 @@ function showScheduleCalendarModal() {
                     <div style="font-size:3rem;margin-bottom:16px;">📅</div>
                     <h4 style="font-weight:800;color:#374151;font-size:1.1rem;margin-bottom:8px;">No Schedules Yet</h4>
                     <p style="color:#9ca3af;margin-bottom:20px;">No active students have schedules set up.</p>
-                    <button id="setup-btn" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;padding:12px 28px;border-radius:12px;font-weight:700;cursor:pointer;">⚙️ Set Up Schedules</button>
+                    <button id="setup-cal-btn" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;padding:12px 28px;border-radius:12px;font-weight:700;cursor:pointer;">⚙️ Set Up Schedules</button>
                 </div>`;
-                calView.querySelector('#setup-btn').addEventListener('click', () => {
-                    closeCalModal(); if (window.tutorData) checkAndShowSchedulePopup(window.tutorData);
+                calView.querySelector('#setup-cal-btn').addEventListener('click', () => {
+                    closeCalModal();
+                    if (window.tutorData) checkAndShowSchedulePopup(window.tutorData);
                 });
                 return;
             }
@@ -2317,15 +2374,20 @@ function showScheduleCalendarModal() {
             const ALL_DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
             const byDay = {};
             ALL_DAYS.forEach(d => byDay[d] = []);
-            const avatarColors = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
+            const ACOLORS = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
+
             students.forEach(s => {
-                (s.schedule||[]).forEach(slot => {
-                    if (byDay[slot.day]) byDay[slot.day].push({
-                        student: s.studentName||'Unknown', grade: s.grade||'',
-                        subjects: (s.subjects||[]).join(', '), start: slot.start, end: slot.end,
-                        time: formatScheduleTime(slot.start) + ' – ' + formatScheduleTime(slot.end),
-                        studentId: s.id, isOvernight: slot.isOvernight||false,
-                        color: avatarColors[(s.studentName||'').charCodeAt(0) % avatarColors.length],
+                (s.schedule || []).forEach(slot => {
+                    if (!byDay[slot.day]) return;
+                    byDay[slot.day].push({
+                        student: s.studentName || 'Unknown',
+                        grade:   s.grade || '',
+                        subjects:(s.subjects || []).join(', '),
+                        start:   slot.start, end: slot.end,
+                        time:    formatScheduleTime(slot.start) + ' – ' + formatScheduleTime(slot.end),
+                        studentId: s.id,
+                        isOvernight: slot.isOvernight || false,
+                        color: ACOLORS[(s.studentName||'').charCodeAt(0) % ACOLORS.length],
                     });
                 });
             });
@@ -2337,51 +2399,52 @@ function showScheduleCalendarModal() {
             ALL_DAYS.forEach(day => {
                 const pal = DAY_PAL[day] || { bg:'#f9fafb', hdr:'#374151', light:'#f3f4f6', dot:'#6b7280', text:'#374151' };
                 const isToday = day === todayName;
-                const events = byDay[day];
+                const events  = byDay[day];
                 grid += `
-                <div style="border-radius:14px;overflow:hidden;border:2px solid ${isToday ? pal.dot : pal.light};${isToday ? 'box-shadow:0 0 0 3px ' + pal.dot + '33;' : ''}">
-                    <div style="background:${isToday ? pal.hdr : pal.light};padding:10px 12px;display:flex;align-items:center;justify-content:space-between;">
-                        <span style="font-weight:800;font-size:.85rem;color:${isToday ? '#fff' : pal.text};">${day}</span>
+                <div style="border-radius:14px;overflow:hidden;border:2px solid ${isToday?pal.dot:pal.light};${isToday?'box-shadow:0 0 0 3px '+pal.dot+'33;':''}">
+                    <div style="background:${isToday?pal.hdr:pal.light};padding:10px 12px;display:flex;align-items:center;justify-content:space-between;">
+                        <span style="font-weight:800;font-size:.85rem;color:${isToday?'#fff':pal.text};">${day}</span>
                         ${isToday
                             ? '<span style="background:rgba(255,255,255,.3);color:#fff;font-size:.65rem;font-weight:800;padding:2px 7px;border-radius:999px;">TODAY</span>'
                             : `<span style="color:${pal.text};font-size:.72rem;opacity:.7;font-weight:600;">${events.length} class${events.length!==1?'es':''}</span>`}
                     </div>
                     <div style="background:${pal.bg};padding:8px;display:flex;flex-direction:column;gap:6px;min-height:80px;">
-                        ${events.length === 0
+                        ${events.length===0
                             ? `<div style="text-align:center;padding:20px 4px;color:${pal.dot};opacity:.4;font-size:.78rem;">No classes</div>`
-                            : events.map(ev => `
-                            <div class="cal-event-card" data-student-id="${escapeHtml(ev.studentId)}" style="background:#fff;border-radius:10px;padding:8px 10px;border-left:3px solid ${pal.dot};box-shadow:0 1px 4px rgba(0,0,0,.07);cursor:pointer;transition:box-shadow .15s;"
+                            : events.map(ev=>`
+                            <div class="cal-event-card" data-student-id="${escapeHtml(ev.studentId)}"
+                                style="background:#fff;border-radius:10px;padding:8px 10px;border-left:3px solid ${pal.dot};box-shadow:0 1px 4px rgba(0,0,0,.07);cursor:pointer;transition:box-shadow .15s;"
                                 onmouseover="this.style.boxShadow='0 3px 10px rgba(0,0,0,.13)'"
                                 onmouseout="this.style.boxShadow='0 1px 4px rgba(0,0,0,.07)'">
                                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
-                                    <div style="width:20px;height:20px;border-radius:6px;background:${ev.color};color:#fff;font-size:.6rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml((ev.student||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())}</div>
+                                    <div style="width:20px;height:20px;border-radius:6px;background:${ev.color};color:#fff;font-size:.6rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                        ${escapeHtml((ev.student||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())}
+                                    </div>
                                     <span style="font-weight:700;font-size:.78rem;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(ev.student)}</span>
                                 </div>
                                 <div style="font-size:.72rem;font-weight:700;color:${pal.text};">⏰ ${escapeHtml(ev.time)}${ev.isOvernight?' 🌙':''}</div>
-                                ${ev.grade ? `<div style="font-size:.68rem;color:#94a3b8;margin-top:2px;">${escapeHtml(ev.grade)}${ev.subjects?' · '+escapeHtml(ev.subjects):''}</div>` : ''}
+                                ${ev.grade?`<div style="font-size:.68rem;color:#94a3b8;margin-top:2px;">${escapeHtml(ev.grade)}${ev.subjects?' · '+escapeHtml(ev.subjects):''}</div>`:''}
                             </div>`).join('')
                         }
                     </div>
                 </div>`;
             });
             grid += `</div>`;
-
             calView.innerHTML = grid;
 
             // Stats footer
-            const totalClasses = ALL_DAYS.reduce((s,d) => s + byDay[d].length, 0);
-            const busiest = ALL_DAYS.reduce((a,b) => byDay[a].length >= byDay[b].length ? a : b);
+            const totalClasses = ALL_DAYS.reduce((s,d)=>s+byDay[d].length,0);
+            const busiest = ALL_DAYS.reduce((a,b)=>byDay[a].length>=byDay[b].length?a:b);
             const statsEl = overlay.querySelector('#cal-stats');
             statsEl.style.display = 'flex';
-            statsEl.style.gap = '20px';
-            statsEl.style.flexWrap = 'wrap';
             statsEl.innerHTML = `
                 <span><b style="color:#1e293b;">${students.length}</b> students scheduled</span>
                 <span><b style="color:#1e293b;">${totalClasses}</b> classes/week</span>
-                <span>Busiest: <b style="color:#1e293b;">${escapeHtml(busiest)}</b></span>
+                <span>Busiest day: <b style="color:#1e293b;">${escapeHtml(busiest)}</b></span>
                 <span>Earliest: <b style="color:#1e293b;">${escapeHtml(getEarliestClass(byDay))}</b></span>
             `;
 
+            // Click-to-edit
             calView.querySelectorAll('.cal-event-card').forEach(card => {
                 card.addEventListener('click', () => {
                     const sid = card.getAttribute('data-student-id');
@@ -2393,171 +2456,156 @@ function showScheduleCalendarModal() {
         } catch (err) {
             console.error('Calendar load error:', err);
             overlay.querySelector('#calendar-loading').style.display = 'none';
-            overlay.querySelector('#calendar-view').style.display = 'block';
-            overlay.querySelector('#calendar-view').innerHTML = `<div style="text-align:center;padding:40px;color:#dc2626;">⚠️ Failed to load: ${escapeHtml(err.message)}</div>`;
+            const cv = overlay.querySelector('#calendar-view');
+            cv.style.display = 'block';
+            cv.innerHTML = `<div style="text-align:center;padding:40px;color:#dc2626;">⚠️ Failed to load: ${escapeHtml(err.message)}</div>`;
         }
     })();
 }
 
-// Edit Schedule Modal
+// Edit Schedule Modal — visually coordinated with the main schedule manager
 function showEditScheduleModal(student) {
-    const modalHTML = `
-        <div class="modal-overlay">
-            <div class="modal-content max-w-2xl">
-                <div class="modal-header">
-                    <h3 class="modal-title">✏️ Edit Schedule for ${escapeHtml(student.studentName)}</h3>
+    const DAY_STYLES = {
+        Monday:{bg:'#eff6ff',border:'#bfdbfe',dot:'#3b82f6',accent:'#1d4ed8'},
+        Tuesday:{bg:'#f5f3ff',border:'#ddd6fe',dot:'#8b5cf6',accent:'#6d28d9'},
+        Wednesday:{bg:'#ecfdf5',border:'#a7f3d0',dot:'#10b981',accent:'#065f46'},
+        Thursday:{bg:'#fff7ed',border:'#fed7aa',dot:'#f97316',accent:'#9a3412'},
+        Friday:{bg:'#fdf4ff',border:'#f3e8ff',dot:'#a855f7',accent:'#6b21a8'},
+        Saturday:{bg:'#fefce8',border:'#fef08a',dot:'#f59e0b',accent:'#92400e'},
+        Sunday:{bg:'#fff1f2',border:'#fecdd3',dot:'#f43f5e',accent:'#9f1239'},
+    };
+    const APAL = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
+    const avatarBg = APAL[(student.studentName||'').charCodeAt(0) % APAL.length];
+    const initials = (student.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9100;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:16px;';
+    overlay.innerHTML = `
+        <div style="background:#fff;border-radius:20px;width:100%;max-width:600px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.4);overflow:hidden;">
+            <!-- Header -->
+            <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:20px 24px;display:flex;align-items:center;gap:14px;flex-shrink:0;">
+                <div style="width:46px;height:46px;border-radius:14px;background:${avatarBg};color:#fff;font-weight:800;font-size:1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml(initials)}</div>
+                <div style="flex:1;min-width:0;">
+                    <div style="color:#fff;font-weight:800;font-size:1.05rem;">✏️ Edit Schedule</div>
+                    <div style="color:#93c5fd;font-size:.78rem;margin-top:2px;">${escapeHtml(student.studentName)} · ${escapeHtml(student.grade||'')}</div>
                 </div>
-                <div class="modal-body">
-                    <div class="mb-4 p-3 bg-blue-50 rounded-lg">
-                        <p class="text-sm text-blue-700">Student: <strong>${escapeHtml(student.studentName)}</strong> | Grade: ${escapeHtml(student.grade)}</p>
-                        <p class="text-xs text-blue-500">Note: You can schedule overnight classes (e.g., 11 PM to 1 AM)</p>
-                    </div>
-                    
-                    <div id="schedule-entries" class="space-y-4">
-                        ${student.schedule && student.schedule.length > 0 ? 
-                            student.schedule.map(slot => `
-                                <div class="schedule-entry bg-gray-50 p-4 rounded-lg border">
-                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div>
-                                            <label class="form-label">Day of Week</label>
-                                            <select class="form-input schedule-day">
-                                                ${DAYS_OF_WEEK.map(day => `<option value="${escapeHtml(day)}" ${day === slot.day ? 'selected' : ''}>${escapeHtml(day)}</option>`).join('')}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label class="form-label">Start Time</label>
-                                            <select class="form-input schedule-start">
-                                                ${TIME_SLOTS.map(timeSlot => `<option value="${escapeHtml(timeSlot.value)}" ${timeSlot.value === slot.start ? 'selected' : ''}>${escapeHtml(timeSlot.label)}</option>`).join('')}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label class="form-label">End Time</label>
-                                            <select class="form-input schedule-end">
-                                                ${TIME_SLOTS.map(timeSlot => `<option value="${escapeHtml(timeSlot.value)}" ${timeSlot.value === slot.end ? 'selected' : ''}>${escapeHtml(timeSlot.label)}</option>`).join('')}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <button class="btn btn-danger btn-sm mt-2 remove-schedule-btn">Remove</button>
-                                </div>
-                            `).join('') : 
-                            `<div class="schedule-entry bg-gray-50 p-4 rounded-lg border">
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div>
-                                        <label class="form-label">Day of Week</label>
-                                        <select class="form-input schedule-day">
-                                            ${DAYS_OF_WEEK.map(day => `<option value="${escapeHtml(day)}">${escapeHtml(day)}</option>`).join('')}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="form-label">Start Time</label>
-                                        <select class="form-input schedule-start">
-                                            ${TIME_SLOTS.map(timeSlot => `<option value="${escapeHtml(timeSlot.value)}">${escapeHtml(timeSlot.label)}</option>`).join('')}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="form-label">End Time</label>
-                                        <select class="form-input schedule-end">
-                                            ${TIME_SLOTS.map(timeSlot => `<option value="${escapeHtml(timeSlot.value)}">${escapeHtml(timeSlot.label)}</option>`).join('')}
-                                        </select>
-                                    </div>
-                                </div>
-                                <button class="btn btn-danger btn-sm mt-2 remove-schedule-btn hidden">Remove</button>
-                            </div>`}
-                    </div>
-                    
-                    <button id="add-schedule-entry" class="btn btn-secondary btn-sm mt-2">
-                        ＋ Add Another Time Slot
-                    </button>
-                </div>
-                <div class="modal-footer">
-                    <button id="cancel-edit-schedule-btn" class="btn btn-secondary">Cancel</button>
-                    <button id="save-edit-schedule-btn" class="btn btn-primary" data-student-id="${escapeHtml(student.id)}">
-                        Save Schedule
-                    </button>
-                </div>
+                <button id="edit-sched-close" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:1rem;cursor:pointer;">✕</button>
+            </div>
+            <!-- Info strip -->
+            <div style="background:#f0f9ff;border-bottom:1px solid #bae6fd;padding:9px 22px;font-size:.8rem;color:#0369a1;font-weight:600;flex-shrink:0;">
+                💡 Overnight sessions supported (e.g. 11 PM → 1 AM)
+            </div>
+            <!-- Slots -->
+            <div id="edit-schedule-entries" style="flex:1;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:10px;"></div>
+            <!-- Add slot -->
+            <div style="padding:0 18px 12px;flex-shrink:0;">
+                <button id="add-edit-slot-btn" style="width:100%;padding:11px;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px;color:#475569;font-size:.875rem;font-weight:600;cursor:pointer;">＋ Add Time Slot</button>
+            </div>
+            <!-- Footer -->
+            <div style="border-top:1px solid #f1f5f9;padding:14px 18px;display:flex;gap:10px;background:#f8fafc;flex-shrink:0;">
+                <button id="cancel-edit-schedule-btn" style="flex:1;background:#f1f5f9;border:1px solid #e2e8f0;color:#64748b;padding:12px;border-radius:12px;font-size:.875rem;font-weight:600;cursor:pointer;">Cancel</button>
+                <button id="save-edit-schedule-btn" style="flex:2;background:linear-gradient(135deg,#059669,#047857);border:none;color:#fff;padding:12px;border-radius:12px;font-size:.9rem;font-weight:700;cursor:pointer;">✅ Save Schedule</button>
             </div>
         </div>
     `;
-    
-    const modal = document.createElement('div');
-    modal.innerHTML = modalHTML;
-    document.body.appendChild(modal);
-    
-    document.getElementById('add-schedule-entry').addEventListener('click', () => {
-        const scheduleEntries = document.getElementById('schedule-entries');
-        const firstEntry = scheduleEntries.querySelector('.schedule-entry');
-        const newEntry = firstEntry.cloneNode(true);
-        // Reset values for new entry
-        newEntry.querySelector('.schedule-day').selectedIndex = 0;
-        newEntry.querySelector('.schedule-start').selectedIndex = 0;
-        newEntry.querySelector('.schedule-end').selectedIndex = 0;
-        newEntry.querySelector('.remove-schedule-btn').classList.remove('hidden');
-        scheduleEntries.appendChild(newEntry);
-    });
-    
-    document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('remove-schedule-btn')) {
-            const scheduleEntries = document.querySelectorAll('.schedule-entry');
-            if (scheduleEntries.length > 1) {
-                e.target.closest('.schedule-entry').remove();
-            } else {
-                showCustomAlert('You must have at least one schedule entry.');
-            }
-        }
-    });
-    
-    document.getElementById('cancel-edit-schedule-btn').addEventListener('click', () => {
-        modal.remove();
-        showScheduleCalendarModal();
-    });
-    
-    document.getElementById('save-edit-schedule-btn').addEventListener('click', async () => {
-        const scheduleEntries = document.querySelectorAll('.schedule-entry');
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden';
+
+    function closeMod() { overlay.remove(); document.body.style.overflow = ''; }
+    overlay.querySelector('#edit-sched-close').addEventListener('click', closeMod);
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeMod(); });
+    overlay.querySelector('#cancel-edit-schedule-btn').addEventListener('click', () => { closeMod(); showScheduleCalendarModal(); });
+
+    const selSt = 'width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.85rem;font-weight:600;color:#1e293b;background:#fff;outline:none;cursor:pointer;';
+    const timeOpts = sel => TIME_SLOTS.map(s=>`<option value="${escapeHtml(s.value)}" ${s.value===sel?'selected':''}>${escapeHtml(s.label)}</option>`).join('');
+    const dayOpts  = sel => DAYS_OF_WEEK.map(d=>`<option value="${escapeHtml(d)}" ${d===sel?'selected':''}>${escapeHtml(d)}</option>`).join('');
+
+    const container = overlay.querySelector('#edit-schedule-entries');
+
+    function addSlot(slot = null) {
+        const day   = slot?.day   || 'Monday';
+        const start = slot?.start || '09:00';
+        const end   = slot?.end   || '10:00';
+        const S = DAY_STYLES[day] || { bg:'#f8fafc', border:'#e2e8f0', dot:'#94a3b8', accent:'#475569' };
+        const row = document.createElement('div');
+        row.style.cssText = `background:${S.bg};border:1.5px solid ${S.border};border-radius:14px;padding:13px 15px;`;
+        row.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <div style="display:flex;align-items:center;gap:7px;">
+                    <span class="edot" style="width:9px;height:9px;border-radius:50%;background:${S.dot};display:inline-block;flex-shrink:0;"></span>
+                    <span class="elbl" style="font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:${S.accent};">${escapeHtml(day)}</span>
+                </div>
+                <button class="rm-slot-btn" style="background:#fee2e2;border:none;color:#ef4444;width:28px;height:28px;border-radius:8px;font-size:.8rem;cursor:pointer;font-weight:700;">✕</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:10px;">
+                <div>
+                    <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Day</label>
+                    <select class="schedule-day" style="${selSt}">${dayOpts(day)}</select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Starts</label>
+                    <select class="schedule-start" style="${selSt}">${timeOpts(start)}</select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Ends</label>
+                    <select class="schedule-end" style="${selSt}">${timeOpts(end)}</select>
+                </div>
+            </div>
+        `;
+        // Live colour on day change
+        const sel = row.querySelector('.schedule-day');
+        sel.addEventListener('change', () => {
+            const d = sel.value;
+            const s = DAY_STYLES[d]||{bg:'#f8fafc',border:'#e2e8f0',dot:'#94a3b8',accent:'#475569'};
+            row.style.background=s.bg; row.style.borderColor=s.border;
+            row.querySelector('.edot').style.background=s.dot;
+            row.querySelector('.elbl').style.color=s.accent;
+            row.querySelector('.elbl').textContent=d;
+        });
+        row.querySelector('.rm-slot-btn').addEventListener('click', () => {
+            if (container.children.length > 1) row.remove();
+            else showCustomAlert('At least one time slot is required.');
+        });
+        container.appendChild(row);
+    }
+
+    // Populate existing slots (or blank if none)
+    if (student.schedule && student.schedule.length > 0) {
+        student.schedule.forEach(s => addSlot(s));
+    } else {
+        addSlot();
+    }
+
+    overlay.querySelector('#add-edit-slot-btn').addEventListener('click', () => addSlot());
+
+    overlay.querySelector('#save-edit-schedule-btn').addEventListener('click', async () => {
+        const saveBtn = overlay.querySelector('#save-edit-schedule-btn');
+        const entries = container.querySelectorAll(':scope > div');
         const schedule = [];
         let hasError = false;
-        
-        for (const entry of scheduleEntries) {
-            const day = entry.querySelector('.schedule-day').value;
+
+        for (const entry of entries) {
+            const day   = entry.querySelector('.schedule-day').value;
             const start = entry.querySelector('.schedule-start').value;
-            const end = entry.querySelector('.schedule-end').value;
-            
-            const validation = validateScheduleTime(start, end);
-            if (!validation.valid) {
-                showCustomAlert(validation.message);
-                hasError = true;
-                break;
-            }
-            
-            schedule.push({ 
-                day, 
-                start, 
-                end,
-                isOvernight: validation.isOvernight || false,
-                duration: validation.duration
-            });
+            const end   = entry.querySelector('.schedule-end').value;
+            const v = validateScheduleTime(start, end);
+            if (!v.valid) { showCustomAlert(v.message); hasError = true; break; }
+            schedule.push({ day, start, end, isOvernight: v.isOvernight||false, duration: v.duration });
         }
-        
-        if (hasError) return;
-        
-        if (schedule.length === 0) {
-            showCustomAlert('Please add at least one schedule entry.');
-            return;
-        }
-        
+        if (hasError || !schedule.length) return;
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = '⏳ Saving…';
         try {
-            const studentRef = doc(db, "students", student.id);
-            await updateDoc(studentRef, { schedule });
-            
-            modal.remove();
+            await updateDoc(doc(db, 'students', student.id), { schedule });
+            closeMod();
             showCustomAlert('✅ Schedule updated successfully!');
-            
-            setTimeout(() => {
-                showScheduleCalendarModal();
-            }, 500);
-            
-        } catch (error) {
-            console.error("Error updating schedule:", error);
-            showCustomAlert('❌ Error updating schedule. Please try again.');
+            setTimeout(() => showScheduleCalendarModal(), 400);
+        } catch (err) {
+            console.error(err);
+            showCustomAlert('❌ Error saving: ' + err.message);
+            saveBtn.disabled = false;
+            saveBtn.textContent = '✅ Save Schedule';
         }
     });
 }
@@ -2721,31 +2769,56 @@ function renderScheduleManagement(container, tutor) {
 
             const totalClasses = Object.values(scheduleByDay).reduce((t, arr) => t + arr.length, 0);
 
-            let gridHtml = `<div class="overflow-x-auto"><div style="display:grid;grid-template-columns:repeat(7,minmax(120px,1fr));border-left:1px solid #e5e7eb;">`;
-            DAYS_OF_WEEK.forEach(day => {
+            let gridHtml = `
+            <div class="overflow-x-auto">
+              <div style="display:grid;grid-template-columns:repeat(7,minmax(130px,1fr));min-width:700px;">`;
+
+            const DAY_COLORS = {
+                Monday:    { bg:'#eff6ff', border:'#bfdbfe', hdr:'#1d4ed8', dot:'#3b82f6' },
+                Tuesday:   { bg:'#f5f3ff', border:'#ddd6fe', hdr:'#6d28d9', dot:'#8b5cf6' },
+                Wednesday: { bg:'#ecfdf5', border:'#bbf7d0', hdr:'#065f46', dot:'#10b981' },
+                Thursday:  { bg:'#fff7ed', border:'#fed7aa', hdr:'#9a3412', dot:'#f97316' },
+                Friday:    { bg:'#fdf4ff', border:'#e9d5ff', hdr:'#6b21a8', dot:'#a855f7' },
+                Saturday:  { bg:'#fef9c3', border:'#fde68a', hdr:'#92400e', dot:'#eab308' },
+                Sunday:    { bg:'#fff1f2', border:'#fecdd3', hdr:'#9f1239', dot:'#ef4444' },
+            };
+
+            DAYS_OF_WEEK.forEach((day, idx) => {
                 const isToday = day === todayName;
                 const classes = scheduleByDay[day];
+                const col = DAY_COLORS[day] || { bg:'#f9fafb', border:'#e5e7eb', hdr:'#374151', dot:'#6b7280' };
+                const borderL = idx === 0 ? '' : `border-left:1px solid #e5e7eb;`;
+
                 gridHtml += `
-                    <div style="border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;">
-                        <div style="padding:8px 10px;font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em;background:${isToday ? '#ecfdf5' : '#f9fafb'};color:${isToday ? '#059669' : '#6b7280'};border-bottom:1px solid #e5e7eb;">
-                            ${escapeHtml(day.substring(0,3))} ${isToday ? '◀' : ''}
-                            <span style="float:right;background:${isToday ? '#059669' : '#e5e7eb'};color:${isToday ? '#fff' : '#6b7280'};border-radius:999px;padding:0 6px;font-size:0.7rem;">${classes.length}</span>
-                        </div>
-                        <div style="padding:6px;min-height:80px;">
-                            ${classes.length === 0 ? '<div style="color:#d1d5db;font-size:0.7rem;text-align:center;padding:12px 4px;">No class</div>' :
-                              classes.map(c => `
-                                <div style="background:${isToday ? '#ecfdf5' : '#f3f4f6'};border:1px solid ${isToday ? '#bbf7d0' : '#e5e7eb'};border-radius:6px;padding:5px 7px;margin-bottom:4px;font-size:0.73rem;">
-                                    <div style="font-weight:700;color:#1f2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.studentName)}</div>
-                                    <div style="color:#6b7280;">${escapeHtml(formatScheduleTime(c.start))}–${escapeHtml(formatScheduleTime(c.end))}</div>
-                                    ${c.subjects?.length ? `<div style="color:#9ca3af;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.subjects.slice(0,2).join(', '))}</div>` : ''}
-                                </div>`).join('')}
-                        </div>
-                    </div>`;
+                <div style="${borderL}border-bottom:1px solid #e5e7eb;">
+                    <div style="padding:8px 10px;font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;
+                        background:${isToday ? col.hdr : col.bg};
+                        color:${isToday ? '#fff' : col.hdr};
+                        border-bottom:2px solid ${isToday ? col.dot : col.border};
+                        display:flex;align-items:center;justify-content:space-between;">
+                        <span>${day.substring(0,3)}${isToday ? ' ◀' : ''}</span>
+                        <span style="background:${isToday ? 'rgba(255,255,255,0.25)' : col.border};color:${isToday ? '#fff' : col.hdr};
+                            border-radius:999px;padding:0 7px;font-size:0.7rem;font-weight:800;">${classes.length}</span>
+                    </div>
+                    <div style="padding:6px;min-height:90px;background:#fff;">
+                        ${classes.length === 0
+                            ? `<div style="color:#d1d5db;font-size:0.7rem;text-align:center;padding:14px 4px;font-style:italic;">No class</div>`
+                            : classes.map(c => `
+                            <div style="background:${col.bg};border:1px solid ${col.border};border-left:3px solid ${col.dot};
+                                border-radius:7px;padding:6px 8px;margin-bottom:5px;font-size:0.73rem;cursor:default;">
+                                <div style="font-weight:700;color:#1f2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.studentName)}</div>
+                                <div style="color:${col.hdr};font-weight:600;margin-top:1px;">${escapeHtml(formatScheduleTime(c.start))}–${escapeHtml(formatScheduleTime(c.end))}</div>
+                                ${c.subjects?.length ? `<div style="color:#9ca3af;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.68rem;margin-top:1px;">${escapeHtml(c.subjects.slice(0,2).join(', '))}</div>` : ''}
+                                ${c.isOvernight ? '<div style="color:#818cf8;font-size:0.67rem;">🌙 Overnight</div>' : ''}
+                            </div>`).join('')}
+                    </div>
+                </div>`;
             });
+
             gridHtml += `</div></div>
             <div style="padding:12px 16px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:0.8rem;color:#6b7280;display:flex;gap:24px;flex-wrap:wrap;">
                 <span>👥 <b>${active.length}</b> active students</span>
-                <span>📚 <b>${totalClasses}</b> classes per week</span>
+                <span>📚 <b>${totalClasses}</b> classes/week</span>
                 <span>🗓️ Busiest: <b>${getMostScheduledDay(scheduleByDay)}</b></span>
                 <span>⏰ Earliest: <b>${getEarliestClass(scheduleByDay)}</b></span>
             </div>`;
@@ -3268,14 +3341,14 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
                     <p class="text-gray-500 font-medium">All caught up! No pending submissions.</p>
                 </div></div>`;
         } else {
-            const avatarColors = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
+            const ACOLORS = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
             pendingReportsContainer.innerHTML = `
                 <div class="card">
                     <div class="card-body p-0">
                         ${pendingItems.map((item, i) => {
                             const initials = (item.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-                            const color = avatarColors[(item.studentName||'').charCodeAt(0) % avatarColors.length];
-                            return `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;${i < pendingItems.length-1 ? 'border-bottom:1px solid #f1f5f9;' : ''}">
+                            const color = ACOLORS[(item.studentName||'').charCodeAt(0) % ACOLORS.length];
+                            return `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;${i < pendingItems.length-1 ? 'border-bottom:1px solid #f1f5f9;' : ''}transition:background .1s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
                                 <div style="width:34px;height:34px;border-radius:10px;background:${color};color:#fff;font-weight:800;font-size:.72rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml(initials)}</div>
                                 <div style="flex:1;min-width:0;">
                                     <div style="font-size:.875rem;font-weight:700;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.studentName)}</div>
@@ -3698,77 +3771,107 @@ async function renderStudentDatabase(container, tutor) {
         if (studentsCount === 0) {
             studentsHTML += `<p class="text-gray-500">You are not assigned to any students yet.</p>`;
         } else {
-            studentsHTML += `
-                <div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">
-                <thead><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student Name</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th></tr></thead>
-                <tbody class="bg-white divide-y divide-gray-200">`;
-            
+            studentsHTML += `<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mt-2">`;
+
             students.forEach(student => {
                 const hasSubmitted = submittedStudentIds.has(student.id);
                 const isReportSaved = savedReports[student.id];
-                const feeDisplay = showStudentFees ? `<div class="text-xs text-gray-500">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
-                let statusHTML = '', actionsHTML = '';
+                const feeDisplay = showStudentFees ? `<div class="text-xs text-indigo-600 font-semibold mt-0.5">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
+                let statusBadge = '', actionsHTML = '';
                 const subjects = student.subjects ? student.subjects.join(', ') : 'N/A';
-                const days = student.days ? `${student.days} days/week` : 'N/A';
+                const days = student.days ? `${student.days} day${student.days !== '1' ? 's' : ''}/wk` : 'N/A';
+                const initial = (student.studentName || '?').charAt(0).toUpperCase();
 
-                // FIXED: No pending student check - tutors only see approved students
-                if (hasSubmitted) {
-                    statusHTML = `<span class="status-indicator text-blue-600 font-semibold">Report Sent</span>`;
-                    actionsHTML = `<span class="text-gray-400">Submitted this month</span>`;
+                let cardAccent = 'border-gray-200';
+                if (student.summerBreak) {
+                    statusBadge = `<span class="bg-yellow-100 text-yellow-700 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">☀️ On Break</span>`;
+                    cardAccent = 'border-yellow-200';
+                } else if (student.isTransitioning) {
+                    statusBadge = `<span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">🔄 Transitioning</span>`;
+                    cardAccent = 'border-orange-200';
+                } else if (hasSubmitted) {
+                    statusBadge = `<span class="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">✅ Report Sent</span>`;
+                    cardAccent = 'border-blue-200';
+                } else if (isReportSaved) {
+                    statusBadge = `<span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">💾 Saved</span>`;
+                    cardAccent = 'border-green-200';
                 } else {
-                    const transIndicator = student.isTransitioning ? `<span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full ml-2">Transitioning</span>` : '';
-                    statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>${transIndicator}`;
-                    
-                    // BREAK/RECALL LOGIC with status checking
+                    statusBadge = `<span class="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">📋 Pending</span>`;
+                }
+
+                if (hasSubmitted) {
+                    actionsHTML = `<span class="text-gray-400 text-xs">Submitted this month</span>`;
+                } else {
                     if (isSummerBreakEnabled) {
                         const recallStatus = window.recallStatusCache ? window.recallStatusCache[student.id] : null;
-                        
                         if (student.summerBreak) {
-                            // Student is on break - show appropriate recall button/status
                             if (recallStatus === 'pending') {
-                                actionsHTML += `<span class="bg-purple-200 text-purple-800 px-3 py-1 rounded text-sm">Recall Requested</span>`;
+                                actionsHTML += `<span class="bg-purple-200 text-purple-800 px-2 py-1 rounded text-xs">Recall Requested</span>`;
                             } else {
-                                actionsHTML += `<button class="recall-from-break-btn bg-purple-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}">Recall</button>`;
+                                actionsHTML += `<button class="recall-from-break-btn bg-purple-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}">Recall</button>`;
                             }
                         } else {
-                            // Student is active - show Break button
-                            actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}">Break</button>`;
+                            actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}">Break</button>`;
                         }
                     }
-
                     if (isSubmissionEnabled && !student.summerBreak) {
                         if (approvedStudents.length === 1) {
-                            actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="${student.isTransitioning}">Submit Report</button>`;
+                            actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="${student.isTransitioning}">Submit Report</button>`;
                         } else {
-                            actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="${student.isTransitioning}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
+                            actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="${student.isTransitioning}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
                         }
                     } else if (!student.summerBreak) {
-                        actionsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
+                        actionsHTML += `<span class="text-gray-400 text-xs">Submission Disabled</span>`;
                     }
                     if (showEditDeleteButtons && !student.summerBreak) {
-                        actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Edit</button>`;
-                        actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Delete</button>`;
+                        actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Edit</button>`;
+                        actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Delete</button>`;
                     }
-
-                    // ── PLACEMENT TEST LAUNCH (Grades 3–12 only) ──────────────────────────────
+                    // Placement Test
                     if (isPlacementTestEligible(student.grade)) {
-                        actionsHTML += `<button
-                            class="launch-placement-btn bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 text-sm font-semibold"
-                            data-student-id="${escapeHtml(student.id)}"
-                            data-student-name="${escapeHtml(student.studentName)}"
-                            data-grade="${escapeHtml(student.grade)}"
-                            data-parent-email="${escapeHtml(student.parentEmail || '')}"
-                            data-parent-name="${escapeHtml(student.parentName || '')}"
-                            data-parent-phone="${escapeHtml(student.parentPhone || '')}"
-                            data-tutor-email="${escapeHtml(tutor.email)}"
-                            data-tutor-name="${escapeHtml(tutor.name || '')}">
-                            🎯 Placement Test
-                        </button>`;
+                        const ptStatus      = student.placementTestStatus || '';
+                        const ptCompletedAt = student.placementTestCompletedAt
+                            ? (student.placementTestCompletedAt.toDate ? student.placementTestCompletedAt.toDate() : new Date(student.placementTestCompletedAt)) : null;
+                        const ONE_HOUR_MS = 60 * 60 * 1000;
+                        const withinOneHour = ptCompletedAt && (Date.now() - ptCompletedAt.getTime() < ONE_HOUR_MS);
+                        if (ptStatus === 'completed' && withinOneHour) {
+                            actionsHTML += `<span class="inline-block bg-green-100 text-green-800 border border-green-300 px-2 py-1 rounded text-xs font-semibold">✅ Test Completed</span>`;
+                        } else if (ptStatus !== 'completed') {
+                            actionsHTML += `<button class="launch-placement-btn bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 text-xs font-semibold"
+                                data-student-id="${escapeHtml(student.id)}"
+                                data-student-name="${escapeHtml(student.studentName)}"
+                                data-grade="${escapeHtml(student.grade)}"
+                                data-parent-email="${escapeHtml(student.parentEmail || '')}"
+                                data-parent-name="${escapeHtml(student.parentName || '')}"
+                                data-parent-phone="${escapeHtml(student.parentPhone || '')}"
+                                data-tutor-email="${escapeHtml(tutor.email)}"
+                                data-tutor-name="${escapeHtml(tutor.name || '')}">🎯 Placement Test</button>`;
+                        }
                     }
                 }
-                studentsHTML += `<tr><td class="px-6 py-4 whitespace-nowrap">${escapeHtml(student.studentName)} (${escapeHtml(cleanGradeString ? cleanGradeString(student.grade) : student.grade)})<div class="text-xs text-gray-500">Subjects: ${escapeHtml(subjects)} | Days: ${escapeHtml(days)}</div>${feeDisplay}</td><td class="px-6 py-4 whitespace-nowrap">${statusHTML}</td><td class="px-6 py-4 whitespace-nowrap space-x-2">${actionsHTML}</td></tr>`;
+
+                studentsHTML += `
+                <div class="bg-white border ${cardAccent} rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 rounded-xl flex items-center justify-center font-black text-lg flex-shrink-0 ${student.summerBreak ? 'bg-yellow-100 text-yellow-700' : student.isTransitioning ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}">${escapeHtml(initial)}</div>
+                        <div class="min-w-0 flex-1">
+                            <div class="font-bold text-gray-800 truncate">${escapeHtml(student.studentName)}</div>
+                            <div class="text-xs text-gray-400">${escapeHtml(cleanGradeString ? cleanGradeString(student.grade) : student.grade)}</div>
+                            ${feeDisplay}
+                        </div>
+                        ${statusBadge}
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                        <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg text-xs">📚 ${escapeHtml(subjects)}</span>
+                        <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg text-xs">📅 ${escapeHtml(days)}</span>
+                    </div>
+                    <div class="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+                        ${actionsHTML || '<span class="text-gray-400 text-xs">No actions available</span>'}
+                    </div>
+                </div>`;
             });
-            studentsHTML += `</tbody></table></div>`;
+
+            studentsHTML += `</div>`;
             
             if (tutor.isManagementStaff) {
                 studentsHTML += `<div class="bg-green-50 p-4 rounded-lg shadow-md mt-6"><h3 class="text-lg font-bold text-green-800 mb-2">Management Fee</h3><div class="flex items-center space-x-2"><label class="font-semibold">Fee (₦):</label><input type="number" id="management-fee-input" class="p-2 border rounded w-full" value="${escapeHtml(tutor.managementFee || 0)}"><button id="save-management-fee-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Save Fee</button></div></div>`;
@@ -4176,25 +4279,24 @@ async function renderStudentDatabase(container, tutor) {
                 }
 
                 // Build the structured hand-off payload.
-                // subject-select.js reads 'studentData' to bypass the student login gate.
-                // studentUid (= Firestore doc ID) is preserved so test results are appended
-                // to the EXISTING student record, preventing duplicate student entries.
+                const derivedCountry = getCountryFromPhone(parentPhone) || '';
                 const payload = {
-                    studentUid:   studentId,    // Firestore doc ID — critical for dedup
+                    studentUid:   studentId,
                     studentName:  studentName,
                     grade:        grade,
-                    studentEmail: parentEmail,  // subject-select reads key 'studentEmail'
+                    parentEmail:  parentEmail,   // FIXED: correct key read by subject-select
+                    studentEmail: parentEmail,   // legacy mirror
                     parentName:   parentName,
                     parentPhone:  parentPhone,
+                    country:      derivedCountry, // FIXED: derived from phone code
                     tutorEmail:   tutorEmail,
                     tutorName:    tutorName,
-                    launchedBy:   'tutor',      // sentinel consumed by subject-select.js
-                    launchedAt:   Date.now()    // used for the 2-hour stale guard
+                    launchedBy:   'tutor',
+                    launchedAt:   Date.now()
                 };
 
                 try {
                     localStorage.setItem('studentData',  JSON.stringify(payload));
-                    // Also mirror individual keys for any CBT page that reads them directly
                     localStorage.setItem('studentName',  studentName);
                     localStorage.setItem('studentEmail', parentEmail);
                     localStorage.setItem('grade',        grade);
@@ -4206,6 +4308,37 @@ async function renderStudentDatabase(container, tutor) {
 
                 // Open in a new tab so the tutor dashboard stays accessible
                 window.open('subject-select.html', '_blank');
+
+                // ── Live listener: update button DOM when student completes the test ──
+                // This handles the case where the tutor keeps the dashboard open.
+                const ONE_HOUR_MS = 60 * 60 * 1000;
+                const unsubPlacement = onSnapshot(
+                    doc(db, 'students', studentId),
+                    (snap) => {
+                        if (!snap.exists()) { unsubPlacement(); return; }
+                        const d = snap.data();
+                        if (d.placementTestStatus === 'completed') {
+                            const ptTime = d.placementTestCompletedAt?.toDate
+                                ? d.placementTestCompletedAt.toDate()
+                                : null;
+                            const still = ptTime && (Date.now() - ptTime.getTime() < ONE_HOUR_MS);
+                            const launchBtn = document.querySelector(`.launch-placement-btn[data-student-id="${studentId}"]`);
+                            if (launchBtn) {
+                                if (still) {
+                                    launchBtn.outerHTML = `<span
+                                        class="inline-block bg-green-100 text-green-800 border border-green-300 px-3 py-1 rounded text-sm font-semibold"
+                                        title="Test completed. Clears after 1 hour.">
+                                        ✅ Test Completed
+                                    </span>`;
+                                } else {
+                                    launchBtn.remove();
+                                }
+                            }
+                            unsubPlacement();
+                        }
+                    },
+                    (err) => { console.warn('Placement onSnapshot error:', err); unsubPlacement(); }
+                );
             });
         });
     }  // ── end of attachEventListeners
@@ -4460,11 +4593,12 @@ async function initGamification(tutorId) {
                 performanceMonth: perfMonth
             });
 
-            // 🎉 Confetti when fresh grades arrive this session
+            // 🎉 Trigger confetti the first time grades appear this session
             if (combined > 0 && (qaScore !== null || qcScore !== null)) {
                 const gradeKey = `confetti_grades_${monthKey}_${tutorId}`;
                 if (!sessionStorage.getItem(gradeKey)) {
                     sessionStorage.setItem(gradeKey, 'true');
+                    // Slight delay so the widget renders first
                     setTimeout(() => triggerConfetti(), 600);
                 }
             }
@@ -4522,27 +4656,27 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
     if (!scoreWidget) return;
 
     const td = window.tutorData || {};
-    const qaScore      = breakdown.qaScore      ?? td.qaScore      ?? null;
-    const qcScore      = breakdown.qcScore      ?? td.qcScore      ?? null;
-    const qaAdvice     = breakdown.qaAdvice     ?? td.qaAdvice     ?? '';
-    const qcAdvice     = breakdown.qcAdvice     ?? td.qcAdvice     ?? '';
+    const qaScore      = breakdown.qaScore       ?? td.qaScore       ?? null;
+    const qcScore      = breakdown.qcScore       ?? td.qcScore       ?? null;
+    const qaAdvice     = breakdown.qaAdvice      ?? td.qaAdvice      ?? '';
+    const qcAdvice     = breakdown.qcAdvice      ?? td.qcAdvice      ?? '';
     const qaGraderName = breakdown.qaGradedByName ?? td.qaGradedByName ?? '';
     const qcGraderName = breakdown.qcGradedByName ?? td.qcGradedByName ?? '';
     const perfMonth    = breakdown.performanceMonth ?? td.performanceMonth ?? '';
 
-    // Correct max: QA=35 + QC=55 = 90 pts
-    const MAX_SCORE = 90;
-    const pct = Math.round(Math.min((totalScore / MAX_SCORE) * 100, 100));
-    let scoreColor, barGrad, scoreLbl, barBg;
-    if (totalScore < 45)      { scoreColor='#ef4444'; barGrad='#f87171,#ef4444'; scoreLbl='⚠️ Needs Improvement'; barBg='#fee2e2'; }
-    else if (totalScore < 68) { scoreColor='#f59e0b'; barGrad='#fbbf24,#f59e0b'; scoreLbl='👍 Good Progress';      barBg='#fef3c7'; }
-    else if (totalScore < 81) { scoreColor='#3b82f6'; barGrad='#60a5fa,#3b82f6'; scoreLbl='🌟 Great Work';         barBg='#dbeafe'; }
-    else                      { scoreColor='#10b981'; barGrad='#34d399,#10b981'; scoreLbl='🏆 Excellent!';         barBg='#d1fae5'; }
+    // QA max = 35, QC max = 55, total max = 90
+    const QA_MAX = 35, QC_MAX = 55, TOTAL_MAX = 90;
+    const pct = Math.round(Math.min((totalScore / TOTAL_MAX) * 100, 100));
+
+    let scoreColor, barGrad, scoreLbl, badgeBg;
+    if (totalScore < 45)      { scoreColor='#ef4444'; barGrad='#f87171,#ef4444'; scoreLbl='⚠️ Needs Improvement'; badgeBg='#fee2e2'; }
+    else if (totalScore < 68) { scoreColor='#f59e0b'; barGrad='#fbbf24,#f59e0b'; scoreLbl='👍 Good Progress';      badgeBg='#fef3c7'; }
+    else if (totalScore < 81) { scoreColor='#3b82f6'; barGrad='#60a5fa,#3b82f6'; scoreLbl='🌟 Great Work';         badgeBg='#dbeafe'; }
+    else                      { scoreColor='#10b981'; barGrad='#34d399,#10b981'; scoreLbl='🏆 Excellent!';         badgeBg='#d1fae5'; }
 
     const hasAnyGrade = qaScore !== null || qcScore !== null;
 
-    // Per-category mini bar
-    function scoreBar(score, label, max, graderName, color, light) {
+    function subBar(score, label, max, grader, color, lightBg) {
         if (score === null || score === undefined) return `
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f8fafc;border-radius:10px;border:1px solid #f1f5f9;">
                 <span style="font-size:.75rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;">${label}</span>
@@ -4550,19 +4684,18 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
             </div>`;
         const bp = Math.round(Math.min((score / max) * 100, 100));
         return `
-            <div style="background:${light};border-radius:10px;padding:10px 12px;border:1px solid ${color}33;">
+            <div style="background:${lightBg};border-radius:10px;padding:10px 12px;border:1px solid ${color}33;">
                 <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
                     <span style="font-size:.75rem;font-weight:800;color:${color};text-transform:uppercase;letter-spacing:.04em;">${label}</span>
-                    <span style="font-size:1rem;font-weight:900;color:${color};">${score}<span style="font-size:.7rem;font-weight:600;color:#94a3b8;"> / ${max}</span></span>
+                    <span style="font-size:1rem;font-weight:900;color:${color};">${score}<span style="font-size:.7rem;font-weight:600;color:#94a3b8;"> / ${max} pts</span></span>
                 </div>
                 <div style="background:${color}22;border-radius:999px;height:6px;overflow:hidden;">
                     <div style="height:6px;border-radius:999px;background:linear-gradient(90deg,${color}88,${color});width:${bp}%;transition:width 1s;"></div>
                 </div>
-                ${graderName ? `<div style="font-size:.68rem;color:#94a3b8;margin-top:4px;">Graded by ${escapeHtml(graderName)}</div>` : ''}
+                ${grader ? `<div style="font-size:.68rem;color:#94a3b8;margin-top:4px;">Graded by ${escapeHtml(grader)}</div>` : ''}
             </div>`;
     }
 
-    // Grader notes
     const notesHTML = [
         qaAdvice ? `<div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:10px 12px;">
             <div style="font-size:.7rem;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">💬 QA Feedback</div>
@@ -4588,26 +4721,27 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
                 ${hasAnyGrade ? `
                 <div style="display:flex;align-items:flex-end;gap:8px;margin-bottom:10px;">
                     <div style="font-size:3.5rem;font-weight:900;color:${scoreColor};line-height:1;">${totalScore}</div>
-                    <div style="margin-bottom:8px;line-height:1.2;">
+                    <div style="margin-bottom:8px;line-height:1.3;">
                         <div style="font-size:.8rem;color:#94a3b8;font-weight:600;">pts</div>
-                        <div style="font-size:.68rem;color:#cbd5e1;">max ${MAX_SCORE}</div>
+                        <div style="font-size:.68rem;color:#cbd5e1;">max ${TOTAL_MAX}</div>
                     </div>
                     <div style="flex:1;"></div>
-                    <div style="background:${barBg};color:${scoreColor};font-size:.78rem;font-weight:800;padding:4px 12px;border-radius:999px;margin-bottom:6px;">${pct}%</div>
+                    <div style="background:${badgeBg};color:${scoreColor};font-size:.78rem;font-weight:800;padding:4px 12px;border-radius:999px;margin-bottom:6px;">${pct}%</div>
                 </div>
                 <div style="background:#f1f5f9;border-radius:999px;height:8px;overflow:hidden;margin-bottom:14px;">
                     <div style="height:8px;border-radius:999px;background:linear-gradient(90deg,${barGrad});width:${pct}%;transition:width 1.2s ease;"></div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:8px;">
-                    ${scoreBar(qaScore, 'QA – Session Quality', 35, qaGraderName, '#7c3aed', '#f5f3ff')}
-                    ${scoreBar(qcScore, 'QC – Lesson Plan Quality', 55, qcGraderName, '#d97706', '#fffbeb')}
+                    ${subBar(qaScore,'QA – Session Quality',QA_MAX,qaGraderName,'#7c3aed','#f5f3ff')}
+                    ${subBar(qcScore,'QC – Lesson Plan Quality',QC_MAX,qcGraderName,'#d97706','#fffbeb')}
                 </div>` : `
                 <div style="text-align:center;padding:24px 0;color:#94a3b8;font-size:.875rem;">No performance grades yet this month.</div>`}
             </div>
+            <!-- Expandable notes -->
             <div id="perf-breakdown" style="display:none;border-top:1px solid #f1f5f9;padding:14px 16px;background:#fafafa;">
                 <div style="font-size:.7rem;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Grader Notes</div>
-                ${notesHTML || '<div style="font-size:.8rem;color:#cbd5e1;text-align:center;padding:8px 0;">No notes provided.</div>'}
-                <div style="margin-top:10px;font-size:.68rem;color:#cbd5e1;text-align:center;">QA (35 pts) + QC (55 pts) = 90 pts max</div>
+                ${notesHTML || '<div style="font-size:.8rem;color:#cbd5e1;text-align:center;padding:8px 0;">No notes provided yet.</div>'}
+                <div style="margin-top:10px;font-size:.68rem;color:#cbd5e1;text-align:center;">QA (${QA_MAX} pts) + QC (${QC_MAX} pts) = ${TOTAL_MAX} pts total</div>
             </div>
         </div>
     `;
@@ -4616,6 +4750,27 @@ function updateScoreDisplay(totalScore, breakdown = {}) {
         const bd = document.getElementById('perf-breakdown');
         if (bd) bd.style.display = bd.style.display === 'none' ? 'block' : 'none';
     });
+}
+
+function buildScoreBadge(score, label, graderName, advice, themeClass) {
+    // kept for any legacy references — delegates to new inline style
+    if (score === null || score === undefined) return `
+        <div class="bg-gray-50 rounded-xl p-3 border border-gray-100">
+            <div class="text-xs font-bold ${themeClass} uppercase tracking-wide mb-1">${label}</div>
+            <div class="text-gray-400 text-sm">Not graded yet</div>
+        </div>`;
+    let sc = 'text-red-500';
+    if (score >= 25) sc = 'text-yellow-500';
+    if (score >= 40) sc = 'text-green-600';
+    return `
+        <div class="bg-white rounded-xl p-3 border border-gray-200">
+            <div class="flex justify-between items-center mb-1">
+                <div class="text-xs font-bold ${themeClass} uppercase tracking-wide">${label}</div>
+                ${graderName ? `<span class="text-xs text-gray-400">by ${escapeHtml(graderName)}</span>` : ''}
+            </div>
+            <div class="text-2xl font-black ${sc}">${score}<span class="text-sm text-gray-400"> pts</span></div>
+            ${advice ? `<div class="mt-2 text-xs text-gray-600 italic bg-gray-50 rounded-lg p-2 border border-gray-100">"${escapeHtml(advice)}"</div>` : ''}
+        </div>`;
 }
 
 function renderWinnerBadge(month) {
@@ -4640,9 +4795,11 @@ function triggerConfetti() {
             if (Date.now() < end) requestAnimationFrame(frame);
         }());
     }
+
     if (typeof confetti === 'function') {
         runConfetti();
     } else {
+        // Dynamically inject canvas-confetti if not already in the page
         const s = document.createElement('script');
         s.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js';
         s.onload = () => runConfetti();
@@ -5338,17 +5495,18 @@ async function loadHomeworkInbox(tutorEmail) {
 }
 
 // ==========================================
-// 3. GRADING OVERLAY MODAL (in-page — reuses main page's Firebase db, no document.write)
+// ==========================================
+// 3. GRADING OVERLAY MODAL — in-page, reuses main page db, NO document.write
 // ==========================================
 async function openGradingModal(homeworkId) {
     // Remove any stale overlay
     document.getElementById('grading-overlay')?.remove();
 
-    // Show loading overlay immediately
+    // Loading state
     const overlay = document.createElement('div');
     overlay.id = 'grading-overlay';
     overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.78);display:flex;align-items:center;justify-content:center;';
-    overlay.innerHTML = '<div style="background:#fff;border-radius:16px;padding:32px 48px;text-align:center;"><div class="spinner mx-auto mb-3"></div><p style="color:#6b7280;">Loading homework…</p></div>';
+    overlay.innerHTML = `<div style="background:#fff;border-radius:16px;padding:32px 48px;text-align:center;"><div class="spinner mx-auto mb-3"></div><p style="color:#6b7280;font-size:.9rem;">Loading assignment…</p></div>`;
     document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden';
 
@@ -5371,80 +5529,85 @@ async function openGradingModal(homeworkId) {
     const tutorName        = window.tutorData?.name  || '';
     const isAlreadyGraded  = hwData.status === 'graded';
 
-    // File preview
-    const ext = (submissionUrl.split('?')[0].split('.').pop() || '').toLowerCase();
-    const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
-    const isPDF   = ext === 'pdf';
+    // Smart file preview
+    const rawExt = (submissionUrl.split('?')[0].split('.').pop() || '').toLowerCase();
+    const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(rawExt);
+    const isPDF   = rawExt === 'pdf';
+
     let previewHTML = '';
     if (submissionUrl) {
         if (isImage) {
-            previewHTML = `<div style="text-align:center;">
-                <img src="${escapeHtml(submissionUrl)}" alt="Student submission"
-                    style="max-width:100%;max-height:68vh;border-radius:10px;box-shadow:0 4px 24px rgba(0,0,0,.15);cursor:zoom-in;"
-                    onclick="window.open('${escapeHtml(submissionUrl)}','_blank')">
-                <p style="font-size:.72rem;color:#9ca3af;margin-top:8px;">Click image to open full size ↗</p>
-            </div>`;
+            previewHTML = `
+                <div style="text-align:center;">
+                    <img src="${escapeHtml(submissionUrl)}" alt="Student submission"
+                        style="max-width:100%;max-height:65vh;border-radius:10px;box-shadow:0 4px 24px rgba(0,0,0,.15);cursor:zoom-in;"
+                        onclick="window.open('${escapeHtml(submissionUrl)}','_blank')">
+                    <p style="font-size:.72rem;color:#9ca3af;margin-top:8px;">Click to open full size ↗</p>
+                </div>`;
         } else if (isPDF) {
-            previewHTML = `<iframe src="${escapeHtml(submissionUrl)}" title="Submission"
-                style="width:100%;height:68vh;min-height:460px;border:none;border-radius:10px;background:#f9fafb;display:block;"></iframe>`;
+            previewHTML = `<iframe src="${escapeHtml(submissionUrl)}" title="Student submission"
+                style="width:100%;height:65vh;min-height:460px;border:none;border-radius:10px;background:#f9fafb;display:block;"></iframe>`;
         } else {
-            const icons = { doc:'📝',docx:'📝',ppt:'📊',pptx:'📊',xls:'📈',xlsx:'📈',txt:'📄',zip:'🗜️',mp4:'🎬',mp3:'🎵' };
-            previewHTML = `<div style="display:flex;flex-direction:column;align-items:center;padding:60px 20px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border-radius:12px;border:2px dashed #7dd3fc;">
-                <div style="font-size:4rem;margin-bottom:16px;">${icons[ext]||'📎'}</div>
-                <p style="font-weight:700;color:#0369a1;font-size:1.1rem;margin-bottom:6px;">${escapeHtml(hwData.fileName||'Submitted File')}</p>
-                <p style="color:#64748b;font-size:.85rem;margin-bottom:20px;">Click below to open and review</p>
-                <a href="${escapeHtml(submissionUrl)}" target="_blank"
-                    style="background:#0369a1;color:#fff;padding:12px 28px;border-radius:10px;text-decoration:none;font-weight:700;font-size:.95rem;">📂 Open File ↗</a>
-            </div>`;
+            const fileIcons = {doc:'📝',docx:'📝',ppt:'📊',pptx:'📊',xls:'📈',xlsx:'📈',txt:'📄',zip:'🗜️',mp4:'🎬',mp3:'🎵'};
+            previewHTML = `
+                <div style="display:flex;flex-direction:column;align-items:center;padding:60px 20px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border-radius:12px;border:2px dashed #7dd3fc;">
+                    <div style="font-size:4rem;margin-bottom:16px;">${fileIcons[rawExt]||'📎'}</div>
+                    <p style="font-weight:700;color:#0369a1;font-size:1.1rem;margin-bottom:6px;">${escapeHtml(hwData.fileName||'Submitted File')}</p>
+                    <p style="color:#64748b;font-size:.85rem;margin-bottom:20px;">Click below to open and review</p>
+                    <a href="${escapeHtml(submissionUrl)}" target="_blank"
+                        style="background:#0369a1;color:#fff;padding:12px 28px;border-radius:10px;text-decoration:none;font-weight:700;">📂 Open File ↗</a>
+                </div>`;
         }
     } else {
-        previewHTML = `<div style="text-align:center;padding:60px 20px;background:#fef9c3;border-radius:12px;border:2px dashed #fde047;">
-            <div style="font-size:3rem;margin-bottom:12px;">⚠️</div>
-            <p style="color:#92400e;font-weight:700;">No file attached yet</p>
-            <p style="color:#a16207;font-size:.85rem;margin-top:6px;">The student has not uploaded a file.</p>
-        </div>`;
+        previewHTML = `
+            <div style="text-align:center;padding:60px 20px;background:#fef9c3;border-radius:12px;border:2px dashed #fde047;">
+                <div style="font-size:3rem;margin-bottom:12px;">⚠️</div>
+                <p style="color:#92400e;font-weight:700;">No file attached yet</p>
+                <p style="color:#a16207;font-size:.85rem;margin-top:6px;">The student has not uploaded a file.</p>
+            </div>`;
     }
 
-    // Replace spinner with full overlay
+    // Build full overlay UI
     overlay.innerHTML = `
     <div style="background:#f8fafc;width:98vw;max-width:1300px;height:92vh;border-radius:20px;display:grid;grid-template-rows:auto 1fr;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.4);">
 
         <!-- Header -->
-        <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);color:#fff;padding:14px 24px;display:flex;align-items:center;gap:14px;">
+        <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);color:#fff;padding:14px 24px;display:flex;align-items:center;gap:14px;flex-shrink:0;">
             <div style="flex:1;min-width:0;">
                 <div style="font-weight:800;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                     📝 Reviewing: <span style="color:#bfdbfe;">${escapeHtml(studentName)}</span>
                 </div>
                 <div style="font-size:.78rem;opacity:.8;margin-top:2px;">
-                    ${escapeHtml(title)}${dueDate ? ' · Due: '+escapeHtml(dueDate) : ''}
-                    ${isAlreadyGraded ? '<span style="background:rgba(52,211,153,.3);color:#d1fae5;border-radius:999px;padding:1px 10px;margin-left:8px;font-size:.72rem;font-weight:700;">✅ Previously Graded</span>' : ''}
+                    ${escapeHtml(title)}${dueDate?' · Due: '+escapeHtml(dueDate):''}
+                    ${isAlreadyGraded?'<span style="background:rgba(52,211,153,.3);color:#d1fae5;border-radius:999px;padding:1px 10px;margin-left:8px;font-size:.72rem;font-weight:700;">✅ Previously Graded</span>':''}
                 </div>
             </div>
             <button id="grading-close-btn" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:1.2rem;cursor:pointer;flex-shrink:0;">✕</button>
         </div>
 
-        <!-- Body -->
-        <div style="display:grid;grid-template-columns:1fr 360px;overflow:hidden;">
+        <!-- Two-panel body -->
+        <div style="display:grid;grid-template-columns:1fr 360px;overflow:hidden;height:100%;">
 
-            <!-- LEFT: submission -->
+            <!-- LEFT: document viewer -->
             <div style="overflow-y:auto;padding:20px;background:#f1f5f9;">
                 ${referenceUrl && referenceUrl !== submissionUrl ? `
                 <a href="${escapeHtml(referenceUrl)}" target="_blank"
-                   style="display:inline-flex;align-items:center;gap:6px;color:#2563eb;font-size:.8rem;text-decoration:none;margin-bottom:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:6px 12px;">
-                   📎 View Original Assignment ↗
+                    style="display:inline-flex;align-items:center;gap:6px;color:#2563eb;font-size:.8rem;text-decoration:none;margin-bottom:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:6px 12px;">
+                    📎 View Original Assignment Reference ↗
                 </a>` : ''}
                 ${previewHTML}
-                ${description ? `<div style="margin-top:16px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
+                ${description ? `
+                <div style="margin-top:16px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
                     <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#94a3b8;margin-bottom:8px;">Assignment Instructions</div>
                     <div style="font-size:.875rem;color:#334155;line-height:1.7;white-space:pre-wrap;">${escapeHtml(description)}</div>
                 </div>` : ''}
             </div>
 
-            <!-- RIGHT: grading panel -->
+            <!-- RIGHT: grading sidebar -->
             <div style="background:#fff;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden;">
                 <div style="flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px;">
 
-                    <!-- Annotations -->
+                    <!-- Annotation -->
                     <div>
                         <label style="display:block;font-size:.73rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:8px;">✏️ Annotations / Feedback</label>
                         <div id="grading-annotation" contenteditable="true"
@@ -5464,18 +5627,17 @@ async function openGradingModal(homeworkId) {
                                 onfocus="this.style.borderColor='#3b82f6'"
                                 onblur="this.style.borderColor='#e2e8f0'">
                             <span style="color:#94a3b8;font-size:.9rem;">/ 100</span>
-                            <span id="grade-emoji" style="font-size:1.5rem;margin-left:4px;"></span>
+                            <span id="grade-emoji" style="font-size:1.5rem;"></span>
                         </div>
                     </div>
 
-                    <!-- Status -->
-                    <div id="grading-status" style="display:none;padding:10px 14px;border-radius:10px;font-size:.875rem;font-weight:600;text-align:center;"></div>
+                    <div id="grading-status" style="display:none;"></div>
                 </div>
 
-                <!-- Actions -->
-                <div style="padding:14px 20px;border-top:1px solid #e2e8f0;display:flex;flex-direction:column;gap:10px;background:#f8fafc;">
+                <!-- Save / Cancel -->
+                <div style="padding:14px 20px;border-top:1px solid #e2e8f0;display:flex;flex-direction:column;gap:10px;background:#f8fafc;flex-shrink:0;">
                     <button id="grading-save-btn" style="background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;border-radius:12px;padding:14px;font-size:1rem;font-weight:700;cursor:pointer;width:100%;">
-                        ✅ Save Grade &amp; Return to Student
+                        ✅ Save &amp; Return to Student
                     </button>
                     <button id="grading-cancel-btn" style="background:none;border:1px solid #e2e8f0;color:#64748b;border-radius:10px;padding:10px;font-size:.875rem;cursor:pointer;width:100%;">
                         Cancel
@@ -5485,27 +5647,26 @@ async function openGradingModal(homeworkId) {
         </div>
     </div>`;
 
-    // Grade emoji feedback
+    // Grade emoji live update
     const scoreInput = overlay.querySelector('#grading-score');
     const gradeEmoji = overlay.querySelector('#grade-emoji');
     function updateEmoji() {
         const v = parseInt(scoreInput.value, 10);
-        if (isNaN(v)) { gradeEmoji.textContent=''; return; }
-        gradeEmoji.textContent = v>=90?'🏆':v>=75?'⭐':v>=60?'👍':v>=40?'📝':'🔄';
+        if (isNaN(v)) { gradeEmoji.textContent = ''; return; }
+        gradeEmoji.textContent = v >= 90 ? '🏆' : v >= 75 ? '⭐' : v >= 60 ? '👍' : v >= 40 ? '📝' : '🔄';
     }
     scoreInput.addEventListener('input', updateEmoji);
     updateEmoji();
 
-    // Close
-    function closeGrading() { overlay.remove(); document.body.style.overflow=''; }
+    // Close handlers
+    function closeGrading() { overlay.remove(); document.body.style.overflow = ''; }
     overlay.querySelector('#grading-close-btn').addEventListener('click', closeGrading);
     overlay.querySelector('#grading-cancel-btn').addEventListener('click', closeGrading);
     overlay.addEventListener('click', e => { if (e.target === overlay) closeGrading(); });
-    document.addEventListener('keydown', function escH(e) {
-        if (e.key==='Escape') { closeGrading(); document.removeEventListener('keydown', escH); }
-    });
+    const escHandler = e => { if (e.key === 'Escape') { closeGrading(); document.removeEventListener('keydown', escHandler); } };
+    document.addEventListener('keydown', escHandler);
 
-    // Save
+    // Save handler — uses existing db, no re-init needed
     overlay.querySelector('#grading-save-btn').addEventListener('click', async () => {
         const saveBtn  = overlay.querySelector('#grading-save-btn');
         const statusEl = overlay.querySelector('#grading-status');
@@ -5513,14 +5674,14 @@ async function openGradingModal(homeworkId) {
         const scoreRaw = overlay.querySelector('#grading-score').value.trim();
         const scoreVal = scoreRaw !== '' ? parseInt(scoreRaw, 10) : null;
 
-        function showStatus(msg, ok) {
+        function showSt(msg, ok) {
             statusEl.style.display = 'block';
             statusEl.style.cssText = `display:block;padding:10px 14px;border-radius:10px;font-size:.875rem;font-weight:600;text-align:center;background:${ok?'#d1fae5':'#fee2e2'};color:${ok?'#065f46':'#991b1b'};`;
             statusEl.textContent = msg;
         }
 
-        if (scoreVal !== null && (isNaN(scoreVal) || scoreVal<0 || scoreVal>100)) {
-            showStatus('❌ Score must be 0–100.', false); return;
+        if (scoreVal !== null && (isNaN(scoreVal) || scoreVal < 0 || scoreVal > 100)) {
+            showSt('❌ Score must be 0–100.', false); return;
         }
         if (!feedback && scoreVal === null) {
             if (!confirm('Save without a grade or feedback?')) return;
@@ -5539,17 +5700,16 @@ async function openGradingModal(homeworkId) {
             if (scoreVal !== null) update.score = scoreVal;
             await updateDoc(doc(db, 'homework_assignments', homeworkId), update);
 
-            showStatus('✅ Grade saved and returned to student!', true);
+            showSt('✅ Grade saved and returned to student!', true);
             saveBtn.textContent = '✅ Saved!';
             saveBtn.style.background = 'linear-gradient(135deg,#6366f1,#4f46e5)';
-
-            try { if (typeof loadHomeworkInbox==='function') loadHomeworkInbox(tutorEmail); } catch(e){}
+            try { if (typeof loadHomeworkInbox === 'function') loadHomeworkInbox(tutorEmail); } catch(e) {}
             setTimeout(closeGrading, 1600);
         } catch (err) {
             console.error('Grading save error:', err);
-            showStatus('❌ Save failed: ' + err.message, false);
+            showSt('❌ Save failed: ' + err.message, false);
             saveBtn.disabled = false;
-            saveBtn.textContent = '✅ Save Grade & Return to Student';
+            saveBtn.textContent = '✅ Save & Return to Student';
         }
     });
 }
