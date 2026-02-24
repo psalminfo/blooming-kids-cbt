@@ -75,7 +75,7 @@ import {
     where,
     getDocs,
     serverTimestamp
-} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+} from "https://www.gstatic.com/firebasejs/10.12.12/firebase-firestore.js";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const REMEMBER_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
