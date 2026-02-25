@@ -1497,12 +1497,33 @@ function showHomeworkModal(student) {
                 <div class="modal-header"><h3 class="modal-title">📝 Assign Homework for ${escapeHtml(student.studentName)}</h3></div>
                 <div class="modal-body">
                     <div class="form-group"><label class="form-label">Title *</label><input type="text" id="hw-title" class="form-input" required></div>
-                    <div class="form-group"><label class="form-label">Description *</label><textarea id="hw-description" class="form-input form-textarea" required></textarea></div>
+                    <div class="form-group">
+                        <label class="form-label">Description * <span style="font-size:.72rem;color:#6b7280;font-weight:400;">(URLs will become clickable links)</span></label>
+                        <textarea id="hw-description" class="form-input form-textarea" required placeholder="Enter instructions... Paste links like https://example.com and they'll be clickable."></textarea>
+                    </div>
                     <div class="form-group"><label class="form-label">Due Date *</label><input type="date" id="hw-due-date" class="form-input" max="${escapeHtml(maxDate)}" required></div>
-                    <div class="form-group"><label class="form-label">Files (Max 5)</label>
-                        <div class="file-upload-container"><input type="file" id="hw-file" class="hidden" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt">
-                        <label for="hw-file" class="file-upload-label"><span class="text-primary-color">Click to upload files</span></label>
-                        <div id="file-list-preview" class="hidden mt-2"><ul id="file-list-ul"></ul><button id="remove-all-files-btn" class="btn btn-danger btn-sm w-full mt-2">Clear Files</button></div></div>
+                    <div class="form-group">
+                        <label class="form-label">Files (Max 5 — any format accepted)</label>
+                        <!-- Drag & Drop Zone -->
+                        <div id="hw-drop-zone" style="border:2px dashed #93c5fd;border-radius:12px;padding:20px 16px;text-align:center;cursor:pointer;transition:all .2s;background:#eff6ff;position:relative;">
+                            <input type="file" id="hw-file" class="hidden" multiple accept="*/*">
+                            <div style="pointer-events:none;">
+                                <div style="font-size:2rem;margin-bottom:6px;">📎</div>
+                                <div style="font-weight:700;color:#1d4ed8;font-size:.9rem;">Drag &amp; drop any files here</div>
+                                <div style="color:#6b7280;font-size:.78rem;margin-top:4px;">PDF, DOC, DOCX, images, videos, zip — anything</div>
+                                <label for="hw-file" style="display:inline-block;margin-top:10px;padding:6px 18px;background:#2563eb;color:#fff;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;pointer-events:all;">Browse Files</label>
+                            </div>
+                        </div>
+                        <!-- Google Drive link input -->
+                        <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+                            <span style="font-size:1.1rem;">🔗</span>
+                            <input type="text" id="hw-drive-link" placeholder="Or paste a Google Drive / YouTube / any link here…" style="flex:1;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:.82rem;outline:none;">
+                            <button type="button" id="hw-drive-add-btn" style="padding:7px 14px;background:#4285f4;color:#fff;border:none;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap;">Add Link</button>
+                        </div>
+                        <div id="file-list-preview" class="hidden mt-2">
+                            <ul id="file-list-ul" style="list-style:none;padding:0;margin:0;"></ul>
+                            <button id="remove-all-files-btn" class="btn btn-danger btn-sm w-full mt-2">Clear All</button>
+                        </div>
                     </div>
                     
                     <div class="email-settings bg-blue-50 p-3 rounded mt-2 border border-blue-100">
@@ -1551,36 +1572,88 @@ function showHomeworkModal(student) {
         if(student.parentEmail) document.getElementById('display-parent-email').textContent = student.parentEmail;
     }
 
-    // File Handling (Standard)
+    // File Handling — drag & drop + click + Google Drive links
     const fileInput = document.getElementById('hw-file');
     const fileListUl = document.getElementById('file-list-ul');
+    const dropZone = document.getElementById('hw-drop-zone');
+
+    // Linkify helper — turns raw URLs in text into <a> tags
+    function linkifyText(text) {
+        if (!text) return '';
+        const escaped = escapeHtml(text);
+        return escaped.replace(
+            /(https?:\/\/[^\s&"<>]+)/g,
+            '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;word-break:break-all;">$1</a>'
+        );
+    }
+    window._hwLinkify = linkifyText; // expose for inbox renderer
+
+    // Drag & Drop
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.style.background = '#dbeafe';
+        dropZone.style.borderColor = '#2563eb';
+    });
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.style.background = '#eff6ff';
+        dropZone.style.borderColor = '#93c5fd';
+    });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.style.background = '#eff6ff';
+        dropZone.style.borderColor = '#93c5fd';
+        const files = Array.from(e.dataTransfer.files);
+        addFiles(files);
+    });
+
+    function addFiles(files) {
+        if (selectedFiles.length + files.length > 5) { showCustomAlert('Max 5 files total.'); return; }
+        files.forEach(f => {
+            if (f.size <= 50 * 1024 * 1024) selectedFiles.push({ file: f, name: f.name, isLink: false });
+            else showCustomAlert(`Skipped "${f.name}" — max 50 MB per file.`);
+        });
+        renderFiles();
+    }
+
     fileInput.addEventListener('change', (e) => {
-        const files = Array.from(e.target.files);
-        if (selectedFiles.length + files.length > 5) { showCustomAlert('Max 5 files.'); fileInput.value=''; return; }
-        files.forEach(f => { if(f.size<=10*1024*1024) selectedFiles.push(f); else showCustomAlert(`Skipped ${f.name} (>10MB)`); });
+        addFiles(Array.from(e.target.files));
+        fileInput.value = '';
+    });
+
+    // Google Drive / any link
+    document.getElementById('hw-drive-add-btn').addEventListener('click', () => {
+        const linkInput = document.getElementById('hw-drive-link');
+        const url = linkInput.value.trim();
+        if (!url) { showCustomAlert('Please paste a link first.'); return; }
+        if (!/^https?:\/\//i.test(url)) { showCustomAlert('Please enter a valid URL starting with http:// or https://'); return; }
+        if (selectedFiles.length >= 5) { showCustomAlert('Max 5 attachments.'); return; }
+        const name = url.includes('drive.google.com') ? '🔗 Google Drive file' :
+                     url.includes('youtube.com') || url.includes('youtu.be') ? '▶️ YouTube video' : '🔗 ' + url.substring(0, 50);
+        selectedFiles.push({ file: null, name, url, isLink: true });
+        linkInput.value = '';
         renderFiles();
     });
+
     function renderFiles() {
         const preview = document.getElementById('file-list-preview');
-        if (selectedFiles.length===0) { preview.classList.add('hidden'); return; }
+        if (selectedFiles.length === 0) { preview.classList.add('hidden'); return; }
         preview.classList.remove('hidden');
         fileListUl.innerHTML = '';
-        selectedFiles.forEach((f, i) => {
+        selectedFiles.forEach((item, i) => {
             const li = document.createElement('li');
             li.className = "flex justify-between bg-white p-1 mb-1 border rounded text-sm";
-            li.innerHTML = `<span>${escapeHtml(f.name)}</span><span class="text-red-500 cursor-pointer remove-file-btn" data-index="${i}">✕</span>`;
+            const icon = item.isLink ? '🔗' : '📄';
+            li.innerHTML = `<span>${icon} ${escapeHtml(item.name)}</span><span class="text-red-500 cursor-pointer remove-file-btn" data-index="${i}">✕</span>`;
             fileListUl.appendChild(li);
         });
-        
         fileListUl.querySelectorAll('.remove-file-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const idx = parseInt(e.target.dataset.index);
-                selectedFiles.splice(idx, 1);
+                selectedFiles.splice(parseInt(e.target.dataset.index), 1);
                 renderFiles();
             });
         });
     }
-    document.getElementById('remove-all-files-btn').addEventListener('click', ()=>{ selectedFiles=[]; fileInput.value=''; renderFiles(); });
+    document.getElementById('remove-all-files-btn').addEventListener('click', () => { selectedFiles = []; fileInput.value = ''; renderFiles(); });
     document.getElementById('cancel-hw-btn').addEventListener('click', () => modal.remove());
 
     // SAVE LOGIC
@@ -1633,13 +1706,20 @@ function showHomeworkModal(student) {
             }
 
             // --- STEP 2: UPLOAD FILES ---
-            saveBtn.innerHTML = `Uploading ${selectedFiles.length} files...`;
+            saveBtn.innerHTML = `Uploading files...`;
             let attachments = [];
             if (selectedFiles.length > 0) {
                 try {
-                    const uploadPromises = selectedFiles.map(f => uploadToCloudinary(f, student.id));
-                    const results = await Promise.all(uploadPromises);
-                    results.forEach(res => attachments.push({url:res.url, name:res.fileName, size:res.bytes, type:res.format}));
+                    for (const item of selectedFiles) {
+                        if (item.isLink) {
+                            // Google Drive / URL link — no upload needed
+                            attachments.push({ url: item.url, name: item.name, size: 0, type: 'link', isLink: true });
+                        } else {
+                            // Real file — upload to Cloudinary
+                            const res = await uploadToCloudinary(item.file, student.id);
+                            attachments.push({ url: res.url, name: item.name || res.fileName, size: res.bytes || 0, type: res.format || 'file', isLink: false });
+                        }
+                    }
                 } catch(e) { 
                     console.error("Upload Error:", e);
                     showCustomAlert(`Upload failed: ${e.message}`); 
@@ -1652,15 +1732,25 @@ function showHomeworkModal(student) {
             // --- STEP 3: SAVE TO FIREBASE ---
             saveBtn.innerHTML = "Saving...";
             const newHwRef = doc(collection(db, "homework_assignments"));
+
+            // Helper: strip undefined values so Firestore never throws
+            function sanitizeForFirestore(obj) {
+                const out = {};
+                for (const [k, v] of Object.entries(obj)) {
+                    out[k] = (v === undefined || v === null) ? '' : v;
+                }
+                return out;
+            }
             
-            const hwData = {
+            const hwData = sanitizeForFirestore({
                 id: newHwRef.id,
-                studentId: student.id,
-                studentName: student.studentName,
-                parentEmail: finalParentEmail,
-                parentName: finalParentName, // Now storing Name in HW record too
-                parentPhone: student.parentPhone,
-                tutorName: tutorName,
+                studentId: student.id || '',
+                studentName: student.studentName || '',
+                parentEmail: finalParentEmail || '',
+                parentName: finalParentName || '',
+                parentPhone: student.parentPhone || '',
+                tutorEmail: window.tutorData?.email || '',
+                tutorName: tutorName || '',
                 title: title,
                 description: desc,
                 dueDate: date,
@@ -1669,7 +1759,7 @@ function showHomeworkModal(student) {
                 attachments: attachments,
                 fileUrl: attachments[0]?.url || '', 
                 fileName: attachments[0]?.name || '' 
-            };
+            });
             
             await setDoc(newHwRef, hwData);
 
@@ -1844,7 +1934,7 @@ function updateFloatingBadges() {
     updateBadge(btnFloatingInbox);
 }
 
-// --- FEATURE 1: SEND MESSAGE MODAL (UPDATED) ---
+// --- FEATURE 1: SEND MESSAGE MODAL (SIMPLIFIED – unified selectable list) ---
 // Conv ID format: tutorId_studentId  (student portal also uses this format)
 
 function showEnhancedMessagingModal() {
@@ -1855,68 +1945,69 @@ function showEnhancedMessagingModal() {
     modal.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.7);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px;';
     modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
 
-    const TYPES = [
-        { type:'individual', icon:'👤', label:'Student' },
-        { type:'group',      icon:'👥', label:'Group' },
-        { type:'parent',     icon:'🏠', label:'Parent' },
-        { type:'tutor',      icon:'🧑‍🏫', label:'Tutor' },
-        { type:'management', icon:'🏢', label:'Admin' },
-        { type:'all',        icon:'📢', label:'Broadcast' }
-    ];
-
     modal.innerHTML = `
-    <div style="background:#fff;border-radius:22px;width:100%;max-width:560px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.4);">
+    <div style="background:#fff;border-radius:22px;width:100%;max-width:580px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.4);">
         <!-- Header -->
-        <div style="background:linear-gradient(135deg,#1e1b4b,#312e81,#1e3a8a);padding:22px 24px;flex-shrink:0;position:relative;overflow:hidden;">
-            <div style="position:absolute;inset:0;background:url('data:image/svg+xml,%3Csvg width=60 height=60 xmlns=http://www.w3.org/2000/svg%3E%3Ccircle cx=30 cy=30 r=20 fill=none stroke=white stroke-opacity=.04 stroke-width=1/%3E%3C/svg%3E') repeat;"></div>
-            <div style="position:relative;display:flex;align-items:center;justify-content:space-between;">
-                <div style="display:flex;align-items:center;gap:12px;">
-                    <div style="width:44px;height:44px;background:rgba(255,255,255,.15);border-radius:14px;border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:1.3rem;">✉️</div>
-                    <div>
-                        <div style="color:#fff;font-weight:900;font-size:1.1rem;line-height:1.2;">New Message</div>
-                        <div style="color:rgba(255,255,255,.55);font-size:.72rem;margin-top:2px;">Choose recipient &amp; compose</div>
-                    </div>
+        <div style="background:linear-gradient(135deg,#1e1b4b,#312e81,#1e3a8a);padding:20px 24px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div style="width:42px;height:42px;background:rgba(255,255,255,.15);border-radius:12px;border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:1.3rem;">✉️</div>
+                <div>
+                    <div style="color:#fff;font-weight:900;font-size:1.05rem;">New Message</div>
+                    <div style="color:rgba(255,255,255,.55);font-size:.72rem;margin-top:1px;">Select one or more recipients &amp; compose</div>
                 </div>
-                <button id="nm-close" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;width:36px;height:36px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;" onmouseover="this.style.background='rgba(255,255,255,.22)'" onmouseout="this.style.background='rgba(255,255,255,.12)'">✕</button>
             </div>
+            <button id="nm-close" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;width:34px;height:34px;border-radius:50%;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
         </div>
 
         <!-- Body -->
-        <div style="flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:16px;">
+        <div style="flex:1;overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;gap:14px;">
 
-            <!-- Recipient Type Selector -->
+            <!-- Recipients panel -->
             <div>
-                <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;margin-bottom:10px;">Send to</div>
-                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;" id="nm-type-grid">
-                    ${TYPES.map(t => `
-                    <button class="nm-type-btn" data-type="${t.type}" style="padding:10px 6px;border-radius:12px;border:1.5px solid ${t.type==='individual'?'#6366f1':'#e2e8f0'};background:${t.type==='individual'?'#eef2ff':'#fff'};cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:4px;" onmouseover="if(!this.classList.contains('nm-selected')){this.style.borderColor='#a5b4fc';this.style.background='#f5f3ff';}" onmouseout="if(!this.classList.contains('nm-selected')){this.style.borderColor='#e2e8f0';this.style.background='#fff';}">
-                        <span style="font-size:1.1rem;">${t.icon}</span>
-                        <span style="font-size:.68rem;font-weight:700;color:${t.type==='individual'?'#4338ca':'#64748b'};" class="nm-type-label">${t.label}</span>
-                    </button>`).join('')}
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;">To: Recipients</div>
+                    <div style="display:flex;gap:8px;">
+                        <button id="nm-select-all" style="font-size:.72rem;color:#6366f1;background:none;border:none;cursor:pointer;font-weight:700;">Select All</button>
+                        <button id="nm-clear-all" style="font-size:.72rem;color:#94a3b8;background:none;border:none;cursor:pointer;font-weight:700;">Clear</button>
+                    </div>
                 </div>
+                <!-- Search box -->
+                <div style="position:relative;margin-bottom:8px;">
+                    <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <input id="nm-search" type="text" placeholder="Search by name…" style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.82rem;outline:none;box-sizing:border-box;">
+                </div>
+                <!-- Filter tabs -->
+                <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;" id="nm-filter-tabs">
+                    <button class="nm-tab active-tab" data-filter="all" style="font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1.5px solid #6366f1;background:#eef2ff;color:#4338ca;cursor:pointer;">All</button>
+                    <button class="nm-tab" data-filter="student" style="font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;">👤 Students</button>
+                    <button class="nm-tab" data-filter="parent" style="font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;">🏠 Parents</button>
+                    <button class="nm-tab" data-filter="tutor" style="font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;">🧑‍🏫 Tutors</button>
+                    <button class="nm-tab" data-filter="management" style="font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;">🏢 Admin</button>
+                </div>
+                <!-- Recipient list -->
+                <div id="nm-recipient-list" style="max-height:180px;overflow-y:auto;border:1.5px solid #e2e8f0;border-radius:10px;">
+                    <div style="padding:20px;text-align:center;color:#9ca3af;font-size:.82rem;">Loading contacts…</div>
+                </div>
+                <!-- Selected count -->
+                <div id="nm-selected-count" style="font-size:.72rem;color:#6366f1;font-weight:700;margin-top:6px;min-height:16px;"></div>
             </div>
-
-            <!-- Recipient Picker (dynamic) -->
-            <div id="nm-recipient-area" style="min-height:60px;"></div>
 
             <!-- Subject -->
             <div>
                 <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;margin-bottom:6px;">Subject <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></div>
-                <input type="text" id="msg-subject" placeholder="e.g. Homework reminder, Schedule update…" style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:.875rem;outline:none;transition:border-color .15s;box-sizing:border-box;" onfocus="this.style.borderColor='#6366f1';this.style.boxShadow='0 0 0 3px rgba(99,102,241,.12)'" onblur="this.style.borderColor='#e2e8f0';this.style.boxShadow='none'">
+                <input type="text" id="msg-subject" placeholder="e.g. Homework reminder, Schedule update…" style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:.875rem;outline:none;transition:border-color .15s;box-sizing:border-box;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'">
             </div>
 
             <!-- Message body -->
             <div>
                 <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;margin-bottom:6px;">Message</div>
-                <textarea id="msg-content" rows="4" placeholder="Type your message here…" style="width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:.875rem;outline:none;resize:vertical;transition:border-color .15s;box-sizing:border-box;font-family:inherit;" onfocus="this.style.borderColor='#6366f1';this.style.boxShadow='0 0 0 3px rgba(99,102,241,.12)'" onblur="this.style.borderColor='#e2e8f0';this.style.boxShadow='none'"></textarea>
+                <textarea id="msg-content" rows="4" placeholder="Type your message here…" style="width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:.875rem;outline:none;resize:vertical;transition:border-color .15s;box-sizing:border-box;font-family:inherit;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'"></textarea>
             </div>
 
             <!-- Attach + Urgent row -->
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                 <input type="file" id="msg-image-file" accept="image/*" style="display:none;">
-                <button onclick="document.getElementById('msg-image-file').click()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border:1.5px solid #e2e8f0;border-radius:10px;background:#f8fafc;color:#475569;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='#6366f1';this.style.color='#4338ca'" onmouseout="this.style.borderColor='#e2e8f0';this.style.color='#475569'">
-                    📎 <span>Attach Image</span>
-                </button>
+                <button onclick="document.getElementById('msg-image-file').click()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border:1.5px solid #e2e8f0;border-radius:10px;background:#f8fafc;color:#475569;font-size:.78rem;font-weight:700;cursor:pointer;">📎 Attach Image</button>
                 <span id="msg-image-name" style="font-size:.72rem;color:#64748b;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
                 <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 12px;border-radius:10px;border:1.5px solid #fee2e2;background:#fef2f2;">
                     <input type="checkbox" id="msg-urgent" style="accent-color:#ef4444;">
@@ -1926,17 +2017,24 @@ function showEnhancedMessagingModal() {
         </div>
 
         <!-- Footer -->
-        <div style="padding:14px 24px;border-top:1px solid #f1f5f9;display:flex;gap:10px;background:#fafafa;flex-shrink:0;">
-            <button id="nm-cancel" style="flex:1;padding:12px;border:1.5px solid #e2e8f0;background:#fff;border-radius:12px;font-weight:700;color:#64748b;cursor:pointer;font-size:.875rem;transition:all .15s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#fff'">Cancel</button>
-            <button id="btn-send-initial" style="flex:2;padding:12px;background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;border:none;border-radius:12px;font-weight:800;cursor:pointer;font-size:.9rem;box-shadow:0 4px 14px rgba(99,102,241,.35);transition:all .15s;" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 6px 20px rgba(99,102,241,.45)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 14px rgba(99,102,241,.35)'">✈️ Send Message</button>
+        <div style="padding:14px 20px;border-top:1px solid #f1f5f9;display:flex;gap:10px;background:#fafafa;flex-shrink:0;">
+            <button id="nm-cancel" style="flex:1;padding:12px;border:1.5px solid #e2e8f0;background:#fff;border-radius:12px;font-weight:700;color:#64748b;cursor:pointer;font-size:.875rem;">Cancel</button>
+            <button id="btn-send-initial" style="flex:2;padding:12px;background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;border:none;border-radius:12px;font-weight:800;cursor:pointer;font-size:.9rem;box-shadow:0 4px 14px rgba(99,102,241,.35);">✈️ Send Message</button>
         </div>
     </div>`;
 
     document.body.appendChild(modal);
 
-    // Mark first button as selected
-    const firstBtn = modal.querySelector('.nm-type-btn[data-type="individual"]');
-    if (firstBtn) firstBtn.classList.add('nm-selected');
+    // Hidden type holder for compatibility with msgProcessSendToStudents
+    const typeHolder = document.createElement('div');
+    typeHolder.className = 'type-option selected';
+    typeHolder.dataset.type = 'group'; // always treat selection as group
+    typeHolder.style.display = 'none';
+    modal.appendChild(typeHolder);
+
+    // Wire close buttons
+    modal.querySelector('#nm-close').onclick = () => modal.remove();
+    modal.querySelector('#nm-cancel').onclick = () => modal.remove();
 
     // Image name display
     modal.querySelector('#msg-image-file').addEventListener('change', (e) => {
@@ -1944,50 +2042,193 @@ function showEnhancedMessagingModal() {
         modal.querySelector('#msg-image-name').textContent = f ? f.name : '';
     });
 
-    // Load initial recipients
-    msgLoadRecipientsByStudentId('individual', modal.querySelector('#nm-recipient-area'));
+    // Load all contacts into the unified list
+    let allContacts = []; // { id, name, role, extra }
+    let activeFilter = 'all';
 
-    // Type button clicks
-    modal.querySelectorAll('.nm-type-btn').forEach(btn => {
-        btn.onclick = () => {
-            modal.querySelectorAll('.nm-type-btn').forEach(b => {
-                b.classList.remove('nm-selected');
-                b.style.borderColor = '#e2e8f0';
-                b.style.background = '#fff';
-                b.querySelector('.nm-type-label').style.color = '#64748b';
+    (async () => {
+        const listEl = modal.querySelector('#nm-recipient-list');
+        try {
+            const tutorObj = window.tutorData || {};
+            const tutor = window.tutorData || {};
+
+            // 1. Active students
+            const studentDocs = await fetchStudentsForTutor(tutorObj, "students");
+            studentDocs.filter(s => !s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status))
+                .forEach(s => allContacts.push({ id: s.id, name: s.studentName || 'Student', role: 'student', extra: s.grade || '' }));
+
+            // 2. Parents
+            try {
+                const parentSnap = await getDocs(collection(db, 'parent_users'));
+                parentSnap.forEach(d => {
+                    const p = d.data();
+                    const id = p.uid || d.id;
+                    const name = p.name || p.displayName || p.email || 'Parent';
+                    allContacts.push({ id, name, role: 'parent', extra: p.email || '' });
+                });
+            } catch(e) {}
+
+            // 3. Other tutors
+            try {
+                const tutorSnap = await getDocs(collection(db, 'tutors'));
+                const myId = tutor.messagingId || tutor.id;
+                tutorSnap.forEach(d => {
+                    if (d.id === tutor.id) return;
+                    const t = d.data();
+                    const tid = t.messagingId || t.tutorUid || d.id;
+                    if (tid === myId) return;
+                    allContacts.push({ id: tid, name: t.name || 'Tutor', role: 'tutor', extra: t.email || '' });
+                });
+            } catch(e) {}
+
+            // 4. Management/Admin
+            allContacts.push({ id: 'management', name: 'Admin (Management)', role: 'management', extra: '' });
+
+            renderList();
+        } catch(e) {
+            listEl.innerHTML = `<div style="padding:16px;text-align:center;color:#ef4444;font-size:.82rem;">Error loading contacts: ${escapeHtml(e.message)}</div>`;
+        }
+    })();
+
+    function renderList() {
+        const listEl = modal.querySelector('#nm-recipient-list');
+        const search = (modal.querySelector('#nm-search').value || '').toLowerCase().trim();
+        const filtered = allContacts.filter(c => {
+            const matchFilter = activeFilter === 'all' || c.role === activeFilter;
+            const matchSearch = !search || c.name.toLowerCase().includes(search) || (c.extra||'').toLowerCase().includes(search);
+            return matchFilter && matchSearch;
+        });
+
+        if (filtered.length === 0) {
+            listEl.innerHTML = '<div style="padding:16px;text-align:center;color:#9ca3af;font-size:.82rem;">No contacts found.</div>';
+            return;
+        }
+
+        const roleIcon = { student:'👤', parent:'🏠', tutor:'🧑‍🏫', management:'🏢' };
+        const roleColor = { student:'#dbeafe', parent:'#dcfce7', tutor:'#fef3c7', management:'#f3e8ff' };
+
+        listEl.innerHTML = filtered.map(c => `
+            <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #f9fafb;cursor:pointer;transition:background .1s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+                <input type="checkbox" class="nm-chk-recipient" value="${escapeHtml(c.id)}" data-name="${escapeHtml(c.name)}" data-role="${escapeHtml(c.role)}" style="accent-color:#6366f1;width:15px;height:15px;flex-shrink:0;">
+                <span style="width:30px;height:30px;border-radius:50%;background:${roleColor[c.role]||'#f1f5f9'};display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;">${roleIcon[c.role]||'👤'}</span>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:.84rem;font-weight:700;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.name)}</div>
+                    ${c.extra ? `<div style="font-size:.7rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.extra)}</div>` : ''}
+                </div>
+            </label>`).join('');
+
+        // Re-attach change listeners to update count
+        listEl.querySelectorAll('.nm-chk-recipient').forEach(chk => chk.addEventListener('change', updateCount));
+        updateCount();
+    }
+
+    function updateCount() {
+        const checked = modal.querySelectorAll('.nm-chk-recipient:checked');
+        const el = modal.querySelector('#nm-selected-count');
+        el.textContent = checked.length > 0 ? `${checked.length} recipient${checked.length !== 1 ? 's' : ''} selected` : '';
+    }
+
+    // Search
+    modal.querySelector('#nm-search').addEventListener('input', renderList);
+
+    // Filter tabs
+    modal.querySelectorAll('.nm-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            modal.querySelectorAll('.nm-tab').forEach(t => {
+                t.style.borderColor = '#e2e8f0'; t.style.background = '#fff'; t.style.color = '#64748b';
+                t.classList.remove('active-tab');
             });
-            btn.classList.add('nm-selected');
-            btn.style.borderColor = '#6366f1';
-            btn.style.background = '#eef2ff';
-            btn.querySelector('.nm-type-label').style.color = '#4338ca';
-            msgLoadRecipientsByStudentId(btn.dataset.type, modal.querySelector('#nm-recipient-area'));
-        };
+            tab.style.borderColor = '#6366f1'; tab.style.background = '#eef2ff'; tab.style.color = '#4338ca';
+            tab.classList.add('active-tab');
+            activeFilter = tab.dataset.filter;
+            renderList();
+        });
     });
 
-    modal.querySelector('#nm-close').onclick = () => modal.remove();
-    modal.querySelector('#nm-cancel').onclick = () => modal.remove();
-    // Patch modal.querySelector for legacy compatibility
-    modal.querySelector('#recipient-loader') || Object.defineProperty(modal, '_recipientArea', { get: () => modal.querySelector('#nm-recipient-area') });
-    modal.querySelector('#btn-send-initial').onclick = () => {
-        // Patch: map nm-type-btn selected to type-option selected for msgProcessSendToStudents
-        const selType = modal.querySelector('.nm-type-btn.nm-selected')?.dataset?.type || 'individual';
-        // Temporarily add a hidden input so msgProcessSendToStudents can read type
-        let typeHolder = modal.querySelector('.type-option.selected');
-        if (!typeHolder) {
-            typeHolder = document.createElement('div');
-            typeHolder.className = 'type-option selected';
-            typeHolder.dataset.type = selType;
-            typeHolder.style.display = 'none';
-            modal.appendChild(typeHolder);
-        } else {
-            typeHolder.dataset.type = selType;
+    // Select All / Clear
+    modal.querySelector('#nm-select-all').onclick = () => {
+        modal.querySelectorAll('.nm-chk-recipient').forEach(c => c.checked = true);
+        updateCount();
+    };
+    modal.querySelector('#nm-clear-all').onclick = () => {
+        modal.querySelectorAll('.nm-chk-recipient').forEach(c => c.checked = false);
+        updateCount();
+    };
+
+    // Send button
+    modal.querySelector('#btn-send-initial').onclick = async () => {
+        const checked = [...modal.querySelectorAll('.nm-chk-recipient:checked')];
+        if (checked.length === 0) { showCustomAlert('Please select at least one recipient.'); return; }
+
+        const content = (modal.querySelector('#msg-content').value || '').trim();
+        const subject = (modal.querySelector('#msg-subject').value || '').trim();
+        const isUrgent = modal.querySelector('#msg-urgent').checked;
+        const imageFile = modal.querySelector('#msg-image-file').files[0] || null;
+        if (!content && !imageFile) { showCustomAlert('Please type a message or attach an image.'); return; }
+
+        const sendBtn = modal.querySelector('#btn-send-initial');
+        sendBtn.disabled = true; sendBtn.textContent = 'Sending…';
+
+        try {
+            let imageUrl = null;
+            if (imageFile) {
+                const fd = new FormData();
+                fd.append('file', imageFile);
+                fd.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+                fd.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
+                const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`, { method: 'POST', body: fd });
+                const data = await res.json();
+                imageUrl = data.secure_url || null;
+            }
+
+            const tutor = window.tutorData;
+            const myMsgId = tutor.messagingId || tutor.id;
+            const now = new Date();
+            const lastMsg = imageUrl ? (content || '📷 Image') : content;
+
+            for (const chk of checked) {
+                const targetId = chk.value;
+                const targetName = chk.dataset.name;
+                const convId = [myMsgId, targetId].sort().join('_');
+                const convRef = doc(db, "conversations", convId);
+
+                await setDoc(convRef, {
+                    participants: [tutor.id, targetId],
+                    participantDetails: {
+                        [tutor.id]: { name: tutor.name, role: 'tutor', email: tutor.email || '' },
+                        [targetId]: { name: targetName, role: chk.dataset.role || 'student' }
+                    },
+                    tutorId: tutor.id,
+                    tutorEmail: tutor.email || '',
+                    tutorName: tutor.name || '',
+                    studentId: targetId,
+                    studentName: targetName,
+                    lastMessage: lastMsg,
+                    lastMessageTimestamp: now,
+                    lastSenderId: tutor.id,
+                    unreadCount: 1
+                }, { merge: true });
+
+                await addDoc(collection(db, "conversations", convId, "messages"), {
+                    content: content || '',
+                    subject: subject || '',
+                    imageUrl: imageUrl || null,
+                    senderId: tutor.id,
+                    senderName: tutor.name || '',
+                    senderRole: 'tutor',
+                    isUrgent: isUrgent,
+                    createdAt: now,
+                    read: false
+                });
+            }
+
+            modal.remove();
+            showCustomAlert(`✅ Message sent to ${checked.length} recipient${checked.length !== 1 ? 's' : ''}!`);
+        } catch(e) {
+            console.error('Messaging error:', e);
+            showCustomAlert('❌ Error: ' + e.message);
+            sendBtn.disabled = false; sendBtn.textContent = '✈️ Send Message';
         }
-        // Map nm-recipient-area → recipient-loader for the send function
-        const recipArea = modal.querySelector('#nm-recipient-area');
-        if (recipArea && !modal.querySelector('#recipient-loader')) {
-            recipArea.id = 'recipient-loader';
-        }
-        msgProcessSendToStudents(modal);
     };
 }
 
@@ -5689,7 +5930,20 @@ async function loadHomeworkInbox(tutorEmail) {
                                         <div class="flex items-start justify-between gap-2">
                                             <div class="flex-1 min-w-0">
                                                 <div class="font-medium text-gray-800 text-sm">${escapeHtml(a.title || 'Untitled')}</div>
-                                                ${a.description ? `<div class="text-xs text-gray-500 mt-0.5 line-clamp-2">${escapeHtml(a.description)}</div>` : ''}
+                                                ${a.description ? `<div class="text-xs text-gray-500 mt-1" style="white-space:pre-wrap;word-break:break-word;">${
+                                                    // Linkify URLs in description
+                                                    escapeHtml(a.description).replace(/(https?:\/\/[^\s&"<>]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;">$1</a>')
+                                                }</div>` : ''}
+                                                ${(() => {
+                                                    const allAttachments = a.attachments || [];
+                                                    if (allAttachments.length === 0 && a.fileUrl) allAttachments.push({ url: a.fileUrl, name: a.fileName || 'File', isLink: false });
+                                                    if (allAttachments.length === 0) return '';
+                                                    return `<div class="flex flex-wrap gap-1.5 mt-1.5">${allAttachments.map(att => {
+                                                        const label = escapeHtml(att.name || 'Attachment');
+                                                        const icon = att.isLink ? '🔗' : '📄';
+                                                        return `<a href="${escapeHtml(att.url)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;background:#eff6ff;color:#1d4ed8;font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:6px;text-decoration:none;border:1px solid #bfdbfe;">${icon} ${label}</a>`;
+                                                    }).join('')}</div>`;
+                                                })()}
                                                 <div class="flex gap-3 mt-1.5 text-xs text-gray-400 flex-wrap">
                                                     <span>Assigned: ${escapeHtml(assignedDate)}</span>
                                                     <span>Due: ${escapeHtml(a.dueDate || '—')}</span>
@@ -5700,7 +5954,6 @@ async function loadHomeworkInbox(tutorEmail) {
                                             <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
                                                 <span class="text-xs font-bold px-2 py-0.5 rounded-full ${statusColor}">${statusLabel}</span>
                                                 ${a.status === 'submitted' ? `<button onclick="openGradingInNewTab('${escapeHtml(a.id)}')" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;padding:5px 12px;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;" title="Review & annotate submission">✏️ Review</button>` : ''}
-                                                ${a.fileUrl ? `<a href="${escapeHtml(a.fileUrl)}" target="_blank" class="text-xs text-blue-500 hover:underline">View File</a>` : ''}
                                             </div>
                                         </div>
                                     </div>`;
