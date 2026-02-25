@@ -91,6 +91,36 @@ let realTimeListeners = [];
 let charts = new Map();
 let pendingRequests = new Set();
 
+// Chart render queue — used because <script> inside innerHTML won't execute
+window.chartRenderQueue = window.chartRenderQueue || [];
+
+// Render all queued charts safely
+window.renderPendingCharts = function() {
+    if (!window.chartRenderQueue || window.chartRenderQueue.length === 0) return;
+    
+    // Process queue with a small delay to ensure DOM is ready
+    setTimeout(() => {
+        const queue = window.chartRenderQueue.splice(0);
+        queue.forEach(({ id, config }) => {
+            try {
+                const ctx = document.getElementById(id);
+                if (!ctx) return;
+                
+                // Destroy existing chart if present
+                if (charts.has(id)) {
+                    charts.get(id).destroy();
+                    charts.delete(id);
+                }
+                
+                const chart = new Chart(ctx.getContext('2d'), config);
+                charts.set(id, chart);
+            } catch (err) {
+                console.warn('Chart render error for', id, err);
+            }
+        });
+    }, 150);
+};
+
 // Initialize intervals array globally
 if (!window.realTimeIntervals) {
     window.realTimeIntervals = [];
@@ -609,7 +639,7 @@ function createCountryCodeDropdown() {
     // Create country code dropdown
     const countryCodeSelect = document.createElement('select');
     countryCodeSelect.id = 'countryCode';
-    countryCodeSelect.className = 'w-32 px-3 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200 mobile-full-width';
+    countryCodeSelect.className = 'input-field w-36 flex-shrink-0 mobile-full-width';
     countryCodeSelect.required = true;
     
     // FULL COUNTRY CODES LIST
@@ -680,8 +710,8 @@ function createCountryCodeDropdown() {
     // Get the existing phone input
     const phoneInput = document.getElementById('signupPhone');
     if (phoneInput) {
-        phoneInput.placeholder = 'Enter phone number without country code';
-        phoneInput.className = 'flex-1 px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200 mobile-full-width';
+        phoneInput.placeholder = 'Phone number without country code';
+        phoneInput.className = 'input-field flex-1 mobile-full-width';
         
         // Replace the original input with new structure
         container.appendChild(countryCodeSelect);
@@ -2160,8 +2190,14 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
     const firstReport = sessionReports[0];
     const formattedDate = formatDetailedDate(date || new Date(firstReport.timestamp * 1000), true);
     
-    let tutorName = 'N/A';
-    const tutorEmail = firstReport.tutorEmail;
+    // ── Fix: get tutor name from the document itself ──
+    const tutorName = safeText(
+        firstReport.tutorName ||
+        firstReport.tutor_name ||
+        firstReport.assessedBy ||
+        firstReport.tutorEmail ||
+        'N/A'
+    );
     
     const results = sessionReports.map(testResult => {
         const topics = [...new Set(testResult.answers?.map(a => safeText(a.topic)).filter(t => t))] || [];
@@ -2175,202 +2211,246 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
 
     const recommendation = generateTemplatedRecommendation(fullName, tutorName, results);
 
-    const tableRows = results.map(res => `
+    const tableRows = results.map(res => {
+        const pct = res.total > 0 ? Math.round((res.correct / res.total) * 100) : 0;
+        const barColor = pct >= 75 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
+        return `
         <tr>
-            <td class="border px-2 py-1">${res.subject.toUpperCase()}</td>
-            <td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td>
-        </tr>
-    `).join("");
+            <td class="border px-3 py-2 font-medium">${res.subject.toUpperCase()}</td>
+            <td class="border px-3 py-2 text-center">${res.correct} / ${res.total}</td>
+            <td class="border px-3 py-2 text-center font-semibold" style="color:${barColor}">${pct}%</td>
+        </tr>`;
+    }).join("");
 
     const topicsTableRows = results.map(res => `
         <tr>
-            <td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td>
-            <td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td>
+            <td class="border px-3 py-2 font-semibold">${res.subject.toUpperCase()}</td>
+            <td class="border px-3 py-2">${res.topics.join(', ') || 'N/A'}</td>
         </tr>
     `).join("");
 
+    // ── Fix: tutor report — check direct field FIRST, then creative writing answer ──
     const creativeWritingAnswer = firstReport.answers?.find(a => a.type === 'creative-writing');
-    const tutorReport = creativeWritingAnswer?.tutorReport || 'Pending review.';
+    const tutorReport = safeText(
+        firstReport.tutorReport ||
+        firstReport.tutorComment ||
+        firstReport.teacherComment ||
+        creativeWritingAnswer?.tutorReport ||
+        ''
+    );
+    const hasTutorReport = tutorReport.length > 0;
 
+    // ── Chart: push to render queue (not inline <script>) ──
     const chartId = `chart-${studentIndex}-${sessionId}`;
     const chartConfig = {
         type: 'bar',
         data: {
             labels: results.map(r => r.subject.toUpperCase()),
             datasets: [
-                { 
-                    label: 'Correct Answers', 
-                    data: results.map(s => s.correct), 
-                    backgroundColor: '#4CAF50' 
-                }, 
-                { 
-                    label: 'Incorrect/Unanswered', 
-                    data: results.map(s => s.total - s.correct), 
-                    backgroundColor: '#FFCD56' 
+                {
+                    label: 'Correct',
+                    data: results.map(s => s.correct),
+                    backgroundColor: 'rgba(16, 185, 129, 0.85)',
+                    borderRadius: 6
+                },
+                {
+                    label: 'Incorrect / Unanswered',
+                    data: results.map(s => Math.max(0, s.total - s.correct)),
+                    backgroundColor: 'rgba(245, 158, 11, 0.75)',
+                    borderRadius: 6
                 }
             ]
         },
         options: {
             responsive: true,
-            scales: { 
-                x: { stacked: true }, 
-                y: { stacked: true, beginAtZero: true } 
+            maintainAspectRatio: false,
+            scales: {
+                x: { stacked: true, grid: { display: false } },
+                y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } }
             },
-            plugins: { 
-                title: { 
-                    display: true, 
-                    text: 'Score Distribution by Subject' 
-                } 
+            plugins: {
+                title: { display: true, text: 'Score Distribution by Subject', font: { size: 13 } },
+                legend: { position: 'top' }
             }
         }
     };
 
+    if (results.length > 0) {
+        window.chartRenderQueue = window.chartRenderQueue || [];
+        window.chartRenderQueue.push({ id: chartId, config: chartConfig });
+    }
+
     return `
-        <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="assessment-block-${studentIndex}-${sessionId}">
-            <div class="text-center mb-6 border-b pb-4">
-                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
-                     alt="Blooming Kids House Logo" 
-                     class="h-16 w-auto mx-auto mb-3">
-                <h2 class="text-2xl font-bold text-green-800">Assessment Report</h2>
-                <p class="text-gray-600">Date: ${formattedDate}</p>
+        <div class="assessment-report-card border rounded-2xl shadow-md mb-8 overflow-hidden bg-white" id="assessment-block-${studentIndex}-${sessionId}">
+            <!-- Header -->
+            <div class="text-center py-6 px-6 border-b bg-gradient-to-r from-green-50 to-emerald-50">
+                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg"
+                     alt="Blooming Kids House Logo"
+                     class="h-14 w-auto mx-auto mb-3">
+                <h2 class="text-2xl font-bold text-green-800 tracking-tight">Assessment Report</h2>
+                <p class="text-gray-500 text-sm mt-1">📅 ${formattedDate}</p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
-                <div>
-                    <p><strong>Student's Name:</strong> ${fullName}</p>
-                    <p><strong>Parent's Phone:</strong> ${firstReport.parentPhone || 'N/A'}</p>
-                    <p><strong>Grade:</strong> ${firstReport.grade}</p>
+            <div class="p-6">
+                <!-- Student info grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 rounded-xl p-4 border border-green-100">
+                    <div class="space-y-1">
+                        <p class="text-sm text-gray-600"><span class="font-semibold text-gray-800">Student:</span> ${fullName}</p>
+                        <p class="text-sm text-gray-600"><span class="font-semibold text-gray-800">Parent Phone:</span> ${safeText(firstReport.parentPhone || 'N/A')}</p>
+                        <p class="text-sm text-gray-600"><span class="font-semibold text-gray-800">Grade:</span> ${safeText(firstReport.grade || 'N/A')}</p>
+                    </div>
+                    <div class="space-y-1">
+                        <p class="text-sm text-gray-600"><span class="font-semibold text-gray-800">Tutor:</span> ${tutorName}</p>
+                        <p class="text-sm text-gray-600"><span class="font-semibold text-gray-800">Location:</span> ${safeText(firstReport.studentCountry || firstReport.location || 'N/A')}</p>
+                    </div>
                 </div>
-                <div>
-                    <p><strong>Tutor:</strong> ${tutorName || 'N/A'}</p>
-                    <p><strong>Location:</strong> ${firstReport.studentCountry || 'N/A'}</p>
+
+                <!-- Performance Summary -->
+                <h3 class="text-base font-bold text-green-700 mb-3 flex items-center gap-2">
+                    <span class="inline-block w-1 h-5 bg-green-500 rounded"></span>
+                    Performance Summary
+                </h3>
+                <div class="overflow-x-auto rounded-xl border border-gray-100 mb-6">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="border px-3 py-2 text-left text-gray-600">Subject</th>
+                                <th class="border px-3 py-2 text-center text-gray-600">Score</th>
+                                <th class="border px-3 py-2 text-center text-gray-600">Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody>${tableRows}</tbody>
+                    </table>
                 </div>
-            </div>
-            
-            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Performance Summary</h3>
-            <table class="w-full text-sm mb-4 border border-collapse">
-                <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr></thead>
-                <tbody>${tableRows}</tbody>
-            </table>
-            
-            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Knowledge & Skill Analysis</h3>
-            <table class="w-full text-sm mb-4 border border-collapse">
-                <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-left">Topics Covered</th></tr></thead>
-                <tbody>${topicsTableRows}</tbody>
-            </table>
-            
-            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Tutor's Recommendation</h3>
-            <p class="mb-2 text-gray-700 leading-relaxed">${recommendation}</p>
 
-            ${creativeWritingAnswer ? `
-            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Creative Writing Feedback</h3>
-            <p class="mb-2 text-gray-700"><strong>Tutor's Report:</strong> ${tutorReport}</p>
-            ` : ''}
+                <!-- Knowledge & Skill Analysis -->
+                <h3 class="text-base font-bold text-green-700 mb-3 flex items-center gap-2">
+                    <span class="inline-block w-1 h-5 bg-green-500 rounded"></span>
+                    Knowledge &amp; Skill Analysis
+                </h3>
+                <div class="overflow-x-auto rounded-xl border border-gray-100 mb-6">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="border px-3 py-2 text-left text-gray-600">Subject</th>
+                                <th class="border px-3 py-2 text-left text-gray-600">Topics Covered</th>
+                            </tr>
+                        </thead>
+                        <tbody>${topicsTableRows}</tbody>
+                    </table>
+                </div>
 
-            ${results.length > 0 ? `
-            <canvas id="${chartId}" class="w-full h-48 mb-4"></canvas>
-            ` : ''}
-            
-            <div class="bg-yellow-50 p-4 rounded-lg mt-6">
-                <h3 class="text-lg font-semibold mb-1 text-green-700">Director's Message</h3>
-                <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
-            </div>
-            
-            <div class="mt-6 text-center">
-                <button onclick="downloadSessionReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}', 'assessment')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
-                    Download Assessment PDF
-                </button>
+                <!-- Tutor's Recommendation -->
+                <h3 class="text-base font-bold text-green-700 mb-2 flex items-center gap-2">
+                    <span class="inline-block w-1 h-5 bg-green-500 rounded"></span>
+                    Tutor's Recommendation
+                </h3>
+                <p class="text-gray-700 leading-relaxed mb-6 text-sm bg-green-50 rounded-xl p-4 border border-green-100">${recommendation}</p>
+
+                ${hasTutorReport ? `
+                <!-- Tutor's Comment -->
+                <div class="mb-6 bg-blue-50 rounded-xl p-4 border border-blue-100">
+                    <h3 class="text-base font-bold text-blue-700 mb-2 flex items-center gap-2">
+                        <span class="inline-block w-1 h-5 bg-blue-500 rounded"></span>
+                        Tutor's Comment
+                    </h3>
+                    <p class="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">${tutorReport}</p>
+                </div>
+                ` : ''}
+
+                ${results.length > 0 ? `
+                <!-- Chart -->
+                <div class="mb-6">
+                    <h3 class="text-base font-bold text-green-700 mb-3 flex items-center gap-2">
+                        <span class="inline-block w-1 h-5 bg-green-500 rounded"></span>
+                        Score Chart
+                    </h3>
+                    <div class="rounded-xl border border-gray-100 p-4 bg-gray-50" style="height:220px; position:relative;">
+                        <canvas id="${chartId}"></canvas>
+                    </div>
+                </div>
+                ` : ''}
+
+                <!-- Director's Message -->
+                <div class="bg-amber-50 border border-amber-100 p-4 rounded-xl mb-6">
+                    <h3 class="text-base font-semibold text-amber-700 mb-1 flex items-center gap-2">
+                        <span>📣</span> Director's Message
+                    </h3>
+                    <p class="italic text-sm text-gray-700 leading-relaxed">
+                        At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>
+                        <span class="font-semibold not-italic text-amber-800">– Mrs. Yinka Isikalu, Director</span>
+                    </p>
+                </div>
+
+                <!-- Download -->
+                <div class="text-center pt-2">
+                    <button onclick="downloadSessionReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}', 'assessment')"
+                            class="inline-flex items-center gap-2 bg-green-600 text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-green-700 transition-all duration-200 shadow-sm">
+                        <span>⬇</span> Download Assessment PDF
+                    </button>
+                </div>
             </div>
         </div>
-        <script>
-            setTimeout(() => {
-                const ctx = document.getElementById('${chartId}');
-                if (ctx) {
-                    const chart = new Chart(ctx, ${JSON.stringify(chartConfig)});
-                    window.charts.set('${chartId}', chart);
-                }
-            }, 100);
-        </script>
     `;
 }
 
 function createMonthlyReportHTML(sessionReports, studentIndex, sessionId, fullName, date) {
     const firstReport = sessionReports[0];
     const formattedDate = formatDetailedDate(date || new Date(firstReport.timestamp * 1000), true);
+
+    const section = (icon, title, content) => content ? `
+        <div class="mb-5">
+            <h3 class="text-base font-bold text-teal-700 mb-2 flex items-center gap-2 border-b border-teal-100 pb-1">
+                <span>${icon}</span> ${title}
+            </h3>
+            <p class="text-gray-700 leading-relaxed text-sm preserve-whitespace bg-teal-50 rounded-xl p-3 border border-teal-100">${safeText(content)}</p>
+        </div>` : '';
     
     return `
-        <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="monthly-block-${studentIndex}-${sessionId}">
-            <div class="text-center mb-6 border-b pb-4">
-                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
-                     alt="Blooming Kids House Logo" 
-                     class="h-16 w-auto mx-auto mb-3">
-                <h2 class="text-2xl font-bold text-green-800">MONTHLY LEARNING REPORT</h2>
-                <p class="text-gray-600">Date: ${formattedDate}</p>
+        <div class="monthly-report-card border rounded-2xl shadow-md mb-8 overflow-hidden bg-white" id="monthly-block-${studentIndex}-${sessionId}">
+            <!-- Header -->
+            <div class="text-center py-6 px-6 border-b bg-gradient-to-r from-teal-50 to-cyan-50">
+                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg"
+                     alt="Blooming Kids House Logo"
+                     class="h-14 w-auto mx-auto mb-3">
+                <h2 class="text-2xl font-bold text-teal-800 tracking-tight">Monthly Learning Report</h2>
+                <p class="text-gray-500 text-sm mt-1">📅 ${formattedDate}</p>
             </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
-                <div>
-                    <p><strong>Student's Name:</strong> ${firstReport.studentName || 'N/A'}</p>
-                    <p><strong>Parent's Name:</strong> ${firstReport.parentName || 'N/A'}</p>
-                    <p><strong>Parent's Phone:</strong> ${firstReport.parentPhone || 'N/A'}</p>
+
+            <div class="p-6">
+                <!-- Student info -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-teal-50 rounded-xl p-4 border border-teal-100">
+                    <div class="space-y-1">
+                        <p class="text-sm text-gray-600"><span class="font-semibold text-gray-800">Student:</span> ${safeText(firstReport.studentName || fullName || 'N/A')}</p>
+                        <p class="text-sm text-gray-600"><span class="font-semibold text-gray-800">Parent:</span> ${safeText(firstReport.parentName || 'N/A')}</p>
+                        <p class="text-sm text-gray-600"><span class="font-semibold text-gray-800">Phone:</span> ${safeText(firstReport.parentPhone || 'N/A')}</p>
+                    </div>
+                    <div class="space-y-1">
+                        <p class="text-sm text-gray-600"><span class="font-semibold text-gray-800">Grade:</span> ${safeText(firstReport.grade || 'N/A')}</p>
+                        <p class="text-sm text-gray-600"><span class="font-semibold text-gray-800">Tutor:</span> ${safeText(firstReport.tutorName || 'N/A')}</p>
+                    </div>
                 </div>
-                <div>
-                    <p><strong>Grade:</strong> ${firstReport.grade || 'N/A'}</p>
-                    <p><strong>Tutor's Name:</strong> ${firstReport.tutorName || 'N/A'}</p>
+
+                ${section('📝', 'Introduction', firstReport.introduction)}
+                ${section('📚', 'Topics &amp; Remarks', firstReport.topics)}
+                ${section('📈', 'Progress &amp; Achievements', firstReport.progress)}
+                ${section('⚖️', 'Strengths &amp; Weaknesses', firstReport.strengthsWeaknesses)}
+                ${section('💡', 'Recommendations', firstReport.recommendations)}
+                ${section('💬', "General Tutor's Comments", firstReport.generalComments)}
+
+                <!-- Signature -->
+                <div class="text-right mt-6 pt-4 border-t border-gray-100">
+                    <p class="text-gray-500 text-sm">Best regards,</p>
+                    <p class="font-semibold text-teal-800">${safeText(firstReport.tutorName || 'N/A')}</p>
                 </div>
-            </div>
 
-            ${firstReport.introduction ? `
-            <div class="mb-6">
-                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">INTRODUCTION</h3>
-                <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.introduction)}</p>
-            </div>
-            ` : ''}
-
-            ${firstReport.topics ? `
-            <div class="mb-6">
-                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">TOPICS & REMARKS</h3>
-                <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.topics)}</p>
-            </div>
-            ` : ''}
-
-            ${firstReport.progress ? `
-            <div class="mb-6">
-                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">PROGRESS & ACHIEVEMENTS</h3>
-                <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.progress)}</p>
-            </div>
-            ` : ''}
-
-            ${firstReport.strengthsWeaknesses ? `
-            <div class="mb-6">
-                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">STRENGTHS AND WEAKNESSES</h3>
-                <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.strengthsWeaknesses)}</p>
-            </div>
-            ` : ''}
-
-            ${firstReport.recommendations ? `
-            <div class="mb-6">
-                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">RECOMMENDATIONS</h3>
-                <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.recommendations)}</p>
-            </div>
-            ` : ''}
-
-            ${firstReport.generalComments ? `
-            <div class="mb-6">
-                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">GENERAL TUTOR'S COMMENTS</h3>
-                <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.generalComments)}</p>
-            </div>
-            ` : ''}
-
-            <div class="text-right mt-8 pt-4 border-t">
-                <p class="text-gray-600">Best regards,</p>
-                <p class="font-semibold text-green-800">${firstReport.tutorName || 'N/A'}</p>
-            </div>
-
-            <div class="mt-6 text-center">
-                <button onclick="downloadMonthlyReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
-                    Download Monthly Report PDF
-                </button>
+                <!-- Download -->
+                <div class="text-center mt-4">
+                    <button onclick="downloadMonthlyReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}')"
+                            class="inline-flex items-center gap-2 bg-teal-600 text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-teal-700 transition-all duration-200 shadow-sm">
+                        <span>⬇</span> Download Monthly Report PDF
+                    </button>
+                </div>
             </div>
         </div>
     `;
@@ -2573,6 +2653,9 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
 
         reportsHtml = createYearlyArchiveReportView(formattedReportsByStudent);
         reportContent.innerHTML = reportsHtml;
+        
+        // ── Render all queued charts now that DOM is updated ──
+        if (window.renderPendingCharts) window.renderPendingCharts();
 
         // Setup other features in background
         setTimeout(() => {
@@ -2853,8 +2936,8 @@ function addManualRefreshButton() {
     const refreshBtn = document.createElement('button');
     refreshBtn.id = 'manualRefreshBtn';
     refreshBtn.onclick = manualRefreshReportsV2;
-    refreshBtn.className = 'bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 btn-glow flex items-center justify-center';
-    refreshBtn.innerHTML = '<span class="mr-2">🔄</span> Check for New Reports';
+    refreshBtn.className = 'btn-primary flex items-center justify-center gap-2 text-sm px-5 py-2.5';
+    refreshBtn.innerHTML = '<span>🔄</span> Check for New Reports';
     
     const logoutBtn = buttonContainer.querySelector('button[onclick="logout()"]');
     if (logoutBtn) {
@@ -2876,8 +2959,8 @@ function addLogoutButton() {
     
     const logoutBtn = document.createElement('button');
     logoutBtn.onclick = logout;
-    logoutBtn.className = 'bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition-all duration-200 btn-glow flex items-center justify-center';
-    logoutBtn.innerHTML = '<span class="mr-2">🚪</span> Logout';
+    logoutBtn.className = 'btn-danger flex items-center justify-center gap-2 text-sm px-5 py-2.5';
+    logoutBtn.innerHTML = '<span>🚪</span> Logout';
     
     buttonContainer.appendChild(logoutBtn);
 }
@@ -2903,7 +2986,7 @@ class SettingsManager {
             const settingsBtn = document.createElement('button');
             settingsBtn.id = 'settingsBtn';
             settingsBtn.onclick = () => this.openSettingsTab();
-            settingsBtn.className = 'bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-700 transition-all duration-200 btn-glow flex items-center justify-center';
+            settingsBtn.className = 'btn-secondary flex items-center justify-center gap-2 text-sm px-5 py-2.5';
             settingsBtn.innerHTML = '<span class="mr-2">⚙️</span> Settings';
             
             const logoutBtn = navContainer.querySelector('button[onclick="logout()"]');
@@ -4637,6 +4720,9 @@ window.loadAllReportsForParent = async function(parentPhone, userId, forceRefres
         // Use existing display function
         reportsHtml = createYearlyArchiveReportView(formattedReportsByStudent);
         reportContent.innerHTML = reportsHtml;
+
+        // ── Render all queued charts now that DOM is updated ──
+        if (window.renderPendingCharts) window.renderPendingCharts();
 
         // Setup monitoring silently
         setupRealTimeMonitoring(parentPhone, userId);
