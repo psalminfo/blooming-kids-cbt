@@ -2025,15 +2025,16 @@ async function msgLoadRecipientsByStudentId(type, container) {
             };
         } else if (type === 'group') {
             container.innerHTML = `
-                <div class="checklist-box max-h-40 overflow-y-auto border rounded p-2">
-                    ${students.map(s => `
-                        <label class="flex items-center gap-2 py-1 cursor-pointer">
-                            <input type="checkbox" class="chk-recipient" value="${escapeHtml(s.id)}" data-name="${escapeHtml(s.studentName)}">
-                            <span class="text-sm">${escapeHtml(s.studentName)} <small class="text-gray-400">(${escapeHtml(s.grade)})</small></span>
+                <div style="max-height:160px;overflow-y:auto;border:1.5px solid #e2e8f0;border-radius:10px;padding:6px;">
+                    ${students.length === 0 ? '<div style="text-align:center;padding:16px;color:#9ca3af;font-size:.82rem;">No active students found</div>' : students.map(s => `
+                        <label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;cursor:pointer;transition:background .12s;" onmouseover="this.style.background='#f5f3ff'" onmouseout="this.style.background=''">
+                            <input type="checkbox" class="chk-recipient" value="${escapeHtml(s.id)}" data-name="${escapeHtml(s.studentName)}" style="accent-color:#6366f1;width:15px;height:15px;">
+                            <span style="font-size:.85rem;font-weight:600;color:#1e293b;">${escapeHtml(s.studentName)}</span>
+                            <span style="font-size:.72rem;color:#94a3b8;margin-left:auto;">${escapeHtml(s.grade)}</span>
                         </label>`).join('')}
                 </div>`;
         } else if (type === 'all') {
-            container.innerHTML = `<div class="p-3 bg-blue-50 rounded text-sm text-blue-700">📢 Sending to all ${students.length} active students.</div>`;
+            container.innerHTML = `<div style="padding:12px 16px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;font-size:.85rem;color:#1d4ed8;font-weight:600;">📢 Broadcast to all ${students.length} active students</div>`;
             container.dataset.allStudents = JSON.stringify(students.map(s => ({ id: s.id, name: s.studentName })));
         } else if (type === 'parent') {
             // Load parents from parent_users collection
@@ -2045,9 +2046,13 @@ async function msgLoadRecipientsByStudentId(type, container) {
                     if (p.uid || d.id) parents.push({ id: p.uid || d.id, name: p.name || p.displayName || p.email || 'Parent', email: p.email || '' });
                 });
                 container.innerHTML = `
-                    <select id="sel-recipient" class="form-input" data-recipient-type="parent">
-                        <option value="">Select parent...</option>
-                        ${parents.map(p => `<option value="${escapeHtml(p.id)}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)}${p.email ? ' ('+escapeHtml(p.email)+')' : ''}</option>`).join('')}
+                    <div style="position:relative;margin-bottom:6px;">
+                        <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <input type="text" placeholder="Search parent by name…" style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.82rem;outline:none;box-sizing:border-box;" oninput="(function(q){const s=document.getElementById('sel-recipient');if(!s)return;Array.from(s.options).forEach(o=>o.hidden=q.trim()&&!o.text.toLowerCase().includes(q.toLowerCase()));}).call(this,this.value)">
+                    </div>
+                    <select id="sel-recipient" size="5" style="width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:4px;font-size:.85rem;outline:none;max-height:160px;" data-recipient-type="parent">
+                        <option value="">— Select parent —</option>
+                        ${parents.map(p => `<option value="${escapeHtml(p.id)}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)}${p.email ? ' · '+escapeHtml(p.email) : ''}</option>`).join('')}
                     </select>`;
             } catch(e) {
                 container.innerHTML = `<div class="p-3 bg-red-50 text-red-600 text-sm rounded">Could not load parents: ${escapeHtml(e.message)}</div>`;
@@ -2078,7 +2083,7 @@ async function msgLoadRecipientsByStudentId(type, container) {
                 container.innerHTML = `<div style="padding:10px;background:#fef2f2;color:#dc2626;border-radius:10px;font-size:.82rem;">Could not load tutors: ${escapeHtml(e.message)}</div>`;
             }
         } else {
-            container.innerHTML = `<div class="p-3 bg-gray-50 rounded text-sm text-gray-600">🏢 Sending to Management/Admin.</div>`;
+            container.innerHTML = `<div style="padding:12px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.85rem;color:#475569;font-weight:600;">🏢 Message will be sent to Management / Admin team.</div>`;
         }
     } catch (e) {
         container.innerHTML = `<div class="text-red-500 text-sm p-2">Error: ${escapeHtml(e.message)}</div>`;
@@ -3920,194 +3925,124 @@ async function renderStudentDatabase(container, tutor) {
 
     // --- RENDER UI (UPDATED) ---
     function renderUI() {
-        // Stats for header
-        const activeCount    = students.filter(s => !s.summerBreak && !s.isTransitioning).length;
-        const breakCount     = students.filter(s => s.summerBreak).length;
-        const transCount     = students.filter(s => s.isTransitioning).length;
-        const submittedCount = students.filter(s => submittedStudentIds.has(s.id)).length;
-
-        // Avatar colors palette
-        const AV_COLORS = [
-            ['#4f46e5','#eef2ff'],['#0891b2','#ecfeff'],['#059669','#ecfdf5'],
-            ['#d97706','#fffbeb'],['#dc2626','#fef2f2'],['#7c3aed','#f5f3ff'],
-            ['#0369a1','#f0f9ff'],['#be185d','#fdf2f8']
-        ];
-        function getAv(name) {
-            const idx = (name||'?').charCodeAt(0) % AV_COLORS.length;
-            return AV_COLORS[idx];
-        }
-
         let studentsHTML = `
-        <style>
-        #sdb-root { font-family: inherit; }
-        .sdb-hero { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 55%, #0c4a6e 100%); border-radius:20px; padding:26px 24px 20px; margin-bottom:20px; position:relative; overflow:hidden; }
-        .sdb-hero::after { content:''; position:absolute; top:-40px; right:-40px; width:220px; height:220px; background:radial-gradient(circle, rgba(99,102,241,.25) 0%, transparent 70%); pointer-events:none; }
-        .sdb-stat-pill { background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.14); border-radius:12px; padding:10px 12px; text-align:center; }
-        .sdb-stat-val { font-size:1.45rem; font-weight:900; color:#fff; line-height:1.1; }
-        .sdb-stat-lbl { font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:rgba(255,255,255,.5); margin-top:2px; }
-        .sdb-search-bar { width:100%; padding:11px 14px 11px 40px; border:1.5px solid #e2e8f0; border-radius:14px; font-size:.875rem; outline:none; background:#fff; box-sizing:border-box; transition:border-color .15s, box-shadow .15s; }
-        .sdb-search-bar:focus { border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,.12); }
-        .sdb-card { background:#fff; border-radius:18px; border:1.5px solid #f1f5f9; box-shadow:0 2px 10px rgba(0,0,0,.04); display:flex; flex-direction:column; overflow:hidden; transition:box-shadow .2s, transform .2s; }
-        .sdb-card:hover { box-shadow:0 8px 28px rgba(0,0,0,.1); transform:translateY(-2px); }
-        .sdb-action { display:inline-flex; align-items:center; gap:5px; padding:6px 12px; border-radius:9px; border:none; font-size:.72rem; font-weight:700; cursor:pointer; transition:all .15s; }
-        .sdb-filter-btn { padding:7px 14px; border-radius:999px; border:1.5px solid #e2e8f0; background:#fff; font-size:.72rem; font-weight:700; cursor:pointer; color:#64748b; transition:all .15s; }
-        .sdb-filter-btn.active { background:#4f46e5; color:#fff; border-color:#4f46e5; }
-        </style>
-
-        <div id="sdb-root">
-        <!-- ── Hero Header ── -->
-        <div class="sdb-hero">
-            <div style="position:relative;z-index:1;">
-                <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap;">
-                    <div>
-                        <div style="color:rgba(255,255,255,.55);font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;">My Classroom</div>
-                        <h2 style="color:#fff;font-size:1.75rem;font-weight:900;line-height:1;margin:0;">${studentsCount} Student${studentsCount!==1?'s':''}</h2>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                        <label style="display:flex;align-items:center;gap:7px;cursor:pointer;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:7px 12px;">
-                            <input type="checkbox" id="toggle-fees-display" style="accent-color:#22c55e;" ${showFeesToggle ? 'checked' : ''}>
-                            <span style="color:rgba(255,255,255,.8);font-size:.72rem;font-weight:700;white-space:nowrap;">Show Fees</span>
-                        </label>
-                        ${showFeesToggle ? `<div style="background:rgba(34,197,94,.18);border:1px solid rgba(34,197,94,.35);color:#86efac;padding:7px 13px;border-radius:10px;font-weight:800;font-size:.82rem;white-space:nowrap;" id="total-fees-display">₦${calculateTotalFees().toLocaleString()}</div>` : ''}
-                    </div>
-                </div>
-                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
-                    <div class="sdb-stat-pill"><div class="sdb-stat-val">${activeCount}</div><div class="sdb-stat-lbl">Active</div></div>
-                    <div class="sdb-stat-pill"><div class="sdb-stat-val">${breakCount}</div><div class="sdb-stat-lbl">On Break</div></div>
-                    <div class="sdb-stat-pill"><div class="sdb-stat-val">${transCount}</div><div class="sdb-stat-lbl">Transition</div></div>
-                    <div class="sdb-stat-pill"><div class="sdb-stat-val">${submittedCount}</div><div class="sdb-stat-lbl">Submitted</div></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ── Submission status banner ── -->
-        <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:12px;background:${isSubmissionEnabled?'#f0fdf4':'#fff7ed'};border:1.5px solid ${isSubmissionEnabled?'#bbf7d0':'#fed7aa'};margin-bottom:16px;">
-            <span>${isSubmissionEnabled?'✅':'🔒'}</span>
-            <span style="font-size:.78rem;font-weight:700;color:${isSubmissionEnabled?'#166534':'#c2410c'};">Report submission is ${isSubmissionEnabled?'ENABLED':'DISABLED'} by admin</span>
-        </div>`;
-
-        // Add student form
-        if (isTutorAddEnabled) {
-            studentsHTML += `
-            <div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border-radius:16px;padding:18px 20px;margin-bottom:18px;border:1.5px solid #bae6fd;">
-                <div style="font-weight:800;color:#0369a1;font-size:.9rem;margin-bottom:12px;">➕ Add New Student</div>
-                <div style="display:flex;flex-direction:column;gap:8px;">${getNewStudentFormFields()}</div>
-                <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
-                    <button id="add-student-btn" style="background:linear-gradient(135deg,#0369a1,#0284c7);color:#fff;border:none;padding:9px 20px;border-radius:10px;font-weight:700;cursor:pointer;font-size:.82rem;">Add Student</button>
-                    ${isTransitionAddEnabled ? `<button id="add-transitioning-btn" style="background:linear-gradient(135deg,#ea580c,#f97316);color:#fff;border:none;padding:9px 20px;border-radius:10px;font-weight:700;cursor:pointer;font-size:.82rem;">Add Transitioning</button>` : ''}
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-green-700">My Students (${studentsCount})</h2>
+                <div class="flex items-center space-x-4">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="toggle-fees-display" class="hidden peer" ${showFeesToggle ? 'checked' : ''}>
+                        <div class="relative w-12 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-colors">
+                            <div class="absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-6"></div>
+                        </div>
+                        <span class="text-sm font-medium">Show Total Fees</span>
+                    </label>
+                    ${showFeesToggle ? `<div class="bg-green-100 text-green-800 px-3 py-1 rounded-lg font-bold" id="total-fees-display">Total: ₦${calculateTotalFees().toLocaleString()}</div>` : ''}
                 </div>
             </div>`;
+
+        if (isTutorAddEnabled) {
+            studentsHTML += `
+                <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
+                    <h3 class="font-bold text-lg mb-2">Add a New Student</h3>
+                    <div class="space-y-2">${getNewStudentFormFields()}</div>
+                    <div class="flex space-x-2 mt-3">
+                        <button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Student</button>
+                        ${isTransitionAddEnabled ? `<button id="add-transitioning-btn" class="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700">Add Transitioning</button>` : ''}
+                    </div>
+                </div>`;
         }
 
+        studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEnabled ? 'text-green-600' : 'text-red-500'}">${isSubmissionEnabled ? 'Enabled' : 'Disabled'}</strong> by the admin.</p>`;
+
         if (studentsCount === 0) {
-            studentsHTML += `<div style="text-align:center;padding:60px 20px;"><div style="font-size:3.5rem;margin-bottom:16px;">🎓</div><p style="font-weight:800;color:#475569;font-size:1.1rem;margin:0 0 6px;">No students yet</p><p style="color:#94a3b8;font-size:.875rem;">Contact management to get assigned students</p></div>`;
+            studentsHTML += `<p class="text-gray-500">You are not assigned to any students yet.</p>`;
         } else {
-            // Search + filter controls
-            studentsHTML += `
-            <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
-                <div style="position:relative;flex:1;min-width:200px;">
-                    <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                    <input type="text" id="sdb-search" class="sdb-search-bar" placeholder="Search by name, grade, subject…">
-                </div>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    <button class="sdb-filter-btn active" data-filter="all">All (${studentsCount})</button>
-                    <button class="sdb-filter-btn" data-filter="active">Active (${activeCount})</button>
-                    <button class="sdb-filter-btn" data-filter="break">Break (${breakCount})</button>
-                </div>
-            </div>
-            <div id="sdb-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">`;
+            studentsHTML += `<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mt-2">`;
 
             students.forEach(student => {
                 const hasSubmitted = submittedStudentIds.has(student.id);
                 const isReportSaved = savedReports[student.id];
-                const [avColor, avBg] = getAv(student.studentName);
+                const feeDisplay = showStudentFees ? `<div class="text-xs text-indigo-600 font-semibold mt-0.5">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
+                let statusBadge = '', actionsHTML = '';
                 const subjects = student.subjects ? student.subjects.join(', ') : 'N/A';
                 const days = student.days ? `${student.days} day${student.days !== '1' ? 's' : ''}/wk` : 'N/A';
-                const initials = (student.studentName||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
-                const feeDisplay = showStudentFees ? `<div style="font-size:.65rem;color:#6366f1;font-weight:700;margin-top:2px;">₦${(student.studentFee||0).toLocaleString()}</div>` : '';
-                let actionsHTML = '';
+                const initial = (student.studentName || '?').charAt(0).toUpperCase();
 
-                // Status config
-                let borderColor = '#f1f5f9', topBar = '#4f46e5', badgeBg, badgeColor, badgeText;
+                let cardAccent = 'border-gray-200';
                 if (student.summerBreak) {
-                    borderColor='#fef3c7'; topBar='#f59e0b';
-                    badgeBg='#fef3c7'; badgeColor='#92400e'; badgeText='☀️ On Break';
+                    statusBadge = `<span class="bg-yellow-100 text-yellow-700 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">☀️ On Break</span>`;
+                    cardAccent = 'border-yellow-200';
                 } else if (student.isTransitioning) {
-                    borderColor='#ffedd5'; topBar='#f97316';
-                    badgeBg='#ffedd5'; badgeColor='#9a3412'; badgeText='🔄 Transitioning';
+                    statusBadge = `<span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">🔄 Transitioning</span>`;
+                    cardAccent = 'border-orange-200';
                 } else if (hasSubmitted) {
-                    borderColor='#dbeafe'; topBar='#2563eb';
-                    badgeBg='#dbeafe'; badgeColor='#1e40af'; badgeText='✅ Submitted';
+                    statusBadge = `<span class="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">✅ Report Sent</span>`;
+                    cardAccent = 'border-blue-200';
                 } else if (isReportSaved) {
-                    borderColor='#dcfce7'; topBar='#16a34a';
-                    badgeBg='#dcfce7'; badgeColor='#166534'; badgeText='💾 Draft Saved';
+                    statusBadge = `<span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">💾 Saved</span>`;
+                    cardAccent = 'border-green-200';
                 } else {
-                    badgeBg='#f1f5f9'; badgeColor='#475569'; badgeText='📋 Pending';
+                    statusBadge = `<span class="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">📋 Pending</span>`;
                 }
 
-                // Build actions
                 if (hasSubmitted) {
-                    actionsHTML = `<span style="font-size:.7rem;color:#94a3b8;font-weight:600;">Report submitted this month</span>`;
+                    actionsHTML = `<span class="text-gray-400 text-xs">Submitted this month</span>`;
                 } else {
                     if (isSummerBreakEnabled) {
                         const recallStatus = window.recallStatusCache ? window.recallStatusCache[student.id] : null;
                         if (student.summerBreak) {
-                            actionsHTML += recallStatus === 'pending'
-                                ? `<span style="background:#ede9fe;color:#6d28d9;padding:5px 10px;border-radius:8px;font-size:.7rem;font-weight:700;">Recall Requested</span>`
-                                : `<button class="recall-from-break-btn sdb-action" style="background:#7c3aed;color:#fff;" data-student-id="${escapeHtml(student.id)}">🔔 Recall</button>`;
+                            if (recallStatus === 'pending') {
+                                actionsHTML += `<span class="bg-purple-200 text-purple-800 px-2 py-1 rounded text-xs">Recall Requested</span>`;
+                            } else {
+                                actionsHTML += `<button class="recall-from-break-btn bg-purple-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}">Recall</button>`;
+                            }
                         } else {
-                            actionsHTML += `<button class="summer-break-btn sdb-action" style="background:#f59e0b;color:#fff;" data-student-id="${escapeHtml(student.id)}">☀️ Break</button>`;
+                            actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}">Break</button>`;
                         }
                     }
                     if (isSubmissionEnabled && !student.summerBreak) {
-                        const label = approvedStudents.length === 1 ? 'Submit Report' : (isReportSaved ? 'Edit Report' : 'Enter Report');
-                        const btnClass = approvedStudents.length === 1 ? 'submit-single-report-btn' : 'enter-report-btn';
-                        actionsHTML += `<button class="${btnClass} sdb-action" style="background:linear-gradient(135deg,#059669,#16a34a);color:#fff;" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="${student.isTransitioning}">📝 ${label}</button>`;
+                        if (approvedStudents.length === 1) {
+                            actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="${student.isTransitioning}">Submit Report</button>`;
+                        } else {
+                            actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="${student.isTransitioning}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
+                        }
                     } else if (!student.summerBreak) {
-                        actionsHTML += `<span style="font-size:.7rem;color:#94a3b8;font-style:italic;">Submission disabled</span>`;
+                        actionsHTML += `<span class="text-gray-400 text-xs">Submission Disabled</span>`;
                     }
                     if (showEditDeleteButtons && !student.summerBreak) {
-                        actionsHTML += `<button class="edit-student-btn-tutor sdb-action" style="background:#3b82f6;color:#fff;" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">✏️ Edit</button>`;
-                        actionsHTML += `<button class="delete-student-btn-tutor sdb-action" style="background:#ef4444;color:#fff;" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">🗑️</button>`;
+                        actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Edit</button>`;
+                        actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Delete</button>`;
                     }
-                    if (isPlacementTestEligible(student.grade) && (student.placementTestStatus||'') !== 'completed') {
-                        actionsHTML += `<button class="launch-placement-btn sdb-action" style="background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;"
+                    if (isPlacementTestEligible(student.grade) && (student.placementTestStatus || '') !== 'completed') {
+                        actionsHTML += `<button class="launch-placement-btn bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 text-xs font-semibold"
                             data-student-id="${escapeHtml(student.id)}"
                             data-student-name="${escapeHtml(student.studentName)}"
                             data-grade="${escapeHtml(student.grade)}"
-                            data-parent-email="${escapeHtml(student.parentEmail||'')}"
-                            data-parent-name="${escapeHtml(student.parentName||'')}"
-                            data-parent-phone="${escapeHtml(student.parentPhone||'')}"
+                            data-parent-email="${escapeHtml(student.parentEmail || '')}"
+                            data-parent-name="${escapeHtml(student.parentName || '')}"
+                            data-parent-phone="${escapeHtml(student.parentPhone || '')}"
                             data-tutor-email="${escapeHtml(tutor.email)}"
-                            data-tutor-name="${escapeHtml(tutor.name||'')}">🎯 Placement Test</button>`;
+                            data-tutor-name="${escapeHtml(tutor.name || '')}">Placement Test</button>`;
                     }
                 }
 
-                const statusFilter = student.summerBreak ? 'break' : student.isTransitioning ? 'transitioning' : 'active';
-
                 studentsHTML += `
-                <div class="sdb-card" data-name="${escapeHtml((student.studentName||'').toLowerCase())}" data-subjects="${escapeHtml((subjects||'').toLowerCase())}" data-grade="${escapeHtml((student.grade||'').toLowerCase())}" data-status="${statusFilter}" style="border-color:${borderColor};">
-                    <!-- Top accent bar -->
-                    <div style="height:4px;background:${topBar};"></div>
-                    <!-- Card header -->
-                    <div style="padding:14px 16px 10px;display:flex;align-items:center;gap:11px;">
-                        <div style="width:44px;height:44px;border-radius:13px;background:${avBg};color:${avColor};font-weight:900;font-size:.92rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:-.02em;">${escapeHtml(initials)}</div>
-                        <div style="min-width:0;flex:1;">
-                            <div style="font-weight:800;color:#0f172a;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(student.studentName)}</div>
-                            <div style="font-size:.7rem;color:#64748b;margin-top:1px;">${escapeHtml(cleanGradeString ? cleanGradeString(student.grade) : student.grade)}</div>
+                <div class="bg-white border ${cardAccent} rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 rounded-xl flex items-center justify-center font-black text-lg flex-shrink-0 ${student.summerBreak ? 'bg-yellow-100 text-yellow-700' : student.isTransitioning ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}">${escapeHtml(initial)}</div>
+                        <div class="min-w-0 flex-1">
+                            <div class="font-bold text-gray-800 truncate">${escapeHtml(student.studentName)}</div>
+                            <div class="text-xs text-gray-400">${escapeHtml(cleanGradeString ? cleanGradeString(student.grade) : student.grade)}</div>
                             ${feeDisplay}
                         </div>
-                        <span style="background:${badgeBg};color:${badgeColor};font-size:.62rem;font-weight:800;padding:3px 8px;border-radius:999px;white-space:nowrap;flex-shrink:0;">${badgeText}</span>
+                        ${statusBadge}
                     </div>
-                    <!-- Info pills -->
-                    <div style="padding:0 16px 10px;display:flex;flex-wrap:wrap;gap:5px;">
-                        <span style="background:#f8fafc;border:1px solid #e2e8f0;color:#475569;padding:4px 9px;border-radius:999px;font-size:.65rem;font-weight:700;">📚 ${escapeHtml(subjects)}</span>
-                        <span style="background:#f8fafc;border:1px solid #e2e8f0;color:#475569;padding:4px 9px;border-radius:999px;font-size:.65rem;font-weight:700;">📅 ${escapeHtml(days)}</span>
-                        ${student.parentName ? `<span style="background:#f8fafc;border:1px solid #e2e8f0;color:#475569;padding:4px 9px;border-radius:999px;font-size:.65rem;font-weight:700;">👤 ${escapeHtml(student.parentName)}</span>` : ''}
+                    <div class="flex flex-wrap gap-1.5">
+                        <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg text-xs">📚 ${escapeHtml(subjects)}</span>
+                        <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg text-xs">📅 ${escapeHtml(days)}</span>
                     </div>
-                    <!-- Actions -->
-                    <div style="padding:10px 14px 14px;border-top:1px solid #f8fafc;display:flex;flex-wrap:wrap;gap:6px;margin-top:auto;">
-                        ${actionsHTML || '<span style="font-size:.7rem;color:#cbd5e1;">No actions available</span>'}
+                    <div class="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+                        ${actionsHTML || '<span class="text-gray-400 text-xs">No actions available</span>'}
                     </div>
                 </div>`;
             });
@@ -4115,52 +4050,27 @@ async function renderStudentDatabase(container, tutor) {
             studentsHTML += `</div>`;
 
             if (tutor.isManagementStaff) {
-                studentsHTML += `<div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-radius:16px;padding:18px 20px;margin-top:20px;border:1.5px solid #bbf7d0;"><div style="font-weight:800;color:#166534;margin-bottom:12px;">💰 Management Fee</div><div style="display:flex;align-items:center;gap:8px;"><label style="font-weight:700;color:#166534;font-size:.85rem;">Fee (₦):</label><input type="number" id="management-fee-input" style="flex:1;padding:9px 12px;border:1.5px solid #bbf7d0;border-radius:10px;font-size:.875rem;outline:none;" value="${escapeHtml(tutor.managementFee || 0)}"><button id="save-management-fee-btn" style="background:linear-gradient(135deg,#059669,#16a34a);color:#fff;border:none;padding:9px 18px;border-radius:10px;font-weight:700;cursor:pointer;">Save</button></div></div>`;
+                studentsHTML += `<div class="bg-green-50 p-4 rounded-lg shadow-md mt-6"><h3 class="text-lg font-bold text-green-800 mb-2">Management Fee</h3><div class="flex items-center space-x-2"><label class="font-semibold">Fee:</label><input type="number" id="management-fee-input" class="p-2 border rounded w-full" value="${escapeHtml(tutor.managementFee || 0)}"><button id="save-management-fee-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Save Fee</button></div></div>`;
             }
             if (approvedStudents.length > 1 && isSubmissionEnabled) {
                 const submittable = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length;
                 const allSaved = Object.keys(savedReports).length === submittable && submittable > 0;
                 if (submittable > 0) {
-                    studentsHTML += `<div style="margin-top:20px;text-align:right;"><button id="submit-all-reports-btn" style="background:${allSaved?'linear-gradient(135deg,#059669,#047857)':'#94a3b8'};color:#fff;border:none;padding:13px 28px;border-radius:12px;font-weight:800;cursor:${allSaved?'pointer':'not-allowed'};font-size:.95rem;box-shadow:${allSaved?'0 4px 14px rgba(5,150,105,.35)':'none'};" ${!allSaved?'disabled':''}>📤 Submit All Reports</button></div>`;
+                    studentsHTML += `<div class="mt-6 text-right"><button id="submit-all-reports-btn" class="bg-green-700 text-white px-6 py-3 rounded-lg font-bold ${!allSaved ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-800'}" ${!allSaved ? 'disabled' : ''}>Submit All Reports</button></div>`;
                 }
             }
         }
-
-        studentsHTML += `</div>`; // close sdb-root
-
-        container.innerHTML = `<div id="student-list-view" style="padding:0;">${studentsHTML}</div>`;
+        container.innerHTML = `<div id="student-list-view" class="bg-white p-6 rounded-lg shadow-md">${studentsHTML}</div>`;
         attachEventListeners();
 
-        // Search & filter logic
-        const searchEl = document.getElementById('sdb-search');
-        const filterBtns = document.querySelectorAll('.sdb-filter-btn');
-        let currentFilter = 'all';
-
-        function applyFilter() {
-            const q = (searchEl?.value||'').toLowerCase().trim();
-            document.querySelectorAll('#sdb-grid .sdb-card').forEach(card => {
-                const matchSearch = !q || card.dataset.name.includes(q) || (card.dataset.subjects||'').includes(q) || (card.dataset.grade||'').includes(q);
-                const matchFilter = currentFilter === 'all' || card.dataset.status === currentFilter;
-                card.style.display = (matchSearch && matchFilter) ? '' : 'none';
-            });
-        }
-        if (searchEl) searchEl.addEventListener('input', applyFilter);
-        filterBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                filterBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentFilter = btn.dataset.filter;
-                applyFilter();
-            });
-        });
-
-        // Toggle fees
+        // Toggle fees listener
         const feesToggle = document.getElementById('toggle-fees-display');
         if (feesToggle) feesToggle.addEventListener('change', () => {
             localStorage.setItem(showFeesToggleKey, feesToggle.checked);
             renderUI();
         });
     }
+
 
     // --- MODAL FUNCTIONS (Restored inside Scope) ---
     
@@ -6203,8 +6113,8 @@ window.__fbOnSnapshot = onSnapshot;
 window.__fbDoc        = doc;
 window.__fbSetDoc     = setDoc;
 window.__fbUpdateDoc  = updateDoc;
-// Also expose db once auth resolves (set in onAuthStateChanged below)
-// window.db is set by firebaseConfig.js and imported here
+// Expose db instance so games.js and other scripts can use Firebase
+window.db = db;
 
 // Opens grading in a dedicated new browser tab for full-screen annotation experience
 window.openGradingInNewTab = function(homeworkId) {
