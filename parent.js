@@ -1628,17 +1628,16 @@ async function loadAcademicsData(selectedStudent = null) {
                                     ` : ''}
                                 </div>
                                 
-                                ${isSubmitted ? `
-                                <div class="mt-4 pt-3 border-t border-gray-100">
-                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                                        ✅ Submitted
-                                    </span>
-                                </div>` : isGraded ? `
-                                <div class="mt-4 pt-3 border-t border-gray-100">
-                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                                        📊 Graded
-                                    </span>
-                                </div>` : ''}
+                                ${isGraded ? `
+                                <div class="mt-3 pt-3 border-t border-gray-100">
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">📊 Graded</span>
+                                </div>` : isSubmitted ? `
+                                <div class="mt-3 pt-3 border-t border-gray-100">
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800">✅ Submitted</span>
+                                </div>` : `
+                                <div class="mt-3 pt-3 border-t border-gray-100">
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800">⏳ Pending</span>
+                                </div>`}
                             </div>
                         `;
                     });
@@ -2161,7 +2160,10 @@ function createYearlyArchiveReportView(reportsByStudent) {
     return html;
 }
 
-// Chart initialization registry — avoids broken <script> tags inside innerHTML
+
+// ============================================================================
+// CHART REGISTRY — Safely init charts in hidden accordion content
+// ============================================================================
 function registerPendingChart(chartId, chartConfig) {
     if (!window._pendingCharts) window._pendingCharts = {};
     window._pendingCharts[chartId] = chartConfig;
@@ -2170,87 +2172,73 @@ function registerPendingChart(chartId, chartConfig) {
 function initPendingCharts() {
     const pending = window._pendingCharts || {};
     if (!window.charts) window.charts = new Map();
-    for (const [chartId, config] of Object.entries(pending)) {
+    Object.keys(pending).forEach(chartId => {
         try {
             const ctx = document.getElementById(chartId);
-            if (ctx && !ctx.dataset.chartInitialized) {
-                // Destroy previous instance if any
+            if (ctx && !ctx.dataset.chartDone) {
                 if (window.charts.has(chartId)) {
-                    window.charts.get(chartId).destroy();
+                    try { window.charts.get(chartId).destroy(); } catch(e) {}
                 }
-                ctx.dataset.chartInitialized = 'true';
-                const chart = new Chart(ctx, config);
+                ctx.dataset.chartDone = '1';
+                const chart = new Chart(ctx, pending[chartId]);
                 window.charts.set(chartId, chart);
             }
         } catch(e) {
-            console.warn('Chart init error for', chartId, e);
+            console.warn('Chart init error', chartId, e);
         }
-    }
+    });
 }
 
 function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, fullName, date) {
     const firstReport = sessionReports[0];
     const formattedDate = formatDetailedDate(date || new Date(firstReport.timestamp * 1000), true);
     
-    // FIX: Extract tutorName from report data
+    // Extract tutor name from available fields
     const tutorName = safeText(
-        firstReport.tutorName || 
-        firstReport.tutor_name || 
-        firstReport.tutorDisplayName || 
-        'N/A'
+        firstReport.tutorName || firstReport.tutor_name || firstReport.tutorDisplayName || 'N/A'
     );
     const tutorEmail = firstReport.tutorEmail || firstReport.tutor_email || '';
     
-    // FIX: Extract tutor's actual comments from the report
+    // Extract tutor comment/feedback
     const tutorComment = safeText(
-        firstReport.tutorComment || 
-        firstReport.comment || 
-        firstReport.generalComment || 
-        firstReport.tutorFeedback || 
-        firstReport.feedback || 
-        ''
-    );
-    const tutorObservation = safeText(
-        firstReport.tutorObservation || 
-        firstReport.observation || 
-        ''
+        firstReport.tutorComment || firstReport.comment || firstReport.generalComment ||
+        firstReport.tutorFeedback || firstReport.feedback || firstReport.tutorObservation || ''
     );
     
     const results = sessionReports.map(testResult => {
         const topics = [...new Set(testResult.answers?.map(a => safeText(a.topic)).filter(t => t))] || [];
+        const pct = testResult.totalScoreableQuestions > 0
+            ? Math.round((testResult.score / testResult.totalScoreableQuestions) * 100) : 0;
         return {
             subject: safeText(testResult.subject || testResult.testSubject || 'General'),
             correct: testResult.score !== undefined ? testResult.score : 0,
             total: testResult.totalScoreableQuestions !== undefined ? testResult.totalScoreableQuestions : 0,
+            pct,
             topics: topics,
-            percentage: testResult.totalScoreableQuestions > 0 
-                ? Math.round((testResult.score / testResult.totalScoreableQuestions) * 100) 
-                : 0
         };
     });
 
     const recommendation = generateTemplatedRecommendation(fullName, tutorName, results);
 
     const tableRows = results.map(res => {
-        const pct = res.percentage;
-        const badge = pct >= 75 ? '🟢' : pct >= 50 ? '🟡' : '🔴';
+        const emoji = res.pct >= 75 ? '🟢' : res.pct >= 50 ? '🟡' : '🔴';
         return `
-        <tr>
-            <td class="border px-2 py-2">${res.subject.toUpperCase()}</td>
-            <td class="border px-2 py-2 text-center font-semibold">${res.correct} / ${res.total}</td>
-            <td class="border px-2 py-2 text-center">${badge} ${pct}%</td>
-        </tr>
-    `}).join("");
+        <tr class="hover:bg-gray-50">
+            <td class="border px-3 py-2">${res.subject.toUpperCase()}</td>
+            <td class="border px-3 py-2 text-center">${res.correct} / ${res.total}</td>
+            <td class="border px-3 py-2 text-center">${emoji} ${res.pct}%</td>
+        </tr>`;
+    }).join("");
 
     const topicsTableRows = results.map(res => `
-        <tr>
-            <td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td>
-            <td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td>
+        <tr class="hover:bg-gray-50">
+            <td class="border px-3 py-2 font-semibold">${res.subject.toUpperCase()}</td>
+            <td class="border px-3 py-2">${res.topics.join(', ') || 'N/A'}</td>
         </tr>
     `).join("");
 
     const creativeWritingAnswer = firstReport.answers?.find(a => a.type === 'creative-writing');
-    const cwTutorReport = creativeWritingAnswer?.tutorReport || tutorReport || 'Pending review.';
+    const tutorReport = creativeWritingAnswer?.tutorReport || 'Pending review.';
 
     const chartId = `chart-${studentIndex}-${sessionId}`;
     const chartConfig = {
@@ -2258,44 +2246,22 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
         data: {
             labels: results.map(r => r.subject.toUpperCase()),
             datasets: [
-                { 
-                    label: 'Correct', 
-                    data: results.map(s => s.correct), 
-                    backgroundColor: 'rgba(22, 163, 74, 0.85)',
-                    borderColor: '#15803d',
-                    borderWidth: 1,
-                    borderRadius: 4
-                }, 
-                { 
-                    label: 'Remaining', 
-                    data: results.map(s => Math.max(0, s.total - s.correct)), 
-                    backgroundColor: 'rgba(249, 115, 22, 0.5)',
-                    borderColor: '#ea580c',
-                    borderWidth: 1,
-                    borderRadius: 4
-                }
+                { label: 'Correct', data: results.map(s => s.correct), backgroundColor: 'rgba(16,185,129,0.85)', borderRadius: 4 }, 
+                { label: 'Remaining', data: results.map(s => s.total - s.correct), backgroundColor: 'rgba(251,191,36,0.75)', borderRadius: 4 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: { 
-                x: { stacked: true, grid: { display: false } }, 
-                y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } } 
-            },
-            plugins: { 
-                title: { 
-                    display: true, 
-                    text: 'Assessment Score Distribution by Subject',
-                    font: { size: 13, weight: 'bold' },
-                    color: '#166534'
-                },
+            scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } } },
+            plugins: {
+                title: { display: true, text: 'Score Distribution by Subject', color: '#166534', font: { size: 13, weight: 'bold' } },
                 legend: { position: 'bottom' }
             }
         }
     };
 
-    // Register chart for deferred initialization (avoids innerHTML script execution issue)
+    // Register chart for deferred init (fires on accordion open via initPendingCharts)
     registerPendingChart(chartId, chartConfig);
 
     return `
@@ -2322,19 +2288,19 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
             </div>
             
             <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">📊 Performance Summary</h3>
-            <table class="w-full text-sm mb-4 border border-collapse rounded-lg overflow-hidden">
+            <table class="w-full text-sm mb-4 border border-collapse">
                 <thead class="bg-green-700 text-white">
                     <tr>
                         <th class="border border-green-600 px-3 py-2 text-left">Subject</th>
                         <th class="border border-green-600 px-3 py-2 text-center">Score</th>
-                        <th class="border border-green-600 px-3 py-2 text-center">Result</th>
+                        <th class="border border-green-600 px-3 py-2 text-center">%</th>
                     </tr>
                 </thead>
                 <tbody>${tableRows}</tbody>
             </table>
             
             ${results.length > 0 ? `
-            <div class="mb-6" style="height: 220px; position: relative;">
+            <div class="mb-6" style="height:220px;position:relative;">
                 <canvas id="${chartId}"></canvas>
             </div>
             ` : ''}
@@ -2343,39 +2309,37 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
             <table class="w-full text-sm mb-4 border border-collapse">
                 <thead class="bg-gray-100">
                     <tr>
-                        <th class="border px-2 py-1 text-left">Subject</th>
-                        <th class="border px-2 py-1 text-left">Topics Covered</th>
+                        <th class="border px-3 py-2 text-left">Subject</th>
+                        <th class="border px-3 py-2 text-left">Topics Covered</th>
                     </tr>
                 </thead>
                 <tbody>${topicsTableRows}</tbody>
             </table>
             
+            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">💡 Tutor's Recommendation</h3>
+            <p class="mb-2 text-gray-700 leading-relaxed">${recommendation}</p>
+            
             ${tutorComment ? `
-            <div class="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
-                <h3 class="text-lg font-semibold mb-2 text-blue-800">✍️ Tutor's Comment</h3>
-                <p class="text-gray-700 leading-relaxed preserve-whitespace">${tutorComment}</p>
-                ${tutorObservation ? `<p class="text-gray-600 mt-2 leading-relaxed preserve-whitespace"><em>${tutorObservation}</em></p>` : ''}
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                <h3 class="font-semibold text-blue-800 mb-1">🗣️ Tutor's Comment</h3>
+                <p class="text-blue-700 leading-relaxed">${tutorComment}</p>
             </div>
             ` : ''}
-            
-            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">🎯 Tutor's Recommendation</h3>
-            <p class="mb-4 text-gray-700 leading-relaxed bg-purple-50 p-3 rounded-lg border border-purple-100">${recommendation}</p>
 
             ${creativeWritingAnswer ? `
-            <div class="mb-6 bg-orange-50 border-l-4 border-orange-400 p-4 rounded-r-lg">
-                <h3 class="text-lg font-semibold mb-2 text-orange-800">✏️ Creative Writing Feedback</h3>
-                <p class="text-gray-700 leading-relaxed"><strong>Tutor's Report:</strong> ${safeText(cwTutorReport)}</p>
+            <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 mt-4">
+                <h3 class="font-semibold text-purple-800 mb-1">✍️ Creative Writing Feedback</h3>
+                <p class="text-purple-700"><strong>Tutor's Report:</strong> ${safeText(tutorReport)}</p>
             </div>
             ` : ''}
             
-            <div class="bg-yellow-50 p-4 rounded-lg mt-6 border border-yellow-200">
-                <h3 class="text-lg font-semibold mb-1 text-green-700">📝 Director's Message</h3>
+            <div class="bg-yellow-50 border border-yellow-200 p-4 rounded-lg mt-6">
+                <h3 class="text-lg font-semibold mb-1 text-green-700">Director's Message</h3>
                 <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
             </div>
             
             <div class="mt-6 text-center">
-                <button onclick="downloadSessionReport(${studentIndex}, '${safeText(sessionId)}', '${safeText(fullName)}', 'assessment')" 
-                        class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
+                <button onclick="downloadSessionReport(${studentIndex}, '${sessionId}', '${safeText(fullName)}', 'assessment')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
                     📥 Download Assessment PDF
                 </button>
             </div>
@@ -2511,6 +2475,8 @@ function toggleAccordion(elementId) {
     if (content.classList.contains('hidden')) {
         content.classList.remove('hidden');
         arrow.textContent = '▲';
+        // Initialize any charts that were registered inside this accordion
+        setTimeout(() => { if (typeof initPendingCharts === 'function') initPendingCharts(); }, 50);
     } else {
         content.classList.add('hidden');
         arrow.textContent = '▼';
@@ -2533,7 +2499,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         reportArea.classList.remove("hidden");
         authLoader.classList.add("hidden");
         localStorage.setItem('isAuthenticated', 'true');
-        setTimeout(() => { if (typeof injectEnrollmentTab === 'function') injectEnrollmentTab(); }, 1000);
     } else {
         localStorage.removeItem('isAuthenticated');
     }
@@ -2661,15 +2626,13 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             });
         }
 
-        // Clear pending charts registry before rendering
         window._pendingCharts = {};
         reportsHtml = createYearlyArchiveReportView(formattedReportsByStudent);
         reportContent.innerHTML = reportsHtml;
-        
-        // Initialize all charts after DOM is set
-        setTimeout(() => {
-            initPendingCharts();
-        }, 200);
+
+        // Charts are registered during HTML generation; init fires when accordions open
+        // (see toggleAccordion). Also init now in case some are already visible.
+        setTimeout(() => { if (typeof initPendingCharts === 'function') initPendingCharts(); }, 150);
 
         // Setup other features in background
         setTimeout(() => {
@@ -2872,8 +2835,13 @@ class UnifiedAuthManager {
     setupUIComponents() {
         addManualRefreshButton();
         addLogoutButton();
+        // Initialize parent messaging after a short delay
         if (this.currentUser) {
-            setTimeout(() => initializeParentMessaging(this.currentUser.uid, this.currentUser.parentName || 'Parent'), 500);
+            setTimeout(() => {
+                if (typeof initializeParentMessaging === 'function') {
+                    initializeParentMessaging(this.currentUser.uid, this.currentUser.parentName || 'Parent');
+                }
+            }, 600);
         }
     }
 
@@ -3887,7 +3855,6 @@ function switchMainTab(tab) {
         t?.classList.remove('tab-active-main');
         t?.classList.add('tab-inactive-main');
     });
-    
     [reportContentArea, academicsContentArea, rewardsContentArea, settingsContentArea, enrollContentArea].forEach(a => {
         a?.classList.add('hidden');
     });
@@ -3905,16 +3872,13 @@ function switchMainTab(tab) {
         rewardsTab?.classList.remove('tab-inactive-main');
         rewardsTab?.classList.add('tab-active-main');
         rewardsContentArea?.classList.remove('hidden');
-        
         const user = auth.currentUser;
-        if (user) {
-            loadReferralRewards(user.uid);
-        }
+        if (user) { loadReferralRewards(user.uid); }
     } else if (tab === 'enroll') {
         enrollTab?.classList.remove('tab-inactive-main');
         enrollTab?.classList.add('tab-active-main');
         enrollContentArea?.classList.remove('hidden');
-        loadEnrollmentTab();
+        if (typeof loadEnrollmentTab === 'function') loadEnrollmentTab();
     }
 }
 
@@ -5861,95 +5825,91 @@ if (window.authManager && window.authManager.loadUserDashboard) {
     };
 }
 
+console.log("✅ SINGLE FIX APPLIED: Double registration & email linking resolved");
 
 // ============================================================================
-// SECTION 20: PARENT MESSAGING SYSTEM
+// SECTION 27: PARENT MESSAGING SYSTEM
 // ============================================================================
 
 const PARENT_CLOUDINARY = { cloudName: 'dwjq7j5zp', uploadPreset: 'tutor_homework' };
 
 let _parentMsgUnreadUnsub = null;
-let _parentChatUnsub = null;
-let _parentInboxUnsub = null;
+let _parentChatUnsub    = null;
+let _parentInboxUnsub   = null;
 let _parentMsgUnreadCount = 0;
-let _parentMsgBtn = null;
+let _parentMsgBtn   = null;
 let _parentInboxBtn = null;
-let _parentCurrentUserId = null;
+let _parentCurrentUserId   = null;
 let _parentCurrentUserName = null;
 
 function initializeParentMessaging(uid, name) {
-    _parentCurrentUserId = uid;
+    _parentCurrentUserId   = uid;
     _parentCurrentUserName = name;
-    
-    // Remove existing buttons
+
     document.querySelectorAll('.parent-floating-msg-btn, .parent-floating-inbox-btn').forEach(el => el.remove());
-    
-    // Inject styles
+
     if (!document.getElementById('parent-msg-styles')) {
         const style = document.createElement('style');
         style.id = 'parent-msg-styles';
         style.textContent = `
             .parent-floating-msg-btn, .parent-floating-inbox-btn {
-                position: fixed; bottom: 24px; z-index: 9999;
-                background: linear-gradient(135deg, #1e40af, #3b82f6);
-                color: white; border: none; border-radius: 28px;
-                padding: 12px 20px; cursor: pointer; font-weight: 700;
-                font-size: 0.875rem; display: flex; align-items: center;
-                gap: 8px; box-shadow: 0 8px 24px rgba(59,130,246,0.4);
-                transition: transform 0.2s, box-shadow 0.2s;
+                position:fixed; bottom:24px; z-index:9990;
+                background:linear-gradient(135deg,#059669,#10b981);
+                color:#fff; border:none; border-radius:28px;
+                padding:12px 20px; cursor:pointer; font-weight:700;
+                font-size:0.875rem; display:flex; align-items:center; gap:8px;
+                box-shadow:0 8px 24px rgba(16,185,129,0.45);
+                transition:transform 0.2s,box-shadow 0.2s;
             }
-            .parent-floating-msg-btn { right: 24px; }
-            .parent-floating-inbox-btn { right: 168px; }
-            .parent-floating-msg-btn:hover, .parent-floating-inbox-btn:hover {
-                transform: translateY(-2px); box-shadow: 0 12px 32px rgba(59,130,246,0.5);
+            .parent-floating-msg-btn  { right:24px; }
+            .parent-floating-inbox-btn{ right:178px; }
+            .parent-floating-msg-btn:hover,.parent-floating-inbox-btn:hover {
+                transform:translateY(-2px); box-shadow:0 12px 32px rgba(16,185,129,0.55);
             }
-            .parent-msg-unread-badge {
-                background: #ef4444; color: white; border-radius: 50%;
-                min-width: 18px; height: 18px; font-size: 0.65rem;
-                display: flex; align-items: center; justify-content: center;
-                padding: 0 3px; font-weight: 900;
+            .parent-msg-badge {
+                background:#ef4444; color:#fff; border-radius:50%;
+                min-width:18px; height:18px; font-size:0.65rem; font-weight:900;
+                display:flex; align-items:center; justify-content:center; padding:0 3px;
             }
         `;
         document.head.appendChild(style);
     }
-    
+
     _parentMsgBtn = document.createElement('button');
     _parentMsgBtn.className = 'parent-floating-msg-btn';
     _parentMsgBtn.innerHTML = '<span>✉️</span><span>New Message</span>';
     _parentMsgBtn.onclick = showParentNewMessageModal;
     document.body.appendChild(_parentMsgBtn);
-    
+
     _parentInboxBtn = document.createElement('button');
     _parentInboxBtn.className = 'parent-floating-inbox-btn';
     _parentInboxBtn.innerHTML = '<span>📨</span><span>Inbox</span>';
     _parentInboxBtn.onclick = showParentInboxModal;
     document.body.appendChild(_parentInboxBtn);
-    
-    // Start unread listener
+
     if (_parentMsgUnreadUnsub) _parentMsgUnreadUnsub();
     _parentMsgUnreadUnsub = db.collection('conversations')
         .where('participants', 'array-contains', uid)
-        .onSnapshot(snapshot => {
+        .onSnapshot(snap => {
             let count = 0;
-            snapshot.forEach(d => {
+            snap.forEach(d => {
                 const data = d.data();
                 if (data.unreadCount > 0 && data.lastSenderId !== uid) count += data.unreadCount;
             });
             _parentMsgUnreadCount = count;
-            _updateParentMsgBadge();
+            _updateParentBadge();
         }, () => {});
 }
 
-function _updateParentMsgBadge() {
+function _updateParentBadge() {
     [_parentMsgBtn, _parentInboxBtn].forEach(btn => {
         if (!btn) return;
-        const existing = btn.querySelector('.parent-msg-unread-badge');
-        if (existing) existing.remove();
+        btn.querySelector('.parent-msg-badge')?.remove();
         if (_parentMsgUnreadCount > 0) {
-            const badge = document.createElement('span');
-            badge.className = 'parent-msg-unread-badge';
-            badge.textContent = _parentMsgUnreadCount > 99 ? '99+' : _parentMsgUnreadCount;
-            btn.appendChild(badge);
+            const b = document.createElement('span');
+            b.className = 'parent-msg-badge';
+            b.textContent = _parentMsgUnreadCount > 99 ? '99+' : _parentMsgUnreadCount;
+            btn.appendChild(b);
         }
     });
 }
@@ -5963,42 +5923,42 @@ async function showParentNewMessageModal() {
 
     modal.innerHTML = `
     <div style="background:#fff;border-radius:20px;width:100%;max-width:520px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.4);">
-        <div style="background:linear-gradient(135deg,#1e40af,#3b82f6);padding:20px 24px;flex-shrink:0;">
+        <div style="background:linear-gradient(135deg,#065f46,#059669,#10b981);padding:20px 24px;flex-shrink:0;">
             <div style="display:flex;align-items:center;justify-content:space-between;">
                 <div style="display:flex;align-items:center;gap:12px;">
-                    <div style="width:40px;height:40px;background:rgba(255,255,255,.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;">✉️</div>
+                    <div style="width:40px;height:40px;background:rgba(255,255,255,.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;">✉️</div>
                     <div>
                         <div style="color:#fff;font-weight:800;font-size:1rem;">New Message</div>
-                        <div style="color:rgba(255,255,255,.65);font-size:.72rem;margin-top:2px;">Contact your child's team</div>
+                        <div style="color:rgba(255,255,255,.65);font-size:.72rem;margin-top:1px;">Contact your child's team</div>
                     </div>
                 </div>
-                <button onclick="this.closest('.parent-new-msg-modal').remove()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:1rem;cursor:pointer;">✕</button>
+                <button onclick="this.closest('.parent-new-msg-modal').remove()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:1rem;cursor:pointer;line-height:1;">✕</button>
             </div>
         </div>
         <div style="flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
             <div>
                 <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;margin-bottom:8px;">Send To</div>
-                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;" id="pnm-type-grid">
-                    ${[{type:'student',icon:'🎓',label:'My Student'},{type:'tutor',icon:'🧑‍🏫',label:'Tutor'},{type:'management',icon:'🏢',label:'Management'}].map(t => `
-                    <button class="pnm-type-btn" data-type="${t.type}" onclick="parentMsgSelectType('${t.type}', this)" 
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;">
+                    ${[{t:'student',i:'🎓',l:'My Student'},{t:'tutor',i:'🧑‍🏫',l:'Tutor'},{t:'management',i:'🏢',l:'Management'}].map(x=>`
+                    <button class="pnm-type-btn" data-type="${x.t}" onclick="parentMsgSelectType('${x.t}',this)"
                         style="padding:10px 6px;border-radius:12px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all .15s;">
-                        <span style="font-size:1.1rem;">${t.icon}</span>
-                        <span style="font-size:.68rem;font-weight:700;color:#64748b;">${t.label}</span>
+                        <span style="font-size:1.1rem;">${x.i}</span>
+                        <span style="font-size:.68rem;font-weight:700;color:#64748b;">${x.l}</span>
                     </button>`).join('')}
                 </div>
             </div>
-            <div id="pnm-recipient-area"></div>
+            <div id="pnm-recipient-area" style="min-height:50px;"></div>
             <div>
                 <label style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;display:block;margin-bottom:6px;">Subject (optional)</label>
-                <input type="text" id="pnm-subject" placeholder="e.g. About homework for next week..." 
-                    style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.875rem;box-sizing:border-box;outline:none;" 
-                    onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#e2e8f0'">
+                <input type="text" id="pnm-subject" placeholder="e.g. About this week's session..."
+                    style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.875rem;box-sizing:border-box;outline:none;"
+                    onfocus="this.style.borderColor='#10b981'" onblur="this.style.borderColor='#e2e8f0'">
             </div>
             <div>
-                <label style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;display:block;margin-bottom:6px;">Message</label>
-                <textarea id="pnm-content" rows="4" placeholder="Type your message here..." 
+                <label style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;display:block;margin-bottom:6px;">Message *</label>
+                <textarea id="pnm-content" rows="4" placeholder="Type your message here..."
                     style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.875rem;box-sizing:border-box;resize:none;outline:none;"
-                    onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#e2e8f0'"></textarea>
+                    onfocus="this.style.borderColor='#10b981'" onblur="this.style.borderColor='#e2e8f0'"></textarea>
             </div>
             <div style="display:flex;align-items:center;gap:10px;">
                 <label style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:0.8rem;color:#64748b;">
@@ -6009,23 +5969,21 @@ async function showParentNewMessageModal() {
             </div>
         </div>
         <div style="padding:16px 24px;border-top:1px solid #f1f5f9;flex-shrink:0;">
-            <button id="pnm-send-btn" onclick="parentMsgSend(this.closest('.parent-new-msg-modal'))" 
-                style="width:100%;background:linear-gradient(135deg,#1e40af,#3b82f6);color:#fff;border:none;border-radius:12px;padding:12px;font-weight:800;font-size:0.95rem;cursor:pointer;">
+            <button id="pnm-send-btn" onclick="parentMsgSend(this.closest('.parent-new-msg-modal'))"
+                style="width:100%;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:12px;padding:13px;font-weight:800;font-size:0.95rem;cursor:pointer;">
                 📤 Send Message
             </button>
         </div>
     </div>`;
-    
+
     document.body.appendChild(modal);
-    
-    // Image name preview
     modal.querySelector('#pnm-image').addEventListener('change', e => {
-        const name = e.target.files[0]?.name || '';
-        modal.querySelector('#pnm-image-name').textContent = name ? `📎 ${name}` : '';
+        modal.querySelector('#pnm-image-name').textContent = e.target.files[0]?.name ? '📎 ' + e.target.files[0].name : '';
     });
-    
-    // Load students for initial selection
-    await parentMsgSelectType('student', modal.querySelector('[data-type="student"]'));
+
+    // Load students by default
+    const firstBtn = modal.querySelector('[data-type="student"]');
+    if (firstBtn) await parentMsgSelectType('student', firstBtn);
 }
 
 window.parentMsgSelectType = async function(type, btn) {
@@ -6034,28 +5992,29 @@ window.parentMsgSelectType = async function(type, btn) {
         b.style.borderColor = '#e2e8f0';
         b.style.background = '#fff';
         b.querySelector('span:last-child').style.color = '#64748b';
+        delete b.dataset.selected;
     });
-    btn.style.borderColor = '#3b82f6';
-    btn.style.background = '#eff6ff';
-    btn.querySelector('span:last-child').style.color = '#1d4ed8';
+    btn.style.borderColor = '#10b981';
+    btn.style.background = '#ecfdf5';
+    btn.querySelector('span:last-child').style.color = '#065f46';
     btn.dataset.selected = 'true';
-    
+
     const area = modal.querySelector('#pnm-recipient-area');
-    
+
     if (type === 'management') {
-        area.innerHTML = `<div style="padding:12px;background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;font-size:0.875rem;color:#1e40af;font-weight:600;">📧 Message will be sent to BrightKids Hub management</div>`;
+        area.innerHTML = `<div style="padding:12px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;font-size:0.875rem;color:#065f46;font-weight:600;">📧 Message will be sent to Blooming Kids House management</div>`;
         return;
     }
-    
+
     area.innerHTML = '<div style="text-align:center;padding:12px;color:#94a3b8;font-size:0.875rem;">Loading...</div>';
-    
+
     try {
         const user = auth.currentUser;
         if (!user) return;
         const userDoc = await db.collection('parent_users').doc(user.uid).get();
         const userData = userDoc.data();
         const childrenResult = await comprehensiveFindChildren(userData.normalizedPhone || userData.phone);
-        
+
         if (type === 'student') {
             const students = childrenResult.allStudentData;
             if (!students.length) {
@@ -6064,84 +6023,73 @@ window.parentMsgSelectType = async function(type, btn) {
             }
             area.innerHTML = `
                 <label style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;display:block;margin-bottom:6px;">Select Student</label>
-                <select id="pnm-student-sel" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.875rem;box-sizing:border-box;outline:none;" 
-                    onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#e2e8f0'">
-                    ${students.map(s => `<option value="${s.id}" data-name="${safeText(s.data.name || s.id)}">${capitalize(s.data.name || s.id)}</option>`).join('')}
+                <select id="pnm-student-sel" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.875rem;box-sizing:border-box;outline:none;"
+                    onfocus="this.style.borderColor='#10b981'" onblur="this.style.borderColor='#e2e8f0'">
+                    ${students.map(s => `<option value="${s.id}" data-name="${safeText(s.data.name||s.id)}">${capitalize(s.data.name||s.id)}</option>`).join('')}
                 </select>`;
         } else if (type === 'tutor') {
-            // Get tutors from students' tutorEmail fields
             const tutors = new Map();
             childrenResult.allStudentData.forEach(s => {
                 const d = s.data;
-                if (d.tutorEmail && d.tutorName) {
-                    tutors.set(d.tutorEmail, { email: d.tutorEmail, name: d.tutorName });
-                }
+                if (d.tutorEmail && d.tutorName) tutors.set(d.tutorEmail, { email: d.tutorEmail, name: d.tutorName });
             });
-            
+
             if (!tutors.size) {
                 area.innerHTML = '<div style="text-align:center;padding:12px;color:#94a3b8;">No assigned tutors found</div>';
                 return;
             }
-            
-            // Fetch tutor UIDs
+
             const tutorOptions = [];
             for (const [email, info] of tutors) {
                 try {
                     const snap = await db.collection('tutors').where('email', '==', email).limit(1).get();
-                    if (!snap.empty) {
-                        tutorOptions.push({ id: snap.docs[0].id, name: info.name, email });
-                    } else {
-                        tutorOptions.push({ id: email, name: info.name, email });
-                    }
+                    tutorOptions.push({ id: snap.empty ? email : snap.docs[0].id, name: info.name, email });
                 } catch(e) {
                     tutorOptions.push({ id: email, name: info.name, email });
                 }
             }
-            
+
             area.innerHTML = `
                 <label style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;display:block;margin-bottom:6px;">Select Tutor</label>
                 <select id="pnm-tutor-sel" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.875rem;box-sizing:border-box;outline:none;"
-                    onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#e2e8f0'">
+                    onfocus="this.style.borderColor='#10b981'" onblur="this.style.borderColor='#e2e8f0'">
                     ${tutorOptions.map(t => `<option value="${t.id}" data-name="${safeText(t.name)}">${safeText(t.name)} (${safeText(t.email)})</option>`).join('')}
                 </select>`;
         }
     } catch(e) {
-        area.innerHTML = `<div style="color:#ef4444;font-size:0.875rem;padding:8px;">Error loading recipients: ${e.message}</div>`;
+        area.innerHTML = `<div style="color:#ef4444;font-size:0.875rem;padding:8px;">Error: ${safeText(e.message)}</div>`;
     }
 };
 
 window.parentMsgSend = async function(modal) {
     const activeBtn = modal.querySelector('.pnm-type-btn[data-selected="true"]');
     const type = activeBtn?.dataset?.type;
-    if (!type) { alert('Please select a recipient type.'); return; }
-    
+    if (!type) { showMessage('Please select a recipient type.', 'error'); return; }
+
     const content = modal.querySelector('#pnm-content')?.value?.trim();
     const subject = modal.querySelector('#pnm-subject')?.value?.trim();
     const imageFile = modal.querySelector('#pnm-image')?.files?.[0] || null;
-    
-    if (!content && !imageFile) { alert('Please enter a message or attach an image.'); return; }
-    
+
+    if (!content && !imageFile) { showMessage('Please enter a message or attach an image.', 'error'); return; }
+
     let recipientId, recipientName;
-    
-    if (type === 'management') {
-        recipientId = 'management';
-        recipientName = 'Management';
-    } else if (type === 'student') {
+    if (type === 'management') { recipientId = 'management'; recipientName = 'Management'; }
+    else if (type === 'student') {
         const sel = modal.querySelector('#pnm-student-sel');
-        if (!sel?.value) { alert('Please select a student.'); return; }
+        if (!sel?.value) { showMessage('Please select a student.', 'error'); return; }
         recipientId = sel.value;
-        recipientName = sel.options[sel.selectedIndex]?.dataset?.name || sel.options[sel.selectedIndex]?.text || recipientId;
+        recipientName = sel.options[sel.selectedIndex]?.dataset?.name || sel.value;
     } else if (type === 'tutor') {
         const sel = modal.querySelector('#pnm-tutor-sel');
-        if (!sel?.value) { alert('Please select a tutor.'); return; }
+        if (!sel?.value) { showMessage('Please select a tutor.', 'error'); return; }
         recipientId = sel.value;
-        recipientName = sel.options[sel.selectedIndex]?.dataset?.name || sel.options[sel.selectedIndex]?.text || recipientId;
+        recipientName = sel.options[sel.selectedIndex]?.dataset?.name || sel.value;
     }
-    
+
     const sendBtn = modal.querySelector('#pnm-send-btn');
-    sendBtn.textContent = 'Sending...';
+    sendBtn.textContent = '⏳ Sending...';
     sendBtn.disabled = true;
-    
+
     try {
         let imageUrl = null;
         if (imageFile) {
@@ -6150,47 +6098,38 @@ window.parentMsgSend = async function(modal) {
             fd.append('upload_preset', PARENT_CLOUDINARY.uploadPreset);
             fd.append('cloud_name', PARENT_CLOUDINARY.cloudName);
             const res = await fetch(`https://api.cloudinary.com/v1_1/${PARENT_CLOUDINARY.cloudName}/image/upload`, { method: 'POST', body: fd });
-            const data = await res.json();
-            imageUrl = data.secure_url || null;
+            imageUrl = (await res.json()).secure_url || null;
         }
-        
+
         const uid = _parentCurrentUserId;
         const parentName = _parentCurrentUserName;
         const now = new Date();
         const lastMsg = imageUrl ? (content || '📷 Image') : content;
         const convId = [uid, recipientId].sort().join('_');
-        
+
         await db.collection('conversations').doc(convId).set({
             participants: [uid, recipientId],
             participantDetails: {
                 [uid]: { name: parentName, role: 'parent' },
                 [recipientId]: { name: recipientName, role: type }
             },
-            parentId: uid,
-            parentName: parentName,
-            lastMessage: lastMsg,
-            lastMessageTimestamp: now,
-            lastSenderId: uid,
-            unreadCount: 1
+            parentId: uid, parentName,
+            lastMessage: lastMsg, lastMessageTimestamp: now,
+            lastSenderId: uid, unreadCount: 1
         }, { merge: true });
-        
+
         await db.collection('conversations').doc(convId).collection('messages').add({
-            content: content || '',
-            subject: subject || null,
-            imageUrl: imageUrl || null,
-            senderId: uid,
-            senderName: parentName,
-            senderRole: 'parent',
-            isUrgent: false,
-            createdAt: now,
-            read: false
+            content: content || '', subject: subject || null,
+            imageUrl: imageUrl || null, senderId: uid,
+            senderName: parentName, senderRole: 'parent',
+            isUrgent: false, createdAt: now, read: false
         });
-        
+
         modal.remove();
         showMessage('✅ Message sent successfully!', 'success');
     } catch(e) {
         console.error('Send error:', e);
-        alert('Error sending message: ' + e.message);
+        showMessage('Error sending message: ' + e.message, 'error');
         sendBtn.textContent = '📤 Send Message';
         sendBtn.disabled = false;
     }
@@ -6198,10 +6137,9 @@ window.parentMsgSend = async function(modal) {
 
 function showParentInboxModal() {
     document.querySelectorAll('.parent-inbox-modal').forEach(e => e.remove());
-    
     const uid = _parentCurrentUserId;
     if (!uid) return;
-    
+
     const modal = document.createElement('div');
     modal.className = 'parent-inbox-modal';
     modal.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.75);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:12px;';
@@ -6212,15 +6150,16 @@ function showParentInboxModal() {
             modal.remove();
         }
     };
-    
+
     modal.innerHTML = `
     <div style="background:#fff;border-radius:20px;width:100%;max-width:820px;height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.4);">
-        <div style="background:linear-gradient(135deg,#1e40af,#3b82f6);padding:16px 20px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;">
+        <div style="background:linear-gradient(135deg,#065f46,#059669,#10b981);padding:16px 20px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;">
             <div style="display:flex;align-items:center;gap:10px;">
                 <span style="font-size:1.3rem;">💬</span>
                 <div style="color:#fff;font-weight:800;font-size:1rem;">Messages</div>
             </div>
-            <button onclick="document.querySelectorAll('.parent-inbox-modal').forEach(e=>e.remove())" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:1rem;cursor:pointer;">✕</button>
+            <button onclick="if(window._parentChatUnsub){_parentChatUnsub();_parentChatUnsub=null;}if(window._parentInboxUnsub){_parentInboxUnsub();_parentInboxUnsub=null;}document.querySelectorAll('.parent-inbox-modal').forEach(e=>e.remove())"
+                style="background:rgba(255,255,255,.2);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:1rem;cursor:pointer;line-height:1;">✕</button>
         </div>
         <div style="display:flex;flex:1;overflow:hidden;">
             <div style="width:270px;min-width:200px;border-right:1px solid #e5e7eb;display:flex;flex-direction:column;background:#fafafa;">
@@ -6232,30 +6171,31 @@ function showParentInboxModal() {
                     <div style="text-align:center;color:#9ca3af;margin-top:40px;font-size:0.875rem;">← Select a conversation to read messages</div>
                 </div>
                 <div id="parent-chat-inputs" style="border-top:1px solid #e5e7eb;padding:10px 14px;background:#fff;display:none;align-items:flex-end;gap:8px;">
-                    <textarea id="parent-chat-text" rows="2" placeholder="Type a message..." style="flex:1;border:1.5px solid #e2e8f0;border-radius:10px;padding:8px 12px;resize:none;font-size:0.875rem;outline:none;" onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#e2e8f0'"></textarea>
+                    <textarea id="parent-chat-text" rows="2" placeholder="Type a message..."
+                        style="flex:1;border:1.5px solid #e2e8f0;border-radius:10px;padding:8px 12px;resize:none;font-size:0.875rem;outline:none;"
+                        onfocus="this.style.borderColor='#10b981'" onblur="this.style.borderColor='#e2e8f0'"></textarea>
                     <div style="display:flex;flex-direction:column;gap:6px;">
                         <label style="cursor:pointer;font-size:1.1rem;" title="Attach image">
                             <input type="file" id="parent-chat-image" accept="image/*" style="display:none;">📎
                         </label>
-                        <button id="parent-chat-send" style="background:#1e40af;color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:700;">➤</button>
+                        <button id="parent-chat-send" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:700;">➤</button>
                     </div>
                 </div>
             </div>
         </div>
     </div>`;
-    
+
     document.body.appendChild(modal);
-    
-    // Load conversations
+
     const listEl = modal.querySelector('#parent-inbox-list');
     listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;font-size:0.875rem;">Loading...</div>';
-    
+
     if (_parentInboxUnsub) _parentInboxUnsub();
     _parentInboxUnsub = db.collection('conversations')
         .where('participants', 'array-contains', uid)
-        .onSnapshot(snapshot => {
+        .onSnapshot(snap => {
             const convs = [];
-            snapshot.forEach(d => convs.push({ id: d.id, ...d.data() }));
+            snap.forEach(d => convs.push({ id: d.id, ...d.data() }));
             convs.sort((a, b) => {
                 const tA = a.lastMessageTimestamp?.toDate ? a.lastMessageTimestamp.toDate() : new Date(a.lastMessageTimestamp || 0);
                 const tB = b.lastMessageTimestamp?.toDate ? b.lastMessageTimestamp.toDate() : new Date(b.lastMessageTimestamp || 0);
@@ -6265,35 +6205,33 @@ function showParentInboxModal() {
         }, () => {});
 }
 
-function _renderParentInboxList(conversations, container, modal, uid) {
+function _renderParentInboxList(convs, container, modal, uid) {
     container.innerHTML = '';
-    if (!conversations.length) {
+    if (!convs.length) {
         container.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;font-size:0.875rem;">No messages yet.</div>';
         return;
     }
-    conversations.forEach(conv => {
+    convs.forEach(conv => {
         const otherId = (conv.participants || []).find(p => p !== uid) || '';
         const otherName = conv.participantDetails?.[otherId]?.name || conv.studentName || conv.tutorName || otherId || 'Unknown';
         const isUnread = conv.unreadCount > 0 && conv.lastSenderId !== uid;
         const lastMsg = conv.lastMessage || '';
-        const lastTime = _parentFormatTime(conv.lastMessageTimestamp);
-        
+        const lastTime = _parentFmtTime(conv.lastMessageTimestamp);
+
         const el = document.createElement('div');
-        el.style.cssText = `padding:12px 14px;border-bottom:1px solid #f3f4f6;cursor:pointer;display:flex;align-items:center;gap:10px;background:${isUnread ? '#eff6ff' : '#fff'};transition:background .15s;`;
+        el.style.cssText = `padding:12px 14px;border-bottom:1px solid #f3f4f6;cursor:pointer;display:flex;align-items:center;gap:10px;background:${isUnread ? '#ecfdf5' : '#fff'};transition:background .15s;`;
         el.innerHTML = `
-            <div style="width:36px;height:36px;border-radius:50%;background:${isUnread ? '#1e40af' : '#e5e7eb'};color:${isUnread ? '#fff' : '#6b7280'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.95rem;flex-shrink:0;">
-                ${safeText(otherName.charAt(0).toUpperCase())}
-            </div>
+            <div style="width:36px;height:36px;border-radius:50%;background:${isUnread ? '#059669' : '#e5e7eb'};color:${isUnread ? '#fff' : '#6b7280'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;flex-shrink:0;">${safeText(otherName.charAt(0).toUpperCase())}</div>
             <div style="flex:1;min-width:0;">
                 <div style="font-weight:${isUnread ? '700' : '600'};font-size:0.875rem;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeText(otherName)}</div>
                 <div style="font-size:0.75rem;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${conv.lastSenderId === uid ? 'You: ' : ''}${safeText(lastMsg.substring(0,50))}${lastMsg.length > 50 ? '…' : ''}</div>
             </div>
             <div style="flex-shrink:0;text-align:right;">
                 <div style="font-size:0.7rem;color:#9ca3af;">${lastTime}</div>
-                ${isUnread ? `<div style="background:#ef4444;color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;margin-top:2px;margin-left:auto;">${conv.unreadCount > 9 ? '9+' : conv.unreadCount}</div>` : ''}
+                ${isUnread ? `<div style="background:#059669;color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;margin-top:2px;margin-left:auto;">${conv.unreadCount > 9 ? '9+' : conv.unreadCount}</div>` : ''}
             </div>`;
-        el.onmouseover = () => { el.style.background = '#f0f9ff'; };
-        el.onmouseout = () => { el.style.background = isUnread ? '#eff6ff' : '#fff'; };
+        el.onmouseover = () => { el.style.background = '#f0fdf4'; };
+        el.onmouseout  = () => { el.style.background = isUnread ? '#ecfdf5' : '#fff'; };
         el.onclick = () => _parentLoadChat(conv.id, otherName, modal, uid);
         container.appendChild(el);
     });
@@ -6303,212 +6241,147 @@ function _parentLoadChat(convId, name, modal, uid) {
     modal.querySelector('#parent-chat-header').textContent = '💬 ' + name;
     const msgContainer = modal.querySelector('#parent-chat-messages');
     msgContainer.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;">Loading messages...</div>';
-    
-    const inputsDiv = modal.querySelector('#parent-chat-inputs');
-    inputsDiv.style.display = 'flex';
-    
-    // Mark as read
+    modal.querySelector('#parent-chat-inputs').style.display = 'flex';
+
     db.collection('conversations').doc(convId).update({ unreadCount: 0 }).catch(() => {});
-    
+
     if (_parentChatUnsub) _parentChatUnsub();
-    
     _parentChatUnsub = db.collection('conversations').doc(convId).collection('messages')
         .orderBy('createdAt', 'asc')
-        .onSnapshot(snapshot => {
+        .onSnapshot(snap => {
             msgContainer.innerHTML = '';
-            snapshot.forEach(d => {
+            snap.forEach(d => {
                 const msg = d.data();
                 const isMe = msg.senderId === uid;
                 const bubble = document.createElement('div');
                 bubble.style.cssText = `display:flex;flex-direction:column;align-items:${isMe ? 'flex-end' : 'flex-start'};`;
                 const inner = document.createElement('div');
-                inner.style.cssText = `max-width:72%;background:${isMe ? '#1e40af' : '#fff'};color:${isMe ? '#fff' : '#1f2937'};border:1px solid ${isMe ? 'transparent' : '#e5e7eb'};border-radius:${isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px'};padding:8px 12px;font-size:0.875rem;`;
+                inner.style.cssText = `max-width:72%;background:${isMe ? '#059669' : '#fff'};color:${isMe ? '#fff' : '#1f2937'};border:1px solid ${isMe ? 'transparent' : '#e5e7eb'};border-radius:${isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px'};padding:8px 12px;font-size:0.875rem;`;
                 let html = '';
                 if (msg.subject) html += `<div style="font-weight:700;font-size:0.75rem;margin-bottom:4px;opacity:0.85;">${safeText(msg.subject)}</div>`;
                 if (msg.content) html += `<div>${safeText(msg.content)}</div>`;
                 if (msg.imageUrl) html += `<img src="${safeText(msg.imageUrl)}" style="max-width:200px;border-radius:8px;margin-top:6px;cursor:pointer;" onclick="window.open('${safeText(msg.imageUrl)}','_blank')">`;
-                html += `<div style="font-size:0.65rem;opacity:0.7;margin-top:4px;text-align:right;">${_parentFormatTime(msg.createdAt)}</div>`;
+                html += `<div style="font-size:0.65rem;opacity:0.7;margin-top:4px;text-align:right;">${_parentFmtTime(msg.createdAt)}</div>`;
                 inner.innerHTML = html;
                 bubble.appendChild(inner);
                 msgContainer.appendChild(bubble);
             });
             msgContainer.scrollTop = msgContainer.scrollHeight;
         }, () => {});
-    
-    // Send button
+
     const sendBtn = modal.querySelector('#parent-chat-send');
-    const input = modal.querySelector('#parent-chat-text');
-    const imageInput = modal.querySelector('#parent-chat-image');
-    
+    const input   = modal.querySelector('#parent-chat-text');
+    const imgInput = modal.querySelector('#parent-chat-image');
+
     const newBtn = sendBtn.cloneNode(true);
     sendBtn.parentNode.replaceChild(newBtn, sendBtn);
-    
+
     const doSend = async () => {
         const txt = input.value.trim();
-        const imgFile = imageInput.files[0] || null;
+        const imgFile = imgInput.files[0] || null;
         if (!txt && !imgFile) return;
-        
-        newBtn.disabled = true;
-        newBtn.textContent = '…';
-        
+        newBtn.disabled = true; newBtn.textContent = '…';
+
         try {
             let imageUrl = null;
             if (imgFile) {
                 const fd = new FormData();
-                fd.append('file', imgFile);
-                fd.append('upload_preset', PARENT_CLOUDINARY.uploadPreset);
-                fd.append('cloud_name', PARENT_CLOUDINARY.cloudName);
-                const res = await fetch(`https://api.cloudinary.com/v1_1/${PARENT_CLOUDINARY.cloudName}/image/upload`, { method: 'POST', body: fd });
-                const data = await res.json();
-                imageUrl = data.secure_url || null;
-                imageInput.value = '';
+                fd.append('file', imgFile); fd.append('upload_preset', PARENT_CLOUDINARY.uploadPreset); fd.append('cloud_name', PARENT_CLOUDINARY.cloudName);
+                imageUrl = ((await (await fetch(`https://api.cloudinary.com/v1_1/${PARENT_CLOUDINARY.cloudName}/image/upload`, { method: 'POST', body: fd })).json()).secure_url) || null;
+                imgInput.value = '';
             }
-            
             const now = new Date();
             const lastMsg = imageUrl ? (txt || '📷 Image') : txt;
-            
             await db.collection('conversations').doc(convId).collection('messages').add({
-                content: txt,
-                imageUrl: imageUrl || null,
-                senderId: uid,
-                senderName: _parentCurrentUserName,
-                senderRole: 'parent',
-                createdAt: now,
-                read: false
+                content: txt, imageUrl: imageUrl || null,
+                senderId: uid, senderName: _parentCurrentUserName, senderRole: 'parent', createdAt: now, read: false
             });
-            
-            const convSnap = await db.collection('conversations').doc(convId).get();
-            const cur = convSnap.exists() ? (convSnap.data().unreadCount || 0) : 0;
-            await db.collection('conversations').doc(convId).update({
-                lastMessage: lastMsg,
-                lastMessageTimestamp: now,
-                lastSenderId: uid,
-                unreadCount: cur + 1
-            });
-            
+            const snap = await db.collection('conversations').doc(convId).get();
+            const cur = snap.exists() ? (snap.data().unreadCount || 0) : 0;
+            await db.collection('conversations').doc(convId).update({ lastMessage: lastMsg, lastMessageTimestamp: now, lastSenderId: uid, unreadCount: cur + 1 });
             input.value = '';
-        } catch(e) {
-            alert('Send failed: ' + e.message);
-        } finally {
-            newBtn.disabled = false;
-            newBtn.textContent = '➤';
-        }
+        } catch(e) { showMessage('Failed to send: ' + e.message, 'error'); }
+        finally { newBtn.disabled = false; newBtn.textContent = '➤'; }
     };
-    
+
     newBtn.onclick = doSend;
     input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); } });
 }
 
-function _parentFormatTime(ts) {
+function _parentFmtTime(ts) {
     if (!ts) return '';
     const d = ts?.toDate ? ts.toDate() : new Date(ts);
     if (isNaN(d)) return '';
     const now = new Date();
-    const diffDays = Math.floor((now - d) / 86400000);
-    if (diffDays === 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return d.toLocaleDateString([], { weekday: 'short' });
+    const diff = Math.floor((now - d) / 86400000);
+    if (diff === 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (diff === 1) return 'Yesterday';
+    if (diff < 7) return d.toLocaleDateString([], { weekday: 'short' });
     return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 window.initializeParentMessaging = initializeParentMessaging;
-window.showParentNewMessageModal = showParentNewMessageModal;
-window.showParentInboxModal = showParentInboxModal;
+window.showParentNewMessageModal  = showParentNewMessageModal;
+window.showParentInboxModal       = showParentInboxModal;
 
 // ============================================================================
-// SECTION 21: ENROLLMENT TAB
+// SECTION 28: ENROLL STUDENT TAB
 // ============================================================================
-
-function injectEnrollmentTab() {
-    // Add tab button if not exists
-    if (document.getElementById('enrollTab')) return;
-    
-    const rewardsTab = document.getElementById('rewardsTab');
-    if (rewardsTab) {
-        const enrollTabBtn = document.createElement('button');
-        enrollTabBtn.id = 'enrollTab';
-        enrollTabBtn.className = rewardsTab.className.replace('tab-active-main', 'tab-inactive-main');
-        enrollTabBtn.textContent = '➕ Enroll Student';
-        enrollTabBtn.onclick = () => switchMainTab('enroll');
-        rewardsTab.insertAdjacentElement('afterend', enrollTabBtn);
-    }
-    
-    // Add content area if not exists
-    if (!document.getElementById('enrollContentArea')) {
-        const rewardsArea = document.getElementById('rewardsContentArea');
-        if (rewardsArea) {
-            const enrollArea = document.createElement('div');
-            enrollArea.id = 'enrollContentArea';
-            enrollArea.className = 'hidden';
-            rewardsArea.insertAdjacentElement('afterend', enrollArea);
-        }
-    }
-}
 
 async function loadEnrollmentTab() {
-    injectEnrollmentTab();
     const area = document.getElementById('enrollContentArea');
     if (!area) return;
-    
+
     const user = auth.currentUser;
     if (!user) return;
-    
-    area.innerHTML = '<div class="text-center py-8"><div class="text-4xl mb-4">⏳</div><p class="text-gray-500">Loading enrollment data...</p></div>';
-    
+
+    area.innerHTML = '<div class="text-center py-12"><div class="text-4xl mb-4">⏳</div><p class="text-gray-500">Loading...</p></div>';
+
     try {
         const userDoc = await db.collection('parent_users').doc(user.uid).get();
         const userData = userDoc.data();
-        
-        // Check for existing draft
+
+        // Load any existing draft
         const draftSnap = await db.collection('enrollments')
-            .where('parentUid', '==', user.uid)
-            .where('status', '==', 'draft')
-            .limit(1).get();
-        
-        let draft = null;
-        let draftId = null;
-        if (!draftSnap.empty) {
-            draftId = draftSnap.docs[0].id;
-            draft = draftSnap.docs[0].data();
-        }
-        
-        renderEnrollmentForm(area, userData, user.uid, draft, draftId);
+            .where('parentUid', '==', user.uid).where('status', '==', 'draft').limit(1).get();
+        const draftId  = draftSnap.empty ? null : draftSnap.docs[0].id;
+        const draft    = draftSnap.empty ? null : draftSnap.docs[0].data();
+
+        _renderEnrollmentForm(area, userData, user.uid, draft, draftId);
     } catch(e) {
-        area.innerHTML = `<div class="text-center py-8"><div class="text-4xl mb-4">❌</div><h3 class="text-xl font-bold text-red-700 mb-2">Error</h3><p class="text-gray-500">${safeText(e.message)}</p></div>`;
+        area.innerHTML = `<div class="text-center py-12"><div class="text-4xl mb-4">❌</div><h3 class="text-xl font-bold text-red-700">Error</h3><p class="text-gray-500">${safeText(e.message)}</p></div>`;
     }
 }
 
-function renderEnrollmentForm(area, userData, uid, draft, draftId) {
+function _renderEnrollmentForm(area, userData, uid, draft, draftId) {
+    const s = draft?.students?.[0] || {};
+
     const subjects = ['Mathematics','English Language','Science','Biology','Chemistry','Physics','Geography','History','Economics','Government','Literature','French','Yoruba','Igbo','Hausa','Computer Science','Further Mathematics','Agricultural Science','Commerce','Civic Education','Music','Fine Art','Technical Drawing'];
-    const extracurriculars = ['Piano','Guitar','Violin','Drums','Vocal Training','Ballet','Contemporary Dance','Hip-Hop Dance','Painting','Sculpture','Drawing','Drama/Theatre','Public Speaking','Chess','Coding/Programming','Football','Basketball','Swimming','Tennis','Taekwondo'];
-    const testPreps = ['WAEC','NECO','JAMB/UTME','SAT','ACT','GRE','GMAT','TOEFL','IELTS','Common Entrance','Junior WAEC','Cambridge IGCSE','A-Levels'];
-    const grades = ['Pre-School','Nursery 1','Nursery 2','Nursery 3','Primary 1','Primary 2','Primary 3','Primary 4','Primary 5','Primary 6','JSS 1','JSS 2','JSS 3','SS 1','SS 2','SS 3','Year 7','Year 8','Year 9','Year 10','Year 11','Year 12','University Level'];
-    
-    const students = draft?.students || [{}];
-    const s = students[0] || {};
-    
+    const extras   = ['Piano','Guitar','Violin','Drums','Vocal Training','Ballet','Contemporary Dance','Hip-Hop Dance','Painting','Sculpture','Drawing','Drama/Theatre','Public Speaking','Chess','Coding/Programming','Football','Basketball','Swimming','Tennis','Taekwondo'];
+    const tests    = ['WAEC','NECO','JAMB/UTME','SAT','ACT','GRE','GMAT','TOEFL','IELTS','Common Entrance','Junior WAEC','Cambridge IGCSE','A-Levels'];
+    const grades   = ['Pre-School','Nursery 1','Nursery 2','Nursery 3','Primary 1','Primary 2','Primary 3','Primary 4','Primary 5','Primary 6','JSS 1','JSS 2','JSS 3','SS 1','SS 2','SS 3','Year 7','Year 8','Year 9','Year 10','Year 11','Year 12','University Level'];
+
     area.innerHTML = `
-    <div class="max-w-4xl mx-auto">
-        <div class="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 rounded-xl mb-6">
-            <h2 class="text-2xl font-bold mb-1">Enroll a New Student</h2>
-            <p class="text-blue-100 text-sm">Fill out the form below to enroll your child in our programs.</p>
-            ${draftId ? '<div class="mt-2 text-sm bg-blue-500 bg-opacity-50 rounded-lg px-3 py-1 inline-block">📝 Draft saved — continue where you left off</div>' : ''}
+    <div class="max-w-4xl mx-auto pb-10">
+        <!-- Header banner -->
+        <div class="bg-gradient-to-r from-green-700 to-emerald-600 text-white p-6 rounded-xl mb-6 shadow-md">
+            <h2 class="text-2xl font-bold mb-1">➕ Enroll a New Student</h2>
+            <p class="text-green-100 text-sm">Fill out the form below to add a new child to your account.</p>
+            ${draftId ? '<div class="mt-2 text-sm bg-green-600 bg-opacity-60 rounded-lg px-3 py-1 inline-block">📝 Draft found — continue from where you left off</div>' : ''}
         </div>
-        
-        <div id="enroll-form-content" class="space-y-6">
-        
+
         <!-- Student Info -->
-        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-            <h3 class="font-bold text-gray-800 text-lg mb-4">👤 Student Information</h3>
+        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-4">
+            <h3 class="font-bold text-gray-800 text-lg mb-4 border-b pb-2">👤 Student Information</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Student Full Name *</label>
-                    <input type="text" id="enroll-name" value="${safeText(s.name || '')}" placeholder="First and Last Name"
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                    <input type="text" id="enroll-name" value="${safeText(s.name||'')}" placeholder="First and Last Name"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none transition-all">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Gender *</label>
-                    <select id="enroll-gender" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    <select id="enroll-gender" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none">
                         <option value="">Select gender</option>
                         <option value="male" ${s.gender==='male'?'selected':''}>Male</option>
                         <option value="female" ${s.gender==='female'?'selected':''}>Female</option>
@@ -6516,236 +6389,203 @@ function renderEnrollmentForm(area, userData, uid, draft, draftId) {
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-                    <input type="date" id="enroll-dob" value="${safeText(s.dob || '')}"
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    <input type="date" id="enroll-dob" value="${safeText(s.dob||'')}"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Current Grade/Class *</label>
-                    <select id="enroll-grade" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    <select id="enroll-grade" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none">
                         <option value="">Select grade</option>
-                        ${grades.map(g => `<option value="${g}" ${s.grade===g?'selected':''}>${g}</option>`).join('')}
+                        ${grades.map(g=>`<option value="${g}" ${s.grade===g?'selected':''}>${g}</option>`).join('')}
                     </select>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Desired Start Date</label>
-                    <input type="date" id="enroll-start" value="${safeText(s.startDate || '')}"
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    <input type="date" id="enroll-start" value="${safeText(s.startDate||'')}"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none">
                 </div>
-            </div>
-        </div>
-        
-        <!-- Academic Program -->
-        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-            <h3 class="font-bold text-gray-800 text-lg mb-4">📚 Academic Program</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Sessions per Week</label>
-                    <select id="enroll-sessions" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                        ${[1,2,3,4,5].map(n => `<option value="${n}" ${s.academicSessions==n?'selected':''}>${n} session${n>1?'s':''}/week</option>`).join('')}
+                    <select id="enroll-sessions" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none">
+                        ${[1,2,3,4,5].map(n=>`<option value="${n}" ${s.academicSessions==n?'selected':''}>${n} session${n>1?'s':''}/week</option>`).join('')}
                     </select>
                 </div>
-                <div>
+                <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Preferred Time</label>
-                    <select id="enroll-time" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                        <option value="">Select time</option>
-                        ${['Morning (7am-12pm)','Afternoon (12pm-4pm)','Evening (4pm-8pm)'].map(t => `<option value="${t}" ${s.academicTime===t?'selected':''}>${t}</option>`).join('')}
+                    <select id="enroll-time" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none">
+                        <option value="">Select preferred time</option>
+                        ${['Morning (7am-12pm)','Afternoon (12pm-4pm)','Evening (4pm-8pm)'].map(t=>`<option value="${t}" ${s.academicTime===t?'selected':''}>${t}</option>`).join('')}
                     </select>
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Subjects *</label>
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-                    ${subjects.map(subj => `
-                    <label class="flex items-center gap-2 text-sm cursor-pointer">
-                        <input type="checkbox" class="enroll-subject-chk" value="${subj}" ${(s.selectedSubjects||[]).includes(subj)?'checked':''}>
-                        <span>${subj}</span>
-                    </label>`).join('')}
                 </div>
             </div>
         </div>
-        
-        <!-- Extracurriculars -->
-        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-            <h3 class="font-bold text-gray-800 text-lg mb-4">🎨 Extracurricular Activities (Optional)</h3>
+
+        <!-- Subjects -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-4">
+            <h3 class="font-bold text-gray-800 text-lg mb-3 border-b pb-2">📚 Subjects *</h3>
             <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-                ${extracurriculars.map(e => `
-                <label class="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" class="enroll-extra-chk" value="${e}" ${(s.extracurriculars||[]).includes(e)?'checked':''}>
+                ${subjects.map(subj=>`
+                <label class="flex items-center gap-2 text-sm cursor-pointer hover:text-green-700 transition-colors">
+                    <input type="checkbox" class="enroll-subject-chk accent-green-600" value="${subj}" ${(s.selectedSubjects||[]).includes(subj)?'checked':''}>
+                    <span>${subj}</span>
+                </label>`).join('')}
+            </div>
+        </div>
+
+        <!-- Extracurriculars -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-4">
+            <h3 class="font-bold text-gray-800 text-lg mb-3 border-b pb-2">🎨 Extracurricular Activities <span class="text-sm font-normal text-gray-500">(optional)</span></h3>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                ${extras.map(e=>`
+                <label class="flex items-center gap-2 text-sm cursor-pointer hover:text-green-700 transition-colors">
+                    <input type="checkbox" class="enroll-extra-chk accent-green-600" value="${e}" ${(s.extracurriculars||[]).includes(e)?'checked':''}>
                     <span>${e}</span>
                 </label>`).join('')}
             </div>
         </div>
-        
+
         <!-- Test Prep -->
-        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-            <h3 class="font-bold text-gray-800 text-lg mb-4">📝 Test Preparation (Optional)</h3>
+        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-4">
+            <h3 class="font-bold text-gray-800 text-lg mb-3 border-b pb-2">📝 Test Preparation <span class="text-sm font-normal text-gray-500">(optional)</span></h3>
             <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-                ${testPreps.map(t => `
-                <label class="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" class="enroll-test-chk" value="${t}" ${(s.testPrep||[]).includes(t)?'checked':''}>
+                ${tests.map(t=>`
+                <label class="flex items-center gap-2 text-sm cursor-pointer hover:text-green-700 transition-colors">
+                    <input type="checkbox" class="enroll-test-chk accent-green-600" value="${t}" ${(s.testPrep||[]).includes(t)?'checked':''}>
                     <span>${t}</span>
                 </label>`).join('')}
             </div>
         </div>
-        
-        <!-- Additional Notes -->
-        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-            <h3 class="font-bold text-gray-800 text-lg mb-4">💬 Additional Notes</h3>
-            <textarea id="enroll-notes" rows="4" placeholder="Any special requirements, learning difficulties, or additional information..." 
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none">${safeText(s.notes || '')}</textarea>
+
+        <!-- Notes -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-6">
+            <h3 class="font-bold text-gray-800 text-lg mb-3 border-b pb-2">💬 Additional Notes</h3>
+            <textarea id="enroll-notes" rows="4" placeholder="Any special requirements, learning difficulties, or additional information..."
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none resize-none">${safeText(s.notes||'')}</textarea>
         </div>
-        
+
         <!-- Actions -->
-        <div class="flex flex-col sm:flex-row gap-3 pb-6">
-            <button onclick="saveEnrollmentDraft('${draftId || ''}')" 
-                class="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors">
+        <div class="flex flex-col sm:flex-row gap-3">
+            <button onclick="saveEnrollmentDraft('${draftId||''}')"
+                class="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors border border-gray-200">
                 💾 Save Draft
             </button>
-            <button onclick="submitEnrollment('${draftId || ''}')" 
-                class="flex-1 bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-3 rounded-xl font-bold hover:opacity-90 transition-opacity shadow-lg">
-                🚀 Submit Enrollment
+            <button onclick="submitEnrollment('${draftId||''}')"
+                class="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-xl font-bold hover:opacity-90 transition-opacity shadow-lg">
+                🚀 Submit Enrollment Application
             </button>
         </div>
-        
-        </div><!-- end form content -->
     </div>`;
 }
 
-function _collectEnrollmentData() {
-    const getVal = id => (document.getElementById(id)?.value || '').trim();
-    const getChecked = cls => [...document.querySelectorAll(`.${cls}:checked`)].map(c => c.value);
-    
+function _collectEnrollData() {
+    const v = id => (document.getElementById(id)?.value || '').trim();
+    const c = cls => [...document.querySelectorAll(`.${cls}:checked`)].map(x => x.value);
     return {
-        name: getVal('enroll-name'),
-        gender: getVal('enroll-gender'),
-        dob: getVal('enroll-dob'),
-        grade: getVal('enroll-grade'),
-        startDate: getVal('enroll-start'),
-        academicSessions: parseInt(getVal('enroll-sessions')) || 1,
-        academicTime: getVal('enroll-time'),
-        selectedSubjects: getChecked('enroll-subject-chk'),
-        extracurriculars: getChecked('enroll-extra-chk'),
-        testPrep: getChecked('enroll-test-chk'),
-        notes: getVal('enroll-notes')
+        name: v('enroll-name'), gender: v('enroll-gender'), dob: v('enroll-dob'),
+        grade: v('enroll-grade'), startDate: v('enroll-start'),
+        academicSessions: parseInt(v('enroll-sessions')) || 1,
+        academicTime: v('enroll-time'),
+        selectedSubjects: c('enroll-subject-chk'),
+        extracurriculars: c('enroll-extra-chk'),
+        testPrep: c('enroll-test-chk'),
+        notes: v('enroll-notes')
     };
 }
 
-window.saveEnrollmentDraft = async function(existingDraftId) {
+window.saveEnrollmentDraft = async function(existingId) {
     const user = auth.currentUser;
     if (!user) return;
-    
-    const studentData = _collectEnrollmentData();
-    
-    const saveBtn = document.querySelector('[onclick*="saveEnrollmentDraft"]');
-    if (saveBtn) { saveBtn.textContent = '💾 Saving...'; saveBtn.disabled = true; }
-    
+    const btn = document.querySelector('[onclick*="saveEnrollmentDraft"]');
+    if (btn) { btn.textContent = '💾 Saving...'; btn.disabled = true; }
     try {
         const userDoc = await db.collection('parent_users').doc(user.uid).get();
-        const userData = userDoc.data();
-        
-        const enrollmentData = {
-            parent: {
-                name: userData.parentName || '',
-                email: userData.email || '',
-                phone: userData.phone || ''
-            },
-            students: [studentData],
-            status: 'draft',
-            parentUid: user.uid,
+        const ud = userDoc.data();
+        const data = {
+            parent: { name: ud.parentName||'', email: ud.email||'', phone: ud.phone||'' },
+            students: [_collectEnrollData()], status: 'draft', parentUid: user.uid,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
-        
-        if (existingDraftId) {
-            await db.collection('enrollments').doc(existingDraftId).update(enrollmentData);
+        if (existingId) {
+            await db.collection('enrollments').doc(existingId).update(data);
         } else {
-            enrollmentData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-            await db.collection('enrollments').add(enrollmentData);
+            data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('enrollments').add(data);
         }
-        
-        showMessage('✅ Draft saved successfully!', 'success');
+        showMessage('✅ Draft saved!', 'success');
     } catch(e) {
-        alert('Error saving draft: ' + e.message);
+        showMessage('Error saving draft: ' + e.message, 'error');
     } finally {
-        if (saveBtn) { saveBtn.textContent = '💾 Save Draft'; saveBtn.disabled = false; }
+        if (btn) { btn.textContent = '💾 Save Draft'; btn.disabled = false; }
     }
 };
 
-window.submitEnrollment = async function(existingDraftId) {
+window.submitEnrollment = async function(existingId) {
     const user = auth.currentUser;
     if (!user) return;
-    
-    const studentData = _collectEnrollmentData();
-    
-    // Validate
-    if (!studentData.name) { alert("Please enter the student's name."); return; }
-    if (!studentData.grade) { alert('Please select a grade/class.'); return; }
-    if (!studentData.selectedSubjects.length) { alert('Please select at least one subject.'); return; }
-    
-    const submitBtn = document.querySelector('[onclick*="submitEnrollment"]');
-    if (submitBtn) { submitBtn.textContent = '⏳ Submitting...'; submitBtn.disabled = true; }
-    
+    const studentData = _collectEnrollData();
+    if (!studentData.name)  { showMessage("Please enter the student's full name.", 'error'); return; }
+    if (!studentData.grade) { showMessage('Please select a grade/class.', 'error'); return; }
+    if (!studentData.selectedSubjects.length) { showMessage('Please select at least one subject.', 'error'); return; }
+
+    const btn = document.querySelector('[onclick*="submitEnrollment"]');
+    if (btn) { btn.textContent = '⏳ Submitting...'; btn.disabled = true; }
+
     try {
         const userDoc = await db.collection('parent_users').doc(user.uid).get();
-        const userData = userDoc.data();
-        
-        const enrollmentData = {
-            parent: {
-                name: userData.parentName || '',
-                email: userData.email || '',
-                phone: userData.phone || ''
-            },
-            students: [studentData],
-            status: 'submitted',
-            parentUid: user.uid,
+        const ud = userDoc.data();
+        const data = {
+            parent: { name: ud.parentName||'', email: ud.email||'', phone: ud.phone||'' },
+            students: [studentData], status: 'submitted', parentUid: user.uid,
             submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            updatedAt:   firebase.firestore.FieldValue.serverTimestamp()
         };
-        
-        if (existingDraftId) {
-            await db.collection('enrollments').doc(existingDraftId).update(enrollmentData);
+        if (existingId) {
+            await db.collection('enrollments').doc(existingId).update(data);
         } else {
-            enrollmentData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-            await db.collection('enrollments').add(enrollmentData);
+            data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('enrollments').add(data);
         }
-        
-        // Show success state
+
         const area = document.getElementById('enrollContentArea');
         if (area) {
             area.innerHTML = `
             <div class="max-w-lg mx-auto text-center py-16">
                 <div class="text-7xl mb-6">🎉</div>
                 <h2 class="text-3xl font-bold text-green-700 mb-3">Enrollment Submitted!</h2>
-                <p class="text-gray-600 mb-2">Your enrollment application for <strong>${safeText(studentData.name)}</strong> has been received.</p>
-                <p class="text-gray-500 text-sm mb-8">Our team will review it and reach out to you within 1-2 business days.</p>
+                <p class="text-gray-600 mb-2">Your application for <strong>${safeText(studentData.name)}</strong> has been received.</p>
+                <p class="text-gray-500 text-sm mb-8">Our team will reach out to you within 1–2 business days.</p>
                 <div class="bg-green-50 border border-green-200 rounded-xl p-4 text-left mb-6">
                     <p class="font-semibold text-green-800 mb-2">📋 What happens next?</p>
                     <ul class="text-sm text-green-700 space-y-1">
-                        <li>• Our team reviews your application</li>
-                        <li>• We contact you to schedule a placement test</li>
-                        <li>• A tutor is assigned to your child</li>
-                        <li>• First session scheduled within 3-5 days</li>
+                        <li>✓ Our team reviews your application</li>
+                        <li>✓ We contact you to schedule a placement test</li>
+                        <li>✓ A tutor is matched to your child</li>
+                        <li>✓ First session scheduled within 3–5 days</li>
                     </ul>
                 </div>
-                <button onclick="loadEnrollmentTab()" class="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700">
+                <button onclick="loadEnrollmentTab()" class="bg-green-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-green-700">
                     ➕ Enroll Another Student
                 </button>
             </div>`;
         }
     } catch(e) {
-        alert('Error submitting enrollment: ' + e.message);
-        if (submitBtn) { submitBtn.textContent = '🚀 Submit Enrollment'; submitBtn.disabled = false; }
+        showMessage('Error submitting: ' + e.message, 'error');
+        if (btn) { btn.textContent = '🚀 Submit Enrollment Application'; btn.disabled = false; }
     }
 };
 
 window.loadEnrollmentTab = loadEnrollmentTab;
 
-// Inject enrollment tab when dashboard is shown
-const _origShowDashboard = window.showDashboard;
-function _ensureEnrollTabOnDashboard() {
-    setTimeout(injectEnrollmentTab, 800);
-}
+// Auto-init messaging when user dashboard loads
+const _origSetupUIComponents = window.addManualRefreshButton;
+window._parentMessagingAutoInit = function(uid, name) {
+    if (uid && !_parentCurrentUserId) {
+        initializeParentMessaging(uid, name);
+    }
+};
 
-console.log("✅ SINGLE FIX APPLIED: Double registration & email linking resolved");
+console.log("✅ Messaging & Enrollment tabs loaded");
+
 
 // ============================================================================
 // END OF PARENT.JS - PRODUCTION READY
