@@ -253,6 +253,151 @@
             color: #15803d;
             border-color: #86efac;
         }
+
+        /* ============================================================
+           GLOBAL DATA PRIVACY SYSTEM — Blooming Kids House
+           Covers: NDPA · GDPR · COPPA · Cookie Consent · Data Rights
+           ============================================================ */
+
+        /* --- Consent Banner --- */
+        #privacyConsentBanner {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: #fff;
+            border-top: 3px solid #059669;
+            box-shadow: 0 -4px 30px rgba(0,0,0,0.15);
+            z-index: 9999;
+            padding: 20px 24px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 16px;
+            animation: slideUpBanner 0.4s ease-out;
+        }
+        @keyframes slideUpBanner {
+            from { transform: translateY(100%); opacity: 0; }
+            to   { transform: translateY(0);    opacity: 1; }
+        }
+        #privacyConsentBanner .banner-text { flex: 1; min-width: 260px; font-size: 0.88rem; color: #374151; line-height: 1.5; }
+        #privacyConsentBanner .banner-text strong { color: #065f46; }
+        #privacyConsentBanner .banner-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+        .banner-btn-accept  { background:#059669; color:#fff; border:none; padding:10px 22px; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.9rem; transition:background .2s; }
+        .banner-btn-accept:hover  { background:#047857; }
+        .banner-btn-manage  { background:#ecfdf5; color:#065f46; border:1.5px solid #6ee7b7; padding:10px 22px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.9rem; transition:all .2s; }
+        .banner-btn-manage:hover  { background:#d1fae5; }
+        .banner-btn-reject  { background:#fef2f2; color:#dc2626; border:1.5px solid #fca5a5; padding:10px 18px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.9rem; transition:all .2s; }
+        .banner-btn-reject:hover  { background:#fee2e2; }
+
+        /* --- Privacy Modals Shared --- */
+        .privacy-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.55);
+            z-index: 10000;
+            display: flex; align-items: center; justify-content: center;
+            padding: 16px;
+        }
+        .privacy-overlay.hidden { display: none !important; }
+        .privacy-modal {
+            background: #fff;
+            border-radius: 20px;
+            max-width: 780px; width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.2);
+            animation: fadeIn 0.3s ease;
+        }
+        .privacy-modal-header {
+            background: linear-gradient(135deg, #065f46, #059669);
+            color: #fff;
+            padding: 24px 28px;
+            border-radius: 20px 20px 0 0;
+            display: flex; justify-content: space-between; align-items: center;
+            position: sticky; top: 0; z-index: 1;
+        }
+        .privacy-modal-header h2 { font-size: 1.3rem; font-weight: 700; margin: 0; }
+        .privacy-modal-header .badge { background: rgba(255,255,255,0.2); font-size: 0.72rem; padding: 3px 10px; border-radius: 20px; margin-left: 10px; }
+        .privacy-close-btn { background: rgba(255,255,255,0.2); border: none; color: #fff; font-size: 1.4rem; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; line-height: 1; transition: background .2s; }
+        .privacy-close-btn:hover { background: rgba(255,255,255,0.35); }
+        .privacy-modal-body { padding: 28px; }
+        .privacy-section { margin-bottom: 28px; }
+        .privacy-section h3 { font-size: 1.05rem; font-weight: 700; color: #065f46; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 2px solid #d1fae5; display: flex; align-items: center; gap: 8px; }
+        .privacy-section p, .privacy-section li { font-size: 0.9rem; color: #374151; line-height: 1.65; margin-bottom: 8px; }
+        .privacy-section ul { padding-left: 18px; }
+        .privacy-section ul li { list-style: disc; }
+        .privacy-law-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+        .law-badge { padding: 5px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; }
+        .law-badge.ndpa  { background: #ecfdf5; color: #065f46; border: 1.5px solid #6ee7b7; }
+        .law-badge.gdpr  { background: #eff6ff; color: #1d4ed8; border: 1.5px solid #93c5fd; }
+        .law-badge.coppa { background: #fdf4ff; color: #7c3aed; border: 1.5px solid #c4b5fd; }
+
+        /* --- Toggle Switches (Consent Preferences) --- */
+        .consent-toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid #f3f4f6; }
+        .consent-toggle-row:last-child { border-bottom: none; }
+        .consent-toggle-info h4 { font-size: 0.92rem; font-weight: 600; color: #111827; margin-bottom: 2px; }
+        .consent-toggle-info p  { font-size: 0.8rem; color: #6b7280; margin: 0; }
+        .toggle-switch { position: relative; width: 48px; height: 26px; flex-shrink: 0; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; inset: 0; background: #d1d5db; border-radius: 34px; cursor: pointer; transition: .3s; }
+        .toggle-slider:before { content:""; position:absolute; height:20px; width:20px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.3s; }
+        input:checked + .toggle-slider { background: #059669; }
+        input:checked + .toggle-slider:before { transform: translateX(22px); }
+        .toggle-switch.disabled-toggle .toggle-slider { cursor: not-allowed; opacity: 0.7; }
+
+        /* --- Data Rights Form --- */
+        .rights-card { background: #f9fafb; border: 1.5px solid #e5e7eb; border-radius: 14px; padding: 20px; margin-bottom: 16px; cursor: pointer; transition: all .2s; }
+        .rights-card:hover { border-color: #6ee7b7; background: #f0fdf4; }
+        .rights-card.selected { border-color: #059669; background: #ecfdf5; }
+        .rights-card h4 { font-size: 0.95rem; font-weight: 700; color: #065f46; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+        .rights-card p  { font-size: 0.82rem; color: #6b7280; margin: 0; }
+        .rights-form-group { margin-bottom: 16px; }
+        .rights-form-group label { display: block; font-size: 0.85rem; font-weight: 600; color: #374151; margin-bottom: 6px; }
+        .rights-form-group input, .rights-form-group select, .rights-form-group textarea {
+            width: 100%; padding: 10px 14px; border: 1.5px solid #d1d5db; border-radius: 10px;
+            font-size: 0.88rem; font-family: inherit; transition: border-color .2s;
+            outline: none; background: #fff; box-sizing: border-box;
+        }
+        .rights-form-group input:focus, .rights-form-group select:focus, .rights-form-group textarea:focus { border-color: #059669; box-shadow: 0 0 0 3px rgba(5,150,105,0.1); }
+        .rights-submit-btn { width:100%; background:#059669; color:#fff; border:none; padding:13px; border-radius:12px; font-weight:700; font-size:0.95rem; cursor:pointer; transition:background .2s; margin-top:8px; }
+        .rights-submit-btn:hover { background:#047857; }
+        .rights-success-box { background: #ecfdf5; border: 1.5px solid #6ee7b7; border-radius: 12px; padding: 20px; text-align: center; }
+        .rights-success-box .check-icon { font-size: 2.5rem; margin-bottom: 8px; }
+        .rights-success-box h4 { color: #065f46; font-weight: 700; margin-bottom: 6px; }
+        .rights-success-box p { color: #374151; font-size: 0.88rem; margin: 0; }
+
+        /* --- Privacy Floating Button --- */
+        #privacyFloatingBtn {
+            position: fixed; bottom: 24px; left: 24px;
+            background: #059669; color: #fff;
+            border: none; border-radius: 50px;
+            padding: 10px 18px; font-size: 0.82rem; font-weight: 700;
+            cursor: pointer; z-index: 9000;
+            box-shadow: 0 4px 16px rgba(5,150,105,0.35);
+            display: flex; align-items: center; gap: 6px;
+            transition: all .2s;
+        }
+        #privacyFloatingBtn:hover { background: #047857; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(5,150,105,0.4); }
+
+        /* --- Consent Checkbox (sign-up) --- */
+        .privacy-consent-check { display: flex; align-items: flex-start; gap: 10px; background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 10px; padding: 12px 14px; }
+        .privacy-consent-check input[type="checkbox"] { margin-top: 2px; width: 16px; height: 16px; flex-shrink: 0; accent-color: #059669; cursor: pointer; }
+        .privacy-consent-check label { font-size: 0.85rem; color: #374151; line-height: 1.5; cursor: pointer; }
+        .privacy-consent-check label a, .privacy-consent-check label span.link { color: #059669; font-weight: 600; cursor: pointer; text-decoration: underline; }
+
+        /* --- Age Verification (COPPA) --- */
+        .coppa-box { background: #fdf4ff; border: 1.5px solid #c4b5fd; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+        .coppa-box h4 { color: #7c3aed; font-weight: 700; font-size: 0.9rem; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+        .coppa-box p { font-size: 0.82rem; color: #4b5563; margin: 0; }
+
+        /* --- Data Retention Info --- */
+        .retention-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 10px; }
+        .retention-table th { background: #ecfdf5; color: #065f46; padding: 8px 12px; text-align: left; font-weight: 700; border: 1px solid #d1fae5; }
+        .retention-table td { padding: 8px 12px; border: 1px solid #e5e7eb; color: #374151; }
+        .retention-table tr:nth-child(even) td { background: #f9fafb; }
+
+        /* --- Privacy footer note in modals --- */
+        .privacy-modal-footer { padding: 16px 28px; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .privacy-modal-footer span { font-size: 0.8rem; color: #9ca3af; }
+        .privacy-modal-footer a { font-size: 0.8rem; color: #059669; cursor: pointer; font-weight: 600; }
     </style>
 </head>
 <body class="flex flex-col items-center p-4">
@@ -375,6 +520,20 @@
                                required minlength="6">
                     </div>
                     
+                    <!-- COPPA Notice -->
+                    <div class="coppa-box">
+                        <h4>🛡️ Child Data Protection (COPPA)</h4>
+                        <p>By registering, you confirm you are a parent or legal guardian aged 18+, and you provide verifiable parental consent for any student data associated with your account. Children under 13 are protected under COPPA.</p>
+                    </div>
+                    <!-- Privacy Consent -->
+                    <div class="privacy-consent-check">
+                        <input type="checkbox" id="privacyConsentCheck" required>
+                        <label for="privacyConsentCheck">
+                            I have read and agree to the <span class="link" onclick="openPrivacyPolicy()">Privacy Policy</span> and
+                            <span class="link" onclick="openConsentPreferences()">Data Processing Terms</span>.
+                            I understand my data is processed under NDPA, GDPR &amp; COPPA. I consent to collection of contact details, student academic data, and referral tracking for educational service purposes.
+                        </label>
+                    </div>
                     <button id="signUpBtn" 
                             class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
                         <span id="signUpText">Create Account</span>
@@ -406,15 +565,22 @@
                 </div>
             </div>
 
-            <div class="flex mb-6 rounded-xl overflow-hidden shadow-lg border border-green-200">
-                <button id="reportTab" class="flex-1 py-3 font-semibold tab-active-main hover:bg-green-500 transition-all duration-200">
-                    <span class="mr-2">📄</span> Progress Reports
+            <div class="flex mb-6 rounded-xl overflow-hidden shadow-lg border border-green-200 flex-wrap">
+                <button id="reportTab" onclick="switchMainTab('reports')" class="flex-1 py-3 font-semibold tab-active-main hover:bg-green-500 transition-all duration-200" style="min-width:120px">
+                    <span class="mr-1">📄</span><span class="hidden sm:inline">Progress</span> Reports
                 </button>
-                <button id="academicsTab" class="flex-1 py-3 font-semibold tab-inactive-main hover:bg-green-100 transition-all duration-200">
-                    <span class="mr-2">📚</span> Academics
+                <button id="academicsTab" onclick="switchMainTab('academics')" class="flex-1 py-3 font-semibold tab-inactive-main hover:bg-green-100 transition-all duration-200 relative" style="min-width:100px">
+                    <span class="mr-1">📚</span> Academics
                 </button>
-                <button id="rewardsTab" class="flex-1 py-3 font-semibold tab-inactive-main hover:bg-green-100 transition-all duration-200">
-                    <span class="mr-2">🎁</span> Rewards Dashboard
+                <button id="messagesTab" onclick="switchMainTab('messages')" class="flex-1 py-3 font-semibold tab-inactive-main hover:bg-green-100 transition-all duration-200 relative" style="min-width:100px">
+                    <span class="mr-1">💬</span> Messages
+                    <span id="msgUnreadBadge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-5 h-5 flex items-center justify-center font-bold px-1" style="font-size:0.65rem;line-height:1rem;"></span>
+                </button>
+                <button id="enrollTab" onclick="switchMainTab('enroll')" class="flex-1 py-3 font-semibold tab-inactive-main hover:bg-green-100 transition-all duration-200" style="min-width:120px">
+                    <span class="mr-1">➕</span> Add Student
+                </button>
+                <button id="rewardsTab" onclick="switchMainTab('rewards')" class="flex-1 py-3 font-semibold tab-inactive-main hover:bg-green-100 transition-all duration-200" style="min-width:100px">
+                    <span class="mr-1">🎁</span> Rewards
                 </button>
             </div>
 
@@ -456,9 +622,90 @@
                     <!-- Rewards data will be inserted here by JavaScript -->
                 </div>
             </div>
+
+            <!-- ============================================================ -->
+            <!-- MESSAGES TAB CONTENT                                          -->
+            <!-- ============================================================ -->
+            <div id="messagesContentArea" class="hidden">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold text-green-800">💬 Messages</h2>
+                    <button onclick="openNewMessageModal()" class="bg-green-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-green-700 transition-all duration-200 btn-glow flex items-center gap-2 text-sm">
+                        <span>✏️</span> New Message
+                    </button>
+                </div>
+                <div class="bg-white rounded-2xl card-glow overflow-hidden" style="min-height:520px;display:flex;">
+                    <!-- Conversation List (left pane) -->
+                    <div id="msgConvList" style="width:280px;min-width:200px;border-right:1px solid #e5e7eb;display:flex;flex-direction:column;background:#fff;">
+                        <div style="padding:14px 16px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">
+                            <p style="font-weight:700;font-size:0.9rem;color:#1f2937;">Conversations</p>
+                        </div>
+                        <div id="msgConvListInner" style="flex:1;overflow-y:auto;">
+                            <div class="text-center py-8 text-gray-400 text-sm">Loading conversations…</div>
+                        </div>
+                    </div>
+                    <!-- Chat View (right pane) -->
+                    <div style="flex:1;display:flex;flex-direction:column;background:#f9fafb;">
+                        <div id="msgChatHeader" style="padding:12px 18px;border-bottom:1px solid #e5e7eb;background:#fff;display:flex;align-items:center;gap:10px;">
+                            <div id="msgChatTitle" style="font-weight:700;color:#1f2937;font-size:0.95rem;">Select a conversation</div>
+                        </div>
+                        <div id="msgChatMessages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;">
+                            <div class="text-center text-gray-400 py-16">
+                                <div style="font-size:3rem;margin-bottom:12px;">💬</div>
+                                <p>Select a conversation to start chatting</p>
+                            </div>
+                        </div>
+                        <div id="msgChatInputArea" style="border-top:1px solid #e5e7eb;padding:12px 14px;background:#fff;display:none;align-items:flex-end;gap:8px;">
+                            <textarea id="msgChatInput" rows="2" placeholder="Type a message…" style="flex:1;border:1.5px solid #d1d5db;border-radius:10px;padding:9px 12px;resize:none;font-size:0.875rem;outline:none;font-family:inherit;" onfocus="this.style.borderColor='#10b981'" onblur="this.style.borderColor='#d1d5db'"></textarea>
+                            <label style="cursor:pointer;padding:8px;border-radius:8px;background:#f3f4f6;font-size:1rem;" title="Attach image">
+                                📎 <input type="file" id="msgChatImageFile" accept="image/*" style="display:none;">
+                            </label>
+                            <button id="msgChatSendBtn" onclick="parentSendChatMessage()" style="background:#10b981;color:#fff;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-weight:700;font-size:0.9rem;">➤</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================ -->
+            <!-- ENROLL STUDENT TAB CONTENT                                    -->
+            <!-- ============================================================ -->
+            <div id="enrollContentArea" class="hidden">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold text-green-800">➕ Add a New Student</h2>
+                    <div class="text-sm text-gray-500 bg-green-50 border border-green-200 px-4 py-2 rounded-lg">
+                        <span class="text-green-700 font-semibold">Parent info pre-filled</span> from your account
+                    </div>
+                </div>
+                <div id="enrollFormContainer" class="bg-white rounded-2xl card-glow p-6 md:p-8">
+                    <div id="enrollFormContent">
+                        <!-- Will be rendered by JavaScript -->
+                        <div class="text-center py-12"><div class="loading-spinner mx-auto" style="width:36px;height:36px;"></div><p class="text-green-600 mt-3">Loading enrollment form…</p></div>
+                    </div>
+                    <!-- Success screen (hidden initially) -->
+                    <div id="enrollSuccessScreen" class="hidden text-center py-12">
+                        <div style="font-size:4rem;margin-bottom:16px;">🎉</div>
+                        <h3 class="text-2xl font-bold text-green-800 mb-3">Application Submitted!</h3>
+                        <p class="text-gray-600 mb-2">Your new student enrollment request has been received.</p>
+                        <p class="text-gray-500 text-sm mb-6">Our team will review and contact you within 24–48 hours.</p>
+                        <div id="enrollAppIdDisplay" class="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 inline-block">
+                            <p class="text-xs text-green-600 font-semibold uppercase tracking-wider mb-1">Application ID</p>
+                            <p id="enrollAppId" class="text-xl font-bold text-green-800 font-mono"></p>
+                        </div>
+                        <div class="flex justify-center gap-4">
+                            <button onclick="resetEnrollForm()" class="bg-green-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-green-700 transition-all duration-200">
+                                ➕ Add Another Student
+                            </button>
+                            <button onclick="switchMainTab('reports')" class="bg-gray-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-gray-700 transition-all duration-200">
+                                ← Back to Dashboard
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
-        <!-- Feedback Modal -->
+        <!-- New Message Modal (dynamically created by JS) -->
+        <!-- ============================================================ -->
         <div id="feedbackModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
             <div class="bg-white rounded-2xl p-6 md:p-8 max-w-2xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-6">
@@ -613,5 +860,674 @@
     </div>
 
     <script src="parent.js"></script>
-</body>
-</html>
+    <script src="parent_additions.js"></script>
+
+    <!-- ================================================================
+         GLOBAL DATA PRIVACY SYSTEM — All HTML, JS self-contained below
+         ================================================================ -->
+
+    <!-- Floating Privacy Button -->
+    <button id="privacyFloatingBtn" onclick="openPrivacyHub()" title="Privacy & Data Rights">
+        🔒 Privacy &amp; Data Rights
+    </button>
+
+    <!-- ① COOKIE / CONSENT BANNER -->
+    <div id="privacyConsentBanner" class="hidden">
+        <div class="banner-text">
+            <strong>🍪 We value your privacy.</strong> Blooming Kids House uses essential cookies for secure authentication and optional analytics cookies to improve your experience.
+            We process your data under the <strong>Nigeria Data Protection Act (NDPA)</strong>, <strong>GDPR</strong>, and <strong>COPPA</strong>.
+            <span onclick="openPrivacyPolicy()" style="color:#059669;font-weight:600;cursor:pointer;text-decoration:underline;">Read our full Privacy Policy →</span>
+        </div>
+        <div class="banner-actions">
+            <button class="banner-btn-accept" onclick="acceptAllCookies()">✓ Accept All</button>
+            <button class="banner-btn-manage" onclick="openConsentPreferences()">⚙ Manage Preferences</button>
+            <button class="banner-btn-reject" onclick="rejectOptionalCookies()">✗ Essential Only</button>
+        </div>
+    </div>
+
+    <!-- ② PRIVACY HUB MODAL (Central Navigation) -->
+    <div id="privacyHubModal" class="privacy-overlay hidden">
+        <div class="privacy-modal" style="max-width:560px;">
+            <div class="privacy-modal-header">
+                <div>
+                    <h2>🔒 Privacy &amp; Data Rights Centre</h2>
+                    <div style="font-size:0.8rem;opacity:0.85;margin-top:4px;">Blooming Kids House — Parent Portal</div>
+                </div>
+                <button class="privacy-close-btn" onclick="closeModal('privacyHubModal')">&times;</button>
+            </div>
+            <div class="privacy-modal-body">
+                <div class="privacy-law-badges">
+                    <span class="law-badge ndpa">🇳🇬 NDPA Compliant</span>
+                    <span class="law-badge gdpr">🇪🇺 GDPR Compliant</span>
+                    <span class="law-badge coppa">👶 COPPA Protected</span>
+                </div>
+                <p style="font-size:0.9rem;color:#4b5563;margin-bottom:24px;">Your privacy matters to us. From here you can review our policies, manage what data we collect, and exercise your legal rights over your personal information.</p>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <button onclick="closeModal('privacyHubModal');openPrivacyPolicy()" style="background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:14px;padding:18px;text-align:left;cursor:pointer;transition:all .2s;" onmouseover="this.style.background='#d1fae5'" onmouseout="this.style.background='#ecfdf5'">
+                        <div style="font-size:1.8rem;margin-bottom:8px;">📜</div>
+                        <div style="font-weight:700;color:#065f46;font-size:0.92rem;">Privacy Policy</div>
+                        <div style="font-size:0.78rem;color:#6b7280;margin-top:2px;">Full policy covering all portals</div>
+                    </button>
+                    <button onclick="closeModal('privacyHubModal');openConsentPreferences()" style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:14px;padding:18px;text-align:left;cursor:pointer;transition:all .2s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
+                        <div style="font-size:1.8rem;margin-bottom:8px;">⚙️</div>
+                        <div style="font-weight:700;color:#1d4ed8;font-size:0.92rem;">Consent Preferences</div>
+                        <div style="font-size:0.78rem;color:#6b7280;margin-top:2px;">Manage what we collect</div>
+                    </button>
+                    <button onclick="closeModal('privacyHubModal');openDataRights()" style="background:#fdf4ff;border:1.5px solid #c4b5fd;border-radius:14px;padding:18px;text-align:left;cursor:pointer;transition:all .2s;" onmouseover="this.style.background='#f3e8ff'" onmouseout="this.style.background='#fdf4ff'">
+                        <div style="font-size:1.8rem;margin-bottom:8px;">⚖️</div>
+                        <div style="font-weight:700;color:#7c3aed;font-size:0.92rem;">My Data Rights</div>
+                        <div style="font-size:0.78rem;color:#6b7280;margin-top:2px;">Access, correct or delete data</div>
+                    </button>
+                    <button onclick="closeModal('privacyHubModal');openDataRetention()" style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:14px;padding:18px;text-align:left;cursor:pointer;transition:all .2s;" onmouseover="this.style.background='#ffedd5'" onmouseout="this.style.background='#fff7ed'">
+                        <div style="font-size:1.8rem;margin-bottom:8px;">📅</div>
+                        <div style="font-weight:700;color:#c2410c;font-size:0.92rem;">Data Retention</div>
+                        <div style="font-size:0.78rem;color:#6b7280;margin-top:2px;">How long we keep your data</div>
+                    </button>
+                </div>
+                <div style="margin-top:20px;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:12px;padding:14px;font-size:0.83rem;color:#991b1b;">
+                    <strong>⚠️ Withdraw Consent:</strong> You may withdraw consent at any time by contacting <a href="/cdn-cgi/l/email-protection#442d2a222b0426282b2b292d2a232f2d20372c2b3137216a272b29" style="color:#059669;font-weight:600;"><span class="__cf_email__" data-cfemail="97fef9f1f8d7f5fbf8f8fafef9f0fcfef3e4fff8e2e4f2b9f4f8fa">[email&#160;protected]</span></a>. Note that withdrawing consent may affect access to certain platform features.
+                </div>
+            </div>
+            <div class="privacy-modal-footer">
+                <span>Last Updated: February 24, 2026</span>
+                <span>DPO: <a href="/cdn-cgi/l/email-protection#84edeae2ebc4e6e8ebebe9edeae3efede0f7ecebf1f7e1aae7ebe9"><span class="__cf_email__" data-cfemail="e48d8a828ba486888b8b898d8a838f8d80978c8b919781ca878b89">[email&#160;protected]</span></a></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ③ FULL PRIVACY POLICY MODAL -->
+    <div id="privacyPolicyModal" class="privacy-overlay hidden">
+        <div class="privacy-modal">
+            <div class="privacy-modal-header">
+                <div>
+                    <h2>📜 Privacy Policy <span class="badge">v2.0</span></h2>
+                    <div style="font-size:0.8rem;opacity:0.85;margin-top:4px;">Last Updated: February 24, 2026</div>
+                </div>
+                <button class="privacy-close-btn" onclick="closeModal('privacyPolicyModal')">&times;</button>
+            </div>
+            <div class="privacy-modal-body">
+                <div class="privacy-law-badges">
+                    <span class="law-badge ndpa">🇳🇬 Nigeria Data Protection Act</span>
+                    <span class="law-badge gdpr">🇪🇺 GDPR (EU) 2016/679</span>
+                    <span class="law-badge coppa">👶 COPPA (USA)</span>
+                </div>
+
+                <div class="privacy-section">
+                    <h3>🏢 1. Data Controller &amp; Identity</h3>
+                    <p><strong>Blooming Kids House</strong> is the Data Controller for all personal information processed through this platform. Our multi-portal educational platform operates under Nigerian law while serving an international community.</p>
+                    <p><strong>Data Protection Officer (DPO):</strong> Available at <a href="/cdn-cgi/l/email-protection#3f565159507f5d5350505256515854565b4c57504a4c5a115c5052" style="color:#059669;"><span class="__cf_email__" data-cfemail="a6cfc8c0c9e6c4cac9c9cbcfc8c1cdcfc2d5cec9d3d5c388c5c9cb">[email&#160;protected]</span></a></p>
+                    <p><strong>Platform Infrastructure:</strong> Google Firebase / Firestore (Google Cloud, located in Belgium — EU servers). Google LLC acts as a Data Processor under a Data Processing Agreement compliant with Standard Contractual Clauses (SCCs).</p>
+                </div>
+
+                <div class="privacy-section">
+                    <h3>📋 2. What Data We Collect &amp; Why (Lawful Basis)</h3>
+                    <p>We collect only the minimum data required to deliver our educational services ("data minimisation" principle):</p>
+                    <ul>
+                        <li><strong>Parents:</strong> Email address, phone number, password (hashed by Firebase Auth), referral code/tracking data. <em>Lawful basis: Contract performance + Legitimate interest.</em></li>
+                        <li><strong>Students (via parent):</strong> Full name, grade level, test scores, assignment responses, academic progress records. <em>Lawful basis: Parental consent + Contract performance.</em></li>
+                        <li><strong>Tutors:</strong> Name, email, professional credentials, session logs. <em>Lawful basis: Contract performance.</em></li>
+                        <li><strong>Technical Data:</strong> Login timestamps, device type, IP address (Firebase automatic). <em>Lawful basis: Legitimate interest (security).</em></li>
+                        <li><strong>Analytics Cookies (optional):</strong> Page interaction metrics. <em>Lawful basis: Consent only.</em></li>
+                    </ul>
+                </div>
+
+                <div class="privacy-section">
+                    <h3>🔒 3. How We Protect Your Data</h3>
+                    <ul>
+                        <li>All data is encrypted in transit (TLS 1.2+) and at rest via Firebase/Google Cloud encryption.</li>
+                        <li>Firestore Security Rules enforce role-based access — tutors can only access their assigned students, parents can only access their own children's data.</li>
+                        <li>Passwords are never stored in plain text; Firebase Authentication handles credential management.</li>
+                        <li>No third-party marketing tools, advertising networks, or data brokers have access to your data.</li>
+                        <li>Regular security audits and access reviews are conducted.</li>
+                    </ul>
+                </div>
+
+                <div class="privacy-section">
+                    <h3>🌍 4. International Data Transfers</h3>
+                    <p>Your data is stored on Google Cloud servers (primarily in Belgium, EU). This constitutes an international data transfer from Nigeria. We rely on Google's Standard Contractual Clauses (SCCs) and adequacy decisions to ensure your data receives equivalent protection to Nigerian NDPA standards.</p>
+                </div>
+
+                <div class="privacy-section">
+                    <h3>👶 5. Children's Privacy (COPPA — Under 13)</h3>
+                    <p>We take the privacy of children extremely seriously:</p>
+                    <ul>
+                        <li>No personal data is collected directly from students. All student data is provided and managed by a registered parent/guardian.</li>
+                        <li>For students under 13, we require verifiable parental consent before any academic data is processed.</li>
+                        <li>Parents may review all data stored about their child, correct inaccuracies, or request permanent deletion at any time.</li>
+                        <li>Student data is never used for advertising, profiling, or shared with any third party beyond the direct delivery of educational services.</li>
+                        <li>If we discover that student data has been collected without proper parental consent, we will delete it immediately.</li>
+                    </ul>
+                </div>
+
+                <div class="privacy-section">
+                    <h3>🔗 6. Data Sharing &amp; Third Parties</h3>
+                    <p>We do <strong>NOT</strong> sell, rent, or trade your personal data. Limited sharing occurs only with:</p>
+                    <ul>
+                        <li><strong>Google Firebase/Firestore:</strong> Infrastructure provider (Data Processing Agreement in place).</li>
+                        <li><strong>Assigned Tutors:</strong> Access only to their specific assigned students' academic data.</li>
+                        <li><strong>Legal Authorities:</strong> Only if required by Nigerian law, court order, or to protect safety.</li>
+                    </ul>
+                </div>
+
+                <div class="privacy-section">
+                    <h3>🍪 7. Cookies &amp; Tracking</h3>
+                    <ul>
+                        <li><strong>Essential Cookies:</strong> Firebase authentication tokens (session management). Cannot be disabled — required for the portal to function.</li>
+                        <li><strong>Analytics Cookies (Optional):</strong> Page visit metrics to improve the platform. Requires your explicit consent.</li>
+                        <li><strong>No advertising cookies</strong> or third-party tracking scripts are used.</li>
+                    </ul>
+                </div>
+
+                <div class="privacy-section">
+                    <h3>⚖️ 8. Your Legal Rights</h3>
+                    <p>Under the NDPA (Nigeria), GDPR (if applicable), and COPPA (for children), you have the right to:</p>
+                    <ul>
+                        <li><strong>Access:</strong> Request a complete copy of all data we hold about you and your children.</li>
+                        <li><strong>Rectification:</strong> Correct any inaccurate or incomplete data.</li>
+                        <li><strong>Erasure ("Right to be Forgotten"):</strong> Request permanent deletion of your account and all associated data.</li>
+                        <li><strong>Portability:</strong> Receive your data in a structured, machine-readable format (JSON/CSV).</li>
+                        <li><strong>Restriction:</strong> Request that we limit how we process your data while a dispute is resolved.</li>
+                        <li><strong>Object:</strong> Object to processing based on legitimate interest.</li>
+                        <li><strong>Withdraw Consent:</strong> Withdraw marketing/analytics consent at any time without affecting past lawful processing.</li>
+                        <li><strong>Lodge a Complaint:</strong> File a complaint with the Nigeria Data Protection Commission (NDPC) at <a href="https://ndpc.gov.ng" target="_blank" style="color:#059669;">ndpc.gov.ng</a>.</li>
+                    </ul>
+                    <p>All rights requests are responded to within <strong>30 days</strong> as required by NDPA and GDPR.</p>
+                </div>
+
+                <div class="privacy-section">
+                    <h3>📢 9. Policy Updates &amp; Notifications</h3>
+                    <p>We may update this Privacy Policy to reflect changes in law, technology, or our services. When we make material changes, we will notify you via email (registered on this portal) and display a prominent notice on the platform at least 14 days before changes take effect. Continued use of the platform after changes take effect constitutes acceptance.</p>
+                </div>
+
+                <div class="privacy-section">
+                    <h3>📞 10. Contact &amp; Complaints</h3>
+                    <p>For any privacy-related concern, data rights request, or to contact our Data Protection Officer:</p>
+                    <ul>
+                        <li><strong>Email:</strong> <a href="/cdn-cgi/l/email-protection#5a33343c351a383635353733343d31333e2932352f293f74393537" style="color:#059669;"><span class="__cf_email__" data-cfemail="7d14131b123d1f1112121014131a1614190e1512080e18531e1210">[email&#160;protected]</span></a></li>
+                        <li><strong>Regulatory Body:</strong> Nigeria Data Protection Commission — <a href="https://ndpc.gov.ng" target="_blank" style="color:#059669;">ndpc.gov.ng</a></li>
+                        <li><strong>Response Time:</strong> We aim to respond to all privacy inquiries within 72 hours.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="privacy-modal-footer">
+                <span>© 2026 Blooming Kids House · Privacy Policy v2.0</span>
+                <a onclick="openDataRights()">Exercise My Rights →</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ④ CONSENT PREFERENCES MODAL -->
+    <div id="consentPreferencesModal" class="privacy-overlay hidden">
+        <div class="privacy-modal" style="max-width:600px;">
+            <div class="privacy-modal-header">
+                <div>
+                    <h2>⚙️ Consent Preferences</h2>
+                    <div style="font-size:0.8rem;opacity:0.85;margin-top:4px;">Control what data we collect and process</div>
+                </div>
+                <button class="privacy-close-btn" onclick="closeModal('consentPreferencesModal')">&times;</button>
+            </div>
+            <div class="privacy-modal-body">
+                <p style="font-size:0.88rem;color:#4b5563;margin-bottom:20px;">Below you can manage your consent for each category of data processing. Essential processing cannot be disabled as it is required for the platform to function. Changes are saved immediately.</p>
+
+                <div class="consent-toggle-row">
+                    <div class="consent-toggle-info">
+                        <h4>🔑 Essential Processing</h4>
+                        <p>Authentication, session management, Firestore security rules. Required for login and access to your children's reports.</p>
+                    </div>
+                    <label class="toggle-switch disabled-toggle">
+                        <input type="checkbox" checked disabled>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="consent-toggle-row">
+                    <div class="consent-toggle-info">
+                        <h4>📊 Academic Progress Tracking</h4>
+                        <p>Storing test scores, assignment results, and academic growth charts for your children's profiles.</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="consentAcademic" checked onchange="saveConsentPreference('academic', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="consent-toggle-row">
+                    <div class="consent-toggle-info">
+                        <h4>📣 Referral &amp; Rewards Tracking</h4>
+                        <p>Tracking referral codes and reward points for the Parent Referral Reward System.</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="consentReferral" checked onchange="saveConsentPreference('referral', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="consent-toggle-row">
+                    <div class="consent-toggle-info">
+                        <h4>💬 Communication &amp; Feedback</h4>
+                        <p>Storing feedback messages, admin responses, and enabling two-way communication with tutors and management.</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="consentComms" checked onchange="saveConsentPreference('comms', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="consent-toggle-row">
+                    <div class="consent-toggle-info">
+                        <h4>📧 Email Notifications</h4>
+                        <p>Receiving email alerts for new progress reports, admin responses, and important platform announcements.</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="consentEmail" checked onchange="saveConsentPreference('email', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="consent-toggle-row">
+                    <div class="consent-toggle-info">
+                        <h4>📈 Analytics &amp; Platform Improvement</h4>
+                        <p>Anonymous usage data to help us understand how parents use the portal and improve the experience.</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="consentAnalytics" onchange="saveConsentPreference('analytics', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap;">
+                    <button onclick="acceptAllConsents()" style="flex:1;background:#059669;color:#fff;border:none;padding:12px;border-radius:10px;font-weight:700;cursor:pointer;min-width:140px;">✓ Accept All</button>
+                    <button onclick="saveAndCloseConsents()" style="flex:1;background:#ecfdf5;color:#065f46;border:1.5px solid #6ee7b7;padding:12px;border-radius:10px;font-weight:700;cursor:pointer;min-width:140px;">💾 Save My Choices</button>
+                    <button onclick="rejectAllOptional()" style="flex:1;background:#fef2f2;color:#dc2626;border:1.5px solid #fca5a5;padding:12px;border-radius:10px;font-weight:700;cursor:pointer;min-width:140px;">✗ Essential Only</button>
+                </div>
+
+                <div id="consentSavedMsg" class="hidden" style="margin-top:14px;background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:10px;padding:12px;text-align:center;font-size:0.88rem;font-weight:600;color:#065f46;">
+                    ✅ Your consent preferences have been saved.
+                </div>
+
+                <div style="margin-top:20px;background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:14px;font-size:0.82rem;color:#92400e;">
+                    <strong>⚠️ Note:</strong> Disabling Academic Tracking or Communications may limit certain features of the portal. You can change these preferences at any time by returning to this menu.
+                </div>
+            </div>
+            <div class="privacy-modal-footer">
+                <span>Consent preferences are stored locally on your device.</span>
+                <a onclick="openPrivacyPolicy()">View Full Policy →</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⑤ DATA RIGHTS MODAL -->
+    <div id="dataRightsModal" class="privacy-overlay hidden">
+        <div class="privacy-modal">
+            <div class="privacy-modal-header">
+                <div>
+                    <h2>⚖️ Exercise My Data Rights</h2>
+                    <div style="font-size:0.8rem;opacity:0.85;margin-top:4px;">NDPA · GDPR · COPPA — Responses within 30 days</div>
+                </div>
+                <button class="privacy-close-btn" onclick="closeModal('dataRightsModal')">&times;</button>
+            </div>
+            <div class="privacy-modal-body">
+                <p style="font-size:0.88rem;color:#4b5563;margin-bottom:20px;">Under Nigerian and international data protection law, you have several rights regarding your personal data. Select your request type below and submit the form. Our Data Protection Officer will respond within <strong>30 days</strong>.</p>
+
+                <div id="dataRightsForm">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;" id="rightsTypeSelector">
+                        <div class="rights-card selected" onclick="selectRightType(this,'access')" data-type="access">
+                            <h4>📥 Right of Access</h4>
+                            <p>Request a complete copy of all personal data we hold about you and your children.</p>
+                        </div>
+                        <div class="rights-card" onclick="selectRightType(this,'rectification')" data-type="rectification">
+                            <h4>✏️ Right to Rectification</h4>
+                            <p>Request correction of inaccurate or incomplete personal data.</p>
+                        </div>
+                        <div class="rights-card" onclick="selectRightType(this,'erasure')" data-type="erasure">
+                            <h4>🗑️ Right to Erasure</h4>
+                            <p>Request permanent deletion of your account and all associated data ("Right to be Forgotten").</p>
+                        </div>
+                        <div class="rights-card" onclick="selectRightType(this,'portability')" data-type="portability">
+                            <h4>📤 Right to Portability</h4>
+                            <p>Receive your data in a structured, machine-readable format (JSON/CSV).</p>
+                        </div>
+                        <div class="rights-card" onclick="selectRightType(this,'restriction')" data-type="restriction">
+                            <h4>⏸️ Right to Restriction</h4>
+                            <p>Request that we pause processing of your data while a complaint is being investigated.</p>
+                        </div>
+                        <div class="rights-card" onclick="selectRightType(this,'objection')" data-type="objection">
+                            <h4>✋ Right to Object</h4>
+                            <p>Object to processing of your personal data for specific purposes.</p>
+                        </div>
+                    </div>
+
+                    <div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:16px;margin-bottom:20px;" id="selectedRightInfo">
+                        <strong style="color:#065f46;">📥 Right of Access:</strong>
+                        <span style="font-size:0.87rem;color:#374151;"> We will compile a complete data export of all information linked to your account and email it to your registered address within 30 days.</span>
+                    </div>
+
+                    <div class="rights-form-group">
+                        <label>Full Name *</label>
+                        <input type="text" id="rightsFullName" placeholder="Your full name as registered">
+                    </div>
+                    <div class="rights-form-group">
+                        <label>Registered Email Address *</label>
+                        <input type="email" id="rightsEmail" placeholder="Email linked to your portal account">
+                    </div>
+                    <div class="rights-form-group">
+                        <label>Proof of Identity</label>
+                        <select id="rightsIdType">
+                            <option value="">Select ID type (for verification)</option>
+                            <option>Nigerian NIN (National Identification Number)</option>
+                            <option>International Passport Number</option>
+                            <option>Driver's Licence Number</option>
+                            <option>Voter's Card Number</option>
+                        </select>
+                    </div>
+                    <div class="rights-form-group">
+                        <label>Additional Details / Reason for Request</label>
+                        <textarea id="rightsDetails" rows="4" placeholder="Provide any additional context to help us process your request efficiently..."></textarea>
+                    </div>
+
+                    <div style="background:#fdf4ff;border:1.5px solid #c4b5fd;border-radius:10px;padding:14px;margin-bottom:16px;font-size:0.83rem;color:#4b5563;">
+                        <strong style="color:#7c3aed;">🛡️ COPPA — Child Data:</strong> If your request concerns data about a student under 13, please mention the child's name and confirm your relationship as parent/legal guardian. We will process child data requests with the highest priority.
+                    </div>
+
+                    <div class="privacy-consent-check" style="margin-bottom:16px;">
+                        <input type="checkbox" id="rightsConsentCheck">
+                        <label for="rightsConsentCheck">I confirm that the information provided is accurate and I am authorised to make this data rights request. I understand this request may be verified against my registered account.</label>
+                    </div>
+
+                    <button class="rights-submit-btn" onclick="submitDataRightsRequest()">📤 Submit Data Rights Request</button>
+                </div>
+
+                <div id="dataRightsSuccess" class="rights-success-box hidden">
+                    <div class="check-icon">✅</div>
+                    <h4>Request Submitted Successfully</h4>
+                    <p>Your data rights request has been received. Our Data Protection Officer will review your request and respond to your registered email address within <strong>30 days</strong> as required by the NDPA and GDPR. A reference number has been generated for your records.</p>
+                    <div id="rightsRefNumber" style="margin-top:12px;background:#fff;border:1.5px solid #6ee7b7;border-radius:8px;padding:10px;font-weight:700;color:#065f46;font-size:0.9rem;"></div>
+                    <button onclick="resetDataRightsForm()" style="margin-top:16px;background:#059669;color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:700;cursor:pointer;">Submit Another Request</button>
+                </div>
+            </div>
+            <div class="privacy-modal-footer">
+                <span>DPO: <a href="/cdn-cgi/l/email-protection#b8d1d6ded7f8dad4d7d7d5d1d6dfd3d1dccbd0d7cdcbdd96dbd7d5"><span class="__cf_email__" data-cfemail="6e070008012e0c0201010307000905070a1d06011b1d0b400d0103">[email&#160;protected]</span></a></span>
+                <a href="https://ndpc.gov.ng" target="_blank">File Complaint with NDPC →</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⑥ DATA RETENTION MODAL -->
+    <div id="dataRetentionModal" class="privacy-overlay hidden">
+        <div class="privacy-modal" style="max-width:640px;">
+            <div class="privacy-modal-header">
+                <div>
+                    <h2>📅 Data Retention Schedule</h2>
+                    <div style="font-size:0.8rem;opacity:0.85;margin-top:4px;">How long we store each category of personal data</div>
+                </div>
+                <button class="privacy-close-btn" onclick="closeModal('dataRetentionModal')">&times;</button>
+            </div>
+            <div class="privacy-modal-body">
+                <p style="font-size:0.88rem;color:#4b5563;margin-bottom:20px;">We retain personal data only for as long as necessary to fulfil the purpose it was collected for, or as required by Nigerian law and applicable international regulations.</p>
+
+                <table class="retention-table">
+                    <thead>
+                        <tr>
+                            <th>Data Category</th>
+                            <th>Retention Period</th>
+                            <th>Legal Basis</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Parent Account &amp; Login Data</strong></td><td>Duration of account + 2 years</td><td>Contract / NDPA Art. 24</td></tr>
+                        <tr><td><strong>Student Academic Records</strong></td><td>Duration of enrolment + 3 years</td><td>Educational records law</td></tr>
+                        <tr><td><strong>Progress Report PDFs</strong></td><td>Duration of enrolment + 5 years</td><td>Legitimate interest</td></tr>
+                        <tr><td><strong>Feedback &amp; Messages</strong></td><td>2 years from submission</td><td>Legitimate interest</td></tr>
+                        <tr><td><strong>Referral &amp; Rewards Data</strong></td><td>3 years from last activity</td><td>Contract performance</td></tr>
+                        <tr><td><strong>Authentication Logs</strong></td><td>90 days</td><td>Security / Fraud prevention</td></tr>
+                        <tr><td><strong>Analytics Data (if consented)</strong></td><td>13 months (Google standard)</td><td>Consent</td></tr>
+                        <tr><td><strong>Data Rights Requests</strong></td><td>6 years</td><td>Legal compliance / NDPA</td></tr>
+                        <tr><td><strong>Deleted Account Data</strong></td><td>30 days (recovery window), then purged</td><td>Erasure right / NDPA</td></tr>
+                    </tbody>
+                </table>
+
+                <div class="privacy-section" style="margin-top:24px;">
+                    <h3>🗑️ Automatic Deletion</h3>
+                    <p>When your account is deleted (via request or inactivity), our automated system initiates a data purge process. All personally identifiable information is removed from Firestore within 30 days. Anonymised statistical data (e.g., aggregated test score averages) may be retained indefinitely as it cannot be linked back to any individual.</p>
+                </div>
+
+                <div class="privacy-section">
+                    <h3>📦 Data Backups</h3>
+                    <p>Google Firebase maintains automated backups for disaster recovery. Backup data follows the same retention schedule above. Backup data is encrypted and access-controlled, and will be purged in sync with the primary deletion within the same 30-day window.</p>
+                </div>
+
+                <button onclick="openDataRights()" style="width:100%;background:#059669;color:#fff;border:none;padding:12px;border-radius:12px;font-weight:700;font-size:0.95rem;cursor:pointer;margin-top:8px;">⚖️ Request Early Deletion of My Data</button>
+            </div>
+            <div class="privacy-modal-footer">
+                <span>Last reviewed: February 24, 2026</span>
+                <a onclick="openPrivacyPolicy()">Full Privacy Policy →</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================
+         PRIVACY SYSTEM JAVASCRIPT
+         ================================================================ -->
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+    // ─── State ───────────────────────────────────────────────────────────
+    const PRIVACY_KEY = 'bkh_privacy_consent_v2';
+    let selectedRightType = 'access';
+
+    const rightDescriptions = {
+        access:        '📥 <strong>Right of Access:</strong> We will compile a complete data export of all information linked to your account and email it to your registered address within 30 days.',
+        rectification: '✏️ <strong>Right to Rectification:</strong> Tell us which data is incorrect. We will review and correct it within 30 days and confirm the changes.',
+        erasure:       '🗑️ <strong>Right to Erasure:</strong> We will permanently delete your account and all associated data within 30 days. This action is irreversible. Your children\'s academic records will also be removed.',
+        portability:   '📤 <strong>Right to Portability:</strong> We will prepare a machine-readable export (JSON/CSV) of all your data and your children\'s academic records within 30 days.',
+        restriction:   '⏸️ <strong>Right to Restriction:</strong> We will pause all non-essential processing of your data while your request is under review. You will still be able to log in.',
+        objection:     '✋ <strong>Right to Object:</strong> Tell us which processing activities you object to. We will review our legal basis and either stop the processing or explain why we must continue.',
+    };
+
+    // ─── Initialisation ──────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+        const saved = getSavedConsent();
+        if (!saved || !saved.bannerSeen) {
+            setTimeout(() => {
+                document.getElementById('privacyConsentBanner').classList.remove('hidden');
+            }, 1200);
+        }
+        // Load saved toggle states
+        if (saved && saved.preferences) {
+            const prefs = saved.preferences;
+            ['academic','referral','comms','email','analytics'].forEach(k => {
+                const el = document.getElementById('consent' + k.charAt(0).toUpperCase() + k.slice(1));
+                if (el && prefs[k] !== undefined) el.checked = prefs[k];
+            });
+        }
+        // Validate sign-up consent before account creation
+        hookSignUpConsent();
+    });
+
+    // ─── Storage Helpers ─────────────────────────────────────────────────
+    function getSavedConsent() {
+        try { return JSON.parse(localStorage.getItem(PRIVACY_KEY)); } catch(e) { return null; }
+    }
+    function saveConsent(obj) {
+        try { localStorage.setItem(PRIVACY_KEY, JSON.stringify(obj)); } catch(e) {}
+    }
+
+    // ─── Banner Actions ───────────────────────────────────────────────────
+    function acceptAllCookies() {
+        saveConsent({ bannerSeen: true, preferences: { academic:true, referral:true, comms:true, email:true, analytics:true }, timestamp: new Date().toISOString(), version:'2.0' });
+        hideBanner();
+        showPrivacyToast('✅ All preferences accepted. Thank you!', 'success');
+    }
+    function rejectOptionalCookies() {
+        saveConsent({ bannerSeen: true, preferences: { academic:true, referral:true, comms:true, email:false, analytics:false }, timestamp: new Date().toISOString(), version:'2.0' });
+        hideBanner();
+        // Update toggles
+        const emailEl = document.getElementById('consentEmail');
+        const analyticsEl = document.getElementById('consentAnalytics');
+        if (emailEl) emailEl.checked = false;
+        if (analyticsEl) analyticsEl.checked = false;
+        showPrivacyToast('🔒 Essential processing only. Analytics disabled.', 'info');
+    }
+    function hideBanner() {
+        const banner = document.getElementById('privacyConsentBanner');
+        banner.style.animation = 'none';
+        banner.style.transform = 'translateY(100%)';
+        banner.style.opacity = '0';
+        banner.style.transition = 'all 0.35s ease';
+        setTimeout(() => banner.classList.add('hidden'), 350);
+    }
+
+    // ─── Modal Controls ───────────────────────────────────────────────────
+    function openPrivacyHub()            { openModal('privacyHubModal'); }
+    function openPrivacyPolicy()         { closeAllModals(); openModal('privacyPolicyModal'); }
+    function openConsentPreferences()    { closeAllModals(); hideBanner(); openModal('consentPreferencesModal'); }
+    function openDataRights()            { closeAllModals(); openModal('dataRightsModal'); }
+    function openDataRetention()         { closeAllModals(); openModal('dataRetentionModal'); }
+
+    function openModal(id) {
+        document.getElementById(id).classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeModal(id) {
+        document.getElementById(id).classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+    function closeAllModals() {
+        ['privacyHubModal','privacyPolicyModal','consentPreferencesModal','dataRightsModal','dataRetentionModal'].forEach(closeModal);
+    }
+
+    // Close modals when clicking overlay background
+    document.querySelectorAll('.privacy-overlay').forEach(overlay => {
+        overlay.addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+        });
+    });
+
+    // ─── Consent Preferences ─────────────────────────────────────────────
+    function saveConsentPreference(key, value) {
+        const saved = getSavedConsent() || { bannerSeen: true, preferences: {} };
+        saved.preferences[key] = value;
+        saved.timestamp = new Date().toISOString();
+        saveConsent(saved);
+    }
+    function acceptAllConsents() {
+        ['academic','referral','comms','email','analytics'].forEach(k => {
+            const el = document.getElementById('consent' + k.charAt(0).toUpperCase() + k.slice(1));
+            if (el) { el.checked = true; saveConsentPreference(k, true); }
+        });
+        showConsentSavedMsg();
+    }
+    function rejectAllOptional() {
+        ['email','analytics'].forEach(k => {
+            const el = document.getElementById('consent' + k.charAt(0).toUpperCase() + k.slice(1));
+            if (el) { el.checked = false; saveConsentPreference(k, false); }
+        });
+        showConsentSavedMsg();
+    }
+    function saveAndCloseConsents() {
+        const saved = getSavedConsent() || { preferences: {} };
+        saved.bannerSeen = true;
+        saved.timestamp = new Date().toISOString();
+        saved.version = '2.0';
+        saveConsent(saved);
+        hideBanner();
+        showConsentSavedMsg();
+        setTimeout(() => closeModal('consentPreferencesModal'), 1800);
+    }
+    function showConsentSavedMsg() {
+        const msg = document.getElementById('consentSavedMsg');
+        if (!msg) return;
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 3000);
+    }
+
+    // ─── Data Rights ──────────────────────────────────────────────────────
+    function selectRightType(card, type) {
+        document.querySelectorAll('#rightsTypeSelector .rights-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        selectedRightType = type;
+        const infoEl = document.getElementById('selectedRightInfo');
+        if (infoEl) infoEl.innerHTML = '<strong style="color:#065f46;">' + rightDescriptions[type] + '</strong>';
+    }
+
+    function submitDataRightsRequest() {
+        const name    = document.getElementById('rightsFullName').value.trim();
+        const email   = document.getElementById('rightsEmail').value.trim();
+        const consent = document.getElementById('rightsConsentCheck').checked;
+
+        if (!name || !email) {
+            showPrivacyToast('⚠️ Please provide your full name and email address.', 'warning');
+            return;
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            showPrivacyToast('⚠️ Please enter a valid email address.', 'warning');
+            return;
+        }
+        if (!consent) {
+            showPrivacyToast('⚠️ Please confirm the declaration checkbox.', 'warning');
+            return;
+        }
+
+        // Generate reference number
+        const ref = 'BKH-DR-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2,4).toUpperCase();
+        const timestamp = new Date().toLocaleString('en-NG', { timeZone: 'Africa/Lagos' });
+
+        // Store request locally
+        const requests = JSON.parse(localStorage.getItem('bkh_rights_requests') || '[]');
+        requests.push({ ref, type: selectedRightType, name, email, timestamp });
+        localStorage.setItem('bkh_rights_requests', JSON.stringify(requests));
+
+        document.getElementById('dataRightsForm').classList.add('hidden');
+        document.getElementById('dataRightsSuccess').classList.remove('hidden');
+        document.getElementById('rightsRefNumber').textContent = '🔖 Reference: ' + ref + ' | Submitted: ' + timestamp;
+
+        showPrivacyToast('✅ Data rights request submitted successfully!', 'success');
+    }
+
+    function resetDataRightsForm() {
+        document.getElementById('dataRightsForm').classList.remove('hidden');
+        document.getElementById('dataRightsSuccess').classList.add('hidden');
+        document.getElementById('rightsFullName').value = '';
+        document.getElementById('rightsEmail').value = '';
+        document.getElementById('rightsDetails').value = '';
+        document.getElementById('rightsConsentCheck').checked = false;
+        document.getElementById('rightsIdType').value = '';
+        document.querySelectorAll('#rightsTypeSelector .rights-card').forEach((c,i) => {
+            c.classList.toggle('selected', i === 0);
+        });
+        selectedRightType = 'access';
+        document.getElementById('selectedRightInfo').innerHTML = '<strong style="color:#065f46;">' + rightDescriptions.access + '</strong>';
+    }
+
+    // ─── Sign-Up Consent Hook ─────────────────────────────────────────────
+    function hookSignUpConsent() {
+        const signUpBtn = document.getElementById('signUpBtn');
+        if (!signUpBtn) return;
+        signUpBtn.addEventListener('click', function(e) {
+            const check = document.getElementById('privacyConsentCheck');
+            if (check && !check.checked) {
+                e.stopImmediatePropagation();
+                e.preventDefault();
+                showPrivacyToast('⚠️ You must agree to the Privacy Policy and Data Processing Terms to create an account.', 'warning');
+                check.closest('.privacy-consent-check').style.animation = 'none';
+                check.closest('.privacy-consent-check').style.borderColor = '#ef4444';
+                check.closest('.privacy-consent-check').style.background = '#fef2f2';
+                setTimeout(() => {
+                    check.closest('.privacy-consent-check').style.borderColor = '#bbf7d0';
+                    check.closest('.privacy-consent-check').style.background = '#f0fdf4';
+                }, 2500);
+                return false;
+            }
+        }, true); // capture phase so it fires before parent.js handlers
+    }
+
+    // ─── Toast Helper ────────────────────────────────────────────────────
+    function showPrivacyToast(message, type = 'success') {
+        // Reuse portal's existing toast if available
+        if (typeof showToast === 'function') {
+            showToast(message, type === 'info' ? 'warning' : type);
+            return;
+        }
+        // Fallback
+        const t = document.create
