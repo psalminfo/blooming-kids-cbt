@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Parent Portal — Blooming Kids House</title>
+    <title>Parent Portal - Blooming Kids House</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
     <link rel="icon" href="favicon.ico" />
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- Firebase SDKs (in correct order) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -24,409 +23,360 @@
     <script src="https://cdn.jsdelivr.net/npm/libphonenumber-js@1.9.6/bundle/libphonenumber-js.min.js"></script>
 
     <style>
-        :root {
-            --primary: #059669;
-            --primary-dark: #065f46;
-            --primary-light: #ecfdf5;
-            --primary-mid: #d1fae5;
-            --accent: #f59e0b;
-            --surface: #ffffff;
-            --surface-2: #f8faf9;
-            --border: #e2e8f0;
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-            --radius-lg: 20px;
-            --radius-xl: 28px;
-            --shadow-sm: 0 2px 8px rgba(0,0,0,.06);
-            --shadow-md: 0 8px 28px rgba(0,0,0,.10);
-            --shadow-lg: 0 20px 60px rgba(0,0,0,.14);
-        }
-
-        * { box-sizing: border-box; }
-
         body {
-            font-family: 'DM Sans', sans-serif;
-            background: #f0faf6;
+            background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 50%, #d1fae5 100%);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             min-height: 100vh;
-            color: var(--text-main);
         }
-
-        /* Animated mesh background */
-        body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background:
-                radial-gradient(ellipse 80% 50% at 10% 0%, rgba(16,185,129,.12) 0%, transparent 60%),
-                radial-gradient(ellipse 60% 60% at 90% 100%, rgba(5,150,105,.10) 0%, transparent 60%),
-                radial-gradient(ellipse 50% 40% at 50% 50%, rgba(209,250,229,.3) 0%, transparent 70%);
-            pointer-events: none;
-            z-index: 0;
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
         }
-
-        body > * { position: relative; z-index: 1; }
-
-        h1, h2, .font-serif { font-family: 'Playfair Display', serif; }
-
-        /* ─── HIDDEN ─────────────────────── */
-        .hidden { display: none !important; }
-
-        /* ─── CARD ──────────────────────── */
-        .card {
-            background: var(--surface);
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-md);
-            border: 1px solid rgba(255,255,255,.8);
+        .logo-glow {
+            filter: drop-shadow(0 0 15px rgba(34, 197, 94, 0.3));
         }
-
-        /* ─── AUTH TABS ─────────────────── */
-        .auth-tab-active {
-            background: var(--primary);
-            color: #fff;
-            border-radius: 12px;
+        .card-glow {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
-        .auth-tab-inactive {
-            background: transparent;
-            color: var(--primary);
+        .btn-glow {
+            box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.3), 0 2px 4px -1px rgba(34, 197, 94, 0.1);
+            transition: all 0.3s ease;
         }
-
-        /* ─── MAIN TABS ─────────────────── */
+        .btn-glow:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(34, 197, 94, 0.4), 0 4px 6px -2px rgba(34, 197, 94, 0.2);
+        }
+        .input-focus:focus {
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+            border-color: #10b981;
+        }
+        .hidden { 
+            display: none !important; 
+        }
+        /* Auth Tabs */
+        .tab-active {
+            background-color: #059669;
+            color: white;
+        }
+        .tab-inactive {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        /* Main Content Tabs */
         .tab-active-main {
-            background: var(--primary);
-            color: #fff;
-            box-shadow: 0 4px 14px rgba(5,150,105,.35);
+            background-color: #10b981;
+            color: white;
+            position: relative;
         }
         .tab-inactive-main {
-            background: transparent;
-            color: var(--primary-dark);
+            background-color: #ecfdf5;
+            color: #059669;
+            position: relative;
         }
-        .tab-inactive-main:hover {
-            background: var(--primary-mid);
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
         }
-
-        /* ─── BUTTONS ───────────────────── */
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
-            color: #fff;
-            border: none;
-            border-radius: 12px;
-            padding: 12px 24px;
-            font-weight: 700;
-            font-family: 'DM Sans', sans-serif;
-            cursor: pointer;
-            transition: transform .2s, box-shadow .2s, opacity .2s;
-            box-shadow: 0 4px 14px rgba(5,150,105,.3);
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(5,150,105,.4);
-        }
-        .btn-primary:active { transform: translateY(0); }
-
-        /* ─── INPUTS ────────────────────── */
-        .input-styled {
-            width: 100%;
-            padding: 12px 16px;
-            border: 1.5px solid var(--border);
-            border-radius: 12px;
-            font-size: 0.9rem;
-            font-family: 'DM Sans', sans-serif;
-            outline: none;
-            transition: border-color .2s, box-shadow .2s;
-            background: var(--surface);
-        }
-        .input-styled:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(16,185,129,.12);
-        }
-        /* For compatibility with old input-focus class */
-        .input-focus:focus {
-            box-shadow: 0 0 0 3px rgba(16,185,129,.12);
-            border-color: var(--primary) !important;
-        }
-
-        /* ─── SPINNERS ──────────────────── */
         .loading-spinner {
-            border: 3px solid rgba(255,255,255,.3);
-            border-top: 3px solid #fff;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #10b981;
             border-radius: 50%;
-            width: 22px; height: 22px;
-            animation: spin 0.8s linear infinite;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
             display: inline-block;
             margin-right: 8px;
             vertical-align: middle;
         }
         .loading-spinner-small {
-            border: 2px solid rgba(255,255,255,.3);
-            border-top: 2px solid #fff;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #10b981;
             border-radius: 50%;
-            width: 16px; height: 16px;
-            animation: spin 0.8s linear infinite;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
             display: inline-block;
             vertical-align: middle;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* ─── TOAST ─────────────────────── */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
         .toast {
-            position: fixed; top: 20px; right: 20px;
-            padding: 12px 20px; border-radius: 12px;
-            color: #fff; font-weight: 600; z-index: 10000;
-            box-shadow: var(--shadow-md);
-            transform: translateX(130%);
-            transition: transform .3s cubic-bezier(.34,1.56,.64,1);
-            font-family: 'DM Sans', sans-serif;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
         }
-        .toast.show { transform: translateX(0); }
-        .toast.success { background: linear-gradient(135deg, #059669, #10b981); }
-        .toast.error   { background: linear-gradient(135deg, #dc2626, #ef4444); }
-        .toast.warning { background: linear-gradient(135deg, #d97706, #f59e0b); }
-
-        /* ─── FADE IN ───────────────────── */
-        .fade-in { animation: fadeIn .5s ease; }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(12px); }
-            to   { opacity: 1; transform: translateY(0); }
+        .toast.show {
+            transform: translateX(0);
         }
-
-        /* ─── ACCORDIONS ────────────────── */
-        .accordion-header { transition: all .25s ease; }
-        .accordion-header:hover { transform: translateX(2px); }
-        .slide-down {
-            animation: slideDown .3s ease-out;
+        .toast.success {
+            background-color: #10b981;
         }
-        @keyframes slideDown {
-            from { opacity: 0; max-height: 0; }
-            to   { opacity: 1; max-height: 9999px; }
+        .toast.error {
+            background-color: #ef4444;
         }
-
-        /* ─── NOTIFICATION BADGE ─────────── */
-        .notification-badge {
-            position: absolute; top: -7px; right: -7px;
-            background: #ef4444; color: #fff;
-            border-radius: 9999px; font-size: 0.7rem; font-weight: 800;
-            min-width: 1.2rem; height: 1.2rem;
-            display: flex; align-items: center; justify-content: center;
-            padding: 0 3px;
-            animation: pulse 2s infinite;
+        .toast.warning {
+            background-color: #f59e0b;
         }
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.15); }
-        }
-
-        /* ─── ACADEMICS ─────────────────── */
-        .topic-item {
-            transition: all .2s ease;
-            border-left: 4px solid #3b82f6;
-        }
-        .topic-item:hover { transform: translateX(4px); }
-        .homework-item {
-            transition: all .2s ease;
-            border-left: 4px solid #8b5cf6;
-        }
-        .homework-item:hover { transform: translateX(4px); }
-        .status-overdue  { background:#fef2f2; color:#dc2626; border-color:#fca5a5; }
-        .status-pending  { background:#eff6ff; color:#1d4ed8; border-color:#93c5fd; }
-        .status-submitted{ background:#f0fdf4; color:#15803d; border-color:#86efac; }
-
-        /* ─── RESPONSE BUBBLE ───────────── */
         .response-bubble {
-            background: #f0fdf4;
+            background-color: #f0fdf4;
             border: 1px solid #bbf7d0;
             border-radius: 12px;
             padding: 12px;
             margin-top: 8px;
         }
-        .response-header { font-weight: 700; color: #065f46; margin-bottom: 4px; }
-        .preserve-whitespace { white-space: pre-wrap; word-break: break-word; }
-
-        /* ─── WELCOME BANNER ────────────── */
-        .welcome-banner {
-            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 60%, #34d399 100%);
-            border-radius: var(--radius-lg);
-            color: #fff;
-            padding: 24px 28px;
-            margin-bottom: 24px;
-            position: relative;
-            overflow: hidden;
+        .response-header {
+            font-weight: 600;
+            color: #065f46;
+            margin-bottom: 4px;
         }
-        .welcome-banner::after {
-            content: '';
-            position: absolute; inset: 0;
-            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Ccircle cx='50' cy='50' r='40' fill='none' stroke='rgba(255,255,255,.06)' stroke-width='1'/%3E%3C/svg%3E") repeat;
-            pointer-events: none;
+        /* Accordion Styles */
+        .accordion-header {
+            transition: all 0.3s ease;
         }
-
-        /* ─── MAIN TAB BAR ──────────────── */
-        .main-tab-bar {
+        .accordion-header:hover {
+            background-color: #bbf7d0 !important;
+        }
+        /* Slide Down Animation */
+        .slide-down {
+            animation: slideDown 0.3s ease-out;
+        }
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+                max-height: 0;
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+                max-height: 5000px;
+            }
+        }
+        .preserve-whitespace {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        /* Notification Badge */
+        .notification-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background-color: #ef4444;
+            color: white;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            min-width: 1.25rem;
+            height: 1.25rem;
             display: flex;
-            background: var(--surface);
-            border-radius: 16px;
-            padding: 6px;
-            gap: 4px;
-            box-shadow: var(--shadow-sm);
-            border: 1px solid var(--border);
-            margin-bottom: 24px;
-            overflow-x: auto;
+            align-items: center;
+            justify-content: center;
+            padding: 0 0.25rem;
+            animation: pulse 2s infinite;
         }
-        .main-tab-bar button {
-            flex: 1;
-            min-width: max-content;
-            padding: 10px 16px;
-            border-radius: 12px;
-            font-weight: 700;
-            font-size: 0.85rem;
-            border: none;
-            cursor: pointer;
-            transition: all .2s ease;
-            white-space: nowrap;
-            font-family: 'DM Sans', sans-serif;
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
         }
-
-        /* ─── AUTH CARD ─────────────────── */
-        .auth-card {
-            background: rgba(255,255,255,.97);
-            backdrop-filter: blur(20px);
-            border-radius: var(--radius-xl);
-            box-shadow: var(--shadow-lg);
-            border: 1px solid rgba(209,250,229,.6);
-            padding: 40px;
+        /* Message urgent styling */
+        .urgent-message {
+            border-left: 4px solid #ef4444;
+            background-color: #fef2f2;
         }
-
-        /* ─── LOGO GLOW (kept for compat) ─ */
-        .logo-glow { filter: drop-shadow(0 0 20px rgba(16,185,129,.25)); }
-        .card-glow  { box-shadow: var(--shadow-md); }
-        .btn-glow   { box-shadow: 0 4px 14px rgba(5,150,105,.25); transition: all .25s ease; }
-        .btn-glow:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(5,150,105,.35); }
-
-        /* ─── SCROLLBAR ─────────────────── */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
-        /* ─── URGENT MESSAGE ────────────── */
-        .urgent-message { border-left: 4px solid #ef4444; background: #fef2f2; }
-
-        /* ─── SECTION HEADING ───────────── */
-        .section-title {
-            font-family: 'Playfair Display', serif;
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary-dark);
-            margin-bottom: 20px;
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
         }
-
-        /* ─── ACADEMICS STUDENT SELECTOR ── */
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a1;
+        }
+        /* Academics Section Specific */
         .academics-student-selector {
-            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-            color: #fff;
-            border-radius: 14px;
-            padding: 1.25rem 1.5rem;
+            background: linear-gradient(to right, #3b82f6, #1d4ed8);
+            color: white;
+            border-radius: 12px;
+            padding: 1.5rem;
             margin-bottom: 1.5rem;
         }
-
-        /* ─── PRIVACY BANNER ────────────── */
-        #privacyCookieBanner {
-            font-family: 'DM Sans', sans-serif;
+        .topic-item {
+            transition: all 0.2s ease;
+            border-left: 4px solid #3b82f6;
+        }
+        .topic-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+        }
+        .homework-item {
+            transition: all 0.2s ease;
+            border-left: 4px solid #8b5cf6;
+        }
+        .homework-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+        }
+        .status-overdue {
+            background-color: #fef2f2;
+            color: #dc2626;
+            border-color: #fca5a5;
+        }
+        .status-pending {
+            background-color: #eff6ff;
+            color: #1d4ed8;
+            border-color: #93c5fd;
+        }
+        .status-submitted {
+            background-color: #f0fdf4;
+            color: #15803d;
+            border-color: #86efac;
         }
     </style>
 </head>
-<body class="flex flex-col items-center p-4 md:p-6">
+<body class="flex flex-col items-center p-4">
     <div id="toastContainer"></div>
 
     <div class="w-full max-w-6xl">
-
-        <!-- ══════════ HEADER ══════════ -->
-        <div class="text-center mb-8 pt-4">
+        <div class="text-center mb-8">
             <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
                  alt="Blooming Kids House Logo" 
                  class="h-20 w-auto mx-auto logo-glow mb-4">
-            <h1 class="text-4xl font-bold text-green-900 mb-1" style="font-family:'Playfair Display',serif;">Parent Portal</h1>
-            <p class="text-green-700 text-base">Secure access to your children's progress &amp; reports</p>
+            <h1 class="text-4xl font-bold text-green-800 mb-2">Parent Portal</h1>
+            <p class="text-green-600 text-lg">Secure Access to Your Children's Progress Reports</p>
         </div>
 
-        <!-- ══════════ AUTH AREA ══════════ -->
-        <div id="authArea" class="auth-card mb-8 fade-in max-w-md mx-auto">
-            <!-- Auth Tab Toggle -->
-            <div class="flex mb-6 rounded-xl overflow-hidden border border-green-100 bg-green-50 p-1 gap-1">
-                <button id="signInTab" class="flex-1 py-2.5 font-bold rounded-xl auth-tab-active transition-all duration-200">
+        <div id="authArea" class="bg-white rounded-2xl card-glow p-8 mb-8 fade-in">
+            <div class="flex mb-6 rounded-xl overflow-hidden border border-green-200">
+                <button id="signInTab" class="flex-1 py-3 font-semibold tab-active transition-all duration-200">
                     Sign In
                 </button>
-                <button id="signUpTab" class="flex-1 py-2.5 font-bold rounded-xl auth-tab-inactive transition-all duration-200">
+                <button id="signUpTab" class="flex-1 py-3 font-semibold tab-inactive transition-all duration-200">
                     Sign Up
                 </button>
             </div>
 
-            <!-- Sign In Form -->
             <div id="signInForm">
-                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center" style="font-family:'Playfair Display',serif;">Welcome Back</h2>
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Welcome Back</h2>
                 
                 <div class="space-y-4">
                     <div>
-                        <label for="loginIdentifier" class="block text-sm font-semibold text-gray-700 mb-2">Phone Number or Email</label>
-                        <input id="loginIdentifier" type="text" placeholder="Enter your phone number or email"
-                               class="input-styled" required>
+                        <label for="loginIdentifier" class="block text-sm font-medium text-gray-700 mb-2">
+                            Phone Number or Email
+                        </label>
+                        <input id="loginIdentifier" 
+                               type="text" 
+                               placeholder="Enter your phone number or email"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required>
                     </div>
+                    
                     <div>
-                        <label for="loginPassword" class="block text-sm font-semibold text-gray-700 mb-2">Password</label>
-                        <input id="loginPassword" type="password" placeholder="Enter your password"
-                               class="input-styled" required>
+                        <label for="loginPassword" class="block text-sm font-medium text-gray-700 mb-2">
+                            Password
+                        </label>
+                        <input id="loginPassword" 
+                               type="password" 
+                               placeholder="Enter your password"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required>
                     </div>
+
                     <div class="flex items-center">
-                        <input id="rememberMe" type="checkbox" class="h-4 w-4 accent-green-600">
-                        <label for="rememberMe" class="ml-2 text-sm text-gray-600">Remember me</label>
+                        <input id="rememberMe" type="checkbox" class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
+                        <label for="rememberMe" class="ml-2 block text-sm text-gray-700">
+                            Remember me
+                        </label>
                     </div>
-                    <button id="signInBtn" class="btn-primary w-full py-3 flex justify-center items-center">
+                    
+                    <button id="signInBtn" 
+                            class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
                         <span id="signInText">Sign In</span>
                         <div id="signInSpinner" class="loading-spinner hidden"></div>
                     </button>
+
                     <div class="text-center">
-                        <button id="forgotPasswordBtn" class="text-green-600 hover:text-green-800 text-sm font-semibold transition-colors">
+                        <button id="forgotPasswordBtn" class="text-green-600 hover:text-green-800 text-sm transition-colors duration-200">
                             Forgot Password?
                         </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Sign Up Form -->
             <div id="signUpForm" class="hidden">
-                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center" style="font-family:'Playfair Display',serif;">Create Account</h2>
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Create Account</h2>
                 
                 <div class="space-y-4">
                     <div>
-                        <label for="signupPhone" class="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
+                        <label for="signupPhone" class="block text-sm font-medium text-gray-700 mb-2">
+                            Phone Number
+                        </label>
                         <div id="phoneInputContainer">
-                            <input id="signupPhone" type="tel" placeholder="Enter your phone number"
-                                   class="input-styled" required>
+                            <!-- Country code dropdown will be inserted here by JavaScript -->
+                            <input id="signupPhone" 
+                                   type="tel" 
+                                   placeholder="Enter your phone number (any format)"
+                                   class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                                   required>
                         </div>
                     </div>
+                    
                     <div>
-                        <label for="signupEmail" class="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
-                        <input id="signupEmail" type="email" placeholder="Enter your email address"
-                               class="input-styled" required>
-                    </div>
-                    <div>
-                        <label for="signupPassword" class="block text-sm font-semibold text-gray-700 mb-2">Password</label>
-                        <input id="signupPassword" type="password" placeholder="Minimum 6 characters"
-                               class="input-styled" required minlength="6">
-                    </div>
-                    <div>
-                        <label for="signupConfirmPassword" class="block text-sm font-semibold text-gray-700 mb-2">Confirm Password</label>
-                        <input id="signupConfirmPassword" type="password" placeholder="Confirm your password"
-                               class="input-styled" required minlength="6">
-                    </div>
-
-                    <!-- Privacy Consent -->
-                    <div class="bg-green-50 border border-green-200 rounded-xl p-3">
-                        <label class="flex items-start gap-2 cursor-pointer text-sm text-green-900 leading-relaxed">
-                            <input type="checkbox" id="signup-privacy-consent" class="mt-0.5 flex-shrink-0 accent-green-600">
-                            <span>I agree to the <a href="#" onclick="showPrivacyPolicy();return false;" class="font-bold underline text-green-700">Privacy Policy</a> and consent to Blooming Kids House collecting my data in accordance with NDPA, GDPR, and COPPA.</span>
+                        <label for="signupEmail" class="block text-sm font-medium text-gray-700 mb-2">
+                            Email Address
                         </label>
+                        <input id="signupEmail" 
+                               type="email" 
+                               placeholder="Enter your email address"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required>
                     </div>
-
-                    <button id="signUpBtn" class="btn-primary w-full py-3 flex justify-center items-center">
+                    
+                    <div>
+                        <label for="signupPassword" class="block text-sm font-medium text-gray-700 mb-2">
+                            Password
+                        </label>
+                        <input id="signupPassword" 
+                               type="password" 
+                               placeholder="Minimum 6 characters"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required minlength="6">
+                    </div>
+                    
+                    <div>
+                        <label for="signupConfirmPassword" class="block text-sm font-medium text-gray-700 mb-2">
+                            Confirm Password
+                        </label>
+                        <input id="signupConfirmPassword" 
+                               type="password" 
+                               placeholder="Confirm your password"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required minlength="6">
+                    </div>
+                    
+                    <button id="signUpBtn" 
+                            class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
                         <span id="signUpText">Create Account</span>
                         <div id="signUpSpinner" class="loading-spinner hidden"></div>
                     </button>
@@ -434,57 +384,49 @@
             </div>
             
             <div id="authLoader" class="hidden text-center mt-4">
-                <div class="loading-spinner" style="border-color:rgba(16,185,129,.3);border-top-color:#059669;"></div>
-                <p class="text-green-700 font-semibold mt-2 text-sm">Processing… Please wait.</p>
+                <div class="loading-spinner"></div>
+                <p class="text-green-600 font-semibold mt-2">Processing... Please wait.</p>
             </div>
         </div>
 
-        <!-- ══════════ DASHBOARD AREA ══════════ -->
         <div id="reportArea" class="hidden fade-in">
-
-            <!-- Welcome Banner -->
-            <div class="welcome-banner mb-6">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
+            <div class="bg-green-50 border-l-4 border-green-600 p-6 rounded-lg mb-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <p class="text-green-200 text-sm font-semibold uppercase tracking-widest mb-1">Blooming Kids House</p>
-                        <h2 id="welcomeMessage" class="text-2xl md:text-3xl font-bold mb-1" style="font-family:'Playfair Display',serif;">Welcome!</h2>
-                        <p class="text-green-100 text-sm">Thank you for being part of our family</p>
+                        <h2 id="welcomeMessage" class="text-2xl font-bold text-green-800">Welcome!</h2>
+                        <p class="text-green-600">Thank you for being part of Blooming Kids House family</p>
                     </div>
-                    <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto" id="dashboard-action-btns">
+                    <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                        <!-- Buttons will be added here by JavaScript -->
                         <button onclick="logout()" 
-                                class="bg-white bg-opacity-15 border border-white border-opacity-25 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-opacity-25 transition-all flex items-center justify-center gap-2">
-                            🚪 Logout
+                                class="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition-all duration-200 btn-glow flex items-center justify-center">
+                            <span class="mr-2">🚪</span> Logout
                         </button>
                     </div>
                 </div>
             </div>
 
-            <!-- ── Main Tab Bar ── -->
-            <div class="main-tab-bar">
-                <button id="reportTab" class="tab-active-main">
-                    📄 Progress Reports
+            <div class="flex mb-6 rounded-xl overflow-hidden shadow-lg border border-green-200">
+                <button id="reportTab" class="flex-1 py-3 font-semibold tab-active-main hover:bg-green-500 transition-all duration-200">
+                    <span class="mr-2">📄</span> Progress Reports
                 </button>
-                <button id="academicsTab" class="tab-inactive-main">
-                    📚 Academics
+                <button id="academicsTab" class="flex-1 py-3 font-semibold tab-inactive-main hover:bg-green-100 transition-all duration-200">
+                    <span class="mr-2">📚</span> Academics
                 </button>
-                <button id="rewardsTab" class="tab-inactive-main">
-                    🎁 Rewards
-                </button>
-                <button id="enrollTab" class="tab-inactive-main">
-                    ➕ Enroll Student
+                <button id="rewardsTab" class="flex-1 py-3 font-semibold tab-inactive-main hover:bg-green-100 transition-all duration-200">
+                    <span class="mr-2">🎁</span> Rewards Dashboard
                 </button>
             </div>
 
-            <!-- ── Reports Tab ── -->
             <div id="reportContentArea">
-                <h2 class="section-title">Your Children's Reports</h2>
+                <h2 class="text-2xl font-bold text-green-800 mb-6">Your Children's Reports</h2>
                 
-                <div id="reportsLoading" class="hidden text-center py-10">
-                    <div class="loading-spinner" style="border-color:rgba(16,185,129,.2);border-top-color:#059669;width:40px;height:40px;border-width:4px;"></div>
-                    <p class="text-green-700 font-semibold mt-4">Loading reports…</p>
+                <div id="reportsLoading" class="hidden text-center py-8">
+                    <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+                    <p class="text-green-600 font-semibold mt-4">Loading reports...</p>
                 </div>
                 
-                <div id="reportsEmpty" class="hidden text-center py-14 card">
+                <div id="reportsEmpty" class="hidden text-center py-12 bg-white rounded-xl card-glow">
                     <div class="text-6xl mb-4">📬</div>
                     <h3 class="text-xl font-bold text-gray-700 mb-2">No Reports Available</h3>
                     <p class="text-gray-500 max-w-md mx-auto">No progress reports are available for your children at this time. Please check back later.</p>
@@ -495,48 +437,47 @@
                 </div>
             </div>
             
-            <!-- ── Academics Tab ── -->
             <div id="academicsContentArea" class="hidden">
-                <h2 class="section-title">Academic Progress &amp; Assignments</h2>
+                <h2 class="text-2xl font-bold text-green-800 mb-6">Academic Progress & Assignments</h2>
+                
+                <!-- Student Selection Dropdown Container -->
                 <div id="academicsStudentDropdown" class="mb-6">
-                    <!-- Student dropdown inserted by JS -->
+                    <!-- Student dropdown will be inserted here by JavaScript -->
                 </div>
-                <div id="academicsContent" class="card p-6 min-h-48">
-                    <!-- Academics data inserted by JS -->
+                
+                <div id="academicsContent" class="bg-white rounded-xl card-glow p-6 min-h-[400px]">
+                    <!-- Academics data will be inserted here by JavaScript -->
                 </div>
             </div>
             
-            <!-- ── Rewards Tab ── -->
             <div id="rewardsContentArea" class="hidden">
-                <h2 class="section-title">Parent Referral Rewards</h2>
-                <div id="rewardsContent" class="card p-6 min-h-48">
-                    <!-- Rewards data inserted by JS -->
+                <h2 class="text-2xl font-bold text-green-800 mb-6">Parent Referral Rewards</h2>
+                <div id="rewardsContent" class="bg-white rounded-xl card-glow p-6 min-h-[400px]">
+                    <!-- Rewards data will be inserted here by JavaScript -->
                 </div>
             </div>
+        </div>
 
-            <!-- ── Enroll Tab ── -->
-            <div id="enrollContentArea" class="hidden">
-                <!-- Enrollment form inserted by JS -->
-            </div>
-
-            <!-- ── Settings (hidden, created by JS) ── -->
-            <div id="settingsContentArea" class="hidden"></div>
-
-        </div><!-- end reportArea -->
-
-
-        <!-- ══════════ FEEDBACK MODAL ══════════ -->
-        <div id="feedbackModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4" style="backdrop-filter:blur(6px);">
+        <!-- Feedback Modal -->
+        <div id="feedbackModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
             <div class="bg-white rounded-2xl p-6 md:p-8 max-w-2xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-2xl font-bold text-gray-800" style="font-family:'Playfair Display',serif;">Send Feedback</h3>
-                    <button onclick="hideFeedbackModal()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">&times;</button>
+                    <h3 class="text-2xl font-bold text-gray-800">Send Feedback</h3>
+                    <button onclick="hideFeedbackModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
+                        &times;
+                    </button>
                 </div>
-                <p class="text-gray-500 mb-6 text-sm">We value your feedback! Please fill out the form below.</p>
+                
+                <p class="text-gray-600 mb-6">We value your feedback! Please fill out the form below.</p>
+                
                 <div class="space-y-4">
                     <div>
-                        <label for="feedbackCategory" class="block text-sm font-semibold text-gray-700 mb-2">Category *</label>
-                        <select id="feedbackCategory" class="input-styled" required>
+                        <label for="feedbackCategory" class="block text-sm font-medium text-gray-700 mb-2">
+                            Category *
+                        </label>
+                        <select id="feedbackCategory" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                                required>
                             <option value="">Select category</option>
                             <option value="Feedback">General Feedback</option>
                             <option value="Request">Special Request</option>
@@ -544,9 +485,14 @@
                             <option value="Suggestion">Suggestion</option>
                         </select>
                     </div>
+
                     <div>
-                        <label for="feedbackPriority" class="block text-sm font-semibold text-gray-700 mb-2">Priority *</label>
-                        <select id="feedbackPriority" class="input-styled" required>
+                        <label for="feedbackPriority" class="block text-sm font-medium text-gray-700 mb-2">
+                            Priority *
+                        </label>
+                        <select id="feedbackPriority" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                                required>
                             <option value="">Select priority</option>
                             <option value="Low">Low</option>
                             <option value="Medium">Medium</option>
@@ -554,148 +500,117 @@
                             <option value="Urgent">Urgent</option>
                         </select>
                     </div>
+
                     <div>
-                        <label for="feedbackStudent" class="block text-sm font-semibold text-gray-700 mb-2">Regarding Student *</label>
-                        <select id="feedbackStudent" class="input-styled" required>
+                        <label for="feedbackStudent" class="block text-sm font-medium text-gray-700 mb-2">
+                            Regarding Student *
+                        </label>
+                        <select id="feedbackStudent" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                                required>
                             <option value="">Select student</option>
                         </select>
                     </div>
+
                     <div>
-                        <label for="feedbackMessage" class="block text-sm font-semibold text-gray-700 mb-2">Your Message *</label>
-                        <textarea id="feedbackMessage" rows="5" placeholder="Please provide details…"
-                                  class="input-styled preserve-whitespace" required></textarea>
+                        <label for="feedbackMessage" class="block text-sm font-medium text-gray-700 mb-2">
+                            Your Message *
+                        </label>
+                        <textarea id="feedbackMessage" 
+                                  rows="6"
+                                  placeholder="Please provide details about your feedback..."
+                                  class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200 preserve-whitespace"
+                                  required></textarea>
                     </div>
-                    <div class="flex flex-col sm:flex-row gap-2 pt-2">
-                        <button id="submitFeedbackBtn" class="btn-primary flex-1 flex justify-center items-center gap-2">
+                    
+                    <div class="flex flex-col sm:flex-row gap-2 pt-4">
+                        <button id="submitFeedbackBtn" 
+                                class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
                             <span id="submitFeedbackText">Submit Feedback</span>
                             <div id="submitFeedbackSpinner" class="loading-spinner hidden"></div>
                         </button>
                         <button onclick="hideFeedbackModal()" 
-                                class="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors border border-gray-200">
+                                class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">
                             Cancel
                         </button>
                     </div>
                 </div>
-                <p class="text-xs text-gray-400 text-center mt-4">Your feedback is important to us. We'll respond within 24–48 hours.</p>
+
+                <div class="mt-6 text-center">
+                    <p class="text-sm text-gray-500">
+                        Your feedback is important to us. We'll respond within 24-48 hours.
+                    </p>
+                </div>
             </div>
         </div>
 
-        <!-- ══════════ ADMIN RESPONSES MODAL ══════════ -->
-        <div id="responsesModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4" style="backdrop-filter:blur(6px);">
+        <!-- Admin Responses Modal -->
+        <div id="responsesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
             <div class="bg-white rounded-2xl p-6 md:p-8 max-w-4xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-2xl font-bold text-gray-800" style="font-family:'Playfair Display',serif;">📨 Admin Responses</h3>
-                    <button onclick="hideResponsesModal()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">&times;</button>
+                    <h3 class="text-2xl font-bold text-gray-800">📨 Admin Responses</h3>
+                    <button onclick="hideResponsesModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
+                        &times;
+                    </button>
                 </div>
-                <p class="text-gray-500 mb-6 text-sm">Responses from our staff to your feedback.</p>
-                <div id="responsesContent" class="space-y-4"></div>
+                
+                <p class="text-gray-600 mb-6">Responses from our staff to your feedback.</p>
+                
+                <div id="responsesContent" class="space-y-4">
+                    <!-- Responses will be inserted here by JavaScript -->
+                </div>
+
                 <div class="mt-6 text-center">
-                    <button onclick="hideResponsesModal()" class="bg-gray-100 text-gray-700 px-6 py-2.5 rounded-xl font-bold hover:bg-gray-200 transition-colors border border-gray-200">Close</button>
+                    <button onclick="hideResponsesModal()" 
+                            class="bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 transition-all duration-200">
+                        Close
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- ══════════ PASSWORD RESET MODAL ══════════ -->
-        <div id="passwordResetModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4" style="backdrop-filter:blur(6px);">
+        <div id="passwordResetModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
             <div class="bg-white rounded-2xl p-6 md:p-8 max-w-md w-full mx-auto card-glow">
-                <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center" style="font-family:'Playfair Display',serif;">Reset Password</h3>
-                <p class="text-gray-500 mb-6 text-center text-sm">Enter your email address to receive a password reset link.</p>
+                <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Reset Password</h3>
+                <p class="text-gray-600 mb-4 text-center">Enter your email address to receive a password reset link.</p>
+                
                 <div class="space-y-4">
                     <div>
-                        <label for="resetEmail" class="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
-                        <input id="resetEmail" type="email" placeholder="Enter your registered email" class="input-styled" required>
+                        <label for="resetEmail" class="block text-sm font-medium text-gray-700 mb-2">
+                            Email Address
+                        </label>
+                        <input id="resetEmail" 
+                               type="email" 
+                               placeholder="Enter your registered email"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required>
                     </div>
+                    
                     <div class="flex flex-col sm:flex-row gap-2">
-                        <button id="sendResetBtn" class="btn-primary flex-1 flex justify-center items-center gap-2">
+                        <button id="sendResetBtn" 
+                                class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
                             <span id="sendResetText">Send Reset Link</span>
                             <div id="sendResetSpinner" class="loading-spinner hidden"></div>
                         </button>
-                        <button id="cancelResetBtn" class="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors border border-gray-200">
+                        <button id="cancelResetBtn" 
+                                class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">
                             Cancel
                         </button>
                     </div>
                 </div>
+                
                 <div id="resetLoader" class="hidden text-center mt-4">
-                    <div class="loading-spinner" style="border-color:rgba(16,185,129,.2);border-top-color:#059669;"></div>
-                    <p class="text-green-700 font-semibold mt-2 text-sm">Sending reset link…</p>
+                    <div class="loading-spinner mx-auto"></div>
+                    <p class="text-green-600 font-semibold mt-2">Sending reset link...</p>
                 </div>
             </div>
         </div>
 
-        <!-- Footer -->
-        <div class="text-center mt-12 pb-8">
-            <p class="text-green-800 font-bold text-sm" style="font-family:'Playfair Display',serif;">BLOOMING KIDS HOUSE</p>
-            <p class="text-green-600 text-xs mt-1">Where Every Child Blossoms</p>
-            <p class="text-gray-400 text-xs mt-3">
-                <a href="#" onclick="showPrivacyPolicy();return false;" class="hover:text-green-600 transition-colors">Privacy Policy</a>
-            </p>
+        <div class="text-center mt-12">
+            <p class="text-green-800 font-semibold">BLOOMING KIDS HOUSE</p>
+            <p class="text-green-600 text-sm">Where Every Child Blossoms</p>
         </div>
     </div>
-
-    <!-- ══════════ COOKIE CONSENT BANNER ══════════ -->
-    <div id="privacyCookieBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:99998;background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;padding:16px 20px;box-shadow:0 -4px 30px rgba(0,0,0,.4);">
-        <div style="max-width:900px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:14px;">
-            <div style="flex:1;min-width:260px;">
-                <div style="font-family:'Playfair Display',serif;font-weight:700;font-size:1rem;margin-bottom:4px;">🔒 We value your privacy</div>
-                <div style="font-family:'DM Sans',sans-serif;font-size:0.78rem;color:rgba(255,255,255,.65);line-height:1.55;">We use essential cookies for authentication and analytics cookies to improve your experience. We comply with NDPA, GDPR, and COPPA.
-                    <a href="#" onclick="showPrivacyPolicy();return false;" style="color:#34d399;text-decoration:underline;font-weight:600;">Privacy Policy</a>
-                </div>
-            </div>
-            <div style="display:flex;gap:8px;flex-shrink:0;">
-                <button onclick="acceptPrivacyCookies()" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;padding:9px 20px;border-radius:10px;font-family:'DM Sans',sans-serif;font-weight:700;cursor:pointer;font-size:0.85rem;">Accept All</button>
-                <button onclick="declinePrivacyCookies()" style="background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);padding:9px 16px;border-radius:10px;font-family:'DM Sans',sans-serif;font-weight:600;cursor:pointer;font-size:0.85rem;">Essential Only</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ══════════ PRIVACY POLICY MODAL ══════════ -->
-    <div id="privacyPolicyModal" style="display:none;position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:16px;">
-        <div style="background:#fff;border-radius:22px;width:100%;max-width:680px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,.5);">
-            <div style="background:linear-gradient(135deg,#065f46,#059669,#34d399);padding:20px 24px;display:flex;align-items:center;justify-content:space-between;">
-                <div style="display:flex;align-items:center;gap:10px;">
-                    <span style="font-size:1.4rem;">🔒</span>
-                    <div style="color:#fff;font-family:'Playfair Display',serif;font-weight:700;font-size:1.05rem;">Privacy Policy</div>
-                </div>
-                <button onclick="closePrivacyPolicy()" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:1rem;cursor:pointer;line-height:1;">✕</button>
-            </div>
-            <div style="flex:1;overflow-y:auto;padding:26px;font-family:'DM Sans',sans-serif;">
-                <p style="font-size:0.78rem;color:#94a3b8;margin-bottom:18px;">Last updated: January 2025 | Blooming Kids House</p>
-                <h3 style="font-family:'Playfair Display',serif;font-weight:700;color:#0f172a;margin:0 0 8px;">Data We Collect</h3>
-                <p style="font-size:0.875rem;color:#475569;margin-bottom:18px;line-height:1.65;">We collect personal information you provide during registration (name, email, phone number) and usage data (session activity, login times). For students under 13, we collect only what is strictly necessary, in compliance with COPPA.</p>
-                <h3 style="font-family:'Playfair Display',serif;font-weight:700;color:#0f172a;margin:0 0 8px;">How We Use Your Data</h3>
-                <p style="font-size:0.875rem;color:#475569;margin-bottom:18px;line-height:1.65;">Your data is used solely to provide tutoring services, match students with tutors, track academic progress, and communicate with parents/guardians. We do not sell your data to third parties.</p>
-                <h3 style="font-family:'Playfair Display',serif;font-weight:700;color:#0f172a;margin:0 0 8px;">Your Rights (NDPA / GDPR)</h3>
-                <ul style="font-size:0.875rem;color:#475569;margin-bottom:18px;padding-left:18px;line-height:2.2;">
-                    <li>Access your personal data</li>
-                    <li>Request correction or deletion</li>
-                    <li>Withdraw consent at any time</li>
-                    <li>Data portability</li>
-                    <li>Lodge a complaint with the supervisory authority</li>
-                </ul>
-                <h3 style="font-family:'Playfair Display',serif;font-weight:700;color:#0f172a;margin:0 0 8px;">Children Privacy (COPPA)</h3>
-                <p style="font-size:0.875rem;color:#475569;margin-bottom:18px;line-height:1.65;">We never knowingly collect personal data from children under 13 without verifiable parental consent. Parents may review, update, or delete their child's information by contacting us.</p>
-                <h3 style="font-family:'Playfair Display',serif;font-weight:700;color:#0f172a;margin:0 0 8px;">Contact Us</h3>
-                <p style="font-size:0.875rem;color:#475569;line-height:1.65;">For data requests or privacy concerns: <strong>privacy@bloomingkidshouse.com</strong></p>
-            </div>
-            <div style="padding:14px 24px;border-top:1px solid #f1f5f9;display:flex;justify-content:flex-end;">
-                <button onclick="closePrivacyPolicy()" style="background:linear-gradient(135deg,#065f46,#059669);color:#fff;border:none;padding:10px 24px;border-radius:12px;font-family:'DM Sans',sans-serif;font-weight:700;cursor:pointer;font-size:0.9rem;">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-    // ── Cookie Consent Logic ──
-    (function() {
-        var KEY = "bkh_cookie_consent";
-        window.acceptPrivacyCookies  = function() { localStorage.setItem(KEY,'all');       document.getElementById('privacyCookieBanner').style.display='none'; };
-        window.declinePrivacyCookies = function() { localStorage.setItem(KEY,'essential'); document.getElementById('privacyCookieBanner').style.display='none'; };
-        window.showPrivacyPolicy  = function() { var m=document.getElementById('privacyPolicyModal'); if(m) m.style.display='flex'; };
-        window.closePrivacyPolicy = function() { var m=document.getElementById('privacyPolicyModal'); if(m) m.style.display='none'; };
-        document.addEventListener('DOMContentLoaded', function() {
-            if (!localStorage.getItem(KEY)) document.getElementById('privacyCookieBanner').style.display='block';
-        });
-    })();
-    </script>
 
     <script src="parent.js"></script>
 </body>
