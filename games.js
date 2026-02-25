@@ -521,12 +521,15 @@
         if(!db()){ el.innerHTML='<div style="color:#d1d5db;font-size:.72rem;text-align:center;padding:8px;">Offline — Firebase unavailable</div>'; return; }
         try {
             let snap;
-            if(C()&&Q()&&W()&&OB()&&LIM()&&GD()){
-                snap=await GD()(Q()(C()(db(),'leaderboard'),W()('game','==',game),OB()('score','desc'),LIM()(5)));
+            if(C()&&Q()&&W()&&GD()){
+                // Query by game only (no orderBy) to avoid requiring a composite Firestore index.
+                // Sort by score client-side instead.
+                snap=await GD()(Q()(C()(db(),'leaderboard'),W()('game','==',game)));
             } else if(db().collection){
-                snap=await db().collection('leaderboard').where('game','==',game).orderBy('score','desc').limit(5).get();
+                snap=await db().collection('leaderboard').where('game','==',game).get();
             } else { el.innerHTML='<div style="color:#d1d5db;font-size:.72rem;text-align:center;">Unavailable</div>'; return; }
-            const docs=(snap.docs||[]);
+            // Sort client-side by score descending, take top 5
+            const docs=(snap.docs||[]).sort((a,b)=>(b.data().score||0)-(a.data().score||0)).slice(0,5);
             if(!docs.length){ el.innerHTML='<div style="color:#9ca3af;font-style:italic;font-size:.75rem;text-align:center;padding:8px;">No scores yet — be first!</div>'; return; }
             const medals=['🥇','🥈','🥉','4️⃣','5️⃣'];
             el.innerHTML=docs.map((d,i)=>{
@@ -537,9 +540,7 @@
                 </div>`;
             }).join('');
         } catch(e){
-            el.innerHTML=e.code==='failed-precondition'
-                ? '<div style="color:#ef4444;font-size:.68rem;text-align:center;padding:6px;">⚠️ Create Firestore index for leaderboard</div>'
-                : `<div style="color:#d1d5db;font-size:.68rem;text-align:center;padding:6px;">Offline</div>`;
+            el.innerHTML=`<div style="color:#d1d5db;font-size:.68rem;text-align:center;padding:6px;">Offline</div>`;
         }
     }
 
