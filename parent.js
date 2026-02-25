@@ -1313,12 +1313,6 @@ async function searchAllReportsForParent(parentPhone, parentEmail = '', parentUi
         assessmentResults = [...new Map(assessmentResults.map(item => [item.id, item])).values()];
         monthlyResults = [...new Map(monthlyResults.map(item => [item.id, item])).values()];
         
-
-            assessments: assessmentResults.length,
-            monthly: monthlyResults.length,
-            parentSuffix: parentSuffix
-        });
-        
     } catch (error) {
         console.error("❌ Suffix-matching search error:", error);
     }
@@ -2389,15 +2383,6 @@ function createMonthlyReportHTML(sessionReports, studentIndex, sessionId, fullNa
             <div class="mb-6">
                 <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">GENERAL TUTOR'S COMMENTS</h3>
                 <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.generalComments)}</p>
-            </div>
-            ` : ''}
-
-            ${firstReport.tutorReport ? `
-            <div class="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
-                <h3 class="text-lg font-semibold text-blue-800 mb-2 flex items-center">
-                    <span class="mr-2">📝</span> Tutor's Full Report
-                </h3>
-                <p class="text-gray-700 leading-relaxed preserve-whitespace">${safeText(firstReport.tutorReport)}</p>
             </div>
             ` : ''}
 
@@ -5004,20 +4989,6 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
         uniqueAssessments.sort((a, b) => b.timestamp - a.timestamp);
         uniqueMonthly.sort((a, b) => b.timestamp - a.timestamp);
         
-
-            original: {
-                assessments: originalResults.assessmentResults.length,
-                monthly: originalResults.monthlyResults.length
-            },
-            shared: {
-                assessments: sharedResults.assessmentResults.length,
-                monthly: sharedResults.monthlyResults.length
-            },
-            combined: {
-                assessments: uniqueAssessments.length,
-                monthly: uniqueMonthly.length
-            }
-        });
         
         return {
             assessmentResults: uniqueAssessments,
