@@ -5806,5 +5806,161 @@ if (window.authManager && window.authManager.loadUserDashboard) {
 
 
 // ============================================================================
+// SECTION 21: FEEDBACK & RESPONSES MODAL SYSTEM
+// ============================================================================
+
+function showFeedbackModal() {
+    // Populate student select
+    const sel = document.getElementById('feedbackStudent');
+    if (sel) {
+        sel.innerHTML = '<option value="">Select student</option>';
+        userChildren.forEach(name => {
+            const opt = document.createElement('option');
+            opt.value = safeText(name);
+            opt.textContent = capitalize(name);
+            sel.appendChild(opt);
+        });
+    }
+    const modal = document.getElementById('feedbackModal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function hideFeedbackModal() {
+    const modal = document.getElementById('feedbackModal');
+    if (modal) modal.classList.add('hidden');
+
+    // Reset form fields
+    ['feedbackCategory', 'feedbackPriority', 'feedbackStudent', 'feedbackMessage'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+}
+
+function showResponsesModal() {
+    const modal = document.getElementById('responsesModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        loadParentFeedback();
+    }
+}
+
+function hideResponsesModal() {
+    const modal = document.getElementById('responsesModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function loadParentFeedback() {
+    const container = document.getElementById('responsesContent');
+    if (!container) return;
+
+    container.innerHTML = '<div class="text-center py-6"><div class="loading-spinner mx-auto"></div><p class="text-green-600 mt-3">Loading responses...</p></div>';
+
+    try {
+        const user = auth.currentUser;
+        if (!user) throw new Error('Not authenticated');
+
+        const snapshot = await db.collection('parent_feedback')
+            .where('parentUid', '==', user.uid)
+            .orderBy('createdAt', 'desc')
+            .limit(20)
+            .get();
+
+        if (snapshot.empty) {
+            container.innerHTML = '<div class="text-center py-8 text-gray-500"><div class="text-4xl mb-3">📭</div><p>No feedback submissions yet.</p></div>';
+            return;
+        }
+
+        let html = '';
+        snapshot.forEach(doc => {
+            const d = doc.data();
+            const date = d.createdAt?.toDate?.().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) || 'N/A';
+            const statusColor = d.status === 'resolved' ? 'bg-green-100 text-green-800' :
+                                d.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+                                'bg-yellow-100 text-yellow-800';
+
+            html += `
+                <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <span class="font-semibold text-gray-800">${safeText(d.category || 'Feedback')}</span>
+                            <span class="ml-2 text-xs text-gray-500">${safeText(date)}</span>
+                        </div>
+                        <span class="text-xs px-2 py-1 rounded-full font-medium ${statusColor}">${capitalize(d.status || 'pending')}</span>
+                    </div>
+                    <p class="text-gray-700 text-sm mb-3 preserve-whitespace">${safeText(d.message || '')}</p>
+                    ${d.adminResponse ? `
+                        <div class="response-bubble">
+                            <div class="response-header">📣 Admin Response</div>
+                            <p class="text-sm text-gray-700 preserve-whitespace">${safeText(d.adminResponse)}</p>
+                        </div>
+                    ` : '<p class="text-xs text-gray-400 italic">Awaiting response...</p>'}
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+
+    } catch (error) {
+        console.error('Error loading feedback:', error);
+        container.innerHTML = '<p class="text-red-500 text-center py-6">Error loading responses. Please try again.</p>';
+    }
+}
+
+async function submitFeedbackHandler() {
+    const category = document.getElementById('feedbackCategory')?.value;
+    const priority = document.getElementById('feedbackPriority')?.value;
+    const student = document.getElementById('feedbackStudent')?.value;
+    const message = document.getElementById('feedbackMessage')?.value?.trim();
+
+    if (!category || !priority || !student || !message) {
+        showMessage('Please fill in all required fields', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('submitFeedbackBtn');
+    const btnText = document.getElementById('submitFeedbackText');
+    const spinner = document.getElementById('submitFeedbackSpinner');
+
+    if (btn) btn.disabled = true;
+    if (btnText) btnText.textContent = 'Submitting...';
+    if (spinner) spinner.classList.remove('hidden');
+
+    try {
+        const user = auth.currentUser;
+        if (!user) throw new Error('Not authenticated');
+
+        await db.collection('parent_feedback').add({
+            parentUid: user.uid,
+            parentName: currentUserData?.parentName || 'Parent',
+            category: safeText(category),
+            priority: safeText(priority),
+            studentName: safeText(student),
+            message: safeText(message),
+            status: 'pending',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        showMessage('Feedback submitted successfully! We\'ll respond within 24-48 hours.', 'success');
+        hideFeedbackModal();
+
+    } catch (error) {
+        console.error('Feedback submit error:', error);
+        showMessage('Failed to submit feedback. Please try again.', 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.textContent = 'Submit Feedback';
+        if (spinner) spinner.classList.add('hidden');
+    }
+}
+
+// Wire up feedback submit button after DOM load
+document.addEventListener('DOMContentLoaded', function() {
+    const submitFeedbackBtn = document.getElementById('submitFeedbackBtn');
+    if (submitFeedbackBtn) {
+        submitFeedbackBtn.addEventListener('click', submitFeedbackHandler);
+    }
+});
+
+// ============================================================================
 // END OF PARENT.JS - PRODUCTION READY
 // ============================================================================
