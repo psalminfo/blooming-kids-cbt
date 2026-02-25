@@ -161,15 +161,16 @@
         } else {
             // If no data is found, redirect to login
             alert("Session expired or missing data. Please log in again.");
-            window.location.href = 'index.html';
+            window.location.href = 'tutor.html';
         }
     });
 
     // The logout function
     window.logout = function() {
       localStorage.clear(); // Clears the student's login data
-      window.location.href = 'index.html';
+      window.location.href = 'tutor.html';
     };
 </script>
 </body>
 </html>
+
