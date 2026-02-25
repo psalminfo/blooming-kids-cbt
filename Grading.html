@@ -3,380 +3,700 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Grade Assignment — Blooming Kids</title>
+<title>Grade Homework — Blooming Kids</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#f8fafc;height:100vh;display:flex;flex-direction:column;}
-#app-header{background:linear-gradient(135deg,#1e1b4b,#3730a3);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-#toolbar{background:#1e293b;padding:8px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;}
-.tool-btn{padding:6px 13px;border-radius:8px;border:1.5px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#e2e8f0;font-size:.75rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s;}
-.tool-btn:hover,.tool-btn.active{background:#4f46e5;border-color:#6366f1;color:#fff;}
-.color-swatch{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.3);cursor:pointer;transition:transform .12s;}
-.color-swatch:hover,.color-swatch.active{transform:scale(1.25);border-color:#fff;}
-#workspace{flex:1;display:grid;grid-template-columns:1fr 360px;overflow:hidden;min-height:0;}
-#canvas-wrap{position:relative;overflow:auto;background:#e2e8f0;}
-#hw-image{display:block;max-width:none;}
-#draw-canvas{position:absolute;top:0;left:0;cursor:crosshair;touch-action:none;}
-#sidebar{background:#fff;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;overflow-y:auto;}
-.sb-section{padding:16px 18px;border-bottom:1px solid #f1f5f9;}
-.sb-label{font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;margin-bottom:8px;}
-.grade-btn{padding:8px 14px;border-radius:10px;border:1.5px solid #e2e8f0;background:#fff;font-size:.82rem;font-weight:700;cursor:pointer;transition:all .15s;}
-.grade-btn:hover{border-color:#6366f1;background:#eef2ff;color:#4338ca;}
-.grade-btn.sel{background:#4338ca;color:#fff;border-color:#4338ca;}
-textarea{width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.85rem;font-family:inherit;resize:vertical;outline:none;transition:border-color .15s;}
-textarea:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.1);}
-input[type=number]{width:80px;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.95rem;font-weight:700;text-align:center;outline:none;}
-input[type=number]:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.1);}
-#save-btn{background:linear-gradient(135deg,#059669,#16a34a);color:#fff;border:none;padding:13px 20px;border-radius:12px;font-weight:800;cursor:pointer;font-size:.9rem;width:100%;box-shadow:0 4px 14px rgba(5,150,105,.35);transition:all .15s;}
-#save-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(5,150,105,.45);}
-#save-btn:disabled{background:#94a3b8;cursor:not-allowed;transform:none;box-shadow:none;}
-#status{font-size:.8rem;font-weight:700;text-align:center;padding:8px 12px;border-radius:10px;display:none;margin-top:8px;}
-.type-tool{position:absolute;border:1.5px dashed #6366f1;background:rgba(255,255,255,.9);padding:4px;min-width:80px;min-height:24px;font-size:.85rem;cursor:move;outline:none;resize:both;overflow:hidden;border-radius:4px;}
-@media(max-width:680px){#workspace{grid-template-columns:1fr;}#sidebar{border-left:none;border-top:1px solid #e2e8f0;height:280px;}}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: #f1f5f9;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Loading */
+#loading {
+  position: fixed; inset: 0;
+  background: #f1f5f9;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 9999;
+}
+.spinner {
+  width: 44px; height: 44px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin-bottom: 16px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Top bar */
+#top-bar {
+  background: linear-gradient(135deg, #1e1b4b, #3730a3);
+  padding: 10px 18px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-shrink: 0; min-height: 56px;
+}
+#hdr-name {
+  color: #fff; font-size: 1rem; font-weight: 800;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#hdr-meta { color: #a5b4fc; font-size: 0.7rem; margin-top: 2px; }
+.icon-btn {
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #e2e8f0; padding: 6px 13px; border-radius: 8px;
+  font-size: 0.75rem; font-weight: 700; cursor: pointer;
+  white-space: nowrap; transition: background 0.15s;
+}
+.icon-btn:hover { background: rgba(255,255,255,0.24); }
+.icon-btn.danger { color: #fca5a5; border-color: rgba(239,68,68,0.4); }
+.icon-btn.danger:hover { background: rgba(239,68,68,0.22); }
+
+/* Toolbar */
+#toolbar {
+  background: #1e293b; padding: 6px 14px;
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  flex-shrink: 0; border-bottom: 1px solid #0f172a;
+}
+.tool {
+  padding: 5px 12px; border-radius: 7px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: transparent; color: #94a3b8;
+  font-size: 0.73rem; font-weight: 700; cursor: pointer;
+  transition: all 0.12s; display: flex; align-items: center; gap: 4px;
+  white-space: nowrap;
+}
+.tool:hover, .tool.on { background: #4338ca; border-color: #6366f1; color: #fff; }
+.swatch {
+  width: 20px; height: 20px; border-radius: 50%;
+  cursor: pointer; border: 2px solid transparent;
+  flex-shrink: 0; transition: transform 0.12s;
+}
+.swatch:hover, .swatch.on { transform: scale(1.3); border-color: #fff; }
+.divider { width: 1px; height: 22px; background: rgba(255,255,255,0.1); margin: 0 3px; flex-shrink: 0; }
+#size-range { width: 70px; accent-color: #6366f1; cursor: pointer; }
+#zoom-lbl { color: #64748b; font-size: 0.68rem; min-width: 36px; }
+
+/* Main */
+#main { flex: 1; display: flex; overflow: hidden; min-height: 0; }
+
+/* Canvas area */
+#canvas-area {
+  flex: 1; overflow: auto;
+  background: #e2e8f0; position: relative;
+}
+#hw-img { display: block; max-width: none; user-select: none; }
+#draw-canvas { position: absolute; top: 0; left: 0; touch-action: none; cursor: crosshair; }
+#text-submission {
+  padding: 40px; background: #fff;
+  min-height: 100%; font-size: 1rem; line-height: 1.8; color: #1e293b; max-width: 760px;
+}
+
+/* Sidebar */
+#sidebar {
+  width: 300px; flex-shrink: 0; background: #fff;
+  border-left: 1px solid #e2e8f0;
+  display: flex; flex-direction: column; overflow-y: auto;
+}
+.sb-block { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; }
+.sb-title { font-size: 0.62rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; margin-bottom: 8px; }
+
+/* Grade grid */
+#grade-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin-bottom: 10px; }
+.gq {
+  padding: 8px 4px; border-radius: 10px;
+  border: 1.5px solid #e2e8f0; background: #fff;
+  cursor: pointer; text-align: center;
+  font-weight: 800; font-size: 0.85rem; transition: all 0.15s; color: #374151;
+}
+.gq small { font-size: 0.6rem; font-weight: 600; display: block; margin-top: 2px; }
+.gq-a:hover, .gq-a.sel { border-color: #16a34a; background: #dcfce7; color: #16a34a; }
+.gq-b:hover, .gq-b.sel { border-color: #2563eb; background: #dbeafe; color: #2563eb; }
+.gq-c:hover, .gq-c.sel { border-color: #d97706; background: #fef3c7; color: #d97706; }
+.gq-f:hover, .gq-f.sel { border-color: #dc2626; background: #fee2e2; color: #dc2626; }
+
+/* Score row */
+.score-row { display: flex; align-items: center; gap: 8px; }
+.score-row label { font-size: 0.82rem; font-weight: 700; color: #475569; white-space: nowrap; }
+.score-row input {
+  width: 72px; padding: 7px 10px;
+  border: 1.5px solid #e2e8f0; border-radius: 9px;
+  font-size: 1rem; font-weight: 800; text-align: center; outline: none;
+  transition: border-color 0.15s;
+}
+.score-row input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+.score-row span { color: #94a3b8; font-size: 0.82rem; }
+
+/* Feedback */
+#feedback {
+  width: 100%; padding: 10px 12px;
+  border: 1.5px solid #e2e8f0; border-radius: 10px;
+  font-size: 0.85rem; font-family: inherit;
+  resize: vertical; min-height: 110px; outline: none;
+  transition: border-color 0.15s;
+}
+#feedback:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+
+/* Notify */
+.notify-row { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px 0; }
+.notify-row input { accent-color: #6366f1; width: 15px; height: 15px; }
+.notify-row span { font-size: 0.82rem; color: #374151; }
+
+/* Save button */
+#save-btn {
+  width: 100%; padding: 13px;
+  background: linear-gradient(135deg, #059669, #16a34a);
+  color: #fff; border: none; border-radius: 12px;
+  font-weight: 800; cursor: pointer; font-size: 0.9rem;
+  box-shadow: 0 4px 14px rgba(5,150,105,0.3);
+  transition: all 0.15s;
+}
+#save-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(5,150,105,0.4); }
+#save-btn:disabled { background: #94a3b8; cursor: not-allowed; transform: none; box-shadow: none; }
+
+#status-msg {
+  display: none; padding: 10px 12px; border-radius: 10px;
+  font-size: 0.82rem; font-weight: 700; text-align: center; margin-top: 8px;
+}
+
+@media (max-width: 640px) {
+  #main { flex-direction: column; }
+  #sidebar { width: 100%; height: 300px; border-left: none; border-top: 1px solid #e2e8f0; }
+}
 </style>
 </head>
 <body>
 
-<div id="app-header">
-    <div style="display:flex;align-items:center;gap:12px;">
-        <div style="width:38px;height:38px;background:rgba(255,255,255,.15);border-radius:10px;border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:1.2rem;">📝</div>
-        <div>
-            <div style="color:#fff;font-weight:900;font-size:.95rem;" id="hdr-title">Grade Assignment</div>
-            <div style="color:#a5b4fc;font-size:.68rem;" id="hdr-sub">Loading…</div>
-        </div>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;">
-        <button id="clear-annotations" style="background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.4);color:#fca5a5;padding:6px 12px;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;">🗑 Clear Annotations</button>
-        <button id="btn-undo" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#e2e8f0;padding:6px 12px;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;">↩ Undo</button>
-    </div>
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p style="color:#64748b;font-weight:700;font-size:0.9rem;">Loading assignment…</p>
 </div>
 
-<div id="toolbar">
-    <button class="tool-btn active" id="tool-pen"    onclick="setTool('pen')"   >✏️ Pen</button>
-    <button class="tool-btn"        id="tool-highlight" onclick="setTool('highlight')">🖍 Highlight</button>
-    <button class="tool-btn"        id="tool-arrow"  onclick="setTool('arrow')" >➤ Arrow</button>
-    <button class="tool-btn"        id="tool-text"   onclick="setTool('text')"  >T Text</button>
-    <button class="tool-btn"        id="tool-eraser" onclick="setTool('eraser')">⬜ Eraser</button>
-    <div style="width:1px;height:28px;background:rgba(255,255,255,.12);margin:0 4px;"></div>
-    <div style="display:flex;gap:5px;align-items:center;">
-        ${['#ef4444','#f97316','#22c55e','#3b82f6','#8b5cf6','#000000'].map(col=>`<div class="color-swatch ${col==='#ef4444'?'active':''}" style="background:${col};" data-color="${col}" onclick="setColor('${col}',this)"></div>`).join('')}
-    </div>
-    <div style="display:flex;align-items:center;gap:5px;margin-left:4px;">
-        <span style="color:#94a3b8;font-size:.7rem;">Size:</span>
-        <input id="brush-size" type="range" min="1" max="20" value="3" style="width:70px;accent-color:#6366f1;">
-    </div>
-    <button class="tool-btn" onclick="zoomIn()">🔍+</button>
-    <button class="tool-btn" onclick="zoomOut()">🔍-</button>
-    <span id="zoom-label" style="color:#64748b;font-size:.7rem;min-width:38px;">100%</span>
+<!-- Top bar -->
+<div id="top-bar" style="display:none;">
+  <div style="min-width:0;flex:1;">
+    <div id="hdr-name">Grade Assignment</div>
+    <div id="hdr-meta">Loading…</div>
+  </div>
+  <div style="display:flex;gap:8px;flex-shrink:0;">
+    <button class="icon-btn" id="btn-undo">&#8617; Undo</button>
+    <button class="icon-btn danger" id="btn-clear">&#128465; Clear All</button>
+  </div>
 </div>
 
-<div id="workspace">
-    <div id="canvas-wrap">
-        <img id="hw-image" src="" alt="Homework">
-        <canvas id="draw-canvas"></canvas>
-    </div>
-    <div id="sidebar">
-        <div class="sb-section">
-            <div class="sb-label">Quick Grade</div>
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px;" id="grade-btns">
-                ${[['A','100','#16a34a'],['B','80','#2563eb'],['C','65','#d97706'],['F','40','#dc2626']].map(([g,s,c])=>`<button class="grade-btn" onclick="quickGrade(${s})" style="color:${c};">${g}<br><small style="font-size:.6rem;">${s}%</small></button>`).join('')}
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-                <label style="font-size:.8rem;font-weight:700;color:#475569;">Score:</label>
-                <input type="number" id="score-input" min="0" max="100" placeholder="0-100">
-                <span style="color:#6b7280;font-size:.8rem;">/100</span>
-            </div>
-        </div>
-        <div class="sb-section" style="flex:1;">
-            <div class="sb-label">Tutor Feedback</div>
-            <textarea id="feedback-text" rows="6" placeholder="Write your feedback, corrections, and encouragement here…"></textarea>
-        </div>
-        <div class="sb-section">
-            <div class="sb-label">Notify Student</div>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 0;">
-                <input type="checkbox" id="notify-student" checked style="accent-color:#6366f1;width:16px;height:16px;">
-                <span style="font-size:.82rem;color:#374151;">Send notification when saved</span>
-            </label>
-        </div>
-        <div style="padding:14px 18px;">
-            <button id="save-btn" onclick="saveGrade()">✅ Save Grade & Return</button>
-            <div id="status"></div>
-        </div>
-    </div>
+<!-- Toolbar -->
+<div id="toolbar" style="display:none;">
+  <button class="tool on" id="tool-pen"       onclick="grading.setTool('pen')">&#9999; Pen</button>
+  <button class="tool"    id="tool-highlight"  onclick="grading.setTool('highlight')">&#128397; Highlight</button>
+  <button class="tool"    id="tool-arrow"      onclick="grading.setTool('arrow')">&#10148; Arrow</button>
+  <button class="tool"    id="tool-text"       onclick="grading.setTool('text')">T Text</button>
+  <button class="tool"    id="tool-eraser"     onclick="grading.setTool('eraser')">&#9633; Eraser</button>
+  <div class="divider"></div>
+  <div id="swatches" style="display:flex;gap:5px;align-items:center;"></div>
+  <div class="divider"></div>
+  <span style="color:#64748b;font-size:0.68rem;white-space:nowrap;">Brush:</span>
+  <input type="range" id="size-range" min="1" max="20" value="3">
+  <div class="divider"></div>
+  <button class="tool" onclick="grading.zoom(1)">+</button>
+  <button class="tool" onclick="grading.zoom(-1)">&minus;</button>
+  <span id="zoom-lbl">100%</span>
 </div>
 
+<!-- Main -->
+<div id="main" style="display:none;">
+
+  <!-- Canvas / content -->
+  <div id="canvas-area"></div>
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+
+    <div class="sb-block">
+      <div class="sb-title">Quick Grade</div>
+      <div id="grade-grid">
+        <button class="gq gq-a" onclick="grading.quickGrade(100,this)">A<small>100%</small></button>
+        <button class="gq gq-b" onclick="grading.quickGrade(85,this)">B<small>85%</small></button>
+        <button class="gq gq-c" onclick="grading.quickGrade(65,this)">C<small>65%</small></button>
+        <button class="gq gq-f" onclick="grading.quickGrade(40,this)">F<small>40%</small></button>
+      </div>
+      <div class="score-row">
+        <label>Score:</label>
+        <input type="number" id="score-input" min="0" max="100" placeholder="0-100">
+        <span>/ 100</span>
+      </div>
+    </div>
+
+    <div class="sb-block" style="flex:1;">
+      <div class="sb-title">Feedback to Student</div>
+      <textarea id="feedback" placeholder="Write corrections, encouragement, and next steps here…"></textarea>
+    </div>
+
+    <div class="sb-block">
+      <div class="sb-title">Options</div>
+      <label class="notify-row">
+        <input type="checkbox" id="notify" checked>
+        <span>Notify student after saving</span>
+      </label>
+    </div>
+
+    <div style="padding:14px 16px;">
+      <button id="save-btn" onclick="grading.save()">&#10003; Save Grade &amp; Notify Student</button>
+      <div id="status-msg"></div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- Firebase module script -->
 <script type="module">
 import { auth, db } from './firebaseConfig.js';
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { doc, getDoc, updateDoc, addDoc, collection } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { doc, getDoc, updateDoc, addDoc, collection } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const params = new URLSearchParams(location.search);
-const hwId   = params.get('hw') || sessionStorage.getItem('grading_hw_id') || '';
+const hwId   = params.get('hw')    || sessionStorage.getItem('grading_hw_id')       || '';
 const tEmail = params.get('tutor') || sessionStorage.getItem('grading_tutor_email') || '';
 const tName  = params.get('name')  || sessionStorage.getItem('grading_tutor_name')  || '';
 
-window._db = db;
-window._doc = doc;
-window._updateDoc = updateDoc;
-window._hwId  = hwId;
-window._tEmail = tEmail;
-window._tName  = tName;
+// Expose to the plain script below
+window._G = { db, doc, updateDoc, addDoc, collection, hwId, tEmail, tName, hw: null };
 
 onAuthStateChanged(auth, async user => {
-    if (!user) {
-        document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;"><div style="text-align:center;"><div style="font-size:3rem;margin-bottom:16px;">🔒</div><p style="color:#ef4444;font-weight:700;font-size:1.1rem;">Not authenticated.</p><p style="color:#9ca3af;margin-top:8px;">Please log in and try again.</p></div></div>';
-        return;
-    }
+  if (!user) {
+    showLoadErr('🔒', 'Not logged in.', 'Please log in from the Tutor Portal first.');
+    return;
+  }
+  if (!hwId) {
+    showLoadErr('⚠️', 'No assignment ID.', 'Open this page via the Review button in the portal.');
+    return;
+  }
 
-    if (!hwId) {
-        document.getElementById('hdr-sub').textContent = 'No homework ID provided';
-        return;
-    }
-
+  try {
     const snap = await getDoc(doc(db, 'homework_assignments', hwId));
     if (!snap.exists()) {
-        document.getElementById('hdr-sub').textContent = 'Assignment not found';
-        return;
+      showLoadErr('📭', 'Assignment not found.', 'It may have been deleted.');
+      return;
     }
 
     const hw = snap.data();
-    window._hw = hw;
-    document.getElementById('hdr-title').textContent = `Grading: ${hw.studentName || 'Student'}`;
-    document.getElementById('hdr-sub').textContent   = `${hw.subject || 'Assignment'} · Submitted: ${hw.submittedAt?.toDate ? hw.submittedAt.toDate().toLocaleDateString() : 'Unknown'}`;
+    window._G.hw = hw;
 
-    // Load image
-    const imgEl = document.getElementById('hw-image');
-    if (hw.imageUrl || hw.fileUrl) {
-        const url = hw.imageUrl || hw.fileUrl;
-        imgEl.src = url;
-        imgEl.onload = () => {
-            const canvas = document.getElementById('draw-canvas');
-            canvas.width  = imgEl.naturalWidth;
-            canvas.height = imgEl.naturalHeight;
-            canvas.style.width  = imgEl.width  + 'px';
-            canvas.style.height = imgEl.height + 'px';
-            initCanvas();
-        };
-    } else if (hw.content || hw.question) {
-        // Text-based submission — show as styled div
-        const wrap = document.getElementById('canvas-wrap');
-        wrap.innerHTML = `<div style="padding:40px;max-width:700px;font-family:serif;font-size:1.1rem;line-height:1.8;color:#1e293b;background:#fff;min-height:100%;border-right:1px solid #e2e8f0;">
-            <h2 style="font-family:sans-serif;font-size:.75rem;color:#6366f1;text-transform:uppercase;letter-spacing:.08em;margin-bottom:20px;font-weight:800;">Student Submission</h2>
-            <p>${(hw.content || hw.question || '').replace(/\n/g,'<br>')}</p>
-        </div>`;
+    // Fill header
+    const dateStr = hw.submittedAt && hw.submittedAt.toDate
+      ? hw.submittedAt.toDate().toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })
+      : 'Unknown date';
+    document.getElementById('hdr-name').textContent = 'Grading: ' + (hw.studentName || 'Student');
+    document.getElementById('hdr-meta').textContent = (hw.subject || 'Homework') + ' · ' + dateStr;
+
+    // Pre-fill existing grade / feedback
+    if (hw.score !== undefined && hw.score !== null) {
+      document.getElementById('score-input').value = hw.score;
+    }
+    if (hw.feedback) {
+      document.getElementById('feedback').value = hw.feedback;
     }
 
-    // Pre-fill existing feedback/score
-    if (hw.score !== undefined) document.getElementById('score-input').value = hw.score;
-    if (hw.feedback) document.getElementById('feedback-text').value = hw.feedback;
+    // Reveal UI
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('top-bar').style.display = 'flex';
+    document.getElementById('toolbar').style.display = 'flex';
+    document.getElementById('main').style.display    = 'flex';
+
+    // Load submission content
+    loadContent(hw);
+
+  } catch (err) {
+    showLoadErr('❌', 'Error loading.', err.message);
+  }
 });
 
-window.saveGrade = async function() {
-    const btn    = document.getElementById('save-btn');
-    const status = document.getElementById('status');
-    const score  = document.getElementById('score-input').value.trim();
-    const feedback = document.getElementById('feedback-text').value.trim();
-    const notify   = document.getElementById('notify-student').checked;
-    const scoreVal = score !== '' ? parseInt(score, 10) : null;
+function loadContent(hw) {
+  const area = document.getElementById('canvas-area');
 
-    if (scoreVal !== null && (isNaN(scoreVal)||scoreVal<0||scoreVal>100)) {
-        showStatus('❌ Score must be between 0 and 100', false);
-        return;
+  if (hw.imageUrl || hw.fileUrl) {
+    const url = hw.imageUrl || hw.fileUrl;
+    const img = document.createElement('img');
+    img.id           = 'hw-img';
+    img.crossOrigin  = 'anonymous';
+    img.style.cssText = 'display:block;max-width:none;user-select:none;';
+
+    img.onload = function () {
+      const cvs         = document.createElement('canvas');
+      cvs.id            = 'draw-canvas';
+      cvs.width         = img.naturalWidth;
+      cvs.height        = img.naturalHeight;
+      cvs.style.cssText = 'position:absolute;top:0;left:0;touch-action:none;cursor:crosshair;'
+                        + 'width:' + img.naturalWidth  + 'px;'
+                        + 'height:' + img.naturalHeight + 'px;';
+      area.style.position = 'relative';
+      area.appendChild(img);
+      area.appendChild(cvs);
+      window._G.canvas = cvs;
+      window._G.ctx    = cvs.getContext('2d');
+      window._G.ctx.lineCap  = 'round';
+      window._G.ctx.lineJoin = 'round';
+      if (window.grading && window.grading.bindCanvas) {
+        window.grading.bindCanvas(cvs);
+      }
+    };
+
+    img.onerror = function () {
+      area.innerHTML = infoBox('🖼️', 'Image unavailable.', 'The file may have expired. You can still write feedback and save the grade.');
+    };
+
+    img.src = url; // set src after event handlers
+
+  } else if (hw.answer || hw.content || hw.question) {
+    const text = hw.answer || hw.content || hw.question || '';
+    const div  = document.createElement('div');
+    div.id = 'text-submission';
+    div.innerHTML = '<div style="font-size:0.7rem;color:#6366f1;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:16px;">Student Submission</div>'
+                  + text.replace(/\n/g, '<br>');
+    area.appendChild(div);
+
+  } else {
+    area.innerHTML = infoBox('📄', 'No file or text found.', 'You can still write feedback and save the grade.');
+  }
+}
+
+function infoBox(icon, title, sub) {
+  return '<div style="padding:60px 40px;text-align:center;color:#94a3b8;">'
+       + '<div style="font-size:2.5rem;margin-bottom:12px;">' + icon + '</div>'
+       + '<p style="font-weight:700;color:#475569;font-size:1rem;margin-bottom:6px;">' + title + '</p>'
+       + '<p style="font-size:0.875rem;">' + sub + '</p></div>';
+}
+
+function showLoadErr(icon, title, sub) {
+  document.getElementById('loading').innerHTML =
+    '<div style="text-align:center;padding:40px;">'
+    + '<div style="font-size:3rem;margin-bottom:16px;">' + icon + '</div>'
+    + '<p style="font-weight:800;color:#ef4444;font-size:1.05rem;margin-bottom:8px;">' + title + '</p>'
+    + '<p style="color:#9ca3af;font-size:0.875rem;">' + sub + '</p></div>';
+}
+
+// Save grade — called from grading.save() below
+window._doSave = async function () {
+  const btn      = document.getElementById('save-btn');
+  const rawScore = document.getElementById('score-input').value.trim();
+  const feedback = document.getElementById('feedback').value.trim();
+  const notify   = document.getElementById('notify').checked;
+  const scoreVal = rawScore !== '' ? parseInt(rawScore, 10) : null;
+
+  if (scoreVal !== null && (isNaN(scoreVal) || scoreVal < 0 || scoreVal > 100)) {
+    showStatus('Score must be between 0 and 100.', false); return;
+  }
+  if (!feedback && scoreVal === null) {
+    showStatus('Please enter a score or write feedback before saving.', false); return;
+  }
+
+  // Capture any drawn annotations as a PNG
+  let annotationImg = '';
+  if (window._G.canvas && window._G.canvas.width > 0) {
+    try { annotationImg = window._G.canvas.toDataURL('image/png'); } catch (e) { /* CORS — skip */ }
+  }
+
+  btn.disabled    = true;
+  btn.textContent = 'Saving…';
+  showStatus('', null);
+
+  try {
+    const update = {
+      status:           'graded',
+      gradedAt:         new Date(),
+      tutorEmail:       window._G.tEmail,
+      tutorName:        window._G.tName,
+      feedback,
+      tutorAnnotations: feedback,
+    };
+    if (scoreVal !== null) update.score           = scoreVal;
+    if (annotationImg)     update.annotationImage = annotationImg;
+
+    await updateDoc(doc(db, 'homework_assignments', hwId), update);
+
+    if (notify && window._G.hw) {
+      try {
+        await addDoc(collection(db, 'student_notifications'), {
+          type:        'homework_graded',
+          studentId:   window._G.hw.studentId   || '',
+          studentName: window._G.hw.studentName || '',
+          tutorName:   window._G.tName,
+          score:       scoreVal,
+          feedback,
+          homeworkId:  hwId,
+          createdAt:   new Date(),
+          read:        false,
+        });
+      } catch (e) { /* optional — don't block */ }
     }
 
-    // Get annotation as base64 image
-    let annotationImg = '';
-    const canvas = document.getElementById('draw-canvas');
-    if (canvas && canvas.width > 0) {
-        try { annotationImg = canvas.toDataURL('image/png'); } catch(e){}
-    }
+    showStatus('Grade saved! Student has been notified.', true);
+    btn.textContent  = 'Saved!';
+    btn.style.background = 'linear-gradient(135deg,#4338ca,#6366f1)';
+    btn.disabled = false;
 
-    btn.disabled = true; btn.textContent = '⏳ Saving…';
-
-    try {
-        const update = {
-            status: 'graded',
-            gradedAt: new Date(),
-            tutorEmail: window._tEmail,
-            tutorName:  window._tName,
-            feedback,
-            tutorAnnotations: feedback,
-        };
-        if (scoreVal !== null) update.score = scoreVal;
-        if (annotationImg)    update.annotationImage = annotationImg;
-
-        await window._updateDoc(window._doc(window._db, 'homework_assignments', window._hwId), update);
-
-        // Optionally send notification to student via messages collection
-        if (notify && window._hw) {
-            try {
-                await addDoc(collection(window._db, 'student_notifications'), {
-                    type: 'homework_graded',
-                    studentId: window._hw.studentId,
-                    studentName: window._hw.studentName,
-                    tutorName: window._tName,
-                    score: scoreVal,
-                    feedback,
-                    homeworkId: window._hwId,
-                    createdAt: new Date(),
-                    read: false
-                });
-            } catch(e) { /* notification optional — don't block */ }
-        }
-
-        showStatus('✅ Saved! Student has been graded.', true);
-        btn.textContent = '✅ Saved!';
-        btn.style.background = 'linear-gradient(135deg,#6366f1,#4f46e5)';
-    } catch(err) {
-        showStatus('❌ ' + err.message, false);
-        btn.disabled = false;
-        btn.textContent = '✅ Save Grade & Return';
-    }
+  } catch (err) {
+    showStatus('Error: ' + err.message, false);
+    btn.disabled    = false;
+    btn.textContent = 'Save Grade & Notify Student';
+  }
 };
 
 function showStatus(msg, ok) {
-    const s = document.getElementById('status');
-    s.style.display = 'block';
-    s.style.background = ok ? '#d1fae5' : '#fee2e2';
-    s.style.color      = ok ? '#065f46' : '#991b1b';
-    s.textContent = msg;
+  const el = document.getElementById('status-msg');
+  if (!msg) { el.style.display = 'none'; return; }
+  el.style.display    = 'block';
+  el.style.background = ok ? '#d1fae5' : '#fee2e2';
+  el.style.color      = ok ? '#065f46' : '#991b1b';
+  el.textContent      = (ok ? '✅ ' : '❌ ') + msg;
 }
 </script>
 
+
+<!-- Drawing tools — plain script, no module, wrapped in IIFE to avoid global pollution -->
 <script>
-/* ── Canvas drawing tools ─────────────────────────── */
-let tool='pen', color='#ef4444', brushSize=3, drawing=false, startX=0, startY=0;
-let ctx, canvas, scale=1;
-let history=[], typingBoxes=[];
+(function () {
+  'use strict';
 
-function initCanvas() {
-    canvas = document.getElementById('draw-canvas');
-    ctx    = canvas.getContext('2d');
-    ctx.lineCap='round'; ctx.lineJoin='round';
+  var tool    = 'pen';
+  var color   = '#ef4444';
+  var size    = 3;
+  var drawing = false;
+  var sx      = 0;
+  var sy      = 0;
+  var history = [];
+  var zoom    = 1;
 
-    canvas.addEventListener('pointerdown', startDraw);
-    canvas.addEventListener('pointermove', draw);
-    canvas.addEventListener('pointerup',   endDraw);
-    canvas.addEventListener('pointerleave',endDraw);
-    canvas.oncontextmenu = e => e.preventDefault();
-}
+  var COLORS = ['#ef4444','#f97316','#22c55e','#3b82f6','#8b5cf6','#1e293b'];
 
-function getPos(e) {
-    const r = canvas.getBoundingClientRect();
-    const sx = canvas.width  / r.width;
-    const sy = canvas.height / r.height;
-    return { x:(e.clientX-r.left)*sx, y:(e.clientY-r.top)*sy };
-}
+  // Build swatches after DOM ready
+  document.addEventListener('DOMContentLoaded', function () {
+    var sw = document.getElementById('swatches');
+    COLORS.forEach(function (c, i) {
+      var d = document.createElement('div');
+      d.className        = 'swatch' + (i === 0 ? ' on' : '');
+      d.style.background = c;
+      d.title            = c;
+      d.onclick = function () {
+        color = c;
+        document.querySelectorAll('.swatch').forEach(function (s) { s.classList.remove('on'); });
+        d.classList.add('on');
+      };
+      sw.appendChild(d);
+    });
 
-function startDraw(e) {
-    if (tool==='text') { addTextBox(e); return; }
-    saveHistory();
-    drawing=true;
-    const p=getPos(e); startX=p.x; startY=p.y;
-    if(tool==='pen'||tool==='highlight'||tool==='eraser'){
-        ctx.beginPath(); ctx.moveTo(p.x,p.y);
+    document.getElementById('size-range').oninput = function (e) {
+      size = parseInt(e.target.value, 10) || 3;
+    };
+    document.getElementById('btn-undo').onclick  = doUndo;
+    document.getElementById('btn-clear').onclick = doClear;
+  });
+
+  // Expose public API used by HTML onclick attributes and module script
+  window.grading = {
+
+    bindCanvas: function (cvs) {
+      cvs.addEventListener('pointerdown', function (e) {
+        if (tool === 'text') { addTextBox(e); return; }
+        saveHistory();
+        drawing = true;
+        var p = getPos(e, cvs);
+        sx = p.x; sy = p.y;
+        if (tool !== 'arrow') {
+          getCtx().beginPath();
+          getCtx().moveTo(p.x, p.y);
+        }
+      });
+
+      cvs.addEventListener('pointermove', function (e) {
+        if (!drawing) return;
+        var p = getPos(e, cvs);
+        var c = getCtx();
+        if (tool === 'pen') {
+          c.globalAlpha              = 1;
+          c.globalCompositeOperation = 'source-over';
+          c.strokeStyle              = color;
+          c.lineWidth                = size;
+          c.lineTo(p.x, p.y);
+          c.stroke();
+        } else if (tool === 'highlight') {
+          c.globalAlpha              = 0.35;
+          c.globalCompositeOperation = 'source-over';
+          c.strokeStyle              = color;
+          c.lineWidth                = size * 5;
+          c.lineTo(p.x, p.y);
+          c.stroke();
+        } else if (tool === 'eraser') {
+          c.globalCompositeOperation = 'destination-out';
+          c.lineWidth                = size * 5;
+          c.lineTo(p.x, p.y);
+          c.stroke();
+        }
+      });
+
+      cvs.addEventListener('pointerup', function (e) {
+        if (!drawing) return;
+        drawing = false;
+        var p = getPos(e, cvs);
+        if (tool === 'arrow') drawArrow(sx, sy, p.x, p.y);
+        resetCtx();
+      });
+
+      cvs.addEventListener('pointerleave', function () {
+        if (drawing) { drawing = false; resetCtx(); }
+      });
+
+      cvs.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    },
+
+    setTool: function (t) {
+      tool = t;
+      document.querySelectorAll('.tool').forEach(function (b) { b.classList.remove('on'); });
+      var el = document.getElementById('tool-' + t);
+      if (el) el.classList.add('on');
+      var cvs = window._G && window._G.canvas;
+      if (cvs) {
+        cvs.style.cursor = t === 'text' ? 'text' : t === 'eraser' ? 'cell' : 'crosshair';
+      }
+    },
+
+    quickGrade: function (score, btn) {
+      document.getElementById('score-input').value = score;
+      document.querySelectorAll('.gq').forEach(function (b) { b.classList.remove('sel'); });
+      btn.classList.add('sel');
+    },
+
+    zoom: function (dir) {
+      zoom = dir > 0 ? Math.min(zoom + 0.25, 4) : Math.max(zoom - 0.25, 0.25);
+      var img = document.getElementById('hw-img');
+      var cvs = window._G && window._G.canvas;
+      if (img && cvs) {
+        var w = img.naturalWidth  * zoom;
+        var h = img.naturalHeight * zoom;
+        img.style.width  = w + 'px';
+        img.style.height = h + 'px';
+        cvs.style.width  = w + 'px';
+        cvs.style.height = h + 'px';
+      }
+      document.getElementById('zoom-lbl').textContent = Math.round(zoom * 100) + '%';
+    },
+
+    save: function () {
+      if (window._doSave) window._doSave();
     }
-}
 
-function draw(e) {
-    if(!drawing) return;
-    const p=getPos(e);
-    if(tool==='pen'){ ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over'; ctx.strokeStyle=color; ctx.lineWidth=brushSize; ctx.lineTo(p.x,p.y); ctx.stroke(); }
-    else if(tool==='highlight'){ ctx.globalAlpha=.35; ctx.globalCompositeOperation='source-over'; ctx.strokeStyle=color; ctx.lineWidth=brushSize*4; ctx.lineTo(p.x,p.y); ctx.stroke(); }
-    else if(tool==='eraser'){ ctx.globalCompositeOperation='destination-out'; ctx.lineWidth=brushSize*4; ctx.lineTo(p.x,p.y); ctx.stroke(); }
-}
+  };
 
-function endDraw(e) {
-    if(!drawing) return;
-    drawing=false;
-    const p=getPos(e);
-    if(tool==='arrow') drawArrow(startX,startY,p.x,p.y);
-    ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
-}
+  // ── Private helpers ──────────────────────────────
 
-function drawArrow(x1,y1,x2,y2){
-    const angle=Math.atan2(y2-y1,x2-x1), len=20, a=Math.PI/7;
-    ctx.strokeStyle=color; ctx.lineWidth=brushSize; ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
-    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x2-len*Math.cos(angle-a), y2-len*Math.sin(angle-a));
-    ctx.lineTo(x2,y2);
-    ctx.lineTo(x2-len*Math.cos(angle+a), y2-len*Math.sin(angle+a));
-    ctx.stroke();
-}
+  function getCtx() {
+    return (window._G && window._G.ctx) || null;
+  }
 
-function addTextBox(e) {
-    const wrap=document.getElementById('canvas-wrap');
-    const r=wrap.getBoundingClientRect();
-    const el=document.createElement('div');
-    el.contentEditable='true';
-    el.className='type-tool';
-    el.style.left=(e.clientX-r.left+wrap.scrollLeft)+'px';
-    el.style.top=(e.clientY-r.top+wrap.scrollTop)+'px';
-    el.style.color=color;
-    el.style.fontSize=Math.max(14,brushSize*3)+'px';
-    el.style.zIndex='100';
-    wrap.appendChild(el);
-    el.focus();
-    typingBoxes.push(el);
-    // Make draggable
-    let dx=0,dy=0,ox=0,oy=0;
-    el.onmousedown=ev=>{if(ev.target!==el)return;ox=ev.clientX-el.offsetLeft;oy=ev.clientY-el.offsetTop;document.onmousemove=me=>{el.style.left=(me.clientX-ox)+'px';el.style.top=(me.clientY-oy)+'px';};document.onmouseup=()=>{document.onmousemove=document.onmouseup=null;};};
-}
+  function getPos(e, cvs) {
+    var r  = cvs.getBoundingClientRect();
+    var sx = cvs.width  / r.width;
+    var sy = cvs.height / r.height;
+    return { x: (e.clientX - r.left) * sx, y: (e.clientY - r.top) * sy };
+  }
 
-function saveHistory(){ if(ctx) history.push(ctx.getImageData(0,0,canvas.width,canvas.height)); if(history.length>30)history.shift(); }
+  function resetCtx() {
+    var c = getCtx();
+    if (!c) return;
+    c.globalAlpha              = 1;
+    c.globalCompositeOperation = 'source-over';
+  }
 
-function setTool(t){
-    tool=t;
-    document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
-    document.getElementById('tool-'+t)?.classList.add('active');
-    if(canvas) canvas.style.cursor = t==='text'?'text':t==='eraser'?'cell':'crosshair';
-}
+  function drawArrow(x1, y1, x2, y2) {
+    var c   = getCtx();
+    if (!c) return;
+    var ang = Math.atan2(y2 - y1, x2 - x1);
+    var L   = 20;
+    var a   = Math.PI / 7;
+    c.strokeStyle              = color;
+    c.lineWidth                = size;
+    c.globalAlpha              = 1;
+    c.globalCompositeOperation = 'source-over';
+    c.beginPath();
+    c.moveTo(x1, y1);
+    c.lineTo(x2, y2);
+    c.stroke();
+    c.beginPath();
+    c.moveTo(x2 - L * Math.cos(ang - a), y2 - L * Math.sin(ang - a));
+    c.lineTo(x2, y2);
+    c.lineTo(x2 - L * Math.cos(ang + a), y2 - L * Math.sin(ang + a));
+    c.stroke();
+  }
 
-function setColor(c,el){
-    color=c;
-    document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('active'));
-    el.classList.add('active');
-}
+  function addTextBox(e) {
+    var area = document.getElementById('canvas-area');
+    var r    = area.getBoundingClientRect();
+    var box  = document.createElement('div');
+    box.contentEditable = 'true';
+    box.style.cssText   =
+      'position:absolute;'
+      + 'left:'   + (e.clientX - r.left + area.scrollLeft) + 'px;'
+      + 'top:'    + (e.clientY - r.top  + area.scrollTop)  + 'px;'
+      + 'min-width:80px;min-height:24px;'
+      + 'padding:3px 6px;'
+      + 'border:1.5px dashed #6366f1;'
+      + 'background:rgba(255,255,255,0.92);'
+      + 'border-radius:4px;'
+      + 'font-size:' + Math.max(13, size * 3) + 'px;'
+      + 'color:' + color + ';'
+      + 'outline:none;cursor:move;z-index:50;resize:both;overflow:hidden;';
+    area.appendChild(box);
+    box.focus();
 
-function quickGrade(s){
-    document.getElementById('score-input').value=s;
-    document.querySelectorAll('.grade-btn').forEach(b=>b.classList.remove('sel'));
-    event.currentTarget.classList.add('sel');
-}
+    var ox = 0;
+    var oy = 0;
+    box.onmousedown = function (ev) {
+      if (ev.target !== box) return;
+      ox = ev.clientX - box.offsetLeft;
+      oy = ev.clientY - box.offsetTop;
+      document.onmousemove = function (me) {
+        box.style.left = (me.clientX - ox) + 'px';
+        box.style.top  = (me.clientY - oy) + 'px';
+      };
+      document.onmouseup = function () {
+        document.onmousemove = null;
+        document.onmouseup   = null;
+      };
+    };
+  }
 
-function zoomIn(){
-    scale=Math.min(scale+.25,4);
-    applyZoom();
-}
-function zoomOut(){
-    scale=Math.max(scale-.25,.25);
-    applyZoom();
-}
-function applyZoom(){
-    const img=document.getElementById('hw-image');
-    const c=document.getElementById('draw-canvas');
-    if(img){ const w=img.naturalWidth*scale+'px'; img.style.width=c.style.width=w; const h=img.naturalHeight*scale+'px'; img.style.height=c.style.height=h; }
-    document.getElementById('zoom-label').textContent=Math.round(scale*100)+'%';
-}
+  function saveHistory() {
+    var cvs = window._G && window._G.canvas;
+    if (!cvs) return;
+    var c = getCtx();
+    if (!c) return;
+    history.push(c.getImageData(0, 0, cvs.width, cvs.height));
+    if (history.length > 30) history.shift();
+  }
 
-document.getElementById('btn-undo').onclick=()=>{
-    if(!ctx||!history.length) return;
-    ctx.putImageData(history.pop(),0,0);
-};
-document.getElementById('clear-annotations').onclick=()=>{
-    if(!ctx) return;
+  function doUndo() {
+    var cvs = window._G && window._G.canvas;
+    if (!cvs || !history.length) return;
+    getCtx().putImageData(history.pop(), 0, 0);
+  }
+
+  function doClear() {
+    var cvs = window._G && window._G.canvas;
+    if (!cvs) return;
     saveHistory();
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    typingBoxes.forEach(el=>el.remove());
-    typingBoxes=[];
-};
-document.getElementById('brush-size').oninput=e=>{ brushSize=parseInt(e.target.value); };
+    getCtx().clearRect(0, 0, cvs.width, cvs.height);
+    document.querySelectorAll('#canvas-area div[contenteditable]').forEach(function (el) {
+      el.remove();
+    });
+  }
 
-// Add color swatches to toolbar via JS (since they were template literals)
-document.querySelectorAll('.color-swatch').forEach(el=>{
-    el.onclick=function(){ setColor(this.dataset.color,this); };
-});
+}());
 </script>
 
 </body>
