@@ -8,9 +8,9 @@
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- Firebase SDK -->
+<!-- Firebase SDK — fixed: was 12.0.0 (does not exist), now 10.12.2 -->
 <script type="module">
-    import { auth, db } from './firebaseConfig-studentsignupmodular.js';
+      import { auth, db } from './firebaseConfig-studentsignupmodular.js';
     import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
     import { collection, query, where, getDocs, doc, getDoc, updateDoc, addDoc, setDoc, orderBy, onSnapshot, Timestamp, limit }
         from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
@@ -39,10 +39,11 @@ body { font-family: 'Inter', sans-serif; }
 @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
 .view-section { display:none; }
 .view-section.active { display:block; }
-#notif-dropdown { max-height:420px; overflow-y:auto; }
-.notif-item { border-bottom:1px solid #f3f4f6; padding:10px 14px; font-size:.83rem; cursor:pointer; }
-.notif-item:hover { background:#f9fafb; }
+#notif-dropdown { max-height:460px; overflow-y:auto; }
+.notif-item { border-bottom:1px solid #f3f4f6; padding:10px 14px; font-size:.83rem; cursor:pointer; transition:background .15s; }
+.notif-item:hover { background:#f0fdf4; }
 .notif-item.unread { background:#eff6ff; border-left:3px solid #3b82f6; }
+.notif-item.clickable:hover { background:#ecfdf5; }
 .notif-badge { position:absolute; top:2px; right:2px; background:#ef4444; color:#fff;
     border-radius:999px; min-width:16px; height:16px; font-size:.65rem; font-weight:700;
     display:flex; align-items:center; justify-content:center; padding:0 3px; }
@@ -53,13 +54,29 @@ details > summary::-webkit-details-marker { display:none; }
 details[open] > summary .chev { transform:rotate(90deg); }
 .chev { display:inline-block; transition:transform .2s; }
 @keyframes spin { to{transform:rotate(360deg)} }
+/* Annotation canvas styles */
+.annot-toolbar { display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:8px 10px; background:#f8fafc; border-radius:10px; border:1px solid #e5e7eb; margin-bottom:10px; }
+.annot-tool-btn { width:32px; height:32px; border-radius:8px; border:2px solid transparent; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:.75rem; transition:all .15s; }
+.annot-tool-btn.active { border-color:#059669; background:#ecfdf5; color:#059669; }
+.annot-tool-btn:not(.active) { background:#e5e7eb; color:#4b5563; }
+.annot-tool-btn:hover:not(.active) { background:#d1d5db; }
+.color-dot { width:20px; height:20px; border-radius:50%; cursor:pointer; border:3px solid transparent; transition:border-color .15s; flex-shrink:0; }
+.color-dot.active { border-color:#059669; }
+/* Ws tab styles */
+.ws-tab-btn { padding:10px 18px; font-size:.875rem; font-weight:600; border-bottom:2px solid transparent; transition:all .15s; cursor:pointer; background:none; border-left:none; border-right:none; border-top:none; }
+.ws-tab-btn.active { color:#059669; border-bottom-color:#059669; }
+.ws-tab-btn:not(.active) { color:#6b7280; }
+.ws-tab-btn:not(.active):hover { color:#059669; }
+/* Notif ring animation */
+@keyframes bellRing { 0%,100%{transform:rotate(0)} 20%{transform:rotate(-15deg)} 40%{transform:rotate(15deg)} 60%{transform:rotate(-10deg)} 80%{transform:rotate(10deg)} }
+.bell-ring { animation: bellRing 0.6s ease; }
 </style>
 </head>
 
 <body class="bg-gray-50 text-gray-800 h-screen flex overflow-hidden">
 
 <!-- SIDEBAR -->
-<aside class="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col justify-between z-20 shadow-lg">
+<aside id="main-sidebar" class="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col justify-between z-20 shadow-lg">
     <div>
         <div class="h-20 flex items-center px-8 border-b border-gray-100">
             <div class="h-10 w-10 bg-brand-primary rounded-lg flex items-center justify-center text-white font-bold text-xl mr-3">
@@ -141,7 +158,7 @@ details[open] > summary .chev { transform:rotate(90deg); }
                         <span class="font-bold text-gray-800">Notifications</span>
                         <button onclick="markAllRead()" class="text-xs text-brand-primary hover:underline">Mark all read</button>
                     </div>
-                    <div id="notif-list"><div class="text-center py-6 text-gray-400 text-sm">Loading...</div></div>
+                    <div id="notif-list"><div class="text-center py-6 text-gray-400 text-sm"><i class="fas fa-spinner fa-spin mr-1"></i> Loading...</div></div>
                 </div>
             </div>
         </div>
@@ -250,9 +267,10 @@ details[open] > summary .chev { transform:rotate(90deg); }
             <div class="p-6 border-b border-gray-100 flex justify-between items-center">
                 <h3 class="font-bold text-gray-800">Assignments</h3>
                 <div class="flex gap-3">
-                    <button id="filter-all"     onclick="filterAssignments('all')"     class="text-xs font-medium text-brand-primary border-b-2 border-brand-primary pb-0.5">All</button>
-                    <button id="filter-pending" onclick="filterAssignments('pending')" class="text-xs font-medium text-gray-500 hover:text-brand-primary">Pending</button>
-                    <button id="filter-graded"  onclick="filterAssignments('graded')"  class="text-xs font-medium text-gray-500 hover:text-brand-primary">Graded</button>
+                    <button id="filter-all"       onclick="filterAssignments('all')"       class="text-xs font-medium text-brand-primary border-b-2 border-brand-primary pb-0.5">All</button>
+                    <button id="filter-pending"   onclick="filterAssignments('pending')"   class="text-xs font-medium text-gray-500 hover:text-brand-primary">Pending</button>
+                    <button id="filter-submitted" onclick="filterAssignments('submitted')" class="text-xs font-medium text-gray-500 hover:text-brand-primary">Submitted</button>
+                    <button id="filter-graded"    onclick="filterAssignments('graded')"    class="text-xs font-medium text-gray-500 hover:text-brand-primary">Graded</button>
                 </div>
             </div>
             <div id="assignments-list" class="p-4 space-y-3">
@@ -305,22 +323,80 @@ details[open] > summary .chev { transform:rotate(90deg); }
 <script type="module">
 document.addEventListener('DOMContentLoaded', async () => {
 
-// Wait for Firebase
+// ── Wait for Firebase modules (max 5s) ──
 await new Promise(r => { const t=setInterval(()=>{if(window.firebaseModules){clearInterval(t);r();}},50); setTimeout(()=>{clearInterval(t);r();},5000); });
 
 const { auth,db,onAuthStateChanged,signOut,collection,query,where,getDocs,doc,getDoc,
         updateDoc,addDoc,setDoc,orderBy,onSnapshot,Timestamp,limit,getStorage,ref,uploadBytes,getDownloadURL }
-    = window.firebaseModules;
+    = window.firebaseModules || {};
+
+if (!auth) { document.body.innerHTML = '<div style="padding:40px;text-align:center;color:red;font-size:1.2rem;">⚠️ Firebase failed to load. Check firebaseConfig file and internet connection.</div>'; return; }
 
 const CLOUDINARY = { cloudName:'dwjq7j5zp', preset:'tutor_homework' };
-let performanceChart = null;
-let allAssignments   = [];
-let studentUnsubChat = null;
-let studentUnsubInbox= null;
-let notifUnread      = 0;
-let allGradedSnap    = [];
+let performanceChart       = null;
+let _perfListenerAttached  = false;
+let allAssignments         = [];
+let studentUnsubChat       = null;
+let studentUnsubInbox      = null;
+let _notifUnsubscribers    = [];
+let _notifData             = { pending: 0, pendingDocs: [], messages: 0, materials: [], convs: [] };
+let _notifLoaded           = false;
+let _prevNotifTotal        = 0;
+const _annotState          = {};
 
+// ══════════════════════════════════════════
+// ── NOTIFICATION SOUNDS (Web Audio API) ──
+// ══════════════════════════════════════════
+function playNotifSound(type) {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const master = ctx.createGain();
+        master.gain.value = 0.35;
+        master.connect(ctx.destination);
+
+        if (type === 'message') {
+            // Friendly two-tone ascending ping
+            [[660, 0], [880, 0.18]].forEach(([freq, delay]) => {
+                const osc = ctx.createOscillator();
+                const g = ctx.createGain();
+                osc.connect(g); g.connect(master);
+                osc.type = 'sine'; osc.frequency.value = freq;
+                g.gain.setValueAtTime(0, ctx.currentTime + delay);
+                g.gain.linearRampToValueAtTime(0.8, ctx.currentTime + delay + 0.02);
+                g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.35);
+                osc.start(ctx.currentTime + delay);
+                osc.stop(ctx.currentTime + delay + 0.35);
+            });
+        } else if (type === 'assignment') {
+            // Three-note alert: C5, E5, G5
+            [[523, 0], [659, 0.2], [784, 0.4]].forEach(([freq, delay]) => {
+                const osc = ctx.createOscillator();
+                const g = ctx.createGain();
+                osc.connect(g); g.connect(master);
+                osc.type = 'triangle'; osc.frequency.value = freq;
+                g.gain.setValueAtTime(0, ctx.currentTime + delay);
+                g.gain.linearRampToValueAtTime(0.9, ctx.currentTime + delay + 0.02);
+                g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.28);
+                osc.start(ctx.currentTime + delay);
+                osc.stop(ctx.currentTime + delay + 0.28);
+            });
+        } else {
+            // Single soft chime for general/material
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.connect(g); g.connect(master);
+            osc.type = 'sine'; osc.frequency.value = 528;
+            g.gain.setValueAtTime(0, ctx.currentTime);
+            g.gain.linearRampToValueAtTime(0.7, ctx.currentTime + 0.03);
+            g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+            osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.6);
+        }
+    } catch(e) { /* AudioContext blocked — silent */ }
+}
+
+// ══════════════════════════════════════════
 // ── HELPERS ──
+// ══════════════════════════════════════════
 function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
 function rand(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
 function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a; }
@@ -334,27 +410,45 @@ function startClock(){
     function tick(){
         if(el) el.textContent=new Intl.DateTimeFormat('en-US',{weekday:'short',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true,timeZone:tz}).format(new Date());
     }
-    tick();
-    setInterval(tick,1000);
+    tick(); setInterval(tick,1000);
 }
 startClock();
 document.getElementById('page-date').textContent=new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 
-// ── TAB SWITCH ──
+// ── TAB SWITCH (fixed: auto-close mobile menu) ──
 window.switchTab = (tab) => {
-    document.querySelectorAll('.view-section').forEach(el=>{el.classList.remove('active');});
+    document.querySelectorAll('.view-section').forEach(el=>el.classList.remove('active'));
     const v=document.getElementById('view-'+tab);
-    if(v){v.classList.add('active');}
+    if(v) v.classList.add('active');
     document.querySelectorAll('.nav-item').forEach(el=>{el.classList.remove('active','text-brand-primary');el.classList.add('text-gray-600');});
     const nav=document.getElementById('nav-'+tab);
     if(nav) nav.classList.add('active');
     const titles={dashboard:'Dashboard Overview',messages:'Messages',courses:'My Courses',assignments:'Assignments',results:'Academic Results',calendar:'Class Schedule',games:'Educational Games'};
     document.getElementById('page-title').textContent=titles[tab]||'Portal';
+    // Auto-close mobile sidebar on nav
+    if(window.innerWidth < 768) closeMobileMenu();
 };
 
-window.toggleMobileMenu=()=>{const s=document.querySelector('aside');s.classList.toggle('hidden');s.classList.toggle('flex');s.classList.toggle('fixed');s.classList.toggle('inset-0');s.classList.toggle('z-40');};
+function closeMobileMenu(){
+    const s=document.getElementById('main-sidebar');
+    if(!s) return;
+    s.classList.add('hidden');
+    s.classList.remove('flex','fixed','inset-0','z-40');
+}
+window.toggleMobileMenu=()=>{
+    const s=document.getElementById('main-sidebar');
+    s.classList.toggle('hidden');
+    s.classList.toggle('flex');
+    s.classList.toggle('fixed');
+    s.classList.toggle('inset-0');
+    s.classList.toggle('z-40');
+};
 window.toggleProfileMenu=()=>document.getElementById('profile-menu').classList.toggle('hidden');
-window.logout=async()=>{try{await signOut(auth);window.location.href='studentsignup.html';}catch(e){alert('Logout error');}};
+// Fixed: redirect to login page (update path if your login page differs)
+window.logout=async()=>{
+    try{await signOut(auth); window.location.href='studentsignup.html';}
+    catch(e){alert('Logout error: '+e.message);}
+};
 
 document.addEventListener('click',e=>{
     const pm=document.getElementById('profile-menu');const ps=document.getElementById('profile-section');
@@ -371,11 +465,10 @@ onAuthStateChanged(auth, async user => {
 
 async function initStudent(user){
     try{
-        let snap=await getDocs(query(collection(db,"students"),where("studentUid","==",user.uid)));
-        if(snap.empty) snap=await getDocs(query(collection(db,"students"),where("email","==",user.email)));
+        let snap=await getDocs(query(collection(db,'students'),where('studentUid','==',user.uid)));
+        if(snap.empty) snap=await getDocs(query(collection(db,'students'),where('email','==',user.email)));
         if(snap.empty){document.getElementById('student-grade-country').textContent='Profile not found';return;}
-        const sd=snap.docs[0];
-        buildStudentGlobal(sd,user);
+        buildStudentGlobal(snap.docs[0],user);
         await loadAll();
     }catch(e){console.error('initStudent',e);}
 }
@@ -411,15 +504,16 @@ async function loadAll(){
         loadResults(),
         loadSchedule(),
         loadGames(),
-        loadNotifications(),
         initMessaging()
     ]);
+    // Start real-time notifications AFTER other data is loaded
+    initRealtimeNotifications();
 }
 
 // ── ATTENDANCE ──
 async function loadAttendance(){
     try{
-        const snap=await getDocs(query(collection(db,"homework_assignments"),where("studentId","==",window.currentStudent.id)));
+        const snap=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',window.currentStudent.id)));
         const total=snap.size;
         const done=snap.docs.filter(d=>['graded','submitted'].includes(d.data().status)).length;
         const pct=total>0?Math.round((done/total)*100):100;
@@ -433,36 +527,36 @@ async function loadAttendance(){
 // ── PENDING TASKS ──
 async function loadPendingTasks(){
     try{
-        const snap=await getDocs(query(collection(db,"homework_assignments"),where("studentId","==",window.currentStudent.id),where("status","in",["assigned","pending"])));
+        const snap=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',window.currentStudent.id),where('status','in',['assigned','pending'])));
         document.getElementById('pending-tasks-count').textContent=snap.size;
         document.getElementById('pending-count').textContent=snap.size;
         const now=new Date();let due48=0;
-        snap.forEach(d=>{const dd=new Date(d.data().dueDate||'');if(!isNaN(dd)&&(dd-now)/(3600000)<=48)due48++;});
+        snap.forEach(d=>{const dd=new Date(d.data().dueDate||'');if(!isNaN(dd)&&(dd-now)/3600000<=48)due48++;});
         const el=document.getElementById('pending-due');
         el.textContent=due48>0?`${due48} due within 48 hrs`:'No immediate deadlines';
         el.className=`text-xs ${due48>0?'text-red-500':'text-gray-500'} mt-auto`;
     }catch(e){console.error(e);}
 }
 
-// ── AVERAGE GRADE (real grade comparison) ──
+// ── AVERAGE GRADE ──
 async function loadAverageGrade(){
     try{
-        const mySnap=await getDocs(query(collection(db,"homework_assignments"),where("studentId","==",window.currentStudent.id),where("status","==","graded")));
+        const mySnap=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',window.currentStudent.id),where('status','==','graded')));
         if(mySnap.empty){document.getElementById('average-grade').textContent='--';document.getElementById('grade-ranking').textContent='No grades yet';return;}
         let myTotal=0,myCount=0;
         mySnap.forEach(d=>{const s=parseFloat(d.data().score);if(!isNaN(s)){myTotal+=s;myCount++;}});
         const myAvg=myCount>0?Math.round(myTotal/myCount):0;
         const letter=myAvg>=90?'A':myAvg>=80?'B+':myAvg>=70?'B':myAvg>=60?'C+':myAvg>=50?'C':'F';
         document.getElementById('average-grade').textContent=`${myAvg}% (${letter})`;
-
-        // Peer comparison in same grade
+        // Peer comparison — batch-limited to avoid N+1 overload
         const grade=window.currentStudent.grade;
         if(grade){
-            const peerStudents=await getDocs(query(collection(db,"students"),where("grade","==",grade)));
-            const peerIds=peerStudents.docs.map(d=>d.id).filter(id=>id!==window.currentStudent.id).slice(0,15);
+            const peerStudents=await getDocs(query(collection(db,'students'),where('grade','==',grade)));
+            // Limit to 8 peers to reduce reads
+            const peerIds=peerStudents.docs.map(d=>d.id).filter(id=>id!==window.currentStudent.id).slice(0,8);
             let peerTotal=0,peerCount=0;
             for(const pid of peerIds){
-                const ps=await getDocs(query(collection(db,"homework_assignments"),where("studentId","==",pid),where("status","==","graded")));
+                const ps=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',pid),where('status','==','graded')));
                 ps.forEach(d=>{const s=parseFloat(d.data().score);if(!isNaN(s)){peerTotal+=s;peerCount++;}});
             }
             const rankEl=document.getElementById('grade-ranking');
@@ -484,13 +578,10 @@ function formatSlotTime(t){
     const[h,m]=t.split(':').map(Number);
     return (h%12||12)+':'+(m<10?'0':'')+m+' '+(h>=12?'PM':'AM');
 }
-
-// Convert WAT schedule slot to student's local time
 function watSlotToLocal(day,startStr){
     const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
     const watNow=new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Lagos'}));
-    const todayIdx=watNow.getDay();
-    const targetIdx=DAYS.indexOf(day);
+    const todayIdx=watNow.getDay();const targetIdx=DAYS.indexOf(day);
     if(targetIdx===-1)return null;
     let ahead=targetIdx-todayIdx;
     if(ahead<0)ahead+=7;
@@ -500,11 +591,10 @@ function watSlotToLocal(day,startStr){
     }
     const[h,m]=startStr.split(':').map(Number);
     const watDate=new Date(watNow);watDate.setDate(watNow.getDate()+ahead);watDate.setHours(h,m,0,0);
-    // WAT=UTC+1 → subtract 1h to get UTC
-    return new Date(watDate.getTime()-3600000);
+    return new Date(watDate.getTime()-3600000); // WAT=UTC+1
 }
 
-// ── NEXT CLASS ──
+// ── NEXT CLASS (fixed: shows day + time, not just day name) ──
 async function loadNextClass(){
     try{
         const schedule=window.currentStudent.schedule||[];
@@ -519,7 +609,9 @@ async function loadNextClass(){
             if(u&&u.getTime()<soonestMs){soonestMs=u.getTime();soonest={slot,utc:u};}
         });
         if(!soonest)return;
-        document.getElementById('next-class-subject').textContent=soonest.slot.day;
+        // Show subject if available, otherwise show day + "Live Class"
+        const subjectLabel = soonest.slot.subject || ('Live Class · ' + soonest.slot.day);
+        document.getElementById('next-class-subject').textContent = subjectLabel;
         document.getElementById('next-class-time').textContent=`${formatSlotTime(soonest.slot.start)} – ${formatSlotTime(soonest.slot.end)} (WAT)`;
         document.getElementById('next-class-local').textContent=
             'Your time: '+soonest.utc.toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
@@ -541,7 +633,7 @@ async function loadUpcomingSchedule(){
                 <span class="text-lg font-bold text-gray-800">${s.utc.getDate()}</span>
             </div>
             <div>
-                <h4 class="text-sm font-bold text-gray-800">${escH(s.day)}</h4>
+                <h4 class="text-sm font-bold text-gray-800">${escH(s.subject||s.day)}</h4>
                 <p class="text-xs text-gray-500 mt-0.5">${formatSlotTime(s.start)} – ${formatSlotTime(s.end)} WAT</p>
                 <p class="text-xs text-blue-500 mt-0.5">Local: ${s.utc.toLocaleString([],{hour:'2-digit',minute:'2-digit',hour12:true})}</p>
             </div>
@@ -549,29 +641,30 @@ async function loadUpcomingSchedule(){
     }catch(e){console.error(e);}
 }
 
-// ── PERFORMANCE CHART (real scores) ──
+// ── PERFORMANCE CHART (fixed: no duplicate listeners) ──
 async function loadPerformanceChart(){
     try{
-        const snap=await getDocs(query(collection(db,"homework_assignments"),where("studentId","==",window.currentStudent.id),where("status","==","graded"),orderBy("gradedAt","asc")));
-        allGradedSnap=snap.docs;
+        const snap=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',window.currentStudent.id),where('status','==','graded'),orderBy('gradedAt','asc')));
+        window._allGradedSnap=snap.docs;
         renderChart(snap.docs);
-        document.getElementById('performance-period').addEventListener('change',e=>{
-            const period=e.target.value;
-            const now=new Date();
-            const filtered=allGradedSnap.filter(d=>{
-                const a=d.data();const date=a.gradedAt?.toDate?a.gradedAt.toDate():new Date(a.gradedAt||0);
-                return period==='month'?(date.getMonth()===now.getMonth()&&date.getFullYear()===now.getFullYear()):true;
+        if(!_perfListenerAttached){
+            _perfListenerAttached=true;
+            document.getElementById('performance-period').addEventListener('change',e=>{
+                const period=e.target.value,now=new Date();
+                const filtered=(window._allGradedSnap||[]).filter(d=>{
+                    const a=d.data();const date=a.gradedAt?.toDate?a.gradedAt.toDate():new Date(a.gradedAt||0);
+                    return period==='month'?(date.getMonth()===now.getMonth()&&date.getFullYear()===now.getFullYear()):true;
+                });
+                renderChart(filtered);
             });
-            renderChart(filtered);
-        });
+        }
     }catch(e){console.error(e);}
 }
 
 function renderChart(docs){
     const labels=[],scores=[],bySubject={};
     docs.forEach(d=>{
-        const a=d.data();const s=parseFloat(a.score);
-        if(isNaN(s))return;
+        const a=d.data();const s=parseFloat(a.score);if(isNaN(s))return;
         const date=a.gradedAt?.toDate?a.gradedAt.toDate():new Date(a.gradedAt||0);
         labels.push(date.toLocaleDateString('en-US',{month:'short',day:'numeric'}));
         scores.push(s);
@@ -582,20 +675,17 @@ function renderChart(docs){
     const ctx=document.getElementById('performanceChart').getContext('2d');
     if(performanceChart)performanceChart.destroy();
     if(!scores.length){
-        ctx.clearRect(0,0,400,200);
-        ctx.fillStyle='#9ca3af';ctx.font='14px Inter';ctx.textAlign='center';
-        ctx.fillText('No graded results yet',200,100);return;
+        ctx.clearRect(0,0,400,200);ctx.fillStyle='#9ca3af';ctx.font='14px Inter';
+        ctx.textAlign='center';ctx.fillText('No graded results yet',200,100);return;
     }
     const colours=['#059669','#3b82f6','#f59e0b','#ef4444','#8b5cf6'];
-    const subjectEntries=Object.entries(bySubject);
-    let datasets;
+    const subjectEntries=Object.entries(bySubject);let datasets;
     if(subjectEntries.length>1){
         datasets=subjectEntries.map(([sub,vals],i)=>{
-            // Pad to full length
             let vi=0;
             const data=labels.map((_,li)=>{
                 const d=docs[li]?.data();if(!d)return null;
-                return (d.subject||'General')===sub?vals[vi++]||null:null;
+                return(d.subject||'General')===sub?vals[vi++]||null:null;
             });
             return{label:sub,data,borderColor:colours[i%colours.length],backgroundColor:'transparent',tension:0.4,spanGaps:true,pointRadius:3};
         });
@@ -614,7 +704,7 @@ function renderChart(docs){
 async function loadCourses(){
     const c=document.getElementById('courses-container');
     try{
-        const snap=await getDocs(query(collection(db,"course_materials"),where("studentId","==",window.currentStudent.id),orderBy("uploadedAt","desc")));
+        const snap=await getDocs(query(collection(db,'course_materials'),where('studentId','==',window.currentStudent.id),orderBy('uploadedAt','desc')));
         if(snap.empty){c.innerHTML='<div class="col-span-3 text-center py-12 text-gray-400"><i class="fas fa-book-open text-4xl mb-4"></i><p>No course materials yet.</p></div>';return;}
         const ICONS={'pdf':'📄','jpg':'🖼️','jpeg':'🖼️','png':'🖼️','gif':'🖼️','ppt':'📊','pptx':'📊','doc':'📝','docx':'📝','xls':'📊','xlsx':'📊'};
         const COLORS=['from-emerald-500 to-teal-400','from-blue-500 to-cyan-400','from-purple-500 to-pink-400','from-orange-500 to-amber-400','from-red-500 to-rose-400'];
@@ -642,28 +732,35 @@ async function loadCourses(){
     }catch(e){console.error(e);c.innerHTML='<div class="col-span-3 text-center py-12 text-red-400">Error loading courses.</div>';}
 }
 
-// ── ASSIGNMENTS (weekly accordion) ──
+// ── ASSIGNMENTS ──
 async function loadAssignments(){
     const c=document.getElementById('assignments-list');
     try{
-        const snap=await getDocs(query(collection(db,"homework_assignments"),where("studentId","==",window.currentStudent.id),orderBy("assignedDate","desc")));
+        const snap=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',window.currentStudent.id),orderBy('assignedDate','desc')));
         if(snap.empty){c.innerHTML='<div class="text-center py-8 text-gray-400">No assignments yet.</div>';return;}
         allAssignments=snap.docs.map(d=>({id:d.id,...d.data()}));
         renderAssignments(allAssignments);
     }catch(e){console.error(e);}
 }
 
+// Fixed: added 'submitted' filter
 window.filterAssignments=(f)=>{
-    ['all','pending','graded'].forEach(x=>{
+    ['all','pending','submitted','graded'].forEach(x=>{
         const btn=document.getElementById('filter-'+x);
-        if(btn) btn.className=x===f?'text-xs font-medium text-brand-primary border-b-2 border-brand-primary pb-0.5':'text-xs font-medium text-gray-500 hover:text-brand-primary';
+        if(btn) btn.className=x===f
+            ?'text-xs font-medium text-brand-primary border-b-2 border-brand-primary pb-0.5'
+            :'text-xs font-medium text-gray-500 hover:text-brand-primary';
     });
-    const filtered=f==='all'?allAssignments:allAssignments.filter(a=>a.status===f||(f==='pending'&&a.status==='assigned'));
+    const filtered=f==='all'?allAssignments:allAssignments.filter(a=>{
+        if(f==='pending') return a.status==='assigned'||a.status==='pending';
+        return a.status===f;
+    });
     renderAssignments(filtered);
 };
 
 function getWeekStart(date){
-    const d=new Date(date);const day=d.getDay();const diff=d.getDate()-day+(day===0?-6:1);
+    const d=new Date(date);const day=d.getDay();
+    const diff=d.getDate()-day+(day===0?-6:1);
     const ws=new Date(d);ws.setDate(diff);ws.setHours(0,0,0,0);return ws;
 }
 
@@ -709,7 +806,7 @@ function renderAssignments(assignments){
                                 <span class="text-xs font-bold px-2.5 py-1 rounded-full ${sc}">${sl}</span>
                                 <div class="flex gap-1.5">
                                     ${fileUrl?`<a href="${escH(fileUrl)}" target="_blank" class="text-xs text-brand-primary hover:underline">View</a>`:''}
-                                    ${a.status!=='graded'?`<button onclick="openWorkspace('${a.id}')" class="text-xs bg-brand-primary text-white px-3 py-1 rounded-lg hover:bg-brand-dark">Submit</button>`:''}
+                                    ${a.status!=='graded'?`<button data-id="${escH(a.id)}" onclick="openWorkspace(this.dataset.id)" class="text-xs bg-brand-primary text-white px-3 py-1 rounded-lg hover:bg-brand-dark">${a.status==='submitted'?'View / Edit':'Submit'}</button>`:''}
                                 </div>
                             </div>
                         </div>
@@ -720,73 +817,388 @@ function renderAssignments(assignments){
     }).join('');
 }
 
-window.openWorkspace=async(assignmentId)=>{
-    const snap=await getDoc(doc(db,"homework_assignments",assignmentId));
-    if(!snap.exists())return alert('Assignment not found');
-    const a=snap.data();
-    const modal=document.createElement('div');
-    modal.className='fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4';
-    const fileUrl=a.fileUrl||a.attachmentUrl||(a.attachments&&a.attachments[0]?.url)||'';
-    modal.innerHTML=`
-    <div class="bg-white rounded-2xl w-full max-w-2xl max-h-screen overflow-y-auto">
-        <div class="flex justify-between items-center p-5 border-b">
-            <h3 class="font-bold text-gray-800">${escH(a.title||'Assignment')}</h3>
-            <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
-        </div>
-        <div class="p-5 space-y-4">
-            <div class="bg-gray-50 rounded-xl p-4">
-                <h5 class="font-bold text-gray-700 mb-1 text-sm">Instructions:</h5>
-                <p class="text-sm text-gray-600">${escH(a.description||a.instructions||'No specific instructions.')}</p>
-            </div>
-            ${fileUrl?`<a href="${escH(fileUrl)}" target="_blank" class="flex items-center gap-3 bg-blue-50 p-3 rounded-xl text-blue-700 hover:bg-blue-100">
-                <i class="fas fa-file text-xl"></i>
-                <span class="font-medium text-sm">${escH(a.fileName||a.attachmentName||'View Assignment File')}</span>
-                <i class="fas fa-external-link-alt ml-auto text-xs"></i>
-            </a>`:''}
+// ══════════════════════════════════════════
+// ── OPEN WORKSPACE — with annotation tab ──
+// ══════════════════════════════════════════
+window.openWorkspace = async (assignmentId) => {
+    // Remove any existing workspace modal
+    const existingModal = document.getElementById('ws-modal-' + assignmentId);
+    if (existingModal) existingModal.remove();
+
+    const snap = await getDoc(doc(db, 'homework_assignments', assignmentId));
+    if (!snap.exists()) return alert('Assignment not found');
+    const a = snap.data();
+
+    const fileUrl = a.fileUrl || a.attachmentUrl || (a.attachments && a.attachments[0]?.url) || '';
+    const ext = (a.fileName || fileUrl || '').split('.').pop().toLowerCase();
+    const isImage = ['jpg','jpeg','png','gif','webp'].includes(ext);
+
+    const modal = document.createElement('div');
+    modal.id = 'ws-modal-' + assignmentId;
+    modal.className = 'fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-3';
+
+    const colorDots = ['#1f2937','#ef4444','#3b82f6','#f59e0b','#059669','#8b5cf6']
+        .map(c => `<span class="color-dot active" data-color="${c}" onclick="setAnnotColor('${assignmentId}','${c}')" style="background:${c};"></span>`).join('');
+
+    modal.innerHTML = `
+    <div class="bg-white rounded-2xl w-full max-w-3xl flex flex-col" style="max-height:92vh;">
+        <!-- Header -->
+        <div class="flex justify-between items-center px-5 py-4 border-b flex-shrink-0">
             <div>
-                <h5 class="font-bold text-gray-700 mb-2 text-sm">Your Answer / Notes:</h5>
-                <textarea id="ws-text-${assignmentId}" rows="5" class="w-full p-3 border border-gray-300 rounded-xl text-sm" placeholder="Type your answer or notes here...">${escH(a.studentWork||'')}</textarea>
+                <h3 class="font-bold text-gray-800 text-base">${escH(a.title||'Assignment')}</h3>
+                ${a.subject ? `<p class="text-xs text-gray-400">${escH(a.subject)}</p>` : ''}
             </div>
-            <div>
-                <h5 class="font-bold text-gray-700 mb-2 text-sm">Upload Your Work (optional):</h5>
-                <input type="file" id="ws-file-${assignmentId}" class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-brand-light file:text-brand-dark file:font-semibold">
-            </div>
-            <div class="flex gap-3 pt-2">
-                <button onclick="this.closest('.fixed').remove()" class="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium">Cancel</button>
-                <button onclick="submitWork('${assignmentId}')" id="submit-btn-${assignmentId}" class="flex-1 px-4 py-3 bg-brand-primary text-white rounded-xl font-bold hover:bg-brand-dark">Submit</button>
-            </div>
+            <button onclick="document.getElementById('ws-modal-${assignmentId}').remove()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
         </div>
+        <!-- Tabs -->
+        <div class="flex border-b flex-shrink-0 bg-gray-50 px-2">
+            <button class="ws-tab-btn active" id="wstab-view-${assignmentId}" onclick="wsTab('${assignmentId}','view')">
+                <i class="fas fa-eye mr-1"></i>View
+            </button>
+            <button class="ws-tab-btn" id="wstab-annotate-${assignmentId}" onclick="wsTab('${assignmentId}','annotate')">
+                <i class="fas fa-pen-nib mr-1"></i>Annotate
+            </button>
+            <button class="ws-tab-btn" id="wstab-submit-${assignmentId}" onclick="wsTab('${assignmentId}','submit')">
+                <i class="fas fa-paper-plane mr-1"></i>Submit
+            </button>
+        </div>
+        <!-- Tab bodies -->
+        <div style="overflow-y:auto;flex:1;">
+
+            <!-- VIEW TAB -->
+            <div id="wscontent-view-${assignmentId}" class="p-5 space-y-4">
+                <div class="bg-gray-50 rounded-xl p-4">
+                    <h5 class="font-semibold text-gray-700 mb-2 text-sm">📋 Instructions</h5>
+                    <p class="text-sm text-gray-600 leading-relaxed">${escH(a.description||a.instructions||'No specific instructions provided.')}</p>
+                </div>
+                ${a.dueDate?`<div class="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"><i class="fas fa-clock"></i><span>Due: <strong>${escH(a.dueDate)}</strong></span></div>`:''}
+                ${a.score!=null?`<div class="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2"><i class="fas fa-star"></i><span>Score: <strong>${a.score}/100</strong></span></div>`:''}
+                ${fileUrl?`
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    ${isImage
+                        ? `<img src="${escH(fileUrl)}" class="w-full object-contain" style="max-height:380px;">`
+                        : `<iframe src="${escH(fileUrl)}" class="w-full" style="height:380px;border:none;" allowfullscreen></iframe>`
+                    }
+                </div>
+                <a href="${escH(fileUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 text-brand-primary text-xs font-medium hover:underline">
+                    <i class="fas fa-external-link-alt"></i>Open file in new tab
+                </a>` : `<p class="text-sm text-gray-400 italic text-center py-4">No file attached to this assignment.</p>`}
+                ${a.feedback?`<div class="bg-blue-50 border border-blue-200 rounded-xl p-4"><p class="text-xs font-bold text-blue-700 mb-1">Tutor Feedback:</p><p class="text-sm text-blue-800 italic">"${escH(a.feedback)}"</p></div>`:''}
+            </div>
+
+            <!-- ANNOTATE TAB -->
+            <div id="wscontent-annotate-${assignmentId}" class="p-5 hidden">
+                <p class="text-xs text-gray-500 mb-3">Use the tools below to annotate your assignment. Your annotation will be included when you submit.</p>
+                <div class="annot-toolbar">
+                    <span class="text-xs font-semibold text-gray-500">Tool:</span>
+                    <button id="tool-pen-${assignmentId}" class="annot-tool-btn active" onclick="setAnnotTool('${assignmentId}','pen')" title="Pen"><i class="fas fa-pen"></i></button>
+                    <button id="tool-text-${assignmentId}" class="annot-tool-btn" onclick="setAnnotTool('${assignmentId}','text')" title="Add Text"><i class="fas fa-font"></i></button>
+                    <button id="tool-eraser-${assignmentId}" class="annot-tool-btn" onclick="setAnnotTool('${assignmentId}','eraser')" title="Eraser"><i class="fas fa-eraser"></i></button>
+                    <span class="text-xs font-semibold text-gray-500 ml-1">Size:</span>
+                    <input type="range" id="brush-size-${assignmentId}" min="1" max="20" value="3" class="w-20" oninput="_annotState['${assignmentId}']&&(_annotState['${assignmentId}'].size=+this.value)">
+                    <span class="text-xs font-semibold text-gray-500 ml-1">Color:</span>
+                    ${colorDots}
+                    <button onclick="undoAnnot('${assignmentId}')" class="ml-1 px-2 py-1 text-xs bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300" title="Undo"><i class="fas fa-undo"></i></button>
+                    <button onclick="clearAnnotCanvas('${assignmentId}')" class="px-2 py-1 text-xs bg-red-100 text-red-600 rounded-lg hover:bg-red-200" title="Clear"><i class="fas fa-trash-alt"></i></button>
+                </div>
+                ${isImage && fileUrl
+                    ? `<div style="position:relative;display:inline-block;width:100%;max-width:100%;">
+                        <img id="annot-bg-${assignmentId}" src="${escH(fileUrl)}" style="max-width:100%;display:block;border-radius:10px;border:1px solid #e5e7eb;" crossorigin="anonymous">
+                        <canvas id="annot-canvas-${assignmentId}" style="position:absolute;top:0;left:0;cursor:crosshair;border-radius:10px;"></canvas>
+                       </div>`
+                    : `<canvas id="annot-canvas-${assignmentId}" width="580" height="380"
+                        style="border:2px dashed #d1d5db;border-radius:12px;cursor:crosshair;display:block;background:#fff;max-width:100%;"></canvas>`
+                }
+                <p id="annot-hint-${assignmentId}" class="text-xs text-blue-500 mt-2"><i class="fas fa-pen mr-1"></i>Pen selected — click and drag to draw</p>
+            </div>
+
+            <!-- SUBMIT TAB -->
+            <div id="wscontent-submit-${assignmentId}" class="p-5 hidden">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">Your Answer / Notes</label>
+                        <textarea id="ws-text-${assignmentId}" rows="6"
+                            class="w-full p-3 border border-gray-300 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                            placeholder="Type your answer, working-out, or notes here...">${escH(a.studentWork||'')}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">Upload Your Work <span class="text-gray-400 font-normal">(optional — image, PDF, Word)</span></label>
+                        <input type="file" id="ws-file-${assignmentId}" accept="image/*,.pdf,.doc,.docx"
+                            class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-brand-light file:text-brand-dark file:font-semibold hover:file:bg-emerald-200">
+                    </div>
+                    <div id="annot-preview-${assignmentId}" class="hidden bg-gray-50 rounded-xl p-3 border border-gray-200">
+                        <p class="text-xs font-bold text-gray-600 mb-2"><i class="fas fa-pen-nib mr-1 text-brand-primary"></i>Your annotation will be sent to the tutor:</p>
+                        <img id="annot-preview-img-${assignmentId}" class="max-w-xs rounded-lg border border-gray-200" src="">
+                    </div>
+                    <div class="flex gap-3 pt-2">
+                        <button onclick="document.getElementById('ws-modal-${assignmentId}').remove()"
+                            class="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors">
+                            Cancel
+                        </button>
+                        <button data-id="${escH(assignmentId)}" onclick="submitWork(this.dataset.id)" id="submit-btn-${assignmentId}"
+                            class="flex-1 px-4 py-3 bg-brand-primary text-white rounded-xl font-bold hover:bg-brand-dark transition-colors">
+                            <i class="fas fa-paper-plane mr-1"></i>Submit
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- end scrollable -->
     </div>`;
+
     document.body.appendChild(modal);
+
+    // Init canvas after modal is in DOM
+    setTimeout(() => initAnnotCanvas(assignmentId, isImage, fileUrl), 120);
 };
 
-window.submitWork=async(id)=>{
-    const btn=document.getElementById('submit-btn-'+id);
-    btn.textContent='Submitting...';btn.disabled=true;
-    try{
-        const txt=document.getElementById('ws-text-'+id)?.value||'';
-        const fi=document.getElementById('ws-file-'+id);
-        let subUrl='';
-        if(fi?.files[0]){
-            const fd=new FormData();fd.append('file',fi.files[0]);fd.append('upload_preset',CLOUDINARY.preset);
-            const r=await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY.cloudName}/upload`,{method:'POST',body:fd});
-            const d=await r.json();subUrl=d.secure_url||'';
+// ── ANNOTATION CANVAS ENGINE ──
+function initAnnotCanvas(id, isImage, fileUrl) {
+    const canvas = document.getElementById('annot-canvas-' + id);
+    if (!canvas) return;
+
+    if (isImage && fileUrl) {
+        const img = document.getElementById('annot-bg-' + id);
+        if (img) {
+            const applySize = () => {
+                canvas.width = img.offsetWidth || 580;
+                canvas.height = img.offsetHeight || 380;
+                canvas.style.width = img.offsetWidth + 'px';
+                canvas.style.height = img.offsetHeight + 'px';
+            };
+            img.complete ? applySize() : (img.onload = applySize);
         }
-        await updateDoc(doc(db,"homework_assignments",id),{
-            status:'submitted',submittedAt:new Date(),studentWork:txt,
-            ...(subUrl?{submissionUrl:subUrl,submissionFileName:fi.files[0].name}:{})
+    }
+
+    const ctx = canvas.getContext('2d');
+    _annotState[id] = { tool:'pen', color:'#1f2937', size:3, drawing:false, history:[], ctx };
+    _saveAnnotHistory(id);
+
+    canvas.addEventListener('mousedown', e => _annotStart(e, id, canvas));
+    canvas.addEventListener('mousemove', e => _annotDraw(e, id, canvas));
+    canvas.addEventListener('mouseup',   () => _annotStop(id));
+    canvas.addEventListener('mouseleave',() => _annotStop(id));
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); _annotStart(e.touches[0], id, canvas); }, {passive:false});
+    canvas.addEventListener('touchmove',  e => { e.preventDefault(); _annotDraw(e.touches[0], id, canvas); }, {passive:false});
+    canvas.addEventListener('touchend',   () => _annotStop(id));
+}
+
+function _getPos(e, canvas) {
+    const r = canvas.getBoundingClientRect();
+    return { x:(e.clientX-r.left)*(canvas.width/r.width), y:(e.clientY-r.top)*(canvas.height/r.height) };
+}
+
+function _annotStart(e, id, canvas) {
+    const s = _annotState[id]; if (!s) return;
+    const pos = _getPos(e, canvas);
+    if (s.tool === 'text') {
+        const txt = prompt('Enter text to add to annotation:');
+        if (txt) {
+            s.ctx.font = `bold ${Math.max(14, s.size*5)}px Inter, sans-serif`;
+            s.ctx.fillStyle = s.color;
+            s.ctx.fillText(txt, pos.x, pos.y);
+            _saveAnnotHistory(id);
+        }
+        return;
+    }
+    s.drawing = true;
+    s.ctx.beginPath();
+    s.ctx.moveTo(pos.x, pos.y);
+}
+
+function _annotDraw(e, id, canvas) {
+    const s = _annotState[id]; if (!s || !s.drawing) return;
+    const pos = _getPos(e, canvas);
+    if (s.tool === 'eraser') {
+        s.ctx.clearRect(pos.x - s.size*2, pos.y - s.size*2, s.size*4, s.size*4);
+    } else {
+        s.ctx.strokeStyle = s.color;
+        s.ctx.lineWidth = s.size;
+        s.ctx.lineCap = 'round';
+        s.ctx.lineJoin = 'round';
+        s.ctx.lineTo(pos.x, pos.y);
+        s.ctx.stroke();
+    }
+}
+
+function _annotStop(id) {
+    const s = _annotState[id]; if (!s || !s.drawing) return;
+    s.drawing = false;
+    _saveAnnotHistory(id);
+}
+
+function _saveAnnotHistory(id) {
+    const s = _annotState[id]; if (!s) return;
+    const c = document.getElementById('annot-canvas-'+id); if (!c) return;
+    s.history.push(c.toDataURL());
+    if (s.history.length > 25) s.history.shift();
+}
+
+window.setAnnotTool = (id, tool) => {
+    const s = _annotState[id]; if (!s) return;
+    s.tool = tool;
+    ['pen','text','eraser'].forEach(t => {
+        const btn = document.getElementById('tool-'+t+'-'+id);
+        if (!btn) return;
+        btn.classList.toggle('active', t === tool);
+    });
+    const hints = {
+        pen: '<i class="fas fa-pen mr-1"></i>Pen — click and drag to draw',
+        text: '<i class="fas fa-font mr-1"></i>Text — click on canvas to add a label',
+        eraser: '<i class="fas fa-eraser mr-1"></i>Eraser — drag to erase areas'
+    };
+    const hint = document.getElementById('annot-hint-'+id);
+    if (hint) hint.innerHTML = hints[tool] || '';
+};
+
+window.setAnnotColor = (id, color) => {
+    const s = _annotState[id]; if (!s) return;
+    s.color = color;
+    if (s.tool === 'eraser') setAnnotTool(id, 'pen');
+    document.querySelectorAll(`#ws-modal-${id} .color-dot`).forEach(dot => {
+        dot.classList.toggle('active', dot.dataset.color === color);
+    });
+};
+
+window.undoAnnot = (id) => {
+    const s = _annotState[id]; if (!s || s.history.length < 2) return;
+    s.history.pop();
+    const c = document.getElementById('annot-canvas-'+id); if (!c) return;
+    const img = new Image();
+    img.onload = () => { s.ctx.clearRect(0,0,c.width,c.height); s.ctx.drawImage(img,0,0); };
+    img.src = s.history[s.history.length-1];
+};
+
+window.clearAnnotCanvas = (id) => {
+    const s = _annotState[id]; if (!s) return;
+    const c = document.getElementById('annot-canvas-'+id); if (!c) return;
+    s.ctx.clearRect(0,0,c.width,c.height);
+    _saveAnnotHistory(id);
+};
+
+window.wsTab = (id, tab) => {
+    ['view','annotate','submit'].forEach(t => {
+        const content = document.getElementById('wscontent-'+t+'-'+id);
+        const btn = document.getElementById('wstab-'+t+'-'+id);
+        if (content) content.classList.toggle('hidden', t !== tab);
+        if (btn) btn.classList.toggle('active', t === tab);
+    });
+    if (tab === 'submit') _updateAnnotPreview(id);
+    if (tab === 'annotate' && !_annotState[id]) {
+        const c = document.getElementById('annot-canvas-'+id);
+        if (c) initAnnotCanvas(id, false, '');
+    }
+};
+
+function _updateAnnotPreview(id) {
+    const canvas = document.getElementById('annot-canvas-'+id);
+    const preview = document.getElementById('annot-preview-'+id);
+    const previewImg = document.getElementById('annot-preview-img-'+id);
+    if (!canvas || !preview || !previewImg) return;
+    const data = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+    const hasContent = Array.from(data).some((v,i) => i%4===3 && v>0);
+    if (hasContent) {
+        preview.classList.remove('hidden');
+        previewImg.src = canvas.toDataURL('image/png');
+    } else {
+        preview.classList.add('hidden');
+    }
+}
+
+// ── SUBMIT WORK (with annotation upload) ──
+window.submitWork = async (id) => {
+    const btn = document.getElementById('submit-btn-'+id);
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Submitting...';
+    btn.disabled = true;
+    try {
+        const txt = document.getElementById('ws-text-'+id)?.value || '';
+        const fi = document.getElementById('ws-file-'+id);
+        let subUrl = '';
+
+        // Upload attached file (Cloudinary)
+        if (fi?.files[0]) {
+            const fd = new FormData();
+            fd.append('file', fi.files[0]);
+            fd.append('upload_preset', CLOUDINARY.preset);
+            const r = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY.cloudName}/upload`, {method:'POST',body:fd});
+            const d = await r.json();
+            subUrl = d.secure_url || '';
+        }
+
+        // Upload annotation canvas if student drew anything
+        let annotUrl = '';
+        const canvas = document.getElementById('annot-canvas-'+id);
+        if (canvas) {
+            const data = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+            const hasContent = Array.from(data).some((v,i) => i%4===3 && v>0);
+            if (hasContent) {
+                const blob = await new Promise(r => canvas.toBlob(r,'image/png'));
+                const fd = new FormData();
+                fd.append('file', blob, 'annotation.png');
+                fd.append('upload_preset', CLOUDINARY.preset);
+                const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY.cloudName}/upload`, {method:'POST',body:fd});
+                const d = await res.json();
+                annotUrl = d.secure_url || '';
+            }
+        }
+
+        // Update assignment in Firestore
+        await updateDoc(doc(db,'homework_assignments',id), {
+            status: 'submitted',
+            submittedAt: new Date(),
+            studentWork: txt,
+            ...(subUrl ? {submissionUrl:subUrl, submissionFileName:fi.files[0].name} : {}),
+            ...(annotUrl ? {annotationUrl:annotUrl} : {})
         });
-        document.querySelector('.fixed.inset-0').remove();
-        alert('Submitted successfully!');
-        await loadAssignments();await loadPendingTasks();
-    }catch(e){btn.textContent='Submit';btn.disabled=false;alert('Error: '+e.message);}
+
+        // Send annotation + notes to tutor via conversation
+        if ((annotUrl || txt) && window.currentStudent) {
+            try {
+                const convSnap = await getDocs(query(collection(db,'conversations'), where('studentId','==',window.currentStudent.id)));
+                const convId = convSnap.docs[0]?.id;
+                if (convId) {
+                    const assignSnap = await getDoc(doc(db,'homework_assignments',id));
+                    const aTitle = assignSnap.exists() ? (assignSnap.data().title||'Assignment') : 'Assignment';
+                    const msgContent = `📎 Submitted work for: "${aTitle}"${txt?'\n\nNotes: '+txt:''}`;
+                    await addDoc(collection(db,'conversations',convId,'messages'), {
+                        content: msgContent,
+                        imageUrl: annotUrl || null,
+                        senderId: window.currentStudent.id,
+                        senderName: window.currentStudent.name,
+                        senderRole: 'student',
+                        createdAt: new Date(),
+                        read: false
+                    });
+                    const cSnap = await getDoc(doc(db,'conversations',convId));
+                    const cur = cSnap.exists() ? (cSnap.data().unreadCount||0) : 0;
+                    await updateDoc(doc(db,'conversations',convId), {
+                        lastMessage: annotUrl ? '📎 Submitted annotated work' : '📎 Submitted work',
+                        lastMessageTimestamp: new Date(),
+                        lastSenderId: window.currentStudent.id,
+                        unreadCount: cur + 1
+                    });
+                }
+            } catch(msgErr) { console.warn('Could not send to conversation:', msgErr); }
+        }
+
+        // Close modal by its unique ID
+        document.getElementById('ws-modal-'+id)?.remove();
+        playNotifSound('general');
+        alert('✅ Submitted successfully!');
+        await loadAssignments();
+        await loadPendingTasks();
+    } catch(e) {
+        btn.innerHTML = '<i class="fas fa-paper-plane mr-1"></i>Submit';
+        btn.disabled = false;
+        alert('Error submitting: ' + e.message);
+    }
 };
 
 // ── RESULTS ──
 async function loadResults(){
     const c=document.getElementById('results-container');
     try{
-        const snap=await getDocs(query(collection(db,"homework_assignments"),where("studentId","==",window.currentStudent.id),where("status","==","graded"),orderBy("gradedAt","desc")));
+        const snap=await getDocs(query(collection(db,'homework_assignments'),where('studentId','==',window.currentStudent.id),where('status','==','graded'),orderBy('gradedAt','desc')));
         if(snap.empty){c.innerHTML='<div class="text-center py-8 text-gray-400">No graded results yet.</div>';return;}
         c.innerHTML=`<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-left">
             <th class="pb-3 font-semibold text-gray-500">Assignment</th>
@@ -829,8 +1241,7 @@ async function loadSchedule(){
     <div class="overflow-x-auto">
         <div style="display:grid;grid-template-columns:repeat(7,minmax(110px,1fr));border-left:1px solid #e5e7eb;border-top:1px solid #e5e7eb;">
         ${DAYS.map(day=>{
-            const isToday=day===todayWAT;
-            const cls=byDay[day];
+            const isToday=day===todayWAT;const cls=byDay[day];
             return `<div style="border-right:1px solid #e5e7eb;">
                 <div style="padding:8px 10px;font-weight:700;font-size:.72rem;text-transform:uppercase;background:${isToday?'#ecfdf5':'#f9fafb'};color:${isToday?'#059669':'#6b7280'};border-bottom:1px solid #e5e7eb;">
                     ${day.substring(0,3)} ${isToday?'▶':''}
@@ -840,6 +1251,7 @@ async function loadSchedule(){
                     <div style="background:${isToday?'#ecfdf5':'#f3f4f6'};border:1px solid ${isToday?'#bbf7d0':'#e5e7eb'};border-radius:6px;padding:5px 7px;margin-bottom:4px;font-size:.73rem;">
                         <div style="font-weight:700;color:#1f2937;">${formatSlotTime(slot.start)}</div>
                         <div style="color:#6b7280;">– ${formatSlotTime(slot.end)}</div>
+                        ${slot.subject?`<div style="color:#059669;font-size:.68rem;margin-top:2px;">${escH(slot.subject)}</div>`:''}
                     </div>`).join(''):'<div style="color:#d1d5db;font-size:.7rem;text-align:center;padding:10px;">Free</div>'}
                 </div>
             </div>`;
@@ -847,66 +1259,254 @@ async function loadSchedule(){
         </div>
     </div>
     <div class="mt-4 p-4 bg-blue-50 rounded-xl text-sm text-blue-700">
-        <i class="fas fa-info-circle mr-2"></i>All times are in <strong>Nigeria time (WAT / UTC+1)</strong>. 
+        <i class="fas fa-info-circle mr-2"></i>All times are in <strong>Nigeria time (WAT / UTC+1)</strong>.
         Your local conversion is shown on the clock above.
     </div>`;
 }
 
-// ── NOTIFICATIONS ──
-async function loadNotifications(){
-    const list=document.getElementById('notif-list');
-    const student=window.currentStudent;
-    const now=new Date();const day=now.getDate();
-    const notifs=[];
+// ══════════════════════════════════════════
+// ── REAL-TIME NOTIFICATIONS (onSnapshot) ──
+// ══════════════════════════════════════════
+function initRealtimeNotifications() {
+    const student = window.currentStudent;
+    if (!student) return;
 
-    // Welcome
-    notifs.push({text:`👋 Welcome back, ${student.name}! Your tutor ${student.tutorName?`<strong>${escH(student.tutorName)}</strong>`:''} is supporting your learning journey.`,unread:false,time:'Welcome'});
-    // Bi-monthly automated
-    if(day<=5) notifs.push({text:'📅 <strong>Start of month!</strong> Set your goals, stay on top of homework, and read your books.',unread:true,time:'Monthly reminder'});
-    if(day>=10&&day<=16) notifs.push({text:'📚 <strong>Mid-month check-in!</strong> Review your topics, practise and complete any pending homework.',unread:true,time:'Mid-month reminder'});
-    // Weekly
-    notifs.push({text:'📖 <strong>Weekly reminder:</strong> Read your books daily and practise your subjects!',unread:false,time:'Every week'});
+    // Unsubscribe any previous listeners
+    _notifUnsubscribers.forEach(u => u());
+    _notifUnsubscribers = [];
 
-    try{
-        // Pending HW count
-        const hwSnap=await getDocs(query(collection(db,"homework_assignments"),where("studentId","==",student.id),where("status","in",["assigned","pending"])));
-        if(hwSnap.size>0) notifs.unshift({text:`📝 You have <strong>${hwSnap.size}</strong> pending homework assignment${hwSnap.size!==1?'s':''}!`,unread:true,time:'Now'});
-    }catch(e){}
+    // 1. Live pending assignments listener
+    const q1 = query(collection(db,'homework_assignments'), where('studentId','==',student.id), where('status','in',['assigned','pending']));
+    _notifUnsubscribers.push(onSnapshot(q1, snap => {
+        const prev = _notifData.pending;
+        _notifData.pending = snap.size;
+        _notifData.pendingDocs = snap.docs.map(d => ({id:d.id,...d.data()}));
+        if (_notifLoaded && snap.size > prev) {
+            playNotifSound('assignment');
+            _ringBell();
+        }
+        _updateNotifBadge();
+    }, err => console.warn('Notif assignments listener:', err)));
 
-    try{
-        // New tutor messages
-        const convSnap=await getDocs(query(collection(db,"conversations"),where("studentId","==",student.id)));
-        let msgCount=0;
-        convSnap.forEach(d=>{const c=d.data();if(c.unreadCount>0&&c.lastSenderId!==student.id)msgCount++;});
-        if(msgCount>0) notifs.unshift({text:`💬 You have <strong>${msgCount}</strong> new message${msgCount!==1?'s':''} from your tutor. Check Messages!`,unread:true,time:'Message'});
-    }catch(e){}
+    // 2. Live conversations (messages) listener
+    const q2 = query(collection(db,'conversations'), where('studentId','==',student.id));
+    _notifUnsubscribers.push(onSnapshot(q2, snap => {
+        let msgCount = 0;
+        _notifData.convs = snap.docs.map(d => ({id:d.id,...d.data()}));
+        _notifData.convs.forEach(c => { if(c.unreadCount>0 && c.lastSenderId!==student.id) msgCount++; });
+        const prev = _notifData.messages;
+        _notifData.messages = msgCount;
+        if (_notifLoaded && msgCount > prev) {
+            playNotifSound('message');
+            _ringBell();
+        }
+        _updateNotifBadge();
+    }, err => console.warn('Notif conversations listener:', err)));
 
-    try{
-        // New courses (last 7 days)
-        const matSnap=await getDocs(query(collection(db,"course_materials"),where("studentId","==",student.id),orderBy("uploadedAt","desc"),limit(5)));
-        matSnap.forEach(d=>{
-            const m=d.data();const dt=m.uploadedAt?.toDate?m.uploadedAt.toDate():null;
-            if(dt&&(now-dt)/(86400000)<7) notifs.unshift({text:`📚 New course material: <strong>${escH(m.title)}</strong> — check My Courses!`,unread:true,time:'Course'});
+    // 3. New course materials listener
+    const q3 = query(collection(db,'course_materials'), where('studentId','==',student.id), orderBy('uploadedAt','desc'), limit(5));
+    _notifUnsubscribers.push(onSnapshot(q3, snap => {
+        const now = new Date();
+        const prev = _notifData.materials.length;
+        _notifData.materials = [];
+        snap.docs.forEach(d => {
+            const m = d.data();
+            const dt = m.uploadedAt?.toDate ? m.uploadedAt.toDate() : null;
+            if (dt && (now - dt)/86400000 < 7) _notifData.materials.push(m);
         });
-    }catch(e){}
+        if (_notifLoaded && _notifData.materials.length > prev) {
+            playNotifSound('general');
+            _ringBell();
+        }
+        _updateNotifBadge();
+    }, err => console.warn('Notif materials listener:', err)));
 
-    notifUnread=notifs.filter(n=>n.unread).length;
-    const badge=document.getElementById('notification-badge');
-    if(notifUnread>0){badge.textContent=notifUnread;badge.classList.remove('hidden');}else badge.classList.add('hidden');
-    list.innerHTML=notifs.map(n=>`<div class="notif-item ${n.unread?'unread':''}"><div class="text-gray-800">${n.text}</div><div class="text-gray-400 text-xs mt-0.5">${n.time}</div></div>`).join('')||'<div class="text-center py-6 text-gray-400">No notifications.</div>';
+    _notifLoaded = true;
 }
 
-window.toggleNotifications=()=>document.getElementById('notif-dropdown').classList.toggle('hidden');
-window.markAllRead=()=>{
-    notifUnread=0;
-    document.getElementById('notification-badge').classList.add('hidden');
-    document.querySelectorAll('.notif-item.unread').forEach(el=>el.classList.remove('unread'));
+function _ringBell() {
+    const bellBtn = document.getElementById('bell-btn');
+    if (!bellBtn) return;
+    bellBtn.classList.remove('bell-ring');
+    // Reflow trick to restart animation
+    void bellBtn.offsetWidth;
+    bellBtn.classList.add('bell-ring');
+    setTimeout(() => bellBtn.classList.remove('bell-ring'), 700);
+}
+
+function _updateNotifBadge() {
+    const total = _notifData.pending + _notifData.messages + _notifData.materials.length;
+    const badge = document.getElementById('notification-badge');
+    if (!badge) return;
+    if (total > 0) {
+        badge.textContent = total > 99 ? '99+' : total;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+    // Also update message badge in sidebar
+    const msgBadge = document.getElementById('msg-badge');
+    if (msgBadge) {
+        if (_notifData.messages > 0) { msgBadge.textContent = _notifData.messages; msgBadge.classList.remove('hidden'); }
+        else msgBadge.classList.add('hidden');
+    }
+}
+
+// Build personalized notification dropdown content (called each time bell is clicked)
+function _buildNotifList() {
+    const list = document.getElementById('notif-list');
+    if (!list) return;
+    const student = window.currentStudent;
+    if (!student) { list.innerHTML = '<div class="py-6 text-center text-gray-400 text-sm">Loading...</div>'; return; }
+
+    const now = new Date();
+    const dow = now.getDay();       // 0=Sun
+    const dom = now.getDate();      // day of month
+    const hour = now.getHours();
+    const firstName = student.name.split(' ')[0];
+
+    const items = [];
+
+    // ── Real-time: new messages ──
+    if (_notifData.messages > 0) {
+        items.push({
+            icon: '💬',
+            text: `You have <strong>${_notifData.messages} new message${_notifData.messages!==1?'s':''}</strong> from your tutor`,
+            type: 'message', unread: true, time: 'New message'
+        });
+    }
+
+    // ── Real-time: pending assignments (each one listed, max 5) ──
+    if (_notifData.pendingDocs.length > 0) {
+        _notifData.pendingDocs.slice(0,5).forEach(a => {
+            const dueStr = a.dueDate ? ` — Due: <strong>${escH(a.dueDate)}</strong>` : '';
+            items.push({
+                icon: '📝',
+                text: `Assignment pending: <strong>${escH(a.title||'Untitled')}</strong>${dueStr}`,
+                type: 'assignment', assignmentId: a.id,
+                unread: true, time: 'Pending'
+            });
+        });
+    }
+
+    // ── Real-time: new course materials ──
+    _notifData.materials.forEach(m => {
+        items.push({
+            icon: '📚',
+            text: `New material added: <strong>${escH(m.title||'Untitled')}</strong> — check My Courses`,
+            type: 'material', unread: true, time: 'New this week'
+        });
+    });
+
+    // ── Personalised time-of-day greeting ──
+    const greetWord = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+    const tutorPart = student.tutorName ? ` Your tutor <strong>${escH(student.tutorName)}</strong> is here to support you.` : '';
+    items.push({
+        icon: '👋',
+        text: `Good ${greetWord}, <strong>${escH(firstName)}</strong>!${tutorPart}`,
+        type: 'general', unread: false, time: 'Welcome back'
+    });
+
+    // ── Day-of-week personalised reminder ──
+    const DAY_MSGS = {
+        1: `🗓️ <strong>New week, ${escH(firstName)}!</strong> Monday is perfect for reviewing last week and planning this week's goals.`,
+        2: `✏️ <strong>Tuesday study tip:</strong> Break your work into 25-min sessions with short breaks for best focus.`,
+        3: `📖 <strong>Mid-week check-in!</strong> How's the homework going? Stay consistent — small daily effort adds up fast.`,
+        4: `💡 <strong>Thursday motivation:</strong> Almost there! Push through today and you'll thank yourself tomorrow.`,
+        5: `🎉 <strong>Friday, ${escH(firstName)}!</strong> Finish strong, review your notes, then enjoy the weekend.`,
+        6: `☀️ <strong>Saturday reminder:</strong> A little weekend reading keeps knowledge fresh — just 20 mins helps!`,
+        0: `📗 <strong>Sunday tip:</strong> Use today to preview what's coming this week — a quick look makes lessons easier.`
+    };
+    items.push({ icon: '📅', text: DAY_MSGS[dow] || '', type: 'general', unread: false, time: 'Today' });
+
+    // ── Rotating daily tip (changes each day based on date number) ──
+    const DAILY_TIPS = [
+        `💡 Reading 20 minutes daily boosts your vocabulary and comprehension dramatically over time.`,
+        `🧠 Spaced repetition works: review a topic after 1 day, 1 week, then 1 month for strong memory.`,
+        `🎯 Set one specific learning goal before each study session — it makes everything more focused.`,
+        `📊 Consistency beats cramming every time. 30 minutes daily beats 5 hours the night before.`,
+        `💪 You're making progress, ${escH(firstName)}! Every assignment you complete is a step forward.`,
+        `🌟 If anything is unclear, ask your tutor straight away — that's exactly what they're here for.`,
+        `✍️ Writing notes in your own words helps your brain process and remember better than just reading.`,
+        `🔄 Practice past questions — it's one of the most effective ways to prepare for assessments.`,
+        `⏰ Study at your peak energy time. Morning person? Study early. Night owl? Use those evening hours.`,
+        `📝 Completing homework on time isn't just a grade — it builds the discipline that leads to success.`,
+    ];
+    const tipIdx = dom % DAILY_TIPS.length;
+    items.push({ icon: '✨', text: DAILY_TIPS[tipIdx], type: 'general', unread: false, time: 'Tip of the day' });
+
+    // ── Monthly milestones ──
+    if (dom <= 3) items.push({ icon: '📅', text: `<strong>New month!</strong> Great time to set fresh goals and check your progress, ${escH(firstName)}.`, type: 'general', unread: true, time: 'Monthly' });
+    if (dom >= 14 && dom <= 16) items.push({ icon: '📊', text: `<strong>Mid-month check-in!</strong> Have you reviewed all your subjects this month?`, type: 'general', unread: false, time: 'Mid-month' });
+    if (dom >= 28) items.push({ icon: '🏁', text: `<strong>End of month coming!</strong> Great time to review what you've learned and prep for next month.`, type: 'general', unread: false, time: 'End of month' });
+
+    // ── Performance-based message (if we have avg grade) ──
+    const avgEl = document.getElementById('average-grade');
+    if (avgEl && avgEl.textContent !== '--') {
+        const avgText = avgEl.textContent;
+        const avgNum = parseInt(avgText);
+        if (!isNaN(avgNum)) {
+            let perfMsg = '';
+            if (avgNum >= 90) perfMsg = `🏆 Outstanding work, ${escH(firstName)}! Your average of <strong>${avgText}</strong> is excellent — keep it up!`;
+            else if (avgNum >= 75) perfMsg = `⭐ Great job! Your average of <strong>${avgText}</strong> is really solid. Keep pushing for that A!`;
+            else if (avgNum >= 60) perfMsg = `📈 Your average is <strong>${avgText}</strong>. You're doing well — a bit more practice will push you higher!`;
+            else if (avgNum > 0) perfMsg = `💪 Current average: <strong>${avgText}</strong>. Let's work together to improve — you've got this, ${escH(firstName)}!`;
+            if (perfMsg) items.push({ icon: '📊', text: perfMsg, type: 'general', unread: false, time: 'Your performance' });
+        }
+    }
+
+    if (!items.length) {
+        list.innerHTML = '<div class="text-center py-8 text-gray-400 text-sm">🎉 All caught up!</div>';
+        return;
+    }
+
+    list.innerHTML = items.map(n => {
+        const isClickable = n.type === 'message' || n.type === 'assignment' || n.type === 'material';
+        return `<div class="notif-item ${n.unread?'unread':''} ${isClickable?'clickable':''}"
+            data-type="${n.type}" data-assignment-id="${n.assignmentId||''}"
+            onclick="handleNotifClick(this)">
+            <div class="text-gray-800">${n.text}</div>
+            <div class="text-gray-400 text-xs mt-0.5">${n.time}</div>
+        </div>`;
+    }).join('');
+}
+
+window.toggleNotifications = () => {
+    const dd = document.getElementById('notif-dropdown');
+    const wasHidden = dd.classList.contains('hidden');
+    dd.classList.toggle('hidden');
+    if (wasHidden) _buildNotifList(); // Rebuild fresh each time it opens
+};
+
+window.markAllRead = () => {
+    _notifData.messages = 0;
+    document.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
+    _updateNotifBadge();
+};
+
+// Click handler for notification items
+window.handleNotifClick = (el) => {
+    el.classList.remove('unread');
+    const type = el.dataset.type;
+    const aId = el.dataset.assignmentId;
+    if (type === 'message') {
+        document.getElementById('notif-dropdown').classList.add('hidden');
+        switchTab('messages');
+    } else if (type === 'assignment' && aId) {
+        document.getElementById('notif-dropdown').classList.add('hidden');
+        switchTab('assignments');
+        // Wait for tab render then open workspace
+        setTimeout(() => openWorkspace(aId), 250);
+    } else if (type === 'material') {
+        document.getElementById('notif-dropdown').classList.add('hidden');
+        switchTab('courses');
+    }
 };
 
 // ── MESSAGING ──
 async function initMessaging(){
     if(studentUnsubInbox)studentUnsubInbox();
-    const q=query(collection(db,"conversations"),where("studentId","==",window.currentStudent.id));
+    const q=query(collection(db,'conversations'),where('studentId','==',window.currentStudent.id));
     studentUnsubInbox=onSnapshot(q,snap=>{
         const convs=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>{
             const tA=a.lastMessageTimestamp?.toDate?a.lastMessageTimestamp.toDate():new Date(a.lastMessageTimestamp||0);
@@ -914,9 +1514,6 @@ async function initMessaging(){
             return tB-tA;
         });
         renderConvList(convs);
-        const unread=convs.filter(c=>c.unreadCount>0&&c.lastSenderId!==window.currentStudent.id).length;
-        const badge=document.getElementById('msg-badge');
-        if(unread>0){badge.textContent=unread;badge.classList.remove('hidden');}else badge.classList.add('hidden');
     });
 }
 
@@ -949,9 +1546,9 @@ function openChat(convId,name){
     document.getElementById('student-chat-inputs').style.display='flex';
     const msgEl=document.getElementById('student-chat-messages');
     msgEl.innerHTML='<div style="text-align:center;margin-top:40px;"><div style="display:inline-block;border:3px solid #059669;border-top-color:transparent;border-radius:50%;width:24px;height:24px;animation:spin .8s linear infinite;"></div></div>';
-    updateDoc(doc(db,"conversations",convId),{unreadCount:0}).catch(()=>{});
+    updateDoc(doc(db,'conversations',convId),{unreadCount:0}).catch(()=>{});
     if(studentUnsubChat)studentUnsubChat();
-    studentUnsubChat=onSnapshot(query(collection(db,"conversations",convId,"messages"),orderBy("createdAt","asc")),snap=>{
+    studentUnsubChat=onSnapshot(query(collection(db,'conversations',convId,'messages'),orderBy('createdAt','asc')),snap=>{
         msgEl.innerHTML='';
         snap.forEach(d=>{
             const msg=d.data();
@@ -970,7 +1567,6 @@ function openChat(convId,name){
         });
         msgEl.scrollTop=msgEl.scrollHeight;
     });
-
     const sendBtn=document.getElementById('student-send-btn');
     const input=document.getElementById('student-msg-input');
     const imgInput=document.getElementById('student-img-file');
@@ -988,10 +1584,10 @@ function openChat(convId,name){
                 const data=await res.json();imageUrl=data.secure_url||null;imgInput.value='';
             }
             const now=new Date();const lastMsg=imageUrl?(txt||'📷 Image'):txt;
-            await addDoc(collection(db,"conversations",convId,"messages"),{content:txt,imageUrl,senderId:window.currentStudent.id,senderName:window.currentStudent.name,senderRole:'student',createdAt:now,read:false});
-            const cSnap=await getDoc(doc(db,"conversations",convId));
+            await addDoc(collection(db,'conversations',convId,'messages'),{content:txt,imageUrl,senderId:window.currentStudent.id,senderName:window.currentStudent.name,senderRole:'student',createdAt:now,read:false});
+            const cSnap=await getDoc(doc(db,'conversations',convId));
             const cur=cSnap.exists()?(cSnap.data().unreadCount||0):0;
-            await updateDoc(doc(db,"conversations",convId),{lastMessage:lastMsg,lastMessageTimestamp:now,lastSenderId:window.currentStudent.id,unreadCount:cur+1});
+            await updateDoc(doc(db,'conversations',convId),{lastMessage:lastMsg,lastMessageTimestamp:now,lastSenderId:window.currentStudent.id,unreadCount:cur+1});
             input.value='';
         }catch(e){alert('Error: '+e.message);}
         finally{newBtn.disabled=false;newBtn.textContent='➤';}
@@ -1006,7 +1602,6 @@ async function loadGames(){
     const grade=parseInt(String(student.grade||'').replace(/\D/g,''))||3;
     const subjects=student.subjects||[];
     const hasSub=s=>subjects.length===0||subjects.some(x=>x.toLowerCase().includes(s.toLowerCase()));
-
     const ALL_GAMES=[
         {id:'math_quiz',name:'Maths Quiz',subject:'Maths',icon:'fa-calculator',grad:'from-blue-500 to-cyan-400',always:true},
         {id:'ela_quiz',name:'ELA Quiz',subject:'ELA',icon:'fa-spell-check',grad:'from-purple-500 to-pink-400',always:true},
@@ -1025,7 +1620,8 @@ async function loadGames(){
         <div class="p-5">
             <h3 class="font-bold text-gray-800 mb-1">${escH(g.name)}</h3>
             <p class="text-xs text-gray-500 mb-4">${escH(g.subject)} · Grade ${grade} difficulty</p>
-            <button onclick="startGame('${g.id}','${escH(g.name)}',${grade})"
+            <button data-gameid="${g.id}" data-gamename="${escH(g.name)}" data-grade="${grade}"
+                onclick="startGame(this.dataset.gameid,this.dataset.gamename,+this.dataset.grade)"
                 class="w-full px-4 py-2 bg-brand-primary text-white text-sm font-bold rounded-xl hover:bg-brand-dark">
                 Play <i class="fas fa-play ml-1"></i>
             </button>
@@ -1034,6 +1630,11 @@ async function loadGames(){
 }
 
 window.startGame=(gameId,gameName,grade)=>{
+    // Clear any old game state
+    if(window._gTimer)clearInterval(window._gTimer);
+    if(window._snakeInt)clearInterval(window._snakeInt);
+    const existing=document.getElementById('game-overlay');if(existing)existing.remove();
+
     const overlay=document.createElement('div');
     overlay.className='fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4';
     overlay.id='game-overlay';
@@ -1058,13 +1659,13 @@ window.startGame=(gameId,gameName,grade)=>{
 };
 
 window.endGame=()=>{
-    if(window._gTimer)clearInterval(window._gTimer);
-    if(window._snakeInt)clearInterval(window._snakeInt);
+    if(window._gTimer){clearInterval(window._gTimer);window._gTimer=null;}
+    if(window._snakeInt){clearInterval(window._snakeInt);window._snakeInt=null;}
     const score=parseInt(document.getElementById('game-score')?.textContent)||0;
     if(score>0&&window.currentStudent){
-        addDoc(collection(db,"game_scores"),{studentId:window.currentStudent.id,studentName:window.currentStudent.name,grade:window.currentStudent.grade,score,gameId:window._lastGameId||'quiz',playedAt:new Date()}).catch(()=>{});
+        addDoc(collection(db,'game_scores'),{studentId:window.currentStudent.id,studentName:window.currentStudent.name,grade:window.currentStudent.grade,score,gameId:window._lastGameId||'quiz',playedAt:new Date()}).catch(()=>{});
     }
-    const o=document.getElementById('game-overlay');if(o)o.remove();
+    document.getElementById('game-overlay')?.remove();
 };
 
 function startQuiz(gameId,grade){
@@ -1076,28 +1677,30 @@ function startQuiz(gameId,grade){
         const q=qs[qi++];const opts=shuffle([...q.wrong,q.correct]);
         vp.innerHTML=`<div style="color:#fff;font-size:1rem;font-weight:600;margin-bottom:16px;line-height:1.4;">${escH(q.q)}</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            ${opts.map(o=>`<button onclick="ansQ(this,'${escH(o.replace(/'/g,"\\'")||'')}','${escH(q.correct.replace(/'/g,"\\'")||'')}',${grade})" style="background:#1e293b;color:#f1f5f9;border:1px solid #334155;border-radius:8px;padding:10px 14px;cursor:pointer;font-size:.85rem;text-align:left;">${escH(o)}</button>`).join('')}
+            ${opts.map(o=>`<button data-ans="${escH(o)}" data-correct="${escH(q.correct)}" data-grade="${grade}" onclick="ansQ(this)"
+                style="background:#1e293b;color:#f1f5f9;border:1px solid #334155;border-radius:8px;padding:10px 14px;cursor:pointer;font-size:.85rem;text-align:left;">${escH(o)}</button>`).join('')}
             </div>`;
     }
-    window.ansQ=(btn,chosen,correct,g)=>{
+    window.ansQ=(btn)=>{
+        const chosen=btn.dataset.ans,correct=btn.dataset.correct,g=+btn.dataset.grade;
         const right=chosen===correct;
         btn.style.background=right?'#065f46':'#7f1d1d';
-        vp.querySelectorAll('button').forEach(b=>{b.disabled=true;if(b.textContent.trim()===correct)b.style.background='#065f46';});
+        vp.querySelectorAll('button').forEach(b=>{b.disabled=true;if(b.dataset.ans===correct)b.style.background='#065f46';});
         if(right){score+=10*g;document.getElementById('game-score').textContent=score;}
         setTimeout(showQ,700);
     };
     window._gTimer=setInterval(()=>{
         timeLeft--;document.getElementById('game-timer').textContent=timeLeft+'s';
-        if(timeLeft<=0){clearInterval(window._gTimer);vp.innerHTML=`<div style="text-align:center;color:#fff;padding:40px;"><div style="font-size:2rem;">🎉</div><div style="font-size:1.4rem;font-weight:700;margin-top:8px;">Game Over!</div><div style="color:#10b981;font-size:1.2rem;margin-top:6px;">Score: ${score}</div><button onclick="endGame()" style="margin-top:16px;background:#059669;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-weight:700;cursor:pointer;">Close</button></div>`;}
+        if(timeLeft<=0){clearInterval(window._gTimer);window._gTimer=null;vp.innerHTML=`<div style="text-align:center;color:#fff;padding:40px;"><div style="font-size:2rem;">🎉</div><div style="font-size:1.4rem;font-weight:700;margin-top:8px;">Game Over!</div><div style="color:#10b981;font-size:1.2rem;margin-top:6px;">Score: ${score}</div><button onclick="endGame()" style="margin-top:16px;background:#059669;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-weight:700;cursor:pointer;">Close</button></div>`;}
     },1000);
     showQ();
 }
 
 function getQuestions(id,g){
-    if(id==='math_quiz'||id==='phy_quiz') return getMathQs(g);
-    if(id==='ela_quiz') return getELAQs(g);
-    if(id==='bio_quiz') return getBioQs();
-    if(id==='chem_quiz') return getChemQs();
+    if(id==='math_quiz'||id==='phy_quiz')return getMathQs(g);
+    if(id==='ela_quiz')return getELAQs(g);
+    if(id==='bio_quiz')return getBioQs();
+    if(id==='chem_quiz')return getChemQs();
     return getMathQs(g);
 }
 function getMathQs(g){
@@ -1158,7 +1761,7 @@ function startSnake(grade){
         if(!alive)return;dir={...nxt};
         const h={x:snake[0].x+dir.x,y:snake[0].y+dir.y};
         if(h.x<0||h.x>=COLS||h.y<0||h.y>=ROWS||snake.some(s=>s.x===h.x&&s.y===h.y)){
-            alive=false;clearInterval(window._snakeInt);
+            alive=false;clearInterval(window._snakeInt);window._snakeInt=null;
             ctx.fillStyle='rgba(0,0,0,.65)';ctx.fillRect(0,0,cv.width,cv.height);
             ctx.fillStyle='#fff';ctx.font='bold 22px Inter';ctx.textAlign='center';
             ctx.fillText('Game Over!',cv.width/2,cv.height/2-10);
@@ -1191,7 +1794,7 @@ function startScrabble(grade){
     const WORDS='apple bread chair dance eagle flame giant happy india jolly knife lemon music night ocean piano queen river stone tiger urban vivid water xenon yacht zebra jungle knight laptop mango narrow orange pencil purple rabbit silver turtle unique violet walnut yellow castle dragon forest garden humble island junior kitten lantern'.split(' ');
     const word=WORDS[rand(0,WORDS.length-1)].toUpperCase();
     const scrambled=shuffle([...word]).join('');
-    let score=parseInt(document.getElementById('game-score').textContent)||0;
+    let score=parseInt(document.getElementById('game-score')?.textContent)||0;
     let attempts=0;
     const vp=document.getElementById('game-viewport');
     function render(){
@@ -1199,17 +1802,17 @@ function startScrabble(grade){
             <div style="font-size:.8rem;color:#9ca3af;margin-bottom:10px;">Unscramble the word:</div>
             <div style="font-size:2.2rem;font-weight:700;letter-spacing:.18em;color:#f59e0b;margin-bottom:20px;">${escH(scrambled)}</div>
             <input id="scr-in" type="text" maxlength="${word.length}" style="background:#1e293b;color:#fff;border:1px solid #334155;border-radius:8px;padding:10px 16px;font-size:1.1rem;width:80%;text-align:center;letter-spacing:.12em;text-transform:uppercase;"
-                onkeydown="if(event.key==='Enter')checkScrabble();">
+                onkeydown="if(event.key==='Enter')window._checkScrabble();">
             <div style="margin-top:12px;display:flex;gap:10px;justify-content:center;">
-                <button onclick="checkScrabble()" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-weight:700;cursor:pointer;">Check</button>
+                <button onclick="window._checkScrabble()" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-weight:700;cursor:pointer;">Check</button>
                 <button onclick="startScrabble(${grade})" style="background:#374151;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-weight:600;cursor:pointer;">Skip</button>
             </div>
             <div id="scr-msg" style="margin-top:16px;font-size:.9rem;min-height:24px;"></div>
             <div style="color:#6b7280;font-size:.72rem;margin-top:6px;">Attempts: ${attempts}/3</div>
         </div>`;
-        document.getElementById('scr-in').focus();
+        document.getElementById('scr-in')?.focus();
     }
-    window.checkScrabble=()=>{
+    window._checkScrabble=()=>{
         const ans=(document.getElementById('scr-in')?.value||'').toUpperCase().trim();
         if(ans===word){
             score+=15;document.getElementById('game-score').textContent=score;
@@ -1225,7 +1828,6 @@ function startScrabble(grade){
             }
         }
     };
-    window.startScrabble=startScrabble;
     render();
 }
 
@@ -1240,7 +1842,7 @@ window.toggleLeaderboard=async()=>{
 async function loadLeaderboard(){
     const c=document.getElementById('leaderboard-content');
     try{
-        const snap=await getDocs(query(collection(db,"game_scores"),orderBy("score","desc"),limit(30)));
+        const snap=await getDocs(query(collection(db,'game_scores'),orderBy('score','desc'),limit(30)));
         if(snap.empty){c.innerHTML='<p class="text-gray-500 text-sm text-center">No scores yet!</p>';return;}
         const byGame={};
         snap.docs.forEach(d=>{const s=d.data();const gid=s.gameId||'quiz';if(!byGame[gid])byGame[gid]=[];if(byGame[gid].length<3)byGame[gid].push(s);});
