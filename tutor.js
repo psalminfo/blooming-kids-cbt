@@ -1948,19 +1948,72 @@ function initializeFloatingMessagingButton() {
     }
 }
 
+// --- NOTIFICATION TONE (Web Audio API — no external files needed) ---
+
+function playNotificationTone(type = 'default') {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const tones = {
+            // Pleasant two-note chime for messages
+            message: [
+                { freq: 880, start: 0,    dur: 0.18, gain: 0.28 },
+                { freq: 1108, start: 0.12, dur: 0.22, gain: 0.22 }
+            ],
+            // Three-note rising chime for alerts/system notifications
+            alert: [
+                { freq: 659, start: 0,    dur: 0.15, gain: 0.25 },
+                { freq: 784, start: 0.14, dur: 0.15, gain: 0.25 },
+                { freq: 988, start: 0.28, dur: 0.25, gain: 0.30 }
+            ],
+            // Soft single ping for management reply
+            reply: [
+                { freq: 1047, start: 0,   dur: 0.30, gain: 0.22 }
+            ],
+            default: [
+                { freq: 800, start: 0,    dur: 0.20, gain: 0.24 },
+                { freq: 1000, start: 0.15, dur: 0.25, gain: 0.20 }
+            ]
+        };
+        const notes = tones[type] || tones.default;
+        notes.forEach(({ freq, start, dur, gain }) => {
+            const osc = ctx.createOscillator();
+            const gainNode = ctx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(ctx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+            gainNode.gain.setValueAtTime(0, ctx.currentTime + start);
+            gainNode.gain.linearRampToValueAtTime(gain, ctx.currentTime + start + 0.02);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+            osc.start(ctx.currentTime + start);
+            osc.stop(ctx.currentTime + start + dur + 0.05);
+        });
+        // Close context after last note
+        setTimeout(() => { try { ctx.close(); } catch(e) {} }, (notes[notes.length-1].start + notes[notes.length-1].dur + 0.3) * 1000);
+    } catch(e) { /* Audio not supported — fail silently */ }
+}
+
+window.playNotificationTone = playNotificationTone;
+
+// Track known notification IDs so we only tone on NEW arrivals
+let _knownNotifIds = new Set();
+let _notifUnsubscribe = null;
+
 // --- BACKGROUND LISTENERS ---
 
 function initializeUnreadListener() {
     const tutorId = window.tutorData.messagingId || window.tutorData.id;
     const tutorEmail = window.tutorData.email;
     if (unsubUnreadListener) unsubUnreadListener();
+    if (_notifUnsubscribe) { _notifUnsubscribe(); _notifUnsubscribe = null; }
 
-    const q = query(
+    // ── 1. Real-time conversation listener for unread chat messages ──
+    const convQ = query(
         collection(db, "conversations"),
         where("participants", "array-contains", tutorId)
     );
 
-    unsubUnreadListener = onSnapshot(q, async (snapshot) => {
+    unsubUnreadListener = onSnapshot(convQ, (snapshot) => {
         let count = 0;
         snapshot.forEach(doc => {
             const data = doc.data();
@@ -1968,22 +2021,99 @@ function initializeUnreadListener() {
                 count += data.unreadCount;
             }
         });
-        
-        // Also count unread tutor_notifications
-        if (tutorEmail) {
-            try {
-                const nSnap = await getDocs(query(
-                    collection(db, "tutor_notifications"),
-                    where("tutorEmail", "==", tutorEmail),
-                    where("read", "==", false)
-                ));
-                count += nSnap.size;
-            } catch(e) { /* ignore */ }
-        }
-        
-        msgSectionUnreadCount = count;
+        // The tutor_notifications listener below will add to this
+        // Store conversation count separately and merge with notif count
+        window._convUnreadCount = count;
+        msgSectionUnreadCount = (window._notifUnreadCount || 0) + count;
         updateFloatingBadges();
     });
+
+    // ── 2. Real-time tutor_notifications listener — plays tone on NEW arrivals ──
+    if (tutorEmail) {
+        let _firstLoad = true;
+        const notifQ = query(
+            collection(db, "tutor_notifications"),
+            where("tutorEmail", "==", tutorEmail),
+            where("read", "==", false)
+        );
+
+        _notifUnsubscribe = onSnapshot(notifQ, (snap) => {
+            const count = snap.size;
+            window._notifUnreadCount = count;
+            msgSectionUnreadCount = (window._convUnreadCount || 0) + count;
+            updateFloatingBadges();
+
+            // On subsequent updates (not first load), detect new docs and play tone
+            if (!_firstLoad) {
+                snap.docChanges().forEach(change => {
+                    if (change.type === 'added') {
+                        const notif = change.doc.data();
+                        const toneType = notif.type === 'management_message' || notif.type === 'management_reply'
+                            ? 'reply'
+                            : notif.type === 'broadcast' ? 'alert' : 'message';
+                        playNotificationTone(toneType);
+                        // Show a small toast for visibility
+                        showNotifToast(notif.title || 'New notification', notif.message || '', toneType);
+                    }
+                });
+            }
+            _firstLoad = false;
+        }, (err) => { console.warn('Notif listener error:', err.message); });
+    }
+}
+
+// ── Show a brief toast when a new notification arrives ──
+function showNotifToast(title, message, type = 'default') {
+    const existing = document.getElementById('tutor-notif-toast');
+    if (existing) existing.remove();
+
+    const icons = { message: '💬', alert: '📢', reply: '📩', default: '🔔' };
+    const colors = { message: '#3b82f6', alert: '#f59e0b', reply: '#10b981', default: '#6366f1' };
+    const icon = icons[type] || icons.default;
+    const color = colors[type] || colors.default;
+
+    const toast = document.createElement('div');
+    toast.id = 'tutor-notif-toast';
+    toast.style.cssText = `
+        position:fixed;top:18px;right:18px;z-index:999999;
+        background:#fff;border-radius:16px;
+        border-left:5px solid ${color};
+        padding:13px 18px;box-shadow:0 8px 32px rgba(0,0,0,.18);
+        display:flex;align-items:flex-start;gap:12px;
+        max-width:320px;animation:slideInToast .3s cubic-bezier(.34,1.56,.64,1);
+        cursor:pointer;
+    `;
+    toast.innerHTML = `
+        <style>
+            @keyframes slideInToast{from{opacity:0;transform:translateX(120px)}to{opacity:1;transform:translateX(0)}}
+            @keyframes fadeOutToast{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(120px)}}
+        </style>
+        <span style="font-size:1.4rem;line-height:1;flex-shrink:0;">${icon}</span>
+        <div style="flex:1;min-width:0;">
+            <div style="font-weight:800;font-size:.84rem;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(title)}</div>
+            <div style="font-size:.74rem;color:#64748b;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml((message||'').slice(0, 90))}</div>
+        </div>
+        <button style="background:none;border:none;color:#94a3b8;font-size:1.1rem;cursor:pointer;flex-shrink:0;line-height:1;padding:0;margin-top:1px;" onclick="document.getElementById('tutor-notif-toast')?.remove()">×</button>
+    `;
+    toast.addEventListener('click', (e) => {
+        if (e.target.tagName === 'BUTTON') return;
+        toast.remove();
+        // Open the inbox
+        showInboxModal();
+        // Switch to notifications tab after short delay
+        setTimeout(() => {
+            const notifTab = document.getElementById('tab-notifications');
+            if (notifTab) notifTab.click();
+        }, 300);
+    });
+    document.body.appendChild(toast);
+    // Auto-dismiss after 6 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.style.animation = 'fadeOutToast .3s ease forwards';
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 6000);
 }
 
 // Compatibility Alias
@@ -2296,6 +2426,26 @@ function showEnhancedMessagingModal() {
                     createdAt: now,
                     read: false
                 });
+
+                // ── If sending to Management, also write to tutor_to_management_messages ──
+                // so the management inbox (management.js) can read and reply to it
+                if (targetId === 'management') {
+                    try {
+                        const { Timestamp: FBTimestamp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+                        await addDoc(collection(db, 'tutor_to_management_messages'), {
+                            tutorId: tutor.id,
+                            tutorEmail: tutor.email || '',
+                            tutorName: tutor.name || '',
+                            subject: subject || '',
+                            message: content || '',
+                            imageUrl: imageUrl || null,
+                            isUrgent: isUrgent,
+                            managementRead: false,
+                            replied: false,
+                            createdAt: FBTimestamp.now()
+                        });
+                    } catch(mgmtErr) { console.warn('Could not mirror message to management inbox:', mgmtErr.message); }
+                }
             }
 
             modal.remove();
@@ -2490,6 +2640,25 @@ async function msgProcessSendToStudents(modal) {
                 createdAt: now,
                 read: false
             });
+
+            // ── Mirror to management inbox when target is management ──
+            if (target.id === 'management') {
+                try {
+                    const { Timestamp: FBTimestamp2 } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+                    await addDoc(collection(db, 'tutor_to_management_messages'), {
+                        tutorId: tutor.id,
+                        tutorEmail: tutor.email || '',
+                        tutorName: tutor.name || '',
+                        subject: subject || '',
+                        message: content || '',
+                        imageUrl: imageUrl || null,
+                        isUrgent: isUrgent,
+                        managementRead: false,
+                        replied: false,
+                        createdAt: FBTimestamp2.now()
+                    });
+                } catch(mgmtErr2) { console.warn('Could not mirror message to management inbox:', mgmtErr2.message); }
+            }
         }
         modal.remove();
         showCustomAlert(`✅ Message sent to ${targets.length} student${targets.length !== 1 ? 's' : ''}!`);
@@ -2745,7 +2914,13 @@ async function loadTutorNotifications(modal) {
             const notif = d.data();
             const isUnread = !notif.read;
             const time = notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleDateString('en-NG', {day:'numeric',month:'short',year:'numeric'}) : '';
-            const typeIcon = notif.type === 'broadcast' ? '📢' : notif.type === 'new_student' ? '👤' : notif.type === 'student_approved' ? '✅' : '🔔';
+            const typeIcon = notif.type === 'broadcast' ? '📢' 
+                : notif.type === 'new_student' ? '👤' 
+                : notif.type === 'student_approved' ? '✅' 
+                : notif.type === 'management_message' ? '📩'
+                : notif.type === 'management_reply' ? '↩️'
+                : notif.type === 'recall_approved' ? '🔁'
+                : '🔔';
             const priorityStyle = notif.priority === 'urgent' ? 'border-left:4px solid #ef4444;' : notif.priority === 'important' ? 'border-left:4px solid #f59e0b;' : 'border-left:4px solid #10b981;';
             
             const el = document.createElement('div');
@@ -2817,6 +2992,29 @@ async function loadTutorNotifications(modal) {
                                 ${notif.parentEmail ? `<div style="margin-top:10px;background:#eff6ff;border-radius:8px;padding:8px 12px;font-size:.78rem;color:#1d4ed8;">✉️ ${msgEscapeHtml(notif.parentEmail)}</div>` : ''}
                                 <div style="margin-top:14px;background:#d1fae5;border-radius:10px;padding:10px 14px;font-size:.8rem;color:#065f46;font-weight:600;">
                                     ✅ This student's schedule has been automatically added to your Schedule Management tab.
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else if (notif.type === 'management_reply' || notif.type === 'management_message') {
+                    // Rich card for management replies and direct messages
+                    const isReply = notif.type === 'management_reply';
+                    const bannerColor = isReply ? 'linear-gradient(135deg,#065f46,#059669)' : 'linear-gradient(135deg,#1e3a8a,#2563eb)';
+                    const headerLabel = isReply ? '↩️ Reply from Management' : '📩 Message from Management';
+                    modal.querySelector('#chat-messages').innerHTML = `
+                        <div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.1);margin:8px;">
+                            <div style="background:${bannerColor};padding:16px 20px;display:flex;align-items:center;gap:10px;">
+                                <div style="width:40px;height:40px;background:rgba(255,255,255,.2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;">${isReply ? '↩️' : '📩'}</div>
+                                <div>
+                                    <div style="color:#fff;font-weight:800;font-size:.95rem;">${headerLabel}</div>
+                                    <div style="color:rgba(255,255,255,.7);font-size:.72rem;margin-top:2px;">${msgEscapeHtml(notif.senderDisplay || 'Management')} · ${time}</div>
+                                </div>
+                            </div>
+                            <div style="padding:16px 20px;">
+                                ${notif.title && notif.title !== headerLabel ? `<div style="font-weight:700;font-size:.9rem;color:#1e293b;margin-bottom:8px;">${msgEscapeHtml(notif.title)}</div>` : ''}
+                                <p style="color:#374151;line-height:1.7;white-space:pre-wrap;font-size:.875rem;">${msgEscapeHtml(notif.message || '')}</p>
+                                <div style="margin-top:14px;padding:10px 14px;background:#f0fdf4;border-radius:10px;font-size:.78rem;color:#166534;font-weight:600;">
+                                    💡 To reply, send a new message to Management using the ✉️ New button.
                                 </div>
                             </div>
                         </div>
