@@ -5574,7 +5574,7 @@ async function loadCourseMaterials(studentId, container, tutor) {
  ******************************************************************************/
 
 // Main App Initialization
-document.addEventListener('DOMContentLoaded', async () => {
+async function initTutorApp() {
     onAuthStateChanged(auth, async (user) => {
         // Remove any full-page loading overlay that the HTML might inject
         const loadingOverlay = document.getElementById('loading-overlay') ||
@@ -5777,7 +5777,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
     }, 500);
-});;
+}
+
+// If DOM already loaded (module scripts often load after DOMContentLoaded),
+// run immediately. Otherwise wait for the event.
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTutorApp);
+} else {
+    initTutorApp();
+}
 
 
 
