@@ -4085,8 +4085,16 @@ function showEditStudentModal(student) {
             await updateDoc(studentRef, studentData);
             editModal.remove();
             showCustomAlert('Student details updated successfully!');
+            
+            // Preserve scroll position — only re-render the student list, not the full page
+            const scrollY = window.scrollY;
             const mainContent = document.getElementById('mainContent');
-            renderStudentDatabase(mainContent, window.tutorData);
+            if (mainContent && window.tutorData) {
+                await renderStudentDatabase(mainContent, window.tutorData);
+                requestAnimationFrame(() => {
+                    window.scrollTo({ top: scrollY, behavior: 'instant' });
+                });
+            }
         } catch (error) {
             console.error("Error updating student:", error);
             showCustomAlert(`An error occurred: ${error.message}`);
@@ -5748,6 +5756,9 @@ async function initTutorApp() {
                 setTimeout(async () => {
                     await initScheduleManager(tutorData);
                 }, 2000);
+                
+                // Show broadcast pop-ups from management
+                setTimeout(() => showPendingBroadcasts(tutorData), 3000);
             } else {
                 console.error("No matching tutor found.");
                 document.getElementById('mainContent').innerHTML = `
@@ -6444,6 +6455,87 @@ inboxObserver.observe(document.body, { childList: true, subtree: true });
 // ==========================================
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
+
+// ======================================================
+// BROADCAST POP-UP SYSTEM (shows management broadcasts)
+// ======================================================
+
+async function showPendingBroadcasts(tutorData) {
+    try {
+        // Get last seen timestamp from localStorage
+        const lastSeenKey = `broadcast_last_seen_${tutorData.email}`;
+        const lastSeen = localStorage.getItem(lastSeenKey);
+        const lastSeenDate = lastSeen ? new Date(parseInt(lastSeen)) : new Date(0);
+        
+        // Query broadcasts targeting tutors
+        const snap = await getDocs(query(
+            collection(db, 'broadcasts'),
+            where('toTutors', '==', true),
+            orderBy('createdAt', 'desc'),
+            limit(5)
+        ));
+        
+        const newBroadcasts = snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(b => {
+                const createdAt = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
+                return createdAt > lastSeenDate;
+            });
+        
+        if (newBroadcasts.length === 0) return;
+        
+        // Show each broadcast as a pop-up sequentially
+        for (const broadcast of newBroadcasts) {
+            await showBroadcastPopup(broadcast);
+        }
+        
+        // Update last seen
+        localStorage.setItem(lastSeenKey, Date.now().toString());
+        
+    } catch(e) {
+        console.warn('Could not load broadcasts:', e.message);
+    }
+}
+
+function showBroadcastPopup(broadcast) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+        
+        const fileSection = broadcast.fileUrl ? (
+            broadcast.fileType === 'image'
+                ? `<div style="margin:12px 0;"><img src="${escapeHtml(broadcast.fileUrl)}" alt="Attachment" style="max-width:100%;max-height:300px;border-radius:10px;object-fit:contain;"></div>`
+                : `<div style="margin:12px 0;"><a href="${escapeHtml(broadcast.fileUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;background:#eff6ff;color:#1d4ed8;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:600;">📎 Download Attachment</a></div>`
+        ) : '';
+        
+        overlay.innerHTML = `
+            <div style="background:#fff;border-radius:16px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
+                <div style="background:linear-gradient(135deg,#059669,#047857);padding:16px 20px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <div style="color:#fff;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px;">📢 Message from Management</div>
+                        <h3 style="color:#fff;font-size:1.1rem;font-weight:800;margin:0;">${escapeHtml(broadcast.title || 'Announcement')}</h3>
+                    </div>
+                    <button id="bc-close-btn" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+                </div>
+                <div style="padding:20px;">
+                    <p style="color:#374151;font-size:.95rem;line-height:1.6;white-space:pre-wrap;">${escapeHtml(broadcast.message || '')}</p>
+                    ${fileSection}
+                    <div style="margin-top:16px;text-align:right;">
+                        <button id="bc-read-btn" style="background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:700;cursor:pointer;font-size:.9rem;">✓ Got it!</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        const close = () => { overlay.remove(); resolve(); };
+        overlay.querySelector('#bc-close-btn').addEventListener('click', close);
+        overlay.querySelector('#bc-read-btn').addEventListener('click', close);
+    });
+}
+
+window.showPendingBroadcasts = showPendingBroadcasts;
 
 // Expose modular Firebase functions globally so games.js (classic script) can use them
 // Do this immediately so games.js has access as soon as this module is parsed
