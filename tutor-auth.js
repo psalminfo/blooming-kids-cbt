@@ -87,7 +87,7 @@ const ATTEMPT_KEY          = 'bkh_login_attempts';
 const LOCKOUT_KEY          = 'bkh_lockout_until';
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+function init() {
 
     // DOM refs
     const signupSection       = document.getElementById('signupSection');
@@ -544,4 +544,12 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     });
 
-});
+}
+
+// If DOM already loaded (module scripts often load after DOMContentLoaded),
+// run immediately. Otherwise wait for the event.
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
