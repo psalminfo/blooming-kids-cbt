@@ -9,49 +9,6 @@ import { onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-
 
 const CACHE_PREFIX = 'management_cache_';
 
-// ======================================================
-// SECURITY: XSS Protection - escapeHtml
-// ======================================================
-function escapeHtml(unsafe) {
-    if (unsafe === undefined || unsafe === null) return '';
-    return String(unsafe)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
-// Rate limit helper - prevents rapid repeated submissions
-const _rateLimitMap = new Map();
-function rateLimitCheck(key, limitMs = 3000) {
-    const now = Date.now();
-    if (_rateLimitMap.has(key) && now - _rateLimitMap.get(key) < limitMs) return false;
-    _rateLimitMap.set(key, now);
-    return true;
-}
-
-// Input sanitization for Firestore writes
-function sanitizeInput(str, maxLen = 500) {
-    if (typeof str !== 'string') return str;
-    return str.trim().slice(0, maxLen);
-}
-
-// Log management activity for the activity log
-async function logManagementActivity(action, details = '') {
-    try {
-        const userEmail = window.userData?.email;
-        if (!userEmail) return;
-        await addDoc(collection(db, 'management_activity'), {
-            userEmail,
-            userName: window.userData?.name || 'Unknown',
-            action: sanitizeInput(action, 200),
-            details: sanitizeInput(details, 500),
-            timestamp: Timestamp.now()
-        });
-    } catch(e) { /* Non-critical, ignore */ }
-}
-
 const sessionCache = {
     tutors: null,
     students: null,
@@ -114,6 +71,71 @@ function capitalize(str) {
 
 function formatNaira(amount) {
     return `₦${(amount || 0).toLocaleString()}`;
+}
+
+// ======================================================
+// SHARED CONSTANTS
+// ======================================================
+
+const GRADE_OPTIONS = [
+    'Creche', 'Nursery 1', 'Nursery 2',
+    'KG 1', 'KG 2',
+    'Primary 1', 'Primary 2', 'Primary 3', 'Primary 4', 'Primary 5', 'Primary 6',
+    'JSS 1', 'JSS 2', 'JSS 3',
+    'SS 1', 'SS 2', 'SS 3'
+];
+
+const DAYS_OF_WEEK_MGT = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+const TIME_SLOTS_MGT = (() => {
+    const slots = [];
+    for (let h = 6; h <= 21; h++) {
+        ['00','30'].forEach(m => {
+            const ampm = h < 12 ? 'AM' : 'PM';
+            let lh = h % 12; if (lh === 0) lh = 12;
+            slots.push({ value: `${String(h).padStart(2,'0')}:${m}`, label: `${lh}:${m} ${ampm}` });
+        });
+    }
+    return slots;
+})();
+
+function buildGradeSelect(id, selectedValue = '', required = true) {
+    return `<select id="${id}" ${required ? 'required' : ''} class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+        <option value="">Select grade...</option>
+        ${GRADE_OPTIONS.map(g => `<option value="${g}" ${g === selectedValue ? 'selected' : ''}>${g}</option>`).join('')}
+    </select>`;
+}
+
+function buildTimeSelect(id, selectedValue = '') {
+    return `<select id="${id}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+        <option value="">Select time...</option>
+        ${TIME_SLOTS_MGT.map(t => `<option value="${t.value}" ${t.value === selectedValue ? 'selected' : ''}>${t.label}</option>`).join('')}
+    </select>`;
+}
+
+function buildDaysCheckboxes(prefix = 'assign', selectedDays = []) {
+    return DAYS_OF_WEEK_MGT.map(day => `
+        <label class="flex items-center gap-1 text-sm cursor-pointer">
+            <input type="checkbox" name="${prefix}-day" value="${day}" ${selectedDays.includes(day) ? 'checked' : ''} class="rounded">
+            ${day.substring(0,3)}
+        </label>
+    `).join('');
+}
+
+function getSelectedDays(prefix = 'assign') {
+    return [...document.querySelectorAll(`input[name="${prefix}-day"]:checked`)].map(cb => cb.value);
+}
+
+// Parse enrollment academicDays string into array
+function parseAcademicDays(str = '') {
+    if (!str) return [];
+    return str.split(/,|\band\b/i).map(d => d.trim()).filter(d => DAYS_OF_WEEK_MGT.includes(d));
+}
+
+// Convert schedule days/time strings to schedule array for Firestore
+function buildScheduleFromDaysTime(daysArr, startTime, endTime) {
+    if (!daysArr || daysArr.length === 0) return [];
+    return daysArr.map(day => ({ day, start: startTime || '14:00', end: endTime || '16:00' }));
 }
 
 // ======================================================
@@ -292,13 +314,8 @@ async function loadDashboardData() {
             if (!sessionCache.students) {
                 const studentsSnapshot = await getDocs(query(collection(db, "students")));
                 const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Exclude break/archived/graduated students from active count
                 const activeStudents = allStudents.filter(student => 
-                    (!student.status || student.status === 'active' || student.status === 'approved') &&
-                    !student.summerBreak &&
-                    student.status !== 'archived' &&
-                    student.status !== 'graduated' &&
-                    student.status !== 'transferred'
+                    !student.status || student.status === 'active' || student.status === 'approved'
                 );
                 saveToLocalStorage('students', activeStudents);
             }
@@ -375,8 +392,8 @@ window.showAssignStudentModal = async function() {
 
         // Create modal HTML
         const modalHTML = `
-            <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-                <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl my-4">
+            <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl">
                     <div class="flex justify-between items-center p-6 border-b">
                         <h3 class="text-xl font-bold text-blue-700">Assign Student to Tutor</h3>
                         <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
@@ -389,46 +406,29 @@ window.showAssignStudentModal = async function() {
                             <label class="block text-sm font-medium text-gray-700 mb-2">
                                 Select Tutor <span class="text-red-500">*</span>
                             </label>
-                            <div class="relative">
-                                <input type="text" id="assign-tutor-search" placeholder="Type to search tutors..." 
-                                    autocomplete="off"
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                <input type="hidden" id="assign-tutor-select" value="">
-                                <div id="assign-tutor-dropdown" class="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto hidden">
-                                    ${tutors.map(tutor => `
-                                        <div class="tutor-option px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm" 
-                                            data-value="${tutor.id}" 
-                                            data-label="${(tutor.name || tutor.email || tutor.id)}${tutor.assignedStudentsCount ? ` (${tutor.assignedStudentsCount} students)` : ''}">
-                                            <span class="font-medium">${tutor.name || tutor.email || tutor.id}</span>
-                                            ${tutor.assignedStudentsCount ? `<span class="text-gray-400 ml-2 text-xs">${tutor.assignedStudentsCount} students</span>` : ''}
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
+                            <select id="assign-tutor-select" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="">-- Select a Tutor --</option>
+                                ${tutors.map(tutor => `
+                                    <option value="${tutor.id}">
+                                        ${tutor.name || tutor.email || tutor.id} ${tutor.assignedStudentsCount ? `(${tutor.assignedStudentsCount} students)` : ''}
+                                    </option>
+                                `).join('')}
+                            </select>
                         </div>
                         
                         <div class="mb-6">
                             <label class="block text-sm font-medium text-gray-700 mb-2">
                                 Select Student <span class="text-red-500">*</span>
                             </label>
-                            <div class="relative">
-                                <input type="text" id="assign-student-search" placeholder="Type to search students..." 
-                                    autocomplete="off"
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                <input type="hidden" id="assign-student-select" value="">
-                                <div id="assign-student-dropdown" class="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto hidden">
-                                    ${students.map(student => `
-                                        <div class="student-option px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm" 
-                                            data-value="${student.id}"
-                                            data-parent-email="${student.parentEmail || ''}"
-                                            data-label="${student.studentName || student.name || student.email || student.id}${student.parentEmail ? ` — ${student.parentEmail}` : ''}">
-                                            <span class="font-medium">${student.studentName || student.name || student.id}</span>
-                                            ${student.grade ? `<span class="text-gray-400 ml-2 text-xs">${student.grade}</span>` : ''}
-                                            ${student.parentEmail ? `<div class="text-gray-400 text-xs">${student.parentEmail}</div>` : ''}
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
+                            <select id="assign-student-select" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="">-- Select a Student --</option>
+                                ${students.map(student => `
+                                    <option value="${student.id}">
+                                        ${student.name || student.email || student.id}
+                                        ${student.parentEmail ? ` (${student.parentEmail})` : ''}
+                                    </option>
+                                `).join('')}
+                            </select>
                         </div>
                         
                         <div class="mb-6">
@@ -460,48 +460,22 @@ window.showAssignStudentModal = async function() {
         modalContainer.innerHTML = modalHTML;
         document.body.appendChild(modalContainer);
         
-        // Setup searchable dropdowns
-        function setupSearchableDropdown(searchInputId, hiddenInputId, dropdownId, optionClass) {
-            const searchInput = document.getElementById(searchInputId);
-            const hiddenInput = document.getElementById(hiddenInputId);
-            const dropdown = document.getElementById(dropdownId);
-            if (!searchInput || !dropdown) return;
-
-            searchInput.addEventListener('focus', () => { dropdown.classList.remove('hidden'); });
-            searchInput.addEventListener('input', () => {
-                const term = searchInput.value.toLowerCase();
-                dropdown.querySelectorAll('.' + optionClass).forEach(opt => {
-                    const label = (opt.dataset.label || '').toLowerCase();
-                    opt.style.display = label.includes(term) ? '' : 'none';
-                });
-                dropdown.classList.remove('hidden');
-                hiddenInput.value = '';
-            });
-            dropdown.querySelectorAll('.' + optionClass).forEach(opt => {
-                opt.addEventListener('mousedown', (e) => {
-                    e.preventDefault();
-                    searchInput.value = opt.querySelector('span.font-medium').textContent;
-                    hiddenInput.value = opt.dataset.value;
-                    dropdown.classList.add('hidden');
-                    // Auto-fill parent email if student selected
-                    if (opt.dataset.parentEmail !== undefined) {
-                        const emailInput = document.getElementById('assign-parent-email');
-                        if (emailInput && opt.dataset.parentEmail) emailInput.value = opt.dataset.parentEmail;
-                    }
-                });
-            });
-            document.addEventListener('click', (e) => {
-                if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
-                    dropdown.classList.add('hidden');
-                }
-            }, { once: false });
-        }
-
+        // Focus on first select
         setTimeout(() => {
-            setupSearchableDropdown('assign-tutor-search', 'assign-tutor-select', 'assign-tutor-dropdown', 'tutor-option');
-            setupSearchableDropdown('assign-student-search', 'assign-student-select', 'assign-student-dropdown', 'student-option');
-            document.getElementById('assign-tutor-search')?.focus();
+            document.getElementById('assign-tutor-select')?.focus();
         }, 100);
+        
+        // Update parent email when student selection changes
+        document.getElementById('assign-student-select').addEventListener('change', function() {
+            const studentId = this.value;
+            const selectedStudent = students.find(s => s.id === studentId);
+            const parentEmailInput = document.getElementById('assign-parent-email');
+            if (selectedStudent && selectedStudent.parentEmail) {
+                parentEmailInput.value = selectedStudent.parentEmail;
+            } else {
+                parentEmailInput.value = '';
+            }
+        });
         
     } catch (error) {
         console.error('Error showing assign student modal:', error);
@@ -639,9 +613,9 @@ window.showMarkInactiveModal = async function() {
 
         // Create modal HTML
         const modalHTML = `
-            <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl">
-                    <div class="flex justify-between items-center p-6 border-b">
+            <div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[9999] p-4">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden" style="max-height:90vh;display:flex;flex-direction:column;">
+                    <div class="flex justify-between items-center p-6 border-b flex-shrink-0">
                         <h3 class="text-xl font-bold text-red-700">Mark Tutor as Inactive</h3>
                         <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
                             <i class="fas fa-times text-xl"></i>
@@ -734,7 +708,7 @@ async function submitAssignment() {
     const notes = document.getElementById('assignment-notes').value;
     
     if (!tutorId || !studentId) {
-        alert('Please select both a tutor and a student from the dropdown lists.');
+        alert('Please select both a tutor and a student.');
         return;
     }
     
@@ -1391,7 +1365,7 @@ async function renderManagementTutorView(container) {
             const students = sessionCache.students || [];
             
             const modalHtml = `
-                <div id="select-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div id="select-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 z-[9999] flex items-center justify-center p-4">
                     <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
                         <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="document.getElementById('select-student-modal').remove()">&times;</button>
                         <h3 class="text-xl font-bold mb-4">View History</h3>
@@ -3136,31 +3110,80 @@ function showAssignStudentModal() {
         .join('');
 
     const modalHtml = `
-        <div id="assign-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
-                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('assign-modal')">&times;</button>
-                <h3 class="text-xl font-bold mb-4">Assign New Student</h3>
+        <div id="assign-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 z-[9999] flex items-center justify-center p-4">
+            <div class="relative bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden" style="max-height:92vh;display:flex;flex-direction:column;">
+                <div class="flex justify-between items-center p-5 border-b bg-green-700 text-white flex-shrink-0">
+                    <h3 class="text-xl font-bold">Assign New Student</h3>
+                    <button onclick="closeManagementModal('assign-modal')" class="text-white hover:text-green-200 text-2xl font-bold">&times;</button>
+                </div>
+                <div style="overflow-y:auto;flex:1;" class="p-5">
                 <form id="assign-student-form">
-                    <div class="mb-2">
-                        <label class="block text-sm font-medium">Assign to Tutor</label>
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-gray-700">Assign to Tutor *</label>
                         <select id="assign-tutor" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
                             <option value="" disabled selected>Select a tutor...</option>
                             ${tutorOptions}
                         </select>
                     </div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Student Name</label><input type="text" id="assign-studentName" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Student Grade</label><input type="text" id="assign-grade" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Days/Week</label><input type="text" id="assign-days" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Subjects (comma-separated)</label><input type="text" id="assign-subjects" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Parent Name</label><input type="text" id="assign-parentName" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Parent Phone</label><input type="text" id="assign-parentPhone" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Parent Email</label><input type="email" id="assign-parentEmail" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" placeholder="parent@example.com"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Student Fee (₦)</label><input type="number" id="assign-studentFee" required value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="flex justify-end mt-4">
-                        <button type="button" onclick="closeManagementModal('assign-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Assign Student</button>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Student Name *</label>
+                            <input type="text" id="assign-studentName" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Student Grade *</label>
+                            ${buildGradeSelect('assign-grade')}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 p-3 border rounded-lg bg-blue-50">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">📅 Class Days *</label>
+                        <div class="flex flex-wrap gap-3">
+                            ${buildDaysCheckboxes('assign')}
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Class Start Time *</label>
+                            ${buildTimeSelect('assign-time-start')}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Class End Time *</label>
+                            ${buildTimeSelect('assign-time-end')}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-gray-700">Subjects (comma-separated) *</label>
+                        <input type="text" id="assign-subjects" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" placeholder="e.g. Mathematics, English, Science">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Parent Name *</label>
+                            <input type="text" id="assign-parentName" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Parent Phone *</label>
+                            <input type="text" id="assign-parentPhone" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Parent Email</label>
+                            <input type="email" id="assign-parentEmail" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" placeholder="parent@example.com">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Student Fee (₦) *</label>
+                            <input type="number" id="assign-studentFee" required value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-3 pt-3 border-t">
+                        <button type="button" onclick="closeManagementModal('assign-modal')" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">✅ Assign Student</button>
                     </div>
                 </form>
+                </div>
             </div>
         </div>
     `;
@@ -3169,11 +3192,26 @@ function showAssignStudentModal() {
         e.preventDefault();
         const form = e.target;
         const selectedTutorData = JSON.parse(form.elements['assign-tutor'].value);
+        const grade = document.getElementById('assign-grade').value;
+        const selectedDays = getSelectedDays('assign');
+        const startTime = document.getElementById('assign-time-start').value;
+        const endTime = document.getElementById('assign-time-end').value;
+
+        if (selectedDays.length === 0) { alert("Please select at least one class day."); return; }
+        if (!startTime || !endTime) { alert("Please select class start and end times."); return; }
+        if (startTime >= endTime) { alert("End time must be after start time."); return; }
+
+        const academicDays = selectedDays.join(', ');
+        const academicTime = `${startTime} - ${endTime}`;
+        const scheduleArr = buildScheduleFromDaysTime(selectedDays, startTime, endTime);
 
         const newStudentData = {
             studentName: form.elements['assign-studentName'].value,
-            grade: form.elements['assign-grade'].value,
-            days: form.elements['assign-days'].value,
+            grade,
+            days: selectedDays.length,
+            academicDays,
+            academicTime,
+            schedule: scheduleArr,
             subjects: form.elements['assign-subjects'].value.split(',').map(s => s.trim()).filter(s => s),
             parentName: form.elements['assign-parentName'].value,
             parentPhone: form.elements['assign-parentPhone'].value,
@@ -3193,14 +3231,32 @@ function showAssignStudentModal() {
                 isCurrent: true
             }],
             gradeHistory: [{
-                grade: form.elements['assign-grade'].value,
+                grade,
                 changedDate: Timestamp.now(),
                 changedBy: window.userData?.email || 'management'
             }]
         };
 
         try {
-            await addDoc(collection(db, "students"), newStudentData);
+            const studentRef = await addDoc(collection(db, "students"), newStudentData);
+            // Also create schedule document so it shows in tutor's schedule
+            await setDoc(doc(db, "schedules", `sched_${studentRef.id}`), {
+                studentId: studentRef.id,
+                studentName: newStudentData.studentName,
+                tutorEmail: selectedTutorData.email,
+                schedule: scheduleArr,
+                updatedAt: Timestamp.now()
+            });
+            // Notify tutor
+            await setDoc(doc(collection(db, "tutor_notifications")), {
+                tutorEmail: selectedTutorData.email,
+                studentName: newStudentData.studentName,
+                type: 'new_student_assigned',
+                message: `A new student "${newStudentData.studentName}" (${grade}) has been assigned to you. Class: ${academicDays} at ${academicTime}.`,
+                read: false,
+                createdAt: Timestamp.now(),
+                actionUrl: '#students'
+            });
             alert(`Student "${newStudentData.studentName}" assigned successfully to ${newStudentData.tutorName}!`);
             closeManagementModal('assign-modal');
             invalidateCache('students');
@@ -3366,10 +3422,13 @@ function showMarkInactiveModal() {
         .join('');
     
     const modalHtml = `
-        <div id="mark-inactive-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
-                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('mark-inactive-modal')">&times;</button>
-                <h3 class="text-xl font-bold mb-4">Mark Tutor as Inactive</h3>
+        <div id="mark-inactive-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 z-[9999] flex items-center justify-center p-4">
+            <div class="relative bg-white w-full max-w-lg rounded-xl shadow-2xl overflow-hidden" style="max-height:90vh;display:flex;flex-direction:column;">
+                <div class="flex justify-between items-center p-4 border-b flex-shrink-0">
+                    <h3 class="text-lg font-bold text-red-700">Mark Tutor as Inactive</h3>
+                    <button class="text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('mark-inactive-modal')">&times;</button>
+                </div>
+                <div style="overflow-y:auto;flex:1;padding:1.5rem;">
                 <form id="mark-inactive-form">
                     <div class="mb-4">
                         <label class="block text-sm font-medium mb-2">Select Tutor</label>
@@ -3398,6 +3457,7 @@ function showMarkInactiveModal() {
                         <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Mark as Inactive</button>
                     </div>
                 </form>
+                </div>
             </div>
         </div>
     `;
@@ -3487,7 +3547,7 @@ async function showTutorHistory(tutorId) {
         `).join('');
         
         const modalHtml = `
-            <div id="tutor-history-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div id="tutor-history-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 z-[9999] flex items-center justify-center p-4">
                 <div class="relative p-8 bg-white w-full max-w-4xl rounded-lg shadow-2xl">
                     <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('tutor-history-modal')">&times;</button>
                     <h3 class="text-2xl font-bold mb-4">Tutor History: ${tutorData.name}</h3>
@@ -3896,7 +3956,7 @@ function showArchiveStudentModal(mode = 'single') {
     
     // Create student list HTML with search
     const modalHtml = `
-        <div id="archive-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+        <div id="archive-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 z-[9999] flex items-center justify-center p-4">
             <div class="relative bg-white w-full max-w-3xl rounded-lg shadow-xl">
                 <!-- Modal Header -->
                 <div class="flex items-center justify-between p-6 border-b">
@@ -4325,7 +4385,7 @@ async function renderPayAdvicePanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor Pay Advice</h2>
-            <div class="bg-green-50 p-4 rounded-lg mb-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <div class="bg-green-50 p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div>
                     <label for="start-date" class="block text-sm font-medium">Start Date</label>
                     <input type="date" id="start-date" class="mt-1 block w-full p-2 border rounded-md">
@@ -4334,14 +4394,10 @@ async function renderPayAdvicePanel(container) {
                     <label for="end-date" class="block text-sm font-medium">End Date</label>
                     <input type="date" id="end-date" class="mt-1 block w-full p-2 border rounded-md">
                 </div>
-                <div>
-                    <label for="pay-name-search" class="block text-sm font-medium">Search by Tutor Name</label>
-                    <input type="text" id="pay-name-search" placeholder="Type a name..." class="mt-1 block w-full p-2 border rounded-md">
-                </div>
-                <div class="flex items-center space-x-2 flex-wrap gap-2">
-                    <div class="bg-green-100 p-2 rounded-lg text-center shadow flex-1"><h4 class="font-bold text-green-800 text-xs">Active Tutors</h4><p id="pay-tutor-count" class="text-2xl font-extrabold">0</p></div>
-                    <div class="bg-yellow-100 p-2 rounded-lg text-center shadow flex-1"><h4 class="font-bold text-yellow-800 text-xs">Active Students</h4><p id="pay-student-count" class="text-2xl font-extrabold">0</p></div>
-                    ${canExport ? `<button id="export-pay-xls-btn" class="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 text-sm">Download XLS</button>` : ''}
+                <div class="flex items-center space-x-4 col-span-2">
+                    <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-green-800 text-sm">Active Tutors</h4><p id="pay-tutor-count" class="text-2xl font-extrabold">0</p></div>
+                    <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-yellow-800 text-sm">Active Students</h4><p id="pay-student-count" class="text-2xl font-extrabold">0</p></div>
+                    ${canExport ? `<button id="export-pay-xls-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 h-full">Download 4 XLS Files</button>` : ''}
                 </div>
             </div>
             <div class="overflow-x-auto">
@@ -4369,7 +4425,6 @@ async function renderPayAdvicePanel(container) {
     
     const startDateInput = document.getElementById('start-date');
     const endDateInput = document.getElementById('end-date');
-    const nameSearchInput = document.getElementById('pay-name-search');
     
     const handleDateChange = () => {
         const startDate = startDateInput.value ? new Date(startDateInput.value) : null;
@@ -4383,10 +4438,6 @@ async function renderPayAdvicePanel(container) {
     
     startDateInput.addEventListener('change', handleDateChange);
     endDateInput.addEventListener('change', handleDateChange);
-    
-    nameSearchInput.addEventListener('input', () => {
-        renderPayAdviceTable(nameSearchInput.value.trim().toLowerCase());
-    });
 
     const exportBtn = document.getElementById('export-pay-xls-btn');
     if (exportBtn) {
@@ -4521,16 +4572,13 @@ async function loadPayAdviceData(startDate, endDate) {
     }
 }
 
-function renderPayAdviceTable(nameFilter = '') {
+function renderPayAdviceTable() {
     const tableBody = document.getElementById('pay-advice-table-body');
     if (!tableBody) return;
     
     let grandTotal = 0;
-    const dataToRender = nameFilter 
-        ? currentPayData.filter(d => (d.tutorName || '').toLowerCase().includes(nameFilter))
-        : currentPayData;
     
-    tableBody.innerHTML = dataToRender.map(d => {
+    tableBody.innerHTML = currentPayData.map(d => {
         const giftAmount = payAdviceGifts[d.tutorEmail] || 0;
         const finalPay = d.totalPay + giftAmount;
         grandTotal += finalPay;
@@ -4907,7 +4955,7 @@ function showReferralDetailsModal(parentUid) {
     }).join('');
 
     const modalHtml = `
-        <div id="referralDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+        <div id="referralDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 z-[9999] flex items-center justify-center p-4">
             <div class="relative p-8 bg-white w-full max-w-4xl rounded-lg shadow-2xl">
                 <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('referralDetailsModal')">&times;</button>
                 <h3 class="text-2xl font-bold mb-4 text-indigo-600">Referral Details for ${parentData.name}</h3>
@@ -5067,15 +5115,6 @@ async function renderTutorReportsPanel(container) {
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor Reports</h2>
             
-            <!-- Quick name search -->
-            <div class="mb-4 flex gap-3 items-center">
-                <div class="relative flex-1">
-                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
-                    <input type="text" id="reports-name-quick-search" placeholder="🔍 Type a tutor or student name to search..." 
-                           class="w-full pl-9 pr-4 py-2.5 border-2 border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 font-medium">
-                </div>
-            </div>
-            
             <div class="bg-green-50 p-4 rounded-lg mb-6">
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-4">
                     <div>
@@ -5173,10 +5212,6 @@ async function renderTutorReportsPanel(container) {
     document.getElementById('refresh-reports-btn').addEventListener('click', handleDateChange);
     
     document.getElementById('reports-search').addEventListener('input', (e) => {
-        filterReports(e.target.value);
-    });
-    
-    document.getElementById('reports-name-quick-search').addEventListener('input', (e) => {
         filterReports(e.target.value);
     });
 
@@ -6719,7 +6754,7 @@ window.showEnrollmentDetails = async function (enrollmentId) {
             : `<button onclick="approveEnrollmentModal('${enrollment.id}')" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Approve</button>`;
 
         const modalHtml = `
-            <div id="enrollmentDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div id="enrollmentDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 z-[9999] flex items-center justify-center p-4">
                 <div class="relative p-8 bg-white w-full max-w-4xl rounded-lg shadow-2xl" style="max-height: 90vh; overflow-y: auto;">
                     <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('enrollmentDetailsModal')">&times;</button>
                     <h3 class="text-2xl font-bold mb-4 text-green-700">Enrollment Details</h3>
@@ -6853,7 +6888,10 @@ window.approveEnrollmentModal = async function (enrollmentId) {
                     <div class="mb-6 p-4 border rounded-lg bg-gray-50">
                         <div class="flex justify-between items-center mb-3">
                             <h4 class="font-bold text-lg">${student.name || 'Student ' + (studentIndex + 1)}</h4>
-                            <span class="text-sm text-gray-600">Grade: ${student.grade || 'N/A'}</span>
+                            <div class="flex items-center gap-2">
+                                <label class="text-sm font-medium">Grade:</label>
+                                ${buildGradeSelect(`student-grade-${studentIndex}`, student.grade || '', false)}
+                            </div>
                         </div>
                         
                         <!-- Academic Tutor Section -->
@@ -6889,10 +6927,13 @@ window.approveEnrollmentModal = async function (enrollmentId) {
         }
 
         const modalHtml = `
-            <div id="approveEnrollmentModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                <div class="relative p-8 bg-white w-full max-w-4xl mx-auto my-8 rounded-lg shadow-xl" style="max-height: 90vh; overflow-y: auto;">
-                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('approveEnrollmentModal')">&times;</button>
-                    <h3 class="text-2xl font-bold mb-6">Approve Enrollment - ${enrollmentId.substring(0, 8)}</h3>
+            <div id="approveEnrollmentModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 z-[9999] flex items-center justify-center p-4">
+                <div class="bg-white w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden" style="max-height:92vh;display:flex;flex-direction:column;">
+                    <div class="flex justify-between items-center p-5 border-b bg-green-700 text-white flex-shrink-0">
+                        <h3 class="text-xl font-bold">Approve Enrollment - ${enrollmentId.substring(0, 8)}</h3>
+                        <button onclick="closeManagementModal('approveEnrollmentModal')" class="text-white hover:text-green-200 text-2xl font-bold">&times;</button>
+                    </div>
+                    <div style="overflow-y:auto;flex:1;padding:1.5rem;">
                     <form id="approve-enrollment-form">
                         <input type="hidden" id="approve-enrollment-id" value="${enrollmentId}">
                         
@@ -6924,17 +6965,25 @@ window.approveEnrollmentModal = async function (enrollmentId) {
                             </div>
                         </div>
                         
-                        <div class="mb-6 grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium mb-2">Academic Days *</label>
-                                <input type="text" id="academic-days" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
-                                       value="${academicDays}" placeholder="e.g., Monday, Wednesday, Friday" required>
+                        <div class="mb-6 p-4 border rounded-lg bg-blue-50">
+                            <h4 class="text-sm font-bold text-blue-800 mb-3">📅 Class Schedule (applies to all students)</h4>
+                            <div class="mb-3">
+                                <label class="block text-sm font-medium mb-2">Class Days *</label>
+                                <div class="flex flex-wrap gap-3">
+                                    ${buildDaysCheckboxes('enroll', parseAcademicDays(academicDays))}
+                                </div>
                             </div>
-                            <div>
-                                <label class="block text-sm font-medium mb-2">Academic Time *</label>
-                                <input type="text" id="academic-time" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
-                                       value="${academicTime}" placeholder="e.g., 3:00 PM - 5:00 PM" required>
+                            <div class="grid grid-cols-2 gap-4 mt-3">
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Class Start Time *</label>
+                                    ${buildTimeSelect('enroll-time-start', academicDays ? '' : '')}
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Class End Time *</label>
+                                    ${buildTimeSelect('enroll-time-end', '')}
+                                </div>
                             </div>
+                            <p class="text-xs text-blue-600 mt-2">These days and times will automatically appear in the tutor's schedule.</p>
                         </div>
                         
                         <div class="mb-6">
@@ -6947,21 +6996,22 @@ window.approveEnrollmentModal = async function (enrollmentId) {
                         
                         <div class="mb-6">
                             <h4 class="text-lg font-bold mb-4">Tutor Assignments</h4>
-                            <p class="text-sm text-gray-600 mb-4">Assign tutors for each student below. Academic tutors are required. Each extracurricular activity requires its own tutor.</p>
+                            <p class="text-sm text-gray-600 mb-4">Assign tutors for each student. You can also confirm/edit each student's grade here.</p>
                             ${studentAssignmentHTML}
                         </div>
                         
-                        <div class="flex justify-end space-x-3 mt-6 pt-6 border-t">
+                        <div class="flex justify-end space-x-3 pt-4 border-t">
                             <button type="button" onclick="closeManagementModal('approveEnrollmentModal')" 
                                     class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
                                 Cancel
                             </button>
                             <button type="submit" 
                                     class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                                Approve Enrollment
+                                ✅ Approve Enrollment
                             </button>
                         </div>
                     </form>
+                    </div>
                 </div>
             </div>
         `;
@@ -7074,9 +7124,15 @@ async function approveEnrollmentWithDetails(enrollmentId) {
     const paymentReference = form.elements['payment-reference'].value;
     const paymentDate = form.elements['payment-date'].value;
     const finalFee = parseFloat(form.elements['final-fee'].value);
-    const academicDays = form.elements['academic-days'].value;
-    const academicTime = form.elements['academic-time'].value;
     const enrollmentStatus = form.elements['enrollment-status'].value;
+
+    // Get selected days/times from new UI
+    const selectedDays = getSelectedDays('enroll');
+    const startTime = document.getElementById('enroll-time-start')?.value || '';
+    const endTime = document.getElementById('enroll-time-end')?.value || '';
+    const academicDays = selectedDays.join(', ');
+    const academicTime = startTime && endTime ? `${startTime} - ${endTime}` : '';
+    const scheduleArr = buildScheduleFromDaysTime(selectedDays, startTime, endTime);
 
     if (!paymentMethod) {
         alert("Please select a payment method.");
@@ -7086,8 +7142,12 @@ async function approveEnrollmentWithDetails(enrollmentId) {
         alert("Please enter a valid fee amount.");
         return;
     }
-    if (!academicDays || !academicTime) {
-        alert("Please enter academic days and time.");
+    if (selectedDays.length === 0) {
+        alert("Please select at least one class day.");
+        return;
+    }
+    if (!startTime || !endTime) {
+        alert("Please select class start and end times.");
         return;
     }
 
@@ -7120,10 +7180,12 @@ async function approveEnrollmentWithDetails(enrollmentId) {
 
         // Process each student
         enrollmentData.students.forEach((student, studentIndex) => {
+            // Get confirmed grade from dropdown (or fallback to original)
+            const confirmedGrade = document.getElementById(`student-grade-${studentIndex}`)?.value || student.grade;
+            
             // --- Academic Tutor ---
             const academicTutorId = document.getElementById(`selected-tutor-${studentIndex}`)?.value;
             if (!academicTutorId) {
-                // Academic tutor is required; if missing, show error and abort
                 throw new Error(`Please select an academic tutor for student: ${student.name}`);
             }
             const academicTutor = tutors.find(t => t.id === academicTutorId || t.email === academicTutorId);
@@ -7131,33 +7193,30 @@ async function approveEnrollmentWithDetails(enrollmentId) {
                 throw new Error(`Invalid tutor selected for student: ${student.name}`);
             }
 
-            // Create a pending record for the academic tutor
+            // Create a pending record for the academic tutor with schedule info
             const pendingAcademicRef = doc(collection(db, "pending_students"));
             batch.set(pendingAcademicRef, {
                 studentName: student.name,
                 tutorId: academicTutor.id,
                 tutorName: academicTutor.name,
                 tutorEmail: academicTutor.email,
-                grade: student.actualGrade || student.grade,
-                actualGrade: student.actualGrade || student.grade,
+                grade: confirmedGrade,
                 subjects: student.selectedSubjects || [],
-                academicDays: academicDays,
-                academicTime: academicTime,
-                days: academicDays,
-                time: academicTime,
-                schedule: [{ day: academicDays, time: academicTime }],
+                academicDays,
+                academicTime,
+                schedule: scheduleArr,
                 parentName: enrollmentData.parent?.name,
                 parentPhone: enrollmentData.parent?.phone,
                 parentEmail: enrollmentData.parent?.email,
                 enrollmentId: enrollmentId,
                 type: 'academic',
-                status: 'pending',        // 'pending' means awaiting tutor acceptance
+                status: 'pending',
                 createdAt: Timestamp.now(),
                 source: 'enrollment_approval',
                 note: 'Academic tutoring assignment awaiting your acceptance'
             });
 
-            // --- Extracurricular Tutors (each activity separately) ---
+            // --- Extracurricular Tutors ---
             if (student.extracurriculars && student.extracurriculars.length > 0) {
                 student.extracurriculars.forEach((activity, ecIndex) => {
                     const ecTutorId = document.getElementById(`selected-ec-tutor-${studentIndex}-${ecIndex}`)?.value;
@@ -7172,7 +7231,10 @@ async function approveEnrollmentWithDetails(enrollmentId) {
                                 tutorEmail: ecTutor.email,
                                 activity: activity.name,
                                 frequency: activity.frequency,
-                                grade: student.grade,
+                                grade: confirmedGrade,
+                                academicDays,
+                                academicTime,
+                                schedule: scheduleArr,
                                 parentName: enrollmentData.parent?.name,
                                 parentPhone: enrollmentData.parent?.phone,
                                 parentEmail: enrollmentData.parent?.email,
@@ -7188,7 +7250,7 @@ async function approveEnrollmentWithDetails(enrollmentId) {
                 });
             }
 
-            // --- Subject Tutors (each subject separately) ---
+            // --- Subject Tutors ---
             if (student.selectedSubjects && student.selectedSubjects.length > 0) {
                 student.selectedSubjects.forEach((subject, subIndex) => {
                     const subTutorId = document.getElementById(`selected-sub-tutor-${studentIndex}-${subIndex}`)?.value;
@@ -7202,7 +7264,10 @@ async function approveEnrollmentWithDetails(enrollmentId) {
                                 tutorName: subTutor.name,
                                 tutorEmail: subTutor.email,
                                 subject: subject,
-                                grade: student.grade,
+                                grade: confirmedGrade,
+                                academicDays,
+                                academicTime,
+                                schedule: scheduleArr,
                                 parentName: enrollmentData.parent?.name,
                                 parentPhone: enrollmentData.parent?.phone,
                                 parentEmail: enrollmentData.parent?.email,
@@ -7221,14 +7286,13 @@ async function approveEnrollmentWithDetails(enrollmentId) {
 
         await batch.commit();
 
-        alert("Enrollment approved! Tutor assignments are now pending acceptance in the Tutors Portal.");
+        alert("Enrollment approved! Tutor assignments are now pending acceptance in the Tutors Portal. The schedule will automatically appear in the tutor's schedule manager.");
 
         closeManagementModal('approveEnrollmentModal');
 
         // Clear relevant caches
         delete sessionCache.enrollments;
         delete sessionCache.pendingStudents;
-        // No need to delete students cache because we didn't create any students
 
         // Refresh the view
         const currentNavId = document.querySelector('.nav-item.active')?.dataset.navId;
@@ -7348,51 +7412,36 @@ function renderPendingApprovalsFromCache(studentsToRender = null) {
         // Check if this came from an enrollment
         const fromEnrollment = student.enrollmentId ? ' (From Enrollment)' : '';
         
-        // Display days and time
-        const daysDisplay = student.academicDays || student.days || 'To be determined';
-        const timeDisplay = student.academicTime || student.time || '';
-        const scheduleDisplay = timeDisplay ? `${daysDisplay} — ${timeDisplay}` : daysDisplay;
-        
-        // Grade: use actualGrade if present
-        const gradeDisplay = student.actualGrade || student.grade || 'N/A';
-        
-        // Placement test eligibility badge
-        const gradeNum = parseInt(String(gradeDisplay).toLowerCase().replace('grade','').trim(), 10);
-        const needsPlacementTest = !isNaN(gradeNum) && gradeNum >= 3 && gradeNum <= 12 && student.placementTestStatus !== 'completed';
-        
         return `
-            <div class="border p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                <div class="flex flex-col md:flex-row justify-between items-start gap-4">
-                    <div class="flex-1 min-w-0">
-                        <div class="flex flex-wrap items-center gap-2 mb-2">
-                            <h3 class="font-bold text-lg text-gray-800">${student.studentName}${fromEnrollment}</h3>
-                            ${student.enrollmentId ? `<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">From Enrollment</span>` : ''}
-                            ${needsPlacementTest ? `<span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-semibold">📝 Needs Placement Test</span>` : ''}
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm text-gray-600">
-                            <div>
-                                <p><i class="fas fa-user-friends mr-2 text-gray-400"></i><strong>Parent:</strong> ${student.parentName || 'N/A'}</p>
-                                <p><i class="fas fa-phone mr-2 text-gray-400"></i>${student.parentPhone || 'N/A'}</p>
-                                <p><i class="fas fa-envelope mr-2 text-gray-400"></i>${student.parentEmail || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p><i class="fas fa-chalkboard-teacher mr-2 text-gray-400"></i><strong>Tutor:</strong> ${tutorName || student.tutorEmail}</p>
-                                <p><i class="fas fa-graduation-cap mr-2 text-gray-400"></i><strong>Grade:</strong> ${gradeDisplay}</p>
-                                <p><i class="fas fa-money-bill-wave mr-2 text-gray-400"></i><strong>Fee:</strong> ₦${(student.studentFee || 0).toLocaleString()}</p>
-                            </div>
-                            <div>
-                                <p><i class="fas fa-book mr-2 text-gray-400"></i><strong>Subjects:</strong> ${Array.isArray(student.subjects) ? student.subjects.join(', ') : student.subjects || 'N/A'}</p>
-                                <p><i class="fas fa-calendar mr-2 text-gray-400"></i><strong>Schedule:</strong> ${scheduleDisplay}</p>
-                                ${student.type ? `<p><i class="fas fa-tag mr-2 text-gray-400"></i><strong>Type:</strong> ${student.type}</p>` : ''}
-                            </div>
-                        </div>
-                        ${student.source === 'enrollment_approval' ? `<p class="text-xs text-green-600 mt-2"><i class="fas fa-check-circle mr-1"></i>Approved from enrollment application.</p>` : ''}
+            <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition-colors">
+                <div class="flex-1">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-bold text-lg text-gray-800">${student.studentName}${fromEnrollment}</h3>
+                        ${student.enrollmentId ? `<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Enrollment ID: ${student.enrollmentId.substring(0, 8)}</span>` : ''}
                     </div>
-                    <div class="flex flex-wrap items-center gap-2 flex-shrink-0">
-                        <button class="edit-pending-btn bg-blue-500 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-blue-600 transition-colors" data-student-id="${student.id}"><i class="fas fa-edit mr-1"></i>Edit</button>
-                        <button class="approve-btn bg-green-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-green-700 transition-colors" data-student-id="${student.id}"><i class="fas fa-check mr-1"></i>Approve</button>
-                        <button class="reject-btn bg-red-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-red-700 transition-colors" data-student-id="${student.id}"><i class="fas fa-times mr-1"></i>Reject</button>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-gray-600">
+                        <div>
+                            <p><i class="fas fa-user-friends mr-2"></i>Parent: ${student.parentName || 'N/A'}</p>
+                            <p><i class="fas fa-phone mr-2"></i>Phone: ${student.parentPhone || 'N/A'}</p>
+                            <p><i class="fas fa-envelope mr-2"></i>Email: ${student.parentEmail || 'N/A'}</p>
+                        </div>
+                        <div>
+                            <p><i class="fas fa-chalkboard-teacher mr-2"></i>Tutor: ${tutorName || student.tutorEmail}</p>
+                            <p><i class="fas fa-graduation-cap mr-2"></i>Grade: ${student.grade || 'N/A'}</p>
+                            <p><i class="fas fa-money-bill-wave mr-2"></i>Fee: ₦${(student.studentFee || 0).toLocaleString()}</p>
+                        </div>
+                        <div>
+                            <p><i class="fas fa-book mr-2"></i>Subjects: ${Array.isArray(student.subjects) ? student.subjects.join(', ') : student.subjects || 'N/A'}</p>
+                            <p><i class="fas fa-calendar mr-2"></i>Days/Week: ${student.days || 'To be determined'}</p>
+                            ${student.enrollmentData ? `<p class="text-xs text-blue-600"><i class="fas fa-file-invoice mr-1"></i>Enrollment Fee: ₦${(student.enrollmentData.summary?.totalFee || 0).toLocaleString()}</p>` : ''}
+                        </div>
                     </div>
+                    ${student.source === 'enrollment_approval' ? `<p class="text-xs text-green-600 mt-2"><i class="fas fa-check-circle mr-1"></i>This student was approved from an enrollment application.</p>` : ''}
+                </div>
+                <div class="flex items-center space-x-2 ml-4">
+                    <button class="edit-pending-btn bg-blue-500 text-white px-3 py-1 text-sm rounded-full hover:bg-blue-600 transition-colors" data-student-id="${student.id}">Edit</button>
+                    <button class="approve-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full hover:bg-green-700 transition-colors" data-student-id="${student.id}">Approve</button>
+                    <button class="reject-btn bg-red-600 text-white px-3 py-1 text-sm rounded-full hover:bg-red-700 transition-colors" data-student-id="${student.id}">Reject</button>
                 </div>
             </div>
         `;
@@ -8438,7 +8487,7 @@ function showResponseModal(messageId) {
     }
 
     const modalHtml = `
-        <div id="response-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+        <div id="response-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 z-[9999] flex items-center justify-center p-4">
             <div class="relative p-8 bg-white w-96 max-w-2xl rounded-lg shadow-xl">
                 <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('response-modal')">&times;</button>
                 <h3 class="text-xl font-bold mb-4">Respond to Parent Feedback</h3>
@@ -8599,7 +8648,7 @@ async function handleEditPendingStudent(studentId) {
 
 function showEditStudentModal(studentId, studentData, collectionName) {
     const modalHtml = `
-        <div id="edit-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+        <div id="edit-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 z-[9999] flex items-center justify-center p-4">
             <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
                 <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('edit-modal')">&times;</button>
                 <h3 class="text-xl font-bold mb-4">Edit Student Details</h3>
@@ -8738,7 +8787,7 @@ function showReassignStudentModal() {
         .join('');
 
     const modalHtml = `
-        <div id="reassign-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+        <div id="reassign-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 z-[9999] flex items-center justify-center p-4">
             <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
                 <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('reassign-modal')">&times;</button>
                 <h3 class="text-xl font-bold mb-4">Reassign Student to Different Tutor</h3>
@@ -8912,14 +8961,21 @@ async function handleApproveStudent(studentId) {
             const batch = writeBatch(db);
             const newStudentRef = doc(db, "students", studentId);
             
-            // Use actualGrade if present (from enrollment), fallback to grade
-            const finalGrade = studentData.actualGrade || studentData.grade || 'Unknown';
+            // Build schedule from academicDays + academicTime if present
+            let scheduleArr = studentData.schedule || [];
+            if (scheduleArr.length === 0 && studentData.academicDays && studentData.academicTime) {
+                const days = parseAcademicDays(studentData.academicDays);
+                // Parse time: "HH:MM - HH:MM" or "HH:MM"
+                const timeParts = studentData.academicTime.split(/\s*[-–]\s*/);
+                const startTime = timeParts[0]?.trim() || '14:00';
+                const endTime = timeParts[1]?.trim() || '16:00';
+                scheduleArr = buildScheduleFromDaysTime(days, startTime, endTime);
+            }
             
             const studentWithHistory = {
                 ...studentData,
-                grade: finalGrade,
-                actualGrade: finalGrade,
                 status: 'approved',
+                schedule: scheduleArr,
                 tutorHistory: [{
                     tutorEmail: studentData.tutorEmail,
                     tutorName: studentData.tutorName || studentData.tutorEmail,
@@ -8928,7 +8984,7 @@ async function handleApproveStudent(studentId) {
                     isCurrent: true
                 }],
                 gradeHistory: [{
-                    grade: finalGrade,
+                    grade: studentData.grade || 'Unknown',
                     changedDate: Timestamp.now(),
                     changedBy: window.userData?.email || 'management'
                 }]
@@ -8937,41 +8993,34 @@ async function handleApproveStudent(studentId) {
             batch.set(newStudentRef, studentWithHistory);
             batch.delete(studentRef);
             
-            // Auto-create schedule document if days/time info is available
-            if (studentData.academicDays || studentData.days) {
+            // Create schedule document for tutor view
+            if (scheduleArr.length > 0) {
                 const scheduleRef = doc(db, "schedules", `sched_${studentId}`);
-                const scheduleEntry = studentData.schedule || [{
-                    day: studentData.academicDays || studentData.days || '',
-                    time: studentData.academicTime || studentData.time || ''
-                }];
                 batch.set(scheduleRef, {
-                    studentId: studentId,
+                    studentId,
                     studentName: studentData.studentName,
                     tutorEmail: studentData.tutorEmail,
-                    schedule: scheduleEntry,
-                    academicDays: studentData.academicDays || studentData.days || '',
-                    academicTime: studentData.academicTime || studentData.time || '',
-                    source: studentData.source || 'pending_approval',
-                    createdAt: Timestamp.now(),
+                    schedule: scheduleArr,
                     updatedAt: Timestamp.now()
-                }, { merge: true });
+                });
             }
             
             await batch.commit();
             
-            // Log this action
-            logManagementActivity('STUDENT_APPROVED', `Approved: ${studentData.studentName} (${finalGrade}) → Tutor: ${studentData.tutorName || studentData.tutorEmail}`);
+            // Notify tutor about new approved student
+            try {
+                await setDoc(doc(collection(db, "tutor_notifications")), {
+                    tutorEmail: studentData.tutorEmail,
+                    studentName: studentData.studentName,
+                    type: 'student_approved',
+                    message: `✅ Student "${studentData.studentName}" has been approved and added to your roster. Grade: ${studentData.grade || 'N/A'}. Class: ${studentData.academicDays || 'TBD'} at ${studentData.academicTime || 'TBD'}.`,
+                    read: false,
+                    createdAt: Timestamp.now(),
+                    actionUrl: '#students'
+                });
+            } catch(ne){ console.warn('Notification error:', ne); }
             
-            // Check if placement test is needed
-            const gradeNum = parseInt(String(finalGrade).toLowerCase().replace('grade','').trim(), 10);
-            const needsPlacementTest = !isNaN(gradeNum) && gradeNum >= 3 && gradeNum <= 12;
-            
-            if (needsPlacementTest) {
-                alert(`✅ Student approved successfully!\n\n📝 NOTE: ${studentData.studentName} (${finalGrade}) is eligible for a placement test. The tutor will be prompted to administer it.`);
-            } else {
-                alert("Student approved successfully!");
-            }
-            
+            alert("Student approved successfully! The tutor has been notified.");
             invalidateCache('pendingStudents');
             invalidateCache('students');
             invalidateCache('tutorAssignments');
@@ -9247,7 +9296,7 @@ function showTutorHistoryModal(studentId, studentData, tutorAssignments, activit
     }).join('');
 
     const modalHtml = `
-        <div id="tutorHistoryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+        <div id="tutorHistoryModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 z-[9999] flex items-center justify-center p-4">
             <div class="relative p-8 bg-white w-full max-w-6xl rounded-lg shadow-2xl max-h-[90vh] overflow-y-auto">
                 <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('tutorHistoryModal')">&times;</button>
                 
@@ -9504,65 +9553,66 @@ window.previewReport = async function(reportId) {
 };
 
 window.downloadSingleReport = async function(reportId, event) {
-    const button = event?.target || event;
-    const originalText = button?.innerHTML || '';
+    const button = event.target;
+    const originalText = button.innerHTML;
     
     try {
-        if (button) { button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; button.disabled = true; }
+        button.innerHTML = '<div class="loading-spinner mx-auto" style="width: 16px; height: 16px;"></div>';
+        button.disabled = true;
         
         const progressModal = document.getElementById('pdf-progress-modal');
         const progressBar = document.getElementById('pdf-progress-bar');
         const progressText = document.getElementById('pdf-progress-text');
         const progressMessage = document.getElementById('pdf-progress-message');
         
-        if (progressModal) {
-            progressModal.classList.remove('hidden');
-            if (progressMessage) progressMessage.textContent = 'Generating PDF...';
-            if (progressBar) progressBar.style.width = '10%';
-            if (progressText) progressText.textContent = '10%';
-        }
+        progressModal.classList.remove('hidden');
+        progressMessage.textContent = 'Generating PDF...';
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
 
         const { html, reportData } = await generateReportHTML(reportId);
         
-        if (progressBar) progressBar.style.width = '50%';
-        if (progressText) progressText.textContent = '50%';
-        if (progressMessage) progressMessage.textContent = 'Converting to PDF...';
+        progressBar.style.width = '50%';
+        progressText.textContent = '50%';
+        progressMessage.textContent = 'Converting to PDF...';
 
-        // Try html2pdf first, fallback to print window
-        if (typeof html2pdf !== 'undefined') {
-            const options = {
-                margin: 0.5,
-                filename: `${reportData.studentName}_Report_${Date.now()}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#FFFFFF' },
-                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-            };
-            await html2pdf().set(options).from(html).save();
-        } else {
-            // Fallback: open in new window for browser print-to-PDF
-            const newWindow = window.open('', '_blank');
-            if (newWindow) {
-                newWindow.document.write(html);
-                newWindow.document.close();
-                newWindow.focus();
-                setTimeout(() => newWindow.print(), 800);
-            } else {
-                alert('Pop-ups blocked. Please allow pop-ups and try again, or right-click the preview button to print.');
+        const options = {
+            margin: 0.5,
+            filename: `${reportData.studentName}_Report_${new Date().getTime()}.pdf`,
+            image: { 
+                type: 'jpeg', 
+                quality: 0.98 
+            },
+            html2canvas: { 
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#FFFFFF'
+            },
+            jsPDF: { 
+                unit: 'in', 
+                format: 'a4', 
+                orientation: 'portrait'
             }
-        }
+        };
+
+        await html2pdf().set(options).from(html).save();
         
-        if (progressBar) progressBar.style.width = '100%';
-        if (progressText) progressText.textContent = '100%';
-        if (progressMessage) progressMessage.textContent = 'Done!';
-        setTimeout(() => { if (progressModal) progressModal.classList.add('hidden'); }, 1000);
+        progressBar.style.width = '100%';
+        progressText.textContent = '100%';
+        progressMessage.textContent = 'Download complete!';
+        
+        setTimeout(() => {
+            progressModal.classList.add('hidden');
+        }, 1000);
         
     } catch (error) {
         console.error("Error downloading report:", error);
         alert(`Error downloading report: ${error.message}`);
-        const progressModal = document.getElementById('pdf-progress-modal');
-        if (progressModal) progressModal.classList.add('hidden');
+        document.getElementById('pdf-progress-modal').classList.add('hidden');
     } finally {
-        if (button) { button.innerHTML = originalText; button.disabled = false; }
+        button.innerHTML = originalText;
+        button.disabled = false;
     }
 };
 
@@ -10450,6 +10500,200 @@ function escHtml(str) {
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ======================================================
+// SECTION 8.5: BROADCAST MESSAGE PANEL
+// ======================================================
+
+async function renderBroadcastPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-bold text-green-700 mb-2">📢 Broadcast Message</h2>
+            <p class="text-gray-500 mb-6 text-sm">Send a message to all tutors, all parents, or both. Tutors will see it in their inbox. Parents will be notified via a parent notification.</p>
+            
+            <div class="max-w-2xl">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Send To *</label>
+                    <div class="flex gap-4">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="bc-to-tutors" checked class="rounded"> 
+                            <span class="font-medium text-blue-700">All Tutors</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="bc-to-parents" checked class="rounded"> 
+                            <span class="font-medium text-green-700">All Parents</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Subject / Title *</label>
+                    <input type="text" id="bc-subject" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="e.g. Important Update – Schedule Change">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Message *</label>
+                    <textarea id="bc-message" rows="6" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="Type your message here..."></textarea>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                    <select id="bc-priority" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500">
+                        <option value="normal">Normal</option>
+                        <option value="important">Important</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+                <div id="bc-status" class="hidden mb-4 p-3 rounded-lg text-center font-medium"></div>
+                <button id="bc-send-btn" class="w-full py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition">
+                    <i class="fas fa-paper-plane mr-2"></i> Send Broadcast
+                </button>
+            </div>
+            
+            <div class="mt-10">
+                <h3 class="text-lg font-bold text-gray-700 mb-3">📋 Recent Broadcasts</h3>
+                <div id="bc-history" class="space-y-2 text-sm text-gray-500">
+                    <p class="italic">Loading history...</p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Load recent broadcasts
+    loadBroadcastHistory();
+
+    document.getElementById('bc-send-btn').addEventListener('click', async () => {
+        const toTutors = document.getElementById('bc-to-tutors').checked;
+        const toParents = document.getElementById('bc-to-parents').checked;
+        const subject = document.getElementById('bc-subject').value.trim();
+        const message = document.getElementById('bc-message').value.trim();
+        const priority = document.getElementById('bc-priority').value;
+        const statusEl = document.getElementById('bc-status');
+
+        if (!toTutors && !toParents) { alert("Please select at least one recipient group."); return; }
+        if (!subject || !message) { alert("Please fill in the subject and message."); return; }
+
+        const btn = document.getElementById('bc-send-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Sending...';
+        statusEl.className = 'hidden mb-4 p-3 rounded-lg text-center font-medium';
+
+        try {
+            const sender = window.userData?.name || window.userData?.email || 'Management';
+            const broadcastData = {
+                subject,
+                message,
+                priority,
+                sentTo: { tutors: toTutors, parents: toParents },
+                sentBy: sender,
+                sentByEmail: window.userData?.email || 'management',
+                createdAt: Timestamp.now(),
+                type: 'broadcast'
+            };
+
+            // Save broadcast record
+            const bcRef = await addDoc(collection(db, "broadcasts"), broadcastData);
+
+            const promises = [];
+
+            if (toTutors) {
+                // Fetch all active tutors and notify each
+                let tutors = sessionCache.tutors || [];
+                if (tutors.length === 0) {
+                    const snap = await getDocs(query(collection(db, "tutors"), where("status", "==", "active")));
+                    tutors = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                }
+                tutors.forEach(tutor => {
+                    if (tutor.email) {
+                        promises.push(setDoc(doc(collection(db, "tutor_notifications")), {
+                            tutorEmail: tutor.email,
+                            type: 'broadcast',
+                            subject,
+                            message,
+                            priority,
+                            sentBy: sender,
+                            broadcastId: bcRef.id,
+                            read: false,
+                            createdAt: Timestamp.now()
+                        }));
+                    }
+                });
+            }
+
+            if (toParents) {
+                // Fetch all students with parentEmail and create parent notifications
+                const studentsSnap = await getDocs(query(collection(db, "students"), where("status", "==", "approved")));
+                const parentEmails = new Set();
+                studentsSnap.docs.forEach(d => {
+                    const pe = d.data().parentEmail;
+                    if (pe) parentEmails.add(pe);
+                });
+                parentEmails.forEach(parentEmail => {
+                    promises.push(setDoc(doc(collection(db, "parent_notifications")), {
+                        parentEmail,
+                        type: 'broadcast',
+                        subject,
+                        message,
+                        priority,
+                        sentBy: sender,
+                        broadcastId: bcRef.id,
+                        read: false,
+                        createdAt: Timestamp.now()
+                    }));
+                });
+            }
+
+            await Promise.all(promises);
+
+            statusEl.textContent = `✅ Broadcast sent successfully to ${toTutors && toParents ? 'tutors and parents' : toTutors ? 'all tutors' : 'all parents'}!`;
+            statusEl.className = 'mb-4 p-3 rounded-lg text-center font-medium bg-green-100 text-green-800';
+
+            document.getElementById('bc-subject').value = '';
+            document.getElementById('bc-message').value = '';
+            loadBroadcastHistory();
+
+        } catch(error) {
+            console.error("Broadcast error:", error);
+            statusEl.textContent = `❌ Failed to send broadcast: ${error.message}`;
+            statusEl.className = 'mb-4 p-3 rounded-lg text-center font-medium bg-red-100 text-red-800';
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i> Send Broadcast';
+    });
+}
+
+async function loadBroadcastHistory() {
+    const container = document.getElementById('bc-history');
+    if (!container) return;
+    try {
+        const snap = await getDocs(query(collection(db, "broadcasts"), orderBy("createdAt", "desc"), limit(10)));
+        if (snap.empty) {
+            container.innerHTML = '<p class="italic">No broadcasts sent yet.</p>';
+            return;
+        }
+        container.innerHTML = snap.docs.map(d => {
+            const bc = d.data();
+            const date = bc.createdAt?.toDate ? bc.createdAt.toDate().toLocaleDateString('en-NG') : 'N/A';
+            const recipients = [bc.sentTo?.tutors && 'Tutors', bc.sentTo?.parents && 'Parents'].filter(Boolean).join(' & ');
+            const priorityBadge = bc.priority === 'urgent' ? 'bg-red-100 text-red-800' : bc.priority === 'important' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-700';
+            return `
+                <div class="border rounded-lg p-3 bg-gray-50">
+                    <div class="flex justify-between items-start">
+                        <div class="font-semibold text-gray-800">${bc.subject || 'No subject'}</div>
+                        <span class="text-xs px-2 py-1 rounded ${priorityBadge}">${bc.priority || 'normal'}</span>
+                    </div>
+                    <p class="text-gray-600 text-xs mt-1 line-clamp-2">${bc.message?.substring(0,100)}${bc.message?.length > 100 ? '...' : ''}</p>
+                    <div class="flex gap-4 mt-2 text-xs text-gray-400">
+                        <span>📅 ${date}</span>
+                        <span>👥 ${recipients}</span>
+                        <span>✉ ${bc.sentBy || 'Management'}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch(e) {
+        if (container) container.innerHTML = '<p class="italic text-red-500">Failed to load history.</p>';
+    }
+}
+
+// ======================================================
 // SECTION 9: NAVIGATION & AUTHENTICATION
 // ======================================================
 
@@ -10499,7 +10743,7 @@ const navigationGroups = {
         label: "Communication",
         items: [
             { id: "navParentFeedback", label: "Parent Feedback", icon: "fas fa-comment-dots", fn: renderParentFeedbackPanel },
-            { id: "navMessaging", label: "Messaging", icon: "fas fa-paper-plane", fn: renderManagementMessagingPanel, perm: "viewParentFeedback" }
+            { id: "navBroadcast", label: "Broadcast Message", icon: "fas fa-bullhorn", fn: renderBroadcastPanel }
         ]
     }
 };
@@ -10653,7 +10897,7 @@ const allNavItems = {
     navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak', label: 'Summer Break' },
     navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'viewPendingApprovals', label: 'Pending Approvals' },
     navParentFeedback: { fn: renderParentFeedbackPanel, perm: 'viewParentFeedback', label: 'Parent Feedback' },
-    navMessaging: { fn: renderManagementMessagingPanel, perm: 'viewParentFeedback', label: 'Messaging' },
+    navBroadcast: { fn: renderBroadcastPanel, perm: 'viewParentFeedback', label: 'Broadcast Message' },
     navReferralsAdmin: { fn: renderReferralsAdminPanel, perm: 'viewReferralsAdmin', label: 'Referral Management' },
     navEnrollments: { fn: renderEnrollmentsPanel, perm: 'viewEnrollments', label: 'Enrollments' },
     navInactiveTutors: { fn: renderInactiveTutorsPanel, perm: 'viewInactiveTutors', label: 'Inactive Tutors' },
@@ -10706,469 +10950,6 @@ function setupSidebarToggle() {
     });
 }
 
-// ======================================================
-// SECTION: MANAGEMENT MESSAGING PANEL
-// ======================================================
-
-async function renderManagementMessagingPanel(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-6">📨 Messaging & Broadcast</h2>
-            
-            <!-- Broadcast Section -->
-            <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 mb-6">
-                <h3 class="text-lg font-bold text-green-800 mb-4">📢 Broadcast Message</h3>
-                <p class="text-sm text-gray-600 mb-4">Send a pop-up announcement to all tutors and/or parents. Recipients will see it the next time they log in.</p>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Subject / Title</label>
-                        <input type="text" id="broadcast-title" placeholder="e.g. Important Notice" 
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Send To</label>
-                        <div class="flex gap-4 mt-1">
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" id="broadcast-to-tutors" checked class="rounded">
-                                <span class="text-sm">Tutors</span>
-                            </label>
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" id="broadcast-to-parents" class="rounded">
-                                <span class="text-sm">Parents</span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Message</label>
-                    <textarea id="broadcast-message" rows="4" placeholder="Type your broadcast message here..."
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 resize-none"></textarea>
-                </div>
-                
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Attach Image or File (Optional)</label>
-                    <input type="file" id="broadcast-file" accept="image/*,.pdf" 
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <p class="text-xs text-gray-500 mt-1">Images will be shown in the pop-up. PDFs will be downloadable.</p>
-                </div>
-                
-                <div class="flex justify-end">
-                    <button id="send-broadcast-btn" class="bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700 font-medium flex items-center gap-2">
-                        <i class="fas fa-bullhorn"></i> Send Broadcast
-                    </button>
-                </div>
-                
-                <div id="broadcast-status" class="mt-3 hidden"></div>
-            </div>
-            
-            <!-- Direct Tutor Messaging -->
-            <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
-                <h3 class="text-lg font-bold text-blue-800 mb-4">💬 Message a Tutor Directly</h3>
-                
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Search Tutor</label>
-                    <div class="relative">
-                        <input type="text" id="msg-tutor-search" placeholder="Type tutor name..." autocomplete="off"
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                        <input type="hidden" id="msg-tutor-id">
-                        <div id="msg-tutor-dropdown" class="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto hidden"></div>
-                    </div>
-                </div>
-                
-                <div id="selected-tutor-info" class="hidden mb-4 p-3 bg-white rounded-lg border border-blue-100">
-                    <p class="text-sm font-medium text-blue-800" id="selected-tutor-name-msg">—</p>
-                    <p class="text-xs text-gray-500" id="selected-tutor-email-msg">—</p>
-                </div>
-                
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Message</label>
-                    <textarea id="direct-msg-content" rows="3" placeholder="Type your message..."
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
-                </div>
-                
-                <div class="flex justify-end">
-                    <button id="send-direct-msg-btn" class="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2">
-                        <i class="fas fa-paper-plane"></i> Send Message
-                    </button>
-                </div>
-                <div id="direct-msg-status" class="mt-3 hidden"></div>
-            </div>
-            
-            <!-- Recent Broadcasts log -->
-            <div class="bg-white border border-gray-200 rounded-xl p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-bold text-gray-700">📋 Recent Broadcasts</h3>
-                    <button id="refresh-broadcasts-btn" class="text-sm text-blue-600 hover:underline">Refresh</button>
-                </div>
-                <div id="broadcasts-list">
-                    <p class="text-gray-500 text-sm text-center py-4">Loading...</p>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    // Load tutors for search
-    let tutorsList = [];
-    try {
-        if (!sessionCache.tutors) {
-            const snap = await getDocs(query(collection(db, "tutors")));
-            sessionCache.tutors = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !t.status || t.status === 'active');
-        }
-        tutorsList = sessionCache.tutors || [];
-    } catch(e) { console.error(e); }
-    
-    // Tutor search dropdown
-    const tutorSearchInput = document.getElementById('msg-tutor-search');
-    const tutorHiddenInput = document.getElementById('msg-tutor-id');
-    const tutorDropdown = document.getElementById('msg-tutor-dropdown');
-    
-    tutorSearchInput.addEventListener('input', () => {
-        const term = tutorSearchInput.value.toLowerCase();
-        const matches = tutorsList.filter(t => (t.name || t.email || '').toLowerCase().includes(term)).slice(0, 10);
-        tutorDropdown.innerHTML = matches.map(t => `
-            <div class="tutor-msg-opt px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b last:border-0" 
-                data-id="${t.id}" data-name="${t.name || t.email}" data-email="${t.email || ''}">
-                <span class="font-medium">${t.name || 'Unknown'}</span>
-                <span class="text-gray-400 text-xs ml-2">${t.email || ''}</span>
-            </div>
-        `).join('');
-        tutorDropdown.classList.toggle('hidden', matches.length === 0);
-    });
-    
-    tutorDropdown.addEventListener('mousedown', (e) => {
-        const opt = e.target.closest('.tutor-msg-opt');
-        if (!opt) return;
-        e.preventDefault();
-        tutorSearchInput.value = opt.dataset.name;
-        tutorHiddenInput.value = opt.dataset.id;
-        document.getElementById('selected-tutor-name-msg').textContent = opt.dataset.name;
-        document.getElementById('selected-tutor-email-msg').textContent = opt.dataset.email;
-        document.getElementById('selected-tutor-info').classList.remove('hidden');
-        tutorDropdown.classList.add('hidden');
-    });
-    
-    document.addEventListener('click', (e) => {
-        if (!tutorSearchInput.contains(e.target)) tutorDropdown.classList.add('hidden');
-    });
-    
-    // Send direct message
-    document.getElementById('send-direct-msg-btn').addEventListener('click', async () => {
-        const tutorId = tutorHiddenInput.value;
-        const content = document.getElementById('direct-msg-content').value.trim();
-        const senderName = window.userData?.name || 'Management';
-        const statusEl = document.getElementById('direct-msg-status');
-        
-        if (!tutorId) { showMsgStatus(statusEl, '❌ Please select a tutor first.', false); return; }
-        if (!content) { showMsgStatus(statusEl, '❌ Please enter a message.', false); return; }
-        
-        const tutor = tutorsList.find(t => t.id === tutorId);
-        if (!tutor) { showMsgStatus(statusEl, '❌ Tutor not found.', false); return; }
-        
-        try {
-            document.getElementById('send-direct-msg-btn').disabled = true;
-            await addDoc(collection(db, 'tutor_notifications'), {
-                tutorEmail: tutor.email,
-                type: 'management_message',
-                title: 'Message from Management',
-                message: content,
-                senderName: senderName,        // visible to management
-                senderDisplay: 'Management',   // what tutor sees
-                read: false,
-                createdAt: Timestamp.now()
-            });
-            document.getElementById('direct-msg-content').value = '';
-            showMsgStatus(statusEl, `✅ Message sent to ${tutor.name || tutor.email}!`, true);
-        } catch(err) {
-            showMsgStatus(statusEl, '❌ Failed to send: ' + err.message, false);
-        } finally {
-            document.getElementById('send-direct-msg-btn').disabled = false;
-        }
-    });
-    
-    // Send broadcast
-    document.getElementById('send-broadcast-btn').addEventListener('click', async () => {
-        const title = document.getElementById('broadcast-title').value.trim();
-        const message = document.getElementById('broadcast-message').value.trim();
-        const toTutors = document.getElementById('broadcast-to-tutors').checked;
-        const toParents = document.getElementById('broadcast-to-parents').checked;
-        const fileInput = document.getElementById('broadcast-file');
-        const statusEl = document.getElementById('broadcast-status');
-        const senderName = window.userData?.name || 'Management';
-        
-        if (!title) { showMsgStatus(statusEl, '❌ Please enter a broadcast title.', false); return; }
-        if (!message) { showMsgStatus(statusEl, '❌ Please enter a message.', false); return; }
-        if (!toTutors && !toParents) { showMsgStatus(statusEl, '❌ Please select at least one recipient group.', false); return; }
-        
-        const btn = document.getElementById('send-broadcast-btn');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Sending...';
-        
-        try {
-            let fileUrl = null;
-            let fileType = null;
-            
-            // Upload file if present
-            if (fileInput.files.length > 0) {
-                const file = fileInput.files[0];
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('upload_preset', 'bkh_assessments');
-                const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/dy2hxcyaf/auto/upload`, { method: 'POST', body: formData });
-                const uploadData = await uploadRes.json();
-                fileUrl = uploadData.secure_url;
-                fileType = file.type.startsWith('image/') ? 'image' : 'file';
-            }
-            
-            const broadcastDoc = {
-                title,
-                message,
-                toTutors,
-                toParents,
-                senderName,        // full name for management log
-                senderDisplay: 'Management',  // what recipients see
-                fileUrl: fileUrl || null,
-                fileType: fileType || null,
-                createdAt: Timestamp.now(),
-                isGlobal: true
-            };
-            
-            await addDoc(collection(db, 'broadcasts'), broadcastDoc);
-            
-            showMsgStatus(statusEl, `✅ Broadcast sent to ${[toTutors && 'Tutors', toParents && 'Parents'].filter(Boolean).join(' & ')}!`, true);
-            document.getElementById('broadcast-title').value = '';
-            document.getElementById('broadcast-message').value = '';
-            fileInput.value = '';
-            loadBroadcasts();
-        } catch(err) {
-            showMsgStatus(statusEl, '❌ Failed: ' + err.message, false);
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-bullhorn"></i> Send Broadcast';
-        }
-    });
-    
-    document.getElementById('refresh-broadcasts-btn').addEventListener('click', loadBroadcasts);
-    loadBroadcasts();
-    
-    function showMsgStatus(el, msg, success) {
-        el.textContent = msg;
-        el.className = `mt-3 p-3 rounded-lg text-sm font-medium ${success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
-        el.classList.remove('hidden');
-        setTimeout(() => el.classList.add('hidden'), 5000);
-    }
-    
-    async function loadBroadcasts() {
-        const listEl = document.getElementById('broadcasts-list');
-        if (!listEl) return;
-        try {
-            const snap = await getDocs(query(collection(db, 'broadcasts'), orderBy('createdAt', 'desc'), limit(20)));
-            if (snap.empty) { listEl.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">No broadcasts yet.</p>'; return; }
-            listEl.innerHTML = snap.docs.map(d => {
-                const b = d.data();
-                const date = b.createdAt?.toDate ? b.createdAt.toDate().toLocaleString() : 'Unknown date';
-                const targets = [b.toTutors && '👩‍🏫 Tutors', b.toParents && '👨‍👩‍👧 Parents'].filter(Boolean).join(', ');
-                return `
-                    <div class="border-b py-3 last:border-0">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <p class="font-semibold text-gray-800">${b.title || 'Broadcast'}</p>
-                                <p class="text-sm text-gray-600 mt-1">${b.message || ''}</p>
-                                <p class="text-xs text-gray-400 mt-1">Sent by: ${b.senderName || 'Management'} · To: ${targets}</p>
-                            </div>
-                            <span class="text-xs text-gray-400 whitespace-nowrap ml-4">${date}</span>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        } catch(e) { listEl.innerHTML = '<p class="text-red-500 text-sm">Failed to load broadcasts.</p>'; }
-    }
-}
-
-// ======================================================
-// SECTION: MANAGEMENT NOTIFICATION BELL
-// ======================================================
-
-async function initManagementNotifications() {
-    const bellBtn = document.getElementById('notificationBell') || document.querySelector('[data-notification-bell]');
-    if (!bellBtn) return;
-    
-    let notificationCount = 0;
-    
-    // Reuse existing badge span if present, otherwise create one
-    let badge = document.getElementById('notification-badge') || bellBtn.querySelector('.notification-badge, span');
-    if (!badge) {
-        badge = document.createElement('span');
-        bellBtn.appendChild(badge);
-    }
-    badge.id = 'notification-badge';
-    badge.className = 'absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold hidden';
-    bellBtn.style.position = 'relative';
-    
-    // Load notifications
-    async function loadNotifications() {
-        try {
-            const snap = await getDocs(query(
-                collection(db, 'management_notifications'),
-                where('read', '==', false),
-                orderBy('createdAt', 'desc'),
-                limit(20)
-            ));
-            notificationCount = snap.size;
-            badge.textContent = notificationCount > 9 ? '9+' : notificationCount;
-            badge.classList.toggle('hidden', notificationCount === 0);
-            return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        } catch(e) {
-            // Try without orderBy (index may not exist)
-            try {
-                const snap2 = await getDocs(query(collection(db, 'management_notifications'), where('read', '==', false), limit(20)));
-                notificationCount = snap2.size;
-                badge.textContent = notificationCount > 9 ? '9+' : notificationCount;
-                badge.classList.toggle('hidden', notificationCount === 0);
-                return snap2.docs.map(d => ({ id: d.id, ...d.data() }));
-            } catch(e2) { return []; }
-        }
-    }
-    
-    // Poll every 30 seconds
-    loadNotifications();
-    const pollInterval = setInterval(loadNotifications, 30000);
-    window._notifPollInterval = pollInterval;
-    
-    // Bell click → show notification panel
-    bellBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const existing = document.getElementById('notification-panel');
-        if (existing) { existing.remove(); return; }
-        
-        const notifications = await loadNotifications();
-        
-        const panel = document.createElement('div');
-        panel.id = 'notification-panel';
-        panel.className = 'fixed top-16 right-4 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden';
-        panel.innerHTML = `
-            <div class="bg-green-700 text-white px-4 py-3 flex justify-between items-center">
-                <span class="font-bold">🔔 Notifications (${notificationCount})</span>
-                <button id="close-notif-panel" class="text-white hover:text-gray-200 text-lg leading-none">&times;</button>
-            </div>
-            <div class="max-h-80 overflow-y-auto divide-y" id="notif-list">
-                ${notifications.length === 0 ? '<p class="text-gray-500 text-sm text-center py-6">No new notifications</p>' :
-                    notifications.map(n => `
-                        <div class="p-3 hover:bg-gray-50 cursor-pointer notif-item" data-id="${n.id}" data-url="${n.actionUrl || ''}">
-                            <p class="text-sm font-medium text-gray-800">${n.title || n.type || 'Notification'}</p>
-                            <p class="text-xs text-gray-600 mt-0.5">${n.message || ''}</p>
-                            <p class="text-xs text-gray-400 mt-1">${n.createdAt?.toDate ? n.createdAt.toDate().toLocaleString() : ''}</p>
-                        </div>
-                    `).join('')
-                }
-            </div>
-            ${notificationCount > 0 ? `<div class="p-2 border-t text-center"><button id="mark-all-read-btn" class="text-xs text-blue-600 hover:underline">Mark all as read</button></div>` : ''}
-        `;
-        document.body.appendChild(panel);
-        
-        document.getElementById('close-notif-panel').addEventListener('click', () => panel.remove());
-        document.getElementById('mark-all-read-btn')?.addEventListener('click', async () => {
-            try {
-                const snap = await getDocs(query(collection(db, 'management_notifications'), where('read', '==', false)));
-                const batch = writeBatch(db);
-                snap.docs.forEach(d => batch.update(d.ref, { read: true }));
-                await batch.commit();
-                panel.remove();
-                loadNotifications();
-            } catch(e) { console.error(e); }
-        });
-        
-        panel.querySelectorAll('.notif-item').forEach(item => {
-            item.addEventListener('click', async () => {
-                const id = item.dataset.id;
-                try { await updateDoc(doc(db, 'management_notifications', id), { read: true }); } catch(e) {}
-                panel.remove();
-                loadNotifications();
-            });
-        });
-        
-        document.addEventListener('click', (ev) => {
-            if (!panel.contains(ev.target) && ev.target !== bellBtn) panel.remove();
-        }, { once: true });
-    });
-}
-
-// ======================================================
-// SECTION: MANAGEMENT ACTIVITY LOG (second button)
-// ======================================================
-
-async function showManagementActivityLog() {
-    const existing = document.getElementById('activity-log-modal');
-    if (existing) { existing.remove(); return; }
-    
-    const staffName = window.userData?.name || 'Unknown';
-    const staffEmail = window.userData?.email || '';
-    const staffRole = window.userData?.role || '';
-    
-    const modal = document.createElement('div');
-    modal.id = 'activity-log-modal';
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
-    modal.innerHTML = `
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-screen overflow-y-auto">
-            <div class="bg-green-700 text-white px-6 py-4 rounded-t-xl flex justify-between items-center">
-                <div>
-                    <h2 class="text-xl font-bold">👤 Management Profile</h2>
-                    <p class="text-green-200 text-sm">${staffEmail}</p>
-                </div>
-                <button id="close-activity-log" class="text-white hover:text-gray-200 text-2xl leading-none">&times;</button>
-            </div>
-            <div class="p-6">
-                <div class="bg-green-50 rounded-xl p-4 mb-6">
-                    <p class="font-bold text-green-800 text-lg">${staffName}</p>
-                    <p class="text-green-700 capitalize">${staffRole}</p>
-                    <p class="text-sm text-gray-500 mt-1">Logged in: ${new Date().toLocaleString()}</p>
-                </div>
-                <h3 class="font-bold text-gray-700 mb-3">Recent Actions</h3>
-                <div id="activity-log-list" class="space-y-2 max-h-64 overflow-y-auto">
-                    <p class="text-gray-400 text-sm text-center py-4">Loading activity log...</p>
-                </div>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-    
-    document.getElementById('close-activity-log').addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
-    
-    // Load activity log
-    try {
-        const snap = await getDocs(query(
-            collection(db, 'management_activity'),
-            where('userEmail', '==', staffEmail),
-            orderBy('timestamp', 'desc'),
-            limit(20)
-        ));
-        const logEl = document.getElementById('activity-log-list');
-        if (!logEl) return;
-        if (snap.empty) {
-            logEl.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">No recent activity found.</p>';
-        } else {
-            logEl.innerHTML = snap.docs.map(d => {
-                const a = d.data();
-                const date = a.timestamp?.toDate ? a.timestamp.toDate().toLocaleString() : '';
-                return `
-                    <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                        <p class="text-sm font-medium text-gray-700">${a.action || 'Action'}</p>
-                        <p class="text-xs text-gray-500">${a.details || ''}</p>
-                        <p class="text-xs text-gray-400 mt-1">${date}</p>
-                    </div>
-                `;
-            }).join('');
-        }
-    } catch(e) {
-        const logEl = document.getElementById('activity-log-list');
-        if (logEl) logEl.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">Activity log not available.</p>';
-    }
-}
-
-window.showManagementActivityLog = showManagementActivityLog;
-
 onAuthStateChanged(auth, async (user) => {
     const mainContent = document.getElementById('main-content');
     const sidebarLogoutBtn = document.getElementById('sidebarLogoutBtn');
@@ -11195,15 +10976,6 @@ onAuthStateChanged(auth, async (user) => {
                 const navItems = initializeSidebarNavigation(staffData);
                 
                 setupSidebarToggle();
-                
-                // Initialize notifications bell
-                setTimeout(() => initManagementNotifications(), 500);
-                
-                // Wire activity log button
-                const activityBtn = document.getElementById('activityLogBtn');
-                if (activityBtn) {
-                    activityBtn.addEventListener('click', showManagementActivityLog);
-                }
                 
                 if (sidebarLogoutBtn) {
                     sidebarLogoutBtn.addEventListener('click', () => {
