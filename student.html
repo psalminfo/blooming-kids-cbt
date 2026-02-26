@@ -401,8 +401,9 @@
                 console.warn("parentPhone not found in localStorage — continuing without it.");
             }
 
-            // Declare referralCode at function scope so the submit handler can access it
-            let referralCode = '';
+            // Referral code: optional. Check URL param first (legacy links), then look up
+            // from parent's Firestore record. Always defaults to '' — never blocks the test.
+            let referralCode = urlParams.get('referralCode') || '';
 
             try {
                 // Use studentUid already stored in localStorage by tutor dashboard
@@ -413,7 +414,7 @@
                     console.log("Using studentUid from localStorage:", studentUid);
                 }
 
-                // Look up parent's referral code from their enrollment record
+                // Look up parent's referral code from their enrollment record (best-effort, non-blocking)
                 try {
                     const parentSnap = await getDocs(query(
                         collection(firestoreDb, 'parent_users'),
@@ -421,8 +422,9 @@
                         limit(1)
                     ));
                     if (!parentSnap.empty) {
-                        referralCode = parentSnap.docs[0].data().referralCode || '';
-                        console.log("Referral code from parent enrollment:", referralCode);
+                        // Only override if we don't already have one from the URL
+                        referralCode = referralCode || parentSnap.docs[0].data().referralCode || '';
+                        if (referralCode) console.log("Referral code resolved:", referralCode);
                     }
                 } catch (refErr) {
                     // Non-blocking — referral lookup is best-effort
@@ -453,7 +455,7 @@
                             tutorEmail, studentCountry, parentPhone
                         );
                         
-                        if (referralCode) {
+                        if (referralCode && referralCode.trim()) {
                             try {
                                 const studentUid = getStudentUidFromStorage();
                                 await handleReferralLogic(referralCode, studentName, studentUid);
