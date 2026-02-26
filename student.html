@@ -353,41 +353,16 @@
             }
         }
 
-        // --- GET OR CREATE STUDENT RECORD (prevents duplicates) ---
-        // Country is now optional; if not provided, we store an empty string.
-        async function getOrCreateStudentRecord(studentName, parentEmail, parentPhone, tutorEmail, grade, country, referralCode) {
-            const snapshot = await getDocs(query(
-                collection(firestoreDb, 'students'),
-                where('parentEmail', '==', parentEmail),
-                where('studentName', '==', studentName),
-                limit(1)
-            ));
-
-            if (!snapshot.empty) {
-                const existingDoc = snapshot.docs[0];
-                await updateDoc(doc(firestoreDb, 'students', existingDoc.id), {
-                    lastActive: serverTimestamp(),
-                    tutorEmail: tutorEmail,
-                    grade: grade,
-                    country: country || ''
-                });
-                console.log("Reusing existing student record with ID:", existingDoc.id);
-                return existingDoc.id;
-            } else {
-                const studentData = {
-                    studentName,
-                    parentEmail,
-                    parentPhone,
-                    tutorEmail,
-                    grade,
-                    country: country || '',
-                    referralCodeUsed: referralCode ? referralCode.toUpperCase() : null,
-                    createdAt: serverTimestamp(),
-                    lastActive: serverTimestamp()
-                };
-                const docRef = await addDoc(collection(firestoreDb, 'students'), studentData);
-                console.log("Created new student record with ID:", docRef.id);
-                return docRef.id;
+        // --- GET STUDENT UID FROM LOCALSTORAGE ---
+        // The tutor dashboard already stores studentUid in localStorage when
+        // launching the placement test. We use that directly — no unauthenticated
+        // Firestore reads needed, which avoids permission errors.
+        function getStudentUidFromStorage() {
+            try {
+                const stored = JSON.parse(localStorage.getItem('studentData') || '{}');
+                return stored.studentUid || localStorage.getItem('studentUid') || null;
+            } catch (e) {
+                return localStorage.getItem('studentUid') || null;
             }
         }
 
@@ -402,7 +377,8 @@
             const tutorEmail = urlParams.get('tutorEmail');
             // Country is now optional – if missing, it will be undefined (handled as empty string)
             const studentCountry = urlParams.get('country') || '';
-            const referralCode = urlParams.get('referralCode') || '';
+            // Referral codes now come from parent enrollment, not URL params.
+            // We look up the parent's referral code from their Firestore document.
             const state = urlParams.get('state') || (subject === 'ela' ? 'creative-writing' : 'mcq');
 
             // Only require essential fields (country is optional)
@@ -426,13 +402,30 @@
             }
 
             try {
-                const studentUid = await getOrCreateStudentRecord(
-                    studentName, parentEmail, parentPhone, tutorEmail, grade, studentCountry, referralCode
-                );
+                // Use studentUid already stored in localStorage by tutor dashboard
+                const studentUid = getStudentUidFromStorage();
+                if (!studentUid) {
+                    console.warn("studentUid not found in localStorage — test will still load but status tracking may be limited.");
+                } else {
+                    console.log("Using studentUid from localStorage:", studentUid);
+                }
 
-                const existingData = JSON.parse(localStorage.getItem("studentData") || '{}');
-                existingData.studentUid = studentUid;
-                localStorage.setItem("studentData", JSON.stringify(existingData));
+                // Look up parent's referral code from their enrollment record
+                let referralCode = '';
+                try {
+                    const parentSnap = await getDocs(query(
+                        collection(firestoreDb, 'parent_users'),
+                        where('email', '==', parentEmail),
+                        limit(1)
+                    ));
+                    if (!parentSnap.empty) {
+                        referralCode = parentSnap.docs[0].data().referralCode || '';
+                        console.log("Referral code from parent enrollment:", referralCode);
+                    }
+                } catch (refErr) {
+                    // Non-blocking — referral lookup is best-effort
+                    console.warn("Could not look up parent referral code:", refErr.message);
+                }
 
                 await loadQuestions(subject, grade, state);
                 document.getElementById("submit-button-container").style.display = 'flex';
@@ -460,8 +453,7 @@
                         
                         if (referralCode) {
                             try {
-                                const studentData = JSON.parse(localStorage.getItem("studentData") || '{}');
-                                const studentUid = studentData.studentUid;
+                                const studentUid = getStudentUidFromStorage();
                                 await handleReferralLogic(referralCode, studentName, studentUid);
                             } catch (referralError) {
                                 console.error("Referral logic failed (non-critical):", referralError);
@@ -471,14 +463,19 @@
                         // ── PLACEMENT TEST STATUS: write back to Firestore so the tutor
                         //    dashboard can show "✅ Test Completed" and clear after 1 hour ──
                         try {
-                            const storedData = JSON.parse(localStorage.getItem("studentData") || '{}');
-                            const studentUid = storedData.studentUid || '';
+                            const studentUid = getStudentUidFromStorage();
                             if (studentUid) {
                                 await updateDoc(doc(firestoreDb, 'students', studentUid), {
                                     placementTestStatus:      'completed',
                                     placementTestCompletedAt: serverTimestamp(),
                                     placementTestSubject:     subject
                                 });
+                                // Notify tutor dashboard tab to remove the button immediately
+                                try {
+                                    const bc = new BroadcastChannel('bkh_placement_complete');
+                                    bc.postMessage({ type: 'PLACEMENT_COMPLETED', studentUid });
+                                    bc.close();
+                                } catch (_) {}
                                 console.log("Placement test status written to Firestore for:", studentUid);
                             }
                         } catch (statusError) {
