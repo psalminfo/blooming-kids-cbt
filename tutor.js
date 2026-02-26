@@ -2613,12 +2613,30 @@ function closeInbox(modal) {
 async function loadNotificationBadge(modal) {
     try {
         const tutorEmail = window.tutorData?.email;
+        const tutorId = window.tutorData?.id;
         if (!tutorEmail) return;
+
+        // Count unread tutor_notifications
         const q = query(collection(db, "tutor_notifications"), where("tutorEmail", "==", tutorEmail), where("read", "==", false));
         const snap = await getDocs(q);
-        const count = snap.size;
-        const badge = modal.querySelector('#notif-badge-count');
+        let count = snap.size;
+
+        // Also count conversations with unread replies from others
+        try {
+            const convQ = query(collection(db, "conversations"), where("tutorEmail", "==", tutorEmail));
+            const convSnap = await getDocs(convQ);
+            convSnap.forEach(d => {
+                const c = d.data();
+                if (c.lastSenderId && c.lastSenderId !== tutorId && (c.unreadCount || 0) > 0) count++;
+            });
+        } catch(e) {}
+
+        const badge = modal?.querySelector('#notif-badge-count');
         if (badge) badge.textContent = count > 0 ? count : '';
+
+        // Also update the floating inbox button badge
+        const floatingBadge = document.querySelector('.floating-inbox-btn .unread-badge');
+        if (floatingBadge) { floatingBadge.textContent = count > 0 ? count : ''; floatingBadge.style.display = count > 0 ? '' : 'none'; }
     } catch(e) { console.warn('Badge load error:', e); }
 }
 
@@ -2627,18 +2645,102 @@ async function loadTutorNotifications(modal) {
     if (!container) return;
     container.innerHTML = '<div style="padding:16px;text-align:center;"><div class="spinner" style="margin:auto;"></div></div>';
     const tutorEmail = window.tutorData?.email;
+    const tutorId = window.tutorData?.id;
     if (!tutorEmail) { container.innerHTML = '<div style="padding:16px;color:#9ca3af;text-align:center;">No email found.</div>'; return; }
     
     try {
+        // ── Part A: unread message replies from conversations ──
+        let replyItems = [];
+        try {
+            // Look for conversations where someone else sent the last message
+            const convQ = query(
+                collection(db, "conversations"),
+                where("tutorEmail", "==", tutorEmail)
+            );
+            const convSnap = await getDocs(convQ);
+            convSnap.forEach(d => {
+                const c = d.data();
+                // Only show if last message was from someone else and there are unread messages
+                if (c.lastSenderId && c.lastSenderId !== tutorId && (c.unreadCount || 0) > 0) {
+                    replyItems.push({ id: d.id, ...c });
+                }
+            });
+            // Also check by participants
+            const convQ2 = query(
+                collection(db, "conversations"),
+                where("participants", "array-contains", tutorId)
+            );
+            const convSnap2 = await getDocs(convQ2);
+            const seen = new Set(replyItems.map(r => r.id));
+            convSnap2.forEach(d => {
+                if (seen.has(d.id)) return;
+                const c = d.data();
+                if (c.lastSenderId && c.lastSenderId !== tutorId && (c.unreadCount || 0) > 0) {
+                    replyItems.push({ id: d.id, ...c });
+                }
+            });
+            replyItems.sort((a, b) => {
+                const tA = a.lastMessageTimestamp?.toDate ? a.lastMessageTimestamp.toDate() : new Date(a.lastMessageTimestamp || 0);
+                const tB = b.lastMessageTimestamp?.toDate ? b.lastMessageTimestamp.toDate() : new Date(b.lastMessageTimestamp || 0);
+                return tB - tA;
+            });
+        } catch(e) { console.warn('Reply fetch error:', e); }
+
+        // ── Part B: tutor_notifications ──
         const q = query(collection(db, "tutor_notifications"), where("tutorEmail", "==", tutorEmail), orderBy("createdAt", "desc"), limit(50));
         const snap = await getDocs(q);
         
-        if (snap.empty) {
+        container.innerHTML = '';
+
+        // ── Render reply notifications first ──
+        if (replyItems.length > 0) {
+            const replyHeader = document.createElement('div');
+            replyHeader.style.cssText = 'padding:8px 14px;background:#f0fdf4;font-size:.68rem;font-weight:800;color:#15803d;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #dcfce7;';
+            replyHeader.textContent = `💬 Message Replies (${replyItems.length})`;
+            container.appendChild(replyHeader);
+
+            replyItems.forEach(conv => {
+                const otherName = conv.studentName || conv.tutorName || 'Someone';
+                const lastMsg = conv.lastMessage || '';
+                const lastTime = conv.lastMessageTimestamp?.toDate
+                    ? conv.lastMessageTimestamp.toDate().toLocaleDateString('en-NG', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
+                    : '';
+                const unread = conv.unreadCount || 0;
+
+                const el = document.createElement('div');
+                el.style.cssText = 'padding:12px 14px;border-bottom:1px solid #f3f4f6;cursor:pointer;background:#f0fdf4;border-left:4px solid #16a34a;';
+                el.innerHTML = `
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+                        <div style="font-weight:700;font-size:0.8rem;color:#1f2937;">💬 Reply from ${msgEscapeHtml(otherName)}</div>
+                        <span style="background:#16a34a;color:#fff;border-radius:9999px;padding:1px 7px;font-size:0.65rem;font-weight:700;">${unread} NEW</span>
+                    </div>
+                    <div style="font-size:0.75rem;color:#374151;line-height:1.4;">${msgEscapeHtml(lastMsg.substring(0,120))}${lastMsg.length>120?'…':''}</div>
+                    <div style="font-size:0.7rem;color:#9ca3af;margin-top:4px;">📅 ${lastTime}</div>
+                `;
+                el.onmouseover = () => { el.style.background = '#dcfce7'; };
+                el.onmouseout  = () => { el.style.background = '#f0fdf4'; };
+                el.onclick = () => {
+                    // Switch to Chats tab and open this conversation
+                    const tabBtn = modal.querySelector('#tab-messages');
+                    if (tabBtn) { window.switchInboxTab('messages', tabBtn); }
+                    setTimeout(() => msgLoadChat(conv.id, otherName, modal, tutorId), 100);
+                };
+                container.appendChild(el);
+            });
+        }
+
+        if (snap.empty && replyItems.length === 0) {
             container.innerHTML = '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:0.875rem;">No notifications yet.</div>';
             return;
         }
+
+        if (!snap.empty) {
+            const notifHeader = document.createElement('div');
+            notifHeader.style.cssText = 'padding:8px 14px;background:#eff6ff;font-size:.68rem;font-weight:800;color:#1d4ed8;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #dbeafe;';
+            notifHeader.textContent = `🔔 System Notifications (${snap.size})`;
+            container.appendChild(notifHeader);
+        }
         
-        container.innerHTML = '';
         snap.forEach(d => {
             const notif = d.data();
             const isUnread = !notif.read;
@@ -2747,27 +2849,66 @@ async function loadTutorNotifications(modal) {
 }
 
 function msgStartInboxListener(modal) {
-    const tutorId = window.tutorData.id;
+    const tutor = window.tutorData;
+    const tutorId = tutor.id;
+    const tutorEmail = tutor.email || '';
     const listEl = modal.querySelector('#inbox-list');
     listEl.innerHTML = '<div class="spinner" style="margin:16px auto;"></div>';
 
     if (unsubInboxListener) unsubInboxListener();
 
-    const q = query(
-        collection(db, "conversations"),
-        where("participants", "array-contains", tutorId)
-    );
+    // We run TWO real-time queries and merge the results:
+    //   1. participants array-contains tutorId  → conversations THIS tutor is listed in
+    //   2. tutorEmail field == tutor.email       → conversations started by tutor (catches replies from student/parent side)
+    // We deduplicate by conversation ID so nothing appears twice.
 
-    unsubInboxListener = onSnapshot(q, (snapshot) => {
-        const convs = [];
-        snapshot.forEach(d => convs.push({ id: d.id, ...d.data() }));
-        convs.sort((a, b) => {
+    let resultsByParticipant = [];
+    let resultsByEmail = [];
+    let unsub1 = null, unsub2 = null;
+
+    function mergeAndRender() {
+        const seen = new Set();
+        const merged = [];
+        [...resultsByParticipant, ...resultsByEmail].forEach(c => {
+            if (!seen.has(c.id)) { seen.add(c.id); merged.push(c); }
+        });
+        merged.sort((a, b) => {
             const tA = a.lastMessageTimestamp?.toDate ? a.lastMessageTimestamp.toDate() : new Date(a.lastMessageTimestamp || 0);
             const tB = b.lastMessageTimestamp?.toDate ? b.lastMessageTimestamp.toDate() : new Date(b.lastMessageTimestamp || 0);
             return tB - tA;
         });
-        msgRenderInboxList(convs, listEl, modal, tutorId);
-    });
+        msgRenderInboxList(merged, listEl, modal, tutorId);
+    }
+
+    // Query 1: by participants array
+    unsub1 = onSnapshot(
+        query(collection(db, "conversations"), where("participants", "array-contains", tutorId)),
+        (snapshot) => {
+            resultsByParticipant = [];
+            snapshot.forEach(d => resultsByParticipant.push({ id: d.id, ...d.data() }));
+            mergeAndRender();
+        },
+        (err) => console.warn('Inbox Q1 error:', err)
+    );
+
+    // Query 2: by tutorEmail field (catches conversations where tutor started as sender but isn't in participants array due to ID mismatch)
+    if (tutorEmail) {
+        unsub2 = onSnapshot(
+            query(collection(db, "conversations"), where("tutorEmail", "==", tutorEmail)),
+            (snapshot) => {
+                resultsByEmail = [];
+                snapshot.forEach(d => resultsByEmail.push({ id: d.id, ...d.data() }));
+                mergeAndRender();
+            },
+            (err) => console.warn('Inbox Q2 error:', err)
+        );
+    }
+
+    // Return a combined unsubscribe so closeInbox can kill both
+    unsubInboxListener = () => {
+        if (unsub1) unsub1();
+        if (unsub2) unsub2();
+    };
 }
 
 function msgRenderInboxList(conversations, container, modal, tutorId) {
@@ -6152,23 +6293,27 @@ async function checkAndShowBroadcastPopups(tutor) {
         if (!tutorEmail) return;
 
         const now = new Date();
+
+        // NOTE: We intentionally avoid filtering read==false in the Firestore query
+        // because that would require a composite index. We filter popupShown client-side.
         const q = query(
             collection(db, 'tutor_notifications'),
             where('tutorEmail', '==', tutorEmail),
             where('type', '==', 'broadcast'),
-            where('read', '==', false),
             orderBy('createdAt', 'desc'),
-            limit(5)
+            limit(10)
         );
         const snap = await getDocs(q);
         if (snap.empty) return;
 
-        // Pick the most recent broadcast still within its popupDays window
+        // Pick the most recent broadcast still within its popupDays window that hasn't been shown
         let broadcastToShow = null;
         let broadcastDocId = null;
         snap.forEach(d => {
             if (broadcastToShow) return;
             const b = d.data();
+            // Skip if already permanently dismissed (popupShown == true)
+            if (b.popupShown === true) return;
             const popupDays = b.popupDays || 3;
             const created = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
             const expiryDate = new Date(created.getTime() + popupDays * 24 * 60 * 60 * 1000);
