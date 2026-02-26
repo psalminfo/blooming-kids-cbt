@@ -4,13 +4,938 @@
  ******************************************************************************/
 
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc, deleteField, orderBy, onSnapshot, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc, deleteField } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
 
 /*******************************************************************************
- * SECTION 2: STYLES & CSS (REMOVED – MOVED TO HTML)
+ * SECTION 2: STYLES & CSS
  ******************************************************************************/
 
+const style = document.createElement('style');
+style.textContent = `
+    /* Modern UI Styles */
+    :root {
+        --primary-color: #10b981;
+        --primary-dark: #059669;
+        --primary-light: #d1fae5;
+        --secondary-color: #6366f1;
+        --danger-color: #ef4444;
+        --warning-color: #f59e0b;
+        --info-color: #3b82f6;
+        --dark-color: #1f2937;
+        --light-color: #f9fafb;
+        --border-color: #e5e7eb;
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        --radius-sm: 0.375rem;
+        --radius: 0.5rem;
+        --radius-lg: 0.75rem;
+        --success-color: #10b981;
+    }
+
+    /* Active Tab Styling */
+    .nav-tab {
+        padding: 0.75rem 1rem;
+        border-radius: var(--radius);
+        font-weight: 500;
+        : all 0.2s ease;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--dark-color);
+    }
+
+    .nav-tab:hover {
+        background-color: var(--light-color);
+    }
+
+    .nav-tab.active {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+        color: white;
+        box-shadow: var(--shadow);
+    }
+
+    /* Enhanced Button Styles */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.625rem 1.25rem;
+        border-radius: var(--radius);
+        font-weight: 500;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        : all 0.2s ease;
+        border: none;
+        cursor: pointer;
+        gap: 0.5rem;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+        color: white;
+        box-shadow: var(--shadow);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .btn-secondary {
+        background-color: white;
+        color: var(--dark-color);
+        border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+        background-color: var(--light-color);
+    }
+
+    .btn-danger {
+        background-color: var(--danger-color);
+        color: white;
+    }
+
+    .btn-warning {
+        background-color: var(--warning-color);
+        color: white;
+    }
+
+    .btn-info {
+        background-color: var(--info-color);
+        color: white;
+    }
+
+    .btn-sm {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.75rem;
+    }
+
+    /* Card Styles */
+    .card {
+        background: white;
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border-color);
+        : transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .card-header {
+        padding: 1.5rem 1.5rem 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .card-body {
+        padding: 1.5rem;
+    }
+
+    .card-footer {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid var(--border-color);
+        background-color: var(--light-color);
+        border-bottom-left-radius: var(--radius-lg);
+        border-bottom-right-radius: var(--radius-lg);
+    }
+
+    /* Badge Styles */
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        line-height: 1;
+    }
+
+    .badge-success {
+        background-color: var(--primary-light);
+        color: var(--primary-dark);
+    }
+
+    .badge-warning {
+        background-color: #fef3c7;
+        color: #92400e;
+    }
+
+    .badge-danger {
+        background-color: #fee2e2;
+        color: #991b1b;
+    }
+
+    .badge-info {
+        background-color: #dbeafe;
+        color: #1e40af;
+    }
+
+    .badge-secondary {
+        background-color: #e5e7eb;
+        color: #4b5563;
+    }
+
+    /* Table Styles */
+    .table-container {
+        overflow-x: auto;
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .table th {
+        background-color: var(--light-color);
+        padding: 1rem;
+        font-weight: 600;
+        text-align: left;
+        color: var(--dark-color);
+        border-bottom: 2px solid var(--border-color);
+    }
+
+    .table td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        vertical-align: middle;
+    }
+
+    .table tr:hover {
+        background-color: var(--light-color);
+    }
+
+    /* Form Styles - ENHANCED WIDTH */
+    .form-group {
+        margin-bottom: 1.25rem;
+    }
+
+    .form-label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: var(--dark-color);
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        : border-color 0.2s ease, box-shadow 0.2s ease;
+        font-size: 1rem;
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+
+    .form-textarea {
+        min-height: 120px;
+        resize: vertical;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+    }
+
+    /* Modal Enhancements - WIDER MODALS */
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 50;
+        padding: 1rem;
+        animation: fadeIn 0.2s ease;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-lg);
+        width: 100%;
+        max-width: 48rem;
+        max-height: 90vh;
+        overflow-y: auto;
+        animation: slideIn 0.3s ease;
+    }
+
+    .modal-header {
+        padding: 1.5rem 1.5rem 1rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+    }
+
+    .modal-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--dark-color);
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+    }
+
+    .modal-footer {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @keyframes slideIn {
+        from { transform: translateY(-1rem); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* Loading Spinner */
+    .spinner {
+        animation: spin 1s linear infinite;
+        width: 1.5rem;
+        height: 1.5rem;
+        border: 2px solid var(--border-color);
+        border-top-color: var(--primary-color);
+        border-radius: 50%;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Hero Section */
+    .hero-section {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+        border-radius: var(--radius-lg);
+        color: white;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    .hero-title {
+        font-size: 1.875rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .hero-subtitle {
+        opacity: 0.9;
+        font-size: 1.125rem;
+    }
+
+    /* Dashboard Grid */
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    /* Status Indicators */
+    .status-dot {
+        display: inline-block;
+        width: 0.75rem;
+        height: 0.75rem;
+        border-radius: 50%;
+        margin-right: 0.5rem;
+    }
+
+    .status-dot-success {
+        background-color: var(--primary-color);
+    }
+
+    .status-dot-warning {
+        background-color: var(--warning-color);
+    }
+
+    .status-dot-danger {
+        background-color: var(--danger-color);
+    }
+
+    /* Action Buttons Container */
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    /* Add ing Button Styling */
+    #add-ing-btn {
+        display: block !important;
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+        color: white !important;
+        padding: 0.625rem 1.25rem !important;
+        border-radius: var(--radius) !important;
+        border: none !important;
+        cursor: pointer !important;
+        margin: 0.25rem !important;
+        font-weight: 500 !important;
+        : all 0.2s ease !important;
+        box-shadow: var(--shadow) !important;
+    }
+
+    #add-ing-btn:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: var(--shadow-lg) !important;
+        background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
+    }
+
+    /* Messaging Button Styling */
+    .messaging-btn {
+        background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%) !important;
+        color: white !important;
+        padding: 0.625rem 1.25rem !important;
+        border-radius: var(--radius) !important;
+        border: none !important;
+        cursor: pointer !important;
+        margin: 0.25rem !important;
+        font-weight: 500 !important;
+        : all 0.2s ease !important;
+        box-shadow: var(--shadow) !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+    }
+
+    .messaging-btn:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: var(--shadow-lg) !important;
+        background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%) !important;
+    }
+
+    /* Inbox Button Styling */
+    .inbox-btn {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important;
+        color: white !important;
+        padding: 0.625rem 1.25rem !important;
+        border-radius: var(--radius) !important;
+        border: none !important;
+        cursor: pointer !important;
+        margin: 0.25rem !important;
+        font-weight: 500 !important;
+        : all 0.2s ease !important;
+        box-shadow: var(--shadow) !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+        position: relative;
+    }
+
+    .inbox-btn:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: var(--shadow-lg) !important;
+        background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%) !important;
+    }
+
+    .inbox-badge {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background-color: #ef4444;
+        color: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        font-weight: bold;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .hero-section {
+            padding: 1.5rem;
+        }
+        
+        .hero-title {
+            font-size: 1.5rem;
+        }
+        
+        .dashboard-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .action-buttons {
+            flex-direction: column;
+        }
+        
+        .action-buttons .btn {
+            width: 100%;
+        }
+        
+        .modal-content {
+            max-width: 95%;
+        }
+    }
+
+    /* Calendar View Styles */
+    .calendar-view {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .calendar-day {
+        background: var(--light-color);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        padding: 0.75rem;
+        min-height: 100px;
+    }
+
+    .calendar-day-header {
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: var(--dark-color);
+        margin-bottom: 0.5rem;
+        padding-bottom: 0.25rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .calendar-event {
+        background: white;
+        border-left: 3px solid var(--primary-color);
+        padding: 0.375rem;
+        margin-bottom: 0.25rem;
+        font-size: 0.75rem;
+        border-radius: var(--radius-sm);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .calendar-event-time {
+        font-size: 0.7rem;
+        color: var(--dark-color);
+        opacity: 0.8;
+    }
+
+    /* Student Actions Container */
+    .student-actions-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-top: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .student-action-card {
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        padding: 1rem;
+        : all 0.2s ease;
+    }
+
+    .student-action-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow);
+    }
+
+    /* Wider report textareas */
+    .report-textarea {
+        min-height: 150px;
+        font-size: 1.05rem;
+        line-height: 1.5;
+    }
+
+    /* Edit Schedule Button */
+    .edit-schedule-btn {
+        background-color: var(--info-color);
+        color: white;
+        border: none;
+        padding: 0.375rem 0.75rem;
+        border-radius: var(--radius);
+        font-size: 0.75rem;
+        cursor: pointer;
+        : all 0.2s ease;
+    }
+
+    .edit-schedule-btn:hover {
+        background-color: #2563eb;
+    }
+
+    /* File Upload Styles */
+    .file-upload-container {
+        border: 2px dashed var(--border-color);
+        border-radius: var(--radius);
+        padding: 1.5rem;
+        text-align: center;
+        : all 0.2s ease;
+        cursor: pointer;
+    }
+
+    .file-upload-container:hover {
+        border-color: var(--primary-color);
+        background-color: var(--primary-light);
+    }
+
+    .file-upload-label {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        cursor: pointer;
+    }
+
+    .file-upload-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+        color: var(--primary-color);
+    }
+
+    .file-preview {
+        margin-top: 1rem;
+        padding: 0.75rem;
+        background-color: var(--light-color);
+        border-radius: var(--radius);
+    }
+
+    .file-name {
+        font-size: 0.875rem;
+        color: var(--dark-color);
+        margin-bottom: 0.25rem;
+    }
+
+    .file-size {
+        font-size: 0.75rem;
+        color: var(--dark-color);
+        opacity: 0.7;
+    }
+
+    /* Email Settings Section */
+    .email-settings {
+        background-color: var(--light-color);
+        border-radius: var(--radius);
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+
+    .email-preview {
+        background-color: white;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        padding: 1rem;
+        margin-top: 1rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+
+    .email-preview-header {
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    /* Messaging Modal Styles - WhatsApp-like UI */
+    .whatsapp-chat-container {
+        display: flex;
+        flex-direction: column;
+        height: 500px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+
+    .chat-header {
+        background: linear-gradient(135deg, #128c7e 0%, #075e54 100%);
+        color: white;
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .chat-header-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .chat-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        color: #128c7e;
+    }
+
+    .chat-header-text h4 {
+        margin: 0;
+        font-weight: 600;
+    }
+
+    .chat-header-text p {
+        margin: 0;
+        font-size: 0.8rem;
+        opacity: 0.9;
+    }
+
+    .chat-messages {
+        flex: 1;
+        padding: 1rem;
+        overflow-y: auto;
+        background-color: #e5ddd5;
+        background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23a8a8a8' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
+    }
+
+    .message-bubble {
+        max-width: 70%;
+        padding: 0.5rem 0.75rem;
+        border-radius: 1rem;
+        margin-bottom: 0.5rem;
+        position: relative;
+        word-wrap: break-word;
+    }
+
+    .message-bubble.sent {
+        background-color: #dcf8c6;
+        align-self: flex-end;
+        margin-left: auto;
+        border-bottom-right-radius: 0.25rem;
+    }
+
+    .message-bubble.received {
+        background-color: white;
+        align-self: flex-start;
+        margin-right: auto;
+        border-bottom-left-radius: 0.25rem;
+    }
+
+    .message-content {
+        font-size: 0.9rem;
+        line-height: 1.4;
+    }
+
+    .message-time {
+        font-size: 0.7rem;
+        color: #666;
+        text-align: right;
+        margin-top: 0.25rem;
+    }
+
+    .message-sender {
+        font-weight: 600;
+        font-size: 0.8rem;
+        margin-bottom: 0.25rem;
+        color: #333;
+    }
+
+    .chat-input-area {
+        padding: 0.75rem;
+        background-color: white;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .chat-input {
+        flex: 1;
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: 2rem;
+        font-size: 0.9rem;
+    }
+
+    .chat-input:focus {
+        outline: none;
+        border-color: #128c7e;
+    }
+
+    .send-message-btn {
+        background-color: #128c7e;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        : background-color 0.2s ease;
+    }
+
+    .send-message-btn:hover {
+        background-color: #075e54;
+    }
+
+    .message-recipient-options {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
+    }
+
+    .recipient-option {
+        border: 2px solid var(--border-color);
+        border-radius: var(--radius);
+        padding: 1rem;
+        cursor: pointer;
+        : all 0.2s ease;
+        text-align: center;
+    }
+
+    .recipient-option:hover {
+        border-color: var(--primary-color);
+        background-color: var(--primary-light);
+    }
+
+    .recipient-option.selected {
+        border-color: var(--primary-color);
+        background-color: var(--primary-light);
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+
+    .recipient-option input[type="checkbox"] {
+        margin-right: 0.5rem;
+    }
+
+    .recipient-label {
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    /* Inbox Modal Styles */
+    .inbox-container {
+        display: flex;
+        height: 600px;
+    }
+
+    .conversations-sidebar {
+        width: 300px;
+        border-right: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .conversations-header {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        font-weight: 600;
+    }
+
+    .conversations-list {
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    .conversation-item {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        : background-color 0.2s ease;
+    }
+
+    .conversation-item:hover {
+        background-color: var(--light-color);
+    }
+
+    .conversation-item.active {
+        background-color: var(--primary-light);
+        border-left: 3px solid var(--primary-color);
+    }
+
+    .conversation-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .conversation-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: var(--primary-color);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+    }
+
+    .conversation-details {
+        flex: 1;
+    }
+
+    .conversation-title {
+        font-weight: 600;
+        margin: 0;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .conversation-preview {
+        font-size: 0.85rem;
+        color: #666;
+        margin: 0.25rem 0 0 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .conversation-time {
+        font-size: 0.75rem;
+        color: #999;
+    }
+
+    .conversation-unread {
+        background-color: var(--primary-color);
+        color: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+
+    .chat-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* New message indicator */
+    .new-message-indicator {
+        background-color: #ef4444;
+        color: white;
+        border-radius: 50%;
+        width: 8px;
+        height: 8px;
+        display: inline-block;
+        margin-left: 0.5rem;
+    }
+`;
+document.head.appendChild(style);
 
 /*******************************************************************************
  * SECTION 3: CONFIGURATION & CONSTANTS
@@ -171,80 +1096,6 @@ TIME_SLOTS.sort((a, b) => {
 /*******************************************************************************
  * SECTION 4: UTILITY FUNCTIONS
  ******************************************************************************/
-
-// ----- ESCAPE HTML (XSS PROTECTION) -----
-function escapeHtml(unsafe) {
-    if (unsafe === undefined || unsafe === null) return '';
-    return String(unsafe)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
-// ----- PLACEMENT TEST ELIGIBILITY (Grades 3-12 only) -----
-/**
- * Returns true if the student's grade is within the placement-test range (3–12).
- * Handles formats such as "Grade 5", "grade5", "5", "Grade 12", "Pre-College", etc.
- */
-function isPlacementTestEligible(grade) {
-    if (!grade) return false;
-    const normalized = String(grade).toLowerCase().replace('grade', '').trim();
-    const num = parseInt(normalized, 10);
-    return !isNaN(num) && num >= 3 && num <= 12;
-}
-
-// ----- COUNTRY FROM PHONE NUMBER (detects country via dialing code) -----
-function getCountryFromPhone(phone) {
-    if (!phone) return '';
-    const cleaned = phone.toString().trim().replace(/[\s\-().]/g, '');
-    let w = cleaned;
-    if (!w.startsWith('+')) {
-        if (w.startsWith('0') && w.length >= 10) w = '+234' + w.substring(1);
-        else if (w.startsWith('234') && w.length >= 12) w = '+' + w;
-        else w = '+' + w;
-    }
-    const MAP = [
-        ['+355','Albania'],['+213','Algeria'],['+244','Angola'],['+374','Armenia'],
-        ['+994','Azerbaijan'],['+973','Bahrain'],['+880','Bangladesh'],['+375','Belarus'],
-        ['+229','Benin'],['+591','Bolivia'],['+387','Bosnia'],['+267','Botswana'],
-        ['+673','Brunei'],['+226','Burkina Faso'],['+855','Cambodia'],['+237','Cameroon'],
-        ['+236','CAR'],['+235','Chad'],['+269','Comoros'],['+243','DR Congo'],
-        ['+242','Congo'],['+506','Costa Rica'],['+385','Croatia'],['+357','Cyprus'],
-        ['+253','Djibouti'],['+593','Ecuador'],['+503','El Salvador'],['+291','Eritrea'],
-        ['+372','Estonia'],['+268','Eswatini'],['+251','Ethiopia'],['+679','Fiji'],
-        ['+241','Gabon'],['+220','Gambia'],['+995','Georgia'],['+233','Ghana'],
-        ['+502','Guatemala'],['+224','Guinea'],['+245','Guinea-Bissau'],['+592','Guyana'],
-        ['+509','Haiti'],['+504','Honduras'],['+354','Iceland'],['+964','Iraq'],
-        ['+972','Israel'],['+962','Jordan'],['+254','Kenya'],['+965','Kuwait'],
-        ['+996','Kyrgyzstan'],['+856','Laos'],['+371','Latvia'],['+961','Lebanon'],
-        ['+266','Lesotho'],['+231','Liberia'],['+218','Libya'],['+370','Lithuania'],
-        ['+352','Luxembourg'],['+261','Madagascar'],['+265','Malawi'],['+960','Maldives'],
-        ['+223','Mali'],['+356','Malta'],['+222','Mauritania'],['+230','Mauritius'],
-        ['+373','Moldova'],['+976','Mongolia'],['+382','Montenegro'],['+212','Morocco'],
-        ['+258','Mozambique'],['+264','Namibia'],['+977','Nepal'],['+505','Nicaragua'],
-        ['+227','Niger'],['+234','Nigeria'],['+968','Oman'],['+507','Panama'],
-        ['+595','Paraguay'],['+974','Qatar'],['+250','Rwanda'],['+966','Saudi Arabia'],
-        ['+221','Senegal'],['+381','Serbia'],['+232','Sierra Leone'],['+252','Somalia'],
-        ['+211','South Sudan'],['+249','Sudan'],['+255','Tanzania'],['+228','Togo'],
-        ['+216','Tunisia'],['+256','Uganda'],['+971','UAE'],['+598','Uruguay'],
-        ['+998','Uzbekistan'],['+967','Yemen'],['+260','Zambia'],['+263','Zimbabwe'],
-        ['+20','Egypt'],['+27','South Africa'],['+30','Greece'],['+31','Netherlands'],
-        ['+32','Belgium'],['+33','France'],['+34','Spain'],['+36','Hungary'],
-        ['+39','Italy'],['+40','Romania'],['+41','Switzerland'],['+43','Austria'],
-        ['+44','United Kingdom'],['+45','Denmark'],['+46','Sweden'],['+47','Norway'],
-        ['+48','Poland'],['+49','Germany'],['+51','Peru'],['+52','Mexico'],
-        ['+54','Argentina'],['+55','Brazil'],['+56','Chile'],['+57','Colombia'],
-        ['+58','Venezuela'],['+60','Malaysia'],['+61','Australia'],['+62','Indonesia'],
-        ['+63','Philippines'],['+64','New Zealand'],['+65','Singapore'],['+66','Thailand'],
-        ['+81','Japan'],['+82','South Korea'],['+84','Vietnam'],['+86','China'],
-        ['+90','Turkey'],['+91','India'],['+92','Pakistan'],['+94','Sri Lanka'],
-        ['+95','Myanmar'],['+98','Iran'],['+1','United States'],['+7','Russia'],
-    ];
-    for (const [code, country] of MAP) { if (w.startsWith(code)) return country; }
-    return '';
-}
 
 // Phone Number Normalization Function
 function normalizePhoneNumber(phone) {
@@ -408,7 +1259,7 @@ function getEarliestClass(scheduleByDay) {
         scheduleByDay[day].forEach(event => {
             if (event.start < earliestTime) {
                 earliestTime = event.start;
-                earliestInfo = `${formatScheduleTime(event.start)} (${escapeHtml(event.student)} - ${escapeHtml(day)})`;
+                earliestInfo = `${formatScheduleTime(event.start)} (${event.student} - ${day})`;
             }
         });
     });
@@ -480,7 +1331,7 @@ function showCustomAlert(message) {
     alertModal.innerHTML = `
         <div class="modal-content max-w-sm">
             <div class="modal-body">
-                <p class="mb-4 text-center">${escapeHtml(message)}</p>
+                <p class="mb-4 text-center">${message}</p>
                 <div class="flex justify-center">
                     <button id="alert-ok-btn" class="btn btn-primary">OK</button>
                 </div>
@@ -490,70 +1341,19 @@ function showCustomAlert(message) {
     document.getElementById('alert-ok-btn').addEventListener('click', () => alertModal.remove());
 }
 
-// Update active tab with smooth fade transition
+// Update active tab
 function updateActiveTab(activeTabId) {
-    const navTabs = ['navDashboard', 'navStudentDatabase', 'navScheduleManagement', 'navAcademic', 'navCourses'];
+    const navTabs = ['navDashboard', 'navStudentDatabase', 'navAutoStudents'];
     navTabs.forEach(tabId => {
         const tab = document.getElementById(tabId);
         if (tab) {
-            tab.classList.toggle('active', tabId === activeTabId);
+            if (tabId === activeTabId) {
+                tab.classList.add('active');
+            } else {
+                tab.classList.remove('active');
+            }
         }
     });
-
-    // Fade in main content on tab switch
-    const mainContent = document.getElementById('mainContent');
-    if (mainContent) {
-        mainContent.style.opacity = '0';
-        mainContent.style.transform = 'translateY(6px)';
-        mainContent.style.transition = 'opacity 0.22s ease, transform 0.22s ease';
-        requestAnimationFrame(() => {
-            setTimeout(() => {
-                mainContent.style.opacity = '1';
-                mainContent.style.transform = 'translateY(0)';
-            }, 30);
-        });
-    }
-}
-
-/*******************************************************************************
- * SECTION 4B: PERSISTENT CLOCK (shows on every tab)
- ******************************************************************************/
-
-/**
- * Injects or updates the Lagos time clock in a fixed top-right bar.
- * Survives tab switches because it lives in the body, not in mainContent.
- * Call this from every renderXxx function.
- */
-function startPersistentClock() {
-    let clockBar = document.getElementById('tutor-persistent-clock-bar');
-    if (!clockBar) {
-        clockBar = document.createElement('div');
-        clockBar.id = 'tutor-persistent-clock-bar';
-        clockBar.style.cssText = [
-            'position:fixed','top:0','right:0','z-index:9999',
-            'background:rgba(37,99,235,0.92)','color:#fff',
-            'padding:4px 14px','font-size:0.78rem','font-weight:600',
-            'border-bottom-left-radius:8px','letter-spacing:0.02em',
-            'backdrop-filter:blur(4px)','pointer-events:none'
-        ].join(';');
-        document.body.appendChild(clockBar);
-    }
-
-    function formatLagos() {
-        return new Intl.DateTimeFormat('en-NG', {
-            weekday:'short', day:'numeric', month:'short', year:'numeric',
-            hour:'2-digit', minute:'2-digit', second:'2-digit',
-            hour12: true, timeZone:'Africa/Lagos'
-        }).format(new Date()) + ' (WAT)';
-    }
-
-    clockBar.textContent = formatLagos();
-    if (window._persistentClockInterval) clearInterval(window._persistentClockInterval);
-    window._persistentClockInterval = setInterval(() => {
-        const el = document.getElementById('tutor-persistent-clock-bar');
-        if (el) el.textContent = formatLagos();
-        else clearInterval(window._persistentClockInterval);
-    }, 1000);
 }
 
 /*******************************************************************************
@@ -637,38 +1437,6 @@ function clearAllReportsFromLocalStorage(tutorEmail) {
 }
 
 /*******************************************************************************
- * SECTION 5B: STUDENT FETCH HELPER
- * Management assigns students by writing tutorId. Tutor portal queries tutorEmail.
- * This helper runs BOTH queries and merges, so both methods work.
- ******************************************************************************/
-
-async function fetchStudentsForTutor(tutor, col) {
-    col = col || "students";
-    try {
-        var colRef = collection(db, col);
-        var byIdPromise = tutor.id
-            ? getDocs(query(colRef, where("tutorId", "==", tutor.id)))
-            : Promise.resolve({ docs: [] });
-        var snaps = await Promise.all([
-            getDocs(query(colRef, where("tutorEmail", "==", tutor.email))),
-            byIdPromise
-        ]);
-        var seen = new Set();
-        var results = [];
-        snaps[0].docs.concat(snaps[1].docs).forEach(function(d) {
-            if (!seen.has(d.id)) {
-                seen.add(d.id);
-                results.push(Object.assign({ id: d.id, collection: col }, d.data()));
-            }
-        });
-        return results;
-    } catch (err) {
-        console.error("fetchStudentsForTutor error:", err);
-        return [];
-    }
-}
-
-/*******************************************************************************
  * SECTION 6: EMPLOYMENT & TIN MANAGEMENT
  ******************************************************************************/
 
@@ -693,7 +1461,7 @@ function showEmploymentDatePopup(tutor) {
                     <p class="text-sm text-gray-600 mb-4">Please provide your employment start date to help us calculate your payments accurately.</p>
                     <div class="form-group">
                         <label class="form-label">Month & Year of Employment</label>
-                        <input type="month" id="employment-date" class="form-input" max="${escapeHtml(new Date().toISOString().slice(0, 7))}">
+                        <input type="month" id="employment-date" class="form-input" max="${new Date().toISOString().slice(0, 7)}">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -814,7 +1582,7 @@ class ScheduleManager {
         this.TIME_SLOTS = this.generateTimeSlots();
         this.DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         
-        // Styles are now in HTML, no injection needed
+        this.injectStyles();
     }
 
     // --- INITIALIZATION ---
@@ -861,17 +1629,19 @@ class ScheduleManager {
     async loadStudents() {
         try {
             const { query, collection, where, getDocs } = this.methods;
-            // Fetch by tutorEmail AND tutorId (management assigns via tutorId)
-            const fetchedStudents = await fetchStudentsForTutor(this.tutor, "students");
+            const q = query(collection(this.db, "students"), where("tutorEmail", "==", this.tutor.email));
+            const snapshot = await getDocs(q);
             
             this.students = [];
             this.scheduledStudentIds.clear();
 
-            fetchedStudents.forEach(student => {
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const student = { id: doc.id, ...data };
                 this.students.push(student);
                 
-                if (student.schedule && Array.isArray(student.schedule) && student.schedule.length > 0) {
-                    this.scheduledStudentIds.add(student.id);
+                if (data.schedule && Array.isArray(data.schedule) && data.schedule.length > 0) {
+                    this.scheduledStudentIds.add(doc.id);
                 }
             });
         } catch (error) {
@@ -927,50 +1697,39 @@ class ScheduleManager {
         this.abortController = new AbortController();
         const signal = { signal: this.abortController.signal };
 
-        // Avatar colour keyed by first char of name
-        const AVATAR_PALETTE = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed','#db2777'];
-        const avatarBg = AVATAR_PALETTE[(this.activeStudent.studentName||'').charCodeAt(0) % AVATAR_PALETTE.length];
-        const initials = (this.activeStudent.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-
-        // Construct HTML (escape student name)
+        // Construct HTML
         const html = `
-            <div style="position:fixed;inset:0;z-index:9000;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:16px;" id="schedule-modal">
-                <div style="background:#fff;border-radius:20px;width:100%;max-width:600px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.4);overflow:hidden;">
-
-                    <!-- Gradient header with avatar -->
-                    <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:20px 24px;display:flex;align-items:center;gap:14px;flex-shrink:0;">
-                        <div style="width:46px;height:46px;border-radius:14px;background:${avatarBg};color:#fff;font-weight:800;font-size:1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.3);">${escapeHtml(initials)}</div>
-                        <div style="flex:1;min-width:0;">
-                            <div style="color:#fff;font-weight:800;font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(this.activeStudent.studentName)}</div>
-                            <div style="color:#93c5fd;font-size:.78rem;margin-top:2px;">${escapeHtml(this.activeStudent.grade||'')}${this.activeStudent.subjects?.length?' · '+escapeHtml(this.activeStudent.subjects.join(', ')):''}</div>
-                        </div>
-                        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-                            ${remaining>1?`<span style="background:rgba(255,255,255,.2);color:#fff;font-size:.73rem;font-weight:700;padding:4px 10px;border-radius:999px;">${remaining} in queue</span>`:''}
-                            <button class="close-trigger" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+            <div class="modal-overlay" id="schedule-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 class="modal-title">📅 Schedule Management</h3>
+                        <div class="flex items-center gap-2">
+                            <span class="badge badge-info">${remaining} in queue</span>
+                            <button class="btn btn-sm btn-ghost close-trigger">✕</button>
                         </div>
                     </div>
-
-                    <!-- Info strip -->
-                    <div style="background:#f0f9ff;border-bottom:1px solid #bae6fd;padding:9px 22px;font-size:.8rem;color:#0369a1;font-weight:600;flex-shrink:0;">
-                        📅 Set weekly class times for this student — multiple slots allowed
-                    </div>
-
-                    <!-- Scrollable time slots -->
-                    <div id="schedule-entries" style="flex:1;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:10px;"></div>
-
-                    <!-- Add slot button -->
-                    <div style="padding:0 18px 12px;flex-shrink:0;">
-                        <button id="add-time-btn" style="width:100%;padding:11px;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px;color:#475569;font-size:.875rem;font-weight:600;cursor:pointer;">＋ Add Another Time Slot</button>
-                    </div>
-
-                    <!-- Footer actions -->
-                    <div style="border-top:1px solid #f1f5f9;padding:14px 18px;display:grid;grid-template-columns:auto 1fr 1fr;gap:8px;align-items:center;background:#f8fafc;flex-shrink:0;">
-                        <div style="display:flex;gap:6px;">
-                            <button id="delete-sched-btn" title="Delete schedule" style="background:#fee2e2;border:none;color:#dc2626;padding:10px 14px;border-radius:10px;font-size:.9rem;cursor:pointer;">🗑️</button>
-                            <button id="skip-btn" style="background:#f1f5f9;border:none;color:#64748b;padding:10px 14px;border-radius:10px;font-size:.8rem;font-weight:600;cursor:pointer;">Skip →</button>
+                    
+                    <div class="modal-body">
+                        <div class="student-info">
+                            <h4 class="font-semibold text-blue-800">${this.activeStudent.studentName}</h4>
+                            <p class="text-sm text-blue-600">
+                                ${this.activeStudent.grade || 'No Grade'} • ${this.activeStudent.subjects?.join(', ') || 'No Subjects'}
+                            </p>
                         </div>
-                        <button id="save-btn" style="background:#f1f5f9;border:1px solid #e2e8f0;color:#374151;padding:11px;border-radius:12px;font-size:.875rem;font-weight:700;cursor:pointer;">💾 Save</button>
-                        <button id="save-next-btn" style="background:linear-gradient(135deg,#059669,#047857);border:none;color:#fff;padding:11px;border-radius:12px;font-size:.875rem;font-weight:700;cursor:pointer;">${remaining>1?'✅ Save & Next →':'✅ Save & Done'}</button>
+                        
+                        <div id="schedule-entries" class="space-y-3 mb-4 max-h-[50vh] overflow-y-auto"></div>
+                        
+                        <button id="add-time-btn" class="btn btn-outline w-full mb-4">＋ Add Time Slot</button>
+                        
+                        <div class="flex gap-2">
+                            <button id="delete-sched-btn" class="btn btn-danger flex-1">🗑️ Delete Schedule</button>
+                            <button id="skip-btn" class="btn btn-ghost">Skip</button>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-footer">
+                        <button id="save-btn" class="btn btn-primary">Save</button>
+                        <button id="save-next-btn" class="btn btn-success">Save & Next</button>
                     </div>
                 </div>
             </div>
@@ -1016,68 +1775,42 @@ class ScheduleManager {
     }
 
     addTimeRow(container, data = null) {
-        const day   = data?.day   || 'Monday';
+        const day = data?.day || 'Monday';
         const start = data?.start || '09:00';
-        const end   = data?.end   || '10:00';
-
-        const DAY_STYLES = {
-            Monday:    { bg:'#eff6ff', border:'#bfdbfe', dot:'#3b82f6', accent:'#1d4ed8' },
-            Tuesday:   { bg:'#f5f3ff', border:'#ddd6fe', dot:'#8b5cf6', accent:'#6d28d9' },
-            Wednesday: { bg:'#ecfdf5', border:'#a7f3d0', dot:'#10b981', accent:'#065f46' },
-            Thursday:  { bg:'#fff7ed', border:'#fed7aa', dot:'#f97316', accent:'#9a3412' },
-            Friday:    { bg:'#fdf4ff', border:'#f3e8ff', dot:'#a855f7', accent:'#6b21a8' },
-            Saturday:  { bg:'#fefce8', border:'#fef08a', dot:'#f59e0b', accent:'#92400e' },
-            Sunday:    { bg:'#fff1f2', border:'#fecdd3', dot:'#f43f5e', accent:'#9f1239' },
-        };
-
-        const S = DAY_STYLES[day] || { bg:'#f8fafc', border:'#e2e8f0', dot:'#94a3b8', accent:'#475569' };
-        const selSt = 'width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.85rem;font-weight:600;color:#1e293b;background:#fff;outline:none;cursor:pointer;';
-        const dayOpts  = this.DAYS.map(d=>`<option value="${escapeHtml(d)}" ${d===day?'selected':''}>${escapeHtml(d)}</option>`).join('');
-        const timeOpts = sel => this.TIME_SLOTS.map(s=>`<option value="${escapeHtml(s.value)}" ${s.value===sel?'selected':''}>${escapeHtml(s.label)}</option>`).join('');
+        const end = data?.end || '10:00';
 
         const row = document.createElement('div');
-        row.style.cssText = `background:${S.bg};border:1.5px solid ${S.border};border-radius:14px;padding:13px 15px;transition:all .15s;`;
+        row.className = 'time-slot-row';
         row.innerHTML = `
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-                <div style="display:flex;align-items:center;gap:7px;">
-                    <span class="row-dot" style="width:9px;height:9px;border-radius:50%;background:${S.dot};display:inline-block;flex-shrink:0;"></span>
-                    <span class="row-day-lbl" style="font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:${S.accent};">${escapeHtml(day)}</span>
+            <button class="remove-row-btn">✕</button>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="flex flex-col">
+                    <label class="text-xs font-medium mb-1">Day</label>
+                    <select class="select select-bordered select-sm day-select">
+                        ${this.DAYS.map(d => `<option value="${d}" ${d === day ? 'selected' : ''}>${d}</option>`).join('')}
+                    </select>
                 </div>
-                <button class="remove-row-btn" style="background:#fee2e2;border:none;color:#ef4444;width:28px;height:28px;border-radius:8px;font-size:.8rem;cursor:pointer;font-weight:700;">✕</button>
-            </div>
-            <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:10px;">
-                <div>
-                    <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Day</label>
-                    <select class="day-select" style="${selSt}">${dayOpts}</select>
+                <div class="flex flex-col">
+                    <label class="text-xs font-medium mb-1">Start</label>
+                    <select class="select select-bordered select-sm start-select">
+                        ${this.TIME_SLOTS.map(s => `<option value="${s.value}" ${s.value === start ? 'selected' : ''}>${s.label}</option>`).join('')}
+                    </select>
                 </div>
-                <div>
-                    <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Starts</label>
-                    <select class="start-select" style="${selSt}">${timeOpts(start)}</select>
-                </div>
-                <div>
-                    <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Ends</label>
-                    <select class="end-select" style="${selSt}">${timeOpts(end)}</select>
+                <div class="flex flex-col">
+                    <label class="text-xs font-medium mb-1">End</label>
+                    <select class="select select-bordered select-sm end-select">
+                        ${this.TIME_SLOTS.map(s => `<option value="${s.value}" ${s.value === end ? 'selected' : ''}>${s.label}</option>`).join('')}
+                    </select>
                 </div>
             </div>
         `;
 
-        // Live day colour update on select change
-        const daySelect = row.querySelector('.day-select');
-        daySelect.addEventListener('change', () => {
-            const d = daySelect.value;
-            const s = DAY_STYLES[d] || { bg:'#f8fafc', border:'#e2e8f0', dot:'#94a3b8', accent:'#475569' };
-            row.style.background   = s.bg;
-            row.style.borderColor  = s.border;
-            row.querySelector('.row-dot').style.background    = s.dot;
-            row.querySelector('.row-day-lbl').style.color     = s.accent;
-            row.querySelector('.row-day-lbl').textContent     = d;
-        });
-
         container.appendChild(row);
 
+        // Row specific event (no signal needed as row dies with modal)
         row.querySelector('.remove-row-btn').addEventListener('click', () => {
             if (container.children.length > 1) row.remove();
-            else this.showAlert('At least one time slot is required.', 'error');
+            else this.showAlert('Minimum one slot required', 'error');
         });
     }
 
@@ -1103,73 +1836,73 @@ class ScheduleManager {
     }
 
     async save(moveToNext) {
-        const rows = this.popup.querySelectorAll('.time-slot-row');
-        const schedule = [];
-        let isValid = true;
+    const rows = this.popup.querySelectorAll('.time-slot-row');
+    const schedule = [];
+    let isValid = true;
 
-        rows.forEach(row => {
-            const day = row.querySelector('.day-select').value;
-            const start = row.querySelector('.start-select').value;
-            const end = row.querySelector('.end-select').value;
+    rows.forEach(row => {
+        const day = row.querySelector('.day-select').value;
+        const start = row.querySelector('.start-select').value;
+        const end = row.querySelector('.end-select').value;
 
-            if (start === end) {
-                this.showAlert('Start and End time cannot be the same', 'error');
-                isValid = false;
-            }
-            schedule.push({ day, start, end });
+        if (start === end) {
+            this.showAlert('Start and End time cannot be the same', 'error');
+            isValid = false;
+        }
+        schedule.push({ day, start, end });
+    });
+
+    if (!isValid) return;
+
+    try {
+        const { updateDoc, doc, setDoc } = this.methods;
+        
+        // 1. Update Student Record
+        const studentRef = doc(this.db, "students", this.activeStudent.id);
+        await updateDoc(studentRef, { schedule });
+
+        // 2. Update/Create Schedule Document
+        const scheduleRef = doc(this.db, "schedules", `sched_${this.activeStudent.id}`);
+        await setDoc(scheduleRef, {
+            studentId: this.activeStudent.id,
+            studentName: this.activeStudent.studentName,
+            tutorEmail: this.tutor.email,
+            schedule,
+            updatedAt: new Date()
+        }, { merge: true });
+
+        this.showAlert('✅ Schedule Saved!', 'success');
+        
+        if (moveToNext) this.next(true);
+        else this.closeModal();
+
+    } catch (error) {
+        console.error(error);
+        this.showAlert('Save failed. Check console.', 'error');
+    }
+}
+
+   async deleteSchedule() {
+    if (!confirm(`Delete schedule for ${this.activeStudent.studentName}?`)) return;
+
+    try {
+        const { updateDoc, doc, deleteDoc } = this.methods;
+        
+        // Remove schedule field from student
+        await updateDoc(doc(this.db, "students", this.activeStudent.id), { 
+            schedule: []  // Set to empty array instead of deleting field
         });
+        
+        // Delete the schedule document
+        await deleteDoc(doc(this.db, "schedules", `sched_${this.activeStudent.id}`));
 
-        if (!isValid) return;
-
-        try {
-            const { updateDoc, doc, setDoc } = this.methods;
-            
-            // 1. Update Student Record
-            const studentRef = doc(this.db, "students", this.activeStudent.id);
-            await updateDoc(studentRef, { schedule });
-
-            // 2. Update/Create Schedule Document
-            const scheduleRef = doc(this.db, "schedules", `sched_${this.activeStudent.id}`);
-            await setDoc(scheduleRef, {
-                studentId: this.activeStudent.id,
-                studentName: this.activeStudent.studentName,
-                tutorEmail: this.tutor.email,
-                schedule,
-                updatedAt: new Date()
-            }, { merge: true });
-
-            this.showAlert('✅ Schedule Saved!', 'success');
-            
-            if (moveToNext) this.next(true);
-            else this.closeModal();
-
-        } catch (error) {
-            console.error(error);
-            this.showAlert('Save failed. Check console.', 'error');
-        }
+        this.showAlert('Schedule Deleted', 'success');
+        this.next(false); // Move next but don't mark as "scheduled"
+    } catch (error) {
+        console.error("Delete error:", error);
+        this.showAlert('Delete failed', 'error');
     }
-
-    async deleteSchedule() {
-        if (!confirm(`Delete schedule for ${escapeHtml(this.activeStudent.studentName)}?`)) return;
-
-        try {
-            const { updateDoc, doc, deleteDoc } = this.methods;
-            
-            // Remove schedule field from student
-            await updateDoc(doc(this.db, "students", this.activeStudent.id), { 
-                schedule: []  // Set to empty array instead of deleting field
-            });
-            
-            // Delete the schedule document
-            await deleteDoc(doc(this.db, "schedules", `sched_${this.activeStudent.id}`));
-
-            this.showAlert('Schedule Deleted', 'success');
-            this.next(false); // Move next but don't mark as "scheduled"
-        } catch (error) {
-            console.error("Delete error:", error);
-            this.showAlert('Delete failed', 'error');
-        }
-    }
+}
 
     // --- UTILITIES ---
 
@@ -1187,6 +1920,35 @@ class ScheduleManager {
             alert.classList.add('translate-x-full');
             setTimeout(() => alert.remove(), 300);
         }, 3000);
+    }
+
+    injectStyles() {
+        if (document.getElementById('schedule-manager-css')) return;
+        const css = `
+            .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(2px); }
+            .modal-content { background: white; width: 95%; max-width: 550px; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden; animation: slideUp 0.3s ease-out; }
+            .modal-header { padding: 1rem 1.5rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; background: #f9fafb; }
+            .modal-body { padding: 1.5rem; max-height: 70vh; overflow-y: auto; }
+            .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; gap: 0.5rem; background: #f9fafb; }
+            .time-slot-row { position: relative; padding: 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 0.75rem; }
+            .remove-row-btn { position: absolute; top: -8px; right: -8px; background: #ef4444; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; font-size: 12px; }
+            @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+            /* Utility Classes matching your previous setup */
+            .btn { display: inline-flex; align-items: center; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 500; : 0.2s; cursor: pointer; border: 1px solid transparent; }
+            .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
+            .btn-primary { background: #3b82f6; color: white; } .btn-primary:hover { background: #2563eb; }
+            .btn-success { background: #10b981; color: white; } .btn-success:hover { background: #059669; }
+            .btn-danger { background: #ef4444; color: white; } .btn-danger:hover { background: #dc2626; }
+            .btn-ghost { color: #6b7280; background: transparent; } .btn-ghost:hover { background: #f3f4f6; }
+            .btn-outline { border: 1px dashed #cbd5e1; color: #3b82f6; background: white; } .btn-outline:hover { border-color: #3b82f6; background: #eff6ff; }
+            .select { width: 100%; border-radius: 6px; border-color: #d1d5db; padding: 0.5rem; }
+            .grid { display: grid; } .gap-3 { gap: 0.75rem; } .grid-cols-1 { grid-template-columns: 1fr; }
+            @media(min-width: 768px) { .md\\:grid-cols-3 { grid-template-columns: repeat(3, 1fr); } }
+        `;
+        const style = document.createElement('style');
+        style.id = 'schedule-manager-css';
+        style.textContent = css;
+        document.head.appendChild(style);
     }
 }
 
@@ -1257,12 +2019,12 @@ function showDailyTopicModal(student) {
         <div class="modal-overlay">
             <div class="modal-content max-w-lg">
                 <div class="modal-header">
-                    <h3 class="modal-title">📚 Daily Topic: ${escapeHtml(student.studentName)}</h3>
+                    <h3 class="modal-title">📚 Daily Topic: ${student.studentName}</h3>
                 </div>
                 <div class="modal-body">
                     <div id="topic-history-container" class="mb-5 bg-blue-50 p-3 rounded-lg border border-blue-100 hidden">
                         <div class="flex justify-between items-center mb-2">
-                            <h5 class="font-bold text-blue-800 text-sm">📅 Topics Covered in ${escapeHtml(monthName)}</h5>
+                            <h5 class="font-bold text-blue-800 text-sm">📅 Topics Covered in ${monthName}</h5>
                             <span id="topic-count-badge" class="bg-blue-200 text-blue-800 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
                         </div>
                         <div id="topic-history" class="topic-history text-sm text-gray-700 max-h-60 overflow-y-auto custom-scrollbar">
@@ -1278,12 +2040,12 @@ function showDailyTopicModal(student) {
                     </div>
                     <div class="mt-2 text-xs text-gray-500 flex justify-between">
                         <span>One topic per line recommended.</span>
-                        <span>Date: ${escapeHtml(localDateString)}</span>
+                        <span>Date: ${localDateString}</span>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button id="cancel-topic-btn" class="btn btn-secondary">Close</button>
-                    <button id="save-topic-btn" class="btn btn-primary" data-student-id="${escapeHtml(student.id)}">Save Topic</button>
+                    <button id="save-topic-btn" class="btn btn-primary" data-student-id="${student.id}">Save Topic</button>
                 </div>
             </div>
         </div>
@@ -1411,15 +2173,15 @@ async function loadDailyTopicHistory(studentId) {
                 count++;
                 html += `<li class="flex flex-col border-b border-blue-100 last:border-0 pb-2">
                     <div class="flex justify-between w-full">
-                        <div class="flex-1 mr-2"><span class="font-bold text-blue-600 text-xs">${escapeHtml(d.parsedDate.toLocaleDateString(undefined,{month:'short',day:'numeric'}))}: </span>
-                        <span id="text-${escapeHtml(d.id)}" class="text-sm">${escapeHtml(d.topics)}</span>
-                        <div id="input-container-${escapeHtml(d.id)}" class="hidden"><textarea id="input-${escapeHtml(d.id)}" class="w-full text-sm border rounded p-1" rows="2"></textarea></div></div>
+                        <div class="flex-1 mr-2"><span class="font-bold text-blue-600 text-xs">${d.parsedDate.toLocaleDateString(undefined,{month:'short',day:'numeric'})}: </span>
+                        <span id="text-${d.id}" class="text-sm">${d.topics}</span>
+                        <div id="input-container-${d.id}" class="hidden"><textarea id="input-${d.id}" class="w-full text-sm border rounded p-1" rows="2"></textarea></div></div>
                         <div class="flex space-x-1">
-                            <button id="btn-edit-${escapeHtml(d.id)}" data-action="edit" data-id="${escapeHtml(d.id)}" class="text-gray-400 hover:text-blue-600">✏️</button>
-                            <button id="btn-delete-${escapeHtml(d.id)}" data-action="delete" data-id="${escapeHtml(d.id)}" class="text-gray-400 hover:text-red-600">🗑️</button>
-                            <div id="action-btns-${escapeHtml(d.id)}" class="hidden flex space-x-1">
-                                <button data-action="save" data-id="${escapeHtml(d.id)}" class="text-green-600">✅</button>
-                                <button data-action="cancel" data-id="${escapeHtml(d.id)}" class="text-red-500">❌</button>
+                            <button id="btn-edit-${d.id}" data-action="edit" data-id="${d.id}" class="text-gray-400 hover:text-blue-600">✏️</button>
+                            <button id="btn-delete-${d.id}" data-action="delete" data-id="${d.id}" class="text-gray-400 hover:text-red-600">🗑️</button>
+                            <div id="action-btns-${d.id}" class="hidden flex space-x-1">
+                                <button data-action="save" data-id="${d.id}" class="text-green-600">✅</button>
+                                <button data-action="cancel" data-id="${d.id}" class="text-red-500">❌</button>
                             </div>
                         </div>
                     </div></li>`;
@@ -1494,44 +2256,23 @@ function showHomeworkModal(student) {
     const modalHTML = `
         <div class="modal-overlay">
             <div class="modal-content max-w-2xl">
-                <div class="modal-header"><h3 class="modal-title">📝 Assign Homework for ${escapeHtml(student.studentName)}</h3></div>
+                <div class="modal-header"><h3 class="modal-title">📝 Assign Homework for ${student.studentName}</h3></div>
                 <div class="modal-body">
                     <div class="form-group"><label class="form-label">Title *</label><input type="text" id="hw-title" class="form-input" required></div>
-                    <div class="form-group">
-                        <label class="form-label">Description * <span style="font-size:.72rem;color:#6b7280;font-weight:400;">(URLs will become clickable links)</span></label>
-                        <textarea id="hw-description" class="form-input form-textarea" required placeholder="Enter instructions... Paste links like https://example.com and they'll be clickable."></textarea>
-                    </div>
-                    <div class="form-group"><label class="form-label">Due Date *</label><input type="date" id="hw-due-date" class="form-input" max="${escapeHtml(maxDate)}" required></div>
-                    <div class="form-group">
-                        <label class="form-label">Files (Max 5 — any format accepted)</label>
-                        <!-- Drag & Drop Zone -->
-                        <div id="hw-drop-zone" style="border:2px dashed #93c5fd;border-radius:12px;padding:20px 16px;text-align:center;cursor:pointer;transition:all .2s;background:#eff6ff;position:relative;">
-                            <input type="file" id="hw-file" class="hidden" multiple accept="*/*">
-                            <div style="pointer-events:none;">
-                                <div style="font-size:2rem;margin-bottom:6px;">📎</div>
-                                <div style="font-weight:700;color:#1d4ed8;font-size:.9rem;">Drag &amp; drop any files here</div>
-                                <div style="color:#6b7280;font-size:.78rem;margin-top:4px;">PDF, DOC, DOCX, images, videos, zip — anything</div>
-                                <label for="hw-file" style="display:inline-block;margin-top:10px;padding:6px 18px;background:#2563eb;color:#fff;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;pointer-events:all;">Browse Files</label>
-                            </div>
-                        </div>
-                        <!-- Google Drive link input -->
-                        <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
-                            <span style="font-size:1.1rem;">🔗</span>
-                            <input type="text" id="hw-drive-link" placeholder="Or paste a Google Drive / YouTube / any link here…" style="flex:1;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:.82rem;outline:none;">
-                            <button type="button" id="hw-drive-add-btn" style="padding:7px 14px;background:#4285f4;color:#fff;border:none;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap;">Add Link</button>
-                        </div>
-                        <div id="file-list-preview" class="hidden mt-2">
-                            <ul id="file-list-ul" style="list-style:none;padding:0;margin:0;"></ul>
-                            <button id="remove-all-files-btn" class="btn btn-danger btn-sm w-full mt-2">Clear All</button>
-                        </div>
+                    <div class="form-group"><label class="form-label">Description *</label><textarea id="hw-description" class="form-input form-textarea" required></textarea></div>
+                    <div class="form-group"><label class="form-label">Due Date *</label><input type="date" id="hw-due-date" class="form-input" max="${maxDate}" required></div>
+                    <div class="form-group"><label class="form-label">Files (Max 5)</label>
+                        <div class="file-upload-container"><input type="file" id="hw-file" class="hidden" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt">
+                        <label for="hw-file" class="file-upload-label"><span class="text-primary-color">Click to upload files</span></label>
+                        <div id="file-list-preview" class="hidden mt-2"><ul id="file-list-ul"></ul><button id="remove-all-files-btn" class="btn btn-danger btn-sm w-full mt-2">Clear Files</button></div></div>
                     </div>
                     
                     <div class="email-settings bg-blue-50 p-3 rounded mt-2 border border-blue-100">
                         <label class="flex items-center space-x-2 mb-2"><input type="checkbox" id="hw-reminder" class="rounded" checked><span class="font-bold text-blue-900">Notify Parent via Email</span></label>
                         <div class="grid grid-cols-2 gap-2 text-xs text-gray-700">
-                            <div><span class="font-semibold">Parent:</span> <span id="display-parent-name">${escapeHtml(currentParentName)}</span></div>
-                            <div><span class="font-semibold">Phone:</span> ${escapeHtml(parentPhone)}</div>
-                            <div class="col-span-2"><span class="font-semibold">Email:</span> <span id="display-parent-email">${escapeHtml(currentParentEmail)}</span></div>
+                            <div><span class="font-semibold">Parent:</span> <span id="display-parent-name">${currentParentName}</span></div>
+                            <div><span class="font-semibold">Phone:</span> ${parentPhone}</div>
+                            <div class="col-span-2"><span class="font-semibold">Email:</span> <span id="display-parent-email">${currentParentEmail}</span></div>
                         </div>
                         <div id="new-data-badge" class="hidden mt-2 text-xs text-green-600 font-bold">✨ New parent details found! Will be saved to student profile.</div>
                     </div>
@@ -1572,88 +2313,36 @@ function showHomeworkModal(student) {
         if(student.parentEmail) document.getElementById('display-parent-email').textContent = student.parentEmail;
     }
 
-    // File Handling — drag & drop + click + Google Drive links
+    // File Handling (Standard)
     const fileInput = document.getElementById('hw-file');
     const fileListUl = document.getElementById('file-list-ul');
-    const dropZone = document.getElementById('hw-drop-zone');
-
-    // Linkify helper — turns raw URLs in text into <a> tags
-    function linkifyText(text) {
-        if (!text) return '';
-        const escaped = escapeHtml(text);
-        return escaped.replace(
-            /(https?:\/\/[^\s&"<>]+)/g,
-            '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;word-break:break-all;">$1</a>'
-        );
-    }
-    window._hwLinkify = linkifyText; // expose for inbox renderer
-
-    // Drag & Drop
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.style.background = '#dbeafe';
-        dropZone.style.borderColor = '#2563eb';
-    });
-    dropZone.addEventListener('dragleave', () => {
-        dropZone.style.background = '#eff6ff';
-        dropZone.style.borderColor = '#93c5fd';
-    });
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.style.background = '#eff6ff';
-        dropZone.style.borderColor = '#93c5fd';
-        const files = Array.from(e.dataTransfer.files);
-        addFiles(files);
-    });
-
-    function addFiles(files) {
-        if (selectedFiles.length + files.length > 5) { showCustomAlert('Max 5 files total.'); return; }
-        files.forEach(f => {
-            if (f.size <= 50 * 1024 * 1024) selectedFiles.push({ file: f, name: f.name, isLink: false });
-            else showCustomAlert(`Skipped "${f.name}" — max 50 MB per file.`);
-        });
-        renderFiles();
-    }
-
     fileInput.addEventListener('change', (e) => {
-        addFiles(Array.from(e.target.files));
-        fileInput.value = '';
-    });
-
-    // Google Drive / any link
-    document.getElementById('hw-drive-add-btn').addEventListener('click', () => {
-        const linkInput = document.getElementById('hw-drive-link');
-        const url = linkInput.value.trim();
-        if (!url) { showCustomAlert('Please paste a link first.'); return; }
-        if (!/^https?:\/\//i.test(url)) { showCustomAlert('Please enter a valid URL starting with http:// or https://'); return; }
-        if (selectedFiles.length >= 5) { showCustomAlert('Max 5 attachments.'); return; }
-        const name = url.includes('drive.google.com') ? '🔗 Google Drive file' :
-                     url.includes('youtube.com') || url.includes('youtu.be') ? '▶️ YouTube video' : '🔗 ' + url.substring(0, 50);
-        selectedFiles.push({ file: null, name, url, isLink: true });
-        linkInput.value = '';
+        const files = Array.from(e.target.files);
+        if (selectedFiles.length + files.length > 5) { showCustomAlert('Max 5 files.'); fileInput.value=''; return; }
+        files.forEach(f => { if(f.size<=10*1024*1024) selectedFiles.push(f); else showCustomAlert(`Skipped ${f.name} (>10MB)`); });
         renderFiles();
     });
-
     function renderFiles() {
         const preview = document.getElementById('file-list-preview');
-        if (selectedFiles.length === 0) { preview.classList.add('hidden'); return; }
+        if (selectedFiles.length===0) { preview.classList.add('hidden'); return; }
         preview.classList.remove('hidden');
         fileListUl.innerHTML = '';
-        selectedFiles.forEach((item, i) => {
+        selectedFiles.forEach((f, i) => {
             const li = document.createElement('li');
             li.className = "flex justify-between bg-white p-1 mb-1 border rounded text-sm";
-            const icon = item.isLink ? '🔗' : '📄';
-            li.innerHTML = `<span>${icon} ${escapeHtml(item.name)}</span><span class="text-red-500 cursor-pointer remove-file-btn" data-index="${i}">✕</span>`;
+            li.innerHTML = `<span>${f.name}</span><span class="text-red-500 cursor-pointer remove-file-btn" data-index="${i}">✕</span>`;
             fileListUl.appendChild(li);
         });
+        
         fileListUl.querySelectorAll('.remove-file-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                selectedFiles.splice(parseInt(e.target.dataset.index), 1);
+                const idx = parseInt(e.target.dataset.index);
+                selectedFiles.splice(idx, 1);
                 renderFiles();
             });
         });
     }
-    document.getElementById('remove-all-files-btn').addEventListener('click', () => { selectedFiles = []; fileInput.value = ''; renderFiles(); });
+    document.getElementById('remove-all-files-btn').addEventListener('click', ()=>{ selectedFiles=[]; fileInput.value=''; renderFiles(); });
     document.getElementById('cancel-hw-btn').addEventListener('click', () => modal.remove());
 
     // SAVE LOGIC
@@ -1706,20 +2395,13 @@ function showHomeworkModal(student) {
             }
 
             // --- STEP 2: UPLOAD FILES ---
-            saveBtn.innerHTML = `Uploading files...`;
+            saveBtn.innerHTML = `Uploading ${selectedFiles.length} files...`;
             let attachments = [];
             if (selectedFiles.length > 0) {
                 try {
-                    for (const item of selectedFiles) {
-                        if (item.isLink) {
-                            // Google Drive / URL link — no upload needed
-                            attachments.push({ url: item.url, name: item.name, size: 0, type: 'link', isLink: true });
-                        } else {
-                            // Real file — upload to Cloudinary
-                            const res = await uploadToCloudinary(item.file, student.id);
-                            attachments.push({ url: res.url, name: item.name || res.fileName, size: res.bytes || 0, type: res.format || 'file', isLink: false });
-                        }
-                    }
+                    const uploadPromises = selectedFiles.map(f => uploadToCloudinary(f, student.id));
+                    const results = await Promise.all(uploadPromises);
+                    results.forEach(res => attachments.push({url:res.url, name:res.fileName, size:res.bytes, type:res.format}));
                 } catch(e) { 
                     console.error("Upload Error:", e);
                     showCustomAlert(`Upload failed: ${e.message}`); 
@@ -1732,25 +2414,15 @@ function showHomeworkModal(student) {
             // --- STEP 3: SAVE TO FIREBASE ---
             saveBtn.innerHTML = "Saving...";
             const newHwRef = doc(collection(db, "homework_assignments"));
-
-            // Helper: strip undefined values so Firestore never throws
-            function sanitizeForFirestore(obj) {
-                const out = {};
-                for (const [k, v] of Object.entries(obj)) {
-                    out[k] = (v === undefined || v === null) ? '' : v;
-                }
-                return out;
-            }
             
-            const hwData = sanitizeForFirestore({
+            const hwData = {
                 id: newHwRef.id,
-                studentId: student.id || '',
-                studentName: student.studentName || '',
-                parentEmail: finalParentEmail || '',
-                parentName: finalParentName || '',
-                parentPhone: student.parentPhone || '',
-                tutorEmail: window.tutorData?.email || '',
-                tutorName: tutorName || '',
+                studentId: student.id,
+                studentName: student.studentName,
+                parentEmail: finalParentEmail,
+                parentName: finalParentName, // Now storing Name in HW record too
+                parentPhone: student.parentPhone,
+                tutorName: tutorName,
                 title: title,
                 description: desc,
                 dueDate: date,
@@ -1759,7 +2431,7 @@ function showHomeworkModal(student) {
                 attachments: attachments,
                 fileUrl: attachments[0]?.url || '', 
                 fileName: attachments[0]?.name || '' 
-            });
+            };
             
             await setDoc(newHwRef, hwData);
 
@@ -1829,7 +2501,7 @@ let unsubUnreadListener = null;
 
 function msgEscapeHtml(text) {
     if (!text) return '';
-    return String(text)
+    return text
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
@@ -1872,9 +2544,10 @@ function initializeFloatingMessagingButton() {
     document.body.appendChild(btnFloatingMsg);
     document.body.appendChild(btnFloatingInbox);
     
-    // Styles are now in HTML, no injection needed
+    // 5. Inject CSS
+    injectMessagingStyles();
     
-    // 5. Start Listener
+    // 6. Start Listener
     if (window.tutorData && window.tutorData.id) {
         initializeUnreadListener();
     } else {
@@ -1887,7 +2560,7 @@ function initializeFloatingMessagingButton() {
 // --- BACKGROUND LISTENERS ---
 
 function initializeUnreadListener() {
-    const tutorId = window.tutorData.messagingId || window.tutorData.id;
+    const tutorId = window.tutorData.id;
     if (unsubUnreadListener) unsubUnreadListener();
 
     const q = query(
@@ -1934,507 +2607,208 @@ function updateFloatingBadges() {
     updateBadge(btnFloatingInbox);
 }
 
-// --- FEATURE 1: SEND MESSAGE MODAL (SIMPLIFIED – unified selectable list) ---
-// Conv ID format: tutorId_studentId  (student portal also uses this format)
+// --- FEATURE 1: SEND MESSAGE MODAL ---
 
 function showEnhancedMessagingModal() {
     document.querySelectorAll('.enhanced-messaging-modal').forEach(e => e.remove());
 
     const modal = document.createElement('div');
-    modal.className = 'enhanced-messaging-modal';
-    modal.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.7);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px;';
+    modal.className = 'modal-overlay enhanced-messaging-modal';
     modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
 
     modal.innerHTML = `
-    <div style="background:#fff;border-radius:22px;width:100%;max-width:580px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.4);">
-        <!-- Header -->
-        <div style="background:linear-gradient(135deg,#1e1b4b,#312e81,#1e3a8a);padding:20px 24px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;">
-            <div style="display:flex;align-items:center;gap:12px;">
-                <div style="width:42px;height:42px;background:rgba(255,255,255,.15);border-radius:12px;border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:1.3rem;">✉️</div>
-                <div>
-                    <div style="color:#fff;font-weight:900;font-size:1.05rem;">New Message</div>
-                    <div style="color:rgba(255,255,255,.55);font-size:.72rem;margin-top:1px;">Select one or more recipients &amp; compose</div>
-                </div>
+        <div class="modal-content messaging-modal-content">
+            <div class="modal-header">
+                <h3>💬 Send Message</h3>
+                <button type="button" class="close-modal-btn text-2xl font-bold">&times;</button>
             </div>
-            <button id="nm-close" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;width:34px;height:34px;border-radius:50%;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
-        </div>
-
-        <!-- Body -->
-        <div style="flex:1;overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;gap:14px;">
-
-            <!-- Recipients panel -->
-            <div>
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-                    <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;">To: Recipients</div>
-                    <div style="display:flex;gap:8px;">
-                        <button id="nm-select-all" style="font-size:.72rem;color:#6366f1;background:none;border:none;cursor:pointer;font-weight:700;">Select All</button>
-                        <button id="nm-clear-all" style="font-size:.72rem;color:#94a3b8;background:none;border:none;cursor:pointer;font-weight:700;">Clear</button>
+            <div class="modal-body">
+                <div class="message-type-grid">
+                    <div class="type-option selected" data-type="individual">
+                        <div class="icon">👤</div><div>Individual</div>
+                    </div>
+                    <div class="type-option" data-type="group">
+                        <div class="icon">👨‍👩‍👧‍👦</div><div>Group</div>
+                    </div>
+                    <div class="type-option" data-type="management">
+                        <div class="icon">🏢</div><div>Admin</div>
+                    </div>
+                    <div class="type-option" data-type="all">
+                        <div class="icon">📢</div><div>All Parents</div>
                     </div>
                 </div>
-                <!-- Search box -->
-                <div style="position:relative;margin-bottom:8px;">
-                    <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                    <input id="nm-search" type="text" placeholder="Search by name…" style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.82rem;outline:none;box-sizing:border-box;">
-                </div>
-                <!-- Filter tabs -->
-                <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;" id="nm-filter-tabs">
-                    <button class="nm-tab active-tab" data-filter="all" style="font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1.5px solid #6366f1;background:#eef2ff;color:#4338ca;cursor:pointer;">All</button>
-                    <button class="nm-tab" data-filter="student" style="font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;">👤 Students</button>
-                    <button class="nm-tab" data-filter="parent" style="font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;">🏠 Parents</button>
-                    <button class="nm-tab" data-filter="tutor" style="font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;">🧑‍🏫 Tutors</button>
-                    <button class="nm-tab" data-filter="management" style="font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;">🏢 Admin</button>
-                </div>
-                <!-- Recipient list -->
-                <div id="nm-recipient-list" style="max-height:180px;overflow-y:auto;border:1.5px solid #e2e8f0;border-radius:10px;">
-                    <div style="padding:20px;text-align:center;color:#9ca3af;font-size:.82rem;">Loading contacts…</div>
-                </div>
-                <!-- Selected count -->
-                <div id="nm-selected-count" style="font-size:.72rem;color:#6366f1;font-weight:700;margin-top:6px;min-height:16px;"></div>
-            </div>
 
-            <!-- Subject -->
-            <div>
-                <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;margin-bottom:6px;">Subject <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></div>
-                <input type="text" id="msg-subject" placeholder="e.g. Homework reminder, Schedule update…" style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:.875rem;outline:none;transition:border-color .15s;box-sizing:border-box;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'">
-            </div>
+                <div id="recipient-loader" class="recipient-area"></div>
 
-            <!-- Message body -->
-            <div>
-                <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;margin-bottom:6px;">Message</div>
-                <textarea id="msg-content" rows="4" placeholder="Type your message here…" style="width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:.875rem;outline:none;resize:vertical;transition:border-color .15s;box-sizing:border-box;font-family:inherit;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'"></textarea>
+                <input type="text" id="msg-subject" class="form-input" placeholder="Subject">
+                <textarea id="msg-content" class="form-input" rows="5" placeholder="Type your message..."></textarea>
+                
+                <div class="flex-row-spaced mt-2">
+                     <label class="urgent-toggle">
+                        <input type="checkbox" id="msg-urgent">
+                        <span class="text-red-500 font-bold">Mark as Urgent</span>
+                     </label>
+                </div>
             </div>
-
-            <!-- Attach + Urgent row -->
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <input type="file" id="msg-image-file" accept="image/*" style="display:none;">
-                <button onclick="document.getElementById('msg-image-file').click()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border:1.5px solid #e2e8f0;border-radius:10px;background:#f8fafc;color:#475569;font-size:.78rem;font-weight:700;cursor:pointer;">📎 Attach Image</button>
-                <span id="msg-image-name" style="font-size:.72rem;color:#64748b;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
-                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 12px;border-radius:10px;border:1.5px solid #fee2e2;background:#fef2f2;">
-                    <input type="checkbox" id="msg-urgent" style="accent-color:#ef4444;">
-                    <span style="font-size:.78rem;font-weight:700;color:#dc2626;">🔴 Urgent</span>
-                </label>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary close-modal-btn">Cancel</button>
+                <button type="button" id="btn-send-initial" class="btn btn-primary">Send Message</button>
             </div>
         </div>
-
-        <!-- Footer -->
-        <div style="padding:14px 20px;border-top:1px solid #f1f5f9;display:flex;gap:10px;background:#fafafa;flex-shrink:0;">
-            <button id="nm-cancel" style="flex:1;padding:12px;border:1.5px solid #e2e8f0;background:#fff;border-radius:12px;font-weight:700;color:#64748b;cursor:pointer;font-size:.875rem;">Cancel</button>
-            <button id="btn-send-initial" style="flex:2;padding:12px;background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;border:none;border-radius:12px;font-weight:800;cursor:pointer;font-size:.9rem;box-shadow:0 4px 14px rgba(99,102,241,.35);">✈️ Send Message</button>
-        </div>
-    </div>`;
+    `;
 
     document.body.appendChild(modal);
 
-    // Hidden type holder for compatibility with msgProcessSendToStudents
-    const typeHolder = document.createElement('div');
-    typeHolder.className = 'type-option selected';
-    typeHolder.dataset.type = 'group'; // always treat selection as group
-    typeHolder.style.display = 'none';
-    modal.appendChild(typeHolder);
+    msgLoadRecipients('individual', modal.querySelector('#recipient-loader'));
 
-    // Wire close buttons
-    modal.querySelector('#nm-close').onclick = () => modal.remove();
-    modal.querySelector('#nm-cancel').onclick = () => modal.remove();
-
-    // Image name display
-    modal.querySelector('#msg-image-file').addEventListener('change', (e) => {
-        const f = e.target.files[0];
-        modal.querySelector('#msg-image-name').textContent = f ? f.name : '';
+    modal.querySelectorAll('.type-option').forEach(opt => {
+        opt.onclick = () => {
+            modal.querySelectorAll('.type-option').forEach(o => o.classList.remove('selected'));
+            opt.classList.add('selected');
+            msgLoadRecipients(opt.dataset.type, modal.querySelector('#recipient-loader'));
+        };
     });
 
-    // Load all contacts into the unified list
-    let allContacts = []; // { id, name, role, extra }
-    let activeFilter = 'all';
-
-    (async () => {
-        const listEl = modal.querySelector('#nm-recipient-list');
-        try {
-            const tutorObj = window.tutorData || {};
-            const tutor = window.tutorData || {};
-
-            // 1. Active students
-            const studentDocs = await fetchStudentsForTutor(tutorObj, "students");
-            studentDocs.filter(s => !s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status))
-                .forEach(s => allContacts.push({ id: s.id, name: s.studentName || 'Student', role: 'student', extra: s.grade || '' }));
-
-            // 2. Parents
-            try {
-                const parentSnap = await getDocs(collection(db, 'parent_users'));
-                parentSnap.forEach(d => {
-                    const p = d.data();
-                    const id = p.uid || d.id;
-                    const name = p.name || p.displayName || p.email || 'Parent';
-                    allContacts.push({ id, name, role: 'parent', extra: p.email || '' });
-                });
-            } catch(e) {}
-
-            // 3. Other tutors
-            try {
-                const tutorSnap = await getDocs(collection(db, 'tutors'));
-                const myId = tutor.messagingId || tutor.id;
-                tutorSnap.forEach(d => {
-                    if (d.id === tutor.id) return;
-                    const t = d.data();
-                    const tid = t.messagingId || t.tutorUid || d.id;
-                    if (tid === myId) return;
-                    allContacts.push({ id: tid, name: t.name || 'Tutor', role: 'tutor', extra: t.email || '' });
-                });
-            } catch(e) {}
-
-            // 4. Management/Admin
-            allContacts.push({ id: 'management', name: 'Admin (Management)', role: 'management', extra: '' });
-
-            renderList();
-        } catch(e) {
-            listEl.innerHTML = `<div style="padding:16px;text-align:center;color:#ef4444;font-size:.82rem;">Error loading contacts: ${escapeHtml(e.message)}</div>`;
-        }
-    })();
-
-    function renderList() {
-        const listEl = modal.querySelector('#nm-recipient-list');
-        const search = (modal.querySelector('#nm-search').value || '').toLowerCase().trim();
-        const filtered = allContacts.filter(c => {
-            const matchFilter = activeFilter === 'all' || c.role === activeFilter;
-            const matchSearch = !search || c.name.toLowerCase().includes(search) || (c.extra||'').toLowerCase().includes(search);
-            return matchFilter && matchSearch;
-        });
-
-        if (filtered.length === 0) {
-            listEl.innerHTML = '<div style="padding:16px;text-align:center;color:#9ca3af;font-size:.82rem;">No contacts found.</div>';
-            return;
-        }
-
-        const roleIcon = { student:'👤', parent:'🏠', tutor:'🧑‍🏫', management:'🏢' };
-        const roleColor = { student:'#dbeafe', parent:'#dcfce7', tutor:'#fef3c7', management:'#f3e8ff' };
-
-        listEl.innerHTML = filtered.map(c => `
-            <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #f9fafb;cursor:pointer;transition:background .1s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
-                <input type="checkbox" class="nm-chk-recipient" value="${escapeHtml(c.id)}" data-name="${escapeHtml(c.name)}" data-role="${escapeHtml(c.role)}" style="accent-color:#6366f1;width:15px;height:15px;flex-shrink:0;">
-                <span style="width:30px;height:30px;border-radius:50%;background:${roleColor[c.role]||'#f1f5f9'};display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;">${roleIcon[c.role]||'👤'}</span>
-                <div style="flex:1;min-width:0;">
-                    <div style="font-size:.84rem;font-weight:700;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.name)}</div>
-                    ${c.extra ? `<div style="font-size:.7rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.extra)}</div>` : ''}
-                </div>
-            </label>`).join('');
-
-        // Re-attach change listeners to update count
-        listEl.querySelectorAll('.nm-chk-recipient').forEach(chk => chk.addEventListener('change', updateCount));
-        updateCount();
-    }
-
-    function updateCount() {
-        const checked = modal.querySelectorAll('.nm-chk-recipient:checked');
-        const el = modal.querySelector('#nm-selected-count');
-        el.textContent = checked.length > 0 ? `${checked.length} recipient${checked.length !== 1 ? 's' : ''} selected` : '';
-    }
-
-    // Search
-    modal.querySelector('#nm-search').addEventListener('input', renderList);
-
-    // Filter tabs
-    modal.querySelectorAll('.nm-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            modal.querySelectorAll('.nm-tab').forEach(t => {
-                t.style.borderColor = '#e2e8f0'; t.style.background = '#fff'; t.style.color = '#64748b';
-                t.classList.remove('active-tab');
-            });
-            tab.style.borderColor = '#6366f1'; tab.style.background = '#eef2ff'; tab.style.color = '#4338ca';
-            tab.classList.add('active-tab');
-            activeFilter = tab.dataset.filter;
-            renderList();
-        });
-    });
-
-    // Select All / Clear
-    modal.querySelector('#nm-select-all').onclick = () => {
-        modal.querySelectorAll('.nm-chk-recipient').forEach(c => c.checked = true);
-        updateCount();
-    };
-    modal.querySelector('#nm-clear-all').onclick = () => {
-        modal.querySelectorAll('.nm-chk-recipient').forEach(c => c.checked = false);
-        updateCount();
-    };
-
-    // Send button
-    modal.querySelector('#btn-send-initial').onclick = async () => {
-        const checked = [...modal.querySelectorAll('.nm-chk-recipient:checked')];
-        if (checked.length === 0) { showCustomAlert('Please select at least one recipient.'); return; }
-
-        const content = (modal.querySelector('#msg-content').value || '').trim();
-        const subject = (modal.querySelector('#msg-subject').value || '').trim();
-        const isUrgent = modal.querySelector('#msg-urgent').checked;
-        const imageFile = modal.querySelector('#msg-image-file').files[0] || null;
-        if (!content && !imageFile) { showCustomAlert('Please type a message or attach an image.'); return; }
-
-        const sendBtn = modal.querySelector('#btn-send-initial');
-        sendBtn.disabled = true; sendBtn.textContent = 'Sending…';
-
-        try {
-            let imageUrl = null;
-            if (imageFile) {
-                const fd = new FormData();
-                fd.append('file', imageFile);
-                fd.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
-                fd.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
-                const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`, { method: 'POST', body: fd });
-                const data = await res.json();
-                imageUrl = data.secure_url || null;
-            }
-
-            const tutor = window.tutorData;
-            const myMsgId = tutor.messagingId || tutor.id;
-            const now = new Date();
-            const lastMsg = imageUrl ? (content || '📷 Image') : content;
-
-            for (const chk of checked) {
-                const targetId = chk.value;
-                const targetName = chk.dataset.name;
-                const convId = [myMsgId, targetId].sort().join('_');
-                const convRef = doc(db, "conversations", convId);
-
-                await setDoc(convRef, {
-                    participants: [tutor.id, targetId],
-                    participantDetails: {
-                        [tutor.id]: { name: tutor.name, role: 'tutor', email: tutor.email || '' },
-                        [targetId]: { name: targetName, role: chk.dataset.role || 'student' }
-                    },
-                    tutorId: tutor.id,
-                    tutorEmail: tutor.email || '',
-                    tutorName: tutor.name || '',
-                    studentId: targetId,
-                    studentName: targetName,
-                    lastMessage: lastMsg,
-                    lastMessageTimestamp: now,
-                    lastSenderId: tutor.id,
-                    unreadCount: 1
-                }, { merge: true });
-
-                await addDoc(collection(db, "conversations", convId, "messages"), {
-                    content: content || '',
-                    subject: subject || '',
-                    imageUrl: imageUrl || null,
-                    senderId: tutor.id,
-                    senderName: tutor.name || '',
-                    senderRole: 'tutor',
-                    isUrgent: isUrgent,
-                    createdAt: now,
-                    read: false
-                });
-            }
-
-            modal.remove();
-            showCustomAlert(`✅ Message sent to ${checked.length} recipient${checked.length !== 1 ? 's' : ''}!`);
-        } catch(e) {
-            console.error('Messaging error:', e);
-            showCustomAlert('❌ Error: ' + e.message);
-            sendBtn.disabled = false; sendBtn.textContent = '✈️ Send Message';
-        }
-    };
+    const closeBtns = modal.querySelectorAll('.close-modal-btn');
+    closeBtns.forEach(btn => btn.onclick = () => modal.remove());
+    
+    const sendBtn = modal.querySelector('#btn-send-initial');
+    sendBtn.onclick = () => msgProcessSend(modal);
 }
 
-/** Load recipients keyed by studentId (not parentPhone) so convId matches student portal */
-async function msgLoadRecipientsByStudentId(type, container) {
+async function msgLoadRecipients(type, container) {
     container.innerHTML = '<div class="spinner"></div>';
     const tutorEmail = window.tutorData?.email;
 
     try {
-        // Fetch by tutorEmail AND tutorId (management assigns via tutorId)
-        const tutorObj = window.tutorData || { email: tutorEmail, id: null };
-        const allStudentDocs = await fetchStudentsForTutor(tutorObj, "students");
-        // Only active students
-        const students = allStudentDocs
-            .filter(s => !s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status));
+        const q = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
+        const snap = await getDocs(q);
+        const students = snap.docs.map(d => d.data());
 
         if (type === 'individual') {
             container.innerHTML = `
-                <div style="position:relative;margin-bottom:6px;">
-                    <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                    <input id="student-search-box" type="text" placeholder="Search student by name…" style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.82rem;outline:none;box-sizing:border-box;" oninput="filterStudentDropdown(this.value)">
-                </div>
-                <select id="sel-recipient" class="form-input" size="5" style="width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:4px;font-size:.85rem;outline:none;max-height:160px;overflow-y:auto;">
-                    <option value="">— Select student —</option>
-                    ${students.map(s => `<option value="${escapeHtml(s.id)}" data-name="${escapeHtml(s.studentName)}">${escapeHtml(s.studentName)} (${escapeHtml(s.grade)})</option>`).join('')}
-                </select>`;
-            window._studentListForSearch = students;
-            window.filterStudentDropdown = function(q) {
-                const sel = document.getElementById('sel-recipient');
-                if (!sel) return;
-                const lq = q.toLowerCase().trim();
-                Array.from(sel.options).forEach(opt => {
-                    opt.hidden = lq && !opt.text.toLowerCase().includes(lq);
-                });
-            };
+                <select id="sel-recipient" class="form-input">
+                    <option value="">Select Parent...</option>
+                    ${students.map(s => `<option value="${s.parentPhone}" data-name="${s.parentName}">${s.parentName} (${s.studentName})</option>`).join('')}
+                </select>
+            `;
         } else if (type === 'group') {
             container.innerHTML = `
-                <div style="max-height:160px;overflow-y:auto;border:1.5px solid #e2e8f0;border-radius:10px;padding:6px;">
-                    ${students.length === 0 ? '<div style="text-align:center;padding:16px;color:#9ca3af;font-size:.82rem;">No active students found</div>' : students.map(s => `
-                        <label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;cursor:pointer;transition:background .12s;" onmouseover="this.style.background='#f5f3ff'" onmouseout="this.style.background=''">
-                            <input type="checkbox" class="chk-recipient" value="${escapeHtml(s.id)}" data-name="${escapeHtml(s.studentName)}" style="accent-color:#6366f1;width:15px;height:15px;">
-                            <span style="font-size:.85rem;font-weight:600;color:#1e293b;">${escapeHtml(s.studentName)}</span>
-                            <span style="font-size:.72rem;color:#94a3b8;margin-left:auto;">${escapeHtml(s.grade)}</span>
-                        </label>`).join('')}
-                </div>`;
+                <div class="checklist-box">
+                    ${students.map(s => `
+                        <label class="checklist-item">
+                            <input type="checkbox" class="chk-recipient" value="${s.parentPhone}" data-name="${s.parentName}">
+                            <span>${s.parentName} <small>(${s.studentName})</small></span>
+                        </label>
+                    `).join('')}
+                </div>
+            `;
         } else if (type === 'all') {
-            container.innerHTML = `<div style="padding:12px 16px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;font-size:.85rem;color:#1d4ed8;font-weight:600;">📢 Broadcast to all ${students.length} active students</div>`;
-            container.dataset.allStudents = JSON.stringify(students.map(s => ({ id: s.id, name: s.studentName })));
-        } else if (type === 'parent') {
-            // Load parents from parent_users collection
-            try {
-                const parentSnap = await getDocs(collection(db, 'parent_users'));
-                const parents = [];
-                parentSnap.forEach(d => {
-                    const p = d.data();
-                    if (p.uid || d.id) parents.push({ id: p.uid || d.id, name: p.name || p.displayName || p.email || 'Parent', email: p.email || '' });
-                });
-                container.innerHTML = `
-                    <div style="position:relative;margin-bottom:6px;">
-                        <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                        <input type="text" placeholder="Search parent by name…" style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.82rem;outline:none;box-sizing:border-box;" oninput="(function(q){const s=document.getElementById('sel-recipient');if(!s)return;Array.from(s.options).forEach(o=>o.hidden=q.trim()&&!o.text.toLowerCase().includes(q.toLowerCase()));}).call(this,this.value)">
-                    </div>
-                    <select id="sel-recipient" size="5" style="width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:4px;font-size:.85rem;outline:none;max-height:160px;" data-recipient-type="parent">
-                        <option value="">— Select parent —</option>
-                        ${parents.map(p => `<option value="${escapeHtml(p.id)}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)}${p.email ? ' · '+escapeHtml(p.email) : ''}</option>`).join('')}
-                    </select>`;
-            } catch(e) {
-                container.innerHTML = `<div class="p-3 bg-red-50 text-red-600 text-sm rounded">Could not load parents: ${escapeHtml(e.message)}</div>`;
-            }
-        } else if (type === 'tutor') {
-            // Load other tutors for tutor-to-tutor messaging (with search)
-            try {
-                const tutorSnap = await getDocs(collection(db, 'tutors'));
-                const myId = window.tutorData?.messagingId || window.tutorData?.id;
-                const tutors = [];
-                tutorSnap.forEach(d => {
-                    const t = d.data();
-                    const tMsgId = t.tutorUid || d.id;
-                    if (tMsgId !== myId && t.status !== 'inactive') {
-                        tutors.push({ id: tMsgId, docId: d.id, name: t.name || t.email || 'Tutor', email: t.email || '' });
-                    }
-                });
-                container.innerHTML = `
-                    <div style="position:relative;margin-bottom:6px;">
-                        <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                        <input type="text" placeholder="Search tutor by name…" style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.82rem;outline:none;box-sizing:border-box;" oninput="(function(q){const s=document.getElementById('sel-recipient');if(!s)return;Array.from(s.options).forEach(o=>o.hidden=q&&!o.text.toLowerCase().includes(q.toLowerCase()));}).call(this,this.value)">
-                    </div>
-                    <select id="sel-recipient" class="form-input" size="5" style="width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:4px;font-size:.85rem;outline:none;max-height:160px;" data-recipient-type="tutor">
-                        <option value="">— Select tutor —</option>
-                        ${tutors.map(t => `<option value="${escapeHtml(t.id)}" data-name="${escapeHtml(t.name)}">${escapeHtml(t.name)}${t.email ? ' · '+escapeHtml(t.email) : ''}</option>`).join('')}
-                    </select>`;
-            } catch(e) {
-                container.innerHTML = `<div style="padding:10px;background:#fef2f2;color:#dc2626;border-radius:10px;font-size:.82rem;">Could not load tutors: ${escapeHtml(e.message)}</div>`;
-            }
+            container.innerHTML = `<div class="info-box">Sending to all ${students.length} parents.</div>`;
         } else {
-            container.innerHTML = `<div style="padding:12px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.85rem;color:#475569;font-weight:600;">🏢 Message will be sent to Management / Admin team.</div>`;
+            container.innerHTML = `<div class="info-box">Sending to Management/Admin.</div>`;
         }
     } catch (e) {
-        container.innerHTML = `<div class="text-red-500 text-sm p-2">Error: ${escapeHtml(e.message)}</div>`;
+        container.innerHTML = `<div class="error-box">Error loading students: ${e.message}</div>`;
     }
 }
 
-async function msgProcessSendToStudents(modal) {
+async function msgProcessSend(modal) {
     const type = modal.querySelector('.type-option.selected').dataset.type;
-    const subject = (modal.querySelector('#msg-subject').value || '').trim();
-    const content = (modal.querySelector('#msg-content').value || '').trim();
+    const subject = modal.querySelector('#msg-subject').value;
+    const content = modal.querySelector('#msg-content').value;
     const isUrgent = modal.querySelector('#msg-urgent').checked;
-    const imageFile = modal.querySelector('#msg-image-file').files[0] || null;
     const tutor = window.tutorData;
 
-    if (!content && !imageFile) { showCustomAlert('Please type a message or attach an image.'); return; }
+    if (!subject || !content) {
+        alert("Please fill in subject and content.");
+        return;
+    }
 
-    let targets = []; // { id: studentId, name: studentName }
-
+    let targets = [];
     if (type === 'individual') {
         const sel = modal.querySelector('#sel-recipient');
-        if (!sel.value) { showCustomAlert('Please select a student.'); return; }
-        targets.push({ id: sel.value, name: sel.options[sel.selectedIndex].dataset.name });
+        if (sel.value) targets.push({ phone: sel.value, name: sel.options[sel.selectedIndex].dataset.name });
     } else if (type === 'group') {
-        modal.querySelectorAll('.chk-recipient:checked').forEach(c => targets.push({ id: c.value, name: c.dataset.name }));
-        if (!targets.length) { showCustomAlert('Please select at least one student.'); return; }
+        modal.querySelectorAll('.chk-recipient:checked').forEach(c => {
+            targets.push({ phone: c.value, name: c.dataset.name });
+        });
     } else if (type === 'all') {
-        try { targets = JSON.parse(modal.querySelector('#recipient-loader').dataset.allStudents || '[]'); } catch(e) {}
-        if (!targets.length) { showCustomAlert('No active students found.'); return; }
-    } else if (type === 'parent' || type === 'tutor') {
-        const sel = modal.querySelector('#sel-recipient');
-        if (!sel || !sel.value) { showCustomAlert('Please select a recipient.'); return; }
-        targets.push({ id: sel.value, name: sel.options[sel.selectedIndex].dataset.name, recipientType: type });
-    } else if (type === 'management') {
-        targets = [{ id: 'management', name: 'Admin' }];
+        const q = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+        const snap = await getDocs(q);
+        const map = new Map();
+        snap.forEach(d => {
+            const s = d.data();
+            map.set(s.parentPhone, s.parentName);
+        });
+        map.forEach((name, phone) => targets.push({ phone, name }));
+    }
+
+    if (targets.length === 0 && type !== 'management') {
+        alert("No recipients selected.");
+        return;
     }
 
     const btn = modal.querySelector('#btn-send-initial');
-    btn.innerText = 'Sending...'; btn.disabled = true;
-
+    btn.innerText = "Sending...";
+    btn.disabled = true;
+    
     try {
-        // Upload image if attached
-        let imageUrl = null;
-        if (imageFile) {
-            const fd = new FormData();
-            fd.append('file', imageFile);
-            fd.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
-            fd.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
-            const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`, { method: 'POST', body: fd });
-            const data = await res.json();
-            imageUrl = data.secure_url || null;
-        }
-
-        const now = new Date();
-        const lastMsg = imageUrl ? (content || '📷 Image') : content;
-
+        // Send loop
         for (const target of targets) {
-            // Use messagingId_recipientId as convId — supports parent_users uid and tutor-to-tutor
-            const myMsgId = tutor.messagingId || tutor.id;
-            const convId = [myMsgId, target.id].sort().join('_');
+            const convId = msgGenerateConvId(tutor.id, target.phone);
+            const now = new Date(); // USE NATIVE DATE
+            
+            // Manual Increment Logic: Read -> Calculate -> Write
             const convRef = doc(db, "conversations", convId);
+            const convSnap = await getDoc(convRef); // New dependency: getDoc (usually available)
+            
+            let newCount = 1;
+            if (convSnap.exists()) {
+                const data = convSnap.data();
+                // If the last sender was me, reset count. If not, increment.
+                // Logic: I am sending now, so for the RECIPIENT, it increments.
+                // But since I am the tutor, and I'm sending to Parent, I want to update THEIR unread count?
+                // Actually, this unreadCount field is shared. A better schema splits it, but for now:
+                // We just increment it.
+                newCount = (data.unreadCount || 0) + 1;
+            }
 
             await setDoc(convRef, {
-                participants: [tutor.id, target.id],
+                participants: [tutor.id, target.phone],
                 participantDetails: {
-                    [tutor.id]: { name: tutor.name, role: 'tutor', email: tutor.email },
-                    [target.id]: { name: target.name, role: 'student' }
+                    [tutor.id]: { name: tutor.name, role: 'tutor' },
+                    [target.phone]: { name: target.name, role: 'parent' }
                 },
-                tutorId: tutor.id,
-                tutorEmail: tutor.email,
-                tutorName: tutor.name,
-                studentId: target.id,
-                studentName: target.name,
-                lastMessage: lastMsg,
+                lastMessage: content,
                 lastMessageTimestamp: now,
                 lastSenderId: tutor.id,
-                unreadCount: 1
+                unreadCount: newCount
             }, { merge: true });
 
             await addDoc(collection(db, "conversations", convId, "messages"), {
-                content: content || '',
+                content: content,
                 subject: subject,
-                imageUrl: imageUrl || null,
                 senderId: tutor.id,
                 senderName: tutor.name,
-                senderRole: 'tutor',
                 isUrgent: isUrgent,
                 createdAt: now,
                 read: false
             });
         }
+        
         modal.remove();
-        showCustomAlert(`✅ Message sent to ${targets.length} student${targets.length !== 1 ? 's' : ''}!`);
+        alert("Message Sent!");
     } catch (e) {
-        console.error('Messaging error:', e);
-        showCustomAlert('❌ Error: ' + e.message);
-        btn.innerText = 'Try Again'; btn.disabled = false;
+        console.error(e);
+        // Fallback if getDoc is missing, try blind write
+        alert("Error sending: " + e.message);
+        btn.innerText = "Try Again";
+        btn.disabled = false;
     }
 }
 
-async function msgLoadRecipients(type, container) {
-    // Alias kept for backwards-compatibility – delegates to new function
-    return msgLoadRecipientsByStudentId(type, container);
-}
-
-async function msgProcessSend(modal) {
-    // Alias kept for backwards-compatibility – delegates to new function
-    return msgProcessSendToStudents(modal);
-}
-
-// --- FEATURE 2: INBOX MODAL (UPDATED – student-centric, image support) ---
+// --- FEATURE 2: INBOX MODAL ---
 
 function showInboxModal() {
     document.querySelectorAll('.inbox-modal').forEach(e => e.remove());
@@ -2444,36 +2818,28 @@ function showInboxModal() {
     modal.onclick = (e) => { if (e.target === modal) closeInbox(modal); };
 
     modal.innerHTML = `
-        <div class="modal-content inbox-content" style="max-width:820px;height:85vh;display:flex;flex-direction:column;padding:0;overflow:hidden;">
-            <div class="inbox-container" style="display:flex;flex:1;overflow:hidden;">
-                <!-- Left: conversation list -->
-                <div style="width:280px;min-width:220px;border-right:1px solid #e5e7eb;display:flex;flex-direction:column;background:#fafafa;">
-                    <div style="padding:14px 16px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;">
-                        <h4 style="font-weight:700;font-size:1rem;color:#1f2937;">💬 Messages</h4>
-                        <div style="display:flex;gap:6px;">
-                            <button onclick="this.closest('.inbox-modal').querySelector('#inbox-list').innerHTML='<div class=spinner></div>';window._msgStartInboxListener && window._msgStartInboxListener()" style="background:none;border:none;cursor:pointer;font-size:1rem;" title="Refresh">🔄</button>
-                            <button class="close-modal-absolute" style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:#6b7280;">&times;</button>
-                        </div>
+        <div class="modal-content inbox-content">
+            <button class="close-modal-absolute">&times;</button>
+            <div class="inbox-container">
+                <div class="inbox-list-col">
+                    <div class="inbox-header">
+                        <h4>Inbox</h4>
+                        <button id="refresh-inbox" class="btn-icon">🔄</button>
                     </div>
-                    <div id="inbox-list" style="flex:1;overflow-y:auto;"></div>
+                    <div id="inbox-list" class="inbox-list">
+                        <div class="spinner"></div>
+                    </div>
                 </div>
-                <!-- Right: chat -->
-                <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
-                    <div id="chat-view-header" style="padding:12px 16px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap-10px;background:#fff;">
-                        <div id="chat-title" style="font-weight:700;color:#1f2937;font-size:0.95rem;">Select a conversation</div>
+                <div class="inbox-chat-col">
+                    <div id="chat-view-header" class="chat-header hidden">
+                        <div class="chat-title" id="chat-title">Select a chat</div>
                     </div>
-                    <div id="chat-messages" style="flex:1;overflow-y:auto;padding:14px 16px;background:#f9fafb;display:flex;flex-direction:column;gap:8px;">
-                        <div style="text-align:center;color:#9ca3af;margin-top:40px;">← Select a conversation</div>
+                    <div id="chat-messages" class="chat-messages">
+                        <div class="empty-state">Select a conversation</div>
                     </div>
-                    <div id="chat-inputs" style="border-top:1px solid #e5e7eb;padding:10px 14px;background:#fff;display:none;gap:8px;align-items:flex-end;">
-                        <textarea id="chat-input-text" rows="2" placeholder="Type a message..." style="flex:1;border:1px solid #d1d5db;border-radius:8px;padding:8px;resize:none;font-size:0.875rem;"></textarea>
-                        <div style="display:flex;flex-direction:column;gap:6px;">
-                            <label style="cursor:pointer;font-size:1.2rem;" title="Attach image">
-                                <input type="file" id="chat-image-file" accept="image/*" style="display:none;">
-                                📎
-                            </label>
-                            <button id="chat-send-btn" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:700;">➤</button>
-                        </div>
+                    <div id="chat-inputs" class="chat-inputs hidden">
+                        <input type="text" id="chat-input-text" placeholder="Type a message...">
+                        <button id="chat-send-btn">➤</button>
                     </div>
                 </div>
             </div>
@@ -2482,30 +2848,19 @@ function showInboxModal() {
 
     document.body.appendChild(modal);
     modal.querySelector('.close-modal-absolute').onclick = () => closeInbox(modal);
-
-    // Image preview label
-    modal.querySelector('#chat-image-file').addEventListener('change', (e) => {
-        const f = e.target.files[0];
-        const lbl = modal.querySelector('#chat-inputs label');
-        if (lbl) lbl.title = f ? f.name : 'Attach image';
-    });
-
-    // Store starter so refresh button can call it
-    window._msgStartInboxListener = () => msgStartInboxListener(modal);
     msgStartInboxListener(modal);
 }
 
 function closeInbox(modal) {
-    if (unsubInboxListener) { unsubInboxListener(); unsubInboxListener = null; }
-    if (unsubChatListener)  { unsubChatListener();  unsubChatListener  = null; }
+    if (unsubInboxListener) unsubInboxListener();
+    if (unsubChatListener) unsubChatListener();
     modal.remove();
 }
 
 function msgStartInboxListener(modal) {
     const tutorId = window.tutorData.id;
     const listEl = modal.querySelector('#inbox-list');
-    listEl.innerHTML = '<div class="spinner" style="margin:16px auto;"></div>';
-
+    
     if (unsubInboxListener) unsubInboxListener();
 
     const q = query(
@@ -2515,153 +2870,240 @@ function msgStartInboxListener(modal) {
 
     unsubInboxListener = onSnapshot(q, (snapshot) => {
         const convs = [];
-        snapshot.forEach(d => convs.push({ id: d.id, ...d.data() }));
+        snapshot.forEach(doc => convs.push({ id: doc.id, ...doc.data() }));
+
         convs.sort((a, b) => {
-            const tA = a.lastMessageTimestamp?.toDate ? a.lastMessageTimestamp.toDate() : new Date(a.lastMessageTimestamp || 0);
-            const tB = b.lastMessageTimestamp?.toDate ? b.lastMessageTimestamp.toDate() : new Date(b.lastMessageTimestamp || 0);
-            return tB - tA;
+            const timeA = a.lastMessageTimestamp?.toDate ? a.lastMessageTimestamp.toDate() : new Date(a.lastMessageTimestamp || 0);
+            const timeB = b.lastMessageTimestamp?.toDate ? b.lastMessageTimestamp.toDate() : new Date(b.lastMessageTimestamp || 0);
+            return timeB - timeA; 
         });
+
         msgRenderInboxList(convs, listEl, modal, tutorId);
     });
 }
 
 function msgRenderInboxList(conversations, container, modal, tutorId) {
     container.innerHTML = '';
+    
     if (conversations.length === 0) {
-        container.innerHTML = '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:0.875rem;">No messages yet.</div>';
+        container.innerHTML = '<div class="p-4 text-gray-500 text-center">No messages found.</div>';
         return;
     }
+
     conversations.forEach(conv => {
         const otherId = conv.participants.find(p => p !== tutorId);
-        const otherName = conv.studentName || conv.participantDetails?.[otherId]?.name || 'Student';
+        const otherName = conv.participantDetails?.[otherId]?.name || "Parent";
         const isUnread = conv.unreadCount > 0 && conv.lastSenderId !== tutorId;
-        const lastMsg = conv.lastMessage || '';
-        const lastTime = msgFormatTime(conv.lastMessageTimestamp);
 
         const el = document.createElement('div');
-        el.style.cssText = `padding:12px 14px;border-bottom:1px solid #f3f4f6;cursor:pointer;display:flex;align-items:center;gap:10px;${isUnread ? 'background:#eff6ff;' : 'background:#fff;'}`;
+        el.className = `inbox-item ${isUnread ? 'unread' : ''}`;
         el.innerHTML = `
-            <div style="width:38px;height:38px;border-radius:50%;background:${isUnread ? '#059669' : '#e5e7eb'};color:${isUnread ? '#fff' : '#6b7280'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;flex-shrink:0;">
-                ${escapeHtml(otherName.charAt(0).toUpperCase())}
+            <div class="avatar">${otherName.charAt(0)}</div>
+            <div class="info">
+                <div class="name">${msgEscapeHtml(otherName)}</div>
+                <div class="preview">
+                    ${conv.lastSenderId === tutorId ? 'You: ' : ''}${msgEscapeHtml(conv.lastMessage || '')}
+                </div>
             </div>
-            <div style="flex:1;min-width:0;">
-                <div style="font-weight:${isUnread ? '700' : '600'};font-size:0.875rem;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(otherName)}</div>
-                <div style="font-size:0.75rem;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${conv.lastSenderId === tutorId ? 'You: ' : ''}${escapeHtml(lastMsg.substring(0,50))}${lastMsg.length > 50 ? '…' : ''}</div>
-            </div>
-            <div style="text-align:right;flex-shrink:0;">
-                <div style="font-size:0.7rem;color:#9ca3af;">${escapeHtml(lastTime)}</div>
-                ${isUnread ? `<div style="background:#059669;color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;margin-left:auto;margin-top:2px;">${conv.unreadCount > 9 ? '9+' : conv.unreadCount}</div>` : ''}
+            <div class="meta">
+                <div class="time">${msgFormatTime(conv.lastMessageTimestamp)}</div>
+                ${isUnread ? `<div class="badge">${conv.unreadCount}</div>` : ''}
             </div>
         `;
-        el.onmouseover = () => { el.style.background = '#f0fdf4'; };
-        el.onmouseout  = () => { el.style.background = isUnread ? '#eff6ff' : '#fff'; };
         el.onclick = () => msgLoadChat(conv.id, otherName, modal, tutorId);
         container.appendChild(el);
     });
 }
 
 function msgLoadChat(convId, name, modal, tutorId) {
-    modal.querySelector('#chat-title').textContent = name;
+    modal.querySelector('#chat-view-header').classList.remove('hidden');
+    modal.querySelector('#chat-inputs').classList.remove('hidden');
+    modal.querySelector('#chat-title').innerText = name;
+    
     const msgContainer = modal.querySelector('#chat-messages');
-    msgContainer.innerHTML = '<div style="text-align:center;margin:20px;"><div class="spinner" style="margin:auto;"></div></div>';
-    modal.querySelector('#chat-inputs').style.display = 'flex';
+    msgContainer.innerHTML = '<div class="spinner"></div>';
 
-    // Mark as read
-    updateDoc(doc(db, "conversations", convId), { unreadCount: 0 }).catch(() => {});
+    updateDoc(doc(db, "conversations", convId), { unreadCount: 0 });
 
     if (unsubChatListener) unsubChatListener();
 
-    const q = query(collection(db, "conversations", convId, "messages"), orderBy("createdAt", "asc"));
+    const q = query(collection(db, "conversations", convId, "messages"));
 
     unsubChatListener = onSnapshot(q, (snapshot) => {
+        let msgs = [];
+        snapshot.forEach(doc => msgs.push(doc.data()));
+        
+        msgs.sort((a,b) => {
+            const tA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+            const tB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+            return tA - tB;
+        });
+
         msgContainer.innerHTML = '';
-        snapshot.forEach(d => {
-            const msg = d.data();
+        msgs.forEach(msg => {
             const isMe = msg.senderId === tutorId;
             const bubble = document.createElement('div');
-            bubble.style.cssText = `display:flex;flex-direction:column;align-items:${isMe ? 'flex-end' : 'flex-start'};`;
-            const inner = document.createElement('div');
-            inner.style.cssText = `max-width:72%;background:${isMe ? '#059669' : '#fff'};color:${isMe ? '#fff' : '#1f2937'};border:1px solid ${isMe ? 'transparent' : '#e5e7eb'};border-radius:${isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px'};padding:8px 12px;font-size:0.875rem;`;
-            let html = '';
-            if (msg.subject) html += `<div style="font-weight:700;font-size:0.78rem;margin-bottom:4px;opacity:0.85;">${escapeHtml(msg.subject)}</div>`;
-            if (msg.content) html += `<div>${escapeHtml(msg.content)}</div>`;
-            if (msg.imageUrl) html += `<img src="${escapeHtml(msg.imageUrl)}" style="max-width:200px;border-radius:8px;margin-top:6px;cursor:pointer;" onclick="window.open('${escapeHtml(msg.imageUrl)}','_blank')">`;
-            html += `<div style="font-size:0.65rem;opacity:0.7;margin-top:4px;text-align:right;">${escapeHtml(msgFormatTime(msg.createdAt))}${msg.isUrgent ? ' 🔴' : ''}</div>`;
-            inner.innerHTML = html;
-            bubble.appendChild(inner);
+            bubble.className = `chat-bubble ${isMe ? 'me' : 'them'}`;
+            bubble.innerHTML = `
+                ${msg.subject ? `<strong>${msgEscapeHtml(msg.subject)}</strong><br>` : ''}
+                ${msgEscapeHtml(msg.content)}
+                <div class="timestamp">${msgFormatTime(msg.createdAt)}</div>
+            `;
             msgContainer.appendChild(bubble);
         });
         msgContainer.scrollTop = msgContainer.scrollHeight;
     });
 
-    // Send button
-    const sendBtn = modal.querySelector('#chat-send-btn');
+    const btn = modal.querySelector('#chat-send-btn');
     const input = modal.querySelector('#chat-input-text');
-    const imageInput = modal.querySelector('#chat-image-file');
-
-    const newBtn = sendBtn.cloneNode(true);
-    sendBtn.parentNode.replaceChild(newBtn, sendBtn);
+    
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
 
     newBtn.onclick = async () => {
         const txt = input.value.trim();
-        const imgFile = imageInput.files[0] || null;
-        if (!txt && !imgFile) return;
+        if (!txt) return;
+        input.value = '';
 
-        newBtn.disabled = true;
-        newBtn.textContent = '…';
+        const now = new Date();
 
-        try {
-            let imageUrl = null;
-            if (imgFile) {
-                const fd = new FormData();
-                fd.append('file', imgFile);
-                fd.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
-                fd.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
-                const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`, { method: 'POST', body: fd });
-                const data = await res.json();
-                imageUrl = data.secure_url || null;
-                imageInput.value = '';
-            }
+        // 1. Send Message
+        await addDoc(collection(db, "conversations", convId, "messages"), {
+            content: txt,
+            senderId: tutorId,
+            createdAt: now,
+            read: false
+        });
 
-            const now = new Date();
-            const lastMsg = imageUrl ? (txt || '📷 Image') : txt;
-
-            await addDoc(collection(db, "conversations", convId, "messages"), {
-                content: txt,
-                imageUrl: imageUrl,
-                senderId: tutorId,
-                senderName: window.tutorData.name,
-                senderRole: 'tutor',
-                createdAt: now,
-                read: false
-            });
-
-            const convRef = doc(db, "conversations", convId);
-            const snap = await getDoc(convRef);
-            const cur = snap.exists() ? (snap.data().unreadCount || 0) : 0;
-            await updateDoc(convRef, {
-                lastMessage: lastMsg,
+        // 2. Manual Increment for Metadata
+        const convRef = doc(db, "conversations", convId);
+        // We do a quick read to get current count to be safe
+        getDoc(convRef).then(snap => {
+            const current = snap.exists() ? (snap.data().unreadCount || 0) : 0;
+            updateDoc(convRef, {
+                lastMessage: txt,
                 lastMessageTimestamp: now,
                 lastSenderId: tutorId,
-                unreadCount: cur + 1
+                unreadCount: current + 1
             });
-
-            input.value = '';
-        } catch (e) {
-            console.error('Send error:', e);
-            showCustomAlert('Failed to send message: ' + e.message);
-        } finally {
-            newBtn.disabled = false;
-            newBtn.textContent = '➤';
-        }
+        });
     };
-
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); newBtn.click(); }
-    });
+    
+    input.onkeypress = (e) => { if (e.key === 'Enter') newBtn.click(); };
 }
 
-// Styles removed – now in HTML.
+// --- CSS STYLES ---
+
+function injectMessagingStyles() {
+    if (document.getElementById('msg-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'msg-styles';
+    style.textContent = `
+        /* --- Floating Buttons --- */
+        .floating-messaging-btn, .floating-inbox-btn {
+            position: fixed; bottom: 20px; right: 20px;
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white; border: none; border-radius: 50px;
+            padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 9999; font-weight: bold;
+        }
+        .floating-inbox-btn { right: 140px; background: linear-gradient(135deg, #10b981, #059669); }
+        .unread-badge {
+            background: red; color: white; border-radius: 50%; width: 20px; height: 20px;
+            font-size: 10px; display: flex; align-items: center; justify-content: center;
+            position: absolute; top: -5px; right: -5px; border: 2px solid white;
+        }
+
+        /* --- Modals --- */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5); 
+            display: flex; justify-content: center; align-items: center; z-index: 10000;
+        }
+        .modal-content {
+            background: white; border-radius: 12px; width: 90%; max-width: 800px;
+            max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); position: relative;
+        }
+        .modal-header {
+            padding: 15px; border-bottom: 1px solid #eee; display: flex; 
+            justify-content: space-between; align-items: center; background: #f9fafb;
+        }
+        .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+        .modal-footer { padding: 15px; background: #f9fafb; display: flex; justify-content: flex-end; gap: 10px; }
+        
+        .close-modal-absolute { 
+            position: absolute; top: 10px; right: 10px; font-size: 30px; 
+            background: rgba(255,255,255,0.8); border: none; cursor: pointer; color: #333; z-index: 50;
+            width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        }
+        
+        /* --- Inputs --- */
+        .form-input { 
+            width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; 
+            margin-bottom: 10px; font-size: 14px;
+        }
+        .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: 500; }
+        .btn-primary { background: #4f46e5; color: white; }
+        .btn-secondary { background: #e5e7eb; color: #374151; }
+        .btn:disabled { opacity: 0.7; cursor: not-allowed; }
+        
+        /* --- Messaging Specific --- */
+        .message-type-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+        .type-option { 
+            border: 2px solid #eee; border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; 
+            transition: 0.2s;
+        }
+        .type-option:hover, .type-option.selected { border-color: #4f46e5; background: #eef2ff; }
+        .type-option .icon { font-size: 24px; margin-bottom: 5px; }
+        
+        /* --- Inbox Specific --- */
+        .inbox-container { display: flex; height: 600px; max-height: 80vh; }
+        .inbox-list-col { width: 35%; border-right: 1px solid #eee; display: flex; flex-direction: column; }
+        .inbox-chat-col { width: 65%; display: flex; flex-direction: column; background: #f3f4f6; }
+        
+        .inbox-list { overflow-y: auto; flex: 1; }
+        .inbox-item { 
+            padding: 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer; display: flex; gap: 10px; 
+            align-items: center; transition: 0.2s;
+        }
+        .inbox-item:hover { background: #f9fafb; }
+        .inbox-item.unread { background: #eff6ff; }
+        .inbox-item .avatar { 
+            width: 40px; height: 40px; background: #ddd; border-radius: 50%; 
+            display: flex; align-items: center; justify-content: center; font-weight: bold; color: white;
+            background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+        }
+        .inbox-item .info { flex: 1; overflow: hidden; }
+        .inbox-item .name { font-weight: 600; font-size: 14px; }
+        .inbox-item .preview { font-size: 12px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .inbox-item .meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+        .inbox-item .time { font-size: 10px; color: #9ca3af; }
+        .inbox-item .badge { background: #ef4444; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; }
+
+        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .chat-bubble { max-width: 70%; padding: 10px 15px; border-radius: 12px; font-size: 14px; line-height: 1.4; position: relative; }
+        .chat-bubble.me { align-self: flex-end; background: #4f46e5; color: white; border-bottom-right-radius: 2px; }
+        .chat-bubble.them { align-self: flex-start; background: white; border: 1px solid #e5e7eb; border-bottom-left-radius: 2px; }
+        .chat-bubble .timestamp { font-size: 9px; opacity: 0.7; text-align: right; margin-top: 4px; }
+        
+        .chat-inputs { padding: 15px; background: white; border-top: 1px solid #eee; display: flex; gap: 10px; }
+        .chat-inputs input { flex: 1; padding: 10px; border-radius: 20px; border: 1px solid #ddd; outline: none; }
+        .chat-inputs button { background: #4f46e5; color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; }
+
+        .hidden { display: none !important; }
+        .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #4f46e5; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 10px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        @media(max-width: 640px) {
+            .inbox-list-col { width: 100%; }
+            .inbox-chat-col { display: none; }
+            .inbox-container.chat-active .inbox-list-col { display: none; }
+            .inbox-container.chat-active .inbox-chat-col { display: flex; width: 100%; }
+            .message-type-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    `;
+    document.head.appendChild(style);
+}
 
 // --- AUTO-INIT ---
 initializeFloatingMessagingButton();
@@ -2670,341 +3112,360 @@ initializeFloatingMessagingButton();
  * SECTION 10: SCHEDULE CALENDAR VIEW
  ******************************************************************************/
 
-// View Schedule Calendar for All Students — fully self-contained overlay
+// View Schedule Calendar for All Students
 function showScheduleCalendarModal() {
-    const DAY_PAL = {
-        Monday:    { bg:'#eff6ff', hdr:'#1d4ed8', light:'#dbeafe', dot:'#3b82f6', text:'#1e40af' },
-        Tuesday:   { bg:'#f5f3ff', hdr:'#6d28d9', light:'#ede9fe', dot:'#8b5cf6', text:'#5b21b6' },
-        Wednesday: { bg:'#ecfdf5', hdr:'#065f46', light:'#d1fae5', dot:'#10b981', text:'#047857' },
-        Thursday:  { bg:'#fff7ed', hdr:'#9a3412', light:'#fed7aa', dot:'#f97316', text:'#c2410c' },
-        Friday:    { bg:'#fdf4ff', hdr:'#6b21a8', light:'#f3e8ff', dot:'#a855f7', text:'#7e22ce' },
-        Saturday:  { bg:'#fefce8', hdr:'#92400e', light:'#fef08a', dot:'#f59e0b', text:'#b45309' },
-        Sunday:    { bg:'#fff1f2', hdr:'#9f1239', light:'#fecdd3', dot:'#f43f5e', text:'#be123c' },
-    };
-
-    const overlay = document.createElement('div');
-    overlay.id = 'calendar-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:8000;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:12px;';
-    overlay.innerHTML = `
-        <div style="background:#f8fafc;width:98vw;max-width:1400px;height:92vh;border-radius:22px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.45);">
-            <!-- Header -->
-            <div style="background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 65%,#0891b2 100%);padding:18px 26px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:relative;overflow:hidden;">
-                <div style="position:absolute;inset:0;background:url('data:image/svg+xml,%3Csvg width=40 height=40 viewBox=%220 0 40 40%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg fill=%22none%22 fill-rule=%22evenodd%22%3E%3Cg fill=%22%23ffffff%22 fill-opacity=%220.05%22%3E%3Cpath d=%22M20 20c0-5.523-4.477-10-10-10S0 14.477 0 20s4.477 10 10 10 10-4.477 10-10zm10 0c0 5.523 4.477 10 10 10s10-4.477 10-10-4.477-10-10-10-10 4.477-10 10z%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');pointer-events:none;"></div>
-                <div style="position:relative;display:flex;align-items:center;gap:12px;">
-                    <div style="width:44px;height:44px;background:rgba(255,255,255,.2);border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;border:1.5px solid rgba(255,255,255,.3);">📆</div>
-                    <div>
-                        <div style="color:#fff;font-weight:900;font-size:1.15rem;letter-spacing:-.01em;">Weekly Schedule Calendar</div>
-                        <div style="color:#bfdbfe;font-size:.78rem;margin-top:2px;">All active students · tap any class card to edit schedule</div>
+    const modalHTML = `
+        <div class="modal-overlay">
+            <div class="modal-content max-w-6xl">
+                <div class="modal-header">
+                    <h3 class="modal-title">📅 Weekly Schedule Calendar</h3>
+                    <div class="action-buttons">
+                        <button id="print-calendar-btn" class="btn btn-secondary btn-sm">📄 Print/PDF</button>
+                        <button id="edit-schedule-btn" class="btn btn-primary btn-sm">✏️ Edit Schedules</button>
                     </div>
                 </div>
-                <div style="display:flex;gap:8px;position:relative;">
-                    <button id="cal-print-btn" style="background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);color:#fff;padding:9px 16px;border-radius:10px;font-size:.8rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s;" onmouseover="this.style.background='rgba(255,255,255,.25)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">📄 Print</button>
-                    <button id="cal-edit-btn" style="background:rgba(255,255,255,.95);border:none;color:#1e3a8a;padding:9px 16px;border-radius:10px;font-size:.8rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 4px 12px rgba(0,0,0,.2);transition:all .2s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform=''">⚙️ Edit Schedules</button>
-                    <button id="cal-close-btn" style="background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.25);color:#fff;width:38px;height:38px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;" onmouseover="this.style.background='rgba(255,255,255,.25)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">✕</button>
+                <div class="modal-body">
+                    <div id="calendar-loading" class="text-center">
+                        <div class="spinner mx-auto mb-2"></div>
+                        <p class="text-gray-500">Loading schedule calendar...</p>
+                    </div>
+                    <div id="calendar-view" class="hidden">
+                        <!-- Calendar will be loaded here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="close-calendar-btn" class="btn btn-secondary">Close</button>
                 </div>
             </div>
-            <!-- Body -->
-            <div style="flex:1;overflow:auto;padding:20px;" id="cal-body">
-                <div id="calendar-loading" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;gap:12px;">
-                    <div class="spinner"></div>
-                    <p style="color:#94a3b8;">Loading schedule…</p>
-                </div>
-                <div id="calendar-view" style="display:none;"></div>
-            </div>
-            <!-- Stats footer -->
-            <div id="cal-stats" style="display:none;border-top:1px solid #e2e8f0;padding:11px 24px;background:#fff;font-size:.8rem;color:#64748b;flex-shrink:0;gap:20px;flex-wrap:wrap;"></div>
         </div>
     `;
-    document.body.appendChild(overlay);
-    document.body.style.overflow = 'hidden';
-
-    function closeCalModal() { overlay.remove(); document.body.style.overflow = ''; }
-
-    overlay.querySelector('#cal-close-btn').addEventListener('click', closeCalModal);
-    overlay.addEventListener('click', e => { if (e.target === overlay) closeCalModal(); });
-    overlay.querySelector('#cal-edit-btn').addEventListener('click', () => {
-        closeCalModal();
-        if (window.tutorData) checkAndShowSchedulePopup(window.tutorData);
+    
+    const modal = document.createElement('div');
+    modal.innerHTML = modalHTML;
+    document.body.appendChild(modal);
+    
+    loadScheduleCalendar();
+    
+    document.getElementById('print-calendar-btn').addEventListener('click', () => {
+        printCalendar();
     });
-    overlay.querySelector('#cal-print-btn').addEventListener('click', () => {
-        const content = overlay.querySelector('#calendar-view').innerHTML;
-        const w = window.open('', '_blank');
-        w.document.write(`<html><head><title>Schedule</title><style>body{font-family:sans-serif;padding:20px}.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}</style></head><body>${content}</body></html>`);
-        w.document.close(); w.print();
-    });
-
-    // Async data load
-    (async () => {
-        try {
-            const snap = await getDocs(query(collection(db, 'students'), where('tutorEmail', '==', window.tutorData.email)));
-            const students = [];
-            snap.forEach(d => {
-                const s = { id: d.id, ...d.data() };
-                if (!['archived','graduated','transferred'].includes(s.status) && s.schedule?.length > 0) students.push(s);
-            });
-
-            overlay.querySelector('#calendar-loading').style.display = 'none';
-            const calView = overlay.querySelector('#calendar-view');
-            calView.style.display = 'block';
-
-            if (students.length === 0) {
-                calView.innerHTML = `<div style="text-align:center;padding:60px 20px;">
-                    <div style="font-size:3rem;margin-bottom:16px;">📅</div>
-                    <h4 style="font-weight:800;color:#374151;font-size:1.1rem;margin-bottom:8px;">No Schedules Yet</h4>
-                    <p style="color:#9ca3af;margin-bottom:20px;">No active students have schedules set up.</p>
-                    <button id="setup-cal-btn" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;padding:12px 28px;border-radius:12px;font-weight:700;cursor:pointer;">⚙️ Set Up Schedules</button>
-                </div>`;
-                calView.querySelector('#setup-cal-btn').addEventListener('click', () => {
-                    closeCalModal();
-                    if (window.tutorData) checkAndShowSchedulePopup(window.tutorData);
-                });
-                return;
-            }
-
-            const ALL_DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-            const byDay = {};
-            ALL_DAYS.forEach(d => byDay[d] = []);
-            const ACOLORS = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
-
-            students.forEach(s => {
-                (s.schedule || []).forEach(slot => {
-                    if (!byDay[slot.day]) return;
-                    byDay[slot.day].push({
-                        student: s.studentName || 'Unknown',
-                        grade:   s.grade || '',
-                        subjects:(s.subjects || []).join(', '),
-                        start:   slot.start, end: slot.end,
-                        time:    formatScheduleTime(slot.start) + ' – ' + formatScheduleTime(slot.end),
-                        studentId: s.id,
-                        isOvernight: slot.isOvernight || false,
-                        color: ACOLORS[(s.studentName||'').charCodeAt(0) % ACOLORS.length],
-                    });
-                });
-            });
-            ALL_DAYS.forEach(d => byDay[d].sort((a,b) => a.start.localeCompare(b.start)));
-
-            const todayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()];
-
-            let grid = `<div style="display:grid;grid-template-columns:repeat(7,minmax(150px,1fr));gap:10px;min-width:1050px;">`;
-            ALL_DAYS.forEach(day => {
-                const pal = DAY_PAL[day] || { bg:'#f9fafb', hdr:'#374151', light:'#f3f4f6', dot:'#6b7280', text:'#374151' };
-                const isToday = day === todayName;
-                const events  = byDay[day];
-                grid += `
-                <div style="border-radius:14px;overflow:hidden;border:2px solid ${isToday?pal.dot:pal.light};${isToday?'box-shadow:0 0 0 3px '+pal.dot+'33;':''}">
-                    <div style="background:${isToday?pal.hdr:pal.light};padding:10px 12px;display:flex;align-items:center;justify-content:space-between;">
-                        <span style="font-weight:800;font-size:.85rem;color:${isToday?'#fff':pal.text};">${day}</span>
-                        ${isToday
-                            ? '<span style="background:rgba(255,255,255,.3);color:#fff;font-size:.65rem;font-weight:800;padding:2px 7px;border-radius:999px;">TODAY</span>'
-                            : `<span style="color:${pal.text};font-size:.72rem;opacity:.7;font-weight:600;">${events.length} class${events.length!==1?'es':''}</span>`}
-                    </div>
-                    <div style="background:${pal.bg};padding:8px;display:flex;flex-direction:column;gap:6px;min-height:80px;">
-                        ${events.length===0
-                            ? `<div style="text-align:center;padding:20px 4px;color:${pal.dot};opacity:.4;font-size:.78rem;">No classes</div>`
-                            : events.map(ev=>`
-                            <div class="cal-event-card" data-student-id="${escapeHtml(ev.studentId)}"
-                                style="background:#fff;border-radius:10px;padding:8px 10px;border-left:3px solid ${pal.dot};box-shadow:0 1px 4px rgba(0,0,0,.07);cursor:pointer;transition:box-shadow .15s;"
-                                onmouseover="this.style.boxShadow='0 3px 10px rgba(0,0,0,.13)'"
-                                onmouseout="this.style.boxShadow='0 1px 4px rgba(0,0,0,.07)'">
-                                <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
-                                    <div style="width:20px;height:20px;border-radius:6px;background:${ev.color};color:#fff;font-size:.6rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                                        ${escapeHtml((ev.student||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())}
-                                    </div>
-                                    <span style="font-weight:700;font-size:.78rem;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(ev.student)}</span>
-                                </div>
-                                <div style="font-size:.72rem;font-weight:700;color:${pal.text};">⏰ ${escapeHtml(ev.time)}${ev.isOvernight?' 🌙':''}</div>
-                                ${ev.grade?`<div style="font-size:.68rem;color:#94a3b8;margin-top:2px;">${escapeHtml(ev.grade)}${ev.subjects?' · '+escapeHtml(ev.subjects):''}</div>`:''}
-                            </div>`).join('')
-                        }
-                    </div>
-                </div>`;
-            });
-            grid += `</div>`;
-            calView.innerHTML = grid;
-
-            // Stats footer
-            const totalClasses = ALL_DAYS.reduce((s,d)=>s+byDay[d].length,0);
-            const busiest = ALL_DAYS.reduce((a,b)=>byDay[a].length>=byDay[b].length?a:b);
-            const statsEl = overlay.querySelector('#cal-stats');
-            statsEl.style.display = 'flex';
-            statsEl.innerHTML = `
-                <span><b style="color:#1e293b;">${students.length}</b> students scheduled</span>
-                <span><b style="color:#1e293b;">${totalClasses}</b> classes/week</span>
-                <span>Busiest day: <b style="color:#1e293b;">${escapeHtml(busiest)}</b></span>
-                <span>Earliest: <b style="color:#1e293b;">${escapeHtml(getEarliestClass(byDay))}</b></span>
-            `;
-
-            // Click-to-edit
-            calView.querySelectorAll('.cal-event-card').forEach(card => {
-                card.addEventListener('click', () => {
-                    const sid = card.getAttribute('data-student-id');
-                    const student = students.find(s => s.id === sid);
-                    if (student) { closeCalModal(); showEditScheduleModal(student); }
-                });
-            });
-
-        } catch (err) {
-            console.error('Calendar load error:', err);
-            overlay.querySelector('#calendar-loading').style.display = 'none';
-            const cv = overlay.querySelector('#calendar-view');
-            cv.style.display = 'block';
-            cv.innerHTML = `<div style="text-align:center;padding:40px;color:#dc2626;">⚠️ Failed to load: ${escapeHtml(err.message)}</div>`;
+    
+    document.getElementById('edit-schedule-btn').addEventListener('click', () => {
+        modal.remove();
+        if (window.tutorData) {
+            checkAndShowSchedulePopup(window.tutorData);
         }
-    })();
+    });
+    
+    document.getElementById('close-calendar-btn').addEventListener('click', () => {
+        modal.remove();
+    });
 }
 
-// Edit Schedule Modal — visually coordinated with the main schedule manager
-function showEditScheduleModal(student) {
-    const DAY_STYLES = {
-        Monday:{bg:'#eff6ff',border:'#bfdbfe',dot:'#3b82f6',accent:'#1d4ed8'},
-        Tuesday:{bg:'#f5f3ff',border:'#ddd6fe',dot:'#8b5cf6',accent:'#6d28d9'},
-        Wednesday:{bg:'#ecfdf5',border:'#a7f3d0',dot:'#10b981',accent:'#065f46'},
-        Thursday:{bg:'#fff7ed',border:'#fed7aa',dot:'#f97316',accent:'#9a3412'},
-        Friday:{bg:'#fdf4ff',border:'#f3e8ff',dot:'#a855f7',accent:'#6b21a8'},
-        Saturday:{bg:'#fefce8',border:'#fef08a',dot:'#f59e0b',accent:'#92400e'},
-        Sunday:{bg:'#fff1f2',border:'#fecdd3',dot:'#f43f5e',accent:'#9f1239'},
-    };
-    const APAL = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
-    const avatarBg = APAL[(student.studentName||'').charCodeAt(0) % APAL.length];
-    const initials = (student.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:9100;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:16px;';
-    overlay.innerHTML = `
-        <div style="background:#fff;border-radius:20px;width:100%;max-width:600px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.4);overflow:hidden;">
-            <!-- Header -->
-            <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:20px 24px;display:flex;align-items:center;gap:14px;flex-shrink:0;">
-                <div style="width:46px;height:46px;border-radius:14px;background:${avatarBg};color:#fff;font-weight:800;font-size:1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml(initials)}</div>
-                <div style="flex:1;min-width:0;">
-                    <div style="color:#fff;font-weight:800;font-size:1.05rem;">✏️ Edit Schedule</div>
-                    <div style="color:#93c5fd;font-size:.78rem;margin-top:2px;">${escapeHtml(student.studentName)} · ${escapeHtml(student.grade||'')}</div>
+async function loadScheduleCalendar() {
+    try {
+        const studentsQuery = query(
+            collection(db, "students"), 
+            where("tutorEmail", "==", window.tutorData.email)
+        );
+        const studentsSnapshot = await getDocs(studentsQuery);
+        
+        const studentsWithSchedule = [];
+        studentsSnapshot.forEach(doc => {
+            const student = { id: doc.id, ...doc.data() };
+            // Filter out archived students
+            if (!['archived', 'graduated', 'transferred'].includes(student.status) &&
+                student.schedule && student.schedule.length > 0) {
+                studentsWithSchedule.push(student);
+            }
+        });
+        
+        if (studentsWithSchedule.length === 0) {
+            document.getElementById('calendar-view').innerHTML = `
+                <div class="text-center p-8">
+                    <div class="text-gray-400 text-4xl mb-3">📅</div>
+                    <h4 class="font-bold text-gray-600 mb-2">No Schedules Found</h4>
+                    <p class="text-gray-500 mb-4">No students have schedules set up yet.</p>
+                    <button id="setup-schedules-btn" class="btn btn-primary">Set Up Schedules</button>
                 </div>
-                <button id="edit-sched-close" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:1rem;cursor:pointer;">✕</button>
+            `;
+            
+            document.getElementById('setup-schedules-btn').addEventListener('click', () => {
+                document.querySelector('.modal-overlay').remove();
+                if (window.tutorData) {
+                    checkAndShowSchedulePopup(window.tutorData);
+                }
+            });
+        } else {
+            renderCalendarView(studentsWithSchedule);
+        }
+        
+        document.getElementById('calendar-loading').classList.add('hidden');
+        document.getElementById('calendar-view').classList.remove('hidden');
+        
+    } catch (error) {
+        console.error("Error loading calendar:", error);
+        document.getElementById('calendar-view').innerHTML = `
+            <div class="text-center text-red-600 p-8">
+                <div class="text-4xl mb-3">⚠️</div>
+                <h4 class="font-bold mb-2">Failed to Load Schedule</h4>
+                <p class="text-gray-500">Please try again later.</p>
             </div>
-            <!-- Info strip -->
-            <div style="background:#f0f9ff;border-bottom:1px solid #bae6fd;padding:9px 22px;font-size:.8rem;color:#0369a1;font-weight:600;flex-shrink:0;">
-                💡 Overnight sessions supported (e.g. 11 PM → 1 AM)
-            </div>
-            <!-- Slots -->
-            <div id="edit-schedule-entries" style="flex:1;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:10px;"></div>
-            <!-- Add slot -->
-            <div style="padding:0 18px 12px;flex-shrink:0;">
-                <button id="add-edit-slot-btn" style="width:100%;padding:11px;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px;color:#475569;font-size:.875rem;font-weight:600;cursor:pointer;">＋ Add Time Slot</button>
-            </div>
-            <!-- Footer -->
-            <div style="border-top:1px solid #f1f5f9;padding:14px 18px;display:flex;gap:10px;background:#f8fafc;flex-shrink:0;">
-                <button id="cancel-edit-schedule-btn" style="flex:1;background:#f1f5f9;border:1px solid #e2e8f0;color:#64748b;padding:12px;border-radius:12px;font-size:.875rem;font-weight:600;cursor:pointer;">Cancel</button>
-                <button id="save-edit-schedule-btn" style="flex:2;background:linear-gradient(135deg,#059669,#047857);border:none;color:#fff;padding:12px;border-radius:12px;font-size:.9rem;font-weight:700;cursor:pointer;">✅ Save Schedule</button>
-            </div>
-        </div>
+        `;
+        document.getElementById('calendar-loading').classList.add('hidden');
+        document.getElementById('calendar-view').classList.remove('hidden');
+    }
+}
+
+function renderCalendarView(students) {
+    const scheduleByDay = {};
+    DAYS_OF_WEEK.forEach(day => {
+        scheduleByDay[day] = [];
+    });
+    
+    students.forEach(student => {
+        student.schedule.forEach(slot => {
+            scheduleByDay[slot.day].push({
+                student: student.studentName,
+                grade: student.grade,
+                start: slot.start,
+                end: slot.end,
+                time: `${formatScheduleTime(slot.start)} - ${formatScheduleTime(slot.end)}`,
+                studentId: student.id,
+                isOvernight: slot.isOvernight || false
+            });
+        });
+    });
+    
+    DAYS_OF_WEEK.forEach(day => {
+        scheduleByDay[day].sort((a, b) => {
+            return a.start.localeCompare(b.start);
+        });
+    });
+    
+    let calendarHTML = `
+        <div class="calendar-view">
     `;
-    document.body.appendChild(overlay);
-    document.body.style.overflow = 'hidden';
-
-    function closeMod() { overlay.remove(); document.body.style.overflow = ''; }
-    overlay.querySelector('#edit-sched-close').addEventListener('click', closeMod);
-    overlay.addEventListener('click', e => { if (e.target === overlay) closeMod(); });
-    overlay.querySelector('#cancel-edit-schedule-btn').addEventListener('click', () => { closeMod(); showScheduleCalendarModal(); });
-
-    const selSt = 'width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.85rem;font-weight:600;color:#1e293b;background:#fff;outline:none;cursor:pointer;';
-    const timeOpts = sel => TIME_SLOTS.map(s=>`<option value="${escapeHtml(s.value)}" ${s.value===sel?'selected':''}>${escapeHtml(s.label)}</option>`).join('');
-    const dayOpts  = sel => DAYS_OF_WEEK.map(d=>`<option value="${escapeHtml(d)}" ${d===sel?'selected':''}>${escapeHtml(d)}</option>`).join('');
-
-    const container = overlay.querySelector('#edit-schedule-entries');
-
-    function addSlot(slot = null) {
-        const day   = slot?.day   || 'Monday';
-        const start = slot?.start || '09:00';
-        const end   = slot?.end   || '10:00';
-        const S = DAY_STYLES[day] || { bg:'#f8fafc', border:'#e2e8f0', dot:'#94a3b8', accent:'#475569' };
-        const row = document.createElement('div');
-        row.style.cssText = `background:${S.bg};border:1.5px solid ${S.border};border-radius:14px;padding:13px 15px;`;
-        row.innerHTML = `
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-                <div style="display:flex;align-items:center;gap:7px;">
-                    <span class="edot" style="width:9px;height:9px;border-radius:50%;background:${S.dot};display:inline-block;flex-shrink:0;"></span>
-                    <span class="elbl" style="font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:${S.accent};">${escapeHtml(day)}</span>
-                </div>
-                <button class="rm-slot-btn" style="background:#fee2e2;border:none;color:#ef4444;width:28px;height:28px;border-radius:8px;font-size:.8rem;cursor:pointer;font-weight:700;">✕</button>
-            </div>
-            <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:10px;">
-                <div>
-                    <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Day</label>
-                    <select class="schedule-day" style="${selSt}">${dayOpts(day)}</select>
-                </div>
-                <div>
-                    <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Starts</label>
-                    <select class="schedule-start" style="${selSt}">${timeOpts(start)}</select>
-                </div>
-                <div>
-                    <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Ends</label>
-                    <select class="schedule-end" style="${selSt}">${timeOpts(end)}</select>
+    
+    DAYS_OF_WEEK.forEach(day => {
+        const dayEvents = scheduleByDay[day];
+        calendarHTML += `
+            <div class="calendar-day">
+                <div class="calendar-day-header">${day}</div>
+                <div class="calendar-day-events">
+                    ${dayEvents.length === 0 ? 
+                        '<div class="text-sm text-gray-400 text-center mt-4">No classes</div>' : 
+                        dayEvents.map(event => `
+                            <div class="calendar-event">
+                                <div class="font-medium text-xs">${event.student}</div>
+                                <div class="calendar-event-time">${event.time} ${event.isOvernight ? '🌙' : ''}</div>
+                                <div class="text-xs text-gray-500">${event.grade}</div>
+                                <button class="edit-schedule-btn mt-1" data-student-id="${event.studentId}">Edit</button>
+                            </div>
+                        `).join('')
+                    }
                 </div>
             </div>
         `;
-        // Live colour on day change
-        const sel = row.querySelector('.schedule-day');
-        sel.addEventListener('change', () => {
-            const d = sel.value;
-            const s = DAY_STYLES[d]||{bg:'#f8fafc',border:'#e2e8f0',dot:'#94a3b8',accent:'#475569'};
-            row.style.background=s.bg; row.style.borderColor=s.border;
-            row.querySelector('.edot').style.background=s.dot;
-            row.querySelector('.elbl').style.color=s.accent;
-            row.querySelector('.elbl').textContent=d;
+    });
+    
+    calendarHTML += `</div>`;
+    
+    calendarHTML += `
+        <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+            <h4 class="font-bold text-lg mb-3">Schedule Summary</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <p class="text-sm"><span class="font-semibold">Total Students with Schedule:</span> ${students.length}</p>
+                    <p class="text-sm"><span class="font-semibold">Total Weekly Classes:</span> ${Object.values(scheduleByDay).reduce((total, day) => total + day.length, 0)}</p>
+                </div>
+                <div>
+                    <p class="text-sm"><span class="font-semibold">Most Scheduled Day:</span> ${getMostScheduledDay(scheduleByDay)}</p>
+                    <p class="text-sm"><span class="font-semibold">Earliest Class:</span> ${getEarliestClass(scheduleByDay)}</p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('calendar-view').innerHTML = calendarHTML;
+    
+    document.querySelectorAll('.edit-schedule-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const studentId = e.target.getAttribute('data-student-id');
+            const student = students.find(s => s.id === studentId);
+            if (student) {
+                document.querySelector('.modal-overlay').remove();
+                showEditScheduleModal(student);
+            }
         });
-        row.querySelector('.rm-slot-btn').addEventListener('click', () => {
-            if (container.children.length > 1) row.remove();
-            else showCustomAlert('At least one time slot is required.');
-        });
-        container.appendChild(row);
-    }
+    });
+}
 
-    // Populate existing slots (or blank if none)
-    if (student.schedule && student.schedule.length > 0) {
-        student.schedule.forEach(s => addSlot(s));
-    } else {
-        addSlot();
-    }
-
-    overlay.querySelector('#add-edit-slot-btn').addEventListener('click', () => addSlot());
-
-    overlay.querySelector('#save-edit-schedule-btn').addEventListener('click', async () => {
-        const saveBtn = overlay.querySelector('#save-edit-schedule-btn');
-        const entries = container.querySelectorAll(':scope > div');
+// Edit Schedule Modal
+function showEditScheduleModal(student) {
+    const modalHTML = `
+        <div class="modal-overlay">
+            <div class="modal-content max-w-2xl">
+                <div class="modal-header">
+                    <h3 class="modal-title">✏️ Edit Schedule for ${student.studentName}</h3>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-4 p-3 bg-blue-50 rounded-lg">
+                        <p class="text-sm text-blue-700">Student: <strong>${student.studentName}</strong> | Grade: ${student.grade}</p>
+                        <p class="text-xs text-blue-500">Note: You can schedule overnight classes (e.g., 11 PM to 1 AM)</p>
+                    </div>
+                    
+                    <div id="schedule-entries" class="space-y-4">
+                        ${student.schedule && student.schedule.length > 0 ? 
+                            student.schedule.map(slot => `
+                                <div class="schedule-entry bg-gray-50 p-4 rounded-lg border">
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label class="form-label">Day of Week</label>
+                                            <select class="form-input schedule-day">
+                                                ${DAYS_OF_WEEK.map(day => `<option value="${day}" ${day === slot.day ? 'selected' : ''}>${day}</option>`).join('')}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="form-label">Start Time</label>
+                                            <select class="form-input schedule-start">
+                                                ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}" ${timeSlot.value === slot.start ? 'selected' : ''}>${timeSlot.label}</option>`).join('')}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="form-label">End Time</label>
+                                            <select class="form-input schedule-end">
+                                                ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}" ${timeSlot.value === slot.end ? 'selected' : ''}>${timeSlot.label}</option>`).join('')}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-danger btn-sm mt-2 remove-schedule-btn">Remove</button>
+                                </div>
+                            `).join('') : 
+                            `<div class="schedule-entry bg-gray-50 p-4 rounded-lg border">
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label class="form-label">Day of Week</label>
+                                        <select class="form-input schedule-day">
+                                            ${DAYS_OF_WEEK.map(day => `<option value="${day}">${day}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Start Time</label>
+                                        <select class="form-input schedule-start">
+                                            ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}">${timeSlot.label}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="form-label">End Time</label>
+                                        <select class="form-input schedule-end">
+                                            ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}">${timeSlot.label}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                </div>
+                                <button class="btn btn-danger btn-sm mt-2 remove-schedule-btn hidden">Remove</button>
+                            </div>`}
+                    </div>
+                    
+                    <button id="add-schedule-entry" class="btn btn-secondary btn-sm mt-2">
+                        ＋ Add Another Time Slot
+                    </button>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-edit-schedule-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="save-edit-schedule-btn" class="btn btn-primary" data-student-id="${student.id}">
+                        Save Schedule
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const modal = document.createElement('div');
+    modal.innerHTML = modalHTML;
+    document.body.appendChild(modal);
+    
+    document.getElementById('add-schedule-entry').addEventListener('click', () => {
+        const scheduleEntries = document.getElementById('schedule-entries');
+        const firstEntry = scheduleEntries.querySelector('.schedule-entry');
+        const newEntry = firstEntry.cloneNode(true);
+        // Reset values for new entry
+        newEntry.querySelector('.schedule-day').selectedIndex = 0;
+        newEntry.querySelector('.schedule-start').selectedIndex = 0;
+        newEntry.querySelector('.schedule-end').selectedIndex = 0;
+        newEntry.querySelector('.remove-schedule-btn').classList.remove('hidden');
+        scheduleEntries.appendChild(newEntry);
+    });
+    
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-schedule-btn')) {
+            const scheduleEntries = document.querySelectorAll('.schedule-entry');
+            if (scheduleEntries.length > 1) {
+                e.target.closest('.schedule-entry').remove();
+            } else {
+                showCustomAlert('You must have at least one schedule entry.');
+            }
+        }
+    });
+    
+    document.getElementById('cancel-edit-schedule-btn').addEventListener('click', () => {
+        modal.remove();
+        showScheduleCalendarModal();
+    });
+    
+    document.getElementById('save-edit-schedule-btn').addEventListener('click', async () => {
+        const scheduleEntries = document.querySelectorAll('.schedule-entry');
         const schedule = [];
         let hasError = false;
-
-        for (const entry of entries) {
-            const day   = entry.querySelector('.schedule-day').value;
+        
+        for (const entry of scheduleEntries) {
+            const day = entry.querySelector('.schedule-day').value;
             const start = entry.querySelector('.schedule-start').value;
-            const end   = entry.querySelector('.schedule-end').value;
-            const v = validateScheduleTime(start, end);
-            if (!v.valid) { showCustomAlert(v.message); hasError = true; break; }
-            schedule.push({ day, start, end, isOvernight: v.isOvernight||false, duration: v.duration });
+            const end = entry.querySelector('.schedule-end').value;
+            
+            const validation = validateScheduleTime(start, end);
+            if (!validation.valid) {
+                showCustomAlert(validation.message);
+                hasError = true;
+                break;
+            }
+            
+            schedule.push({ 
+                day, 
+                start, 
+                end,
+                isOvernight: validation.isOvernight || false,
+                duration: validation.duration
+            });
         }
-        if (hasError || !schedule.length) return;
-
-        saveBtn.disabled = true;
-        saveBtn.textContent = '⏳ Saving…';
+        
+        if (hasError) return;
+        
+        if (schedule.length === 0) {
+            showCustomAlert('Please add at least one schedule entry.');
+            return;
+        }
+        
         try {
-            await updateDoc(doc(db, 'students', student.id), { schedule });
-            closeMod();
+            const studentRef = doc(db, "students", student.id);
+            await updateDoc(studentRef, { schedule });
+            
+            modal.remove();
             showCustomAlert('✅ Schedule updated successfully!');
-            setTimeout(() => showScheduleCalendarModal(), 400);
-        } catch (err) {
-            console.error(err);
-            showCustomAlert('❌ Error saving: ' + err.message);
-            saveBtn.disabled = false;
-            saveBtn.textContent = '✅ Save Schedule';
+            
+            setTimeout(() => {
+                showScheduleCalendarModal();
+            }, 500);
+            
+        } catch (error) {
+            console.error("Error updating schedule:", error);
+            showCustomAlert('❌ Error updating schedule. Please try again.');
         }
     });
 }
 
 function printCalendar() {
-    // calendar-view lives inside the calendar overlay modal, not the main document
-    const calEl = document.querySelector('#calendar-overlay #calendar-view') || document.getElementById('calendar-view');
-    if (!calEl) { showCustomAlert('Please open the Calendar View first, then use Print.'); return; }
-    const calendarContent = calEl.innerHTML;
+    const calendarContent = document.getElementById('calendar-view').innerHTML;
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
         <html>
@@ -3022,8 +3483,8 @@ function printCalendar() {
             </head>
             <body>
                 <h2>Weekly Schedule Calendar</h2>
-                <p>Tutor: ${escapeHtml(window.tutorData.name)}</p>
-                <p>Generated on: ${escapeHtml(new Date().toLocaleDateString())}</p>
+                <p>Tutor: ${window.tutorData.name}</p>
+                <p>Generated on: ${new Date().toLocaleDateString()}</p>
                 <hr>
                 ${calendarContent}
                 <script>
@@ -3031,7 +3492,7 @@ function printCalendar() {
                         window.print();
                         setTimeout(() => window.close(), 1000);
                     }
-                <\/script>
+                </script>
             </body>
         </html>
     `);
@@ -3045,426 +3506,42 @@ function printCalendar() {
 let studentCache = [];
 
 // Enhanced Tutor Dashboard - WITH MESSAGING & INBOX FEATURES
-/*******************************************************************************
- * SCHEDULE MANAGEMENT TAB
- ******************************************************************************/
-function renderScheduleManagement(container, tutor) {
-    updateActiveTab('navScheduleManagement');
-    startPersistentClock(); // ← clock on every tab
-
-    container.innerHTML = `
-        <!-- Hero banner -->
-        <div style="background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 60%,#0891b2 100%);border-radius:20px;padding:28px 28px 24px;margin-bottom:24px;position:relative;overflow:hidden;">
-            <div style="position:absolute;inset:0;background:url('data:image/svg+xml,%3Csvg width=60 height=60 viewBox=%220 0 60 60%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg fill=%22none%22 fill-rule=%22evenodd%22%3E%3Cg fill=%22%23ffffff%22 fill-opacity=%220.05%22%3E%3Cpath d=%22M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');pointer-events:none;"></div>
-            <div style="position:relative;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;">
-                <div style="display:flex;align-items:center;gap:12px;">
-                    <div style="width:48px;height:48px;background:rgba(255,255,255,.18);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;border:1.5px solid rgba(255,255,255,.3);">📅</div>
-                    <div>
-                        <h2 style="color:#fff;font-weight:900;font-size:1.5rem;margin:0;letter-spacing:-.02em;">Schedule Management</h2>
-                        <p style="color:#bfdbfe;font-size:.82rem;margin:2px 0 0;">View, set up &amp; edit weekly class times for all your students</p>
-                    </div>
-                </div>
-                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-                    <button id="setup-all-schedules-btn" style="background:#fff;color:#1e3a8a;border:none;padding:11px 20px;border-radius:12px;font-weight:800;font-size:.875rem;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(0,0,0,.22);transition:all .2s;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 22px rgba(0,0,0,.28)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 14px rgba(0,0,0,.22)'">
-                        <span style="font-size:1rem;">⚙️</span> Set Up / Edit Schedules
-                    </button>
-                    <button id="view-full-calendar-btn" style="background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.45);padding:11px 20px;border-radius:12px;font-weight:700;font-size:.875rem;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .2s;backdrop-filter:blur(8px);" onmouseover="this.style.background='rgba(255,255,255,.28)'" onmouseout="this.style.background='rgba(255,255,255,.18)'">
-                        <span>📆</span> Calendar View
-                    </button>
-                    <button id="print-schedule-btn" style="background:rgba(255,255,255,.1);color:#bfdbfe;border:1.5px solid rgba(255,255,255,.2);padding:11px 16px;border-radius:12px;font-weight:600;font-size:.85rem;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s;" onmouseover="this.style.background='rgba(255,255,255,.2)'" onmouseout="this.style.background='rgba(255,255,255,.1)'">
-                        🖨️ Print
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Today's snapshot card -->
-        <div style="background:#fff;border-radius:18px;box-shadow:0 2px 14px rgba(0,0,0,.07);border:1px solid #f1f5f9;margin-bottom:20px;overflow:hidden;">
-            <div style="background:linear-gradient(90deg,#ecfdf5,#f0fdf4);border-bottom:2px solid #dcfce7;padding:14px 20px;display:flex;align-items:center;gap:10px;">
-                <div style="width:38px;height:38px;background:linear-gradient(135deg,#22c55e,#16a34a);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.1rem;box-shadow:0 3px 10px rgba(22,163,74,.3);">📊</div>
-                <h3 style="font-weight:800;font-size:1rem;color:#15803d;margin:0;flex:1;">Today's Classes</h3>
-                <span id="today-day-label" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-size:.7rem;font-weight:800;padding:4px 12px;border-radius:999px;text-transform:uppercase;letter-spacing:.05em;box-shadow:0 2px 6px rgba(22,163,74,.3);"></span>
-            </div>
-            <div style="padding:16px;" id="todays-schedule-inline">
-                <div style="text-align:center;padding:24px;"><div class="spinner mx-auto mb-2"></div><p style="color:#94a3b8;font-size:.875rem;">Loading…</p></div>
-            </div>
-        </div>
-
-        <!-- Full week grid card -->
-        <div style="background:#fff;border-radius:18px;box-shadow:0 2px 14px rgba(0,0,0,.07);border:1px solid #f1f5f9;overflow:hidden;">
-            <div style="background:linear-gradient(90deg,#eff6ff,#f0f9ff);border-bottom:2px solid #dbeafe;padding:14px 20px;display:flex;align-items:center;gap:10px;">
-                <div style="width:38px;height:38px;background:linear-gradient(135deg,#60a5fa,#2563eb);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.1rem;box-shadow:0 3px 10px rgba(37,99,235,.3);">🗓️</div>
-                <h3 style="font-weight:800;font-size:1rem;color:#1d4ed8;margin:0;flex:1;">Full Week Overview</h3>
-                <span style="color:#94a3b8;font-size:.72rem;font-weight:600;background:#f1f5f9;padding:3px 10px;border-radius:999px;">Sorted by time</span>
-            </div>
-            <div id="week-grid-container">
-                <div style="text-align:center;padding:32px;"><div class="spinner mx-auto mb-2"></div><p style="color:#94a3b8;font-size:.875rem;">Loading week…</p></div>
-            </div>
-        </div>
-    `;
-
-    // Wire buttons
-    document.getElementById('view-full-calendar-btn').addEventListener('click', showScheduleCalendarModal);
-    document.getElementById('print-schedule-btn').addEventListener('click', printCalendar);
-    document.getElementById('setup-all-schedules-btn').addEventListener('click', async () => {
-        try {
-            if (window.scheduleManager) {
-                await window.scheduleManager.openManualManager();
-            } else {
-                const firebaseDeps = { db, methods: { getDocs, query, collection, where, doc, updateDoc, setDoc, deleteDoc, getDoc } };
-                window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
-                await window.scheduleManager.openManualManager();
-            }
-        } catch (err) {
-            console.error(err);
-            showCustomAlert('Error opening schedule manager.');
-        }
-    });
-
-    // Load inline views
-    (async () => {
-        try {
-            const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Africa/Lagos' });
-            document.getElementById('today-day-label').textContent = todayName;
-
-            const allStudents = await fetchStudentsForTutor(tutor, "students");
-            const active = allStudents.filter(s => !s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status));
-
-            // Today's classes
-            const todayInline = document.getElementById('todays-schedule-inline');
-            const todayClasses = [];
-            active.forEach(s => {
-                (s.schedule || []).forEach(slot => {
-                    if (slot.day === todayName) todayClasses.push({ studentName: s.studentName, grade: s.grade, subjects: s.subjects, ...slot });
-                });
-            });
-            todayClasses.sort((a, b) => (a.start || '').localeCompare(b.start || ''));
-
-            if (todayClasses.length === 0) {
-                todayInline.innerHTML = `<div class="text-center py-6"><div class="text-3xl mb-2">🌿</div><p class="text-gray-500">No classes today (${todayName}).</p></div>`;
-            } else {
-                todayInline.innerHTML = `
-                    <div class="space-y-2">
-                        ${todayClasses.map(c => `
-                        <div class="flex items-center gap-4 p-3 rounded-xl border border-gray-100 bg-gray-50 hover:bg-green-50 hover:border-green-200 transition-all">
-                            <div class="w-10 h-10 rounded-xl bg-green-100 text-green-700 flex items-center justify-center font-bold text-sm flex-shrink-0">${escapeHtml((c.studentName||'?').charAt(0))}</div>
-                            <div class="flex-1 min-w-0">
-                                <p class="font-semibold text-gray-800">${escapeHtml(c.studentName)}</p>
-                                <p class="text-xs text-gray-400">${escapeHtml(c.grade || '')}${c.subjects?.length ? ' · ' + escapeHtml(c.subjects.join(', ')) : ''}</p>
-                            </div>
-                            <div class="text-right flex-shrink-0">
-                                <p class="text-sm font-bold text-green-700">${escapeHtml(formatScheduleTime(c.start))} – ${escapeHtml(formatScheduleTime(c.end))}</p>
-                                ${c.isOvernight ? '<p class="text-xs text-indigo-500">🌙 Overnight</p>' : ''}
-                            </div>
-                        </div>`).join('')}
-                    </div>`;
-            }
-
-            // Week grid
-            const weekContainer = document.getElementById('week-grid-container');
-            const scheduleByDay = {};
-            DAYS_OF_WEEK.forEach(d => { scheduleByDay[d] = []; });
-            active.forEach(s => {
-                (s.schedule || []).forEach(slot => {
-                    if (scheduleByDay[slot.day]) {
-                        scheduleByDay[slot.day].push({ studentName: s.studentName, grade: s.grade, subjects: s.subjects, ...slot });
-                    }
-                });
-            });
-            DAYS_OF_WEEK.forEach(d => scheduleByDay[d].sort((a, b) => (a.start || '').localeCompare(b.start || '')));
-
-            const totalClasses = Object.values(scheduleByDay).reduce((t, arr) => t + arr.length, 0);
-
-            let gridHtml = `
-            <div class="overflow-x-auto">
-              <div style="display:grid;grid-template-columns:repeat(7,minmax(130px,1fr));min-width:700px;">`;
-
-            const DAY_COLORS = {
-                Monday:    { bg:'#eff6ff', border:'#bfdbfe', hdr:'#1d4ed8', dot:'#3b82f6' },
-                Tuesday:   { bg:'#f5f3ff', border:'#ddd6fe', hdr:'#6d28d9', dot:'#8b5cf6' },
-                Wednesday: { bg:'#ecfdf5', border:'#bbf7d0', hdr:'#065f46', dot:'#10b981' },
-                Thursday:  { bg:'#fff7ed', border:'#fed7aa', hdr:'#9a3412', dot:'#f97316' },
-                Friday:    { bg:'#fdf4ff', border:'#e9d5ff', hdr:'#6b21a8', dot:'#a855f7' },
-                Saturday:  { bg:'#fef9c3', border:'#fde68a', hdr:'#92400e', dot:'#eab308' },
-                Sunday:    { bg:'#fff1f2', border:'#fecdd3', hdr:'#9f1239', dot:'#ef4444' },
-            };
-
-            DAYS_OF_WEEK.forEach((day, idx) => {
-                const isToday = day === todayName;
-                const classes = scheduleByDay[day];
-                const col = DAY_COLORS[day] || { bg:'#f9fafb', border:'#e5e7eb', hdr:'#374151', dot:'#6b7280' };
-                const borderL = idx === 0 ? '' : `border-left:1px solid #e5e7eb;`;
-
-                gridHtml += `
-                <div style="${borderL}border-bottom:1px solid #e5e7eb;">
-                    <div style="padding:8px 10px;font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;
-                        background:${isToday ? col.hdr : col.bg};
-                        color:${isToday ? '#fff' : col.hdr};
-                        border-bottom:2px solid ${isToday ? col.dot : col.border};
-                        display:flex;align-items:center;justify-content:space-between;">
-                        <span>${day.substring(0,3)}${isToday ? ' ◀' : ''}</span>
-                        <span style="background:${isToday ? 'rgba(255,255,255,0.25)' : col.border};color:${isToday ? '#fff' : col.hdr};
-                            border-radius:999px;padding:0 7px;font-size:0.7rem;font-weight:800;">${classes.length}</span>
-                    </div>
-                    <div style="padding:6px;min-height:90px;background:#fff;">
-                        ${classes.length === 0
-                            ? `<div style="color:#d1d5db;font-size:0.7rem;text-align:center;padding:14px 4px;font-style:italic;">No class</div>`
-                            : classes.map(c => `
-                            <div style="background:${col.bg};border:1px solid ${col.border};border-left:3px solid ${col.dot};
-                                border-radius:7px;padding:6px 8px;margin-bottom:5px;font-size:0.73rem;cursor:default;">
-                                <div style="font-weight:700;color:#1f2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.studentName)}</div>
-                                <div style="color:${col.hdr};font-weight:600;margin-top:1px;">${escapeHtml(formatScheduleTime(c.start))}–${escapeHtml(formatScheduleTime(c.end))}</div>
-                                ${c.subjects?.length ? `<div style="color:#9ca3af;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.68rem;margin-top:1px;">${escapeHtml(c.subjects.slice(0,2).join(', '))}</div>` : ''}
-                                ${c.isOvernight ? '<div style="color:#818cf8;font-size:0.67rem;">🌙 Overnight</div>' : ''}
-                            </div>`).join('')}
-                    </div>
-                </div>`;
-            });
-
-            gridHtml += `</div></div>
-            <div style="padding:12px 16px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:0.8rem;color:#6b7280;display:flex;gap:24px;flex-wrap:wrap;">
-                <span>👥 <b>${active.length}</b> active students</span>
-                <span>📚 <b>${totalClasses}</b> classes/week</span>
-                <span>🗓️ Busiest: <b>${getMostScheduledDay(scheduleByDay)}</b></span>
-                <span>⏰ Earliest: <b>${getEarliestClass(scheduleByDay)}</b></span>
-            </div>`;
-
-            weekContainer.innerHTML = gridHtml;
-
-        } catch (err) {
-            console.error(err);
-            document.getElementById('todays-schedule-inline').innerHTML = '<p class="text-red-500 text-center">Failed to load schedule.</p>';
-            document.getElementById('week-grid-container').innerHTML = '<p class="text-red-500 text-center">Failed to load week view.</p>';
-        }
-    })();
-}
-
-/*******************************************************************************
- * ACADEMIC TAB — Enhanced with monthly archive
- ******************************************************************************/
-function renderAcademic(container, tutor) {
-    updateActiveTab('navAcademic');
-    startPersistentClock(); // ← clock on every tab
-
-    container.innerHTML = `
-        <div class="hero-section">
-            <h1 class="hero-title">🎓 Academic</h1>
-            <p class="hero-subtitle">Record topics, assign homework, review submissions & view your archive</p>
-        </div>
-
-        <!-- Action Cards -->
-        <div class="student-actions-container">
-            <div class="student-action-card">
-                <div class="flex items-center gap-3 mb-3">
-                    <div class="stat-icon" style="width:44px;height:44px;font-size:1.2rem;border-radius:1rem;background:linear-gradient(135deg,#3b82f6,#1d4ed8);">📚</div>
-                    <h3 class="font-bold text-lg">Today's Topic</h3>
-                </div>
-                <p class="text-sm text-gray-600 mb-4">Record topics covered in today's classes.</p>
-                <select id="select-student-topic" class="form-input mb-3"><option value="">Select a student...</option></select>
-                <button id="add-topic-btn" class="btn btn-secondary w-full" disabled>Add Today's Topic</button>
-            </div>
-
-            <div class="student-action-card">
-                <div class="flex items-center gap-3 mb-3">
-                    <div class="stat-icon" style="width:44px;height:44px;font-size:1.2rem;border-radius:1rem;background:linear-gradient(135deg,#f59e0b,#d97706);">📝</div>
-                    <h3 class="font-bold text-lg">Assign Homework</h3>
-                </div>
-                <p class="text-sm text-gray-600 mb-4">Assign homework to your students.</p>
-                <select id="select-student-hw" class="form-input mb-3"><option value="">Select a student...</option></select>
-                <button id="assign-hw-btn" class="btn btn-warning w-full" disabled>Assign Homework</button>
-            </div>
-        </div>
-
-        <!-- Homework Inbox -->
-        <div class="card mt-4">
-            <div class="card-header flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <span class="text-xl">📨</span>
-                    <h3 class="font-bold text-lg">Homework Inbox</h3>
-                    <span class="badge badge-info text-xs" id="inbox-count">…</span>
-                </div>
-                <button id="refresh-inbox-btn" class="btn btn-secondary btn-sm">🔄 Refresh</button>
-            </div>
-            <div class="card-body" id="homework-inbox-container">
-                <div class="text-center py-6">
-                    <div class="spinner mx-auto mb-3"></div>
-                    <p class="text-gray-500">Loading submissions...</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Monthly Archive Accordion -->
-        <div class="card mt-4">
-            <div class="card-header flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <span class="text-xl">🗄️</span>
-                    <h3 class="font-bold text-lg">Academic Archive</h3>
-                </div>
-                <button id="load-archive-btn" class="btn btn-secondary btn-sm">📂 Load Archive</button>
-            </div>
-            <div class="card-body" id="academic-archive-container">
-                <p class="text-center text-gray-400 text-sm py-4">Click "Load Archive" to view your past topics & homework by month.</p>
-            </div>
-        </div>
-    `;
-
-    loadStudentDropdowns(tutor.email);
-
-    const addTopicBtn = document.getElementById('add-topic-btn');
-    if (addTopicBtn) addTopicBtn.addEventListener('click', () => {
-        const sid = document.getElementById('select-student-topic').value;
-        const s = getStudentFromCache(sid);
-        if (s) showDailyTopicModal(s);
-    });
-
-    const assignHwBtn = document.getElementById('assign-hw-btn');
-    if (assignHwBtn) assignHwBtn.addEventListener('click', () => {
-        const sid = document.getElementById('select-student-hw').value;
-        const s = getStudentFromCache(sid);
-        if (s) showHomeworkModal(s);
-    });
-
-    document.getElementById('select-student-topic')?.addEventListener('change', e => {
-        document.getElementById('add-topic-btn').disabled = !e.target.value;
-    });
-    document.getElementById('select-student-hw')?.addEventListener('change', e => {
-        document.getElementById('assign-hw-btn').disabled = !e.target.value;
-    });
-
-    document.getElementById('refresh-inbox-btn')?.addEventListener('click', () => loadHomeworkInbox(tutor.email));
-    loadHomeworkInbox(tutor.email);
-
-    // Archive loader
-    document.getElementById('load-archive-btn')?.addEventListener('click', () => loadAcademicArchive(tutor));
-}
-
-// Load and render the academic archive grouped by month
-async function loadAcademicArchive(tutor) {
-    const container = document.getElementById('academic-archive-container');
-    if (!container) return;
-    container.innerHTML = `<div class="text-center py-6"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading archive…</p></div>`;
-
-    try {
-        const [topicsSnap, hwSnap] = await Promise.all([
-            getDocs(query(collection(db, 'daily_topics'), where('tutorEmail', '==', tutor.email))),
-            getDocs(query(collection(db, 'homework_assignments'), where('tutorEmail', '==', tutor.email)))
-        ]);
-
-        // Organise by month
-        const months = {}; // 'YYYY-MM' → { topics:[], hw:[] }
-
-        topicsSnap.docs.forEach(d => {
-            const data = d.data();
-            const date = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || '');
-            if (isNaN(date.getTime())) return;
-            const mk = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
-            if (!months[mk]) months[mk] = { topics:[], hw:[] };
-            months[mk].topics.push({ date, text: data.topics || '', studentId: data.studentId });
-        });
-
-        hwSnap.docs.forEach(d => {
-            const data = d.data();
-            const raw = data.assignedAt || data.createdAt || data.uploadedAt;
-            const date = raw?.toDate ? raw.toDate() : new Date(raw || '');
-            if (isNaN(date.getTime())) return;
-            const mk = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
-            if (!months[mk]) months[mk] = { topics:[], hw:[] };
-            months[mk].hw.push({ date, title: data.title || 'Homework', studentName: data.studentName || '', score: data.score, feedback: data.feedback, status: data.status });
-        });
-
-        const sortedMonths = Object.keys(months).sort((a,b) => b.localeCompare(a));
-
-        if (sortedMonths.length === 0) {
-            container.innerHTML = '<p class="text-center text-gray-400 py-6">No academic records found yet.</p>';
-            return;
-        }
-
-        container.innerHTML = `<div class="space-y-2" id="archive-accordion"></div>`;
-        const accordion = document.getElementById('archive-accordion');
-
-        sortedMonths.forEach(mk => {
-            const { topics, hw } = months[mk];
-            const [y, m] = mk.split('-');
-            const label = new Date(parseInt(y), parseInt(m)-1, 1).toLocaleString('en-NG', { month:'long', year:'numeric' });
-
-            const item = document.createElement('details');
-            item.className = 'bg-white border border-gray-200 rounded-xl overflow-hidden';
-            item.innerHTML = `
-            <summary class="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 list-none">
-                <div class="flex-1">
-                    <span class="font-semibold text-gray-800">${escapeHtml(label)}</span>
-                </div>
-                <div class="flex gap-3 flex-shrink-0">
-                    <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-bold">${topics.length} topics</span>
-                    <span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs font-bold">${hw.length} H/W</span>
-                </div>
-                <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
-            </summary>
-            <div class="border-t border-gray-100 divide-y divide-gray-50">
-                <!-- Topics -->
-                ${topics.length > 0 ? `
-                <div class="p-3">
-                    <h4 class="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">📚 Topics Entered</h4>
-                    <div class="space-y-1.5">
-                        ${topics.sort((a,b) => b.date-a.date).map(t => `
-                        <div class="flex items-start gap-2 bg-blue-50 rounded-lg px-3 py-2">
-                            <span class="text-xs text-gray-400 flex-shrink-0 mt-0.5">${t.date.toLocaleDateString('en-NG', {day:'2-digit',month:'short'})}</span>
-                            <span class="text-sm text-gray-700">${escapeHtml(t.text)}</span>
-                        </div>`).join('')}
-                    </div>
-                </div>` : ''}
-                <!-- Homework -->
-                ${hw.length > 0 ? `
-                <div class="p-3">
-                    <h4 class="text-xs font-bold text-amber-600 uppercase tracking-wide mb-2">📝 Homework Assigned</h4>
-                    <div class="space-y-1.5">
-                        ${hw.sort((a,b) => b.date-a.date).map(h => `
-                        <div class="flex items-start justify-between bg-amber-50 rounded-lg px-3 py-2 gap-2">
-                            <div class="flex items-start gap-2 min-w-0">
-                                <span class="text-xs text-gray-400 flex-shrink-0 mt-0.5">${h.date.toLocaleDateString('en-NG', {day:'2-digit',month:'short'})}</span>
-                                <div class="min-w-0">
-                                    <span class="text-sm text-gray-700 font-medium">${escapeHtml(h.title)}</span>
-                                    ${h.studentName ? `<div class="text-xs text-gray-400">${escapeHtml(h.studentName)}</div>` : ''}
-                                    ${h.feedback ? `<div class="text-xs text-gray-500 italic mt-0.5">"${escapeHtml(h.feedback)}"</div>` : ''}
-                                </div>
-                            </div>
-                            ${h.score ? `<span class="bg-white border border-amber-200 text-amber-700 px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0">${escapeHtml(String(h.score))}/100</span>` : ''}
-                        </div>`).join('')}
-                    </div>
-                </div>` : ''}
-            </div>`;
-            accordion.appendChild(item);
-        });
-
-    } catch (err) {
-        console.error('Archive error:', err);
-        container.innerHTML = `<p class="text-red-500 text-center py-4">Error loading archive: ${escapeHtml(err.message)}</p>`;
-    }
-}
-
-/*******************************************************************************
- * DASHBOARD TAB
- ******************************************************************************/
 function renderTutorDashboard(container, tutor) {
     // Update active tab
     updateActiveTab('navDashboard');
-    startPersistentClock(); // ← clock on every tab
     
     container.innerHTML = `
-        <!-- Top bar: greeting + Lagos clock + Performance scorecard -->
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <div class="flex-1">
-                <h1 class="text-xl font-black text-gray-800">Welcome, ${escapeHtml(tutor.name || 'Tutor')}! 👋</h1>
-                <p class="text-sm text-gray-400">Review submissions, track your performance and manage students</p>
+        <div class="hero-section">
+            <h1 class="hero-title">Welcome, ${tutor.name || 'Tutor'}! 👋</h1>
+            <p class="hero-subtitle">Manage your students, submit reports, and track progress</p>
+        </div>
+        
+        <div class="student-actions-container">
+            <div class="student-action-card">
+                <h3 class="font-bold text-lg mb-3">📅 Schedule Management</h3>
+                <p class="text-sm text-gray-600 mb-4">Set up and view class schedules for all students</p>
+                <button id="view-full-calendar-btn" class="btn btn-info w-full mb-2">View Schedule Calendar</button>
+                <button id="setup-all-schedules-btn" class="btn btn-primary w-full">Set Up Schedules</button>
             </div>
-            <div class="flex flex-col items-end gap-1">
-                <div id="tutor-lagos-clock" class="text-sm font-semibold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 whitespace-nowrap">Loading time…</div>
-                <div class="text-xs text-gray-400">📍 Lagos, Nigeria (WAT)</div>
+            
+            <div class="student-action-card">
+                <h3 class="font-bold text-lg mb-3">📚 Today's Topic</h3>
+                <p class="text-sm text-gray-600 mb-4">Record topics covered in today's classes</p>
+                <select id="select-student-topic" class="form-input mb-3">
+                    <option value="">Select a student...</option>
+                </select>
+                <button id="add-topic-btn" class="btn btn-secondary w-full" disabled>Add Today's Topic</button>
+            </div>
+            
+            <div class="student-action-card">
+                <h3 class="font-bold text-lg mb-3">📝 Assign Homework</h3>
+                <p class="text-sm text-gray-600 mb-4">Assign homework to your students</p>
+                <select id="select-student-hw" class="form-input mb-3">
+                    <option value="">Select a student...</option>
+                </select>
+                <button id="assign-hw-btn" class="btn btn-warning w-full" disabled>Assign Homework</button>
             </div>
         </div>
-
-        <!-- Performance Scorecard always visible on dashboard -->
-        <div id="performance-widget" class="mb-4"></div>
         
         <div class="card">
             <div class="card-header">
@@ -3526,7 +3603,84 @@ function renderTutorDashboard(container, tutor) {
         </div>
     `;
 
-    // Toggle graded submissions visibility
+    // Load student dropdowns
+    loadStudentDropdowns(tutor.email);
+
+    // Add event listeners for new buttons
+    const viewCalendarBtn = document.getElementById('view-full-calendar-btn');
+if (viewCalendarBtn) {
+    viewCalendarBtn.addEventListener('click', showScheduleCalendarModal);
+}
+    
+    const setupSchedulesBtn = document.getElementById('setup-all-schedules-btn');
+if (setupSchedulesBtn) {
+    setupSchedulesBtn.addEventListener('click', async () => {
+        try {
+            // Check if scheduleManager already exists
+            if (window.scheduleManager) {
+                await window.scheduleManager.openManualManager();
+            } else {
+                // Create a new instance if it doesn't exist
+                const firebaseDeps = {
+                    db: db,
+                    methods: { 
+                        getDocs, query, collection, where, doc, updateDoc, 
+                        setDoc, deleteDoc, getDoc  // Added getDoc here
+                    }
+                };
+                window.scheduleManager = new ScheduleManager(tutor, firebaseDeps);
+                await window.scheduleManager.openManualManager();
+            }
+        } catch (error) {
+            console.error("Error opening schedule manager:", error);
+            showCustomAlert('Error opening schedule manager. Please try again.');
+        }
+    });
+}
+    
+    const addTopicBtn = document.getElementById('add-topic-btn');
+    if (addTopicBtn) {
+        addTopicBtn.addEventListener('click', () => {
+            const studentId = document.getElementById('select-student-topic').value;
+            const student = getStudentFromCache(studentId);
+            if (student) {
+                showDailyTopicModal(student);
+            }
+        });
+    }
+    
+    const assignHwBtn = document.getElementById('assign-hw-btn');
+    if (assignHwBtn) {
+        assignHwBtn.addEventListener('click', () => {
+            const studentId = document.getElementById('select-student-hw').value;
+            const student = getStudentFromCache(studentId);
+            if (student) {
+                showHomeworkModal(student);
+            }
+        });
+    }
+    
+    // Enable buttons when students are selected
+    const topicSelect = document.getElementById('select-student-topic');
+    if (topicSelect) {
+        topicSelect.addEventListener('change', (e) => {
+            const addTopicBtn = document.getElementById('add-topic-btn');
+            if (addTopicBtn) {
+                addTopicBtn.disabled = !e.target.value;
+            }
+        });
+    }
+    
+    const hwSelect = document.getElementById('select-student-hw');
+    if (hwSelect) {
+        hwSelect.addEventListener('change', (e) => {
+            const assignHwBtn = document.getElementById('assign-hw-btn');
+            if (assignHwBtn) {
+                assignHwBtn.disabled = !e.target.value;
+            }
+        });
+    }
+
     const toggleGradedBtn = document.getElementById('toggle-graded-btn');
     if (toggleGradedBtn) {
         toggleGradedBtn.addEventListener('click', () => {
@@ -3553,44 +3707,17 @@ function renderTutorDashboard(container, tutor) {
     }
 
     loadTutorReports(tutor.email);
-
-    // Start Lagos clock on dashboard
-    (function startTutorClock() {
-        function getLagosTime() {
-            return new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
-        }
-        function formatLagosDT() {
-            const opts = { weekday:'short', day:'numeric', month:'short', year:'numeric',
-                           hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true, timeZone:'Africa/Lagos' };
-            return new Intl.DateTimeFormat('en-NG', opts).format(new Date());
-        }
-        const clockEl = document.getElementById('tutor-lagos-clock');
-        if (clockEl) {
-            clockEl.textContent = formatLagosDT();
-            // Store interval id so it can be cleared on tab switch
-            if (window._tutorClockInterval) clearInterval(window._tutorClockInterval);
-            window._tutorClockInterval = setInterval(() => {
-                const el = document.getElementById('tutor-lagos-clock');
-                if (el) el.textContent = formatLagosDT();
-                else clearInterval(window._tutorClockInterval);
-            }, 1000);
-        }
-    })();
-
-    // Init performance scorecard (real-time listener to tutor doc)
-    if (tutor.id) initGamification(tutor.id);
 }
 
 async function loadStudentDropdowns(tutorEmail) {
     try {
-        // Fetch by tutorEmail AND tutorId (management assigns via tutorId)
-        const tutorObj = window.tutorData || { email: tutorEmail, id: null };
-        const studentDocs = await fetchStudentsForTutor(tutorObj, "students");
+        const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
+        const studentsSnapshot = await getDocs(studentsQuery);
         
         studentCache = [];
         const students = [];
-        studentDocs.forEach(student => {
-            // student already has id and data merged by fetchStudentsForTutor
+        studentsSnapshot.forEach(doc => {
+            const student = { id: doc.id, ...doc.data() };
             // Filter out archived students
             if (!['archived', 'graduated', 'transferred'].includes(student.status)) {
                 students.push(student);
@@ -3608,7 +3735,7 @@ async function loadStudentDropdowns(tutorEmail) {
             students.forEach(student => {
                 const option = document.createElement('option');
                 option.value = student.id;
-                option.textContent = `${escapeHtml(student.studentName)} (${escapeHtml(student.grade)})`;
+                option.textContent = `${student.studentName} (${student.grade})`;
                 
                 const option2 = option.cloneNode(true);
                 topicSelect.appendChild(option);
@@ -3631,44 +3758,31 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
     if (!pendingReportsContainer) return;
     
     pendingReportsContainer.innerHTML = `
-        <div class="card"><div class="card-body text-center">
-            <div class="spinner mx-auto mb-2"></div>
-            <p class="text-gray-500">Loading submissions...</p>
-        </div></div>`;
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="spinner mx-auto mb-2"></div>
+                <p class="text-gray-500">Loading submissions...</p>
+            </div>
+        </div>
+    `;
     
     if (gradedReportsContainer) {
         gradedReportsContainer.innerHTML = `
-            <div class="card"><div class="card-body text-center">
-                <div class="spinner mx-auto mb-2"></div>
-                <p class="text-gray-500">Loading graded submissions...</p>
-            </div></div>`;
+            <div class="card">
+                <div class="card-body text-center">
+                    <div class="spinner mx-auto mb-2"></div>
+                    <p class="text-gray-500">Loading graded submissions...</p>
+                </div>
+            </div>
+        `;
     }
 
     try {
-        // Fetch active students (not on break) to use as a filter
-        const activeStudentsSnap = await getDocs(query(
-            collection(db, 'students'),
-            where('tutorEmail', '==', tutorEmail)
-        ));
-        const activeStudentIds = new Set();
-        const activeStudentMap = {};
-        const breakOrTransitionNames = new Set(); // extra name-based guard
-        activeStudentsSnap.docs.forEach(d => {
-            const s = d.data();
-            // Exclude: on break, archived/graduated/transferred, OR actively transitioning
-            if (!s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status)) {
-                activeStudentIds.add(d.id);
-                activeStudentMap[d.id] = s;
-            } else {
-                // Track names of excluded students so we can also filter by name
-                if (s.studentName) breakOrTransitionNames.add(s.studentName.trim().toLowerCase());
-            }
-        });
-
         let assessmentsQuery = query(
             collection(db, "student_results"), 
             where("tutorEmail", "==", tutorEmail)
         );
+
         if (parentName) {
             assessmentsQuery = query(assessmentsQuery, where("parentName", "==", parentName));
         }
@@ -3678,6 +3792,7 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
             where("tutorEmail", "==", tutorEmail),
             where("type", "==", "creative_writing")
         );
+
         if (parentName) {
             creativeWritingQuery = query(creativeWritingQuery, where("parentName", "==", parentName));
         }
@@ -3687,195 +3802,270 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
             getDocs(creativeWritingQuery)
         ]);
 
-        let pendingItems = []; // { studentName, grade } — simple list
+        let pendingHTML = '';
         let gradedHTML = '';
         let pendingCount = 0;
         let gradedCount = 0;
 
-        assessmentsSnapshot.forEach(docSnap => {
-            const data = docSnap.data();
-            // Skip break / inactive students — by ID or by name fallback
-            if (data.studentId && !activeStudentIds.has(data.studentId)) return;
-            if (!data.studentId && data.studentName && breakOrTransitionNames.has(data.studentName.trim().toLowerCase())) return;
-
+        assessmentsSnapshot.forEach(doc => {
+            const data = doc.data();
             const needsFeedback = data.answers && data.answers.some(answer => 
                 answer.type === 'creative-writing' && 
                 (!answer.tutorReport || answer.tutorReport.trim() === '')
             );
 
+            const reportCard = `
+                <div class="card">
+                    <div class="card-body">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h4 class="font-bold text-lg">${data.studentName}</h4>
+                                <p class="text-gray-600">${data.parentName || 'N/A'} • ${data.grade}</p>
+                            </div>
+                            <span class="badge ${needsFeedback ? 'badge-warning' : 'badge-success'}">
+                                ${needsFeedback ? 'Pending Review' : 'Graded'}
+                            </span>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <div class="bg-gray-50 p-3 rounded">
+                                <span class="text-sm text-gray-500">Type:</span>
+                                <p class="font-medium">Multiple-Choice Test</p>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded">
+                                <span class="text-sm text-gray-500">Submitted:</span>
+                                <p class="font-medium">${new Date(data.submittedAt.seconds * 1000).toLocaleDateString()}</p>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded">
+                                <span class="text-sm text-gray-500">Status:</span>
+                                <p class="font-medium">${needsFeedback ? 'Needs Feedback' : 'Completed'}</p>
+                            </div>
+                        </div>
+
+                        <div class="border-t pt-4">
+                            <h5 class="font-semibold mb-2">Assessment Details:</h5>
+                            ${data.answers ? data.answers.map((answer, index) => {
+                                if (answer.type === 'creative-writing') {
+                                    return `
+                                        <div class="mb-4 p-4 bg-blue-50 rounded-lg">
+                                            <div class="flex justify-between items-start mb-2">
+                                                <h6 class="font-semibold">Creative Writing</h6>
+                                                <span class="badge ${answer.tutorReport ? 'badge-success' : 'badge-warning'}">
+                                                    ${answer.tutorReport ? 'Graded' : 'Pending'}
+                                                </span>
+                                            </div>
+                                            <p class="italic text-gray-700 mb-3">${answer.textAnswer || "No response"}</p>
+                                            ${answer.fileUrl ? `
+                                                <a href="${answer.fileUrl}" target="_blank" class="btn btn-secondary btn-sm">
+                                                    📎 Download File
+                                                </a>
+                                            ` : ''}
+                                            
+                                            ${!answer.tutorReport ? `
+                                                <div class="mt-3">
+                                                    <label class="form-label">Your Feedback</label>
+                                                    <textarea class="form-input form-textarea tutor-report" rows="3" placeholder="Write your feedback here..."></textarea>
+                                                    <button class="btn btn-primary mt-2 submit-report-btn" 
+                                                            data-doc-id="${doc.id}" 
+                                                            data-collection="student_results" 
+                                                            data-answer-index="${index}">
+                                                        Submit Feedback
+                                                    </button>
+                                                </div>
+                                            ` : `
+                                                <div class="mt-3 bg-white p-3 rounded border">
+                                                    <label class="form-label">Your Feedback:</label>
+                                                    <p class="text-gray-700">${answer.tutorReport || 'N/A'}</p>
+                                                </div>
+                                            `}
+                                        </div>
+                                    `;
+                                }
+                                return '';
+                            }).join('') : '<p class="text-gray-500">No assessment data available.</p>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+
             if (needsFeedback) {
                 if (!statusFilter || statusFilter === 'pending') {
-                    pendingItems.push({ studentName: data.studentName || 'Unknown', grade: data.grade || 'N/A' });
+                    pendingHTML += reportCard;
                     pendingCount++;
                 }
             } else {
                 if (!statusFilter || statusFilter === 'graded') {
-                    gradedHTML += buildReportCard(docSnap, data, false);
+                    gradedHTML += reportCard;
                     gradedCount++;
                 }
             }
         });
 
-        creativeWritingSnapshot.forEach(docSnap => {
-            const data = docSnap.data();
-            if (data.studentId && !activeStudentIds.has(data.studentId)) return;
-            if (!data.studentId && data.studentName && breakOrTransitionNames.has(data.studentName.trim().toLowerCase())) return;
-
+        creativeWritingSnapshot.forEach(doc => {
+            const data = doc.data();
             const needsFeedback = !data.tutorReport || data.tutorReport.trim() === '';
 
+            const creativeWritingCard = `
+                <div class="card border-l-4 border-blue-500">
+                    <div class="card-body">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h4 class="font-bold text-lg">${data.studentName}</h4>
+                                <p class="text-gray-600">${data.parentName || 'N/A'} • ${data.grade}</p>
+                            </div>
+                            <span class="badge ${needsFeedback ? 'badge-warning' : 'badge-success'}">
+                                ${needsFeedback ? 'Pending Review' : 'Graded'}
+                            </span>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <div class="bg-blue-50 p-3 rounded">
+                                <span class="text-sm text-blue-500">Type:</span>
+                                <p class="font-medium">Creative Writing</p>
+                            </div>
+                            <div class="bg-blue-50 p-3 rounded">
+                                <span class="text-sm text-blue-500">Submitted:</span>
+                                <p class="font-medium">${new Date(data.submittedAt.seconds * 1000).toLocaleDateString()}</p>
+                            </div>
+                            <div class="bg-blue-50 p-3 rounded">
+                                <span class="text-sm text-blue-500">Status:</span>
+                                <p class="font-medium">${needsFeedback ? 'Needs Review' : 'Completed'}</p>
+                            </div>
+                        </div>
+
+                        <div class="border-t pt-4">
+                            <h5 class="font-semibold mb-2">Writing Assignment:</h5>
+                            <div class="mb-4 p-4 bg-blue-50 rounded-lg">
+                                <p class="font-medium mb-2">${data.questionText || 'Creative Writing Assignment'}</p>
+                                <p class="italic text-gray-700 bg-white p-3 rounded border">${data.textAnswer || "No response"}</p>
+                                ${data.fileUrl ? `
+                                    <a href="${data.fileUrl}" target="_blank" class="btn btn-secondary btn-sm mt-3">
+                                        📎 Download Attachment
+                                    </a>
+                                ` : ''}
+                            </div>
+                            
+                            ${!data.tutorReport ? `
+                                <div class="mt-4">
+                                    <label class="form-label">Your Feedback</label>
+                                    <textarea class="form-input form-textarea tutor-report" rows="4" placeholder="Provide constructive feedback on the student's writing..."></textarea>
+                                    <button class="btn btn-primary mt-3 submit-report-btn" 
+                                            data-doc-id="${doc.id}" 
+                                            data-collection="tutor_submissions">
+                                        Submit Feedback
+                                    </button>
+                                </div>
+                            ` : `
+                                <div class="mt-4 bg-white p-4 rounded border">
+                                    <label class="form-label">Your Feedback:</label>
+                                    <p class="text-gray-700">${data.tutorReport || 'N/A'}</p>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            `;
+
             if (needsFeedback) {
                 if (!statusFilter || statusFilter === 'pending') {
-                    pendingItems.push({ studentName: data.studentName || 'Unknown', grade: data.grade || 'N/A' });
+                    pendingHTML += creativeWritingCard;
                     pendingCount++;
                 }
             } else {
                 if (!statusFilter || statusFilter === 'graded') {
-                    gradedHTML += buildCreativeWritingCard(docSnap, data);
+                    gradedHTML += creativeWritingCard;
                     gradedCount++;
                 }
             }
         });
 
-        // Render pending list — compact, name + grade only
-        const pendingCountEl = document.getElementById('pending-count');
-        if (pendingCountEl) pendingCountEl.textContent = pendingCount;
-
-        if (pendingItems.length === 0) {
-            pendingReportsContainer.innerHTML = `
-                <div class="card"><div class="card-body text-center">
-                    <div style="font-size:2.5rem;margin-bottom:8px;">🎉</div>
-                    <p class="text-gray-500 font-medium">All caught up! No pending submissions.</p>
-                </div></div>`;
-        } else {
-            const ACOLORS = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
-            pendingReportsContainer.innerHTML = `
-                <div class="card">
-                    <div class="card-body p-0">
-                        ${pendingItems.map((item, i) => {
-                            const initials = (item.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-                            const color = ACOLORS[(item.studentName||'').charCodeAt(0) % ACOLORS.length];
-                            return `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;${i < pendingItems.length-1 ? 'border-bottom:1px solid #f1f5f9;' : ''}transition:background .1s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
-                                <div style="width:34px;height:34px;border-radius:10px;background:${color};color:#fff;font-weight:800;font-size:.72rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml(initials)}</div>
-                                <div style="flex:1;min-width:0;">
-                                    <div style="font-size:.875rem;font-weight:700;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.studentName)}</div>
-                                    ${item.grade && item.grade !== 'N/A' ? `<div style="font-size:.72rem;color:#94a3b8;">${escapeHtml(item.grade)}</div>` : ''}
-                                </div>
-                                <div style="background:#fef3c7;color:#92400e;font-size:.68rem;font-weight:800;padding:3px 8px;border-radius:999px;flex-shrink:0;">PENDING</div>
-                            </div>`;
-                        }).join('')}
-                    </div>
-                </div>`;
+        const pendingCountElement = document.getElementById('pending-count');
+        if (pendingCountElement) {
+            pendingCountElement.textContent = `${pendingCount} Pending`;
         }
-
+        
+        pendingReportsContainer.innerHTML = pendingHTML || `
+            <div class="card">
+                <div class="card-body text-center">
+                    <div class="text-gray-400 text-4xl mb-3">📭</div>
+                    <h4 class="font-bold text-gray-600 mb-2">No Pending Submissions</h4>
+                    <p class="text-gray-500">All caught up! No submissions need your review.</p>
+                </div>
+            </div>
+        `;
+        
         if (gradedReportsContainer) {
-            gradedReportsContainer.innerHTML = gradedHTML ||
-                `<div class="card"><div class="card-body text-center text-gray-500">No graded submissions yet.</div></div>`;
+            gradedReportsContainer.innerHTML = gradedHTML || `
+                <div class="card">
+                    <div class="card-body text-center">
+                        <div class="text-gray-400 text-4xl mb-3">✅</div>
+                        <h4 class="font-bold text-gray-600 mb-2">No Graded Submissions</h4>
+                        <p class="text-gray-500">No submissions have been graded yet.</p>
+                    </div>
+                </div>
+            `;
         }
 
-        // Attach submit feedback listeners
-        attachSubmitReportListeners();
-
+        document.querySelectorAll('.submit-report-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const docId = e.target.getAttribute('data-doc-id');
+                const collectionName = e.target.getAttribute('data-collection');
+                const answerIndex = e.target.getAttribute('data-answer-index');
+                const reportTextarea = e.target.closest('.mb-4, .mt-4').querySelector('.tutor-report');
+                const tutorReport = reportTextarea.value.trim();
+                
+                if (tutorReport) {
+                    try {
+                        const docRef = doc(db, collectionName, docId);
+                        
+                        if (collectionName === "student_results" && answerIndex !== null) {
+                            const docSnap = await getDoc(docRef);
+                            const currentData = docSnap.data();
+                            
+                            const updatedAnswers = [...currentData.answers];
+                            updatedAnswers[parseInt(answerIndex)] = {
+                                ...updatedAnswers[parseInt(answerIndex)],
+                                tutorReport: tutorReport,
+                                gradedAt: new Date()
+                            };
+                            
+                            await updateDoc(docRef, { 
+                                answers: updatedAnswers,
+                                hasTutorFeedback: true
+                            });
+                        } else {
+                            await updateDoc(docRef, { 
+                                tutorReport: tutorReport,
+                                gradedAt: new Date(),
+                                status: "graded"
+                            });
+                        }
+                        
+                        showCustomAlert('✅ Feedback submitted successfully!');
+                        loadTutorReports(tutorEmail, parentName, statusFilter);
+                    } catch (error) {
+                        console.error("Error submitting feedback:", error);
+                        showCustomAlert('❌ Failed to submit feedback. Please try again.');
+                    }
+                } else {
+                    showCustomAlert('Please write some feedback before submitting.');
+                }
+            });
+        });
     } catch (error) {
-        console.error("Error loading reports:", error);
-        if (pendingReportsContainer) pendingReportsContainer.innerHTML =
-            `<div class="card"><div class="card-body text-center text-red-500">Error loading submissions.</div></div>`;
+        console.error("Error loading tutor reports:", error);
+        pendingReportsContainer.innerHTML = `
+            <div class="card">
+                <div class="card-body text-center">
+                    <div class="text-red-400 text-4xl mb-3">⚠️</div>
+                    <h4 class="font-bold text-red-600 mb-2">Failed to Load Reports</h4>
+                    <p class="text-gray-500">Please check your connection and try again.</p>
+                    <button class="btn btn-primary mt-3" onclick="location.reload()">Retry</button>
+                </div>
+            </div>
+        `;
     }
 }
-
-// Helper: Build a standard report card HTML string
-function buildReportCard(docRef, data, needsFeedback) {
-    const dateStr = data.gradedAt ? (data.gradedAt.toDate ? data.gradedAt.toDate() : new Date(data.gradedAt)).toLocaleDateString('en-NG', {day:'numeric',month:'short',year:'numeric'}) :
-                    data.submittedAt ? (data.submittedAt.toDate ? data.submittedAt.toDate() : new Date(data.submittedAt)).toLocaleDateString('en-NG', {day:'numeric',month:'short',year:'numeric'}) : '';
-    const subject = data.subject || data.grade || '';
-    const ACOLORS = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
-    const color = ACOLORS[(data.studentName||'').charCodeAt(0) % ACOLORS.length];
-    const initials = (data.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    return `
-    <div style="background:#fff;border-radius:14px;border:1px solid #f1f5f9;box-shadow:0 2px 8px rgba(0,0,0,.06);overflow:hidden;margin-bottom:10px;">
-        <div style="background:linear-gradient(90deg,#f8fafc,#f1f5f9);padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f1f5f9;">
-            <div style="width:36px;height:36px;border-radius:10px;background:${color};color:#fff;font-weight:800;font-size:.75rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml(initials)}</div>
-            <div style="flex:1;min-width:0;">
-                <div style="font-weight:700;color:#1e293b;font-size:.9rem;">${escapeHtml(data.studentName)}</div>
-                <div style="font-size:.72rem;color:#64748b;display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;">
-                    ${subject ? `<span>📚 ${escapeHtml(subject)}</span>` : ''}
-                    ${dateStr ? `<span>📅 ${dateStr}</span>` : ''}
-                </div>
-            </div>
-            <span style="background:#d1fae5;color:#065f46;font-size:.68rem;font-weight:800;padding:3px 10px;border-radius:999px;">✅ Graded</span>
-        </div>
-        <div style="padding:12px 16px;">
-            ${data.answers ? data.answers.filter(a => a.type === 'creative-writing').map(answer => `
-                <div style="background:#f0f9ff;border-radius:10px;padding:10px 12px;margin-bottom:8px;border-left:3px solid #60a5fa;">
-                    <div style="font-size:.75rem;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Student Response</div>
-                    <p style="font-style:italic;color:#334155;font-size:.875rem;line-height:1.5;">${escapeHtml(answer.textAnswer || "No response")}</p>
-                    ${answer.tutorReport ? `<div style="margin-top:8px;background:#fff;border-radius:8px;padding:8px 10px;border:1px solid #bae6fd;">
-                        <div style="font-size:.7rem;font-weight:700;color:#0891b2;text-transform:uppercase;margin-bottom:3px;">💬 Your Comment</div>
-                        <p style="font-size:.875rem;color:#0369a1;">${escapeHtml(answer.tutorReport)}</p>
-                    </div>` : ''}
-                </div>`).join('') : ''}
-        </div>
-    </div>`;
-}
-
-function buildCreativeWritingCard(docRef, data) {
-    const dateStr = data.gradedAt ? (data.gradedAt.toDate ? data.gradedAt.toDate() : new Date(data.gradedAt)).toLocaleDateString('en-NG', {day:'numeric',month:'short',year:'numeric'}) :
-                    data.submittedAt ? (data.submittedAt.toDate ? data.submittedAt.toDate() : new Date(data.submittedAt)).toLocaleDateString('en-NG', {day:'numeric',month:'short',year:'numeric'}) : '';
-    const subject = data.subject || data.type || 'Creative Writing';
-    const ACOLORS = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
-    const color = ACOLORS[(data.studentName||'').charCodeAt(0) % ACOLORS.length];
-    const initials = (data.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    return `
-    <div style="background:#fff;border-radius:14px;border:1px solid #f1f5f9;box-shadow:0 2px 8px rgba(0,0,0,.06);overflow:hidden;margin-bottom:10px;">
-        <div style="background:linear-gradient(90deg,#f8fafc,#fdf4ff);padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f3e8ff;">
-            <div style="width:36px;height:36px;border-radius:10px;background:${color};color:#fff;font-weight:800;font-size:.75rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml(initials)}</div>
-            <div style="flex:1;min-width:0;">
-                <div style="font-weight:700;color:#1e293b;font-size:.9rem;">${escapeHtml(data.studentName)}</div>
-                <div style="font-size:.72rem;color:#64748b;display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;">
-                    <span>✍️ ${escapeHtml(subject)}</span>
-                    ${dateStr ? `<span>📅 ${dateStr}</span>` : ''}
-                </div>
-            </div>
-            <span style="background:#d1fae5;color:#065f46;font-size:.68rem;font-weight:800;padding:3px 10px;border-radius:999px;">✅ Graded</span>
-        </div>
-        <div style="padding:12px 16px;">
-            <div style="background:#fdf4ff;border-radius:10px;padding:10px 12px;border-left:3px solid #a855f7;">
-                <div style="font-size:.75rem;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Student Writing</div>
-                <p style="font-style:italic;color:#334155;font-size:.875rem;line-height:1.5;">${escapeHtml(data.textAnswer || "No response")}</p>
-            </div>
-            ${data.tutorReport ? `<div style="margin-top:8px;background:#fffbeb;border-radius:10px;padding:10px 12px;border:1px solid #fde68a;border-left:3px solid #f59e0b;">
-                <div style="font-size:.7rem;font-weight:700;color:#b45309;text-transform:uppercase;margin-bottom:3px;">💬 Your Comment</div>
-                <p style="font-size:.875rem;color:#92400e;">${escapeHtml(data.tutorReport)}</p>
-            </div>` : ''}
-        </div>
-    </div>`;
-}
-
-function attachSubmitReportListeners() {
-    document.querySelectorAll('.submit-report-btn').forEach(button => {
-        button.addEventListener('click', async (e) => {
-            const docId = e.target.dataset.docId;
-            const collectionName = e.target.dataset.collection;
-            const answerIndex = parseInt(e.target.dataset.answerIndex);
-            const feedback = e.target.closest('.mb-4').querySelector('.tutor-report').value.trim();
-            if (!feedback) { showCustomAlert('Please write feedback before submitting.'); return; }
-            try {
-                e.target.disabled = true; e.target.textContent = 'Submitting…';
-                const docRef2 = doc(db, collectionName, docId);
-                const docSnap2 = await getDoc(docRef2);
-                if (docSnap2.exists()) {
-                    const answers = [...(docSnap2.data().answers || [])];
-                    if (answers[answerIndex]) { answers[answerIndex].tutorReport = feedback; }
-                    await updateDoc(docRef2, { answers });
-                    showCustomAlert('✅ Feedback submitted!');
-                    loadTutorReports(window.tutorData?.email);
-                }
-            } catch (err) { console.error(err); showCustomAlert('❌ Error submitting feedback.'); }
-        });
-    });
-}
-
-/*******************************************************************************
- * SECTION 12: STUDENT DATABASE MANAGEMENT
 
 /*******************************************************************************
  * SECTION 12: STUDENT DATABASE MANAGEMENT (FINAL FIXED VERSION WITH NEW FEATURES)
@@ -3948,9 +4138,9 @@ function getNewStudentFormFields() {
     for (const category in subjectsByCategory) {
         subjectsHTML += `
             <details>
-                <summary class="font-semibold cursor-pointer text-sm">${escapeHtml(category)}</summary>
+                <summary class="font-semibold cursor-pointer text-sm">${category}</summary>
                 <div class="pl-4 grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-                    ${subjectsByCategory[category].map(subject => `<div><label class="text-sm font-normal"><input type="checkbox" name="subjects" value="${escapeHtml(subject)}"> ${escapeHtml(subject)}</label></div>`).join('')}
+                    ${subjectsByCategory[category].map(subject => `<div><label class="text-sm font-normal"><input type="checkbox" name="subjects" value="${subject}"> ${subject}</label></div>`).join('')}
                 </div>
             </details>
         `;
@@ -3991,7 +4181,7 @@ function showEditStudentModal(student) {
     
     for (let i = 1; i <= 12; i++) {
         const gradeValue = `Grade ${i}`;
-        gradeOptions += `<option value="${escapeHtml(gradeValue)}" ${student.grade === gradeValue ? 'selected' : ''}>${escapeHtml(gradeValue)}</option>`;
+        gradeOptions += `<option value="${gradeValue}" ${student.grade === gradeValue ? 'selected' : ''}>${gradeValue}</option>`;
     }
     
     gradeOptions += `
@@ -4017,11 +4207,11 @@ function showEditStudentModal(student) {
     for (const category in subjectsByCategory) {
         subjectsHTML += `
             <details>
-                <summary class="font-semibold cursor-pointer text-sm">${escapeHtml(category)}</summary>
+                <summary class="font-semibold cursor-pointer text-sm">${category}</summary>
                 <div class="pl-4 grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
                     ${subjectsByCategory[category].map(subject => {
                         const isChecked = student.subjects && student.subjects.includes(subject);
-                        return `<div><label class="text-sm font-normal"><input type="checkbox" name="edit-subjects" value="${escapeHtml(subject)}" ${isChecked ? 'checked' : ''}> ${escapeHtml(subject)}</label></div>`;
+                        return `<div><label class="text-sm font-normal"><input type="checkbox" name="edit-subjects" value="${subject}" ${isChecked ? 'checked' : ''}> ${subject}</label></div>`;
                     }).join('')}
                 </div>
             </details>
@@ -4030,11 +4220,11 @@ function showEditStudentModal(student) {
     subjectsHTML += `<div class="font-semibold pt-2 border-t"><label class="text-sm"><input type="checkbox" name="edit-subjects" value="Music" ${student.subjects && student.subjects.includes('Music') ? 'checked' : ''}> Music</label></div></div>`;
 
     const editFormHTML = `
-        <h3 class="text-xl font-bold mb-4">Edit Student: ${escapeHtml(student.studentName)}</h3>
+        <h3 class="text-xl font-bold mb-4">Edit Student: ${student.studentName}</h3>
         <div class="space-y-4">
-            <div><label class="block font-semibold">Parent Name</label><input type="text" id="edit-parent-name" class="w-full mt-1 p-2 border rounded" value="${escapeHtml(student.parentName || '')}" placeholder="Parent Name"></div>
-            <div><label class="block font-semibold">Parent Phone Number</label><input type="tel" id="edit-parent-phone" class="w-full mt-1 p-2 border rounded" value="${escapeHtml(student.parentPhone || '')}" placeholder="Parent Phone Number"></div>
-            <div><label class="block font-semibold">Student Name</label><input type="text" id="edit-student-name" class="w-full mt-1 p-2 border rounded" value="${escapeHtml(student.studentName || '')}" placeholder="Student Name"></div>
+            <div><label class="block font-semibold">Parent Name</label><input type="text" id="edit-parent-name" class="w-full mt-1 p-2 border rounded" value="${student.parentName || ''}" placeholder="Parent Name"></div>
+            <div><label class="block font-semibold">Parent Phone Number</label><input type="tel" id="edit-parent-phone" class="w-full mt-1 p-2 border rounded" value="${student.parentPhone || ''}" placeholder="Parent Phone Number"></div>
+            <div><label class="block font-semibold">Student Name</label><input type="text" id="edit-student-name" class="w-full mt-1 p-2 border rounded" value="${student.studentName || ''}" placeholder="Student Name"></div>
             <div><label class="block font-semibold">Grade</label><select id="edit-student-grade" class="w-full mt-1 p-2 border rounded">${gradeOptions}</select></div>
             ${subjectsHTML}
             <div><label class="block font-semibold">Days per Week</label><select id="edit-student-days" class="w-full mt-1 p-2 border rounded">${daysOptions}</select></div>
@@ -4044,7 +4234,7 @@ function showEditStudentModal(student) {
             <div><label class="block font-semibold">Fee (₦)</label><input type="text" id="edit-student-fee" class="w-full mt-1 p-2 border rounded" value="${(student.studentFee || 0).toLocaleString()}" placeholder="Enter fee (e.g., 50,000)"></div>
             <div class="flex justify-end space-x-2 mt-6">
                 <button id="cancel-edit-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
-                <button id="save-edit-btn" class="bg-green-600 text-white px-6 py-2 rounded" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Save Changes</button>
+                <button id="save-edit-btn" class="bg-green-600 text-white px-6 py-2 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Save Changes</button>
             </div>
         </div>`;
 
@@ -4070,11 +4260,11 @@ function showEditStudentModal(student) {
         const studentFee = parseFloat(feeValue.replace(/,/g, ''));
 
         if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
-            showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
+             if (typeof showCustomAlert === 'function') showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.'); else alert('Please fill in all details.');
             return;
         }
         if (isNaN(studentFee) || studentFee < 0) {
-            showCustomAlert('Please enter a valid fee amount.');
+             if (typeof showCustomAlert === 'function') showCustomAlert('Please enter a valid fee amount.'); else alert('Invalid fee.');
             return;
         }
 
@@ -4084,30 +4274,23 @@ function showEditStudentModal(student) {
             const studentRef = doc(db, collectionName, studentId);
             await updateDoc(studentRef, studentData);
             editModal.remove();
-            showCustomAlert('Student details updated successfully!');
-            
-            // Preserve scroll position — only re-render the student list, not the full page
-            const scrollY = window.scrollY;
+            if (typeof showCustomAlert === 'function') showCustomAlert('Student details updated successfully!'); else alert('Updated!');
             const mainContent = document.getElementById('mainContent');
-            if (mainContent && window.tutorData) {
-                await renderStudentDatabase(mainContent, window.tutorData);
-                requestAnimationFrame(() => {
-                    window.scrollTo({ top: scrollY, behavior: 'instant' });
-                });
-            }
+            renderStudentDatabase(mainContent, window.tutorData);
         } catch (error) {
             console.error("Error updating student:", error);
-            showCustomAlert(`An error occurred: ${error.message}`);
+            if (typeof showCustomAlert === 'function') showCustomAlert(`An error occurred: ${error.message}`); else alert(`Error: ${error.message}`);
         }
     });
 }
 
 // --- Main Render Function ---
 async function renderStudentDatabase(container, tutor) {
-    // REMOVED early return check for window.fixedMonthSystemInitialized
+     if (window.fixedMonthSystemInitialized) {
+        // Let the fixed system handle it
+        return;
+    }
     if (!container) return;
-    updateActiveTab('navStudentDatabase');
-    startPersistentClock(); // ← clock on every tab
 
     // Load Reports
     let savedReports = await loadReportsFromFirestore(tutor.email);
@@ -4128,16 +4311,17 @@ async function renderStudentDatabase(container, tutor) {
         return total;
     }
     
-    // Queries - fetch by tutorEmail OR tutorId (management assigns via tutorId)
+    // Queries - REMOVED pendingStudentQuery (Tutors only see approved students)
+    const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
     const allSubmissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutor.email));
-
-    const [allStudentDocs, allSubmissionsSnapshot] = await Promise.all([
-        fetchStudentsForTutor(tutor, "students"),
-        getDocs(allSubmissionsQuery)
+    
+    const [studentsSnapshot, allSubmissionsSnapshot] = await Promise.all([
+        getDocs(studentQuery), getDocs(allSubmissionsQuery)  // Only approved students and submissions
     ]);
 
     // Process Students - ONLY APPROVED STUDENTS
-    let approvedStudents = allStudentDocs
+    let approvedStudents = studentsSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data(), collection: "students" }))
         .filter(student => !student.status || student.status === 'active' || student.status === 'approved' || !['archived', 'graduated', 'transferred'].includes(student.status));
 
     const now = new Date();
@@ -4188,7 +4372,8 @@ async function renderStudentDatabase(container, tutor) {
                     ${showFeesToggle ? `<div class="bg-green-100 text-green-800 px-3 py-1 rounded-lg font-bold" id="total-fees-display">Total: ₦${calculateTotalFees().toLocaleString()}</div>` : ''}
                 </div>
             </div>`;
-
+        
+        // 🆕 NEW: Conditionally show the entire "Add a New Student" section
         if (isTutorAddEnabled) {
             studentsHTML += `
                 <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
@@ -4200,106 +4385,70 @@ async function renderStudentDatabase(container, tutor) {
                     </div>
                 </div>`;
         }
-
+        
         studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEnabled ? 'text-green-600' : 'text-red-500'}">${isSubmissionEnabled ? 'Enabled' : 'Disabled'}</strong> by the admin.</p>`;
 
         if (studentsCount === 0) {
             studentsHTML += `<p class="text-gray-500">You are not assigned to any students yet.</p>`;
         } else {
-            studentsHTML += `<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mt-2">`;
-
+            studentsHTML += `
+                <div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">
+                <thead><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student Name</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th></tr></thead>
+                <tbody class="bg-white divide-y divide-gray-200">`;
+            
             students.forEach(student => {
                 const hasSubmitted = submittedStudentIds.has(student.id);
                 const isReportSaved = savedReports[student.id];
-                const feeDisplay = showStudentFees ? `<div class="text-xs text-indigo-600 font-semibold mt-0.5">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
-                let statusBadge = '', actionsHTML = '';
+                const feeDisplay = showStudentFees ? `<div class="text-xs text-gray-500">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
+                let statusHTML = '', actionsHTML = '';
                 const subjects = student.subjects ? student.subjects.join(', ') : 'N/A';
-                const days = student.days ? `${student.days} day${student.days !== '1' ? 's' : ''}/wk` : 'N/A';
-                const initial = (student.studentName || '?').charAt(0).toUpperCase();
+                const days = student.days ? `${student.days} days/week` : 'N/A';
 
-                let cardAccent = 'border-gray-200';
-                if (student.summerBreak) {
-                    statusBadge = `<span class="bg-yellow-100 text-yellow-700 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">☀️ On Break</span>`;
-                    cardAccent = 'border-yellow-200';
-                } else if (student.isTransitioning) {
-                    statusBadge = `<span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">🔄 Transitioning</span>`;
-                    cardAccent = 'border-orange-200';
-                } else if (hasSubmitted) {
-                    statusBadge = `<span class="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">✅ Report Sent</span>`;
-                    cardAccent = 'border-blue-200';
-                } else if (isReportSaved) {
-                    statusBadge = `<span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">💾 Saved</span>`;
-                    cardAccent = 'border-green-200';
-                } else {
-                    statusBadge = `<span class="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">📋 Pending</span>`;
-                }
-
+                // FIXED: No pending student check - tutors only see approved students
                 if (hasSubmitted) {
-                    actionsHTML = `<span class="text-gray-400 text-xs">Submitted this month</span>`;
+                    statusHTML = `<span class="status-indicator text-blue-600 font-semibold">Report Sent</span>`;
+                    actionsHTML = `<span class="text-gray-400">Submitted this month</span>`;
                 } else {
+                    const transIndicator = student.isTransitioning ? `<span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full ml-2">Transitioning</span>` : '';
+                    statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>${transIndicator}`;
+                    
+                    // BREAK/RECALL LOGIC with status checking
                     if (isSummerBreakEnabled) {
                         const recallStatus = window.recallStatusCache ? window.recallStatusCache[student.id] : null;
+                        
                         if (student.summerBreak) {
+                            // Student is on break - show appropriate recall button/status
                             if (recallStatus === 'pending') {
-                                actionsHTML += `<span class="bg-purple-200 text-purple-800 px-2 py-1 rounded text-xs">Recall Requested</span>`;
+                                actionsHTML += `<span class="bg-purple-200 text-purple-800 px-3 py-1 rounded text-sm">Recall Requested</span>`;
                             } else {
-                                actionsHTML += `<button class="recall-from-break-btn bg-purple-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}">Recall</button>`;
+                                actionsHTML += `<button class="recall-from-break-btn bg-purple-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Recall</button>`;
                             }
                         } else {
-                            actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}">Break</button>`;
+                            // Student is active - show Break button
+                            actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Break</button>`;
                         }
                     }
+
                     if (isSubmissionEnabled && !student.summerBreak) {
                         if (approvedStudents.length === 1) {
-                            actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="${student.isTransitioning}">Submit Report</button>`;
+                            actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-is-transitioning="${student.isTransitioning}">Submit Report</button>`;
                         } else {
-                            actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="${student.isTransitioning}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
+                            actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-is-transitioning="${student.isTransitioning}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
                         }
                     } else if (!student.summerBreak) {
-                        actionsHTML += `<span class="text-gray-400 text-xs">Submission Disabled</span>`;
+                        actionsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
                     }
                     if (showEditDeleteButtons && !student.summerBreak) {
-                        actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Edit</button>`;
-                        actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Delete</button>`;
-                    }
-                    if (isPlacementTestEligible(student.grade) && (student.placementTestStatus || '') !== 'completed') {
-                        actionsHTML += `<button class="launch-placement-btn bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 text-xs font-semibold"
-                            data-student-id="${escapeHtml(student.id)}"
-                            data-student-name="${escapeHtml(student.studentName)}"
-                            data-grade="${escapeHtml(student.grade)}"
-                            data-parent-email="${escapeHtml(student.parentEmail || '')}"
-                            data-parent-name="${escapeHtml(student.parentName || '')}"
-                            data-parent-phone="${escapeHtml(student.parentPhone || '')}"
-                            data-tutor-email="${escapeHtml(tutor.email)}"
-                            data-tutor-name="${escapeHtml(tutor.name || '')}">Placement Test</button>`;
+                        actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Edit</button>`;
+                        actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Delete</button>`;
                     }
                 }
-
-                studentsHTML += `
-                <div class="bg-white border ${cardAccent} rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col gap-3">
-                    <div class="flex items-center gap-3">
-                        <div class="w-11 h-11 rounded-xl flex items-center justify-center font-black text-lg flex-shrink-0 ${student.summerBreak ? 'bg-yellow-100 text-yellow-700' : student.isTransitioning ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}">${escapeHtml(initial)}</div>
-                        <div class="min-w-0 flex-1">
-                            <div class="font-bold text-gray-800 truncate">${escapeHtml(student.studentName)}</div>
-                            <div class="text-xs text-gray-400">${escapeHtml(cleanGradeString ? cleanGradeString(student.grade) : student.grade)}</div>
-                            ${feeDisplay}
-                        </div>
-                        ${statusBadge}
-                    </div>
-                    <div class="flex flex-wrap gap-1.5">
-                        <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg text-xs">📚 ${escapeHtml(subjects)}</span>
-                        <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg text-xs">📅 ${escapeHtml(days)}</span>
-                    </div>
-                    <div class="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
-                        ${actionsHTML || '<span class="text-gray-400 text-xs">No actions available</span>'}
-                    </div>
-                </div>`;
+                studentsHTML += `<tr><td class="px-6 py-4 whitespace-nowrap">${student.studentName} (${cleanGradeString ? cleanGradeString(student.grade) : student.grade})<div class="text-xs text-gray-500">Subjects: ${subjects} | Days: ${days}</div>${feeDisplay}</td><td class="px-6 py-4 whitespace-nowrap">${statusHTML}</td><td class="px-6 py-4 whitespace-nowrap space-x-2">${actionsHTML}</td></tr>`;
             });
-
-            studentsHTML += `</div>`;
-
+            studentsHTML += `</tbody></table></div>`;
+            
             if (tutor.isManagementStaff) {
-                studentsHTML += `<div class="bg-green-50 p-4 rounded-lg shadow-md mt-6"><h3 class="text-lg font-bold text-green-800 mb-2">Management Fee</h3><div class="flex items-center space-x-2"><label class="font-semibold">Fee:</label><input type="number" id="management-fee-input" class="p-2 border rounded w-full" value="${escapeHtml(tutor.managementFee || 0)}"><button id="save-management-fee-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Save Fee</button></div></div>`;
+                studentsHTML += `<div class="bg-green-50 p-4 rounded-lg shadow-md mt-6"><h3 class="text-lg font-bold text-green-800 mb-2">Management Fee</h3><div class="flex items-center space-x-2"><label class="font-semibold">Fee (₦):</label><input type="number" id="management-fee-input" class="p-2 border rounded w-full" value="${tutor.managementFee || 0}"><button id="save-management-fee-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Save Fee</button></div></div>`;
             }
             if (approvedStudents.length > 1 && isSubmissionEnabled) {
                 const submittable = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length;
@@ -4311,15 +4460,7 @@ async function renderStudentDatabase(container, tutor) {
         }
         container.innerHTML = `<div id="student-list-view" class="bg-white p-6 rounded-lg shadow-md">${studentsHTML}</div>`;
         attachEventListeners();
-
-        // Toggle fees listener
-        const feesToggle = document.getElementById('toggle-fees-display');
-        if (feesToggle) feesToggle.addEventListener('change', () => {
-            localStorage.setItem(showFeesToggleKey, feesToggle.checked);
-            renderUI();
-        });
     }
-
 
     // --- MODAL FUNCTIONS (Restored inside Scope) ---
     
@@ -4340,15 +4481,15 @@ async function renderStudentDatabase(container, tutor) {
         const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
         
         const reportFormHTML = `
-            <h3 class="text-xl font-bold mb-4">Monthly Report for ${escapeHtml(student.studentName)}</h3>
-            <div class="bg-blue-50 p-3 rounded-lg mb-4"><p class="text-sm font-semibold text-blue-800">Month: ${escapeHtml(currentMonthYear)}</p><p class="text-xs text-blue-600 mt-1">All fields are required</p></div>
+            <h3 class="text-xl font-bold mb-4">Monthly Report for ${student.studentName}</h3>
+            <div class="bg-blue-50 p-3 rounded-lg mb-4"><p class="text-sm font-semibold text-blue-800">Month: ${currentMonthYear}</p><p class="text-xs text-blue-600 mt-1">All fields are required</p></div>
             <div class="space-y-4">
-                <div><label class="block font-semibold">Introduction</label><textarea id="report-intro" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter introduction...">${escapeHtml(existingReport.introduction || '')}</textarea></div>
-                <div><label class="block font-semibold">Topics & Remarks</label><textarea id="report-topics" class="w-full mt-1 p-2 border rounded required-field" rows="3" placeholder="Enter topics...">${escapeHtml(existingReport.topics || '')}</textarea></div>
-                <div><label class="block font-semibold">Progress & Achievements</label><textarea id="report-progress" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter progress...">${escapeHtml(existingReport.progress || '')}</textarea></div>
-                <div><label class="block font-semibold">Strengths & Weaknesses</label><textarea id="report-sw" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter strengths...">${escapeHtml(existingReport.strengthsWeaknesses || '')}</textarea></div>
-                <div><label class="block font-semibold">Recommendations</label><textarea id="report-recs" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter recommendations...">${escapeHtml(existingReport.recommendations || '')}</textarea></div>
-                <div><label class="block font-semibold">General Comments</label><textarea id="report-general" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter general comments...">${escapeHtml(existingReport.generalComments || '')}</textarea></div>
+                <div><label class="block font-semibold">Introduction</label><textarea id="report-intro" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter introduction...">${existingReport.introduction || ''}</textarea></div>
+                <div><label class="block font-semibold">Topics & Remarks</label><textarea id="report-topics" class="w-full mt-1 p-2 border rounded required-field" rows="3" placeholder="Enter topics...">${existingReport.topics || ''}</textarea></div>
+                <div><label class="block font-semibold">Progress & Achievements</label><textarea id="report-progress" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter progress...">${existingReport.progress || ''}</textarea></div>
+                <div><label class="block font-semibold">Strengths & Weaknesses</label><textarea id="report-sw" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter strengths...">${existingReport.strengthsWeaknesses || ''}</textarea></div>
+                <div><label class="block font-semibold">Recommendations</label><textarea id="report-recs" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter recommendations...">${existingReport.recommendations || ''}</textarea></div>
+                <div><label class="block font-semibold">General Comments</label><textarea id="report-general" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter general comments...">${existingReport.generalComments || ''}</textarea></div>
                 <div class="flex justify-end space-x-2">
                     <button id="cancel-report-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
                     <button id="modal-action-btn" class="bg-green-600 text-white px-6 py-2 rounded">${isSingleApprovedStudent ? 'Proceed to Submit' : 'Save Report'}</button>
@@ -4393,10 +4534,10 @@ async function renderStudentDatabase(container, tutor) {
 
     function showFeeConfirmationModal(student, reportData) {
         const feeConfirmationHTML = `
-            <h3 class="text-xl font-bold mb-4">Confirm Fee for ${escapeHtml(student.studentName)}</h3>
+            <h3 class="text-xl font-bold mb-4">Confirm Fee for ${student.studentName}</h3>
             <p class="text-sm text-gray-600 mb-4">Please verify the monthly fee for this student.</p>
             <div class="space-y-4">
-                <div><label class="block font-semibold">Current Fee (₦)</label><input type="number" id="confirm-student-fee" class="w-full mt-1 p-2 border rounded" value="${escapeHtml(student.studentFee || 0)}"></div>
+                <div><label class="block font-semibold">Current Fee (₦)</label><input type="number" id="confirm-student-fee" class="w-full mt-1 p-2 border rounded" value="${student.studentFee || 0}"></div>
                 <div class="flex justify-end space-x-2 mt-6">
                     <button id="cancel-fee-confirm-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
                     <button id="confirm-fee-btn" class="bg-green-600 text-white px-6 py-2 rounded">Confirm Fee & Save</button>
@@ -4457,6 +4598,13 @@ async function renderStudentDatabase(container, tutor) {
         await clearAllReportsFromFirestore(tutor.email);
         showCustomAlert("Reports Submitted!");
         renderStudentDatabase(container, tutor);
+    }
+
+    function showCustomAlert(msg) {
+        const d = document.createElement('div');
+        d.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50';
+        d.innerHTML = `<div class="bg-white p-8 rounded-lg shadow-xl"><p>${msg}</p><button onclick="this.parentElement.parentElement.remove()" class="bg-green-600 text-white px-6 py-2 rounded float-right mt-4">OK</button></div>`;
+        document.body.appendChild(d);
     }
 
     // Pre-fetch recall status for all students
@@ -4560,7 +4708,7 @@ async function renderStudentDatabase(container, tutor) {
         document.querySelectorAll('.summer-break-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const s = students.find(s => s.id === btn.getAttribute('data-student-id'));
-                if (confirm(`Put ${escapeHtml(s.studentName)} on Break?`)) {
+                if (confirm(`Put ${s.studentName} on Break?`)) {
                     await updateDoc(doc(db, "students", s.id), { summerBreak: true });
                     renderStudentDatabase(container, tutor);
                 }
@@ -4573,7 +4721,7 @@ async function renderStudentDatabase(container, tutor) {
                 const studentId = btn.getAttribute('data-student-id');
                 const student = students.find(s => s.id === studentId);
                 
-                if (confirm(`Recall ${escapeHtml(student.studentName)} from break? This requires management approval.`)) {
+                if (confirm(`Recall ${student.studentName} from break? This requires management approval.`)) {
                     try {
                         // Disable button immediately
                         btn.disabled = true;
@@ -4646,7 +4794,7 @@ async function renderStudentDatabase(container, tutor) {
         document.querySelectorAll('.delete-student-btn-tutor').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const s = students.find(s => s.id === btn.getAttribute('data-student-id'));
-                if (confirm(`Delete ${escapeHtml(s.studentName)}?`)) {
+                if (confirm(`Delete ${s.studentName}?`)) {
                     await deleteDoc(doc(db, s.collection, s.id));
                     renderStudentDatabase(container, tutor);
                 }
@@ -4693,159 +4841,7 @@ async function renderStudentDatabase(container, tutor) {
                 renderStudentDatabase(container, tutor);
             } catch (error) { console.error("Error adding student:", error); showCustomAlert(`An error occurred: ${error.message}`); }
         }
-
-        // ── PLACEMENT TEST — event delegation for .launch-placement-btn ──────────────
-        document.querySelectorAll('.launch-placement-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const studentId   = btn.getAttribute('data-student-id');
-                const studentName = btn.getAttribute('data-student-name');
-                const grade       = btn.getAttribute('data-grade');
-                const parentEmail = btn.getAttribute('data-parent-email');
-                const parentName  = btn.getAttribute('data-parent-name');
-                const parentPhone = btn.getAttribute('data-parent-phone');
-                const tutorEmail  = btn.getAttribute('data-tutor-email');
-                const tutorName   = btn.getAttribute('data-tutor-name');
-
-                if (!studentName || !grade) {
-                    showCustomAlert('⚠️ Missing student data. Cannot launch placement test.');
-                    return;
-                }
-
-                const derivedCountry = getCountryFromPhone(parentPhone) || '';
-                const payload = {
-                    studentUid:   studentId,
-                    studentName:  studentName,
-                    grade:        grade,
-                    parentEmail:  parentEmail,
-                    studentEmail: parentEmail,
-                    parentName:   parentName,
-                    parentPhone:  parentPhone,
-                    country:      derivedCountry,
-                    tutorEmail:   tutorEmail,
-                    tutorName:    tutorName,
-                    launchedBy:   'tutor',
-                    launchedAt:   Date.now()
-                };
-
-                try {
-                    localStorage.setItem('studentData',  JSON.stringify(payload));
-                    localStorage.setItem('studentName',  studentName);
-                    localStorage.setItem('studentEmail', parentEmail);
-                    localStorage.setItem('grade',        grade);
-                    localStorage.setItem('studentUid',   studentId);
-                } catch (e) {
-                    showCustomAlert('⚠️ Could not save to localStorage. Check browser privacy settings.');
-                    return;
-                }
-
-                window.open('subject-select.html', '_blank');
-            });
-        });
-
-        // ── REAL-TIME PLACEMENT TEST COMPLETION DETECTION ────────────────────────
-        //
-        // ROOT CAUSE OF THE BUTTON NOT DISAPPEARING:
-        // The student portal is unauthenticated, so Firestore security rules block
-        // its attempt to write placementTestStatus='completed' to the students doc.
-        // The write fails silently (caught & swallowed), so the flag is never set
-        // and the tutor dashboard never removes the button.
-        //
-        // FIX: Watch student_results (students CAN write here — test submission works).
-        // The tutor IS authenticated, so when a matching result appears, the tutor's
-        // session updates the students doc AND removes the button.
-        // ─────────────────────────────────────────────────────────────────────────
-
-        // Build a lookup of studentId → button for all currently visible placement btns
-        const _placementBtnMap = {}; // { studentId: btn, ... }
-        const _placementNameMap = {}; // { lowerCaseStudentName: studentId, ... } — fallback
-        document.querySelectorAll('.launch-placement-btn').forEach(btn => {
-            const sid  = btn.getAttribute('data-student-id');
-            const sname = (btn.getAttribute('data-student-name') || '').toLowerCase().trim();
-            if (sid) {
-                _placementBtnMap[sid] = btn;
-                if (sname) _placementNameMap[sname] = sid;
-            }
-        });
-
-        // Helper: given a student_results doc, figure out which student it belongs to.
-        // Prefers studentId field (added by updated submitAnswers.js);
-        // falls back to studentName match so old results still work.
-        function _matchResultToStudent(data) {
-            if (data.studentId && _placementBtnMap[data.studentId]) {
-                return data.studentId;
-            }
-            const name = (data.studentName || '').toLowerCase().trim();
-            return _placementNameMap[name] || null;
-        }
-
-        // Helper: remove the button and persist the completion flag (using the
-        // tutor's authenticated Firestore session so the write succeeds).
-        async function _markPlacementDone(studentId, subject) {
-            const btn = _placementBtnMap[studentId];
-            if (btn) {
-                btn.remove();
-                delete _placementBtnMap[studentId];
-            }
-            try {
-                await updateDoc(doc(db, 'students', studentId), {
-                    placementTestStatus:      'completed',
-                    placementTestCompletedAt: new Date(),
-                    placementTestSubject:     subject || ''
-                });
-                console.log('Placement test marked complete for student:', studentId);
-            } catch (e) {
-                // Non-fatal — button is already removed from the UI
-                console.warn('Could not persist placementTestStatus:', e.message);
-            }
-        }
-
-        // Stop any previous listener before starting a new one (navigation / re-render)
-        if (window._prevPlacementResultsUnsub) {
-            try { window._prevPlacementResultsUnsub(); } catch (_) {}
-            window._prevPlacementResultsUnsub = null;
-        }
-
-        // Only start the listener if there are actually buttons to watch
-        if (Object.keys(_placementBtnMap).length > 0) {
-            const _resultsQ = query(
-                collection(db, 'student_results'),
-                where('tutorEmail', '==', tutor.email)
-            );
-
-            window._prevPlacementResultsUnsub = onSnapshot(_resultsQ, (snapshot) => {
-                snapshot.forEach(d => {
-                    const data = d.data();
-                    const sid = _matchResultToStudent(data);
-                    if (sid && _placementBtnMap[sid]) {
-                        // A result exists for this student — mark done and remove button
-                        _markPlacementDone(sid, data.subject);
-                    }
-                });
-            }, (err) => {
-                console.warn('student_results placement listener error:', err.message);
-            });
-        }
-
-        // ── BroadcastChannel: belt-and-suspenders instant removal from same browser ──
-        try {
-            if (window._bkh_placement_bc) {
-                try { window._bkh_placement_bc.close(); } catch (_) {}
-            }
-            const globalBc = new BroadcastChannel('bkh_placement_complete');
-            globalBc.onmessage = (event) => {
-                if (event.data?.type === 'PLACEMENT_COMPLETED' && event.data?.studentUid) {
-                    const sid = event.data.studentUid;
-                    if (_placementBtnMap[sid]) {
-                        _markPlacementDone(sid, event.data.subject || '');
-                    }
-                }
-            };
-            window._bkh_placement_bc = globalBc;
-        } catch (_) {
-            // BroadcastChannel not supported — onSnapshot above is the fallback
-        }
-
-    }  // ── end of attachEventListeners
+    }
 
     renderUI();
 }
@@ -4856,7 +4852,6 @@ async function renderStudentDatabase(container, tutor) {
 
 // Auto-Registered Students Functions
 function renderAutoRegisteredStudents(container, tutor) {
-    startPersistentClock(); // ← clock on every tab
     container.innerHTML = `
         <div class="card">
             <div class="card-header">
@@ -4954,22 +4949,22 @@ function renderAutoStudentsList(students) {
         html += `
             <tr>
                 <td>
-                    <div class="font-medium">${escapeHtml(student.studentName)}</div>
-                    <div class="text-sm text-gray-500">${escapeHtml(student.grade)} • ${escapeHtml(student.parentPhone || 'No phone')}</div>
-                    <div class="text-xs text-gray-400">${escapeHtml(student.parentEmail || 'No email')}</div>
+                    <div class="font-medium">${student.studentName}</div>
+                    <div class="text-sm text-gray-500">${student.grade} • ${student.parentPhone || 'No phone'}</div>
+                    <div class="text-xs text-gray-400">${student.parentEmail || 'No email'}</div>
                 </td>
                 <td>
-                    <span class="${escapeHtml(statusClass)}">
-                        ${escapeHtml(status)}
+                    <span class="${statusClass}">
+                        ${status}
                     </span>
                 </td>
                 <td class="text-sm text-gray-500">
-                    ${escapeHtml(student.testSubject || 'General Test')}
+                    ${student.testSubject || 'General Test'}
                 </td>
                 <td>
                     <div class="action-buttons">
                         <button class="btn btn-primary btn-sm complete-student-btn" 
-                                data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">
+                                data-student-id="${student.id}" data-collection="${student.collection}">
                             Complete Profile
                         </button>
                     </div>
@@ -5018,96 +5013,19 @@ let isTutorOfTheMonth = false;
  */
 async function initGamification(tutorId) {
     try {
+        // 1. Get Current Tutor's Score
         const tutorRef = doc(db, "tutors", tutorId);
-
-        // ── Primary: live listener on tutor doc (written by management after grading) ──
-        onSnapshot(tutorRef, async (docSnap) => {
-            if (!docSnap.exists()) return;
-            const data = docSnap.data();
-
-            // ── Authoritative: also query tutor_grades for current month directly ──
-            const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
-            const monthKey = `${lagosNow.getFullYear()}-${String(lagosNow.getMonth()+1).padStart(2,'0')}`;
-            const tutorEmail = data.email || (window.tutorData && window.tutorData.email) || '';
-
-            let qaScore = null, qcScore = null;
-            let qaAdvice = '', qcAdvice = '';
-            let qaGradedByName = '', qcGradedByName = '';
-            let perfMonth = monthKey;
-
-            try {
-                const gradesSnap = await getDocs(
-                    query(collection(db, 'tutor_grades'),
-                        where('tutorEmail', '==', tutorEmail),
-                        where('month', '==', monthKey))
-                );
-
-                if (!gradesSnap.empty) {
-                    // Use tutor_grades as source-of-truth
-                    const g = gradesSnap.docs[0].data();
-                    qaScore        = (g.qa && g.qa.score != null)  ? g.qa.score  : null;
-                    qcScore        = (g.qc && g.qc.score != null)  ? g.qc.score  : null;
-                    qaAdvice       = (g.qa && g.qa.notes)          ? g.qa.notes  : '';
-                    qcAdvice       = (g.qc && g.qc.notes)          ? g.qc.notes  : '';
-                    qaGradedByName = (g.qa && g.qa.gradedByName)   ? g.qa.gradedByName : '';
-                    qcGradedByName = (g.qc && g.qc.gradedByName)   ? g.qc.gradedByName : '';
-                    perfMonth      = g.month || monthKey;
-                } else {
-                    // Fallback: use cached values from tutor doc
-                    qaScore        = data.qaScore        ?? null;
-                    qcScore        = data.qcScore        ?? null;
-                    qaAdvice       = data.qaAdvice       || '';
-                    qcAdvice       = data.qcAdvice       || '';
-                    qaGradedByName = data.qaGradedByName || '';
-                    qcGradedByName = data.qcGradedByName || '';
-                    perfMonth      = data.performanceMonth || '';
-                }
-            } catch (gradeErr) {
-                // Index not ready or permission issue – fall back to tutor doc
-                console.warn('tutor_grades query failed, using tutor doc cache:', gradeErr.message);
-                qaScore        = data.qaScore        ?? null;
-                qcScore        = data.qcScore        ?? null;
-                qaAdvice       = data.qaAdvice       || '';
-                qcAdvice       = data.qcAdvice       || '';
-                qaGradedByName = data.qaGradedByName || '';
-                qcGradedByName = data.qcGradedByName || '';
-                perfMonth      = data.performanceMonth || '';
-            }
-
-            // Merge into window.tutorData
-            if (window.tutorData) {
-                window.tutorData.qaScore          = qaScore;
-                window.tutorData.qcScore          = qcScore;
-                window.tutorData.qaAdvice         = qaAdvice;
-                window.tutorData.qcAdvice         = qcAdvice;
-                window.tutorData.qaGradedByName   = qaGradedByName;
-                window.tutorData.qcGradedByName   = qcGradedByName;
-                window.tutorData.performanceMonth = perfMonth;
-            }
-
-            let combined = 0;
-            if (qaScore !== null && qcScore !== null) combined = qaScore + qcScore;
-            else if (qaScore !== null) combined = qaScore;
-            else if (qcScore !== null) combined = qcScore;
-
-            currentTutorScore = combined;
-            updateScoreDisplay(combined, {
-                qaScore, qcScore, qaAdvice, qcAdvice,
-                qaGradedByName, qcGradedByName,
-                performanceMonth: perfMonth
-            });
-
-            // 🎉 Trigger confetti the first time grades appear this session
-            if (combined > 0 && (qaScore !== null || qcScore !== null)) {
-                const gradeKey = `confetti_grades_${monthKey}_${tutorId}`;
-                if (!sessionStorage.getItem(gradeKey)) {
-                    sessionStorage.setItem(gradeKey, 'true');
-                    // Slight delay so the widget renders first
-                    setTimeout(() => triggerConfetti(), 600);
-                }
+        // We use onSnapshot for REAL-TIME updates. 
+        // If Admin updates score, Tutor sees it instantly.
+        onSnapshot(tutorRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                currentTutorScore = data.performanceScore || 0;
+                updateScoreDisplay(currentTutorScore, data.scoreBreakdown);
             }
         });
 
+        // 2. Check "Tutor of the Month" Status
         checkWinnerStatus(tutorId);
 
     } catch (error) {
@@ -5120,54 +5038,22 @@ async function initGamification(tutorId) {
  */
 async function checkWinnerStatus(tutorId) {
     try {
-        // Also check by comparing all tutor grades for current month
-        try {
-            const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
-            const monthKey = `${lagosNow.getFullYear()}-${String(lagosNow.getMonth()+1).padStart(2,'0')}`;
-            const allGradesSnap = await getDocs(query(collection(db, 'tutor_grades'), where('month', '==', monthKey)));
-            if (!allGradesSnap.empty) {
-                let topScore = -1, topTutorId = null;
-                allGradesSnap.forEach(d => {
-                    const g = d.data();
-                    const qa = g.qa?.score ?? 0;
-                    const qc = g.qc?.score ?? 0;
-                    const total = qa + qc;
-                    if (total > topScore) { topScore = total; topTutorId = g.tutorId || g.tutorEmail; }
-                });
-                // Match by tutorId or email
-                const myEmail = window.tutorData?.email || '';
-                if (topTutorId && (topTutorId === tutorId || topTutorId === myEmail) && topScore > 0) {
-                    isTutorOfTheMonth = true;
-                }
-            }
-        } catch(gErr) { /* ignore — index may not exist */ }
-
+        // We assume a central document 'gamification/current_cycle' holds the winner info
         const cycleRef = doc(db, "gamification", "current_cycle");
         const cycleSnap = await getDoc(cycleRef);
 
         if (cycleSnap.exists()) {
             const data = cycleSnap.data();
+            // Data structure: { winnerId: "xyz", month: "October", year: 2023 }
+            
             if (data.winnerId === tutorId) {
                 isTutorOfTheMonth = true;
-                renderWinnerBadge(data.monthLabel || data.month);
-
-                // Confetti only on first 5 days of the month
-                const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
-                const dayOfMonth = lagosNow.getDate();
-                const currentMonthKey = `${lagosNow.getFullYear()}-${String(lagosNow.getMonth()+1).padStart(2,'0')}`;
-                const winnerMonth = data.month || '';
+                renderWinnerBadge(data.month);
                 
-                // Only show celebration if within first 5 days of the matching month
-                if (dayOfMonth <= 5 && (currentMonthKey === winnerMonth || winnerMonth === '')) {
-                    const celebKey = `confetti_shown_${currentMonthKey}_${tutorId}`;
-                    if (!sessionStorage.getItem(celebKey)) {
-                        sessionStorage.setItem(celebKey, 'true');
-                        setTimeout(() => {
-                            triggerConfetti();
-                            showCustomAlert(`🏆 Congratulations! You are the ${escapeHtml(data.monthLabel || data.month)} Tutor of the Month!`);
-                        }, 800);
-                    }
-                }
+                // Logic: Blow confetti if it's the start of the month OR weekly reminder
+                // For now, we blow it on every login if they are the winner (High Dopamine)
+                triggerConfetti(); 
+                showCustomAlert(`🏆 You are the ${data.month} Tutor of the Month!`);
             }
         }
     } catch (error) {
@@ -5178,138 +5064,34 @@ async function checkWinnerStatus(tutorId) {
 // --- UI RENDERING FUNCTIONS ---
 
 function updateScoreDisplay(totalScore, breakdown = {}) {
+    // Locate the dashboard widget (Create this div in your HTML)
     const scoreWidget = document.getElementById('performance-widget');
     if (!scoreWidget) return;
 
-    // Also update the header stat card
-    const statScoreEl = document.getElementById('performanceScore');
-    if (statScoreEl) {
-        const td2 = window.tutorData || {};
-        const qa2 = breakdown.qaScore ?? td2.qaScore ?? null;
-        const qc2 = breakdown.qcScore ?? td2.qcScore ?? null;
-        let hdrScore = 0;
-        if (qa2 !== null && qc2 !== null) hdrScore = qa2 + qc2;
-        else if (qa2 !== null) hdrScore = qa2;
-        else if (qc2 !== null) hdrScore = qc2;
-        statScoreEl.textContent = hdrScore > 0 ? hdrScore : '–';
-    }
-
-    const td = window.tutorData || {};
-    const qaScore      = breakdown.qaScore       ?? td.qaScore       ?? null;
-    const qcScore      = breakdown.qcScore       ?? td.qcScore       ?? null;
-    const qaAdvice     = breakdown.qaAdvice      ?? td.qaAdvice      ?? '';
-    const qcAdvice     = breakdown.qcAdvice      ?? td.qcAdvice      ?? '';
-    const qaGraderName = breakdown.qaGradedByName ?? td.qaGradedByName ?? '';
-    const qcGraderName = breakdown.qcGradedByName ?? td.qcGradedByName ?? '';
-    const perfMonth    = breakdown.performanceMonth ?? td.performanceMonth ?? '';
-
-    // QA max = 35, QC max = 55, total max = 90
-    const QA_MAX = 35, QC_MAX = 55, TOTAL_MAX = 90;
-    const pct = Math.round(Math.min((totalScore / TOTAL_MAX) * 100, 100));
-
-    let scoreColor, barGrad, scoreLbl, badgeBg;
-    if (totalScore < 45)      { scoreColor='#ef4444'; barGrad='#f87171,#ef4444'; scoreLbl='⚠️ Needs Improvement'; badgeBg='#fee2e2'; }
-    else if (totalScore < 68) { scoreColor='#f59e0b'; barGrad='#fbbf24,#f59e0b'; scoreLbl='👍 Good Progress';      badgeBg='#fef3c7'; }
-    else if (totalScore < 81) { scoreColor='#3b82f6'; barGrad='#60a5fa,#3b82f6'; scoreLbl='🌟 Great Work';         badgeBg='#dbeafe'; }
-    else                      { scoreColor='#10b981'; barGrad='#34d399,#10b981'; scoreLbl='🏆 Excellent!';         badgeBg='#d1fae5'; }
-
-    const hasAnyGrade = qaScore !== null || qcScore !== null;
-
-    function subBar(score, label, max, grader, color, lightBg) {
-        if (score === null || score === undefined) return `
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f8fafc;border-radius:10px;border:1px solid #f1f5f9;">
-                <span style="font-size:.75rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;">${label}</span>
-                <span style="font-size:.72rem;color:#cbd5e1;font-style:italic;">Not graded yet</span>
-            </div>`;
-        const bp = Math.round(Math.min((score / max) * 100, 100));
-        return `
-            <div style="background:${lightBg};border-radius:10px;padding:10px 12px;border:1px solid ${color}33;">
-                <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-                    <span style="font-size:.75rem;font-weight:800;color:${color};text-transform:uppercase;letter-spacing:.04em;">${label}</span>
-                    <span style="font-size:1rem;font-weight:900;color:${color};">${score}<span style="font-size:.7rem;font-weight:600;color:#94a3b8;"> / ${max} pts</span></span>
-                </div>
-                <div style="background:${color}22;border-radius:999px;height:6px;overflow:hidden;">
-                    <div style="height:6px;border-radius:999px;background:linear-gradient(90deg,${color}88,${color});width:${bp}%;transition:width 1s;"></div>
-                </div>
-                <!-- grader name hidden as requested -->
-            </div>`;
-    }
-
-    const notesHTML = [
-        qaAdvice ? `<div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:10px 12px;">
-            <div style="font-size:.7rem;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">💬 QA Feedback</div>
-            <div style="font-size:.8rem;color:#4c1d95;line-height:1.5;">"${escapeHtml(qaAdvice)}"</div>
-        </div>` : '',
-        qcAdvice ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 12px;">
-            <div style="font-size:.7rem;font-weight:800;color:#b45309;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">💬 QC Feedback</div>
-            <div style="font-size:.8rem;color:#78350f;line-height:1.5;">"${escapeHtml(qcAdvice)}"</div>
-        </div>` : ''
-    ].filter(Boolean).join('');
+    // Calculate color based on score
+    let scoreColor = 'text-red-500';
+    if (totalScore > 50) scoreColor = 'text-yellow-500';
+    if (totalScore > 80) scoreColor = 'text-green-500';
 
     scoreWidget.innerHTML = `
-        <div style="background:#fff;border-radius:18px;box-shadow:0 1px 6px rgba(0,0,0,.08);border:1px solid #f1f5f9;overflow:hidden;">
-            ${isTutorOfTheMonth ? '<div style="background:linear-gradient(90deg,#f59e0b,#d97706);color:#fff;font-size:.72rem;font-weight:800;padding:6px 16px;text-align:center;letter-spacing:.08em;">👑 TUTOR OF THE MONTH</div>' : ''}
-            <div style="padding:16px;">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
-                    <div>
-                        <div style="font-size:.7rem;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;">Performance Score${perfMonth ? ' · ' + perfMonth : ''}</div>
-                        ${hasAnyGrade ? `<div style="font-size:.78rem;color:#64748b;margin-top:2px;">${scoreLbl}</div>` : ''}
-                    </div>
-                    <button id="perf-toggle-btn" style="font-size:.72rem;color:#3b82f6;background:#eff6ff;border:none;cursor:pointer;font-weight:600;padding:3px 8px;border-radius:6px;">Details ↕</button>
-                </div>
-                ${hasAnyGrade ? `
-                <div style="display:flex;align-items:flex-end;gap:8px;margin-bottom:10px;">
-                    <div style="font-size:3.5rem;font-weight:900;color:${scoreColor};line-height:1;">${totalScore}</div>
-                    <div style="margin-bottom:8px;line-height:1.3;">
-                        <div style="font-size:.8rem;color:#94a3b8;font-weight:600;">pts</div>
-                        <div style="font-size:.68rem;color:#cbd5e1;">max ${TOTAL_MAX}</div>
-                    </div>
-                    <div style="flex:1;"></div>
-                    <div style="background:${badgeBg};color:${scoreColor};font-size:.78rem;font-weight:800;padding:4px 12px;border-radius:999px;margin-bottom:6px;">${pct}%</div>
-                </div>
-                <div style="background:#f1f5f9;border-radius:999px;height:8px;overflow:hidden;margin-bottom:14px;">
-                    <div style="height:8px;border-radius:999px;background:linear-gradient(90deg,${barGrad});width:${pct}%;transition:width 1.2s ease;"></div>
-                </div>
-                <div style="display:flex;flex-direction:column;gap:8px;">
-                    ${subBar(qaScore,'QA – Session Quality',QA_MAX,qaGraderName,'#7c3aed','#f5f3ff')}
-                    ${subBar(qcScore,'QC – Lesson Plan Quality',QC_MAX,qcGraderName,'#d97706','#fffbeb')}
-                </div>` : `
-                <div style="text-align:center;padding:24px 0;color:#94a3b8;font-size:.875rem;">No performance grades yet this month.</div>`}
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
+            ${isTutorOfTheMonth ? '<div class="absolute top-0 right-0 bg-yellow-400 text-xs font-bold px-2 py-1 rounded-bl-lg">👑 REIGNING CHAMPION</div>' : ''}
+            
+            <h3 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Performance Score</h3>
+            
+            <div class="flex items-end gap-2 mb-3">
+                <span class="text-4xl font-black ${scoreColor}">${totalScore}</span>
+                <span class="text-gray-400 text-sm mb-1">/ 100 pts</span>
             </div>
-            <!-- Expandable notes -->
-            <div id="perf-breakdown" style="display:none;border-top:1px solid #f1f5f9;padding:14px 16px;background:#fafafa;">
-                <div style="font-size:.7rem;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Grader Notes</div>
-                ${notesHTML || '<div style="font-size:.8rem;color:#cbd5e1;text-align:center;padding:8px 0;">No notes provided yet.</div>'}
-                <div style="margin-top:10px;font-size:.68rem;color:#cbd5e1;text-align:center;">QA (${QA_MAX} pts) + QC (${QC_MAX} pts) = ${TOTAL_MAX} pts total</div>
+            
+            <div class="space-y-2">
+                <div class="w-full bg-gray-100 rounded-full h-2">
+                    <div class="bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full transition-all duration-1000" style="width: ${totalScore}%"></div>
+                </div>
+                <p class="text-xs text-gray-400 text-right">Updated by Management</p>
             </div>
         </div>
     `;
-
-    document.getElementById('perf-toggle-btn')?.addEventListener('click', () => {
-        const bd = document.getElementById('perf-breakdown');
-        if (bd) bd.style.display = bd.style.display === 'none' ? 'block' : 'none';
-    });
-}
-
-function buildScoreBadge(score, label, graderName, advice, themeClass) {
-    // kept for any legacy references — delegates to new inline style
-    if (score === null || score === undefined) return `
-        <div class="bg-gray-50 rounded-xl p-3 border border-gray-100">
-            <div class="text-xs font-bold ${themeClass} uppercase tracking-wide mb-1">${label}</div>
-            <div class="text-gray-400 text-sm">Not graded yet</div>
-        </div>`;
-    let sc = 'text-red-500';
-    if (score >= 25) sc = 'text-yellow-500';
-    if (score >= 40) sc = 'text-green-600';
-    return `
-        <div class="bg-white rounded-xl p-3 border border-gray-200">
-            <div class="flex justify-between items-center mb-1">
-                <div class="text-xs font-bold ${themeClass} uppercase tracking-wide">${label}</div>
-                ${graderName ? `<span class="text-xs text-gray-400">by ${escapeHtml(graderName)}</span>` : ''}
-            </div>
-            <div class="text-2xl font-black ${sc}">${score}<span class="text-sm text-gray-400"> pts</span></div>
-            ${advice ? `<div class="mt-2 text-xs text-gray-600 italic bg-gray-50 rounded-lg p-2 border border-gray-100">"${escapeHtml(advice)}"</div>` : ''}
-        </div>`;
 }
 
 function renderWinnerBadge(month) {
@@ -5318,33 +5100,41 @@ function renderWinnerBadge(month) {
     if (header) {
         const badge = document.createElement('div');
         badge.className = 'winner-badge animate-pulse bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 rounded-full border border-yellow-300 ml-2 flex items-center gap-1';
-        badge.innerHTML = `<span>🏆</span> ${escapeHtml(month)} Top Tutor`;
+        badge.innerHTML = `<span>🏆</span> ${month} Top Tutor`;
         header.appendChild(badge);
     }
 }
 
 // --- VISUAL FX (Confetti Engine) ---
+// No external library needed - Raw Canvas implementation for speed
 function triggerConfetti() {
-    const duration = 3500;
-    function runConfetti() {
-        const end = Date.now() + duration;
-        (function frame() {
-            confetti({ particleCount: 3, angle: 60,  spread: 55, origin: { x: 0 } });
-            confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 } });
-            if (Date.now() < end) requestAnimationFrame(frame);
-        }());
-    }
+    const duration = 3000;
+    const end = Date.now() + duration;
 
-    if (typeof confetti === 'function') {
-        runConfetti();
-    } else {
-        // Dynamically inject canvas-confetti if not already in the page
-        const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js';
-        s.onload = () => runConfetti();
-        document.head.appendChild(s);
-    }
+    // Simple confetti shim
+    (function frame() {
+        // Launch confetti from left and right edges
+        confetti({
+            particleCount: 2,
+            angle: 60,
+            spread: 55,
+            origin: { x: 0 }
+        });
+        confetti({
+            particleCount: 2,
+            angle: 120,
+            spread: 55,
+            origin: { x: 1 }
+        });
+
+        if (Date.now() < end) {
+            requestAnimationFrame(frame);
+        }
+    }());
 }
+
+// NOTE: You will need to include the lightweight canvas-confetti script in your HTML head for the FX to work:
+// <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
 /*******************************************************************************
  * SECTION 14: ADMIN SETTINGS LISTENER (UPDATED – NO REDECLARATION)
@@ -5377,306 +5167,14 @@ onSnapshot(settingsDocRef, (docSnap) => {
     }
 });
 
-/*******************************************************************************
- * SECTION 17: COURSE MATERIALS UPLOAD (NEW TAB)
- * Allows tutors to upload and manage learning materials for their students.
- ******************************************************************************/
-
-/**
- * Main render function for the Courses tab.
- */
-async function renderCourses(container, tutor) {
-    updateActiveTab('navCourses');
-    startPersistentClock(); // ← clock on every tab
-    
-    container.innerHTML = `
-        <div class="hero-section">
-            <h1 class="hero-title">📚 Course Materials</h1>
-            <p class="hero-subtitle">Upload and manage learning resources for your students</p>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Left Panel: Student Selector & Upload Form -->
-            <div class="lg:col-span-1">
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="font-bold text-lg">➕ Add New Material</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="form-group">
-                            <label class="form-label">Select Student</label>
-                            <select id="material-student-select" class="form-input">
-                                <option value="">— Choose a student —</option>
-                            </select>
-                        </div>
-
-                        <div id="upload-form-container" class="space-y-3 mt-4 hidden">
-                            <div class="form-group">
-                                <label class="form-label">Title</label>
-                                <input type="text" id="material-title" class="form-input" placeholder="e.g. Chapter 5 Worksheet">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Description (optional)</label>
-                                <textarea id="material-description" class="form-input form-textarea" rows="2" placeholder="Brief description..."></textarea>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">File</label>
-                                <input type="file" id="material-file" class="form-input" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.jpg,.jpeg,.png,.txt">
-                                <p class="text-xs text-gray-500 mt-1">Max 10MB</p>
-                            </div>
-                            <button id="upload-material-btn" class="btn btn-primary w-full" disabled>Upload Material</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Panel: Material List -->
-            <div class="lg:col-span-2">
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="font-bold text-lg">📋 Materials for <span id="selected-student-name">selected student</span></h3>
-                    </div>
-                    <div class="card-body" id="materials-list-container">
-                        <div class="text-center py-6 text-gray-500">
-                            Select a student to view materials.
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    // Load students into dropdown
-    await loadStudentDropdownCourses(tutor.email);
-
-    const studentSelect = document.getElementById('material-student-select');
-    const uploadForm = document.getElementById('upload-form-container');
-    const selectedStudentNameSpan = document.getElementById('selected-student-name');
-    const materialsContainer = document.getElementById('materials-list-container');
-
-    // When student changes
-    studentSelect.addEventListener('change', async (e) => {
-        const studentId = e.target.value;
-        if (studentId) {
-            uploadForm.classList.remove('hidden');
-            const studentName = studentSelect.options[studentSelect.selectedIndex].text;
-            selectedStudentNameSpan.textContent = studentName;
-            await loadCourseMaterials(studentId, materialsContainer, tutor);
-        } else {
-            uploadForm.classList.add('hidden');
-            selectedStudentNameSpan.textContent = 'selected student';
-            materialsContainer.innerHTML = '<div class="text-center py-6 text-gray-500">Select a student to view materials.</div>';
-        }
-    });
-
-    // Enable/disable upload button based on file selection and title
-    const titleInput = document.getElementById('material-title');
-    const fileInput = document.getElementById('material-file');
-    const uploadBtn = document.getElementById('upload-material-btn');
-
-    function checkUploadReady() {
-        const titleOk = titleInput.value.trim() !== '';
-        const fileOk = fileInput.files.length > 0;
-        uploadBtn.disabled = !(titleOk && fileOk);
-    }
-
-    titleInput.addEventListener('input', checkUploadReady);
-    fileInput.addEventListener('change', checkUploadReady);
-
-    // Handle upload
-    uploadBtn.addEventListener('click', async () => {
-        const studentId = studentSelect.value;
-        if (!studentId) return;
-
-        const title = titleInput.value.trim();
-        const description = document.getElementById('material-description').value.trim();
-        const file = fileInput.files[0];
-
-        if (!title || !file) {
-            showCustomAlert('Please provide a title and select a file.');
-            return;
-        }
-
-        uploadBtn.disabled = true;
-        uploadBtn.innerHTML = '<span class="spinner-small"></span> Uploading...';
-
-        try {
-            await uploadCourseMaterial(file, studentId, tutor, title, description);
-            showCustomAlert('✅ Material uploaded successfully!');
-            
-            // Reset form
-            titleInput.value = '';
-            document.getElementById('material-description').value = '';
-            fileInput.value = '';
-            checkUploadReady();
-
-            // Refresh list
-            await loadCourseMaterials(studentId, materialsContainer, tutor);
-        } catch (error) {
-            console.error('Upload error:', error);
-            showCustomAlert('❌ Upload failed. Please try again.');
-        } finally {
-            uploadBtn.disabled = false;
-            uploadBtn.innerHTML = 'Upload Material';
-        }
-    });
-}
-
-/**
- * Load students for the courses dropdown.
- */
-async function loadStudentDropdownCourses(tutorEmail) {
-    try {
-        // Fetch by tutorEmail AND tutorId (management assigns via tutorId)
-        const tutorObj = window.tutorData || { email: tutorEmail, id: null };
-        const studentDocs = await fetchStudentsForTutor(tutorObj, "students");
-        const select = document.getElementById('material-student-select');
-        
-        // Keep the first placeholder option
-        select.innerHTML = '<option value="">— Choose a student —</option>';
-        
-        studentDocs.forEach(student => {
-            const option = document.createElement('option');
-            option.value = student.id;
-            option.textContent = `${student.studentName} (${student.grade})`;
-            select.appendChild(option);
-        });
-    } catch (error) {
-        console.error("Error loading students for courses:", error);
-    }
-}
-
-/**
- * Upload a single file to Cloudinary and store metadata in Firestore.
- */
-async function uploadCourseMaterial(file, studentId, tutor, title, description) {
-    // 1. Upload to Cloudinary
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
-    formData.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
-    formData.append('folder', 'course_materials');
-    formData.append('public_id', `material_${studentId}_${Date.now()}_${file.name.replace(/\.[^/.]+$/, "")}`);
-
-    const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/upload`, {
-        method: 'POST',
-        body: formData
-    });
-    const uploadData = await uploadRes.json();
-    if (!uploadData.secure_url) throw new Error(uploadData.error?.message || 'Upload failed');
-
-    // 2. Get student name
-    const studentSnap = await getDoc(doc(db, "students", studentId));
-    const studentName = studentSnap.exists() ? studentSnap.data().studentName : 'Unknown';
-
-    // 3. Save to Firestore
-    const materialData = {
-        studentId,
-        studentName,
-        tutorId: tutor.id,
-        tutorEmail: tutor.email,
-        tutorName: tutor.name,
-        title,
-        description,
-        fileUrl: uploadData.secure_url,
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type,
-        uploadedAt: new Date()
-    };
-
-    await addDoc(collection(db, "course_materials"), materialData);
-}
-
-/**
- * Load and display materials for a specific student.
- */
-async function loadCourseMaterials(studentId, container, tutor) {
-    container.innerHTML = '<div class="text-center py-6"><div class="spinner mx-auto"></div><p class="text-gray-500 mt-2">Loading materials...</p></div>';
-
-    try {
-        const q = query(
-            collection(db, "course_materials"),
-            where("studentId", "==", studentId),
-            orderBy("uploadedAt", "desc")
-        );
-        const snapshot = await getDocs(q);
-
-        if (snapshot.empty) {
-            container.innerHTML = '<div class="text-center py-6 text-gray-500">No materials uploaded yet.</div>';
-            return;
-        }
-
-        let html = '<div class="space-y-3">';
-        snapshot.forEach(doc => {
-            const mat = doc.data();
-            const date = mat.uploadedAt?.toDate ? mat.uploadedAt.toDate().toLocaleDateString() : 'Unknown';
-            const size = formatFileSize(mat.fileSize || 0);
-
-            html += `
-                <div class="material-item border rounded-lg p-4 bg-white hover:shadow-sm transition">
-                    <div class="flex items-start justify-between">
-                        <div class="flex-1">
-                            <h4 class="font-semibold text-gray-800">${escapeHtml(mat.title)}</h4>
-                            ${mat.description ? `<p class="text-sm text-gray-600 mt-1">${escapeHtml(mat.description)}</p>` : ''}
-                            <div class="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                                <span>📄 ${escapeHtml(mat.fileName)}</span>
-                                <span>⚖️ ${escapeHtml(size)}</span>
-                                <span>📅 ${escapeHtml(date)}</span>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2 ml-4">
-                            <a href="${escapeHtml(mat.fileUrl)}" target="_blank" class="btn btn-secondary btn-sm" title="Download">⬇️</a>
-                            ${showEditDeleteButtons ? `<button class="btn btn-danger btn-sm delete-material" data-id="${escapeHtml(doc.id)}" title="Delete">🗑️</button>` : ''}
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-        html += '</div>';
-
-        container.innerHTML = html;
-
-        // Attach delete handlers if enabled
-        if (showEditDeleteButtons) {
-            container.querySelectorAll('.delete-material').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
-                    const materialId = e.target.getAttribute('data-id');
-                    if (confirm('Delete this material? This action cannot be undone.')) {
-                        try {
-                            await deleteDoc(doc(db, "course_materials", materialId));
-                            showCustomAlert('✅ Material deleted.');
-                            await loadCourseMaterials(studentId, container, tutor);
-                        } catch (error) {
-                            console.error('Delete error:', error);
-                            showCustomAlert('❌ Failed to delete material.');
-                        }
-                    }
-                });
-            });
-        }
-    } catch (error) {
-        console.error('Error loading materials:', error);
-        container.innerHTML = '<div class="text-center py-6 text-red-500">Failed to load materials.</div>';
-    }
-}
 
 /*******************************************************************************
  * SECTION 15: MAIN APP INITIALIZATION (UPDATED)
  ******************************************************************************/
 
 // Main App Initialization
-async function initTutorApp() {
+document.addEventListener('DOMContentLoaded', async () => {
     onAuthStateChanged(auth, async (user) => {
-        // Remove any full-page loading overlay that the HTML might inject
-        const loadingOverlay = document.getElementById('loading-overlay') ||
-                               document.getElementById('auth-loading') ||
-                               document.getElementById('page-loader') ||
-                               document.querySelector('.loading-screen, .app-loader, .splash-screen, [data-loading]');
-        if (loadingOverlay) {
-            loadingOverlay.style.display = 'none';
-            loadingOverlay.remove();
-        }
         if (user) {
             const tutorQuery = query(collection(db, "tutors"), where("email", "==", user.email.trim()));
             const querySnapshot = await getDocs(tutorQuery);
@@ -5701,38 +5199,7 @@ async function initTutorApp() {
                     return;
                 }
                 
-                // Ensure every tutor has a stable UID for messaging (generates one if missing)
-                if (!tutorData.tutorUid) {
-                    const generatedUid = 'tutor_' + tutorDoc.id + '_' + Date.now();
-                    try {
-                        await updateDoc(doc(db, 'tutors', tutorDoc.id), { tutorUid: generatedUid });
-                        tutorData.tutorUid = generatedUid;
-                    } catch(e) { tutorData.tutorUid = tutorDoc.id; }
-                }
-                // Use tutorUid as the primary messaging ID (falls back to Firestore doc ID)
-                tutorData.messagingId = tutorData.tutorUid || tutorDoc.id;
-                
-                // Ensure every tutor has a stable UID for messaging (generates one if missing)
-                if (!tutorData.tutorUid) {
-                    const generatedUid = 'tutor_' + tutorDoc.id + '_' + Date.now();
-                    try {
-                        await updateDoc(doc(db, 'tutors', tutorDoc.id), { tutorUid: generatedUid });
-                        tutorData.tutorUid = generatedUid;
-                    } catch(e) { tutorData.tutorUid = tutorDoc.id; }
-                }
-                tutorData.messagingId = tutorData.tutorUid || tutorDoc.id;
                 window.tutorData = tutorData;
-                
-                // Expose Firebase config so the grading-tab can initialise its own Firebase instance
-                if (!window.__firebaseConfig) {
-                    // Try to read the config from the already-initialised Firebase app
-                    try {
-                        const _app = (await import('./firebaseConfig.js')).default || {};
-                        window.__firebaseConfig = _app.options || null;
-                    } catch(_) {
-                        // Will be null – the grading tab will log a warning
-                    }
-                }
                 
                 if (shouldShowEmploymentPopup(tutorData)) {
                     showEmploymentDatePopup(tutorData);
@@ -5756,9 +5223,6 @@ async function initTutorApp() {
                 setTimeout(async () => {
                     await initScheduleManager(tutorData);
                 }, 2000);
-                
-                // Show broadcast pop-ups from management
-                setTimeout(() => showPendingBroadcasts(tutorData), 3000);
             } else {
                 console.error("No matching tutor found.");
                 document.getElementById('mainContent').innerHTML = `
@@ -5809,24 +5273,13 @@ async function initTutorApp() {
 
     addNavListener('navDashboard', renderTutorDashboard);
     addNavListener('navStudentDatabase', renderStudentDatabase);
-    // navAutoStudents removed – tab is disabled
-    addNavListener('navScheduleManagement', renderScheduleManagement);
-    addNavListener('navAcademic', renderAcademic);
-    // NEW: Courses tab listener
-    addNavListener('navCourses', renderCourses);
+    addNavListener('navAutoStudents', renderAutoRegisteredStudents);
     
-    // ── Game window helper ─────────────────────────────────────────────────
-    // Call window.openGameWindow(url) from HTML game buttons.
-    // Uses focus() to ensure the new tab appears in front, not behind.
-    window.openGameWindow = function(url) {
-        const gw = window.open(url, 'tutorGameWindow', 'noopener');
-        if (gw) { gw.focus(); } else { window.location.href = url; }
-    };
-    
-    // Add inbox navigation to the sidebar if it doesn't exist
+    // Add inbox navigation to the sidebar if it exists
     setTimeout(() => {
         const navInbox = document.getElementById('navInbox');
         if (!navInbox) {
+            // Create inbox navigation item if it doesn't exist
             const sidebar = document.querySelector('.sidebar-nav');
             if (sidebar) {
                 const inboxNav = document.createElement('li');
@@ -5847,40 +5300,7 @@ async function initTutorApp() {
             }
         }
     }, 500);
-
-    // NEW: Add Courses navigation to the sidebar if it doesn't exist
-    setTimeout(() => {
-        const navCourses = document.getElementById('navCourses');
-        if (!navCourses) {
-            const sidebar = document.querySelector('.sidebar-nav');
-            if (sidebar) {
-                const coursesNav = document.createElement('li');
-                coursesNav.id = 'navCourses';
-                coursesNav.innerHTML = `
-                    <a href="#" class="nav-link flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-                        <span class="text-xl">📚</span>
-                        <span>Courses</span>
-                    </a>
-                `;
-                sidebar.appendChild(coursesNav);
-                
-                coursesNav.addEventListener('click', () => {
-                    if (window.tutorData) {
-                        renderCourses(document.getElementById('mainContent'), window.tutorData);
-                    }
-                });
-            }
-        }
-    }, 500);
-}
-
-// If DOM already loaded (module scripts often load after DOMContentLoaded),
-// run immediately. Otherwise wait for the event.
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initTutorApp);
-} else {
-    initTutorApp();
-}
+});
 
 
 
@@ -5893,7 +5313,52 @@ if (document.readyState === 'loading') {
  ******************************************************************************/
 
 // ==========================================
-// 1. HELPER: Homework Cutoff Date (4th of current month)
+// 1. INJECT GRADING STYLES (unchanged)
+// ==========================================
+(function injectGradingStyles() {
+    if(document.getElementById('gc-grading-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'gc-grading-styles';
+    style.textContent = `
+        /* Overlay */
+        .gc-grading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(2px); animation: fadeIn 0.2s ease-out; }
+        .gc-grading-container { background: #f8f9fa; width: 95%; max-width: 1200px; height: 90vh; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.2); }
+        
+        /* Header */
+        .gc-grading-header { background: white; border-bottom: 1px solid #e0e0e0; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; height: 64px; }
+        .gc-student-name { font-size: 1.1rem; font-weight: 500; color: #3c4043; }
+        .gc-assignment-title { font-size: 0.9rem; color: #5f6368; margin-left: 12px; }
+
+        /* Body */
+        .gc-grading-body { display: flex; flex: 1; overflow: hidden; }
+        .gc-work-panel { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
+        
+        /* File Preview */
+        .gc-file-preview { background: white; border: 1px solid #dadce0; border-radius: 8px; width: 100%; max-width: 800px; padding: 40px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; }
+        .gc-file-icon { font-size: 48px; margin-bottom: 16px; }
+        .gc-download-btn { background: #1a73e8; color: white; padding: 8px 24px; border-radius: 4px; text-decoration: none; font-weight: 500; transition: background 0.2s; }
+        .gc-download-btn:hover { background: #1557b0; }
+
+        /* Sidebar */
+        .gc-grading-sidebar { width: 320px; background: white; border-left: 1px solid #e0e0e0; padding: 24px; display: flex; flex-direction: column; overflow-y: auto; }
+        .gc-grade-input { width: 80px; padding: 8px; border: 1px solid #dadce0; border-radius: 4px; text-align: right; font-size: 1rem; }
+        .gc-comment-box { width: 100%; min-height: 150px; padding: 12px; border: 1px solid #dadce0; border-radius: 4px; resize: vertical; margin-top: 8px; background: #f8f9fa; }
+        
+        /* Return Button */
+        .gc-action-footer { margin-top: auto; padding-top: 24px; }
+        .gc-return-btn { width: 100%; background: #1a73e8; color: white; border: none; padding: 10px; border-radius: 4px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
+        .gc-return-btn:hover { background: #1557b0; }
+        .gc-return-btn:disabled { background: #dadce0; color: #80868b; cursor: not-allowed; }
+        
+        /* Inbox Item */
+        .gc-inbox-item { display: flex; justify-content: space-between; align-items: center; padding: 16px; border-bottom: 1px solid #f1f3f4; cursor: pointer; transition: background 0.1s; }
+        .gc-inbox-item:hover { background: #f8f9fa; }
+    `;
+    document.head.appendChild(style);
+})();
+
+// ==========================================
+// 2. HELPER: Homework Cutoff Date (4th of current month)
 // ==========================================
 /**
  * Returns the cutoff date: 4th day of current month at 00:00:00.
@@ -5905,533 +5370,184 @@ function getHomeworkCutoffDate() {
 }
 
 // ==========================================
-// 2. LOAD HOMEWORK INBOX – per-student card format with accordion
+// 3. LOAD HOMEWORK INBOX (with auto‑clear & safe date handling)
 // ==========================================
 async function loadHomeworkInbox(tutorEmail) {
     const container = document.getElementById('homework-inbox-container');
     if (!container) return;
-    container.innerHTML = '<div class="text-center py-6"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading submissions…</p></div>';
+    container.innerHTML = '<div class="spinner mx-auto"></div>';
 
     try {
-        // Query all homework by this tutor (both name and email)
+        // Query by Tutor Name OR Email to be safe
         let q = query(
             collection(db, "homework_assignments"),
-            where("tutorName", "==", window.tutorData.name)
+            where("tutorName", "==", window.tutorData.name),
+            where("status", "==", "submitted")
         );
         let snapshot = await getDocs(q);
 
         if (snapshot.empty) {
-            q = query(collection(db, "homework_assignments"), where("tutorEmail", "==", tutorEmail));
+            // Fallback query using email
+            q = query(
+                collection(db, "homework_assignments"),
+                where("tutorEmail", "==", tutorEmail),
+                where("status", "==", "submitted")
+            );
             snapshot = await getDocs(q);
         }
 
-        if (snapshot.empty) {
-            container.innerHTML = `<div class="text-center py-6"><div class="text-3xl mb-2">📭</div><p class="text-gray-500">No homework assignments sent yet.</p></div>`;
-            const badge = document.getElementById('inbox-count');
-            if (badge) badge.textContent = '0';
+        // ---------- AUTO‑CLEAR LOGIC (4th day of month) ----------
+        const cutoffDate = getHomeworkCutoffDate();
+        const visibleSubmissions = snapshot.docs.filter(doc => {
+            const data = doc.data();
+            const submitted = data.submittedAt;
+            if (!submitted || typeof submitted.seconds !== 'number') return false;
+            const submittedDate = new Date(submitted.seconds * 1000);
+            return submittedDate >= cutoffDate;
+        });
+        // ---------------------------------------------------------
+
+        if (visibleSubmissions.length === 0) {
+            container.innerHTML = `<div class="text-center py-6">
+                <div class="text-3xl mb-2">🎉</div>
+                <p class="text-gray-500 text-sm">No pending homework from this month.</p>
+            </div>`;
             return;
         }
 
-        // Group all assignments by studentId
-        const studentMap = {}; // { studentId: { name, assignments: [] } }
-        snapshot.forEach(d => {
-            const data = { id: d.id, ...d.data() };
-            const sid = data.studentId || data.studentName || 'unknown';
-            if (!studentMap[sid]) {
-                studentMap[sid] = { name: data.studentName || 'Unknown', assignments: [] };
+        let html = '<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">';
+        visibleSubmissions.forEach(doc => {
+            const data = doc.data();
+            
+            // ✅ SAFE date formatting
+            const submitted = data.submittedAt;
+            let date = 'Unknown';
+            if (submitted && typeof submitted.seconds === 'number') {
+                date = new Date(submitted.seconds * 1000).toLocaleDateString();
             }
-            studentMap[sid].assignments.push(data);
-        });
 
-        // Count pending submissions
-        let pendingTotal = 0;
-        Object.values(studentMap).forEach(s => {
-            s.assignments.forEach(a => { if (a.status === 'submitted') pendingTotal++; });
-            // Sort newest first
-            s.assignments.sort((a, b) => {
-                const getTs = x => x.assignedDate?.toDate ? x.assignedDate.toDate() : new Date(x.assignedDate || x.createdAt || 0);
-                return getTs(b) - getTs(a);
-            });
-        });
-
-        const badge = document.getElementById('inbox-count');
-        if (badge) badge.textContent = pendingTotal > 0 ? pendingTotal : '✓';
-
-        // Render per-student cards
-        const sortedStudents = Object.entries(studentMap).sort((a, b) => {
-            // Students with pending submissions first
-            const aPending = a[1].assignments.filter(x => x.status === 'submitted').length;
-            const bPending = b[1].assignments.filter(x => x.status === 'submitted').length;
-            return bPending - aPending;
-        });
-
-        let html = '<div class="space-y-3">';
-        sortedStudents.forEach(([sid, student]) => {
-            const pending = student.assignments.filter(a => a.status === 'submitted').length;
-            const graded  = student.assignments.filter(a => a.status === 'graded').length;
-            const total   = student.assignments.length;
-
-            // Group by month for accordion
-            const byMonth = {};
-            student.assignments.forEach(a => {
-                const raw = a.assignedDate || a.createdAt;
-                const d = raw?.toDate ? raw.toDate() : new Date(raw || 0);
-                if (isNaN(d.getTime())) return;
-                const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-                if (!byMonth[mk]) byMonth[mk] = [];
-                byMonth[mk].push(a);
-            });
-
-            const monthKeys = Object.keys(byMonth).sort((a,b) => b.localeCompare(a));
+            const isLate = data.dueDate && new Date(data.dueDate) < new Date(submitted?.seconds * 1000 || 0);
 
             html += `
-            <details class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                <summary class="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 list-none select-none">
-                    <div class="w-10 h-10 rounded-full ${pending > 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'} flex items-center justify-center font-bold text-base flex-shrink-0">
-                        ${escapeHtml((student.name||'?').charAt(0))}
+                <div class="gc-inbox-item" onclick="openGradingModal('${doc.id}')">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                            ${data.studentName?.charAt(0) || '?'}
+                        </div>
+                        <div>
+                            <div class="font-medium text-gray-800">${data.studentName || 'Unknown'}</div>
+                            <div class="text-xs text-gray-500">${data.title || 'Untitled'}</div>
+                        </div>
                     </div>
-                    <div class="flex-1 min-w-0">
-                        <div class="font-semibold text-gray-800">${escapeHtml(student.name)}</div>
-                        <div class="text-xs text-gray-400">${total} assignment${total!==1?'s':''} · ${graded} graded</div>
+                    <div class="text-right">
+                        <div class="text-xs font-bold ${isLate ? 'text-red-600' : 'text-green-600'} uppercase tracking-wide">
+                            ${isLate ? 'Done Late' : 'Turned In'}
+                        </div>
+                        <div class="text-xs text-gray-400">${date}</div>
                     </div>
-                    <div class="flex gap-2 flex-shrink-0">
-                        ${pending > 0 ? `<span class="bg-amber-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">${pending} to review</span>` : '<span class="bg-green-100 text-green-700 text-xs font-bold px-2.5 py-1 rounded-full">All clear</span>'}
-                    </div>
-                </summary>
-
-                <!-- Per-month accordion inside -->
-                <div class="border-t border-gray-100">
-                    ${monthKeys.map(mk => {
-                        const [y, m] = mk.split('-');
-                        const label = new Date(parseInt(y), parseInt(m)-1, 1).toLocaleString('en-NG', { month:'long', year:'numeric' });
-                        const items = byMonth[mk];
-                        return `
-                        <details class="border-b border-gray-50 last:border-0">
-                            <summary class="flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-gray-50 list-none select-none">
-                                <span class="text-sm font-semibold text-gray-600">${escapeHtml(label)}</span>
-                                <span class="ml-auto text-xs text-gray-400">${items.length} item${items.length!==1?'s':''}</span>
-                                <i class="fas fa-chevron-right text-gray-300 text-xs ml-1"></i>
-                            </summary>
-                            <div class="px-5 pb-4 space-y-2 bg-gray-50">
-                                ${items.map(a => {
-                                    const assignedDate = (() => {
-                                        const raw = a.assignedDate || a.createdAt;
-                                        const d = raw?.toDate ? raw.toDate() : new Date(raw || 0);
-                                        return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleDateString('en-NG');
-                                    })();
-                                    const submittedDate = (() => {
-                                        if (!a.submittedAt) return null;
-                                        const d = a.submittedAt?.toDate ? a.submittedAt.toDate() : new Date(a.submittedAt);
-                                        return isNaN(d.getTime()) ? null : d.toLocaleDateString('en-NG');
-                                    })();
-                                    const statusColor = a.status === 'graded' ? 'text-green-700 bg-green-100' :
-                                                        a.status === 'submitted' ? 'text-amber-700 bg-amber-100' : 'text-gray-600 bg-gray-100';
-                                    const statusLabel = a.status === 'graded' ? 'Graded' :
-                                                        a.status === 'submitted' ? 'Submitted — Needs Review' : 'Assigned';
-                                    return `
-                                    <div class="bg-white border border-gray-200 rounded-lg p-3">
-                                        <div class="flex items-start justify-between gap-2">
-                                            <div class="flex-1 min-w-0">
-                                                <div class="font-medium text-gray-800 text-sm">${escapeHtml(a.title || 'Untitled')}</div>
-                                                ${a.description ? `<div class="text-xs text-gray-500 mt-1" style="white-space:pre-wrap;word-break:break-word;">${
-                                                    // Linkify URLs in description
-                                                    escapeHtml(a.description).replace(/(https?:\/\/[^\s&"<>]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;">$1</a>')
-                                                }</div>` : ''}
-                                                ${(() => {
-                                                    const allAttachments = a.attachments || [];
-                                                    if (allAttachments.length === 0 && a.fileUrl) allAttachments.push({ url: a.fileUrl, name: a.fileName || 'File', isLink: false });
-                                                    if (allAttachments.length === 0) return '';
-                                                    return `<div class="flex flex-wrap gap-1.5 mt-1.5">${allAttachments.map(att => {
-                                                        const label = escapeHtml(att.name || 'Attachment');
-                                                        const icon = att.isLink ? '🔗' : '📄';
-                                                        return `<a href="${escapeHtml(att.url)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;background:#eff6ff;color:#1d4ed8;font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:6px;text-decoration:none;border:1px solid #bfdbfe;">${icon} ${label}</a>`;
-                                                    }).join('')}</div>`;
-                                                })()}
-                                                <div class="flex gap-3 mt-1.5 text-xs text-gray-400 flex-wrap">
-                                                    <span>Assigned: ${escapeHtml(assignedDate)}</span>
-                                                    <span>Due: ${escapeHtml(a.dueDate || '—')}</span>
-                                                    ${submittedDate ? `<span>Submitted: ${escapeHtml(submittedDate)}</span>` : ''}
-                                                    ${a.score != null ? `<span class="font-bold text-blue-600">Score: ${escapeHtml(String(a.score))}/100</span>` : ''}
-                                                </div>
-                                            </div>
-                                            <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
-                                                <span class="text-xs font-bold px-2 py-0.5 rounded-full ${statusColor}">${statusLabel}</span>
-                                                ${a.status === 'submitted' ? `<button onclick="openGradingInNewTab('${escapeHtml(a.id)}')" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;padding:5px 12px;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;" title="Review & annotate submission">✏️ Review</button>` : ''}
-                                            </div>
-                                        </div>
-                                    </div>`;
-                                }).join('')}
-                            </div>
-                        </details>`;
-                    }).join('')}
-                </div>
-            </details>`;
+                </div>`;
         });
         html += '</div>';
         container.innerHTML = html;
 
     } catch (error) {
         console.error("Inbox Error:", error);
-        container.innerHTML = '<p class="text-red-500 text-center py-4">Error loading homework archive.</p>';
+        container.innerHTML = '<p class="text-red-500 text-center">Error loading inbox.</p>';
     }
 }
 
 // ==========================================
-// ==========================================
-// 3. GRADING OVERLAY MODAL — in-page, reuses main page db, NO document.write
+// 4. OPEN GRADING MODAL (unchanged – safe)
 // ==========================================
 async function openGradingModal(homeworkId) {
-    // Remove any stale overlay
-    document.getElementById('grading-overlay')?.remove();
-
-    // Loading state
-    const overlay = document.createElement('div');
-    overlay.id = 'grading-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.78);display:flex;align-items:center;justify-content:center;';
-    overlay.innerHTML = `<div style="background:#fff;border-radius:16px;padding:32px 48px;text-align:center;"><div class="spinner mx-auto mb-3"></div><p style="color:#6b7280;font-size:.9rem;">Loading assignment…</p></div>`;
-    document.body.appendChild(overlay);
-    document.body.style.overflow = 'hidden';
-
     let hwData;
     try {
-        const docSnap = await getDoc(doc(db, 'homework_assignments', homeworkId));
-        if (!docSnap.exists()) { overlay.remove(); document.body.style.overflow=''; showCustomAlert('Assignment not found.'); return; }
+        const docSnap = await getDoc(doc(db, "homework_assignments", homeworkId));
+        if (!docSnap.exists()) return alert("Assignment not found");
         hwData = { id: docSnap.id, ...docSnap.data() };
-    } catch (e) { overlay.remove(); document.body.style.overflow=''; showCustomAlert('Error loading: ' + e.message); return; }
+    } catch (e) { return alert("Error loading assignment"); }
 
-    const submissionUrl    = hwData.submissionUrl   || hwData.fileUrl || '';
-    const referenceUrl     = hwData.fileUrl         || '';
-    const studentName      = hwData.studentName     || 'Student';
-    const title            = hwData.title           || 'Untitled';
-    const description      = hwData.description     || '';
-    const existingScore    = hwData.score           != null ? String(hwData.score) : '';
-    const existingFeedback = hwData.feedback        || hwData.tutorAnnotations || '';
-    const dueDate          = hwData.dueDate         || '';
-    const tutorEmail       = window.tutorData?.email || '';
-    const tutorName        = window.tutorData?.name  || '';
-    const isAlreadyGraded  = hwData.status === 'graded';
+    const modal = document.createElement('div');
+    modal.className = 'gc-grading-overlay';
+    
+    const hasFile = hwData.submissionUrl && hwData.submissionUrl.length > 5;
+    const fileArea = hasFile ? 
+        `<div class="gc-file-preview"><div class="gc-file-icon">📄</div><div class="mb-2 font-medium">Student Submission</div><a href="${hwData.submissionUrl}" target="_blank" class="gc-download-btn">View File</a></div>` : 
+        `<div class="gc-file-preview"><div class="gc-file-icon">⚠️</div><div class="text-gray-500">No file attached</div></div>`;
 
-    // Smart file preview
-    const rawExt = (submissionUrl.split('?')[0].split('.').pop() || '').toLowerCase();
-    const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(rawExt);
-    const isPDF   = rawExt === 'pdf';
-
-    let previewHTML = '';
-    if (submissionUrl) {
-        if (isImage) {
-            previewHTML = `
-                <div>
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-                        <span style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">✏️ Annotate Submission</span>
-                        <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;" id="anno-tools">
-                            <button onclick="annoSetTool('pen')" id="tool-pen" style="padding:5px 10px;border-radius:8px;border:1.5px solid #3b82f6;background:#eff6ff;color:#2563eb;font-size:.75rem;font-weight:700;cursor:pointer;">✏️ Pen</button>
-                            <button onclick="annoSetTool('highlight')" id="tool-highlight" style="padding:5px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.75rem;font-weight:700;cursor:pointer;">🟡 Highlight</button>
-                            <button onclick="annoSetTool('arrow')" id="tool-arrow" style="padding:5px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.75rem;font-weight:700;cursor:pointer;">➡️ Arrow</button>
-                            <input type="color" id="anno-color" value="#ef4444" title="Pen color" style="width:32px;height:32px;padding:2px;border-radius:8px;border:1.5px solid #e2e8f0;cursor:pointer;">
-                            <button onclick="annoUndo()" style="padding:5px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.75rem;font-weight:700;cursor:pointer;">↩️ Undo</button>
-                            <button onclick="annoClear()" style="padding:5px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.75rem;font-weight:700;cursor:pointer;">🗑️ Clear</button>
-                            <button onclick="annoSave()" style="padding:5px 10px;border-radius:8px;border:none;background:linear-gradient(135deg,#059669,#047857);color:#fff;font-size:.75rem;font-weight:700;cursor:pointer;">💾 Save Image</button>
+    modal.innerHTML = `
+        <div class="gc-grading-container">
+            <header class="gc-grading-header">
+                <div class="flex items-center">
+                    <button class="mr-4 text-gray-500 hover:text-gray-800 text-2xl" onclick="this.closest('.gc-grading-overlay').remove()">✕</button>
+                    <div><span class="gc-student-name">${hwData.studentName}</span><span class="gc-assignment-title"> ➤ ${hwData.title}</span></div>
+                </div>
+            </header>
+            <div class="gc-grading-body">
+                <div class="gc-work-panel">
+                    ${fileArea}
+                    <div class="w-full max-w-2xl mt-6 border-t pt-4">
+                        <div class="text-xs font-bold text-gray-500 uppercase mb-2">Original Instructions</div>
+                        <div class="text-gray-700 text-sm">${hwData.description}</div>
+                        ${hwData.fileUrl ? `<div class="mt-2"><a href="${hwData.fileUrl}" target="_blank" class="text-blue-600 text-xs hover:underline">View Assignment Reference</a></div>` : ''}
+                    </div>
+                </div>
+                <div class="gc-grading-sidebar">
+                    <div class="mb-6">
+                        <label class="font-medium text-gray-700 block mb-2">Grade</label>
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="gc-score-input" class="gc-grade-input" min="0" max="100" value="${hwData.score || ''}">
+                            <span class="text-gray-500 text-sm">/ 100</span>
                         </div>
                     </div>
-                    <div style="position:relative;display:inline-block;width:100%;border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.15);">
-                        <img id="anno-base-img" src="${escapeHtml(submissionUrl)}" alt="Student submission"
-                            style="max-width:100%;display:block;user-select:none;" crossorigin="anonymous"
-                            onload="initAnnotationCanvas(this)">
-                        <canvas id="anno-canvas" style="position:absolute;top:0;left:0;cursor:crosshair;touch-action:none;"></canvas>
+                    <div class="flex-1 flex flex-col">
+                        <label class="font-medium text-gray-700">Private Comments</label>
+                        <textarea id="gc-feedback-input" class="gc-comment-box" placeholder="Add feedback...">${hwData.feedback || ''}</textarea>
                     </div>
-                    <p style="font-size:.72rem;color:#9ca3af;margin-top:6px;text-align:center;">Draw directly on the image · annotations are saved with your feedback</p>
-                </div>`;
-        } else if (isPDF) {
-            previewHTML = `<iframe src="${escapeHtml(submissionUrl)}" title="Student submission"
-                style="width:100%;height:65vh;min-height:460px;border:none;border-radius:10px;background:#f9fafb;display:block;"></iframe>`;
-        } else {
-            const fileIcons = {doc:'📝',docx:'📝',ppt:'📊',pptx:'📊',xls:'📈',xlsx:'📈',txt:'📄',zip:'🗜️',mp4:'🎬',mp3:'🎵'};
-            previewHTML = `
-                <div style="display:flex;flex-direction:column;align-items:center;padding:60px 20px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border-radius:12px;border:2px dashed #7dd3fc;">
-                    <div style="font-size:4rem;margin-bottom:16px;">${fileIcons[rawExt]||'📎'}</div>
-                    <p style="font-weight:700;color:#0369a1;font-size:1.1rem;margin-bottom:6px;">${escapeHtml(hwData.fileName||'Submitted File')}</p>
-                    <p style="color:#64748b;font-size:.85rem;margin-bottom:20px;">Click below to open and review</p>
-                    <a href="${escapeHtml(submissionUrl)}" target="_blank"
-                        style="background:#0369a1;color:#fff;padding:12px 28px;border-radius:10px;text-decoration:none;font-weight:700;">📂 Open File ↗</a>
-                </div>`;
-        }
-    } else {
-        previewHTML = `
-            <div style="text-align:center;padding:60px 20px;background:#fef9c3;border-radius:12px;border:2px dashed #fde047;">
-                <div style="font-size:3rem;margin-bottom:12px;">⚠️</div>
-                <p style="color:#92400e;font-weight:700;">No file attached yet</p>
-                <p style="color:#a16207;font-size:.85rem;margin-top:6px;">The student has not uploaded a file.</p>
-            </div>`;
-    }
-
-    // Build full overlay UI
-    overlay.innerHTML = `
-    <div style="background:#f8fafc;width:98vw;max-width:1300px;height:92vh;border-radius:20px;display:grid;grid-template-rows:auto 1fr;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.4);">
-
-        <!-- Header -->
-        <div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);color:#fff;padding:14px 24px;display:flex;align-items:center;gap:14px;flex-shrink:0;">
-            <div style="flex:1;min-width:0;">
-                <div style="font-weight:800;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                    📝 Reviewing: <span style="color:#bfdbfe;">${escapeHtml(studentName)}</span>
-                </div>
-                <div style="font-size:.78rem;opacity:.8;margin-top:2px;">
-                    ${escapeHtml(title)}${dueDate?' · Due: '+escapeHtml(dueDate):''}
-                    ${isAlreadyGraded?'<span style="background:rgba(52,211,153,.3);color:#d1fae5;border-radius:999px;padding:1px 10px;margin-left:8px;font-size:.72rem;font-weight:700;">✅ Previously Graded</span>':''}
+                    <div class="gc-action-footer">
+                        <button id="gc-return-btn" class="gc-return-btn">Return</button>
+                    </div>
                 </div>
             </div>
-            <button id="grading-close-btn" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:1.2rem;cursor:pointer;flex-shrink:0;">✕</button>
-        </div>
+        </div>`;
 
-        <!-- Two-panel body -->
-        <div style="display:grid;grid-template-columns:1fr 360px;overflow:hidden;height:100%;">
+    document.body.appendChild(modal);
 
-            <!-- LEFT: document viewer -->
-            <div style="overflow-y:auto;padding:20px;background:#f1f5f9;">
-                ${referenceUrl && referenceUrl !== submissionUrl ? (() => {
-                    const refExt = (referenceUrl.split('?')[0].split('.').pop() || '').toLowerCase();
-                    const refIsImg = ['jpg','jpeg','png','gif','webp','svg'].includes(refExt);
-                    const refIsPDF = refExt === 'pdf';
-                    if (refIsImg) {
-                        return `<div style="margin-bottom:14px;border:1.5px solid #bfdbfe;border-radius:10px;overflow:hidden;background:#eff6ff;">
-                            <div style="background:#eff6ff;padding:7px 12px;font-size:.72rem;font-weight:700;color:#1d4ed8;display:flex;align-items:center;justify-content:space-between;">
-                                <span>📎 Original Assignment Reference</span>
-                                <a href="${escapeHtml(referenceUrl)}" target="_blank" style="color:#2563eb;text-decoration:none;font-size:.7rem;">Open full size ↗</a>
-                            </div>
-                            <img src="${escapeHtml(referenceUrl)}" alt="Assignment reference" style="width:100%;max-height:260px;object-fit:contain;background:#fff;display:block;">
-                        </div>`;
-                    } else if (refIsPDF) {
-                        return `<div style="margin-bottom:14px;border:1.5px solid #bfdbfe;border-radius:10px;overflow:hidden;">
-                            <div style="background:#eff6ff;padding:7px 12px;font-size:.72rem;font-weight:700;color:#1d4ed8;display:flex;align-items:center;justify-content:space-between;">
-                                <span>📎 Original Assignment Reference (PDF)</span>
-                                <a href="${escapeHtml(referenceUrl)}" target="_blank" style="color:#2563eb;text-decoration:none;font-size:.7rem;">Open in tab ↗</a>
-                            </div>
-                            <iframe src="${escapeHtml(referenceUrl)}" style="width:100%;height:260px;border:none;display:block;background:#f9fafb;"></iframe>
-                        </div>`;
-                    } else {
-                        return `<a href="${escapeHtml(referenceUrl)}" target="_blank"
-                            style="display:inline-flex;align-items:center;gap:6px;color:#2563eb;font-size:.8rem;text-decoration:none;margin-bottom:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:6px 12px;">
-                            📎 Open Original Assignment Reference ↗
-                        </a>`;
-                    }
-                })() : ''}
-                ${previewHTML}
-                ${description ? `
-                <div style="margin-top:16px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
-                    <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#94a3b8;margin-bottom:8px;">Assignment Instructions</div>
-                    <div style="font-size:.875rem;color:#334155;line-height:1.7;white-space:pre-wrap;">${escapeHtml(description)}</div>
-                </div>` : ''}
-            </div>
+    modal.querySelector('#gc-return-btn').onclick = async function() {
+        const btn = this;
+        const score = modal.querySelector('#gc-score-input').value;
+        const feedback = modal.querySelector('#gc-feedback-input').value;
 
-            <!-- RIGHT: grading sidebar -->
-            <div style="background:#fff;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden;">
-                <div style="flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px;">
+        if (!score && !confirm("Return without a numerical grade?")) return;
 
-                    <!-- Annotation -->
-                    <div>
-                        <label style="display:block;font-size:.73rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:8px;">✏️ Annotations / Feedback</label>
-                        <div id="grading-annotation" contenteditable="true"
-                            style="min-height:180px;max-height:280px;overflow-y:auto;border:2px solid #e2e8f0;border-radius:10px;padding:12px;font-size:.875rem;line-height:1.7;color:#1e293b;outline:none;white-space:pre-wrap;background:#fafafa;"
-                            onfocus="this.style.borderColor='#3b82f6';this.style.background='#fff'"
-                            onblur="this.style.borderColor='#e2e8f0';this.style.background='#fafafa'"
-                        >${existingFeedback.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-                        <p style="font-size:.72rem;color:#94a3b8;margin-top:6px;">This will be visible to the student.</p>
-                    </div>
-
-                    <!-- Grade -->
-                    <div>
-                        <label style="display:block;font-size:.73rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:8px;">🎯 Grade (out of 100)</label>
-                        <div style="display:flex;align-items:center;gap:10px;">
-                            <input type="number" id="grading-score" min="0" max="100" value="${escapeHtml(existingScore)}" placeholder="–"
-                                style="width:90px;padding:10px 14px;border:2px solid #e2e8f0;border-radius:10px;font-size:1.4rem;font-weight:800;color:#1e293b;outline:none;text-align:center;"
-                                onfocus="this.style.borderColor='#3b82f6'"
-                                onblur="this.style.borderColor='#e2e8f0'">
-                            <span style="color:#94a3b8;font-size:.9rem;">/ 100</span>
-                            <span id="grade-emoji" style="font-size:1.5rem;"></span>
-                        </div>
-                    </div>
-
-                    <div id="grading-status" style="display:none;"></div>
-                </div>
-
-                <!-- Save / Cancel -->
-                <div style="padding:14px 20px;border-top:1px solid #e2e8f0;display:flex;flex-direction:column;gap:10px;background:#f8fafc;flex-shrink:0;">
-                    <button id="grading-save-btn" style="background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;border-radius:12px;padding:14px;font-size:1rem;font-weight:700;cursor:pointer;width:100%;">
-                        ✅ Save &amp; Return to Student
-                    </button>
-                    <button id="grading-cancel-btn" style="background:none;border:1px solid #e2e8f0;color:#64748b;border-radius:10px;padding:10px;font-size:.875rem;cursor:pointer;width:100%;">
-                        Cancel
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>`;
-
-    // ── Annotation canvas system ────────────────────────────────
-    let annoTool = 'pen';
-    let annoDrawing = false;
-    let annoHistory = []; // snapshots for undo
-    let annoCtx = null;
-    let annoStartX = 0, annoStartY = 0;
-    let annoTempSnap = null;
-
-    window.initAnnotationCanvas = function(img) {
-        const canvas = document.getElementById('anno-canvas');
-        if (!canvas || !img) return;
-        canvas.width  = img.naturalWidth  || img.offsetWidth;
-        canvas.height = img.naturalHeight || img.offsetHeight;
-        canvas.style.width  = img.offsetWidth  + 'px';
-        canvas.style.height = img.offsetHeight + 'px';
-        annoCtx = canvas.getContext('2d');
-
-        function getPos(e) {
-            const r = canvas.getBoundingClientRect();
-            const scaleX = canvas.width  / r.width;
-            const scaleY = canvas.height / r.height;
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            return { x: (clientX - r.left) * scaleX, y: (clientY - r.top) * scaleY };
-        }
-
-        canvas.addEventListener('mousedown',  e => { annoDrawing=true; const p=getPos(e); annoStartX=p.x; annoStartY=p.y; annoTempSnap=annoCtx.getImageData(0,0,canvas.width,canvas.height); if(annoTool==='pen'||annoTool==='highlight'){annoCtx.beginPath();annoCtx.moveTo(p.x,p.y);} });
-        canvas.addEventListener('mousemove',  e => { if(!annoDrawing)return; const p=getPos(e); if(annoTool==='pen'){annoCtx.strokeStyle=document.getElementById('anno-color')?.value||'#ef4444';annoCtx.lineWidth=3;annoCtx.lineCap='round';annoCtx.globalAlpha=1;annoCtx.lineTo(p.x,p.y);annoCtx.stroke();} else if(annoTool==='highlight'){annoCtx.strokeStyle='#fef08a';annoCtx.lineWidth=18;annoCtx.lineCap='round';annoCtx.globalAlpha=0.5;annoCtx.lineTo(p.x,p.y);annoCtx.stroke();} else if(annoTool==='arrow'){annoCtx.putImageData(annoTempSnap,0,0);drawArrow(annoCtx,annoStartX,annoStartY,p.x,p.y,document.getElementById('anno-color')?.value||'#ef4444');} });
-        canvas.addEventListener('mouseup',    e => { if(!annoDrawing)return; annoDrawing=false; annoCtx.globalAlpha=1; annoHistory.push(annoCtx.getImageData(0,0,canvas.width,canvas.height)); });
-        canvas.addEventListener('mouseleave', e => { if(annoDrawing){annoDrawing=false;annoCtx.globalAlpha=1;annoHistory.push(annoCtx.getImageData(0,0,canvas.width,canvas.height));} });
-        canvas.addEventListener('touchstart', e => { e.preventDefault(); const p=getPos(e); canvas.dispatchEvent(new MouseEvent('mousedown',{clientX:p.x,clientY:p.y})); }, {passive:false});
-        canvas.addEventListener('touchmove',  e => { e.preventDefault(); const p=getPos(e); canvas.dispatchEvent(new MouseEvent('mousemove',{clientX:e.touches[0].clientX,clientY:e.touches[0].clientY})); }, {passive:false});
-        canvas.addEventListener('touchend',   e => { canvas.dispatchEvent(new MouseEvent('mouseup',{})); }, {passive:false});
-    };
-
-    function drawArrow(ctx, x1, y1, x2, y2, color) {
-        const hw=12, hl=18;
-        const angle=Math.atan2(y2-y1,x2-x1);
-        ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=3; ctx.globalAlpha=1;
-        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(x2,y2);
-        ctx.lineTo(x2-hl*Math.cos(angle-Math.PI/7),y2-hl*Math.sin(angle-Math.PI/7));
-        ctx.lineTo(x2-hl*Math.cos(angle+Math.PI/7),y2-hl*Math.sin(angle+Math.PI/7));
-        ctx.closePath(); ctx.fill();
-    }
-
-    window.annoSetTool = function(t) {
-        annoTool = t;
-        ['pen','highlight','arrow'].forEach(tt => {
-            const btn = document.getElementById('tool-'+tt);
-            if (btn) { btn.style.background=t===tt?'#eff6ff':'#f8fafc'; btn.style.border=t===tt?'1.5px solid #3b82f6':'1.5px solid #e2e8f0'; btn.style.color=t===tt?'#2563eb':'#64748b'; }
-        });
-    };
-
-    window.annoUndo = function() {
-        const canvas = document.getElementById('anno-canvas');
-        if (!canvas || !annoCtx) return;
-        annoHistory.pop();
-        if (annoHistory.length > 0) {
-            annoCtx.putImageData(annoHistory[annoHistory.length-1], 0, 0);
-        } else {
-            annoCtx.clearRect(0, 0, canvas.width, canvas.height);
-        }
-    };
-
-    window.annoClear = function() {
-        const canvas = document.getElementById('anno-canvas');
-        if (!canvas || !annoCtx) return;
-        annoCtx.clearRect(0, 0, canvas.width, canvas.height);
-        annoHistory = [];
-    };
-
-    window.annoSave = function() {
-        const canvas = document.getElementById('anno-canvas');
-        const img = document.getElementById('anno-base-img');
-        if (!canvas || !img || !annoCtx) return;
-        // Composite: draw base image + annotations onto a new canvas
-        const merged = document.createElement('canvas');
-        merged.width = canvas.width; merged.height = canvas.height;
-        const mc = merged.getContext('2d');
-        mc.drawImage(img, 0, 0, canvas.width, canvas.height);
-        mc.drawImage(canvas, 0, 0);
-        const link = document.createElement('a');
-        link.download = 'annotated_submission.png';
-        link.href = merged.toDataURL('image/png');
-        link.click();
-        // Also store dataURL in a hidden field so the save handler can optionally upload it
-        window._annoDataURL = merged.toDataURL('image/png');
-    };
-    // ── End annotation canvas system ─────────────────────────
-
-    // Grade emoji live update
-    const scoreInput = overlay.querySelector('#grading-score');
-    const gradeEmoji = overlay.querySelector('#grade-emoji');
-    function updateEmoji() {
-        const v = parseInt(scoreInput.value, 10);
-        if (isNaN(v)) { gradeEmoji.textContent = ''; return; }
-        gradeEmoji.textContent = v >= 90 ? '🏆' : v >= 75 ? '⭐' : v >= 60 ? '👍' : v >= 40 ? '📝' : '🔄';
-    }
-    scoreInput.addEventListener('input', updateEmoji);
-    updateEmoji();
-
-    // Close handlers
-    function closeGrading() { overlay.remove(); document.body.style.overflow = ''; }
-    overlay.querySelector('#grading-close-btn').addEventListener('click', closeGrading);
-    overlay.querySelector('#grading-cancel-btn').addEventListener('click', closeGrading);
-    overlay.addEventListener('click', e => { if (e.target === overlay) closeGrading(); });
-    const escHandler = e => { if (e.key === 'Escape') { closeGrading(); document.removeEventListener('keydown', escHandler); } };
-    document.addEventListener('keydown', escHandler);
-
-    // Save handler — uses existing db, no re-init needed
-    overlay.querySelector('#grading-save-btn').addEventListener('click', async () => {
-        const saveBtn  = overlay.querySelector('#grading-save-btn');
-        const statusEl = overlay.querySelector('#grading-status');
-        const feedback = overlay.querySelector('#grading-annotation').innerText.trim();
-        const scoreRaw = overlay.querySelector('#grading-score').value.trim();
-        const scoreVal = scoreRaw !== '' ? parseInt(scoreRaw, 10) : null;
-
-        function showSt(msg, ok) {
-            statusEl.style.display = 'block';
-            statusEl.style.cssText = `display:block;padding:10px 14px;border-radius:10px;font-size:.875rem;font-weight:600;text-align:center;background:${ok?'#d1fae5':'#fee2e2'};color:${ok?'#065f46':'#991b1b'};`;
-            statusEl.textContent = msg;
-        }
-
-        if (scoreVal !== null && (isNaN(scoreVal) || scoreVal < 0 || scoreVal > 100)) {
-            showSt('❌ Score must be 0–100.', false); return;
-        }
-        if (!feedback && scoreVal === null) {
-            if (!confirm('Save without a grade or feedback?')) return;
-        }
-
-        saveBtn.disabled = true;
-        saveBtn.textContent = '⏳ Saving…';
-        statusEl.style.display = 'none';
+        btn.innerText = "Returning...";
+        btn.disabled = true;
 
         try {
-            const update = {
-                feedback, tutorAnnotations: feedback,
-                status: 'graded', gradedAt: new Date(),
-                tutorEmail, tutorName
-            };
-            if (scoreVal !== null) update.score = scoreVal;
-            await updateDoc(doc(db, 'homework_assignments', homeworkId), update);
+            await updateDoc(doc(db, "homework_assignments", homeworkId), {
+                score: score,
+                feedback: feedback,
+                status: 'graded',
+                gradedAt: new Date(),
+                tutorEmail: window.tutorData.email // Ensure this is tracked for history
+            });
 
-            showSt('✅ Grade saved and returned to student!', true);
-            saveBtn.textContent = '✅ Saved!';
-            saveBtn.style.background = 'linear-gradient(135deg,#6366f1,#4f46e5)';
-            try { if (typeof loadHomeworkInbox === 'function') loadHomeworkInbox(tutorEmail); } catch(e) {}
-            setTimeout(closeGrading, 1600);
-        } catch (err) {
-            console.error('Grading save error:', err);
-            showSt('❌ Save failed: ' + err.message, false);
-            saveBtn.disabled = false;
-            saveBtn.textContent = '✅ Save & Return to Student';
+            modal.remove();
+            showCustomAlert(`✅ Returned to ${hwData.studentName}`);
+            loadHomeworkInbox(window.tutorData.email); // Refresh inbox
+        } catch (error) {
+            console.error(error);
+            showCustomAlert("Error returning assignment");
+            btn.innerText = "Return";
+            btn.disabled = false;
         }
-    });
+    };
 }
 
 // ==========================================
-// 4. DASHBOARD WIDGET INJECTOR (unchanged)
+// 5. DASHBOARD WIDGET INJECTOR (unchanged)
 // ==========================================
 const inboxObserver = new MutationObserver(() => {
-    // Only run if we are on the Dashboard tab (unique element present)
-    if (!document.getElementById('pendingReportsContainer')) return;
-
     const hero = document.querySelector('.hero-section');
     if (hero && !document.getElementById('homework-inbox-section')) {
         const div = document.createElement('div');
@@ -6451,128 +5567,7 @@ const inboxObserver = new MutationObserver(() => {
 inboxObserver.observe(document.body, { childList: true, subtree: true });
 
 // ==========================================
-// 5. EXPOSE FUNCTIONS TO WINDOW (for onclick handlers)
+// 6. EXPOSE FUNCTIONS TO WINDOW (for onclick handlers)
 // ==========================================
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
-
-// ======================================================
-// BROADCAST POP-UP SYSTEM (shows management broadcasts)
-// ======================================================
-
-async function showPendingBroadcasts(tutorData) {
-    try {
-        // Get last seen timestamp from localStorage
-        const lastSeenKey = `broadcast_last_seen_${tutorData.email}`;
-        const lastSeen = localStorage.getItem(lastSeenKey);
-        const lastSeenDate = lastSeen ? new Date(parseInt(lastSeen)) : new Date(0);
-        
-        // Query broadcasts targeting tutors
-        const snap = await getDocs(query(
-            collection(db, 'broadcasts'),
-            where('toTutors', '==', true),
-            orderBy('createdAt', 'desc'),
-            limit(5)
-        ));
-        
-        const newBroadcasts = snap.docs
-            .map(d => ({ id: d.id, ...d.data() }))
-            .filter(b => {
-                const createdAt = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
-                return createdAt > lastSeenDate;
-            });
-        
-        if (newBroadcasts.length === 0) return;
-        
-        // Show each broadcast as a pop-up sequentially
-        for (const broadcast of newBroadcasts) {
-            await showBroadcastPopup(broadcast);
-        }
-        
-        // Update last seen
-        localStorage.setItem(lastSeenKey, Date.now().toString());
-        
-    } catch(e) {
-        console.warn('Could not load broadcasts:', e.message);
-    }
-}
-
-function showBroadcastPopup(broadcast) {
-    return new Promise((resolve) => {
-        const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
-        
-        const fileSection = broadcast.fileUrl ? (
-            broadcast.fileType === 'image'
-                ? `<div style="margin:12px 0;"><img src="${escapeHtml(broadcast.fileUrl)}" alt="Attachment" style="max-width:100%;max-height:300px;border-radius:10px;object-fit:contain;"></div>`
-                : `<div style="margin:12px 0;"><a href="${escapeHtml(broadcast.fileUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;background:#eff6ff;color:#1d4ed8;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:600;">📎 Download Attachment</a></div>`
-        ) : '';
-        
-        overlay.innerHTML = `
-            <div style="background:#fff;border-radius:16px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
-                <div style="background:linear-gradient(135deg,#059669,#047857);padding:16px 20px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                        <div style="color:#fff;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px;">📢 Message from Management</div>
-                        <h3 style="color:#fff;font-size:1.1rem;font-weight:800;margin:0;">${escapeHtml(broadcast.title || 'Announcement')}</h3>
-                    </div>
-                    <button id="bc-close-btn" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
-                </div>
-                <div style="padding:20px;">
-                    <p style="color:#374151;font-size:.95rem;line-height:1.6;white-space:pre-wrap;">${escapeHtml(broadcast.message || '')}</p>
-                    ${fileSection}
-                    <div style="margin-top:16px;text-align:right;">
-                        <button id="bc-read-btn" style="background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:700;cursor:pointer;font-size:.9rem;">✓ Got it!</button>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(overlay);
-        
-        const close = () => { overlay.remove(); resolve(); };
-        overlay.querySelector('#bc-close-btn').addEventListener('click', close);
-        overlay.querySelector('#bc-read-btn').addEventListener('click', close);
-    });
-}
-
-window.showPendingBroadcasts = showPendingBroadcasts;
-
-// Expose modular Firebase functions globally so games.js (classic script) can use them
-// Do this immediately so games.js has access as soon as this module is parsed
-window.__fbCollection = collection;
-window.__fbAddDoc     = addDoc;
-window.__fbGetDocs    = getDocs;
-window.__fbQuery      = query;
-window.__fbWhere      = where;
-window.__fbOrderBy    = orderBy;
-window.__fbLimit      = limit;
-window.__fbOnSnapshot = onSnapshot;
-window.__fbDoc        = doc;
-window.__fbSetDoc     = setDoc;
-window.__fbUpdateDoc  = updateDoc;
-// Expose db instance so games.js and other scripts can use Firebase
-window.db = db;
-
-// Opens grading in a dedicated new browser tab for full-screen annotation experience
-window.openGradingInNewTab = function(homeworkId) {
-    // Store IDs in sessionStorage so grading.html can read them
-    sessionStorage.setItem('grading_hw_id',     homeworkId);
-    sessionStorage.setItem('grading_tutor_email', window.tutorData?.email || '');
-    sessionStorage.setItem('grading_tutor_name',  window.tutorData?.name  || '');
-    // Build query string too (belt and suspenders)
-    const p = new URLSearchParams({
-        hw:    homeworkId,
-        tutor: window.tutorData?.email || '',
-        name:  window.tutorData?.name  || ''
-    });
-    const url = `./grading.html?${p.toString()}`;
-    const tab = window.open(url, '_blank');
-    if (!tab) showCustomAlert('Pop-up blocked — please allow pop-ups and try again.');
-};
-
-window.showDailyTopicModal = showDailyTopicModal;
-window.showHomeworkModal = showHomeworkModal;
-window.showScheduleCalendarModal = showScheduleCalendarModal;
-window.renderCourses = renderCourses;
-window.loadCourseMaterials = loadCourseMaterials;
-window.uploadCourseMaterial = uploadCourseMaterial;
