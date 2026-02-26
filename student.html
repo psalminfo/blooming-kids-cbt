@@ -260,8 +260,7 @@
     </style>
     
     <!-- Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <!-- Firebase modular SDK is now used via firebaseConfig.js imports -->
 </head>
 <body>
     <div class="test-container max-w-4xl mx-auto p-6">
@@ -282,23 +281,13 @@
     </div>
 
     <script type="module">
-        // --- FIREBASE INITIALIZATION ---
-        if (typeof firebase !== 'undefined' && !firebase.apps.length) {
-            firebase.initializeApp({
-                apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
-                authDomain: "bloomingkidsassessment.firebaseapp.com",
-                projectId: "bloomingkidsassessment",
-                storageBucket: "bloomingkidsassessment.appspot.com",
-                messagingSenderId: "238975054977",
-                appId: "1:238975054977:web:87c70b4db044998a204980"
-            });
-        }
-        const db = firebase.firestore();
-        const REFERRAL_REWARD_AMOUNT = 5000;
-
-        // --- MODULE IMPORTS ---
+        // --- MODULE IMPORTS MUST BE FIRST IN A MODULE SCRIPT ---
         import { loadQuestions, clearTestSession } from './autoQuestionGen.js';
         import { submitTestToFirebase } from './submitAnswers.js';
+        import { db as firestoreDb } from './firebaseConfig.js';
+        import { collection, query, where, limit, getDocs, addDoc, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        const REFERRAL_REWARD_AMOUNT = 5000;
 
         // --- HELPER: Escape HTML (prevent XSS) ---
         function escapeHtml(unsafe) {
@@ -333,10 +322,11 @@
             }
 
             try {
-                const parentQuery = await db.collection('parent_users')
-                    .where('referralCode', '==', cleanCode)
-                    .limit(1)
-                    .get();
+                const parentQuery = await getDocs(query(
+                    collection(firestoreDb, 'parent_users'),
+                    where('referralCode', '==', cleanCode),
+                    limit(1)
+                ));
 
                 if (parentQuery.empty) {
                     console.warn(`Referral Code ${cleanCode} is invalid or expired. Skipping logging.`);
@@ -346,14 +336,14 @@
                 const parentDoc = parentQuery.docs[0];
                 const referringParentUid = parentDoc.id;
 
-                await db.collection('referral_transactions').add({
+                await addDoc(collection(firestoreDb, 'referral_transactions'), {
                     referringParentUid: referringParentUid,
                     referredStudentUid: studentUid,
                     referredStudentName: studentName,
                     referralCode: cleanCode,
                     rewardAmount: REFERRAL_REWARD_AMOUNT,
                     status: 'pending',
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    timestamp: serverTimestamp(),
                     ownerUid: referringParentUid
                 });
 
@@ -366,20 +356,20 @@
         // --- GET OR CREATE STUDENT RECORD (prevents duplicates) ---
         // Country is now optional; if not provided, we store an empty string.
         async function getOrCreateStudentRecord(studentName, parentEmail, parentPhone, tutorEmail, grade, country, referralCode) {
-            const studentsRef = db.collection('students');
-            const q = studentsRef
-                .where('parentEmail', '==', parentEmail)
-                .where('studentName', '==', studentName)
-                .limit(1);
-            const snapshot = await q.get();
+            const snapshot = await getDocs(query(
+                collection(firestoreDb, 'students'),
+                where('parentEmail', '==', parentEmail),
+                where('studentName', '==', studentName),
+                limit(1)
+            ));
 
             if (!snapshot.empty) {
                 const existingDoc = snapshot.docs[0];
-                await existingDoc.ref.update({
-                    lastActive: firebase.firestore.FieldValue.serverTimestamp(),
+                await updateDoc(doc(firestoreDb, 'students', existingDoc.id), {
+                    lastActive: serverTimestamp(),
                     tutorEmail: tutorEmail,
                     grade: grade,
-                    country: country || ''   // store empty string if country missing
+                    country: country || ''
                 });
                 console.log("Reusing existing student record with ID:", existingDoc.id);
                 return existingDoc.id;
@@ -390,19 +380,19 @@
                     parentPhone,
                     tutorEmail,
                     grade,
-                    country: country || '',   // optional
+                    country: country || '',
                     referralCodeUsed: referralCode ? referralCode.toUpperCase() : null,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    lastActive: firebase.firestore.FieldValue.serverTimestamp()
+                    createdAt: serverTimestamp(),
+                    lastActive: serverTimestamp()
                 };
-                const docRef = await studentsRef.add(studentData);
+                const docRef = await addDoc(collection(firestoreDb, 'students'), studentData);
                 console.log("Created new student record with ID:", docRef.id);
                 return docRef.id;
             }
         }
 
         // --- MAIN ---
-        document.addEventListener('DOMContentLoaded', async () => {
+        async function initStudentTest() {
             const urlParams = new URLSearchParams(window.location.search);
             
             const subject = urlParams.get('subject');
@@ -431,9 +421,8 @@
             }
 
             if (!parentPhone) {
-                alert("Parent phone number is missing. Please log in again.");
-                window.location.href = "tutor.html";
-                return;
+                // parentPhone is optional — log warning but allow test to continue
+                console.warn("parentPhone not found in localStorage — continuing without it.");
             }
 
             try {
@@ -485,9 +474,9 @@
                             const storedData = JSON.parse(localStorage.getItem("studentData") || '{}');
                             const studentUid = storedData.studentUid || '';
                             if (studentUid) {
-                                await db.collection('students').doc(studentUid).update({
+                                await updateDoc(doc(firestoreDb, 'students', studentUid), {
                                     placementTestStatus:      'completed',
-                                    placementTestCompletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                    placementTestCompletedAt: serverTimestamp(),
                                     placementTestSubject:     subject
                                 });
                                 console.log("Placement test status written to Firestore for:", studentUid);
@@ -511,6 +500,13 @@
                 });
             }
         });
+
+        // Run immediately if DOM ready (module scripts load after DOMContentLoaded)
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initStudentTest);
+        } else {
+            initStudentTest();
+        }
 
         // --- FIXED LOGOUT: Always go to tutor.html, even if clearTestSession tries to redirect elsewhere ---
         window.logout = () => {
