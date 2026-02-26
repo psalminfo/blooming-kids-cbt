@@ -10499,7 +10499,7 @@ const navigationGroups = {
         label: "Communication",
         items: [
             { id: "navParentFeedback", label: "Parent Feedback", icon: "fas fa-comment-dots", fn: renderParentFeedbackPanel },
-            { id: "navMessaging", label: "Messaging", icon: "fas fa-paper-plane", fn: renderManagementMessagingPanel }
+            { id: "navMessaging", label: "Messaging", icon: "fas fa-paper-plane", fn: renderManagementMessagingPanel, perm: "viewParentFeedback" }
         ]
     }
 };
@@ -10914,8 +10914,8 @@ async function renderManagementMessagingPanel(container) {
                 const file = fileInput.files[0];
                 const formData = new FormData();
                 formData.append('file', file);
-                formData.append('upload_preset', 'tutor_homework');
-                const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/dwjq7j5zp/auto/upload`, { method: 'POST', body: formData });
+                formData.append('upload_preset', 'bkh_assessments');
+                const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/dy2hxcyaf/auto/upload`, { method: 'POST', body: formData });
                 const uploadData = await uploadRes.json();
                 fileUrl = uploadData.secure_url;
                 fileType = file.type.startsWith('image/') ? 'image' : 'file';
@@ -10996,12 +10996,15 @@ async function initManagementNotifications() {
     
     let notificationCount = 0;
     
-    // Create badge
-    const badge = document.createElement('span');
+    // Reuse existing badge span if present, otherwise create one
+    let badge = document.getElementById('notification-badge') || bellBtn.querySelector('.notification-badge, span');
+    if (!badge) {
+        badge = document.createElement('span');
+        bellBtn.appendChild(badge);
+    }
     badge.id = 'notification-badge';
     badge.className = 'absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold hidden';
-    if (!bellBtn.style.position) bellBtn.style.position = 'relative';
-    bellBtn.appendChild(badge);
+    bellBtn.style.position = 'relative';
     
     // Load notifications
     async function loadNotifications() {
@@ -11196,21 +11199,10 @@ onAuthStateChanged(auth, async (user) => {
                 // Initialize notifications bell
                 setTimeout(() => initManagementNotifications(), 500);
                 
-                // Wire activity log button (the button next to bell)
-                const activityBtn = document.getElementById('activityLogBtn') || document.querySelector('[data-activity-log]');
+                // Wire activity log button
+                const activityBtn = document.getElementById('activityLogBtn');
                 if (activityBtn) {
                     activityBtn.addEventListener('click', showManagementActivityLog);
-                } else {
-                    // Try to auto-discover any secondary button in the header
-                    setTimeout(() => {
-                        const headerBtns = document.querySelectorAll('header button, #header button, .header button, [class*="header"] button');
-                        headerBtns.forEach(btn => {
-                            if (!btn.id && !btn.dataset.bound && !btn.querySelector('.fa-bell')) {
-                                btn.dataset.bound = 'true';
-                                btn.addEventListener('click', showManagementActivityLog);
-                            }
-                        });
-                    }, 600);
                 }
                 
                 if (sidebarLogoutBtn) {
