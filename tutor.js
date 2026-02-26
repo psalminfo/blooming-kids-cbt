@@ -4751,6 +4751,28 @@ async function renderStudentDatabase(container, tutor) {
                     },
                     (err) => { console.warn('Placement onSnapshot error:', err); unsubPlacement(); }
                 );
+
+                // ── BroadcastChannel: instant removal when test tab posts completion ──
+                // Fires immediately when handleTestSubmit.js posts the message,
+                // even before Firestore propagates the onSnapshot above.
+                try {
+                    const bc = new BroadcastChannel('bkh_placement_complete');
+                    bc.onmessage = (event) => {
+                        if (
+                            event.data?.type === 'PLACEMENT_COMPLETED' &&
+                            event.data?.studentUid === studentId
+                        ) {
+                            const launchBtn = document.querySelector(`.launch-placement-btn[data-student-id="${studentId}"]`);
+                            if (launchBtn) launchBtn.remove();
+                            unsubPlacement(); // also stop the Firestore listener
+                            bc.close();
+                        }
+                    };
+                    // Auto-close channel after 1 hour to avoid memory leaks
+                    setTimeout(() => bc.close(), ONE_HOUR_MS);
+                } catch (_) {
+                    // BroadcastChannel not supported — Firestore onSnapshot is the fallback
+                }
             });
         });
     }  // ── end of attachEventListeners
