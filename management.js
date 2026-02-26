@@ -11189,9 +11189,17 @@ async function renderManagementMessagingPanel(container) {
         if (!listEl) return;
         listEl.innerHTML = `<div class="text-center py-10 text-gray-400"><i class="fas fa-spinner fa-spin text-3xl mb-3 block"></i><p>Loading...</p></div>`;
         try {
-            let q = query(collection(db, 'tutor_to_management_messages'), orderBy('createdAt', 'desc'), limit(50));
-            const snap = await getDocs(q);
+            // Single query, no compound index needed — sort client-side
+            const snap = await getDocs(query(collection(db, 'tutor_to_management_messages'), limit(100)));
             let messages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+            // Sort by createdAt descending (client-side — no index needed)
+            messages.sort((a, b) => {
+                const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
+                const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
+                return tb - ta;
+            });
+            messages = messages.slice(0, 50);
 
             // Apply filter
             if (filter === 'unread') messages = messages.filter(m => !m.managementRead);
@@ -11683,18 +11691,25 @@ async function initManagementNotifications() {
     };
 
     // ── Aggregate notifications from multiple Firestore collections ──
+    // NOTE: All queries use at most ONE where() clause + client-side filtering
+    // to avoid requiring Firestore composite indexes.
     async function loadAllNotifications() {
         const notifs = [];
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
 
-        // Helper to safely run a query
+        // Helper to safely run a query — returns [] on any error
         async function safeQuery(fn) {
-            try { return await fn(); } catch(e) { console.warn('Notif query failed:', e.message); return []; }
+            try { return await fn(); } catch(e) { console.warn('Notif query skipped:', e.message); return []; }
         }
 
-        // 1. management_notifications (existing system)
+        // 1. management_notifications — single where, sort client-side
         const mgmtNotifs = await safeQuery(async () => {
-            const snap = await getDocs(query(collection(db, 'management_notifications'), where('read', '==', false), orderBy('createdAt', 'desc'), limit(30)));
+            const snap = await getDocs(query(
+                collection(db, 'management_notifications'),
+                where('read', '==', false),
+                limit(30)
+            ));
             return snap.docs.map(d => ({
                 id: d.id, _collection: 'management_notifications', _type: 'management_notification',
                 title: d.data().title || 'Notification',
@@ -11705,9 +11720,13 @@ async function initManagementNotifications() {
         });
         notifs.push(...mgmtNotifs);
 
-        // 2. Tutor → Management messages (unread inbox)
+        // 2. Tutor → Management messages (unread inbox) — single where, sort client-side
         const tutorMessages = await safeQuery(async () => {
-            const snap = await getDocs(query(collection(db, 'tutor_to_management_messages'), where('managementRead', '==', false), orderBy('createdAt', 'desc'), limit(20)));
+            const snap = await getDocs(query(
+                collection(db, 'tutor_to_management_messages'),
+                where('managementRead', '==', false),
+                limit(20)
+            ));
             return snap.docs.map(d => ({
                 id: d.id, _collection: 'tutor_to_management_messages', _type: 'tutor_message',
                 title: `New message from ${d.data().tutorName || 'a tutor'}`,
@@ -11719,23 +11738,31 @@ async function initManagementNotifications() {
         });
         notifs.push(...tutorMessages);
 
-        // 3. Parent feedback (unread)
+        // 3. Parent feedback (unread) — single where, sort client-side
         const feedbackNotifs = await safeQuery(async () => {
-            const snap = await getDocs(query(collection(db, 'parent_feedback'), where('read', '==', false), orderBy('submittedAt', 'desc'), limit(20)));
+            const snap = await getDocs(query(
+                collection(db, 'parent_feedback'),
+                where('read', '==', false),
+                limit(20)
+            ));
             return snap.docs.map(d => ({
                 id: d.id, _collection: 'parent_feedback', _type: 'parent_feedback',
                 title: `Feedback from ${d.data().parentName || 'a parent'}`,
                 message: `Student: ${d.data().studentName || 'N/A'} · ${(d.data().message || '').slice(0, 80)}`,
-                createdAt: d.data().submittedAt || d.data().timestamp,
+                createdAt: d.data().submittedAt || d.data().timestamp || d.data().createdAt,
                 read: false,
                 actionTab: 'feedback'
             }));
         });
         notifs.push(...feedbackNotifs);
 
-        // 4. Pending recall requests
+        // 4. Pending recall requests — single where, sort client-side
         const recallNotifs = await safeQuery(async () => {
-            const snap = await getDocs(query(collection(db, 'recall_requests'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'), limit(20)));
+            const snap = await getDocs(query(
+                collection(db, 'recall_requests'),
+                where('status', '==', 'pending'),
+                limit(20)
+            ));
             return snap.docs.map(d => ({
                 id: d.id, _collection: 'recall_requests', _type: 'recall_request',
                 title: `Recall request: ${d.data().studentName || 'Student'}`,
@@ -11747,11 +11774,16 @@ async function initManagementNotifications() {
         });
         notifs.push(...recallNotifs);
 
-        // 5. Students recently placed on break (last 7 days)
+        // 5. Students on break (single where, filter by date client-side, no breakNotifRead needed)
         const breakNotifs = await safeQuery(async () => {
-            const snap = await getDocs(query(collection(db, 'students'), where('summerBreak', '==', true), orderBy('breakDate', 'desc'), limit(20)));
+            const snap = await getDocs(query(
+                collection(db, 'students'),
+                where('summerBreak', '==', true),
+                limit(30)
+            ));
             return snap.docs
                 .filter(d => {
+                    if (d.data().breakNotifRead === true) return false;
                     const bd = d.data().breakDate?.toDate ? d.data().breakDate.toDate() : null;
                     return bd && bd > sevenDaysAgo;
                 })
@@ -11760,38 +11792,49 @@ async function initManagementNotifications() {
                     title: `${d.data().studentName || 'Student'} placed on break`,
                     message: `Tutor: ${d.data().tutorName || 'N/A'} · Break started ${d.data().breakDate?.toDate ? d.data().breakDate.toDate().toLocaleDateString() : ''}`,
                     createdAt: d.data().breakDate,
-                    read: d.data().breakNotifRead === true,
+                    read: false,
                     actionTab: 'breaks'
                 }));
         });
-        notifs.push(...breakNotifs.filter(n => !n.read));
+        notifs.push(...breakNotifs);
 
-        // 6. Tutors who completed placement tests (not yet acknowledged)
+        // 6. Tutors who completed placement tests — single where, filter acknowledged client-side
         const placementNotifs = await safeQuery(async () => {
-            const snap = await getDocs(query(collection(db, 'tutors'), where('placementTestStatus', '==', 'completed'), where('placementTestAcknowledged', '!=', true), limit(20)));
-            return snap.docs.map(d => ({
-                id: d.id, _collection: 'tutors', _type: 'placement_test',
-                title: `Placement test completed: ${d.data().name || d.data().email}`,
-                message: `${d.data().name || d.data().email} has completed their placement test`,
-                createdAt: d.data().placementTestDate || d.data().updatedAt,
-                read: false,
-                actionTab: 'tutors'
-            }));
+            const snap = await getDocs(query(
+                collection(db, 'tutors'),
+                where('placementTestStatus', '==', 'completed'),
+                limit(20)
+            ));
+            return snap.docs
+                .filter(d => d.data().placementTestAcknowledged !== true)
+                .map(d => ({
+                    id: d.id, _collection: 'tutors', _type: 'placement_test',
+                    title: `Placement test completed: ${d.data().name || d.data().email}`,
+                    message: `${d.data().name || d.data().email} has completed their placement test`,
+                    createdAt: d.data().placementTestDate || d.data().updatedAt,
+                    read: false,
+                    actionTab: 'tutors'
+                }));
         });
         notifs.push(...placementNotifs);
 
-        // 7. New enrollments (last 3 days, not yet seen)
+        // 7. New enrollments — single where (createdAt range), filter managementSeen client-side
         const enrollNotifs = await safeQuery(async () => {
-            const threeDaysAgo = Timestamp.fromDate(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000));
-            const snap = await getDocs(query(collection(db, 'enrollments'), where('createdAt', '>', threeDaysAgo), where('managementSeen', '!=', true), orderBy('createdAt', 'desc'), limit(15)));
-            return snap.docs.map(d => ({
-                id: d.id, _collection: 'enrollments', _type: 'new_enrollment',
-                title: `New enrollment: ${d.data().studentName || 'Student'}`,
-                message: `${d.data().parentName || 'Parent'} enrolled ${d.data().studentName || 'a student'}`,
-                createdAt: d.data().createdAt,
-                read: false,
-                actionTab: 'enrollments'
-            }));
+            const snap = await getDocs(query(
+                collection(db, 'enrollments'),
+                where('createdAt', '>', Timestamp.fromDate(threeDaysAgo)),
+                limit(20)
+            ));
+            return snap.docs
+                .filter(d => d.data().managementSeen !== true)
+                .map(d => ({
+                    id: d.id, _collection: 'enrollments', _type: 'new_enrollment',
+                    title: `New enrollment: ${d.data().studentName || 'Student'}`,
+                    message: `${d.data().parentName || 'Parent'} enrolled ${d.data().studentName || 'a student'}`,
+                    createdAt: d.data().createdAt,
+                    read: false,
+                    actionTab: 'enrollments'
+                }));
         });
         notifs.push(...enrollNotifs);
 
