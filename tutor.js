@@ -981,9 +981,26 @@ class ScheduleManager {
         this.popup = wrapper.firstElementChild;
         document.body.appendChild(this.popup);
 
-        // Populate existing schedule
+        // Populate existing schedule (or pre-fill from enrollment data)
         const container = this.popup.querySelector('#schedule-entries');
-        const existing = this.activeStudent.schedule || [];
+        let existing = this.activeStudent.schedule || [];
+        
+        // If no schedule yet but student has academicDays + academicTime from enrollment, pre-fill
+        if (existing.length === 0 && this.activeStudent.academicDays && this.activeStudent.academicTime) {
+            const timeParts = (this.activeStudent.academicTime || '').split(/\s*[-–]\s*/);
+            const startTime = timeParts[0]?.trim() || '14:00';
+            const endTime = timeParts[1]?.trim() || '16:00';
+            const daysList = (this.activeStudent.academicDays || '').split(/,|\band\b/i).map(d => d.trim()).filter(d => DAYS_OF_WEEK.includes(d));
+            if (daysList.length > 0) {
+                existing = daysList.map(day => ({ day, start: startTime, end: endTime }));
+                // Show pre-fill notice
+                const notice = document.createElement('div');
+                notice.style.cssText = 'background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 12px;font-size:.78rem;color:#1e40af;margin:0 18px 6px;flex-shrink:0;';
+                notice.textContent = `📅 Pre-filled from enrollment: ${this.activeStudent.academicDays} at ${this.activeStudent.academicTime}. You can edit below.`;
+                this.popup.querySelector('#schedule-entries').before(notice);
+            }
+        }
+        
         if (existing.length > 0) {
             existing.forEach(slot => this.addTimeRow(container, slot));
         } else {
@@ -1798,6 +1815,7 @@ async function scheduleEmailReminder(hwData, fileUrl = '') {
             studentId: hwData.studentId, 
             parentEmail: hwData.parentEmail,
             parentName: hwData.parentName || "Parent",
+            tutorEmail: hwData.tutorEmail || (window.tutorData?.email || ''),
             title: hwData.title, 
             dueDate: hwData.dueDate, 
             reminderDate: d,
@@ -1805,6 +1823,52 @@ async function scheduleEmailReminder(hwData, fileUrl = '') {
             createdAt: new Date()
         });
     } catch(e){ console.error("Error scheduling reminder:", e); }
+}
+
+// ── In-app homework reminder banner ──────────────────────────────
+async function checkAndShowHomeworkReminders() {
+    try {
+        const tutorEmail = window.tutorData?.email;
+        if (!tutorEmail) return;
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+2);
+        
+        // Find homework assigned by this tutor that's due within 2 days
+        const hwSnap = await getDocs(query(
+            collection(db, "homeworks"),
+            where("tutorEmail", "==", tutorEmail),
+            where("status", "==", "active")
+        ));
+        
+        const upcomingHW = [];
+        hwSnap.forEach(d => {
+            const hw = d.data();
+            if (!hw.dueDate) return;
+            const due = new Date(hw.dueDate);
+            due.setHours(0,0,0,0);
+            if (due >= today && due <= tomorrow) {
+                upcomingHW.push({ id: d.id, ...hw, dueDate: due });
+            }
+        });
+        
+        if (upcomingHW.length === 0) return;
+        
+        // Show a reminder banner at the top of the page
+        const existing = document.getElementById('hw-reminder-banner');
+        if (existing) existing.remove();
+        
+        const banner = document.createElement('div');
+        banner.id = 'hw-reminder-banner';
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:8000;background:#f59e0b;color:#7c2d12;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:0.875rem;box-shadow:0 2px 8px rgba(0,0,0,.15);';
+        banner.innerHTML = `
+            <div>⏰ Reminder: ${upcomingHW.length} homework assignment${upcomingHW.length>1?'s':''} due soon — ${upcomingHW.map(h=>`"${h.title||'Homework'}" (${h.studentName||'student'}) due ${h.dueDate.toLocaleDateString('en-NG')}`).join('; ')}</div>
+            <button onclick="document.getElementById('hw-reminder-banner').remove()" style="background:none;border:none;color:#7c2d12;font-size:1.3rem;cursor:pointer;line-height:1;margin-left:16px;">✕</button>
+        `;
+        document.body.prepend(banner);
+        // Auto-hide after 30 seconds
+        setTimeout(() => { if (document.getElementById('hw-reminder-banner')) document.getElementById('hw-reminder-banner').remove(); }, 30000);
+    } catch(e) { console.warn('Reminder check error:', e); }
 }
 
 /*******************************************************************************
@@ -1888,6 +1952,7 @@ function initializeFloatingMessagingButton() {
 
 function initializeUnreadListener() {
     const tutorId = window.tutorData.messagingId || window.tutorData.id;
+    const tutorEmail = window.tutorData.email;
     if (unsubUnreadListener) unsubUnreadListener();
 
     const q = query(
@@ -1895,15 +1960,26 @@ function initializeUnreadListener() {
         where("participants", "array-contains", tutorId)
     );
 
-    unsubUnreadListener = onSnapshot(q, (snapshot) => {
+    unsubUnreadListener = onSnapshot(q, async (snapshot) => {
         let count = 0;
         snapshot.forEach(doc => {
             const data = doc.data();
-            // Count unread if I am NOT the last sender
             if (data.unreadCount > 0 && data.lastSenderId !== tutorId) {
                 count += data.unreadCount;
             }
         });
+        
+        // Also count unread tutor_notifications
+        if (tutorEmail) {
+            try {
+                const nSnap = await getDocs(query(
+                    collection(db, "tutor_notifications"),
+                    where("tutorEmail", "==", tutorEmail),
+                    where("read", "==", false)
+                ));
+                count += nSnap.size;
+            } catch(e) { /* ignore */ }
+        }
         
         msgSectionUnreadCount = count;
         updateFloatingBadges();
@@ -2455,7 +2531,13 @@ function showInboxModal() {
                             <button class="close-modal-absolute" style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:#6b7280;">&times;</button>
                         </div>
                     </div>
+                    <!-- Tabs -->
+                    <div style="display:flex;border-bottom:1px solid #e5e7eb;background:#fff;">
+                        <button id="tab-messages" onclick="switchInboxTab('messages',this)" style="flex:1;padding:8px 4px;font-size:0.8rem;font-weight:700;border:none;background:none;color:#059669;border-bottom:2px solid #059669;cursor:pointer;">Chats</button>
+                        <button id="tab-notifications" onclick="switchInboxTab('notifications',this)" style="flex:1;padding:8px 4px;font-size:0.8rem;font-weight:600;border:none;background:none;color:#6b7280;border-bottom:2px solid transparent;cursor:pointer;">🔔 Alerts <span id="notif-badge-count" style="background:#ef4444;color:#fff;border-radius:9999px;padding:0 5px;font-size:0.7rem;"></span></button>
+                    </div>
                     <div id="inbox-list" style="flex:1;overflow-y:auto;"></div>
+                    <div id="notifications-list" style="flex:1;overflow-y:auto;display:none;"></div>
                 </div>
                 <!-- Right: chat -->
                 <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
@@ -2490,15 +2572,122 @@ function showInboxModal() {
         if (lbl) lbl.title = f ? f.name : 'Attach image';
     });
 
+    // Tab switching
+    window.switchInboxTab = (tab, btn) => {
+        const tabs = modal.querySelectorAll('[id^="tab-"]');
+        tabs.forEach(t => { t.style.color='#6b7280'; t.style.borderBottom='2px solid transparent'; });
+        btn.style.color = '#059669';
+        btn.style.borderBottom = '2px solid #059669';
+        const inboxList = modal.querySelector('#inbox-list');
+        const notifList = modal.querySelector('#notifications-list');
+        if (tab === 'messages') {
+            inboxList.style.display = '';
+            notifList.style.display = 'none';
+            modal.querySelector('#chat-messages').innerHTML = '<div style="text-align:center;color:#9ca3af;margin-top:40px;">← Select a conversation</div>';
+            modal.querySelector('#chat-inputs').style.display = 'none';
+            modal.querySelector('#chat-title').textContent = 'Select a conversation';
+        } else {
+            inboxList.style.display = 'none';
+            notifList.style.display = '';
+            modal.querySelector('#chat-inputs').style.display = 'none';
+            modal.querySelector('#chat-title').textContent = 'Notifications & Alerts';
+            modal.querySelector('#chat-messages').innerHTML = '<div style="text-align:center;color:#9ca3af;margin-top:40px;">Select a notification to view</div>';
+            loadTutorNotifications(modal);
+        }
+    };
+
     // Store starter so refresh button can call it
     window._msgStartInboxListener = () => msgStartInboxListener(modal);
     msgStartInboxListener(modal);
+    
+    // Load notification count badge
+    loadNotificationBadge(modal);
 }
 
 function closeInbox(modal) {
     if (unsubInboxListener) { unsubInboxListener(); unsubInboxListener = null; }
     if (unsubChatListener)  { unsubChatListener();  unsubChatListener  = null; }
     modal.remove();
+}
+
+async function loadNotificationBadge(modal) {
+    try {
+        const tutorEmail = window.tutorData?.email;
+        if (!tutorEmail) return;
+        const q = query(collection(db, "tutor_notifications"), where("tutorEmail", "==", tutorEmail), where("read", "==", false));
+        const snap = await getDocs(q);
+        const count = snap.size;
+        const badge = modal.querySelector('#notif-badge-count');
+        if (badge) badge.textContent = count > 0 ? count : '';
+    } catch(e) { console.warn('Badge load error:', e); }
+}
+
+async function loadTutorNotifications(modal) {
+    const container = modal.querySelector('#notifications-list');
+    if (!container) return;
+    container.innerHTML = '<div style="padding:16px;text-align:center;"><div class="spinner" style="margin:auto;"></div></div>';
+    const tutorEmail = window.tutorData?.email;
+    if (!tutorEmail) { container.innerHTML = '<div style="padding:16px;color:#9ca3af;text-align:center;">No email found.</div>'; return; }
+    
+    try {
+        const q = query(collection(db, "tutor_notifications"), where("tutorEmail", "==", tutorEmail), orderBy("createdAt", "desc"), limit(50));
+        const snap = await getDocs(q);
+        
+        if (snap.empty) {
+            container.innerHTML = '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:0.875rem;">No notifications yet.</div>';
+            return;
+        }
+        
+        container.innerHTML = '';
+        snap.forEach(d => {
+            const notif = d.data();
+            const isUnread = !notif.read;
+            const time = notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleDateString('en-NG', {day:'numeric',month:'short',year:'numeric'}) : '';
+            const typeIcon = notif.type === 'broadcast' ? '📢' : notif.type === 'new_student_assigned' ? '👤' : notif.type === 'student_approved' ? '✅' : '🔔';
+            const priorityStyle = notif.priority === 'urgent' ? 'border-left:4px solid #ef4444;' : notif.priority === 'important' ? 'border-left:4px solid #f59e0b;' : 'border-left:4px solid #10b981;';
+            
+            const el = document.createElement('div');
+            el.style.cssText = `padding:12px 14px;border-bottom:1px solid #f3f4f6;cursor:pointer;${isUnread ? 'background:#eff6ff;' : 'background:#fff;'}${priorityStyle}`;
+            el.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+                    <div style="font-weight:${isUnread?'700':'600'};font-size:0.8rem;color:#1f2937;">${typeIcon} ${msgEscapeHtml(notif.subject || notif.type?.replace(/_/g,' ') || 'Notification')}</div>
+                    ${isUnread ? '<span style="background:#ef4444;color:#fff;border-radius:9999px;padding:1px 7px;font-size:0.65rem;font-weight:700;">NEW</span>' : ''}
+                </div>
+                <div style="font-size:0.75rem;color:#374151;line-height:1.4;">${msgEscapeHtml((notif.message||'').substring(0,120))}${(notif.message||'').length>120?'…':''}</div>
+                <div style="font-size:0.7rem;color:#9ca3af;margin-top:4px;">📅 ${time}${notif.sentBy ? ' · From: '+msgEscapeHtml(notif.sentBy) : ''}</div>
+            `;
+            el.onmouseover = () => { el.style.background = '#f0fdf4'; };
+            el.onmouseout = () => { el.style.background = isUnread ? '#eff6ff' : '#fff'; };
+            el.onclick = async () => {
+                // Mark as read
+                try { await updateDoc(doc(db, "tutor_notifications", d.id), { read: true }); } catch(e){}
+                el.style.background = '#fff';
+                const badge = modal.querySelector('#notif-badge-count');
+                // Show full message in right panel
+                modal.querySelector('#chat-title').textContent = `${typeIcon} ${notif.subject || 'Notification'}`;
+                modal.querySelector('#chat-inputs').style.display = 'none';
+                modal.querySelector('#chat-messages').innerHTML = `
+                    <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.1);">
+                        <div style="font-weight:800;font-size:1rem;color:#1f2937;margin-bottom:8px;">${typeIcon} ${msgEscapeHtml(notif.subject || 'Notification')}</div>
+                        ${notif.priority && notif.priority !== 'normal' ? `<div style="display:inline-block;background:${notif.priority==='urgent'?'#fee2e2':'#fef3c7'};color:${notif.priority==='urgent'?'#991b1b':'#92400e'};padding:2px 10px;border-radius:999px;font-size:0.75rem;font-weight:700;margin-bottom:10px;">${notif.priority.toUpperCase()}</div>` : ''}
+                        <p style="color:#374151;line-height:1.6;white-space:pre-wrap;">${msgEscapeHtml(notif.message||'')}</p>
+                        <div style="margin-top:16px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:0.75rem;color:#9ca3af;">
+                            From: ${msgEscapeHtml(notif.sentBy || 'Management')} · ${time}
+                        </div>
+                    </div>
+                `;
+                // Reload badge
+                loadNotificationBadge(modal);
+            };
+            container.appendChild(el);
+        });
+        
+        // Update badge
+        loadNotificationBadge(modal);
+    } catch(err) {
+        console.error('Load notifications error:', err);
+        container.innerHTML = '<div style="padding:16px;color:#ef4444;text-align:center;">Failed to load notifications.</div>';
+    }
 }
 
 function msgStartInboxListener(modal) {
@@ -2665,6 +2854,15 @@ function msgLoadChat(convId, name, modal, tutorId) {
 
 // --- AUTO-INIT ---
 initializeFloatingMessagingButton();
+
+// Check for upcoming homework reminders on load
+setTimeout(() => {
+    if (window.tutorData?.email) {
+        checkAndShowHomeworkReminders();
+        // Also re-check every hour
+        setInterval(checkAndShowHomeworkReminders, 3600000);
+    }
+}, 5000);
 
 /*******************************************************************************
  * SECTION 10: SCHEDULE CALENDAR VIEW
@@ -4085,16 +4283,8 @@ function showEditStudentModal(student) {
             await updateDoc(studentRef, studentData);
             editModal.remove();
             showCustomAlert('Student details updated successfully!');
-            
-            // Preserve scroll position — only re-render the student list, not the full page
-            const scrollY = window.scrollY;
             const mainContent = document.getElementById('mainContent');
-            if (mainContent && window.tutorData) {
-                await renderStudentDatabase(mainContent, window.tutorData);
-                requestAnimationFrame(() => {
-                    window.scrollTo({ top: scrollY, behavior: 'instant' });
-                });
-            }
+            renderStudentDatabase(mainContent, window.tutorData);
         } catch (error) {
             console.error("Error updating student:", error);
             showCustomAlert(`An error occurred: ${error.message}`);
@@ -5756,9 +5946,6 @@ async function initTutorApp() {
                 setTimeout(async () => {
                     await initScheduleManager(tutorData);
                 }, 2000);
-                
-                // Show broadcast pop-ups from management
-                setTimeout(() => showPendingBroadcasts(tutorData), 3000);
             } else {
                 console.error("No matching tutor found.");
                 document.getElementById('mainContent').innerHTML = `
@@ -6455,87 +6642,6 @@ inboxObserver.observe(document.body, { childList: true, subtree: true });
 // ==========================================
 window.loadHomeworkInbox = loadHomeworkInbox;
 window.openGradingModal = openGradingModal;
-
-// ======================================================
-// BROADCAST POP-UP SYSTEM (shows management broadcasts)
-// ======================================================
-
-async function showPendingBroadcasts(tutorData) {
-    try {
-        // Get last seen timestamp from localStorage
-        const lastSeenKey = `broadcast_last_seen_${tutorData.email}`;
-        const lastSeen = localStorage.getItem(lastSeenKey);
-        const lastSeenDate = lastSeen ? new Date(parseInt(lastSeen)) : new Date(0);
-        
-        // Query broadcasts targeting tutors
-        const snap = await getDocs(query(
-            collection(db, 'broadcasts'),
-            where('toTutors', '==', true),
-            orderBy('createdAt', 'desc'),
-            limit(5)
-        ));
-        
-        const newBroadcasts = snap.docs
-            .map(d => ({ id: d.id, ...d.data() }))
-            .filter(b => {
-                const createdAt = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
-                return createdAt > lastSeenDate;
-            });
-        
-        if (newBroadcasts.length === 0) return;
-        
-        // Show each broadcast as a pop-up sequentially
-        for (const broadcast of newBroadcasts) {
-            await showBroadcastPopup(broadcast);
-        }
-        
-        // Update last seen
-        localStorage.setItem(lastSeenKey, Date.now().toString());
-        
-    } catch(e) {
-        console.warn('Could not load broadcasts:', e.message);
-    }
-}
-
-function showBroadcastPopup(broadcast) {
-    return new Promise((resolve) => {
-        const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
-        
-        const fileSection = broadcast.fileUrl ? (
-            broadcast.fileType === 'image'
-                ? `<div style="margin:12px 0;"><img src="${escapeHtml(broadcast.fileUrl)}" alt="Attachment" style="max-width:100%;max-height:300px;border-radius:10px;object-fit:contain;"></div>`
-                : `<div style="margin:12px 0;"><a href="${escapeHtml(broadcast.fileUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;background:#eff6ff;color:#1d4ed8;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:600;">📎 Download Attachment</a></div>`
-        ) : '';
-        
-        overlay.innerHTML = `
-            <div style="background:#fff;border-radius:16px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 25px 50px rgba(0,0,0,0.3);">
-                <div style="background:linear-gradient(135deg,#059669,#047857);padding:16px 20px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                        <div style="color:#fff;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px;">📢 Message from Management</div>
-                        <h3 style="color:#fff;font-size:1.1rem;font-weight:800;margin:0;">${escapeHtml(broadcast.title || 'Announcement')}</h3>
-                    </div>
-                    <button id="bc-close-btn" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
-                </div>
-                <div style="padding:20px;">
-                    <p style="color:#374151;font-size:.95rem;line-height:1.6;white-space:pre-wrap;">${escapeHtml(broadcast.message || '')}</p>
-                    ${fileSection}
-                    <div style="margin-top:16px;text-align:right;">
-                        <button id="bc-read-btn" style="background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:700;cursor:pointer;font-size:.9rem;">✓ Got it!</button>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(overlay);
-        
-        const close = () => { overlay.remove(); resolve(); };
-        overlay.querySelector('#bc-close-btn').addEventListener('click', close);
-        overlay.querySelector('#bc-read-btn').addEventListener('click', close);
-    });
-}
-
-window.showPendingBroadcasts = showPendingBroadcasts;
 
 // Expose modular Firebase functions globally so games.js (classic script) can use them
 // Do this immediately so games.js has access as soon as this module is parsed
