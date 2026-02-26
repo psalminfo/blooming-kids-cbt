@@ -1,7 +1,7 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc, setDoc, deleteDoc, orderBy, writeBatch, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
-import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc, setDoc, deleteDoc, orderBy, writeBatch, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
 let activeTutorId = null;
@@ -2909,3 +2909,4 @@ if (document.readyState === 'loading') {
 // ========================================================
 // END OF SAFE INITIALIZATION SCRIPT
 // ========================================================
+
