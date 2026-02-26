@@ -4703,17 +4703,16 @@ async function renderStudentDatabase(container, tutor) {
                     return;
                 }
 
-                // Build the structured hand-off payload.
                 const derivedCountry = getCountryFromPhone(parentPhone) || '';
                 const payload = {
                     studentUid:   studentId,
                     studentName:  studentName,
                     grade:        grade,
-                    parentEmail:  parentEmail,   // FIXED: correct key read by subject-select
-                    studentEmail: parentEmail,   // legacy mirror
+                    parentEmail:  parentEmail,
+                    studentEmail: parentEmail,
                     parentName:   parentName,
                     parentPhone:  parentPhone,
-                    country:      derivedCountry, // FIXED: derived from phone code
+                    country:      derivedCountry,
                     tutorEmail:   tutorEmail,
                     tutorName:    tutorName,
                     launchedBy:   'tutor',
@@ -4731,23 +4730,95 @@ async function renderStudentDatabase(container, tutor) {
                     return;
                 }
 
-                // Open in a new tab so the tutor dashboard stays accessible
                 window.open('subject-select.html', '_blank');
-                // NOTE: Listeners (onSnapshot + BroadcastChannel) are started globally
-                // below, at render time — not here — so they survive page refreshes
-                // and catch completions from any session, not just the current click.
             });
         });
 
-        // ── GLOBAL placement-complete listeners (started at RENDER TIME) ───────────
-        // Running these when the student list renders — not on button click — means:
-        //   1. The FIRST onSnapshot delivery reflects current Firestore state, so if the
-        //      student already completed the test (even in a prior session/page-refresh),
-        //      the button is removed immediately without any click required.
-        //   2. The BroadcastChannel catches the instant message from the test tab on
-        //      submit, even before Firestore propagates the update.
+        // ── REAL-TIME PLACEMENT TEST COMPLETION DETECTION ────────────────────────
+        //
+        // ROOT CAUSE OF THE BUTTON NOT DISAPPEARING:
+        // The student portal is unauthenticated, so Firestore security rules block
+        // its attempt to write placementTestStatus='completed' to the students doc.
+        // The write fails silently (caught & swallowed), so the flag is never set
+        // and the tutor dashboard never removes the button.
+        //
+        // FIX: Watch student_results (students CAN write here — test submission works).
+        // The tutor IS authenticated, so when a matching result appears, the tutor's
+        // session updates the students doc AND removes the button.
+        // ─────────────────────────────────────────────────────────────────────────
 
-        // --- BroadcastChannel (single global instance, replaced each render) ---
+        // Build a lookup of studentId → button for all currently visible placement btns
+        const _placementBtnMap = {}; // { studentId: btn, ... }
+        const _placementNameMap = {}; // { lowerCaseStudentName: studentId, ... } — fallback
+        document.querySelectorAll('.launch-placement-btn').forEach(btn => {
+            const sid  = btn.getAttribute('data-student-id');
+            const sname = (btn.getAttribute('data-student-name') || '').toLowerCase().trim();
+            if (sid) {
+                _placementBtnMap[sid] = btn;
+                if (sname) _placementNameMap[sname] = sid;
+            }
+        });
+
+        // Helper: given a student_results doc, figure out which student it belongs to.
+        // Prefers studentId field (added by updated submitAnswers.js);
+        // falls back to studentName match so old results still work.
+        function _matchResultToStudent(data) {
+            if (data.studentId && _placementBtnMap[data.studentId]) {
+                return data.studentId;
+            }
+            const name = (data.studentName || '').toLowerCase().trim();
+            return _placementNameMap[name] || null;
+        }
+
+        // Helper: remove the button and persist the completion flag (using the
+        // tutor's authenticated Firestore session so the write succeeds).
+        async function _markPlacementDone(studentId, subject) {
+            const btn = _placementBtnMap[studentId];
+            if (btn) {
+                btn.remove();
+                delete _placementBtnMap[studentId];
+            }
+            try {
+                await updateDoc(doc(db, 'students', studentId), {
+                    placementTestStatus:      'completed',
+                    placementTestCompletedAt: new Date(),
+                    placementTestSubject:     subject || ''
+                });
+                console.log('Placement test marked complete for student:', studentId);
+            } catch (e) {
+                // Non-fatal — button is already removed from the UI
+                console.warn('Could not persist placementTestStatus:', e.message);
+            }
+        }
+
+        // Stop any previous listener before starting a new one (navigation / re-render)
+        if (window._prevPlacementResultsUnsub) {
+            try { window._prevPlacementResultsUnsub(); } catch (_) {}
+            window._prevPlacementResultsUnsub = null;
+        }
+
+        // Only start the listener if there are actually buttons to watch
+        if (Object.keys(_placementBtnMap).length > 0) {
+            const _resultsQ = query(
+                collection(db, 'student_results'),
+                where('tutorEmail', '==', tutor.email)
+            );
+
+            window._prevPlacementResultsUnsub = onSnapshot(_resultsQ, (snapshot) => {
+                snapshot.forEach(d => {
+                    const data = d.data();
+                    const sid = _matchResultToStudent(data);
+                    if (sid && _placementBtnMap[sid]) {
+                        // A result exists for this student — mark done and remove button
+                        _markPlacementDone(sid, data.subject);
+                    }
+                });
+            }, (err) => {
+                console.warn('student_results placement listener error:', err.message);
+            });
+        }
+
+        // ── BroadcastChannel: belt-and-suspenders instant removal from same browser ──
         try {
             if (window._bkh_placement_bc) {
                 try { window._bkh_placement_bc.close(); } catch (_) {}
@@ -4756,47 +4827,15 @@ async function renderStudentDatabase(container, tutor) {
             globalBc.onmessage = (event) => {
                 if (event.data?.type === 'PLACEMENT_COMPLETED' && event.data?.studentUid) {
                     const sid = event.data.studentUid;
-                    const el = document.querySelector(`.launch-placement-btn[data-student-id="${sid}"]`);
-                    if (el) el.remove();
-                    console.log('BroadcastChannel: placement button removed for', sid);
+                    if (_placementBtnMap[sid]) {
+                        _markPlacementDone(sid, event.data.subject || '');
+                    }
                 }
             };
             window._bkh_placement_bc = globalBc;
         } catch (_) {
-            // BroadcastChannel not supported — onSnapshot below is the sole fallback
+            // BroadcastChannel not supported — onSnapshot above is the fallback
         }
-
-        // --- onSnapshot per student with a placement button ---
-        // Clean up any listeners from the previous render to avoid duplicates
-        if (window._prevPlacementUnsubs) {
-            window._prevPlacementUnsubs.forEach(fn => { try { fn(); } catch (_) {} });
-        }
-        const _placementUnsubs = [];
-        document.querySelectorAll('.launch-placement-btn').forEach(btn => {
-            const sid = btn.getAttribute('data-student-id');
-            if (!sid) return;
-            const unsub = onSnapshot(
-                doc(db, 'students', sid),
-                (snap) => {
-                    if (!snap.exists()) { unsub(); return; }
-                    if (snap.data().placementTestStatus === 'completed') {
-                        const el = document.querySelector(`.launch-placement-btn[data-student-id="${sid}"]`);
-                        if (el) el.remove();
-                        unsub();
-                        const idx = _placementUnsubs.indexOf(unsub);
-                        if (idx !== -1) _placementUnsubs.splice(idx, 1);
-                        console.log('onSnapshot: placement button removed for', sid);
-                    }
-                },
-                (err) => {
-                    console.warn(`Placement status listener error for ${sid}:`, err.message);
-                    unsub();
-                }
-            );
-            _placementUnsubs.push(unsub);
-        });
-        // Store refs so the next renderStudentDatabase call can clean up stale listeners
-        window._prevPlacementUnsubs = _placementUnsubs;
 
     }  // ── end of attachEventListeners
 
