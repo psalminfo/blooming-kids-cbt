@@ -3383,7 +3383,32 @@ function showAssignStudentModal() {
 
         try {
             const studentRef = await addDoc(collection(db, "students"), newStudentData);
-            // Send notification to tutor
+
+            // Auto-create schedule document with proper { day, start, end } format
+            if (daysValue && startTime && endTime) {
+                const DAYS_LIST = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+                const daysList = daysValue.split(/,|\band\b/i).map(d => d.trim()).filter(d => DAYS_LIST.includes(d));
+                const scheduleEntries = daysList.length > 0
+                    ? daysList.map(day => ({ day, start: startTime, end: endTime }))
+                    : [{ day: daysValue, start: startTime, end: endTime }];
+
+                await setDoc(doc(db, 'schedules', `sched_${studentRef.id}`), {
+                    studentId: studentRef.id,
+                    studentName: newStudentData.studentName,
+                    tutorEmail: tutorEmail,
+                    schedule: scheduleEntries,
+                    academicDays: daysValue,
+                    academicTime: academicTime,
+                    source: 'management_assign',
+                    createdAt: Timestamp.now(),
+                    updatedAt: Timestamp.now()
+                }, { merge: true });
+
+                // Also update the student record with the schedule array
+                await updateDoc(studentRef, { schedule: scheduleEntries });
+            }
+
+            // Send notification to tutor with full student details
             await addDoc(collection(db, 'tutor_notifications'), {
                 tutorEmail: tutorEmail,
                 type: 'new_student',
@@ -3391,6 +3416,11 @@ function showAssignStudentModal() {
                 message: `${newStudentData.studentName} (${gradeValue}) has been assigned to you. Schedule: ${daysValue} at ${academicTime}.`,
                 studentName: newStudentData.studentName,
                 grade: gradeValue,
+                subjects: newStudentData.subjects,
+                parentName: newStudentData.parentName,
+                parentPhone: newStudentData.parentPhone,
+                parentEmail: newStudentData.parentEmail,
+                studentFee: newStudentData.studentFee,
                 academicDays: daysValue,
                 academicTime: academicTime,
                 senderDisplay: 'Management',
@@ -9149,24 +9179,66 @@ async function handleApproveStudent(studentId) {
             batch.set(newStudentRef, studentWithHistory);
             batch.delete(studentRef);
             
-            // Auto-create schedule document if days/time info is available
+            // Auto-create schedule document with proper { day, start, end } format
             if (studentData.academicDays || studentData.days) {
                 const scheduleRef = doc(db, "schedules", `sched_${studentId}`);
-                const scheduleEntry = studentData.schedule || [{
-                    day: studentData.academicDays || studentData.days || '',
-                    time: studentData.academicTime || studentData.time || ''
-                }];
+
+                // Parse academicTime "HH:MM - HH:MM" or "H:MM AM - H:MM PM" format
+                function parseTimeTo24h(timeStr) {
+                    if (!timeStr) return null;
+                    timeStr = timeStr.trim();
+                    // Already 24h format like "14:00"
+                    if (/^\d{1,2}:\d{2}$/.test(timeStr)) return timeStr.padStart(5, '0');
+                    // 12h format like "2:00 PM"
+                    const m = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+                    if (m) {
+                        let h = parseInt(m[1]);
+                        const min = m[2];
+                        const period = m[3].toUpperCase();
+                        if (period === 'AM' && h === 12) h = 0;
+                        if (period === 'PM' && h !== 12) h += 12;
+                        return `${String(h).padStart(2,'0')}:${min}`;
+                    }
+                    return timeStr;
+                }
+
+                let scheduleEntries = studentData.schedule || null;
+
+                if (!scheduleEntries || !Array.isArray(scheduleEntries) || scheduleEntries.length === 0) {
+                    const rawTime = studentData.academicTime || studentData.time || '';
+                    const timeParts = rawTime.split(/\s*[-–]\s*/);
+                    const startTime = parseTimeTo24h(timeParts[0]) || '09:00';
+                    const endTime   = parseTimeTo24h(timeParts[1]) || '10:00';
+
+                    // Split days string "Monday, Wednesday, Friday" or "Monday and Wednesday"
+                    const daysRaw = studentData.academicDays || studentData.days || '';
+                    const DAYS_LIST = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+                    const daysList = daysRaw.split(/,|\band\b/i).map(d => d.trim())
+                        .filter(d => DAYS_LIST.includes(d));
+
+                    if (daysList.length > 0) {
+                        scheduleEntries = daysList.map(day => ({ day, start: startTime, end: endTime }));
+                    } else if (daysRaw) {
+                        scheduleEntries = [{ day: daysRaw, start: startTime, end: endTime }];
+                    } else {
+                        scheduleEntries = [];
+                    }
+                }
+
                 batch.set(scheduleRef, {
                     studentId: studentId,
                     studentName: studentData.studentName,
                     tutorEmail: studentData.tutorEmail,
-                    schedule: scheduleEntry,
+                    schedule: scheduleEntries,
                     academicDays: studentData.academicDays || studentData.days || '',
                     academicTime: studentData.academicTime || studentData.time || '',
                     source: studentData.source || 'pending_approval',
                     createdAt: Timestamp.now(),
                     updatedAt: Timestamp.now()
                 }, { merge: true });
+
+                // Also update the student record with the resolved schedule array
+                batch.update(newStudentRef, { schedule: scheduleEntries });
             }
             
             await batch.commit();
@@ -10965,6 +11037,13 @@ async function renderManagementMessagingPanel(container) {
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                     <p class="text-xs text-gray-500 mt-1">Images will be shown in the pop-up. PDFs will be downloadable.</p>
                 </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Show Popup For (Days) <span class="text-gray-400 text-xs">— how many days this pop-up stays active after login</span></label>
+                    <input type="number" id="broadcast-popup-days" min="1" max="30" value="3"
+                        class="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm">
+                    <span class="text-xs text-gray-500 ml-2">days (default: 3 days)</span>
+                </div>
                 
                 <div class="flex justify-end">
                     <button id="send-broadcast-btn" class="bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700 font-medium flex items-center gap-2">
@@ -11107,6 +11186,7 @@ async function renderManagementMessagingPanel(container) {
         const toParents = document.getElementById('broadcast-to-parents').checked;
         const fileInput = document.getElementById('broadcast-file');
         const statusEl = document.getElementById('broadcast-status');
+        const popupDays = parseInt(document.getElementById('broadcast-popup-days').value) || 3;
         const senderName = window.userData?.name || 'Management';
         
         if (!title) { showMsgStatus(statusEl, '❌ Please enter a broadcast title.', false); return; }
@@ -11142,6 +11222,7 @@ async function renderManagementMessagingPanel(container) {
                 senderDisplay: 'Management',
                 fileUrl: fileUrl || null,
                 fileType: fileType || null,
+                popupDays: popupDays,
                 createdAt: Timestamp.now(),
                 isGlobal: true
             };
@@ -11168,9 +11249,11 @@ async function renderManagementMessagingPanel(container) {
                         message: message,
                         fileUrl: fileUrl || null,
                         fileType: fileType || null,
+                        popupDays: popupDays,
                         senderName: senderName,
                         senderDisplay: 'Management',
                         read: false,
+                        popupShown: false,
                         createdAt: Timestamp.now(),
                         isGlobal: true
                     });
@@ -11614,5 +11697,3 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
-
-
