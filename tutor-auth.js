@@ -63,7 +63,8 @@ import {
     browserLocalPersistence,
     browserSessionPersistence,
     sendPasswordResetEmail,
-    onAuthStateChanged
+    onAuthStateChanged,
+    signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
     doc,
@@ -475,7 +476,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Works regardless of whether the doc uses UID, email, or a custom ID.
             const tutorDoc = await getTutorDocForUser(user);
             if (!tutorDoc) {
-                await auth.signOut();
+                await signOut(auth);
                 showMessage(
                     'Your account is not authorised for this portal. Contact your administrator.',
                     'error'
