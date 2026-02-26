@@ -2643,18 +2643,18 @@ async function loadTutorNotifications(modal) {
             const notif = d.data();
             const isUnread = !notif.read;
             const time = notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleDateString('en-NG', {day:'numeric',month:'short',year:'numeric'}) : '';
-            const typeIcon = notif.type === 'broadcast' ? '📢' : notif.type === 'new_student_assigned' ? '👤' : notif.type === 'student_approved' ? '✅' : '🔔';
+            const typeIcon = notif.type === 'broadcast' ? '📢' : notif.type === 'new_student' ? '👤' : notif.type === 'student_approved' ? '✅' : '🔔';
             const priorityStyle = notif.priority === 'urgent' ? 'border-left:4px solid #ef4444;' : notif.priority === 'important' ? 'border-left:4px solid #f59e0b;' : 'border-left:4px solid #10b981;';
             
             const el = document.createElement('div');
             el.style.cssText = `padding:12px 14px;border-bottom:1px solid #f3f4f6;cursor:pointer;${isUnread ? 'background:#eff6ff;' : 'background:#fff;'}${priorityStyle}`;
             el.innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
-                    <div style="font-weight:${isUnread?'700':'600'};font-size:0.8rem;color:#1f2937;">${typeIcon} ${msgEscapeHtml(notif.subject || notif.type?.replace(/_/g,' ') || 'Notification')}</div>
+                    <div style="font-weight:${isUnread?'700':'600'};font-size:0.8rem;color:#1f2937;">${typeIcon} ${msgEscapeHtml(notif.title || notif.subject || notif.type?.replace(/_/g,' ') || 'Notification')}</div>
                     ${isUnread ? '<span style="background:#ef4444;color:#fff;border-radius:9999px;padding:1px 7px;font-size:0.65rem;font-weight:700;">NEW</span>' : ''}
                 </div>
                 <div style="font-size:0.75rem;color:#374151;line-height:1.4;">${msgEscapeHtml((notif.message||'').substring(0,120))}${(notif.message||'').length>120?'…':''}</div>
-                <div style="font-size:0.7rem;color:#9ca3af;margin-top:4px;">📅 ${time}${notif.sentBy ? ' · From: '+msgEscapeHtml(notif.sentBy) : ''}</div>
+                <div style="font-size:0.7rem;color:#9ca3af;margin-top:4px;">📅 ${time}${notif.senderDisplay ? ' · From: '+msgEscapeHtml(notif.senderDisplay) : ''}</div>
             `;
             el.onmouseover = () => { el.style.background = '#f0fdf4'; };
             el.onmouseout = () => { el.style.background = isUnread ? '#eff6ff' : '#fff'; };
@@ -2662,20 +2662,76 @@ async function loadTutorNotifications(modal) {
                 // Mark as read
                 try { await updateDoc(doc(db, "tutor_notifications", d.id), { read: true }); } catch(e){}
                 el.style.background = '#fff';
-                const badge = modal.querySelector('#notif-badge-count');
                 // Show full message in right panel
-                modal.querySelector('#chat-title').textContent = `${typeIcon} ${notif.subject || 'Notification'}`;
+                modal.querySelector('#chat-title').textContent = `${typeIcon} ${notif.title || notif.subject || 'Notification'}`;
                 modal.querySelector('#chat-inputs').style.display = 'none';
-                modal.querySelector('#chat-messages').innerHTML = `
-                    <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.1);">
-                        <div style="font-weight:800;font-size:1rem;color:#1f2937;margin-bottom:8px;">${typeIcon} ${msgEscapeHtml(notif.subject || 'Notification')}</div>
-                        ${notif.priority && notif.priority !== 'normal' ? `<div style="display:inline-block;background:${notif.priority==='urgent'?'#fee2e2':'#fef3c7'};color:${notif.priority==='urgent'?'#991b1b':'#92400e'};padding:2px 10px;border-radius:999px;font-size:0.75rem;font-weight:700;margin-bottom:10px;">${notif.priority.toUpperCase()}</div>` : ''}
-                        <p style="color:#374151;line-height:1.6;white-space:pre-wrap;">${msgEscapeHtml(notif.message||'')}</p>
-                        <div style="margin-top:16px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:0.75rem;color:#9ca3af;">
-                            From: ${msgEscapeHtml(notif.sentBy || 'Management')} · ${time}
+
+                // Rich card for new_student type — matches assign-new-class style
+                if (notif.type === 'new_student') {
+                    const subjectsDisplay = Array.isArray(notif.subjects) ? notif.subjects.join(', ') : (notif.subjects || 'N/A');
+                    modal.querySelector('#chat-messages').innerHTML = `
+                        <div style="background:#fff;border-radius:16px;padding:0;box-shadow:0 2px 12px rgba(0,0,0,.1);overflow:hidden;margin:8px;">
+                            <!-- Header banner -->
+                            <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:18px 20px;display:flex;align-items:center;gap:12px;">
+                                <div style="width:44px;height:44px;background:rgba(255,255,255,.2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0;">👤</div>
+                                <div>
+                                    <div style="color:#fff;font-weight:900;font-size:1rem;">New Student Assigned!</div>
+                                    <div style="color:#bfdbfe;font-size:.78rem;margin-top:2px;">From Management · ${msgEscapeHtml(time)}</div>
+                                </div>
+                            </div>
+                            <!-- Body -->
+                            <div style="padding:18px 20px;">
+                                <!-- Student name + grade -->
+                                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                                    <div style="width:44px;height:44px;border-radius:12px;background:#dbeafe;color:#1d4ed8;font-weight:900;font-size:1.1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                        ${msgEscapeHtml((notif.studentName||'?').charAt(0).toUpperCase())}
+                                    </div>
+                                    <div>
+                                        <div style="font-weight:800;font-size:1rem;color:#1e293b;">${msgEscapeHtml(notif.studentName||'N/A')}</div>
+                                        <div style="font-size:.78rem;color:#64748b;">${msgEscapeHtml(notif.grade||'')}</div>
+                                    </div>
+                                </div>
+                                <!-- Details grid -->
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:.82rem;">
+                                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;">
+                                        <div style="font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">📅 Schedule</div>
+                                        <div style="font-weight:700;color:#1e293b;">${msgEscapeHtml(notif.academicDays||'N/A')}</div>
+                                        <div style="color:#64748b;">${msgEscapeHtml(notif.academicTime||'')}</div>
+                                    </div>
+                                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;">
+                                        <div style="font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">📚 Subjects</div>
+                                        <div style="font-weight:700;color:#1e293b;">${msgEscapeHtml(subjectsDisplay)}</div>
+                                    </div>
+                                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;">
+                                        <div style="font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">👨‍👩‍👧 Parent</div>
+                                        <div style="font-weight:700;color:#1e293b;">${msgEscapeHtml(notif.parentName||'N/A')}</div>
+                                        <div style="color:#64748b;">${msgEscapeHtml(notif.parentPhone||'')}</div>
+                                    </div>
+                                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;">
+                                        <div style="font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">💰 Fee</div>
+                                        <div style="font-weight:800;color:#065f46;font-size:.95rem;">₦${(notif.studentFee||0).toLocaleString()}</div>
+                                    </div>
+                                </div>
+                                ${notif.parentEmail ? `<div style="margin-top:10px;background:#eff6ff;border-radius:8px;padding:8px 12px;font-size:.78rem;color:#1d4ed8;">✉️ ${msgEscapeHtml(notif.parentEmail)}</div>` : ''}
+                                <div style="margin-top:14px;background:#d1fae5;border-radius:10px;padding:10px 14px;font-size:.8rem;color:#065f46;font-weight:600;">
+                                    ✅ This student's schedule has been automatically added to your Schedule Management tab.
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                } else {
+                    modal.querySelector('#chat-messages').innerHTML = `
+                        <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.1);margin:8px;">
+                            <div style="font-weight:800;font-size:1rem;color:#1f2937;margin-bottom:8px;">${typeIcon} ${msgEscapeHtml(notif.title || notif.subject || 'Notification')}</div>
+                            ${notif.priority && notif.priority !== 'normal' ? `<div style="display:inline-block;background:${notif.priority==='urgent'?'#fee2e2':'#fef3c7'};color:${notif.priority==='urgent'?'#991b1b':'#92400e'};padding:2px 10px;border-radius:999px;font-size:0.75rem;font-weight:700;margin-bottom:10px;">${notif.priority.toUpperCase()}</div>` : ''}
+                            <p style="color:#374151;line-height:1.6;white-space:pre-wrap;">${msgEscapeHtml(notif.message||'')}</p>
+                            ${notif.fileUrl ? `<div style="margin-top:12px;">${notif.fileType==='image' ? `<img src="${msgEscapeHtml(notif.fileUrl)}" style="max-width:100%;border-radius:10px;cursor:pointer;" onclick="window.open('${msgEscapeHtml(notif.fileUrl)}','_blank')">` : `<a href="${msgEscapeHtml(notif.fileUrl)}" target="_blank" style="color:#2563eb;text-decoration:underline;font-size:.875rem;">📎 View Attachment</a>`}</div>` : ''}
+                            <div style="margin-top:16px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:0.75rem;color:#9ca3af;">
+                                From: ${msgEscapeHtml(notif.senderDisplay || notif.sentBy || 'Management')} · ${time}
+                            </div>
+                        </div>
+                    `;
+                }
                 // Reload badge
                 loadNotificationBadge(modal);
             };
@@ -5934,6 +5990,12 @@ async function initTutorApp() {
                 
                 renderTutorDashboard(document.getElementById('mainContent'), tutorData);
                 
+                // Check for broadcast popups on login
+                setTimeout(() => checkAndShowBroadcastPopups(tutorData), 1500);
+                
+                // Auto-sync student schedules on login
+                setTimeout(() => autoSyncStudentSchedules(tutorData), 3000);
+                
                 // Initialize floating messaging and inbox buttons
                 setTimeout(() => {
                     initializeFloatingMessagingButton();
@@ -6014,23 +6076,43 @@ async function initTutorApp() {
     setTimeout(() => {
         const navInbox = document.getElementById('navInbox');
         if (!navInbox) {
-            const sidebar = document.querySelector('.sidebar-nav');
+            const sidebar = document.querySelector('.sidebar-nav, nav ul, .nav-list, aside ul');
             if (sidebar) {
                 const inboxNav = document.createElement('li');
                 inboxNav.id = 'navInbox';
+                inboxNav.style.cssText = 'list-style:none;';
                 inboxNav.innerHTML = `
-                    <a href="#" class="nav-link flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-                        <span class="text-xl">📨</span>
+                    <a href="#" class="nav-link flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:10px;text-decoration:none;color:#374151;font-weight:600;font-size:.9rem;transition:background .15s;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background=''">
+                        <span style="font-size:1.2rem;">📨</span>
                         <span>Inbox</span>
+                        <span id="nav-inbox-badge" style="background:#ef4444;color:#fff;border-radius:9999px;padding:1px 7px;font-size:.7rem;font-weight:700;margin-left:auto;display:none;"></span>
                     </a>
                 `;
                 sidebar.appendChild(inboxNav);
                 
-                inboxNav.addEventListener('click', () => {
+                inboxNav.addEventListener('click', (e) => {
+                    e.preventDefault();
                     if (window.tutorData) {
                         showInboxModal();
                     }
                 });
+
+                // Show unread count badge in nav
+                async function updateNavInboxBadge() {
+                    try {
+                        const tutorEmail = window.tutorData?.email;
+                        if (!tutorEmail) return;
+                        const q = query(collection(db, 'tutor_notifications'), where('tutorEmail', '==', tutorEmail), where('read', '==', false));
+                        const snap = await getDocs(q);
+                        const badge = document.getElementById('nav-inbox-badge');
+                        if (badge) {
+                            badge.textContent = snap.size > 0 ? snap.size : '';
+                            badge.style.display = snap.size > 0 ? '' : 'none';
+                        }
+                    } catch(e) {}
+                }
+                updateNavInboxBadge();
+                setInterval(updateNavInboxBadge, 60000);
             }
         }
     }, 500);
@@ -6059,6 +6141,180 @@ async function initTutorApp() {
             }
         }
     }, 500);
+}
+
+/*******************************************************************************
+ * BROADCAST POPUP: Shows broadcast messages as a modal on login
+ ******************************************************************************/
+async function checkAndShowBroadcastPopups(tutor) {
+    try {
+        const tutorEmail = tutor.email;
+        if (!tutorEmail) return;
+
+        const now = new Date();
+        const q = query(
+            collection(db, 'tutor_notifications'),
+            where('tutorEmail', '==', tutorEmail),
+            where('type', '==', 'broadcast'),
+            where('read', '==', false),
+            orderBy('createdAt', 'desc'),
+            limit(5)
+        );
+        const snap = await getDocs(q);
+        if (snap.empty) return;
+
+        // Pick the most recent broadcast still within its popupDays window
+        let broadcastToShow = null;
+        let broadcastDocId = null;
+        snap.forEach(d => {
+            if (broadcastToShow) return;
+            const b = d.data();
+            const popupDays = b.popupDays || 3;
+            const created = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+            const expiryDate = new Date(created.getTime() + popupDays * 24 * 60 * 60 * 1000);
+            if (now <= expiryDate) {
+                const sessionKey = `broadcast_shown_${d.id}`;
+                if (!sessionStorage.getItem(sessionKey)) {
+                    broadcastToShow = b;
+                    broadcastDocId = d.id;
+                    sessionStorage.setItem(sessionKey, 'true');
+                }
+            }
+        });
+
+        if (!broadcastToShow) return;
+
+        // Build popup
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.75);display:flex;align-items:center;justify-content:center;padding:20px;';
+
+        const popupDays = broadcastToShow.popupDays || 3;
+        const created = broadcastToShow.createdAt?.toDate ? broadcastToShow.createdAt.toDate() : new Date();
+        const expiresStr = new Date(created.getTime() + popupDays * 24 * 60 * 60 * 1000)
+            .toLocaleDateString('en-NG', {day:'numeric',month:'short',year:'numeric'});
+
+        overlay.innerHTML = `
+            <div style="background:#fff;border-radius:22px;max-width:520px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,.45);overflow:hidden;animation:bcastFadeIn .3s ease;">
+                <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:22px 24px;display:flex;align-items:center;gap:14px;position:relative;">
+                    <div style="width:48px;height:48px;background:rgba(255,255,255,.2);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex-shrink:0;">📢</div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="color:#fff;font-weight:900;font-size:1.05rem;line-height:1.3;">${escapeHtml(broadcastToShow.title || 'Message from Management')}</div>
+                        <div style="color:#bfdbfe;font-size:.75rem;margin-top:2px;">From: ${escapeHtml(broadcastToShow.senderDisplay || 'Management')} · Active until ${expiresStr}</div>
+                    </div>
+                    <button id="bcast-close" style="position:absolute;top:12px;right:14px;background:rgba(255,255,255,.15);border:none;color:#fff;width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:1rem;font-weight:700;">✕</button>
+                </div>
+                <div style="padding:24px;">
+                    ${broadcastToShow.fileUrl && broadcastToShow.fileType === 'image' ? `
+                        <img src="${escapeHtml(broadcastToShow.fileUrl)}" style="width:100%;border-radius:12px;margin-bottom:16px;max-height:280px;object-fit:cover;cursor:pointer;" onclick="window.open('${escapeHtml(broadcastToShow.fileUrl)}','_blank')">
+                    ` : ''}
+                    ${broadcastToShow.message ? `<p style="color:#374151;line-height:1.7;white-space:pre-wrap;font-size:.92rem;">${escapeHtml(broadcastToShow.message)}</p>` : ''}
+                    ${broadcastToShow.fileUrl && broadcastToShow.fileType !== 'image' ? `
+                        <div style="margin-top:12px;">
+                            <a href="${escapeHtml(broadcastToShow.fileUrl)}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:8px;padding:8px 14px;font-size:.85rem;font-weight:600;text-decoration:none;">📎 View Attachment</a>
+                        </div>
+                    ` : ''}
+                    <div style="margin-top:20px;display:flex;justify-content:flex-end;gap:10px;">
+                        <button id="bcast-dismiss" style="background:#f1f5f9;border:none;color:#475569;padding:10px 20px;border-radius:10px;font-size:.875rem;font-weight:600;cursor:pointer;">Dismiss</button>
+                        <button id="bcast-ok" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);border:none;color:#fff;padding:10px 24px;border-radius:10px;font-size:.875rem;font-weight:700;cursor:pointer;">Got it ✓</button>
+                    </div>
+                </div>
+            </div>`;
+
+        document.body.appendChild(overlay);
+
+        if (!document.getElementById('bcast-anim-style')) {
+            const st = document.createElement('style');
+            st.id = 'bcast-anim-style';
+            st.textContent = `@keyframes bcastFadeIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}`;
+            document.head.appendChild(st);
+        }
+
+        const closePopup = async () => {
+            overlay.remove();
+            if (broadcastDocId) {
+                try { await updateDoc(doc(db, 'tutor_notifications', broadcastDocId), { read: true, popupShown: true }); } catch(e) {}
+            }
+        };
+
+        overlay.querySelector('#bcast-close').onclick = closePopup;
+        overlay.querySelector('#bcast-dismiss').onclick = closePopup;
+        overlay.querySelector('#bcast-ok').onclick = closePopup;
+        overlay.onclick = (e) => { if (e.target === overlay) closePopup(); };
+
+    } catch (err) {
+        console.warn('Broadcast popup error:', err);
+    }
+}
+
+/*******************************************************************************
+ * AUTO-SYNC SCHEDULES: Creates schedule entries for students who have
+ * academicDays/academicTime but no properly structured schedule array.
+ * Runs automatically on tutor login.
+ ******************************************************************************/
+async function autoSyncStudentSchedules(tutor) {
+    try {
+        const allStudents = await fetchStudentsForTutor(tutor, 'students');
+        const active = allStudents.filter(s =>
+            !s.summerBreak && !s.isTransitioning &&
+            !['archived','graduated','transferred'].includes(s.status)
+        );
+
+        const DAYS_LIST = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+        function parseTimeTo24h(timeStr) {
+            if (!timeStr) return null;
+            timeStr = timeStr.trim();
+            if (/^\d{1,2}:\d{2}$/.test(timeStr)) return timeStr.padStart(5, '0');
+            const m = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+            if (m) {
+                let h = parseInt(m[1]);
+                const min = m[2];
+                const period = m[3].toUpperCase();
+                if (period === 'AM' && h === 12) h = 0;
+                if (period === 'PM' && h !== 12) h += 12;
+                return `${String(h).padStart(2,'0')}:${min}`;
+            }
+            return null;
+        }
+
+        for (const student of active) {
+            const existing = student.schedule || [];
+            const hasValid = existing.length > 0 && existing.every(s => s.day && s.start && s.end);
+            if (hasValid) continue; // already synced
+
+            const rawDays = student.academicDays || student.days || '';
+            const rawTime = student.academicTime || student.time || '';
+            if (!rawDays) continue;
+
+            const timeParts = rawTime.split(/\s*[-–]\s*/);
+            const startTime = parseTimeTo24h(timeParts[0]) || '09:00';
+            const endTime   = parseTimeTo24h(timeParts[1]) || '10:00';
+
+            const daysList = rawDays.split(/,|\band\b/i).map(d => d.trim()).filter(d => DAYS_LIST.includes(d));
+            const scheduleEntries = daysList.length > 0
+                ? daysList.map(day => ({ day, start: startTime, end: endTime }))
+                : [{ day: rawDays, start: startTime, end: endTime }];
+
+            try {
+                await updateDoc(doc(db, 'students', student.id), { schedule: scheduleEntries });
+                await setDoc(doc(db, 'schedules', `sched_${student.id}`), {
+                    studentId: student.id,
+                    studentName: student.studentName,
+                    tutorEmail: tutor.email,
+                    schedule: scheduleEntries,
+                    academicDays: rawDays,
+                    academicTime: rawTime,
+                    source: 'auto_sync',
+                    updatedAt: new Date()
+                }, { merge: true });
+            } catch (err) {
+                console.warn(`Auto-sync schedule failed for ${student.studentName}:`, err.message);
+            }
+        }
+        console.log(`✅ Auto-schedule sync complete for ${tutor.email}`);
+    } catch (err) {
+        console.warn('autoSyncStudentSchedules error:', err);
+    }
 }
 
 // If DOM already loaded (module scripts often load after DOMContentLoaded),
