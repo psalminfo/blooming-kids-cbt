@@ -101,4 +101,5 @@ export const auth    = getAuth(app);
 // Closing the tab signs them out automatically.
 // ─────────────────────────────────────────────
 
-await setPersistence(auth, browserSessionPersistence);
+try {     await setPersistence(auth, browserSessionPersistence); } catch (e) {     console.warn('Could not set auth persistence:', e.message); }
+
