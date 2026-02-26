@@ -7351,7 +7351,7 @@ async function approveEnrollmentWithDetails(enrollmentId) {
                 tutorName: academicTutor.name,
                 tutorEmail: academicTutor.email,
                 grade: student.actualGrade || student.grade,
-                actualGrade: student.actualGrade || student.grade,
+                actualGrade: student.actualGrade || student .Grade,
                 subjects: student.selectedSubjects || [],
                 academicDays: academicDays,
                 academicTime: academicTime,
@@ -11614,3 +11614,4 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
