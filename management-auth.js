@@ -1,6 +1,6 @@
 import { auth, db } from './firebaseConfig.js';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
-import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const errorMessage = document.getElementById('error-message');
 
@@ -112,3 +112,4 @@ async function handlePasswordReset(email) {
         errorMessage.className = 'text-red-500 text-center mt-4';
     }
 }
+
