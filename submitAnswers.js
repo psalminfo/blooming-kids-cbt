@@ -1,5 +1,5 @@
 import { db } from './firebaseConfig.js';
-import { collection, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { getLoadedQuestions } from './autoQuestionGen.js';
 
 /**
@@ -17,9 +17,12 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
     let score = 0;
     let totalScoreableQuestions = 0;
 
-    // Get parentPhone from student data
+    // Get parentPhone and studentId from student data stored by tutor dashboard
     const studentData = JSON.parse(localStorage.getItem("studentData") || "{}");
     const parentPhone = studentData.parentPhone || '';
+    // studentUid is the Firestore students doc ID — stored by tutor.js at launch time.
+    // Including it in the result lets tutor.js reliably match results back to students.
+    const studentId = studentData.studentUid || localStorage.getItem('studentUid') || '';
 
     console.log("🚀 Starting test submission...");
     console.log("📋 Loaded questions:", loadedQuestions.length);
@@ -133,6 +136,7 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         subject,
         grade,
         studentName,
+        studentId,          // Firestore students doc ID — used by tutor dashboard to remove placement button
         parentEmail,
         tutorEmail,
         studentCountry,
