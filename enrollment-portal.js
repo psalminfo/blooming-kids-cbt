@@ -124,7 +124,10 @@ class EnrollmentApp {
     
     // CSRF token generation and handling
     generateCSRFToken() {
-        return 'csrf_' + Math.random().toString(36).substr(2, 15) + '_' + Date.now();
+        // Use cryptographically secure random — Math.random() is NOT secure
+        const arr = new Uint32Array(3);
+        crypto.getRandomValues(arr);
+        return 'csrf_' + arr[0].toString(36) + arr[1].toString(36) + '_' + Date.now();
     }
     
     setCSRFCookie() {
@@ -636,7 +639,7 @@ class EnrollmentApp {
                 </div>
                 <div class="hours-input">
                     <label>Hours per session:</label>
-                    <input type="number" min="0" step="0.5" value="0" class="test-prep-hours" placeholder="1">
+                    <input type="number" min="0" max="8" step="0.5" value="0" class="test-prep-hours" placeholder="1">
                     <span>hrs</span>
                 </div>
                 <div class="days-time-section">
@@ -1537,11 +1540,11 @@ class EnrollmentApp {
     validateForm() {
         let allValid = true;
         
-        // Validate basic form fields
+        // Validate basic form fields (inputs/selects with data-validate)
         document.querySelectorAll('[data-validate]').forEach(input => {
             if (!this.validateField(input)) allValid = false;
         });
-        
+
         // Validate course selection requirement for all students
         if (!this.validateCourseSelectionRequirements()) {
             this.showAlert("Each student must select at least one option from Academic, Extracurricular, or Test Preparation.", "danger");
@@ -1553,9 +1556,33 @@ class EnrollmentApp {
         studentEntries.forEach((entry, index) => {
             const studentId = index + 1;
             
-            // Validate academic time if academic subjects are selected
+            // FIX: Validate tutor preference is selected
+            if (!entry.querySelector('.tutor-option.selected')) {
+                allValid = false;
+                const errEl = entry.querySelector('.student-tutor-error');
+                if (errEl) { errEl.textContent = 'Please select a tutor preference'; errEl.classList.add('show'); }
+            } else {
+                const errEl = entry.querySelector('.student-tutor-error');
+                if (errEl) errEl.classList.remove('show');
+            }
+
             const selectedSubjects = entry.querySelectorAll('.subject-option.selected');
             if (selectedSubjects.length > 0) {
+                // FIX: Validate a session frequency is chosen when subjects are selected
+                if (!entry.querySelector('.session-option.selected')) {
+                    allValid = false;
+                    this.showAlert(`Student ${studentId}: Please select a session frequency (Twice/3x/5x weekly).`, 'danger');
+                }
+                // FIX: Validate at least one academic day is chosen
+                if (entry.querySelectorAll('.academic-day-btn.selected').length === 0) {
+                    allValid = false;
+                    const errEl = entry.querySelector(`.available-days-error-${studentId}`);
+                    if (errEl) { errEl.textContent = 'Please select at least one available day'; errEl.classList.add('show'); }
+                } else {
+                    const errEl = entry.querySelector(`.available-days-error-${studentId}`);
+                    if (errEl) errEl.classList.remove('show');
+                }
+                // Validate academic time
                 if (!this.validateTimeSelection('academic', studentId, null)) {
                     allValid = false;
                 }
@@ -1575,6 +1602,18 @@ class EnrollmentApp {
             // Validate test prep times
             entry.querySelectorAll('.test-prep-card.active').forEach(card => {
                 const testId = card.dataset.testId;
+                // FIX: Enforce max session hours from config
+                const hoursInput = card.querySelector('.test-prep-hours');
+                if (hoursInput) {
+                    const hrs = parseFloat(hoursInput.value) || 0;
+                    if (hrs > CONFIG.CONSTANTS.MAXIMUM_SESSION_HOURS) {
+                        allValid = false;
+                        this.showAlert(`Student ${studentId}: Test prep session cannot exceed ${CONFIG.CONSTANTS.MAXIMUM_SESSION_HOURS} hours.`, 'danger');
+                        hoursInput.classList.add('error');
+                    } else {
+                        hoursInput.classList.remove('error');
+                    }
+                }
                 if (!this.validateTimeSelection('test-prep', studentId, testId)) {
                     allValid = false;
                 }
@@ -1942,8 +1981,8 @@ class EnrollmentApp {
             const endHour = document.getElementById(`academic-end-hour-${index + 1}`)?.value || '';
             
             if (startHour && endHour) {
-                const startTime = `${parseInt(startHour) % 12 || 12} ${startHour < 12 ? 'AM' : 'PM'}`;
-                const endTime = `${parseInt(endHour) % 12 || 12} ${endHour < 12 ? 'AM' : 'PM'}`;
+                const startTime = `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}`;
+                const endTime = `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}`;
                 studentData.academicTime = `${startHour}:${endHour}`;
                 studentData.academicSchedule = `${academicDays.join(', ')} from ${startTime} to ${endTime}`;
             }
@@ -1969,8 +2008,8 @@ class EnrollmentApp {
                 const endHour = document.getElementById(`extracurricular-end-hour-${index + 1}-${activityData.id}`)?.value || '';
                 
                 if (startHour && endHour) {
-                    const startTime = `${parseInt(startHour) % 12 || 12} ${startHour < 12 ? 'AM' : 'PM'}`;
-                    const endTime = `${parseInt(endHour) % 12 || 12} ${endHour < 12 ? 'AM' : 'PM'}`;
+                    const startTime = `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}`;
+                    const endTime = `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}`;
                     activityData.time = `${startHour}:${endHour}`;
                     activityData.schedule = `${activityData.days.join(', ')} from ${startTime} to ${endTime}`;
                 }
@@ -2000,8 +2039,8 @@ class EnrollmentApp {
                     const endHour = document.getElementById(`test-prep-end-hour-${index + 1}-${testData.id}`)?.value || '';
                     
                     if (startHour && endHour) {
-                        const startTime = `${parseInt(startHour) % 12 || 12} ${startHour < 12 ? 'AM' : 'PM'}`;
-                        const endTime = `${parseInt(endHour) % 12 || 12} ${endHour < 12 ? 'AM' : 'PM'}`;
+                        const startTime = `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}`;
+                        const endTime = `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}`;
                         testData.time = `${startHour}:${endHour}`;
                         testData.schedule = `${testData.days.join(', ')} from ${startTime} to ${endTime}`;
                     }
@@ -2018,7 +2057,10 @@ class EnrollmentApp {
     
     async checkResumeLink() {
         const urlParams = new URLSearchParams(window.location.search);
-        const resumeId = urlParams.get('resume') || localStorage.getItem('lastEnrollmentId');
+        // FIX: Only auto-resume if the ?resume= param is in the URL.
+        // Falling back to localStorage silently would load the LAST user's data
+        // on a shared computer — a privacy leak. Users must use their resume link.
+        const resumeId = urlParams.get('resume');
         
         if (resumeId) {
             try {
@@ -2238,8 +2280,8 @@ class EnrollmentApp {
                 const startHour = document.getElementById(`academic-start-hour-${index + 1}`)?.value || '';
                 const endHour = document.getElementById(`academic-end-hour-${index + 1}`)?.value || '';
                 
-                const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${startHour < 12 ? 'AM' : 'PM'}` : '';
-                const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${endHour < 12 ? 'AM' : 'PM'}` : '';
+                const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}` : '';
+                const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}` : '';
                 
                 // Get tutor preference
                 const selectedTutor = entry.querySelector('.tutor-option.selected');
@@ -2270,8 +2312,8 @@ class EnrollmentApp {
                 const startHour = document.getElementById(`extracurricular-start-hour-${index + 1}-${activityId}`)?.value || '';
                 const endHour = document.getElementById(`extracurricular-end-hour-${index + 1}-${activityId}`)?.value || '';
                 
-                const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${startHour < 12 ? 'AM' : 'PM'}` : '';
-                const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${endHour < 12 ? 'AM' : 'PM'}` : '';
+                const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}` : '';
+                const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}` : '';
                 
                 const activity = CONFIG.EXTRACURRICULAR_FEES.find(a => a.id === activityId);
                 const description = `${studentName}: ${activityName} (${selectedDays.join(', ')}, ${startTime}-${endTime})`;
@@ -2309,8 +2351,8 @@ class EnrollmentApp {
                 const startHour = document.getElementById(`test-prep-start-hour-${index + 1}-${testId}`)?.value || '';
                 const endHour = document.getElementById(`test-prep-end-hour-${index + 1}-${testId}`)?.value || '';
                 
-                const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${startHour < 12 ? 'AM' : 'PM'}` : '';
-                const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${endHour < 12 ? 'AM' : 'PM'}` : '';
+                const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}` : '';
+                const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}` : '';
                 
                 const test = CONFIG.TEST_PREP_FEES.find(t => t.id === testId);
                 
@@ -2377,8 +2419,8 @@ class EnrollmentApp {
             const endHour = document.getElementById(`academic-end-hour-${studentId}`)?.value || '';
             
             if (selectedSubjects.length > 0) {
-                const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${startHour < 12 ? 'AM' : 'PM'}` : '';
-                const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${endHour < 12 ? 'AM' : 'PM'}` : '';
+                const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}` : '';
+                const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}` : '';
                 
                 detailsHTML += `
                     <div class="student-schedule">
@@ -2400,8 +2442,8 @@ class EnrollmentApp {
                     const startHour = document.getElementById(`extracurricular-start-hour-${studentId}-${activityId}`)?.value || '';
                     const endHour = document.getElementById(`extracurricular-end-hour-${studentId}-${activityId}`)?.value || '';
                     
-                    const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${startHour < 12 ? 'AM' : 'PM'}` : '';
-                    const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${endHour < 12 ? 'AM' : 'PM'}` : '';
+                    const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}` : '';
+                    const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}` : '';
                     
                     detailsHTML += `${activityName}: ${selectedDays.join(', ')} from ${startTime} to ${endTime}<br>`;
                 });
@@ -2422,8 +2464,8 @@ class EnrollmentApp {
                     const startHour = document.getElementById(`test-prep-start-hour-${studentId}-${testId}`)?.value || '';
                     const endHour = document.getElementById(`test-prep-end-hour-${studentId}-${testId}`)?.value || '';
                     
-                    const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${startHour < 12 ? 'AM' : 'PM'}` : '';
-                    const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${endHour < 12 ? 'AM' : 'PM'}` : '';
+                    const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}` : '';
+                    const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}` : '';
                     
                     detailsHTML += `${testName}: ${selectedDays.join(', ')} from ${startTime} to ${endTime} (${hours}hrs/session)<br>`;
                 });
@@ -2460,11 +2502,17 @@ class EnrollmentApp {
     }
 
     async submitEnrollment() {
+        // FIX: Guard against double-submission (same pattern as saveProgress)
+        if (this._isSubmitting) {
+            this.showAlert("Already processing, please wait...", "warning");
+            return;
+        }
         if (!this.validateForm()) {
             this.showAlert("Please fix all errors before submitting. Make sure all time selections are completed.", "danger");
             return;
         }
 
+        this._isSubmitting = true;
         const btn = document.getElementById('submit-enrollment');
         btn.innerHTML = '<div class="spinner"></div> Processing Enrollment...';
         btn.disabled = true;
@@ -2530,7 +2578,10 @@ class EnrollmentApp {
             console.error("Enrollment Submission Error:", error);
             btn.innerHTML = '<i class="fas fa-lock"></i> Proceed to Secure Payment';
             btn.disabled = false;
+            this._isSubmitting = false;
             this.showAlert("An error occurred during submission. Please try again.", "danger");
+        } finally {
+            this._isSubmitting = false;
         }
     }
 
@@ -2576,19 +2627,20 @@ class EnrollmentApp {
    // REFERRAL CODE GENERATION (HIGH ENTROPY)
    // ==============================================
    async generateReferralCode() {
-        if (!this.db) {
-            // If no database, generate a random code anyway (entropy is high)
+        // Helper: generate a cryptographically secure random suffix
+        const _secureRandomSuffix = () => {
             const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            const arr = new Uint32Array(6);
+            crypto.getRandomValues(arr);
+            return Array.from(arr, v => chars[v % chars.length]).join('');
+        };
+
+        if (!this.db) {
             const prefix = 'BKH';
             const timeSeed = Date.now().toString(36).toUpperCase().slice(-2);
-            let suffix = '';
-            for (let i = 0; i < 6; i++) {
-                suffix += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            return prefix + timeSeed + suffix;
+            return prefix + timeSeed + _secureRandomSuffix();
         }
 
-        const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
         const prefix = 'BKH';
         let code;
         let isUnique = false;
@@ -2598,11 +2650,7 @@ class EnrollmentApp {
         while (!isUnique && attempts < maxAttempts) {
             attempts++;
             const timeSeed = Date.now().toString(36).toUpperCase().slice(-2);
-            let suffix = '';
-            for (let i = 0; i < 6; i++) {
-                suffix += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            code = prefix + timeSeed + suffix;
+            code = prefix + timeSeed + _secureRandomSuffix();
 
             try {
                 const snapshot = await this.db.collection('parent_users').where('referralCode', '==', code).limit(1).get();
@@ -2676,8 +2724,10 @@ class EnrollmentApp {
                 }
             } else {
                 // NEW USER CREATION LOGIC
-                const randomPassword = Math.random().toString(36).slice(-10) + 
-                                       Math.random().toString(36).slice(-10).toUpperCase();
+                // Use cryptographically secure random for the temp password
+                const pwArr = new Uint8Array(16);
+                crypto.getRandomValues(pwArr);
+                const randomPassword = Array.from(pwArr, b => b.toString(36).padStart(2,'0')).join('').slice(0, 16);
                 
                 const userCredential = await firebase.auth().createUserWithEmailAndPassword(parentEmail, randomPassword);
                 const user = userCredential.user;
