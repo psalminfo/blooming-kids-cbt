@@ -10998,107 +10998,376 @@ async function renderManagementMessagingPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-green-700 mb-6">📨 Messaging & Broadcast</h2>
-            
-            <!-- Broadcast Section -->
-            <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 mb-6">
-                <h3 class="text-lg font-bold text-green-800 mb-4">📢 Broadcast Message</h3>
-                <p class="text-sm text-gray-600 mb-4">Send a pop-up announcement to all tutors and/or parents. Recipients will see it the next time they log in.</p>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Subject / Title</label>
-                        <input type="text" id="broadcast-title" placeholder="e.g. Important Notice" 
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+
+            <!-- Tab Navigation -->
+            <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">
+                <button data-msg-tab="inbox" class="msg-tab-btn px-5 py-2.5 font-semibold text-sm border-b-2 border-green-600 text-green-700 whitespace-nowrap flex items-center gap-2">
+                    <i class="fas fa-inbox"></i> Tutor Inbox
+                    <span id="inbox-unread-badge" class="hidden bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 font-bold min-w-[20px] text-center"></span>
+                </button>
+                <button data-msg-tab="compose" class="msg-tab-btn px-5 py-2.5 font-semibold text-sm border-b-2 border-transparent text-gray-500 hover:text-green-700 whitespace-nowrap">
+                    <i class="fas fa-paper-plane"></i> Send Message
+                </button>
+                <button data-msg-tab="broadcast" class="msg-tab-btn px-5 py-2.5 font-semibold text-sm border-b-2 border-transparent text-gray-500 hover:text-green-700 whitespace-nowrap">
+                    <i class="fas fa-bullhorn"></i> Broadcast
+                </button>
+                <button data-msg-tab="logs" class="msg-tab-btn px-5 py-2.5 font-semibold text-sm border-b-2 border-transparent text-gray-500 hover:text-green-700 whitespace-nowrap">
+                    <i class="fas fa-list"></i> Sent Log
+                </button>
+            </div>
+
+            <!-- ====== INBOX TAB ====== -->
+            <div id="msg-tab-inbox" class="msg-tab-content">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold text-gray-700">📥 Messages from Tutors</h3>
+                    <button id="refresh-inbox-btn" class="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+                <div class="flex gap-2 mb-4 flex-wrap">
+                    <button data-inbox-filter="all" class="inbox-filter-btn px-3 py-1.5 rounded-full text-xs font-semibold bg-green-600 text-white">All</button>
+                    <button data-inbox-filter="unread" class="inbox-filter-btn px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200">Unread</button>
+                    <button data-inbox-filter="replied" class="inbox-filter-btn px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200">Replied</button>
+                </div>
+                <div id="inbox-list" class="space-y-3">
+                    <div class="text-center py-10 text-gray-400">
+                        <i class="fas fa-inbox text-4xl mb-3 block"></i>
+                        <p>Loading messages...</p>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Send To</label>
-                        <div class="flex gap-4 mt-1">
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" id="broadcast-to-tutors" checked class="rounded">
-                                <span class="text-sm">Tutors</span>
-                            </label>
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" id="broadcast-to-parents" class="rounded">
-                                <span class="text-sm">Parents</span>
-                            </label>
+                </div>
+            </div>
+
+            <!-- ====== COMPOSE (DIRECT MSG) TAB ====== -->
+            <div id="msg-tab-compose" class="msg-tab-content hidden">
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-6">
+                    <h3 class="text-lg font-bold text-blue-800 mb-4">💬 Message a Tutor Directly</h3>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Search Tutor</label>
+                        <div class="relative">
+                            <input type="text" id="msg-tutor-search" placeholder="Type tutor name..." autocomplete="off"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <input type="hidden" id="msg-tutor-id">
+                            <div id="msg-tutor-dropdown" class="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto hidden"></div>
                         </div>
                     </div>
-                </div>
-                
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Message</label>
-                    <textarea id="broadcast-message" rows="4" placeholder="Type your broadcast message here..."
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 resize-none"></textarea>
-                </div>
-                
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Attach Image or File (Optional)</label>
-                    <input type="file" id="broadcast-file" accept="image/*,.pdf" 
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <p class="text-xs text-gray-500 mt-1">Images will be shown in the pop-up. PDFs will be downloadable.</p>
-                </div>
-
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Show Popup For (Days) <span class="text-gray-400 text-xs">— how many days this pop-up stays active after login</span></label>
-                    <input type="number" id="broadcast-popup-days" min="1" max="30" value="3"
-                        class="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm">
-                    <span class="text-xs text-gray-500 ml-2">days (default: 3 days)</span>
-                </div>
-                
-                <div class="flex justify-end">
-                    <button id="send-broadcast-btn" class="bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700 font-medium flex items-center gap-2">
-                        <i class="fas fa-bullhorn"></i> Send Broadcast
-                    </button>
-                </div>
-                
-                <div id="broadcast-status" class="mt-3 hidden"></div>
-            </div>
-            
-            <!-- Direct Tutor Messaging -->
-            <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
-                <h3 class="text-lg font-bold text-blue-800 mb-4">💬 Message a Tutor Directly</h3>
-                
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Search Tutor</label>
-                    <div class="relative">
-                        <input type="text" id="msg-tutor-search" placeholder="Type tutor name..." autocomplete="off"
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                        <input type="hidden" id="msg-tutor-id">
-                        <div id="msg-tutor-dropdown" class="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto hidden"></div>
+                    
+                    <div id="selected-tutor-info" class="hidden mb-4 p-3 bg-white rounded-lg border border-blue-100">
+                        <p class="text-sm font-medium text-blue-800" id="selected-tutor-name-msg">—</p>
+                        <p class="text-xs text-gray-500" id="selected-tutor-email-msg">—</p>
                     </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Subject (Optional)</label>
+                        <input type="text" id="direct-msg-subject" placeholder="e.g. Schedule Update"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Message</label>
+                        <textarea id="direct-msg-content" rows="4" placeholder="Type your message..."
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button id="send-direct-msg-btn" class="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2">
+                            <i class="fas fa-paper-plane"></i> Send Message
+                        </button>
+                    </div>
+                    <div id="direct-msg-status" class="mt-3 hidden"></div>
                 </div>
-                
-                <div id="selected-tutor-info" class="hidden mb-4 p-3 bg-white rounded-lg border border-blue-100">
-                    <p class="text-sm font-medium text-blue-800" id="selected-tutor-name-msg">—</p>
-                    <p class="text-xs text-gray-500" id="selected-tutor-email-msg">—</p>
-                </div>
-                
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Message</label>
-                    <textarea id="direct-msg-content" rows="3" placeholder="Type your message..."
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
-                </div>
-                
-                <div class="flex justify-end">
-                    <button id="send-direct-msg-btn" class="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2">
-                        <i class="fas fa-paper-plane"></i> Send Message
-                    </button>
-                </div>
-                <div id="direct-msg-status" class="mt-3 hidden"></div>
             </div>
-            
-            <!-- Recent Broadcasts log -->
-            <div class="bg-white border border-gray-200 rounded-xl p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-bold text-gray-700">📋 Recent Broadcasts</h3>
-                    <button id="refresh-broadcasts-btn" class="text-sm text-blue-600 hover:underline">Refresh</button>
+
+            <!-- ====== BROADCAST TAB ====== -->
+            <div id="msg-tab-broadcast" class="msg-tab-content hidden">
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">
+                    <h3 class="text-lg font-bold text-green-800 mb-4">📢 Broadcast Message</h3>
+                    <p class="text-sm text-gray-600 mb-4">Send a pop-up announcement to all tutors and/or parents. Recipients will see it the next time they log in.</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Subject / Title</label>
+                            <input type="text" id="broadcast-title" placeholder="e.g. Important Notice" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Send To</label>
+                            <div class="flex gap-4 mt-1">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="broadcast-to-tutors" checked class="rounded">
+                                    <span class="text-sm">Tutors</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="broadcast-to-parents" class="rounded">
+                                    <span class="text-sm">Parents</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Message</label>
+                        <textarea id="broadcast-message" rows="4" placeholder="Type your broadcast message here..."
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 resize-none"></textarea>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Attach Image or File (Optional)</label>
+                        <input type="file" id="broadcast-file" accept="image/*,.pdf" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <p class="text-xs text-gray-500 mt-1">Images will be shown in the pop-up. PDFs will be downloadable.</p>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Show Popup For (Days) <span class="text-gray-400 text-xs">— how many days this pop-up stays active after login</span></label>
+                        <input type="number" id="broadcast-popup-days" min="1" max="30" value="3"
+                            class="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm">
+                        <span class="text-xs text-gray-500 ml-2">days (default: 3 days)</span>
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button id="send-broadcast-btn" class="bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700 font-medium flex items-center gap-2">
+                            <i class="fas fa-bullhorn"></i> Send Broadcast
+                        </button>
+                    </div>
+                    
+                    <div id="broadcast-status" class="mt-3 hidden"></div>
                 </div>
-                <div id="broadcasts-list">
-                    <p class="text-gray-500 text-sm text-center py-4">Loading...</p>
+            </div>
+
+            <!-- ====== SENT LOG TAB ====== -->
+            <div id="msg-tab-logs" class="msg-tab-content hidden">
+                <div class="bg-white border border-gray-200 rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold text-gray-700">📋 Recent Broadcasts & Messages</h3>
+                        <button id="refresh-broadcasts-btn" class="text-sm text-blue-600 hover:underline">Refresh</button>
+                    </div>
+                    <div id="broadcasts-list">
+                        <p class="text-gray-500 text-sm text-center py-4">Loading...</p>
+                    </div>
                 </div>
             </div>
         </div>
     `;
+
+    // ── Tab switching logic ──
+    const msgTabBtns = container.querySelectorAll('.msg-tab-btn');
+    const msgTabContents = container.querySelectorAll('.msg-tab-content');
+    function switchMsgTab(tabId) {
+        msgTabBtns.forEach(btn => {
+            const active = btn.dataset.msgTab === tabId;
+            btn.classList.toggle('border-green-600', active);
+            btn.classList.toggle('text-green-700', active);
+            btn.classList.toggle('border-transparent', !active);
+            btn.classList.toggle('text-gray-500', !active);
+        });
+        msgTabContents.forEach(c => c.classList.toggle('hidden', c.id !== `msg-tab-${tabId}`));
+        if (tabId === 'inbox') loadInbox('all');
+        if (tabId === 'logs') loadBroadcasts();
+    }
+    msgTabBtns.forEach(btn => btn.addEventListener('click', () => switchMsgTab(btn.dataset.msgTab)));
+
+    // ── Inbox filter buttons ──
+    container.querySelectorAll('.inbox-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            container.querySelectorAll('.inbox-filter-btn').forEach(b => {
+                b.classList.remove('bg-green-600', 'text-white');
+                b.classList.add('bg-gray-100', 'text-gray-600');
+            });
+            btn.classList.add('bg-green-600', 'text-white');
+            btn.classList.remove('bg-gray-100', 'text-gray-600');
+            loadInbox(btn.dataset.inboxFilter);
+        });
+    });
+    document.getElementById('refresh-inbox-btn').addEventListener('click', () => loadInbox('all'));
+
+    // ── Load Inbox ──
+    let inboxFilter = 'all';
+    async function loadInbox(filter = 'all') {
+        inboxFilter = filter;
+        const listEl = document.getElementById('inbox-list');
+        if (!listEl) return;
+        listEl.innerHTML = `<div class="text-center py-10 text-gray-400"><i class="fas fa-spinner fa-spin text-3xl mb-3 block"></i><p>Loading...</p></div>`;
+        try {
+            let q = query(collection(db, 'tutor_to_management_messages'), orderBy('createdAt', 'desc'), limit(50));
+            const snap = await getDocs(q);
+            let messages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+            // Apply filter
+            if (filter === 'unread') messages = messages.filter(m => !m.managementRead);
+            if (filter === 'replied') messages = messages.filter(m => m.replied);
+
+            // Update unread badge
+            const unreadCount = snap.docs.filter(d => !d.data().managementRead).length;
+            const badge = document.getElementById('inbox-unread-badge');
+            if (badge) {
+                badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
+                badge.classList.toggle('hidden', unreadCount === 0);
+            }
+
+            if (messages.length === 0) {
+                listEl.innerHTML = `
+                    <div class="text-center py-14 text-gray-400">
+                        <i class="fas fa-inbox text-5xl mb-4 block"></i>
+                        <p class="font-medium">No messages yet</p>
+                        <p class="text-sm mt-1">Tutor replies will appear here</p>
+                    </div>`;
+                return;
+            }
+
+            listEl.innerHTML = messages.map(msg => {
+                const date = msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleString() : 'Unknown';
+                const unreadStyle = !msg.managementRead ? 'border-l-4 border-l-blue-500 bg-blue-50' : 'bg-white';
+                const unreadDot = !msg.managementRead ? '<span class="inline-block w-2 h-2 rounded-full bg-blue-500 mr-2"></span>' : '';
+                const repliedBadge = msg.replied ? '<span class="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Replied</span>' : '';
+                const repliesHTML = msg.managementReplies?.length ? `
+                    <div class="mt-3 space-y-2 border-t border-gray-100 pt-3">
+                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Replies</p>
+                        ${msg.managementReplies.map(r => `
+                            <div class="bg-green-50 border border-green-100 rounded-lg p-2.5 ml-4">
+                                <p class="text-sm text-gray-800">${escapeHtml(r.message)}</p>
+                                <p class="text-xs text-gray-400 mt-1">${r.repliedBy || 'Management'} · ${r.repliedAt?.toDate ? r.repliedAt.toDate().toLocaleString() : ''}</p>
+                            </div>
+                        `).join('')}
+                    </div>` : '';
+                return `
+                    <div class="border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow ${unreadStyle}" data-inbox-id="${msg.id}">
+                        <div class="flex justify-between items-start flex-wrap gap-2">
+                            <div class="flex-1">
+                                <div class="flex items-center flex-wrap gap-1 mb-1">
+                                    ${unreadDot}
+                                    <span class="font-bold text-gray-800">${escapeHtml(msg.tutorName || 'Unknown Tutor')}</span>
+                                    <span class="text-xs text-gray-400">${escapeHtml(msg.tutorEmail || '')}</span>
+                                    ${repliedBadge}
+                                </div>
+                                ${msg.subject ? `<p class="text-sm font-semibold text-gray-700 mb-1">📌 ${escapeHtml(msg.subject)}</p>` : ''}
+                                <p class="text-sm text-gray-700 leading-relaxed">${escapeHtml(msg.message || '')}</p>
+                                ${repliesHTML}
+                            </div>
+                            <span class="text-xs text-gray-400 whitespace-nowrap">${date}</span>
+                        </div>
+                        <div class="mt-3 flex gap-2 flex-wrap">
+                            ${!msg.managementRead ? `<button class="mark-inbox-read-btn text-xs text-blue-600 hover:text-blue-800 border border-blue-200 rounded px-2 py-1" data-id="${msg.id}"><i class="fas fa-check mr-1"></i>Mark Read</button>` : ''}
+                            <button class="reply-inbox-btn text-xs text-green-700 hover:text-green-900 border border-green-200 rounded px-2 py-1 font-medium" data-id="${msg.id}" data-tutor-email="${escapeHtml(msg.tutorEmail || '')}" data-tutor-name="${escapeHtml(msg.tutorName || '')}">
+                                <i class="fas fa-reply mr-1"></i>Reply
+                            </button>
+                        </div>
+                        <!-- Reply form (hidden by default) -->
+                        <div class="inbox-reply-form hidden mt-3 pt-3 border-t border-gray-100" id="reply-form-${msg.id}">
+                            <textarea class="w-full border border-gray-200 rounded-lg p-2.5 text-sm resize-none focus:ring-2 focus:ring-green-500" rows="3" placeholder="Type your reply..."></textarea>
+                            <div class="flex justify-end gap-2 mt-2">
+                                <button class="cancel-reply-btn text-xs text-gray-500 border border-gray-200 rounded px-3 py-1.5 hover:bg-gray-50">Cancel</button>
+                                <button class="submit-reply-btn bg-green-600 text-white text-xs rounded px-3 py-1.5 hover:bg-green-700 font-medium" data-id="${msg.id}" data-tutor-email="${escapeHtml(msg.tutorEmail || '')}" data-tutor-name="${escapeHtml(msg.tutorName || '')}">
+                                    <i class="fas fa-paper-plane mr-1"></i>Send Reply
+                                </button>
+                            </div>
+                            <div class="reply-status hidden mt-2 text-xs p-2 rounded"></div>
+                        </div>
+                    </div>`;
+            }).join('');
+
+            // Wire up mark-read buttons
+            listEl.querySelectorAll('.mark-inbox-read-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.dataset.id;
+                    try {
+                        await updateDoc(doc(db, 'tutor_to_management_messages', id), { managementRead: true });
+                        loadInbox(inboxFilter);
+                    } catch(e) { console.error(e); }
+                });
+            });
+
+            // Wire up reply buttons
+            listEl.querySelectorAll('.reply-inbox-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const form = document.getElementById(`reply-form-${btn.dataset.id}`);
+                    if (form) form.classList.toggle('hidden');
+                });
+            });
+
+            // Wire up cancel reply buttons
+            listEl.querySelectorAll('.cancel-reply-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    btn.closest('.inbox-reply-form').classList.add('hidden');
+                });
+            });
+
+            // Wire up submit reply buttons
+            listEl.querySelectorAll('.submit-reply-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.dataset.id;
+                    const form = document.getElementById(`reply-form-${id}`);
+                    const textarea = form.querySelector('textarea');
+                    const replyMsg = textarea.value.trim();
+                    const statusEl = form.querySelector('.reply-status');
+                    if (!replyMsg) { 
+                        statusEl.textContent = 'Please enter a reply.'; 
+                        statusEl.className = 'reply-status mt-2 text-xs p-2 rounded bg-red-50 text-red-700'; 
+                        statusEl.classList.remove('hidden'); 
+                        return; 
+                    }
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Sending...';
+                    try {
+                        const senderName = window.userData?.name || 'Management';
+                        const senderEmail = window.userData?.email || '';
+                        const replyData = {
+                            message: sanitizeInput(replyMsg),
+                            repliedBy: senderName,
+                            repliedByEmail: senderEmail,
+                            repliedAt: Timestamp.now()
+                        };
+                        // Update the original message doc
+                        const msgDocRef = doc(db, 'tutor_to_management_messages', id);
+                        const msgSnap = await getDoc(msgDocRef);
+                        const existing = msgSnap.exists() ? (msgSnap.data().managementReplies || []) : [];
+                        await updateDoc(msgDocRef, {
+                            managementReplies: [...existing, replyData],
+                            managementRead: true,
+                            replied: true,
+                            lastRepliedAt: Timestamp.now()
+                        });
+                        // Also send a tutor_notification so the tutor sees the reply
+                        await addDoc(collection(db, 'tutor_notifications'), {
+                            tutorEmail: btn.dataset.tutorEmail,
+                            type: 'management_reply',
+                            title: 'Reply from Management',
+                            message: sanitizeInput(replyMsg),
+                            senderName: senderName,
+                            senderDisplay: 'Management',
+                            read: false,
+                            createdAt: Timestamp.now()
+                        });
+                        statusEl.textContent = '✅ Reply sent!';
+                        statusEl.className = 'reply-status mt-2 text-xs p-2 rounded bg-green-50 text-green-700';
+                        statusEl.classList.remove('hidden');
+                        setTimeout(() => { form.classList.add('hidden'); loadInbox(inboxFilter); }, 1200);
+                        await logManagementActivity('Replied to tutor message', `Replied to ${btn.dataset.tutorName || btn.dataset.tutorEmail}`);
+                    } catch(e) {
+                        statusEl.textContent = '❌ Failed: ' + e.message;
+                        statusEl.className = 'reply-status mt-2 text-xs p-2 rounded bg-red-50 text-red-700';
+                        statusEl.classList.remove('hidden');
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-paper-plane mr-1"></i>Send Reply';
+                    }
+                });
+            });
+
+            // Mark messages as read when opened
+            const unreadIds = messages.filter(m => !m.managementRead).map(m => m.id);
+            if (unreadIds.length > 0 && filter === 'all') {
+                const batch = writeBatch(db);
+                unreadIds.forEach(id => batch.update(doc(db, 'tutor_to_management_messages', id), { managementRead: true }));
+                batch.commit().catch(() => {});
+            }
+
+        } catch(e) {
+            listEl.innerHTML = `<p class="text-red-500 text-sm text-center py-6">Failed to load inbox: ${e.message}</p>`;
+        }
+    }
+
+    // Load inbox on init
+    loadInbox('all');
     
     // Load tutors for search
     let tutorsList = [];
@@ -11148,7 +11417,9 @@ async function renderManagementMessagingPanel(container) {
     document.getElementById('send-direct-msg-btn').addEventListener('click', async () => {
         const tutorId = tutorHiddenInput.value;
         const content = document.getElementById('direct-msg-content').value.trim();
+        const subject = document.getElementById('direct-msg-subject')?.value.trim() || '';
         const senderName = window.userData?.name || 'Management';
+        const senderEmail = window.userData?.email || '';
         const statusEl = document.getElementById('direct-msg-status');
         
         if (!tutorId) { showMsgStatus(statusEl, '❌ Please select a tutor first.', false); return; }
@@ -11159,18 +11430,32 @@ async function renderManagementMessagingPanel(container) {
         
         try {
             document.getElementById('send-direct-msg-btn').disabled = true;
+            // Send to tutor's notification inbox
             await addDoc(collection(db, 'tutor_notifications'), {
                 tutorEmail: tutor.email,
                 type: 'management_message',
-                title: 'Message from Management',
-                message: content,
-                senderName: senderName,        // visible to management
-                senderDisplay: 'Management',   // what tutor sees
+                title: subject ? `Message from Management: ${subject}` : 'Message from Management',
+                message: sanitizeInput(content),
+                senderName: senderName,
+                senderEmail: senderEmail,
+                senderDisplay: 'Management',
                 read: false,
                 createdAt: Timestamp.now()
             });
+            // Also log in management_sent_messages for thread tracking
+            await addDoc(collection(db, 'management_sent_messages'), {
+                tutorEmail: tutor.email,
+                tutorName: tutor.name || tutor.email,
+                subject: sanitizeInput(subject),
+                message: sanitizeInput(content),
+                senderName: senderName,
+                senderEmail: senderEmail,
+                createdAt: Timestamp.now()
+            });
             document.getElementById('direct-msg-content').value = '';
+            if (document.getElementById('direct-msg-subject')) document.getElementById('direct-msg-subject').value = '';
             showMsgStatus(statusEl, `✅ Message sent to ${tutor.name || tutor.email}!`, true);
+            await logManagementActivity('Sent direct message', `To tutor: ${tutor.name || tutor.email}`);
         } catch(err) {
             showMsgStatus(statusEl, '❌ Failed to send: ' + err.message, false);
         } finally {
@@ -11342,15 +11627,39 @@ async function renderManagementMessagingPanel(container) {
 }
 
 // ======================================================
+// SECTION: WRITE MANAGEMENT_NOTIFICATIONS FROM EVENTS
+// Call these helpers whenever you need to alert management
+// ======================================================
+
+/**
+ * Creates a management_notifications entry for any significant event.
+ * type: 'student_break' | 'recall_request' | 'placement_test' | 'parent_feedback' | 'tutor_message' | 'new_enrollment'
+ */
+async function createManagementNotification(type, title, message, extraData = {}) {
+    try {
+        await addDoc(collection(db, 'management_notifications'), {
+            type,
+            title: sanitizeInput(title, 200),
+            message: sanitizeInput(message, 500),
+            read: false,
+            createdAt: Timestamp.now(),
+            ...extraData
+        });
+    } catch(e) { console.warn('Could not create management notification:', e.message); }
+}
+
+window.createManagementNotification = createManagementNotification;
+
+// ======================================================
 // SECTION: MANAGEMENT NOTIFICATION BELL
 // ======================================================
 
 async function initManagementNotifications() {
     const bellBtn = document.getElementById('notificationBell') || document.querySelector('[data-notification-bell]');
     if (!bellBtn) return;
-    
-    let notificationCount = 0;
-    
+
+    let allNotifications = [];
+
     // Reuse existing badge span if present, otherwise create one
     let badge = document.getElementById('notification-badge') || bellBtn.querySelector('.notification-badge, span');
     if (!badge) {
@@ -11358,91 +11667,289 @@ async function initManagementNotifications() {
         bellBtn.appendChild(badge);
     }
     badge.id = 'notification-badge';
-    badge.className = 'absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold hidden';
+    badge.className = 'absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-bold text-[10px] hidden px-1';
     bellBtn.style.position = 'relative';
-    
-    // Load notifications
-    async function loadNotifications() {
-        try {
-            const snap = await getDocs(query(
-                collection(db, 'management_notifications'),
-                where('read', '==', false),
-                orderBy('createdAt', 'desc'),
-                limit(20)
-            ));
-            notificationCount = snap.size;
-            badge.textContent = notificationCount > 9 ? '9+' : notificationCount;
-            badge.classList.toggle('hidden', notificationCount === 0);
-            return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        } catch(e) {
-            // Try without orderBy (index may not exist)
-            try {
-                const snap2 = await getDocs(query(collection(db, 'management_notifications'), where('read', '==', false), limit(20)));
-                notificationCount = snap2.size;
-                badge.textContent = notificationCount > 9 ? '9+' : notificationCount;
-                badge.classList.toggle('hidden', notificationCount === 0);
-                return snap2.docs.map(d => ({ id: d.id, ...d.data() }));
-            } catch(e2) { return []; }
+
+    // ── Notification type config: icon, color, label ──
+    const TYPE_CONFIG = {
+        management_notification: { icon: '🔔', color: 'border-l-green-500',  label: 'Alert' },
+        tutor_message:           { icon: '💬', color: 'border-l-blue-500',   label: 'Tutor Message' },
+        parent_feedback:         { icon: '💌', color: 'border-l-purple-500', label: 'Parent Feedback' },
+        recall_request:          { icon: '🔁', color: 'border-l-orange-500', label: 'Recall Request' },
+        student_break:           { icon: '☕', color: 'border-l-yellow-500', label: 'Student on Break' },
+        placement_test:          { icon: '📋', color: 'border-l-indigo-500', label: 'Placement Test' },
+        new_enrollment:          { icon: '📝', color: 'border-l-teal-500',   label: 'New Enrollment' },
+        tutor_inactive:          { icon: '⚠️', color: 'border-l-red-400',    label: 'Tutor Inactive' },
+    };
+
+    // ── Aggregate notifications from multiple Firestore collections ──
+    async function loadAllNotifications() {
+        const notifs = [];
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+        // Helper to safely run a query
+        async function safeQuery(fn) {
+            try { return await fn(); } catch(e) { console.warn('Notif query failed:', e.message); return []; }
         }
+
+        // 1. management_notifications (existing system)
+        const mgmtNotifs = await safeQuery(async () => {
+            const snap = await getDocs(query(collection(db, 'management_notifications'), where('read', '==', false), orderBy('createdAt', 'desc'), limit(30)));
+            return snap.docs.map(d => ({
+                id: d.id, _collection: 'management_notifications', _type: 'management_notification',
+                title: d.data().title || 'Notification',
+                message: d.data().message || '',
+                createdAt: d.data().createdAt,
+                read: false
+            }));
+        });
+        notifs.push(...mgmtNotifs);
+
+        // 2. Tutor → Management messages (unread inbox)
+        const tutorMessages = await safeQuery(async () => {
+            const snap = await getDocs(query(collection(db, 'tutor_to_management_messages'), where('managementRead', '==', false), orderBy('createdAt', 'desc'), limit(20)));
+            return snap.docs.map(d => ({
+                id: d.id, _collection: 'tutor_to_management_messages', _type: 'tutor_message',
+                title: `New message from ${d.data().tutorName || 'a tutor'}`,
+                message: (d.data().message || '').slice(0, 100),
+                createdAt: d.data().createdAt,
+                read: false,
+                actionTab: 'messaging'
+            }));
+        });
+        notifs.push(...tutorMessages);
+
+        // 3. Parent feedback (unread)
+        const feedbackNotifs = await safeQuery(async () => {
+            const snap = await getDocs(query(collection(db, 'parent_feedback'), where('read', '==', false), orderBy('submittedAt', 'desc'), limit(20)));
+            return snap.docs.map(d => ({
+                id: d.id, _collection: 'parent_feedback', _type: 'parent_feedback',
+                title: `Feedback from ${d.data().parentName || 'a parent'}`,
+                message: `Student: ${d.data().studentName || 'N/A'} · ${(d.data().message || '').slice(0, 80)}`,
+                createdAt: d.data().submittedAt || d.data().timestamp,
+                read: false,
+                actionTab: 'feedback'
+            }));
+        });
+        notifs.push(...feedbackNotifs);
+
+        // 4. Pending recall requests
+        const recallNotifs = await safeQuery(async () => {
+            const snap = await getDocs(query(collection(db, 'recall_requests'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'), limit(20)));
+            return snap.docs.map(d => ({
+                id: d.id, _collection: 'recall_requests', _type: 'recall_request',
+                title: `Recall request: ${d.data().studentName || 'Student'}`,
+                message: `Tutor: ${d.data().tutorName || d.data().tutorEmail || 'N/A'} · Waiting for approval`,
+                createdAt: d.data().createdAt,
+                read: false,
+                actionTab: 'breaks'
+            }));
+        });
+        notifs.push(...recallNotifs);
+
+        // 5. Students recently placed on break (last 7 days)
+        const breakNotifs = await safeQuery(async () => {
+            const snap = await getDocs(query(collection(db, 'students'), where('summerBreak', '==', true), orderBy('breakDate', 'desc'), limit(20)));
+            return snap.docs
+                .filter(d => {
+                    const bd = d.data().breakDate?.toDate ? d.data().breakDate.toDate() : null;
+                    return bd && bd > sevenDaysAgo;
+                })
+                .map(d => ({
+                    id: d.id, _collection: 'students', _type: 'student_break',
+                    title: `${d.data().studentName || 'Student'} placed on break`,
+                    message: `Tutor: ${d.data().tutorName || 'N/A'} · Break started ${d.data().breakDate?.toDate ? d.data().breakDate.toDate().toLocaleDateString() : ''}`,
+                    createdAt: d.data().breakDate,
+                    read: d.data().breakNotifRead === true,
+                    actionTab: 'breaks'
+                }));
+        });
+        notifs.push(...breakNotifs.filter(n => !n.read));
+
+        // 6. Tutors who completed placement tests (not yet acknowledged)
+        const placementNotifs = await safeQuery(async () => {
+            const snap = await getDocs(query(collection(db, 'tutors'), where('placementTestStatus', '==', 'completed'), where('placementTestAcknowledged', '!=', true), limit(20)));
+            return snap.docs.map(d => ({
+                id: d.id, _collection: 'tutors', _type: 'placement_test',
+                title: `Placement test completed: ${d.data().name || d.data().email}`,
+                message: `${d.data().name || d.data().email} has completed their placement test`,
+                createdAt: d.data().placementTestDate || d.data().updatedAt,
+                read: false,
+                actionTab: 'tutors'
+            }));
+        });
+        notifs.push(...placementNotifs);
+
+        // 7. New enrollments (last 3 days, not yet seen)
+        const enrollNotifs = await safeQuery(async () => {
+            const threeDaysAgo = Timestamp.fromDate(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000));
+            const snap = await getDocs(query(collection(db, 'enrollments'), where('createdAt', '>', threeDaysAgo), where('managementSeen', '!=', true), orderBy('createdAt', 'desc'), limit(15)));
+            return snap.docs.map(d => ({
+                id: d.id, _collection: 'enrollments', _type: 'new_enrollment',
+                title: `New enrollment: ${d.data().studentName || 'Student'}`,
+                message: `${d.data().parentName || 'Parent'} enrolled ${d.data().studentName || 'a student'}`,
+                createdAt: d.data().createdAt,
+                read: false,
+                actionTab: 'enrollments'
+            }));
+        });
+        notifs.push(...enrollNotifs);
+
+        // Sort by timestamp descending
+        notifs.sort((a, b) => {
+            const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
+            const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
+            return tb - ta;
+        });
+
+        allNotifications = notifs;
+        const unreadCount = notifs.filter(n => !n.read).length;
+        badge.textContent = unreadCount > 9 ? '9+' : String(unreadCount);
+        badge.classList.toggle('hidden', unreadCount === 0);
+        return notifs;
     }
-    
-    // Poll every 30 seconds
-    loadNotifications();
-    const pollInterval = setInterval(loadNotifications, 30000);
-    window._notifPollInterval = pollInterval;
-    
-    // Bell click → show notification panel
+
+    // ── Mark a single notification as read based on its source collection ──
+    async function markNotifRead(notif) {
+        try {
+            if (notif._collection === 'management_notifications') {
+                await updateDoc(doc(db, 'management_notifications', notif.id), { read: true });
+            } else if (notif._collection === 'tutor_to_management_messages') {
+                await updateDoc(doc(db, 'tutor_to_management_messages', notif.id), { managementRead: true });
+            } else if (notif._collection === 'parent_feedback') {
+                await updateDoc(doc(db, 'parent_feedback', notif.id), { read: true });
+            } else if (notif._collection === 'students' && notif._type === 'student_break') {
+                await updateDoc(doc(db, 'students', notif.id), { breakNotifRead: true });
+            } else if (notif._collection === 'tutors' && notif._type === 'placement_test') {
+                await updateDoc(doc(db, 'tutors', notif.id), { placementTestAcknowledged: true });
+            } else if (notif._collection === 'enrollments') {
+                await updateDoc(doc(db, 'enrollments', notif.id), { managementSeen: true });
+            }
+        } catch(e) { console.warn('Could not mark notif read:', e.message); }
+    }
+
+    // ── Mark all as read ──
+    async function markAllRead() {
+        const batch = writeBatch(db);
+        const batchUpdates = [];
+        try {
+            // management_notifications
+            const snap1 = await getDocs(query(collection(db, 'management_notifications'), where('read', '==', false)));
+            snap1.docs.forEach(d => batch.update(d.ref, { read: true }));
+            // tutor messages
+            const snap2 = await getDocs(query(collection(db, 'tutor_to_management_messages'), where('managementRead', '==', false)));
+            snap2.docs.forEach(d => batch.update(d.ref, { managementRead: true }));
+            // parent feedback
+            const snap3 = await getDocs(query(collection(db, 'parent_feedback'), where('read', '==', false)));
+            snap3.docs.forEach(d => batch.update(d.ref, { read: true }));
+            await batch.commit();
+        } catch(e) { console.warn('Mark all read partial error:', e.message); }
+    }
+
+    // Start polling
+    loadAllNotifications();
+    if (window._notifPollInterval) clearInterval(window._notifPollInterval);
+    window._notifPollInterval = setInterval(loadAllNotifications, 30000);
+
+    // ── Bell click → show notification panel ──
     bellBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const existing = document.getElementById('notification-panel');
         if (existing) { existing.remove(); return; }
-        
-        const notifications = await loadNotifications();
-        
+
+        const notifications = await loadAllNotifications();
+        const unreadCount = notifications.filter(n => !n.read).length;
+
         const panel = document.createElement('div');
         panel.id = 'notification-panel';
-        panel.className = 'fixed top-16 right-4 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden';
+        panel.className = 'fixed top-16 right-4 w-96 max-w-[95vw] bg-white rounded-xl shadow-2xl border border-gray-200 z-[9999] overflow-hidden';
+
+        // Group by type for summary
+        const typeCounts = {};
+        notifications.filter(n => !n.read).forEach(n => { typeCounts[n._type] = (typeCounts[n._type] || 0) + 1; });
+        const summaryHTML = Object.entries(typeCounts).map(([type, count]) => {
+            const cfg = TYPE_CONFIG[type] || { icon: '🔔', label: type };
+            return `<span class="inline-flex items-center gap-1 text-xs bg-gray-100 rounded-full px-2 py-0.5">${cfg.icon} <span class="font-semibold">${count}</span> ${cfg.label}</span>`;
+        }).join(' ');
+
         panel.innerHTML = `
             <div class="bg-green-700 text-white px-4 py-3 flex justify-between items-center">
-                <span class="font-bold">🔔 Notifications (${notificationCount})</span>
-                <button id="close-notif-panel" class="text-white hover:text-gray-200 text-lg leading-none">&times;</button>
+                <div>
+                    <span class="font-bold text-base">🔔 Notifications</span>
+                    <span class="ml-2 bg-white text-green-700 text-xs font-bold rounded-full px-2 py-0.5">${unreadCount} unread</span>
+                </div>
+                <button id="close-notif-panel" class="text-white hover:text-gray-200 text-xl leading-none">&times;</button>
             </div>
-            <div class="max-h-80 overflow-y-auto divide-y" id="notif-list">
-                ${notifications.length === 0 ? '<p class="text-gray-500 text-sm text-center py-6">No new notifications</p>' :
-                    notifications.map(n => `
-                        <div class="p-3 hover:bg-gray-50 cursor-pointer notif-item" data-id="${n.id}" data-url="${n.actionUrl || ''}">
-                            <p class="text-sm font-medium text-gray-800">${n.title || n.type || 'Notification'}</p>
-                            <p class="text-xs text-gray-600 mt-0.5">${n.message || ''}</p>
-                            <p class="text-xs text-gray-400 mt-1">${n.createdAt?.toDate ? n.createdAt.toDate().toLocaleString() : ''}</p>
-                        </div>
-                    `).join('')
+            ${summaryHTML ? `<div class="px-4 py-2 bg-gray-50 border-b flex flex-wrap gap-1">${summaryHTML}</div>` : ''}
+            <div class="max-h-[420px] overflow-y-auto divide-y" id="notif-list">
+                ${notifications.length === 0
+                    ? '<p class="text-gray-500 text-sm text-center py-8">✅ You\'re all caught up!</p>'
+                    : notifications.slice(0, 40).map(n => {
+                        const cfg = TYPE_CONFIG[n._type] || { icon: '🔔', color: 'border-l-gray-400', label: '' };
+                        const date = n.createdAt?.toDate ? n.createdAt.toDate().toLocaleString() : '';
+                        const unreadClass = !n.read ? `border-l-4 ${cfg.color} bg-gray-50` : '';
+                        return `
+                            <div class="p-3 hover:bg-blue-50 cursor-pointer notif-item transition-colors ${unreadClass}" 
+                                data-idx="${notifications.indexOf(n)}"
+                                data-tab="${n.actionTab || ''}">
+                                <div class="flex items-start gap-2">
+                                    <span class="text-lg leading-none mt-0.5">${cfg.icon}</span>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex justify-between items-start gap-2">
+                                            <p class="text-sm font-semibold text-gray-800 leading-snug">${escapeHtml(n.title)}</p>
+                                            ${!n.read ? '<span class="shrink-0 w-2 h-2 rounded-full bg-blue-500 mt-1.5"></span>' : ''}
+                                        </div>
+                                        <p class="text-xs text-gray-600 mt-0.5 leading-snug">${escapeHtml(n.message)}</p>
+                                        <p class="text-[10px] text-gray-400 mt-1">${date}</p>
+                                    </div>
+                                </div>
+                            </div>`;
+                    }).join('')
                 }
             </div>
-            ${notificationCount > 0 ? `<div class="p-2 border-t text-center"><button id="mark-all-read-btn" class="text-xs text-blue-600 hover:underline">Mark all as read</button></div>` : ''}
+            ${unreadCount > 0 ? `
+                <div class="p-3 border-t flex justify-between items-center bg-gray-50">
+                    <span class="text-xs text-gray-500">${notifications.length} total notifications</span>
+                    <button id="mark-all-read-btn" class="text-xs font-semibold text-blue-600 hover:text-blue-800 border border-blue-200 rounded px-3 py-1 hover:bg-blue-50 transition-colors">
+                        ✓ Mark all as read
+                    </button>
+                </div>` : ''}
         `;
         document.body.appendChild(panel);
-        
+
         document.getElementById('close-notif-panel').addEventListener('click', () => panel.remove());
+
         document.getElementById('mark-all-read-btn')?.addEventListener('click', async () => {
-            try {
-                const snap = await getDocs(query(collection(db, 'management_notifications'), where('read', '==', false)));
-                const batch = writeBatch(db);
-                snap.docs.forEach(d => batch.update(d.ref, { read: true }));
-                await batch.commit();
-                panel.remove();
-                loadNotifications();
-            } catch(e) { console.error(e); }
+            await markAllRead();
+            panel.remove();
+            loadAllNotifications();
         });
-        
+
         panel.querySelectorAll('.notif-item').forEach(item => {
             item.addEventListener('click', async () => {
-                const id = item.dataset.id;
-                try { await updateDoc(doc(db, 'management_notifications', id), { read: true }); } catch(e) {}
+                const idx = parseInt(item.dataset.idx);
+                const notif = notifications[idx];
+                if (notif && !notif.read) await markNotifRead(notif);
                 panel.remove();
-                loadNotifications();
+                loadAllNotifications();
+                // Navigate to relevant tab if actionTab is set
+                if (notif?.actionTab) {
+                    const navMap = {
+                        messaging:   'navMessaging',
+                        feedback:    'navParentFeedback',
+                        breaks:      'navBreaks',
+                        tutors:      'navTutorManagement',
+                        enrollments: 'navEnrollments',
+                    };
+                    const navId = navMap[notif.actionTab];
+                    if (navId) {
+                        const navBtn = document.getElementById(navId);
+                        if (navBtn) navBtn.click();
+                    }
+                }
             });
         });
-        
+
         document.addEventListener('click', (ev) => {
             if (!panel.contains(ev.target) && ev.target !== bellBtn) panel.remove();
         }, { once: true });
