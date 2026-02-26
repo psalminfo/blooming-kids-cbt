@@ -7381,7 +7381,7 @@ async function approveEnrollmentWithDetails(enrollmentId) {
                 tutorName: academicTutor.name,
                 tutorEmail: academicTutor.email,
                 grade: student.actualGrade || student.grade,
-                actualGrade: student.actualGrade || student .,
+                actualGrade: student.actualGrade || student.grade,
                 subjects: student.selectedSubjects || [],
                 academicDays: academicDays,
                 academicTime: academicTime,
