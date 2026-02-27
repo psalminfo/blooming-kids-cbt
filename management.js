@@ -11181,63 +11181,56 @@ async function renderManagementMessagingPanel(container) {
     });
     document.getElementById('refresh-inbox-btn').addEventListener('click', () => startInboxListener());
 
-    // ── Load Inbox (REAL-TIME with onSnapshot) ──
+    // ═══ INBOX: Real-time listener (messages appear instantly) ═══
     let inboxFilter = 'all';
     let _inboxUnsub = null;
-    let _cachedInboxMessages = []; // cache to avoid re-reads on filter change
+    let _cachedInbox = [];
 
     function startInboxListener() {
         if (_inboxUnsub) _inboxUnsub();
         const listEl = document.getElementById('inbox-list');
         if (!listEl) return;
-        listEl.innerHTML = `<div class="text-center py-10 text-gray-400"><i class="fas fa-spinner fa-spin text-3xl mb-3 block"></i><p>Loading...</p></div>`;
+        listEl.innerHTML = `<div class="text-center py-10 text-gray-400"><i class="fas fa-spinner fa-spin text-3xl mb-3 block"></i><p>Loading inbox...</p></div>`;
 
         _inboxUnsub = onSnapshot(
             query(collection(db, 'tutor_to_management_messages'), limit(100)),
             (snap) => {
-                let messages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                // Sort by createdAt descending (client-side)
-                messages.sort((a, b) => {
+                let msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                msgs.sort((a, b) => {
                     const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
                     const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
                     return tb - ta;
                 });
-                messages = messages.slice(0, 50);
-                _cachedInboxMessages = messages;
+                _cachedInbox = msgs.slice(0, 50);
                 renderInbox(inboxFilter);
             },
             (err) => {
-                console.warn('Inbox listener error:', err.message);
-                listEl.innerHTML = `<p class="text-red-500 text-sm text-center py-6">Failed to load inbox: ${err.message}</p>`;
+                console.warn('Inbox listener err:', err.message);
+                if (listEl) listEl.innerHTML = `<p class="text-red-500 text-sm text-center py-6">Failed to load inbox: ${err.message}</p>`;
             }
         );
     }
 
-    function renderInbox(filter = 'all') {
-        inboxFilter = filter;
+    function renderInbox(filter) {
+        inboxFilter = filter || 'all';
         const listEl = document.getElementById('inbox-list');
         if (!listEl) return;
 
-        let messages = [..._cachedInboxMessages];
-
-        // Apply filter from cache (no extra reads)
+        let messages = [..._cachedInbox];
         if (filter === 'unread') messages = messages.filter(m => !m.managementRead);
         if (filter === 'replied') messages = messages.filter(m => m.replied);
 
-        // Update unread badge
-        const unreadCount = _cachedInboxMessages.filter(m => !m.managementRead).length;
-        const badge = document.getElementById('inbox-unread-badge');
-        if (badge) {
-            badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
-            badge.classList.toggle('hidden', unreadCount === 0);
-        }
+        // Update inbox badge
+        const unreadCount = _cachedInbox.filter(m => !m.managementRead).length;
+        const inboxBadge = document.getElementById('inbox-unread-badge');
+        if (inboxBadge) { inboxBadge.textContent = unreadCount > 9 ? '9+' : unreadCount; inboxBadge.classList.toggle('hidden', unreadCount === 0); }
 
         if (messages.length === 0) {
             listEl.innerHTML = `
                 <div class="text-center py-14 text-gray-400">
                     <i class="fas fa-inbox text-5xl mb-4 block"></i>
                     <p class="font-medium">No messages yet</p>
-                    <p class="text-sm mt-1">Messages from tutors will appear here in real-time</p>
+                    <p class="text-sm mt-1">Tutor messages will appear here in real-time</p>
                 </div>`;
             return;
         }
@@ -11248,7 +11241,7 @@ async function renderManagementMessagingPanel(container) {
             const unreadDot = !msg.managementRead ? '<span class="inline-block w-2 h-2 rounded-full bg-blue-500 mr-2"></span>' : '';
             const repliedBadge = msg.replied ? '<span class="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Replied</span>' : '';
             const urgentBadge = msg.isUrgent ? '<span class="ml-2 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">🔴 Urgent</span>' : '';
-            const imageHTML = msg.imageUrl ? `<div class="mt-2"><img src="${escapeHtml(msg.imageUrl)}" class="max-w-xs rounded-lg cursor-pointer" onclick="window.open('${escapeHtml(msg.imageUrl)}','_blank')" alt="Attached image"></div>` : '';
+            const imgHTML = msg.imageUrl ? `<div class="mt-2"><img src="${escapeHtml(msg.imageUrl)}" class="max-w-xs rounded-lg cursor-pointer" onclick="window.open('${escapeHtml(msg.imageUrl)}','_blank')"></div>` : '';
             const repliesHTML = msg.managementReplies?.length ? `
                 <div class="mt-3 space-y-2 border-t border-gray-100 pt-3">
                     <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Replies</p>
@@ -11271,7 +11264,7 @@ async function renderManagementMessagingPanel(container) {
                             </div>
                             ${msg.subject ? `<p class="text-sm font-semibold text-gray-700 mb-1">📌 ${escapeHtml(msg.subject)}</p>` : ''}
                             <p class="text-sm text-gray-700 leading-relaxed">${escapeHtml(msg.message || '')}</p>
-                            ${imageHTML}
+                            ${imgHTML}
                             ${repliesHTML}
                         </div>
                         <span class="text-xs text-gray-400 whitespace-nowrap">${date}</span>
@@ -11282,7 +11275,7 @@ async function renderManagementMessagingPanel(container) {
                             <i class="fas fa-reply mr-1"></i>Reply
                         </button>
                     </div>
-                    <!-- Reply form (hidden by default) -->
+                    <!-- Reply form -->
                     <div class="inbox-reply-form hidden mt-3 pt-3 border-t border-gray-100" id="reply-form-${msg.id}">
                         <textarea class="w-full border border-gray-200 rounded-lg p-2.5 text-sm resize-none focus:ring-2 focus:ring-green-500" rows="3" placeholder="Type your reply..."></textarea>
                         <div class="flex justify-end gap-2 mt-2">
@@ -11296,31 +11289,24 @@ async function renderManagementMessagingPanel(container) {
                 </div>`;
         }).join('');
 
-        // Wire up mark-read buttons (single update, no re-fetch — onSnapshot handles re-render)
+        // Wire mark-read (onSnapshot auto-re-renders)
         listEl.querySelectorAll('.mark-inbox-read-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
-                try {
-                    await updateDoc(doc(db, 'tutor_to_management_messages', btn.dataset.id), { managementRead: true });
-                } catch(e) { console.error(e); }
+                try { await updateDoc(doc(db, 'tutor_to_management_messages', btn.dataset.id), { managementRead: true }); } catch(e) { console.error(e); }
             });
         });
-
-        // Wire up reply buttons
+        // Wire reply toggle
         listEl.querySelectorAll('.reply-inbox-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                const form = document.getElementById(`reply-form-${btn.dataset.id}`);
-                if (form) form.classList.toggle('hidden');
+                const f = document.getElementById(`reply-form-${btn.dataset.id}`);
+                if (f) f.classList.toggle('hidden');
             });
         });
-
-        // Wire up cancel reply buttons
+        // Wire cancel
         listEl.querySelectorAll('.cancel-reply-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                btn.closest('.inbox-reply-form').classList.add('hidden');
-            });
+            btn.addEventListener('click', () => btn.closest('.inbox-reply-form').classList.add('hidden'));
         });
-
-        // Wire up submit reply buttons
+        // Wire submit reply
         listEl.querySelectorAll('.submit-reply-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const id = btn.dataset.id;
@@ -11354,7 +11340,7 @@ async function renderManagementMessagingPanel(container) {
                         replied: true,
                         lastRepliedAt: Timestamp.now()
                     });
-                    // Also send a tutor_notification so the tutor sees the reply
+                    // Also notify the tutor
                     await addDoc(collection(db, 'tutor_notifications'), {
                         tutorEmail: btn.dataset.tutorEmail,
                         type: 'management_reply',
@@ -11365,10 +11351,31 @@ async function renderManagementMessagingPanel(container) {
                         read: false,
                         createdAt: Timestamp.now()
                     });
+                    // Also write to conversations collection so tutor sees reply in chat
+                    const origMsg = _cachedInbox.find(m => m.id === id);
+                    if (origMsg?.conversationId) {
+                        try {
+                            await addDoc(collection(db, "conversations", origMsg.conversationId, "messages"), {
+                                content: replyMsg,
+                                senderId: 'management',
+                                senderName: senderName,
+                                senderRole: 'management',
+                                createdAt: Timestamp.now(),
+                                read: false
+                            });
+                            await updateDoc(doc(db, "conversations", origMsg.conversationId), {
+                                lastMessage: replyMsg,
+                                lastMessageTimestamp: Timestamp.now(),
+                                lastSenderId: 'management',
+                                unreadCount: 1
+                            }).catch(() => {});
+                        } catch(convErr) { console.warn('Could not write to conversation:', convErr); }
+                    }
                     statusEl.textContent = '✅ Reply sent!';
                     statusEl.className = 'reply-status mt-2 text-xs p-2 rounded bg-green-50 text-green-700';
                     statusEl.classList.remove('hidden');
-                    setTimeout(() => { form.classList.add('hidden'); }, 1200);
+                    textarea.value = '';
+                    setTimeout(() => form.classList.add('hidden'), 1200);
                     await logManagementActivity('Replied to tutor message', `Replied to ${btn.dataset.tutorName || btn.dataset.tutorEmail}`);
                 } catch(e) {
                     statusEl.textContent = '❌ Failed: ' + e.message;
@@ -11383,8 +11390,6 @@ async function renderManagementMessagingPanel(container) {
 
     // Start real-time inbox listener
     startInboxListener();
-    // Store unsub for cleanup
-    window._inboxUnsub = _inboxUnsub;
     
     // Load tutors for search
     let tutorsList = [];
@@ -11620,64 +11625,28 @@ async function renderManagementMessagingPanel(container) {
         const listEl = document.getElementById('broadcasts-list');
         if (!listEl) return;
         try {
-            // Load broadcasts
-            const broadcastSnap = await getDocs(query(collection(db, 'broadcasts'), orderBy('createdAt', 'desc'), limit(20)));
-            // Also load management_sent_messages (direct messages to tutors)
-            const sentSnap = await getDocs(query(collection(db, 'management_sent_messages'), orderBy('createdAt', 'desc'), limit(20)));
-
-            // Merge and sort
+            // Load broadcasts + direct sent messages
+            const [bcSnap, sentSnap] = await Promise.all([
+                getDocs(query(collection(db, 'broadcasts'), orderBy('createdAt', 'desc'), limit(20))),
+                getDocs(query(collection(db, 'management_sent_messages'), orderBy('createdAt', 'desc'), limit(20)))
+            ]);
             const allLogs = [];
-            broadcastSnap.docs.forEach(d => {
-                const b = d.data();
-                allLogs.push({ ...b, id: d.id, _logType: 'broadcast' });
-            });
-            sentSnap.docs.forEach(d => {
-                const s = d.data();
-                allLogs.push({ ...s, id: d.id, _logType: 'direct' });
-            });
+            bcSnap.docs.forEach(d => allLogs.push({ ...d.data(), id: d.id, _type: 'broadcast' }));
+            sentSnap.docs.forEach(d => allLogs.push({ ...d.data(), id: d.id, _type: 'direct' }));
             allLogs.sort((a, b) => {
                 const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
                 const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
                 return tb - ta;
             });
-
-            if (allLogs.length === 0) { listEl.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">No broadcasts or messages yet.</p>'; return; }
-            
-            // Weekend auto-clear notice
-            const today = new Date();
-            const isWeekend = today.getDay() === 0 || today.getDay() === 6;
-            const clearNotice = isWeekend ? `<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 text-xs text-yellow-800"><i class="fas fa-info-circle mr-1"></i> Logs older than 7 days are automatically cleared every weekend.</div>` : '';
-
-            listEl.innerHTML = clearNotice + allLogs.map(b => {
-                const date = b.createdAt?.toDate ? b.createdAt.toDate().toLocaleString() : 'Unknown date';
-                if (b._logType === 'broadcast') {
+            if (allLogs.length === 0) { listEl.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">No sent messages yet.</p>'; return; }
+            listEl.innerHTML = `<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-2.5 mb-3 text-xs text-yellow-700"><i class="fas fa-info-circle mr-1"></i>Logs older than 7 days are automatically cleared.</div>` +
+                allLogs.map(b => {
+                const date = b.createdAt?.toDate ? b.createdAt.toDate().toLocaleString() : 'Unknown';
+                if (b._type === 'broadcast') {
                     const targets = [b.toTutors && '👩‍🏫 Tutors', b.toParents && '👨‍👩‍👧 Parents'].filter(Boolean).join(', ');
-                    return `
-                        <div class="border-b py-3 last:border-0">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <p class="font-semibold text-gray-800">📢 ${escapeHtml(b.title || 'Broadcast')}</p>
-                                    <p class="text-sm text-gray-600 mt-1">${escapeHtml(b.message || '')}</p>
-                                    <p class="text-xs text-gray-400 mt-1">Sent by: ${escapeHtml(b.senderName || 'Management')} · To: ${targets}</p>
-                                </div>
-                                <span class="text-xs text-gray-400 whitespace-nowrap ml-4">${date}</span>
-                            </div>
-                        </div>
-                    `;
+                    return `<div class="border-b py-3 last:border-0"><div class="flex justify-between items-start"><div><p class="font-semibold text-gray-800">📢 ${escapeHtml(b.title || 'Broadcast')}</p><p class="text-sm text-gray-600 mt-1">${escapeHtml(b.message || '')}</p><p class="text-xs text-gray-400 mt-1">By: ${escapeHtml(b.senderName || 'Management')} · To: ${targets}</p></div><span class="text-xs text-gray-400 whitespace-nowrap ml-4">${date}</span></div></div>`;
                 } else {
-                    return `
-                        <div class="border-b py-3 last:border-0">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <p class="font-semibold text-gray-800">💬 Direct: ${escapeHtml(b.tutorName || b.tutorEmail || 'Tutor')}</p>
-                                    ${b.subject ? `<p class="text-sm text-blue-700 font-medium">📌 ${escapeHtml(b.subject)}</p>` : ''}
-                                    <p class="text-sm text-gray-600 mt-1">${escapeHtml(b.message || '')}</p>
-                                    <p class="text-xs text-gray-400 mt-1">Sent by: ${escapeHtml(b.senderName || 'Management')}</p>
-                                </div>
-                                <span class="text-xs text-gray-400 whitespace-nowrap ml-4">${date}</span>
-                            </div>
-                        </div>
-                    `;
+                    return `<div class="border-b py-3 last:border-0"><div class="flex justify-between items-start"><div><p class="font-semibold text-gray-800">💬 ${escapeHtml(b.tutorName || b.tutorEmail || 'Tutor')}</p>${b.subject ? `<p class="text-sm text-blue-600 font-medium">📌 ${escapeHtml(b.subject)}</p>` : ''}<p class="text-sm text-gray-600 mt-1">${escapeHtml(b.message || '')}</p><p class="text-xs text-gray-400 mt-1">By: ${escapeHtml(b.senderName || 'Management')}</p></div><span class="text-xs text-gray-400 whitespace-nowrap ml-4">${date}</span></div></div>`;
                 }
             }).join('');
         } catch(e) { listEl.innerHTML = '<p class="text-red-500 text-sm">Failed to load sent log.</p>'; }
@@ -11717,19 +11686,37 @@ async function initManagementNotifications() {
     if (!bellBtn) return;
 
     let allNotifications = [];
-    let _bellListeners = [];  // track all onSnapshot unsubs for cleanup
+    const _unsubs = [];
+    let _prevUnread = -1; // -1 = first load, skip sound
 
-    // Reuse existing badge span if present, otherwise create one
-    let badge = document.getElementById('notification-badge') || bellBtn.querySelector('.notification-badge, span');
-    if (!badge) {
-        badge = document.createElement('span');
-        bellBtn.appendChild(badge);
+    // ── Notification Sound ──
+    function playBellSound() {
+        try {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return;
+            const ctx = new AC();
+            if (ctx.state === 'suspended') ctx.resume();
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.connect(g); g.connect(ctx.destination);
+            o.type = 'sine';
+            const t = ctx.currentTime;
+            o.frequency.setValueAtTime(659, t);       // E5
+            o.frequency.setValueAtTime(880, t + 0.1);  // A5
+            o.frequency.setValueAtTime(988, t + 0.2);  // B5
+            g.gain.setValueAtTime(0.15, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+            o.start(t); o.stop(t + 0.5);
+        } catch(e) {}
     }
+
+    // ── Badge setup ──
+    let badge = document.getElementById('notification-badge') || bellBtn.querySelector('.notification-badge, span');
+    if (!badge) { badge = document.createElement('span'); bellBtn.appendChild(badge); }
     badge.id = 'notification-badge';
     badge.className = 'absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-bold text-[10px] hidden px-1';
     bellBtn.style.position = 'relative';
 
-    // ── Notification type config: icon, color, label ──
     const TYPE_CONFIG = {
         management_notification: { icon: '🔔', color: 'border-l-green-500',  label: 'Alert' },
         tutor_message:           { icon: '💬', color: 'border-l-blue-500',   label: 'Tutor Message' },
@@ -11741,286 +11728,110 @@ async function initManagementNotifications() {
         tutor_inactive:          { icon: '⚠️', color: 'border-l-red-400',    label: 'Tutor Inactive' },
     };
 
-    // ── WEEKEND AUTO-CLEAR: Delete old notification/sent logs if today is Sat or Sun ──
-    async function weekendAutoClear() {
-        const today = new Date();
-        const dayOfWeek = today.getDay(); // 0=Sun, 6=Sat
-        if (dayOfWeek !== 0 && dayOfWeek !== 6) return; // Only run on weekends
-
-        // Check if we already cleared this weekend (use localStorage flag)
-        const weekKey = `notif_cleared_week_${today.getFullYear()}_${Math.ceil((today.getTime() - new Date(today.getFullYear(),0,1).getTime()) / (7*24*60*60*1000))}`;
-        if (localStorage.getItem(weekKey)) return;
-
-        console.log('🧹 Weekend auto-clear: cleaning old notifications and sent logs...');
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        const sevenDaysTimestamp = Timestamp.fromDate(sevenDaysAgo);
-
+    // ── 7-day auto-clear (runs once per calendar day) ──
+    (async function autoClear7Days() {
+        const key = 'mgmt_clear7_' + new Date().toISOString().slice(0,10);
+        if (localStorage.getItem(key)) return;
+        const cutoff = new Date(Date.now() - 7*24*60*60*1000);
+        const cutTS = Timestamp.fromDate(cutoff);
+        console.log('🧹 Auto-clearing items older than 7 days...');
         try {
-            // Clear old management_notifications (read ones older than 7 days)
-            const oldNotifs = await getDocs(query(
-                collection(db, 'management_notifications'),
-                where('read', '==', true),
-                limit(100)
-            ));
-            if (oldNotifs.size > 0) {
-                const batch = writeBatch(db);
-                let count = 0;
-                oldNotifs.docs.forEach(d => {
-                    const created = d.data().createdAt?.toDate ? d.data().createdAt.toDate() : null;
-                    if (created && created < sevenDaysAgo) { batch.delete(d.ref); count++; }
-                });
-                if (count > 0) await batch.commit();
-                console.log(`  Cleared ${count} old management_notifications`);
-            }
+            // Old read management_notifications
+            const s1 = await getDocs(query(collection(db,'management_notifications'), where('read','==',true), limit(200)));
+            if (s1.size) { const b = writeBatch(db); let n=0; s1.docs.forEach(d => { const c=d.data().createdAt?.toDate?.(); if(c&&c<cutoff){b.delete(d.ref);n++;} }); if(n) await b.commit(); console.log('  Cleared',n,'old notifications'); }
+            // Old broadcasts
+            const s2 = await getDocs(query(collection(db,'broadcasts'), where('createdAt','<',cutTS), limit(200)));
+            if (s2.size) { const b = writeBatch(db); s2.docs.forEach(d=>b.delete(d.ref)); await b.commit(); console.log('  Cleared',s2.size,'old broadcasts'); }
+            // Old sent messages
+            const s3 = await getDocs(query(collection(db,'management_sent_messages'), where('createdAt','<',cutTS), limit(200)));
+            if (s3.size) { const b = writeBatch(db); s3.docs.forEach(d=>b.delete(d.ref)); await b.commit(); console.log('  Cleared',s3.size,'old sent msgs'); }
+            // Old read inbox messages
+            const s4 = await getDocs(query(collection(db,'tutor_to_management_messages'), where('managementRead','==',true), limit(200)));
+            if (s4.size) { const b = writeBatch(db); let n=0; s4.docs.forEach(d => { const c=d.data().createdAt?.toDate?.(); if(c&&c<cutoff){b.delete(d.ref);n++;} }); if(n) await b.commit(); console.log('  Cleared',n,'old inbox msgs'); }
+            // Old management_activity
+            const s5 = await getDocs(query(collection(db,'management_activity'), where('timestamp','<',cutTS), limit(200)));
+            if (s5.size) { const b = writeBatch(db); s5.docs.forEach(d=>b.delete(d.ref)); await b.commit(); console.log('  Cleared',s5.size,'old activity logs'); }
+            localStorage.setItem(key, '1');
+        } catch(e) { console.warn('Auto-clear err:', e.message); }
+    })();
 
-            // Clear old broadcasts log (older than 7 days)
-            const oldBroadcasts = await getDocs(query(
-                collection(db, 'broadcasts'),
-                where('createdAt', '<', sevenDaysTimestamp),
-                limit(100)
-            ));
-            if (oldBroadcasts.size > 0) {
-                const batch2 = writeBatch(db);
-                oldBroadcasts.docs.forEach(d => batch2.delete(d.ref));
-                await batch2.commit();
-                console.log(`  Cleared ${oldBroadcasts.size} old broadcasts`);
-            }
+    // ── Shared buckets — each onSnapshot updates its own ──
+    let bk1=[], bk2=[], bk3=[], bk4=[], bk5=[], bk6=[], bk7=[];
 
-            // Clear old management_sent_messages (older than 7 days)
-            const oldSent = await getDocs(query(
-                collection(db, 'management_sent_messages'),
-                where('createdAt', '<', sevenDaysTimestamp),
-                limit(100)
-            ));
-            if (oldSent.size > 0) {
-                const batch3 = writeBatch(db);
-                oldSent.docs.forEach(d => batch3.delete(d.ref));
-                await batch3.commit();
-                console.log(`  Cleared ${oldSent.size} old management_sent_messages`);
-            }
-
-            // Clear old read tutor_to_management_messages (older than 7 days)
-            const oldInbox = await getDocs(query(
-                collection(db, 'tutor_to_management_messages'),
-                where('managementRead', '==', true),
-                limit(100)
-            ));
-            if (oldInbox.size > 0) {
-                const batch4 = writeBatch(db);
-                let count4 = 0;
-                oldInbox.docs.forEach(d => {
-                    const created = d.data().createdAt?.toDate ? d.data().createdAt.toDate() : null;
-                    if (created && created < sevenDaysAgo) { batch4.delete(d.ref); count4++; }
-                });
-                if (count4 > 0) await batch4.commit();
-                console.log(`  Cleared ${count4} old tutor_to_management inbox messages`);
-            }
-
-            localStorage.setItem(weekKey, '1');
-            console.log('✅ Weekend auto-clear complete.');
-        } catch(e) { console.warn('Weekend auto-clear error (non-critical):', e.message); }
-    }
-
-    // Run weekend clear on init
-    weekendAutoClear();
-
-    // ── REAL-TIME LISTENERS for notification bell using onSnapshot ──
-    // Each source gets ONE listener — badge updates instantly on any change.
-
-    // Shared notification buckets — each listener updates its own bucket
-    let bucket_mgmt = [];
-    let bucket_tutorMsg = [];
-    let bucket_feedback = [];
-    let bucket_recall = [];
-    let bucket_break = [];
-    let bucket_placement = [];
-    let bucket_enrollment = [];
-
-    function rebuildAllNotifications() {
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        allNotifications = [
-            ...bucket_mgmt,
-            ...bucket_tutorMsg,
-            ...bucket_feedback,
-            ...bucket_recall,
-            ...bucket_break.filter(n => {
-                const bd = n._rawBreakDate?.toDate ? n._rawBreakDate.toDate() : null;
-                return bd && bd > sevenDaysAgo;
-            }),
-            ...bucket_placement,
-            ...bucket_enrollment
+    function rebuild() {
+        const sevenAgo = new Date(Date.now() - 7*24*60*60*1000);
+        allNotifications = [...bk1,...bk2,...bk3,...bk4,
+            ...bk5.filter(n=>{const d=n._bd?.toDate?.();return d&&d>sevenAgo;}),
+            ...bk6,...bk7
         ];
-        allNotifications.sort((a, b) => {
-            const ta = a.createdAt?.toDate ? a.createdAt.toDate() : (a.createdAt instanceof Date ? a.createdAt : new Date(0));
-            const tb = b.createdAt?.toDate ? b.createdAt.toDate() : (b.createdAt instanceof Date ? b.createdAt : new Date(0));
-            return tb - ta;
+        allNotifications.sort((a,b)=>{
+            const ta=a.createdAt?.toDate?a.createdAt.toDate():(a.createdAt instanceof Date?a.createdAt:new Date(0));
+            const tb=b.createdAt?.toDate?b.createdAt.toDate():(b.createdAt instanceof Date?b.createdAt:new Date(0));
+            return tb-ta;
         });
-
-        const unreadCount = allNotifications.filter(n => !n.read).length;
-        badge.textContent = unreadCount > 9 ? '9+' : String(unreadCount);
-        badge.classList.toggle('hidden', unreadCount === 0);
+        const uc = allNotifications.filter(n=>!n.read).length;
+        badge.textContent = uc>9?'9+':String(uc);
+        badge.classList.toggle('hidden', uc===0);
+        // Play sound only when count increases (skip first load)
+        if (_prevUnread >= 0 && uc > _prevUnread) playBellSound();
+        _prevUnread = uc;
     }
 
     // 1. management_notifications (unread)
-    _bellListeners.push(onSnapshot(
-        query(collection(db, 'management_notifications'), where('read', '==', false), limit(30)),
-        (snap) => {
-            bucket_mgmt = snap.docs.map(d => ({
-                id: d.id, _collection: 'management_notifications', _type: 'management_notification',
-                title: d.data().title || 'Notification',
-                message: d.data().message || '',
-                createdAt: d.data().createdAt,
-                read: false
-            }));
-            rebuildAllNotifications();
-        },
-        (err) => console.warn('Bell listener management_notifications error:', err.message)
-    ));
-
-    // 2. Tutor → Management messages (unread) — REAL-TIME
-    _bellListeners.push(onSnapshot(
-        query(collection(db, 'tutor_to_management_messages'), where('managementRead', '==', false), limit(20)),
-        (snap) => {
-            bucket_tutorMsg = snap.docs.map(d => ({
-                id: d.id, _collection: 'tutor_to_management_messages', _type: 'tutor_message',
-                title: `New message from ${d.data().tutorName || 'a tutor'}`,
-                message: (d.data().message || '').slice(0, 100),
-                createdAt: d.data().createdAt,
-                read: false,
-                actionTab: 'messaging'
-            }));
-            rebuildAllNotifications();
-        },
-        (err) => console.warn('Bell listener tutor messages error:', err.message)
-    ));
-
+    _unsubs.push(onSnapshot(query(collection(db,'management_notifications'),where('read','==',false),limit(30)),
+        s=>{bk1=s.docs.map(d=>({id:d.id,_collection:'management_notifications',_type:'management_notification',title:d.data().title||'Notification',message:d.data().message||'',createdAt:d.data().createdAt,read:false}));rebuild();},
+        e=>console.warn('Bell[1]',e.message)));
+    // 2. Tutor messages (unread)
+    _unsubs.push(onSnapshot(query(collection(db,'tutor_to_management_messages'),where('managementRead','==',false),limit(20)),
+        s=>{bk2=s.docs.map(d=>({id:d.id,_collection:'tutor_to_management_messages',_type:'tutor_message',title:'Message from '+(d.data().tutorName||'Tutor'),message:(d.data().message||'').slice(0,100),createdAt:d.data().createdAt,read:false,actionTab:'messaging'}));rebuild();},
+        e=>console.warn('Bell[2]',e.message)));
     // 3. Parent feedback (unread)
-    _bellListeners.push(onSnapshot(
-        query(collection(db, 'parent_feedback'), where('read', '==', false), limit(20)),
-        (snap) => {
-            bucket_feedback = snap.docs.map(d => ({
-                id: d.id, _collection: 'parent_feedback', _type: 'parent_feedback',
-                title: `Feedback from ${d.data().parentName || 'a parent'}`,
-                message: `Student: ${d.data().studentName || 'N/A'} · ${(d.data().message || '').slice(0, 80)}`,
-                createdAt: d.data().submittedAt || d.data().timestamp || d.data().createdAt,
-                read: false,
-                actionTab: 'feedback'
-            }));
-            rebuildAllNotifications();
-        },
-        (err) => console.warn('Bell listener parent_feedback error:', err.message)
-    ));
-
-    // 4. Pending recall requests
-    _bellListeners.push(onSnapshot(
-        query(collection(db, 'recall_requests'), where('status', '==', 'pending'), limit(20)),
-        (snap) => {
-            bucket_recall = snap.docs.map(d => ({
-                id: d.id, _collection: 'recall_requests', _type: 'recall_request',
-                title: `Recall request: ${d.data().studentName || 'Student'}`,
-                message: `Tutor: ${d.data().tutorName || d.data().tutorEmail || 'N/A'} · Waiting for approval`,
-                createdAt: d.data().createdAt,
-                read: false,
-                actionTab: 'breaks'
-            }));
-            rebuildAllNotifications();
-        },
-        (err) => console.warn('Bell listener recall_requests error:', err.message)
-    ));
-
+    _unsubs.push(onSnapshot(query(collection(db,'parent_feedback'),where('read','==',false),limit(20)),
+        s=>{bk3=s.docs.map(d=>({id:d.id,_collection:'parent_feedback',_type:'parent_feedback',title:'Feedback from '+(d.data().parentName||'Parent'),message:'Student: '+(d.data().studentName||'N/A')+' · '+(d.data().message||'').slice(0,80),createdAt:d.data().submittedAt||d.data().timestamp||d.data().createdAt,read:false,actionTab:'feedback'}));rebuild();},
+        e=>console.warn('Bell[3]',e.message)));
+    // 4. Recall requests (pending)
+    _unsubs.push(onSnapshot(query(collection(db,'recall_requests'),where('status','==','pending'),limit(20)),
+        s=>{bk4=s.docs.map(d=>({id:d.id,_collection:'recall_requests',_type:'recall_request',title:'Recall: '+(d.data().studentName||'Student'),message:'Tutor: '+(d.data().tutorName||d.data().tutorEmail||'N/A'),createdAt:d.data().createdAt,read:false,actionTab:'breaks'}));rebuild();},
+        e=>console.warn('Bell[4]',e.message)));
     // 5. Students on break
-    _bellListeners.push(onSnapshot(
-        query(collection(db, 'students'), where('summerBreak', '==', true), limit(30)),
-        (snap) => {
-            bucket_break = snap.docs
-                .filter(d => d.data().breakNotifRead !== true)
-                .map(d => ({
-                    id: d.id, _collection: 'students', _type: 'student_break',
-                    title: `${d.data().studentName || 'Student'} placed on break`,
-                    message: `Tutor: ${d.data().tutorName || 'N/A'} · Break started ${d.data().breakDate?.toDate ? d.data().breakDate.toDate().toLocaleDateString() : ''}`,
-                    createdAt: d.data().breakDate,
-                    _rawBreakDate: d.data().breakDate,
-                    read: false,
-                    actionTab: 'breaks'
-                }));
-            rebuildAllNotifications();
-        },
-        (err) => console.warn('Bell listener students break error:', err.message)
-    ));
+    _unsubs.push(onSnapshot(query(collection(db,'students'),where('summerBreak','==',true),limit(30)),
+        s=>{bk5=s.docs.filter(d=>d.data().breakNotifRead!==true).map(d=>({id:d.id,_collection:'students',_type:'student_break',title:(d.data().studentName||'Student')+' on break',message:'Tutor: '+(d.data().tutorName||'N/A'),createdAt:d.data().breakDate,_bd:d.data().breakDate,read:false,actionTab:'breaks'}));rebuild();},
+        e=>console.warn('Bell[5]',e.message)));
+    // 6. Placement tests
+    _unsubs.push(onSnapshot(query(collection(db,'tutors'),where('placementTestStatus','==','completed'),limit(20)),
+        s=>{bk6=s.docs.filter(d=>d.data().placementTestAcknowledged!==true).map(d=>({id:d.id,_collection:'tutors',_type:'placement_test',title:'Placement: '+(d.data().name||d.data().email),message:(d.data().name||d.data().email)+' completed test',createdAt:d.data().placementTestDate||d.data().updatedAt,read:false,actionTab:'tutors'}));rebuild();},
+        e=>console.warn('Bell[6]',e.message)));
+    // 7. Enrollments (last 3 days)
+    const threeAgo = Timestamp.fromDate(new Date(Date.now()-3*24*60*60*1000));
+    _unsubs.push(onSnapshot(query(collection(db,'enrollments'),where('createdAt','>',threeAgo),limit(20)),
+        s=>{bk7=s.docs.filter(d=>d.data().managementSeen!==true).map(d=>({id:d.id,_collection:'enrollments',_type:'new_enrollment',title:'New enrollment: '+(d.data().studentName||'Student'),message:(d.data().parentName||'Parent')+' enrolled '+(d.data().studentName||'student'),createdAt:d.data().createdAt,read:false,actionTab:'enrollments'}));rebuild();},
+        e=>console.warn('Bell[7]',e.message)));
 
-    // 6. Placement tests completed
-    _bellListeners.push(onSnapshot(
-        query(collection(db, 'tutors'), where('placementTestStatus', '==', 'completed'), limit(20)),
-        (snap) => {
-            bucket_placement = snap.docs
-                .filter(d => d.data().placementTestAcknowledged !== true)
-                .map(d => ({
-                    id: d.id, _collection: 'tutors', _type: 'placement_test',
-                    title: `Placement test completed: ${d.data().name || d.data().email}`,
-                    message: `${d.data().name || d.data().email} has completed their placement test`,
-                    createdAt: d.data().placementTestDate || d.data().updatedAt,
-                    read: false,
-                    actionTab: 'tutors'
-                }));
-            rebuildAllNotifications();
-        },
-        (err) => console.warn('Bell listener placement tests error:', err.message)
-    ));
+    // Cleanup old polling interval if exists
+    if (window._notifPollInterval) { clearInterval(window._notifPollInterval); window._notifPollInterval = null; }
+    window._bellUnsubs = _unsubs;
 
-    // 7. New enrollments (recent 3 days)
-    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
-    _bellListeners.push(onSnapshot(
-        query(collection(db, 'enrollments'), where('createdAt', '>', Timestamp.fromDate(threeDaysAgo)), limit(20)),
-        (snap) => {
-            bucket_enrollment = snap.docs
-                .filter(d => d.data().managementSeen !== true)
-                .map(d => ({
-                    id: d.id, _collection: 'enrollments', _type: 'new_enrollment',
-                    title: `New enrollment: ${d.data().studentName || 'Student'}`,
-                    message: `${d.data().parentName || 'Parent'} enrolled ${d.data().studentName || 'a student'}`,
-                    createdAt: d.data().createdAt,
-                    read: false,
-                    actionTab: 'enrollments'
-                }));
-            rebuildAllNotifications();
-        },
-        (err) => console.warn('Bell listener enrollments error:', err.message)
-    ));
-
-    // Store listeners for cleanup
-    window._bellListeners = _bellListeners;
-
-    // ── Mark a single notification as read based on its source collection ──
+    // ── Mark single notification read ──
     async function markNotifRead(notif) {
         try {
-            if (notif._collection === 'management_notifications') {
-                await updateDoc(doc(db, 'management_notifications', notif.id), { read: true });
-            } else if (notif._collection === 'tutor_to_management_messages') {
-                await updateDoc(doc(db, 'tutor_to_management_messages', notif.id), { managementRead: true });
-            } else if (notif._collection === 'parent_feedback') {
-                await updateDoc(doc(db, 'parent_feedback', notif.id), { read: true });
-            } else if (notif._collection === 'students' && notif._type === 'student_break') {
-                await updateDoc(doc(db, 'students', notif.id), { breakNotifRead: true });
-            } else if (notif._collection === 'tutors' && notif._type === 'placement_test') {
-                await updateDoc(doc(db, 'tutors', notif.id), { placementTestAcknowledged: true });
-            } else if (notif._collection === 'enrollments') {
-                await updateDoc(doc(db, 'enrollments', notif.id), { managementSeen: true });
-            }
-        } catch(e) { console.warn('Could not mark notif read:', e.message); }
+            if (notif._collection==='management_notifications') await updateDoc(doc(db,'management_notifications',notif.id),{read:true});
+            else if (notif._collection==='tutor_to_management_messages') await updateDoc(doc(db,'tutor_to_management_messages',notif.id),{managementRead:true});
+            else if (notif._collection==='parent_feedback') await updateDoc(doc(db,'parent_feedback',notif.id),{read:true});
+            else if (notif._collection==='students') await updateDoc(doc(db,'students',notif.id),{breakNotifRead:true});
+            else if (notif._collection==='tutors') await updateDoc(doc(db,'tutors',notif.id),{placementTestAcknowledged:true});
+            else if (notif._collection==='enrollments') await updateDoc(doc(db,'enrollments',notif.id),{managementSeen:true});
+        } catch(e) { console.warn('markRead err:', e.message); }
     }
 
     // ── Mark all as read ──
     async function markAllRead() {
         try {
             const batch = writeBatch(db);
-            const snap1 = await getDocs(query(collection(db, 'management_notifications'), where('read', '==', false)));
-            snap1.docs.forEach(d => batch.update(d.ref, { read: true }));
-            const snap2 = await getDocs(query(collection(db, 'tutor_to_management_messages'), where('managementRead', '==', false)));
-            snap2.docs.forEach(d => batch.update(d.ref, { managementRead: true }));
-            const snap3 = await getDocs(query(collection(db, 'parent_feedback'), where('read', '==', false)));
-            snap3.docs.forEach(d => batch.update(d.ref, { read: true }));
+            (await getDocs(query(collection(db,'management_notifications'),where('read','==',false)))).docs.forEach(d=>batch.update(d.ref,{read:true}));
+            (await getDocs(query(collection(db,'tutor_to_management_messages'),where('managementRead','==',false)))).docs.forEach(d=>batch.update(d.ref,{managementRead:true}));
+            (await getDocs(query(collection(db,'parent_feedback'),where('read','==',false)))).docs.forEach(d=>batch.update(d.ref,{read:true}));
             await batch.commit();
-        } catch(e) { console.warn('Mark all read partial error:', e.message); }
+        } catch(e) { console.warn('markAllRead err:', e.message); }
     }
 
     // ── Bell click → show notification panel ──
@@ -12029,7 +11840,6 @@ async function initManagementNotifications() {
         const existing = document.getElementById('notification-panel');
         if (existing) { existing.remove(); return; }
 
-        // Use cached allNotifications (already kept in sync by onSnapshot listeners)
         const notifications = allNotifications;
         const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -12095,7 +11905,6 @@ async function initManagementNotifications() {
         document.getElementById('mark-all-read-btn')?.addEventListener('click', async () => {
             await markAllRead();
             panel.remove();
-            // onSnapshot listeners will auto-update the badge
         });
 
         panel.querySelectorAll('.notif-item').forEach(item => {
@@ -12104,7 +11913,6 @@ async function initManagementNotifications() {
                 const notif = notifications[idx];
                 if (notif && !notif.read) await markNotifRead(notif);
                 panel.remove();
-                // onSnapshot listeners will auto-update the badge
                 // Navigate to relevant tab if actionTab is set
                 if (notif?.actionTab) {
                     const navMap = {
@@ -12171,26 +11979,33 @@ async function showManagementActivityLog() {
     document.getElementById('close-activity-log').addEventListener('click', () => modal.remove());
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     
-    // Load activity log
+    // Load activity log (single where clause — sort client-side to avoid composite index requirement)
     try {
         const snap = await getDocs(query(
             collection(db, 'management_activity'),
             where('userEmail', '==', staffEmail),
-            orderBy('timestamp', 'desc'),
-            limit(20)
+            limit(50)
         ));
         const logEl = document.getElementById('activity-log-list');
         if (!logEl) return;
         if (snap.empty) {
             logEl.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">No recent activity found.</p>';
         } else {
-            logEl.innerHTML = snap.docs.map(d => {
-                const a = d.data();
+            // Sort client-side by timestamp descending
+            const sorted = snap.docs
+                .map(d => ({ id: d.id, ...d.data() }))
+                .sort((a, b) => {
+                    const ta = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(0);
+                    const tb = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(0);
+                    return tb - ta;
+                })
+                .slice(0, 20);
+            logEl.innerHTML = sorted.map(a => {
                 const date = a.timestamp?.toDate ? a.timestamp.toDate().toLocaleString() : '';
                 return `
                     <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                        <p class="text-sm font-medium text-gray-700">${a.action || 'Action'}</p>
-                        <p class="text-xs text-gray-500">${a.details || ''}</p>
+                        <p class="text-sm font-medium text-gray-700">${escapeHtml(a.action || 'Action')}</p>
+                        <p class="text-xs text-gray-500">${escapeHtml(a.details || '')}</p>
                         <p class="text-xs text-gray-400 mt-1">${date}</p>
                     </div>
                 `;
