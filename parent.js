@@ -37,17 +37,38 @@ function sanitizeInput(input) {
     return input;
 }
 
-// Safe text (no HTML escaping for display)
+// Safe text (escape HTML for display in innerHTML contexts)
 function safeText(text) {
+    if (typeof text !== 'string') return text;
+    return escapeHtml(text.trim());
+}
+
+// Safe plaintext (no HTML escaping, for textContent only)
+function safePlainText(text) {
     if (typeof text !== 'string') return text;
     return text.trim();
 }
 
-// Capitalize names
+// URL sanitizer — only allow http, https protocols
+function sanitizeUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    const trimmed = url.trim();
+    try {
+        const parsed = new URL(trimmed);
+        if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+            return trimmed;
+        }
+    } catch (e) {
+        // Invalid URL
+    }
+    return '';
+}
+
+// Capitalize names (Unicode-safe)
 function capitalize(str) {
     if (!str || typeof str !== 'string') return "";
-    const cleaned = safeText(str);
-    return cleaned.replace(/\b\w/g, l => l.toUpperCase());
+    const cleaned = safePlainText(str);
+    return cleaned.replace(/\b\p{L}/gu, l => l.toLocaleUpperCase());
 }
 
 // ========== UNIVERSAL PHONE MATCHING (FIXED - SUFFIX BASED) ==========
@@ -101,6 +122,194 @@ let pendingRequests = new Set();
 // Initialize intervals array globally
 if (!window.realTimeIntervals) {
     window.realTimeIntervals = [];
+}
+
+// ============================================================================
+// DATA CACHE (Cost Optimization)
+// ============================================================================
+
+class DataCache {
+    constructor(ttlMs = 5 * 60 * 1000) { // 5 minute default TTL
+        this._store = new Map();
+        this._ttl = ttlMs;
+    }
+    get(key) {
+        const entry = this._store.get(key);
+        if (!entry) return null;
+        if (Date.now() - entry.time > this._ttl) {
+            this._store.delete(key);
+            return null;
+        }
+        return entry.data;
+    }
+    set(key, data) {
+        this._store.set(key, { data, time: Date.now() });
+    }
+    invalidate(key) {
+        if (key) { this._store.delete(key); } else { this._store.clear(); }
+    }
+}
+
+const dataCache = new DataCache();
+
+// ============================================================================
+// FEEDBACK MODAL FUNCTIONS (Previously Missing)
+// ============================================================================
+
+function showFeedbackModal() {
+    const modal = document.getElementById('feedbackModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        // Populate student dropdown
+        const feedbackStudentSelect = document.getElementById('feedbackStudent');
+        if (feedbackStudentSelect && userChildren.length > 0) {
+            feedbackStudentSelect.innerHTML = '<option value="">Select student</option>';
+            userChildren.forEach(name => {
+                const option = document.createElement('option');
+                option.value = safePlainText(name);
+                option.textContent = capitalize(name);
+                feedbackStudentSelect.appendChild(option);
+            });
+        }
+    }
+}
+
+function hideFeedbackModal() {
+    const modal = document.getElementById('feedbackModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        // Reset form
+        const fields = ['feedbackCategory', 'feedbackPriority', 'feedbackStudent', 'feedbackMessage'];
+        fields.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+    }
+}
+
+function showResponsesModal() {
+    const modal = document.getElementById('responsesModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        loadAdminResponses();
+    }
+}
+
+function hideResponsesModal() {
+    const modal = document.getElementById('responsesModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+async function submitFeedback() {
+    const category = document.getElementById('feedbackCategory')?.value;
+    const priority = document.getElementById('feedbackPriority')?.value;
+    const student = document.getElementById('feedbackStudent')?.value;
+    const message = document.getElementById('feedbackMessage')?.value?.trim();
+
+    if (!category || !priority || !student || !message) {
+        showMessage('Please fill in all required fields.', 'error');
+        return;
+    }
+
+    const submitBtn = document.getElementById('submitFeedbackBtn');
+    const submitText = document.getElementById('submitFeedbackText');
+    const submitSpinner = document.getElementById('submitFeedbackSpinner');
+
+    if (submitBtn) submitBtn.disabled = true;
+    if (submitText) submitText.textContent = 'Submitting...';
+    if (submitSpinner) submitSpinner.classList.remove('hidden');
+
+    try {
+        const user = auth.currentUser;
+        if (!user) throw new Error('Not authenticated');
+
+        await db.collection('parent_feedback').add({
+            parentUid: user.uid,
+            parentEmail: user.email || '',
+            parentName: currentUserData?.parentName || 'Parent',
+            category: sanitizeInput(category),
+            priority: sanitizeInput(priority),
+            studentName: sanitizeInput(student),
+            message: sanitizeInput(message),
+            status: 'pending',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        showMessage('Feedback submitted successfully!', 'success');
+        hideFeedbackModal();
+    } catch (error) {
+        console.error('Feedback submission error:', error);
+        showMessage('Failed to submit feedback. Please try again.', 'error');
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+        if (submitText) submitText.textContent = 'Submit Feedback';
+        if (submitSpinner) submitSpinner.classList.add('hidden');
+    }
+}
+
+async function loadAdminResponses() {
+    const responsesContent = document.getElementById('responsesContent');
+    if (!responsesContent) return;
+
+    responsesContent.innerHTML = '<div class="text-center py-4"><div class="loading-spinner mx-auto"></div></div>';
+
+    try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const snapshot = await db.collection('parent_feedback')
+            .where('parentUid', '==', user.uid)
+            .get();
+
+        if (snapshot.empty) {
+            responsesContent.innerHTML = '<p class="text-gray-500 text-center py-8">No feedback submissions yet.</p>';
+            return;
+        }
+
+        let html = '';
+        const feedbacks = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .sort((a, b) => {
+                const aTime = a.createdAt?.toDate?.() || new Date(0);
+                const bTime = b.createdAt?.toDate?.() || new Date(0);
+                return bTime - aTime;
+            });
+
+        feedbacks.forEach(fb => {
+            const statusColor = fb.status === 'resolved' ? 'bg-green-100 text-green-800' :
+                               fb.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+                               'bg-yellow-100 text-yellow-800';
+            const date = fb.createdAt?.toDate?.()?.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) || 'N/A';
+
+            html += `
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <span class="font-semibold text-gray-800">${safeText(fb.category)}</span>
+                            <span class="text-gray-500 text-sm ml-2">— ${safeText(fb.studentName)}</span>
+                        </div>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor}">${safeText(fb.status || 'pending')}</span>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-2">${safeText(fb.message)}</p>
+                    <p class="text-gray-400 text-xs">${safeText(date)}</p>
+                    ${fb.adminResponse ? `
+                        <div class="response-bubble mt-3">
+                            <div class="response-header">Admin Response:</div>
+                            <p class="text-gray-700 text-sm">${safeText(fb.adminResponse)}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        });
+
+        responsesContent.innerHTML = html;
+
+    } catch (error) {
+        console.error('Error loading responses:', error);
+        responsesContent.innerHTML = '<p class="text-red-500 text-center py-4">Error loading responses.</p>';
+    }
 }
 
 // ============================================================================
@@ -712,12 +921,10 @@ async function handleSignInFull(identifier, password, signInBtn, authLoader) {
     } catch (error) {
         if (!pendingRequests.has(requestId)) return;
         
-        let errorMessage = "Failed to sign in. Please check your credentials.";
+        let errorMessage = "Invalid credentials. Please check your email and password.";
         
-        if (error.code === 'auth/user-not-found') {
-            errorMessage = "No account found with this email.";
-        } else if (error.code === 'auth/wrong-password') {
-            errorMessage = "Incorrect password.";
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+            errorMessage = "Invalid email or password. Please try again.";
         } else if (error.code === 'auth/invalid-email') {
             errorMessage = "Invalid email address format.";
         } else if (error.code === 'auth/too-many-requests') {
@@ -817,7 +1024,10 @@ async function handlePasswordResetFull(email, sendResetBtn, resetLoader) {
         
         let errorMessage = "Failed to send reset email.";
         if (error.code === 'auth/user-not-found') {
-            errorMessage = "No account found with this email address.";
+            // Don't reveal whether email exists — show success anyway
+            showMessage('If an account with this email exists, a reset link has been sent.', 'success');
+            hidePasswordResetModal();
+            return;
         }
         showMessage(errorMessage, 'error');
     } finally {
@@ -1027,7 +1237,7 @@ async function comprehensiveFindChildren(parentPhone) {
             }
             
             if (isMatch && !allChildren.has(studentId)) {
-                console.log(`✅ SUFFIX MATCH: Parent ${parentSuffix} = ${matchedField} → Student ${studentName}`);
+                console.log(`✅ SUFFIX MATCH: Student ${studentName} linked`);
                 
                 allChildren.set(studentId, {
                     id: studentId,
@@ -1336,17 +1546,20 @@ window.onStudentSelected = function(studentName) {
     loadAcademicsData(studentName || null);
 };
 
-// Fixed force download function - opens ONLY in new tab
+// Fixed force download function - validates URL, opens ONLY in new tab
 window.forceDownload = function(url, filename) {
+    const safeUrl = sanitizeUrl(url);
+    if (!safeUrl) {
+        showMessage('Invalid file URL.', 'error');
+        return;
+    }
     // Open in new tab without affecting current tab
-    const newWindow = window.open(url, '_blank');
+    const newWindow = window.open(safeUrl, '_blank', 'noopener,noreferrer');
     
     // Focus on the new window
     if (newWindow) {
         newWindow.focus();
     }
-    
-    console.log('File opened in new tab:', filename || 'assignment');
 };
 
 // Updated handleHomeworkAction function - REMOVED Work Here feature
@@ -1618,7 +1831,7 @@ async function loadAcademicsData(selectedStudent = null) {
                                 <div class="flex justify-between items-center pt-3 border-t border-gray-100">
                                     <div class="flex items-center space-x-3">
                                         ${homework.fileUrl ? `
-                                            <button onclick="forceDownload('${safeText(homework.fileUrl)}', '${safeText(homework.title || 'assignment')}.pdf')" 
+                                            <button onclick="forceDownload('${sanitizeUrl(homework.fileUrl)}', '${safeText(homework.title || 'assignment')}.pdf')" 
                                                     class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm">
                                                 <span class="mr-1">📥</span> Download Assignment
                                             </button>
@@ -1765,7 +1978,7 @@ function cleanupRealTimeListeners() {
 }
 
 function setupRealTimeMonitoring(parentPhone, userId) {
-    console.log("📡 Setting up OPTIMIZED real-time monitoring...");
+    console.log("📡 Setting up OPTIMIZED real-time monitoring with onSnapshot...");
     
     cleanupRealTimeListeners();
     
@@ -1775,65 +1988,62 @@ function setupRealTimeMonitoring(parentPhone, userId) {
     
     const parentSuffix = extractPhoneSuffix(parentPhone);
     if (!parentSuffix) {
-        console.warn("⚠️ Cannot setup monitoring - invalid parent phone:", parentPhone);
         return;
     }
 
-    console.log("📡 Monitoring for phone suffix:", parentSuffix);
-    
-    // Function to check for new reports
-    const checkForNewReports = async () => {
-        try {
-            const lastCheckKey = `lastReportCheck_${userId}`;
-            const lastCheckTime = parseInt(localStorage.getItem(lastCheckKey) || '0');
-            const now = Date.now();
-            
-            let foundNew = false;
-            
-            // Check all collections in parallel
-            const collections = ['tutor_submissions', 'student_results'];
-            
-            await Promise.all(collections.map(async (collection) => {
-                try {
-                    const snapshot = await db.collection(collection).limit(200).get();
-                    snapshot.forEach(doc => {
-                        const data = doc.data();
-                        const docPhone = data.parentPhone || data.parent_phone || data.phone;
-                        
-                        if (docPhone && extractPhoneSuffix(docPhone) === parentSuffix) {
-                            const docTime = getTimestamp(data.timestamp || data.createdAt || data.submittedAt);
-                            
-                            if (docTime > lastCheckTime) {
-                                foundNew = true;
-                                console.log(`🆕 NEW ${collection} DETECTED:`, doc.id);
+    // Use Firestore onSnapshot listeners instead of polling (saves ~95% reads)
+    // Listen for new assessment reports
+    try {
+        const assessmentUnsub = db.collection('student_results')
+            .orderBy('timestamp', 'desc')
+            .limit(10)
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === 'added' && change.doc.metadata.hasPendingWrites === false) {
+                        const data = change.doc.data();
+                        const phoneFields = [data.parentPhone, data.parent_phone, data.guardianPhone, data.motherPhone, data.fatherPhone];
+                        for (const fieldPhone of phoneFields) {
+                            if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
+                                showNewReportNotification();
+                                break;
                             }
                         }
-                    });
-                } catch (error) {
-                    console.error(`${collection} check error:`, error);
-                }
-            }));
-            
-            if (foundNew) {
-                showNewReportNotification();
-            }
-            
-            localStorage.setItem(lastCheckKey, now.toString());
-            
-        } catch (error) {
-            console.error("Real-time check error:", error);
-        }
-    };
+                    }
+                });
+            }, (error) => {
+                // Silently handle - will work without real-time updates
+            });
+        
+        realTimeListeners.push(assessmentUnsub);
+        
+        // Listen for new monthly reports
+        const monthlyUnsub = db.collection('tutor_submissions')
+            .orderBy('timestamp', 'desc')
+            .limit(10)
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === 'added' && change.doc.metadata.hasPendingWrites === false) {
+                        const data = change.doc.data();
+                        const phoneFields = [data.parentPhone, data.parent_phone, data.guardianPhone, data.motherPhone, data.fatherPhone];
+                        for (const fieldPhone of phoneFields) {
+                            if (fieldPhone && extractPhoneSuffix(fieldPhone) === parentSuffix) {
+                                showNewReportNotification();
+                                break;
+                            }
+                        }
+                    }
+                });
+            }, (error) => {
+                // Silently handle
+            });
+        
+        realTimeListeners.push(monthlyUnsub);
+
+    } catch (error) {
+        // Fallback: no real-time monitoring
+    }
     
-    // Check for new reports every 60 seconds
-    const reportInterval = setInterval(checkForNewReports, 60000);
-    window.realTimeIntervals.push(reportInterval);
-    realTimeListeners.push(() => clearInterval(reportInterval));
-    
-    // Run initial check after 2 seconds
-    setTimeout(checkForNewReports, 2000);
-    
-    console.log("✅ Real-time monitoring setup complete");
+    console.log("✅ Real-time monitoring setup complete (onSnapshot)");
 }
 
 function showNewReportNotification() {
@@ -2440,6 +2650,16 @@ function toggleAccordion(elementId) {
 // ============================================================================
 
 async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false) {
+    const cacheKey = `reports_${userId}`;
+    if (!forceRefresh) {
+        const cached = dataCache.get(cacheKey);
+        if (cached) {
+            console.log("📦 Using cached report data");
+            renderReportData(cached.userData, cached.searchResults, parentPhone, userId);
+            return;
+        }
+    }
+    
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
     const authArea = document.getElementById("authArea");
@@ -2725,11 +2945,11 @@ class UnifiedAuthManager {
             // Update UI immediately
             this.showDashboardUI();
 
-            // Load remaining data in parallel
+            // Load remaining data in parallel (lazy-load academics on tab switch)
             await Promise.all([
                 loadAllReportsForParent(this.currentUser.normalizedPhone, user.uid),
                 loadReferralRewards(user.uid),
-                loadAcademicsData()
+                checkForNewAcademics() // Only check badge count, don't load full data
             ]);
 
             // Setup monitoring and UI
@@ -3339,7 +3559,7 @@ function renderGoogleClassroomContent(homework, studentId) {
             ${homework.fileUrl ? `
                 <div class="mt-4">
                     <h4 class="text-sm font-medium text-gray-500 mb-2">Reference Materials</h4>
-                    <a href="${homework.fileUrl}" target="_blank" class="gc-attachment hover:bg-gray-50">
+                    <a href="${sanitizeUrl(homework.fileUrl)}" target="_blank" rel="noopener noreferrer" class="gc-attachment hover:bg-gray-50">
                         <div class="gc-att-icon">📎</div>
                         <div class="text-sm font-medium text-blue-900 truncate flex-1">Download Assignment File</div>
                     </a>
@@ -3358,7 +3578,7 @@ function renderGoogleClassroomContent(homework, studentId) {
                         <div class="gc-attachment">
                             <div class="gc-att-icon">📄</div>
                             <div class="flex-1 truncate text-sm">Submitted File</div>
-                            <a href="${homework.submissionUrl}" target="_blank" class="text-blue-600 text-xs font-bold px-2">VIEW</a>
+                            <a href="${sanitizeUrl(homework.submissionUrl)}" target="_blank" rel="noopener noreferrer" class="text-blue-600 text-xs font-bold px-2">VIEW</a>
                         </div>` : ''}
                 </div>
 
@@ -3697,10 +3917,13 @@ function handleSignIn() {
     const signInBtn = document.getElementById('signInBtn');
     const authLoader = document.getElementById('authLoader');
 
-    signInBtn.disabled = true;
-    document.getElementById('signInText').textContent = 'Signing In...';
-    document.getElementById('signInSpinner').classList.remove('hidden');
-    authLoader.classList.remove('hidden');
+    if (signInBtn) signInBtn.disabled = true;
+    
+    const signInText = document.getElementById('signInText');
+    const signInSpinner = document.getElementById('signInSpinner');
+    if (signInText) signInText.textContent = 'Signing In...';
+    if (signInSpinner) signInSpinner.classList.remove('hidden');
+    if (authLoader) authLoader.classList.remove('hidden');
 
     handleSignInFull(identifier, password, signInBtn, authLoader);
 }
@@ -3844,14 +4067,16 @@ function setupEventListeners() {
     const signInTab = document.getElementById("signInTab");
     const signUpTab = document.getElementById("signUpTab");
     
+    // Named handlers for proper removeEventListener
+    function handleSignInTabClick() { switchTab('signin'); }
+    function handleSignUpTabClick() { switchTab('signup'); }
+    
     if (signInTab) {
-        signInTab.removeEventListener("click", () => switchTab('signin'));
-        signInTab.addEventListener("click", () => switchTab('signin'));
+        signInTab.addEventListener("click", handleSignInTabClick);
     }
     
     if (signUpTab) {
-        signUpTab.removeEventListener("click", () => switchTab('signup'));
-        signUpTab.addEventListener("click", () => switchTab('signup'));
+        signUpTab.addEventListener("click", handleSignUpTabClick);
     }
     
     const forgotPasswordBtn = document.getElementById("forgotPasswordBtn");
@@ -3894,19 +4119,27 @@ function setupEventListeners() {
     const academicsTab = document.getElementById("academicsTab");
     const rewardsTab = document.getElementById("rewardsTab");
     
+    // Named handlers for proper cleanup
+    function handleReportTabClick() { switchMainTab('reports'); }
+    function handleAcademicsTabClick() { switchMainTab('academics'); }
+    function handleRewardsTabClick() { switchMainTab('rewards'); }
+    
     if (reportTab) {
-        reportTab.removeEventListener("click", () => switchMainTab('reports'));
-        reportTab.addEventListener("click", () => switchMainTab('reports'));
+        reportTab.addEventListener("click", handleReportTabClick);
     }
     
     if (academicsTab) {
-        academicsTab.removeEventListener("click", () => switchMainTab('academics'));
-        academicsTab.addEventListener("click", () => switchMainTab('academics'));
+        academicsTab.addEventListener("click", handleAcademicsTabClick);
     }
     
     if (rewardsTab) {
-        rewardsTab.removeEventListener("click", () => switchMainTab('rewards'));
-        rewardsTab.addEventListener("click", () => switchMainTab('rewards'));
+        rewardsTab.addEventListener("click", handleRewardsTabClick);
+    }
+    
+    // Feedback submit handler
+    const submitFeedbackBtn = document.getElementById("submitFeedbackBtn");
+    if (submitFeedbackBtn) {
+        submitFeedbackBtn.addEventListener("click", submitFeedback);
     }
 }
 
@@ -3981,18 +4214,20 @@ document.addEventListener('DOMContentLoaded', function() {
     
     initializeParentPortalV2();
     
-    // Initialize Google Classroom scanner
+    // Initialize Google Classroom scanner (only when academics tab visible)
     setTimeout(scanAndInjectButtons, 500);
     
     const observer = new MutationObserver(() => {
-        setTimeout(scanAndInjectButtons, 100);
+        const academicsArea = document.getElementById('academicsContentArea');
+        if (academicsArea && !academicsArea.classList.contains('hidden')) {
+            setTimeout(scanAndInjectButtons, 100);
+        }
     });
     
     const target = document.getElementById('academicsContent');
     if (target) observer.observe(target, { childList: true, subtree: true });
     
-    // Fallback interval (every 2 seconds)
-    setInterval(scanAndInjectButtons, 2000);
+    // No persistent setInterval — MutationObserver handles it
     
     console.log("🎉 Parent Portal V2 fully initialized");
 });
@@ -4017,6 +4252,11 @@ window.showPasswordResetModal = showPasswordResetModal;
 window.hidePasswordResetModal = hidePasswordResetModal;
 window.switchTab = switchTab;
 window.settingsManager = settingsManager;
+window.showFeedbackModal = showFeedbackModal;
+window.hideFeedbackModal = hideFeedbackModal;
+window.showResponsesModal = showResponsesModal;
+window.hideResponsesModal = hideResponsesModal;
+window.submitFeedback = submitFeedback;
 
 // ============================================================================
 // SECTION 21: SIGNUP SUCCESS HANDLER (RACE CONDITION FIX)
@@ -4761,9 +5001,7 @@ window.manualRefreshReportsV2 = async function() {
     }
 };
 
-console.log("✅ Silent unlimited search fix installed");
-console.log("Parents will NOT see progress messages");
-console.log("Search will be FAST and UNLIMITED");
+console.log("✅ Search optimization installed");
 
 // ============================================================================
 // SHARED PARENT ACCESS SYSTEM (NO DUPLICATE DECLARATIONS)
@@ -5275,7 +5513,7 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
                             parentEmail: email,
                             parentPhone: phone,
                             relationship: student.relationship,
-                            linkedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            linkedAt: new Date().toISOString() // arrayUnion does not support serverTimestamp
                         })
                     });
                 } catch (error) {
@@ -5338,14 +5576,7 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
         return { isShared, linkedStudents };
     };
 
-    console.log("✅ SHARED PARENT ACCESS SYSTEM SUCCESSFULLY INSTALLED");
-    console.log("=====================================================");
-    console.log("Parents can now:");
-    console.log("1. Add mother/father phones in Settings");
-    console.log("2. Those contacts can register and see same reports");
-    console.log("3. Automatic linking during signup");
-    console.log("4. Shared access tracking");
-    console.log("=====================================================");
+    console.log("✅ Shared parent access system initialized");
     
 } else {
     console.log("⚠️ Shared access system already installed");
