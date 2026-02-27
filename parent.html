@@ -27,16 +27,9 @@
            This plain synchronous script runs and COMPLETES before any module
            is evaluated, so window.db / window.auth are guaranteed to exist
            by the time parent.js starts.
-         
-         ISOLATION:
-           Named app "parent-portal" mirrors what firebaseConfig.js auto-detects
-           for this URL. Each portal keeps its own named Firebase app so auth
-           sessions are completely independent across portals.
          ═══════════════════════════════════════════════════════════════════════ -->
     <script>
     (function () {
-
-        // ── 1. Same environment detection as firebaseConfig.js ───────────────
         var hostname = window.location.hostname;
         var isDev =
             hostname === 'localhost' ||
@@ -62,20 +55,16 @@
         };
 
         var config = isDev ? devConfig : mainConfig;
-
-        // Also expose for anything that reads window.firebaseConfig
         window.firebaseConfig = config;
 
-        // ── 2. Per-portal named app (same naming as firebaseConfig.js) ───────
         var APP_NAME = 'parent-portal';
         var app;
         try {
-            app = firebase.app(APP_NAME);        // reuse if already created
+            app = firebase.app(APP_NAME);
         } catch (e) {
             app = firebase.initializeApp(config, APP_NAME);
         }
 
-        // ── 3. Auth — session-scoped per tab ─────────────────────────────────
         var authInst = firebase.auth(app);
         authInst
             .setPersistence(firebase.auth.Auth.Persistence.SESSION)
@@ -83,17 +72,11 @@
                 console.warn('Parent portal: could not set auth persistence:', err.message);
             });
 
-        // ── 4. Expose on window SYNCHRONOUSLY before any module runs ─────────
         window.db      = firebase.firestore(app);
         window.auth    = authInst;
         window.storage = firebase.storage(app);
 
-        console.log(
-            '🔗 Parent portal compat bridge ready |',
-            isDev ? '🛠️ DEVELOPMENT' : '🚀 PRODUCTION',
-            '| app:', APP_NAME
-        );
-
+        console.log('🔗 Parent portal compat bridge ready |', isDev ? '🛠️ DEVELOPMENT' : '🚀 PRODUCTION');
     })();
     </script>
 
