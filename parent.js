@@ -1,19 +1,11 @@
 // ============================================================================
-// FIREBASE CONFIGURATION
+// FIREBASE — initialized by shared firebaseConfig.js (compat bridge)
+// db and auth are set on window by the compat bridge in firebaseConfig.js.
+// We read them here so existing code continues to work unchanged.
 // ============================================================================
 
-// Firebase config for the 'bloomingkidsassessment' project
-firebase.initializeApp({
-    apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
-    authDomain: "bloomingkidsassessment.firebaseapp.com",
-    projectId: "bloomingkidsassessment",
-    storageBucket: "bloomingkidsassessment.appspot.com",
-    messagingSenderId: "238975054977",
-    appId: "1:238975054977:web:87c70b4db044998a204980"
-});
-
-const db = firebase.firestore();
-const auth = firebase.auth();
+const db   = window.db;
+const auth = window.auth;
 
 // ============================================================================
 // SECTION 1: CORE UTILITIES & SECURITY (OPTIMIZED)
@@ -4257,6 +4249,10 @@ window.hideFeedbackModal = hideFeedbackModal;
 window.showResponsesModal = showResponsesModal;
 window.hideResponsesModal = hideResponsesModal;
 window.submitFeedback = submitFeedback;
+window.closeGoogleClassroomModal = closeGoogleClassroomModal;
+window.submitHomeworkToFirebase = submitHomeworkToFirebase;
+window.triggerCloudinaryUpload = triggerCloudinaryUpload;
+window.unsubmitHomework = unsubmitHomework;
 
 // ============================================================================
 // SECTION 21: SIGNUP SUCCESS HANDLER (RACE CONDITION FIX)
