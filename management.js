@@ -11659,417 +11659,579 @@ async function createManagementNotification(type, title, message, extraData = {}
 window.createManagementNotification = createManagementNotification;
 
 // ======================================================
-// SECTION: MANAGEMENT NOTIFICATION BELL
+// SECTION: MANAGEMENT NOTIFICATION BELL (real-time onSnapshot)
 // ======================================================
 
-async function initManagementNotifications() {
-    const bellBtn = document.getElementById('notificationBell') || document.querySelector('[data-notification-bell]');
-    if (!bellBtn) return;
+// ── Module-level state ─────────────────────────────────
+const _bellUnsubs  = [];          // stores all onSnapshot unsubscribers
+let   _bellReady   = false;       // true after grace period (suppresses first-load audio)
+const _seenNotifIds = new Set();  // IDs already alerted on — prevents duplicate chimes
+let   _allNotifs   = [];          // merged, sorted notification array (in-memory)
+const _notifStore  = new Map();   // key "collection:id" → notif object
+let   _audioCtx    = null;        // shared Web Audio API context (lazy-created)
+let   _activityUnsub = null;      // onSnapshot unsub for activity log modal
 
-    let allNotifications = [];
+// ── Notification type config ───────────────────────────
+const NOTIF_TYPES = {
+    management_notification: { icon: '🔔', border: 'border-l-green-500',  label: 'General Alert'       },
+    tutor_message:           { icon: '💬', border: 'border-l-blue-500',   label: 'Tutor Message'       },
+    parent_feedback:         { icon: '💌', border: 'border-l-purple-500', label: 'Parent Feedback'     },
+    recall_request:          { icon: '🔁', border: 'border-l-orange-500', label: 'Recall Request'      },
+    student_break:           { icon: '☕', border: 'border-l-yellow-500', label: 'Student on Break'    },
+    placement_test:          { icon: '📋', border: 'border-l-indigo-500', label: 'Placement Test Done' },
+    new_enrollment:          { icon: '📝', border: 'border-l-teal-500',   label: 'New Enrollment'      },
+};
 
-    // Reuse existing badge span if present, otherwise create one
-    let badge = document.getElementById('notification-badge') || bellBtn.querySelector('.notification-badge, span');
+// ── Audio: two-note chime via Web Audio API ────────────
+function _getAudioCtx() {
+    if (!_audioCtx) {
+        try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        catch(e) { /* AudioContext unavailable — silently skip */ }
+    }
+    return _audioCtx;
+}
+
+function _playChime() {
+    const ctx = _getAudioCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    function note(freq, start, dur) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(0.16, start + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+        osc.start(start); osc.stop(start + dur);
+    }
+    const t = ctx.currentTime;
+    note(880,  t,        0.35);   // A5  — first note
+    note(1109, t + 0.2,  0.45);   // C#6 — second note (major third up)
+}
+
+// ── Toast: slide-in from right, 6-second auto-dismiss ──
+function _showToast(title, message, icon) {
+    if (!document.getElementById('_mgmt-toast-style')) {
+        const s = document.createElement('style');
+        s.id = '_mgmt-toast-style';
+        s.textContent = `
+            @keyframes _tIn  { from{transform:translateX(110%);opacity:0} to{transform:translateX(0);opacity:1} }
+            @keyframes _tOut { from{transform:translateX(0);opacity:1}    to{transform:translateX(110%);opacity:0} }
+            ._mgmt-toast           { animation: _tIn  0.35s cubic-bezier(.22,.68,0,1.2) forwards; }
+            ._mgmt-toast.dismissing{ animation: _tOut 0.3s ease-in forwards; }
+        `;
+        document.head.appendChild(s);
+    }
+    const offset = document.querySelectorAll('._mgmt-toast').length * 82;
+    const toast = document.createElement('div');
+    toast.className = '_mgmt-toast fixed z-[99999] flex items-start gap-3 '
+        + 'bg-white border border-gray-200 rounded-xl shadow-2xl px-4 py-3 w-80 max-w-[92vw] cursor-pointer select-none';
+    toast.style.cssText = `top:${72 + offset}px; right:16px;`;
+    toast.innerHTML = `
+        <span class="text-2xl leading-none mt-0.5 shrink-0">${icon || '🔔'}</span>
+        <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-gray-800 leading-snug truncate">${escapeHtml(title)}</p>
+            <p class="text-xs text-gray-500 mt-0.5 line-clamp-2">${escapeHtml(message)}</p>
+        </div>
+        <button class="text-gray-300 hover:text-gray-500 text-lg leading-none shrink-0 mt-0.5">&times;</button>
+    `;
+    document.body.appendChild(toast);
+    function dismiss() {
+        toast.classList.add('dismissing');
+        toast.addEventListener('animationend', () => toast.remove(), { once: true });
+    }
+    toast.querySelector('button').addEventListener('click', e => { e.stopPropagation(); dismiss(); });
+    toast.addEventListener('click', dismiss);
+    const t = setTimeout(dismiss, 6000);
+    toast.addEventListener('animationend', () => clearTimeout(t), { once: true });
+}
+
+// ── Store helpers ───────────────────────────────────────
+function _storeUpsert(key, notif) { _notifStore.set(key, notif); _rebuildList(); }
+function _storeDelete(key)        { _notifStore.delete(key);     _rebuildList(); }
+
+function _rebuildList() {
+    _allNotifs = Array.from(_notifStore.values()).sort((a, b) => {
+        const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
+        const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
+        return tb - ta;
+    });
+    // Update badge
+    const badge = document.getElementById('notification-badge');
+    if (badge) {
+        const n = _allNotifs.length;
+        badge.textContent = n > 99 ? '99+' : String(n);
+        badge.classList.toggle('hidden', n === 0);
+    }
+}
+
+// Handles an incoming doc from any listener — alerts only if genuinely new
+function _handleIncoming(key, notif) {
+    const isNew = !_seenNotifIds.has(key);
+    _seenNotifIds.add(key);
+    _storeUpsert(key, notif);
+    if (isNew && _bellReady) {
+        const cfg = NOTIF_TYPES[notif._type] || {};
+        _playChime();
+        _showToast(notif.title, notif.message, cfg.icon);
+    }
+}
+
+// ── Mark read helpers ────────────────────────────────────
+async function _markSingleRead(notif) {
+    try {
+        const fieldMap = {
+            management_notifications:     { field: 'read',                    value: true },
+            tutor_to_management_messages: { field: 'managementRead',          value: true },
+            parent_feedback:              { field: 'read',                    value: true },
+            recall_requests:              { field: 'managementSeen',          value: true },
+            students:                     { field: 'breakNotifRead',          value: true },
+            tutors:                       { field: 'placementTestAcknowledged', value: true },
+            enrollments:                  { field: 'managementSeen',          value: true },
+        };
+        const entry = fieldMap[notif._collection];
+        if (entry) await updateDoc(doc(db, notif._collection, notif.id), { [entry.field]: entry.value });
+    } catch(e) { console.warn('_markSingleRead:', e.message); }
+}
+
+async function _markAllRead() {
+    const batch = writeBatch(db);
+    try {
+        const [s1, s2, s3, s4] = await Promise.all([
+            getDocs(query(collection(db, 'management_notifications'),     where('read',          '==', false), limit(50))),
+            getDocs(query(collection(db, 'tutor_to_management_messages'), where('managementRead','==', false), limit(50))),
+            getDocs(query(collection(db, 'parent_feedback'),              where('read',          '==', false), limit(50))),
+            getDocs(query(collection(db, 'recall_requests'),              where('status',        '==', 'pending'), limit(50))),
+        ]);
+        s1.docs.forEach(d => batch.update(d.ref, { read: true }));
+        s2.docs.forEach(d => batch.update(d.ref, { managementRead: true }));
+        s3.docs.forEach(d => batch.update(d.ref, { read: true }));
+        s4.docs.forEach(d => batch.update(d.ref, { managementSeen: true }));
+        await batch.commit();
+    } catch(e) { console.warn('_markAllRead partial error:', e.message); }
+}
+
+// ── 7 persistent onSnapshot listeners ───────────────────
+// Every query uses at most ONE where() clause. Secondary filtering is JS-side.
+function _setupBellListeners() {
+    const sevenDaysAgo = Timestamp.fromDate(new Date(Date.now() - 7 * 86400000));
+    const threeDaysAgo = Timestamp.fromDate(new Date(Date.now() - 3 * 86400000));
+
+    // 1. management_notifications
+    _bellUnsubs.push(onSnapshot(
+        query(collection(db, 'management_notifications'), where('read', '==', false), limit(30)),
+        snap => snap.docChanges().forEach(ch => {
+            const key = `management_notifications:${ch.doc.id}`;
+            if (ch.type === 'removed') { _storeDelete(key); return; }
+            const d = ch.doc.data();
+            _handleIncoming(key, {
+                id: ch.doc.id, _collection: 'management_notifications', _type: 'management_notification',
+                title: d.title || 'General Alert', message: d.message || '', createdAt: d.createdAt,
+            });
+        }),
+        e => console.warn('management_notifications listener error:', e.message)
+    ));
+
+    // 2. tutor_to_management_messages
+    _bellUnsubs.push(onSnapshot(
+        query(collection(db, 'tutor_to_management_messages'), where('managementRead', '==', false), limit(20)),
+        snap => snap.docChanges().forEach(ch => {
+            const key = `tutor_to_management_messages:${ch.doc.id}`;
+            if (ch.type === 'removed') { _storeDelete(key); return; }
+            const d = ch.doc.data();
+            _handleIncoming(key, {
+                id: ch.doc.id, _collection: 'tutor_to_management_messages', _type: 'tutor_message',
+                title: `New message from ${d.tutorName || 'a tutor'}`,
+                message: (d.message || '').slice(0, 100),
+                createdAt: d.createdAt, actionTab: 'navMessaging',
+            });
+        }),
+        e => console.warn('tutor_to_management_messages listener error:', e.message)
+    ));
+
+    // 3. parent_feedback
+    _bellUnsubs.push(onSnapshot(
+        query(collection(db, 'parent_feedback'), where('read', '==', false), limit(20)),
+        snap => snap.docChanges().forEach(ch => {
+            const key = `parent_feedback:${ch.doc.id}`;
+            if (ch.type === 'removed') { _storeDelete(key); return; }
+            const d = ch.doc.data();
+            _handleIncoming(key, {
+                id: ch.doc.id, _collection: 'parent_feedback', _type: 'parent_feedback',
+                title: `Feedback from ${d.parentName || 'a parent'}`,
+                message: `Student: ${d.studentName || 'N/A'} · ${(d.message || '').slice(0, 80)}`,
+                createdAt: d.submittedAt || d.timestamp || d.createdAt, actionTab: 'navParentFeedback',
+            });
+        }),
+        e => console.warn('parent_feedback listener error:', e.message)
+    ));
+
+    // 4. recall_requests (status == 'pending')
+    _bellUnsubs.push(onSnapshot(
+        query(collection(db, 'recall_requests'), where('status', '==', 'pending'), limit(20)),
+        snap => snap.docChanges().forEach(ch => {
+            const key = `recall_requests:${ch.doc.id}`;
+            if (ch.type === 'removed') { _storeDelete(key); return; }
+            const d = ch.doc.data();
+            _handleIncoming(key, {
+                id: ch.doc.id, _collection: 'recall_requests', _type: 'recall_request',
+                title: `Recall request: ${d.studentName || 'Student'}`,
+                message: `Tutor: ${d.tutorName || d.tutorEmail || 'N/A'} · Awaiting approval`,
+                createdAt: d.createdAt, actionTab: 'navBreaks',
+            });
+        }),
+        e => console.warn('recall_requests listener error:', e.message)
+    ));
+
+    // 5. students on break — single where, JS-filter breakNotifRead + breakDate
+    _bellUnsubs.push(onSnapshot(
+        query(collection(db, 'students'), where('summerBreak', '==', true), limit(40)),
+        snap => snap.docChanges().forEach(ch => {
+            const key = `students:${ch.doc.id}`;
+            const d   = ch.doc.data();
+            const bd  = d.breakDate?.toDate ? d.breakDate.toDate() : null;
+            if (ch.type === 'removed' || d.breakNotifRead === true || !bd || bd < sevenDaysAgo.toDate()) {
+                _storeDelete(key); return;
+            }
+            _handleIncoming(key, {
+                id: ch.doc.id, _collection: 'students', _type: 'student_break',
+                title: `${d.studentName || 'Student'} placed on break`,
+                message: `Tutor: ${d.tutorName || 'N/A'} · Break started ${bd.toLocaleDateString()}`,
+                createdAt: d.breakDate, actionTab: 'navBreaks',
+            });
+        }),
+        e => console.warn('students (break) listener error:', e.message)
+    ));
+
+    // 6. tutors — placement test completed, JS-filter acknowledged
+    _bellUnsubs.push(onSnapshot(
+        query(collection(db, 'tutors'), where('placementTestStatus', '==', 'completed'), limit(20)),
+        snap => snap.docChanges().forEach(ch => {
+            const key = `tutors:${ch.doc.id}`;
+            const d   = ch.doc.data();
+            if (ch.type === 'removed' || d.placementTestAcknowledged === true) { _storeDelete(key); return; }
+            _handleIncoming(key, {
+                id: ch.doc.id, _collection: 'tutors', _type: 'placement_test',
+                title: `Placement test done: ${d.name || d.email || 'Tutor'}`,
+                message: `${d.name || d.email || 'A tutor'} completed their placement test`,
+                createdAt: d.placementTestDate || d.updatedAt, actionTab: 'navTutorManagement',
+            });
+        }),
+        e => console.warn('tutors (placement) listener error:', e.message)
+    ));
+
+    // 7. enrollments — single where createdAt > 3 days, JS-filter managementSeen
+    _bellUnsubs.push(onSnapshot(
+        query(collection(db, 'enrollments'), where('createdAt', '>', threeDaysAgo), limit(20)),
+        snap => snap.docChanges().forEach(ch => {
+            const key = `enrollments:${ch.doc.id}`;
+            const d   = ch.doc.data();
+            if (ch.type === 'removed' || d.managementSeen === true) { _storeDelete(key); return; }
+            _handleIncoming(key, {
+                id: ch.doc.id, _collection: 'enrollments', _type: 'new_enrollment',
+                title: `New enrollment: ${d.studentName || 'Student'}`,
+                message: `${d.parentName || 'Parent'} enrolled ${d.studentName || 'a student'}`,
+                createdAt: d.createdAt, actionTab: 'navEnrollments',
+            });
+        }),
+        e => console.warn('enrollments listener error:', e.message)
+    ));
+
+    // After 2.5 s the first snapshot batch has arrived — enable audio for future arrivals
+    setTimeout(() => { _bellReady = true; }, 2500);
+}
+
+// ── Teardown — call on signOut ───────────────────────────
+function _teardownBellListeners() {
+    _bellUnsubs.forEach(u => { try { u(); } catch(_) {} });
+    _bellUnsubs.length = 0;
+    _bellReady = false;
+    _notifStore.clear();
+    _allNotifs = [];
+}
+window._teardownBellListeners = _teardownBellListeners;
+
+// ── Notification panel ───────────────────────────────────
+function _buildNotifPanel(bellBtn) {
+    const existing = document.getElementById('notification-panel');
+    if (existing) { existing.remove(); return; }
+
+    const count   = _allNotifs.length;
+    const grouped = {};
+    _allNotifs.forEach(n => { (grouped[n._type] = grouped[n._type] || []).push(n); });
+
+    const summaryHTML = Object.entries(grouped).map(([type, items]) => {
+        const cfg = NOTIF_TYPES[type] || { icon: '🔔', label: type };
+        return `<span class="inline-flex items-center gap-1 text-xs bg-gray-100 rounded-full px-2 py-0.5">
+                    ${cfg.icon} <span class="font-semibold">${items.length}</span> ${cfg.label}
+                </span>`;
+    }).join(' ');
+
+    const itemsHTML = _allNotifs.length === 0
+        ? '<p class="text-gray-500 text-sm text-center py-10">✅ You\'re all caught up!</p>'
+        : _allNotifs.slice(0, 50).map((n, idx) => {
+            const cfg  = NOTIF_TYPES[n._type] || { icon: '🔔', border: 'border-l-gray-400', label: '' };
+            const date = n.createdAt?.toDate ? n.createdAt.toDate().toLocaleString() : '';
+            return `
+                <div class="p-3 hover:bg-blue-50 cursor-pointer notif-item transition-colors border-l-4 ${cfg.border} bg-gray-50"
+                     data-idx="${idx}">
+                    <div class="flex items-start gap-2">
+                        <span class="text-lg leading-none mt-0.5 shrink-0">${cfg.icon}</span>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-start gap-2">
+                                <p class="text-sm font-semibold text-gray-800 leading-snug">${escapeHtml(n.title)}</p>
+                                <span class="shrink-0 w-2 h-2 rounded-full bg-blue-500 mt-1.5"></span>
+                            </div>
+                            <p class="text-xs text-gray-600 mt-0.5 leading-snug">${escapeHtml(n.message)}</p>
+                            <p class="text-[10px] text-gray-400 mt-1">${date}</p>
+                        </div>
+                    </div>
+                </div>`;
+        }).join('');
+
+    const panel = document.createElement('div');
+    panel.id = 'notification-panel';
+    panel.className = 'fixed top-16 right-4 w-96 max-w-[95vw] bg-white rounded-xl shadow-2xl border border-gray-200 z-[9999] overflow-hidden';
+    panel.innerHTML = `
+        <div class="bg-green-700 text-white px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <span class="font-bold text-base">🔔 Notifications</span>
+                <span class="bg-white text-green-700 text-xs font-bold rounded-full px-2 py-0.5">${count} unread</span>
+            </div>
+            <button id="close-notif-panel" class="text-white hover:text-gray-200 text-xl leading-none">&times;</button>
+        </div>
+        ${summaryHTML ? `<div class="px-4 py-2 bg-gray-50 border-b flex flex-wrap gap-1">${summaryHTML}</div>` : ''}
+        <div class="max-h-[420px] overflow-y-auto divide-y" id="notif-list">${itemsHTML}</div>
+        ${count > 0 ? `
+        <div class="p-3 border-t flex justify-between items-center bg-gray-50">
+            <span class="text-xs text-gray-500">${count} unread notification${count !== 1 ? 's' : ''}</span>
+            <button id="mark-all-read-btn"
+                class="text-xs font-semibold text-blue-600 hover:text-blue-800 border border-blue-200
+                       rounded px-3 py-1 hover:bg-blue-50 transition-colors">
+                ✓ Mark all as read
+            </button>
+        </div>` : ''}
+    `;
+    document.body.appendChild(panel);
+
+    panel.querySelector('#close-notif-panel').addEventListener('click', () => panel.remove());
+
+    panel.querySelector('#mark-all-read-btn')?.addEventListener('click', async () => {
+        const btn = panel.querySelector('#mark-all-read-btn');
+        btn.textContent = 'Marking…'; btn.disabled = true;
+        await _markAllRead();
+        panel.remove();
+    });
+
+    panel.querySelectorAll('.notif-item').forEach(el => {
+        el.addEventListener('click', async () => {
+            const notif = _allNotifs[parseInt(el.dataset.idx, 10)];
+            if (!notif) return;
+            panel.remove();
+            await _markSingleRead(notif);
+            if (notif.actionTab) {
+                const btn = document.getElementById(notif.actionTab);
+                if (btn) btn.click();
+            }
+        });
+    });
+
+    // Close on outside click (deferred so this very click doesn't immediately close it)
+    setTimeout(() => {
+        document.addEventListener('click', function outsideClose(e) {
+            if (!panel.contains(e.target) && e.target !== bellBtn) {
+                panel.remove();
+                document.removeEventListener('click', outsideClose);
+            }
+        });
+    }, 0);
+}
+
+// ── Public entry point ────────────────────────────────────
+function initManagementNotifications() {
+    const bellBtn = document.getElementById('notificationBell')
+                 || document.querySelector('[data-notification-bell]');
+    if (!bellBtn) { console.warn('initManagementNotifications: #notificationBell not found'); return; }
+
+    // Badge element
+    let badge = document.getElementById('notification-badge');
     if (!badge) {
         badge = document.createElement('span');
+        badge.id = 'notification-badge';
         bellBtn.appendChild(badge);
     }
-    badge.id = 'notification-badge';
-    badge.className = 'absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-bold text-[10px] hidden px-1';
+    badge.className = 'absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full '
+                    + 'min-w-[18px] h-[18px] flex items-center justify-center font-bold text-[10px] '
+                    + 'hidden px-1 pointer-events-none';
     bellBtn.style.position = 'relative';
 
-    // ── Notification type config: icon, color, label ──
-    const TYPE_CONFIG = {
-        management_notification: { icon: '🔔', color: 'border-l-green-500',  label: 'Alert' },
-        tutor_message:           { icon: '💬', color: 'border-l-blue-500',   label: 'Tutor Message' },
-        parent_feedback:         { icon: '💌', color: 'border-l-purple-500', label: 'Parent Feedback' },
-        recall_request:          { icon: '🔁', color: 'border-l-orange-500', label: 'Recall Request' },
-        student_break:           { icon: '☕', color: 'border-l-yellow-500', label: 'Student on Break' },
-        placement_test:          { icon: '📋', color: 'border-l-indigo-500', label: 'Placement Test' },
-        new_enrollment:          { icon: '📝', color: 'border-l-teal-500',   label: 'New Enrollment' },
-        tutor_inactive:          { icon: '⚠️', color: 'border-l-red-400',    label: 'Tutor Inactive' },
-    };
+    // Tear down any stale listeners from a previous session
+    _teardownBellListeners();
 
-    // ── Aggregate notifications from multiple Firestore collections ──
-    // NOTE: All queries use at most ONE where() clause + client-side filtering
-    // to avoid requiring Firestore composite indexes.
-    async function loadAllNotifications() {
-        const notifs = [];
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+    // Start all 7 real-time listeners
+    _setupBellListeners();
 
-        // Helper to safely run a query — returns [] on any error
-        async function safeQuery(fn) {
-            try { return await fn(); } catch(e) { console.warn('Notif query skipped:', e.message); return []; }
-        }
-
-        // 1. management_notifications — single where, sort client-side
-        const mgmtNotifs = await safeQuery(async () => {
-            const snap = await getDocs(query(
-                collection(db, 'management_notifications'),
-                where('read', '==', false),
-                limit(30)
-            ));
-            return snap.docs.map(d => ({
-                id: d.id, _collection: 'management_notifications', _type: 'management_notification',
-                title: d.data().title || 'Notification',
-                message: d.data().message || '',
-                createdAt: d.data().createdAt,
-                read: false
-            }));
-        });
-        notifs.push(...mgmtNotifs);
-
-        // 2. Tutor → Management messages (unread inbox) — single where, sort client-side
-        const tutorMessages = await safeQuery(async () => {
-            const snap = await getDocs(query(
-                collection(db, 'tutor_to_management_messages'),
-                where('managementRead', '==', false),
-                limit(20)
-            ));
-            return snap.docs.map(d => ({
-                id: d.id, _collection: 'tutor_to_management_messages', _type: 'tutor_message',
-                title: `New message from ${d.data().tutorName || 'a tutor'}`,
-                message: (d.data().message || '').slice(0, 100),
-                createdAt: d.data().createdAt,
-                read: false,
-                actionTab: 'messaging'
-            }));
-        });
-        notifs.push(...tutorMessages);
-
-        // 3. Parent feedback (unread) — single where, sort client-side
-        const feedbackNotifs = await safeQuery(async () => {
-            const snap = await getDocs(query(
-                collection(db, 'parent_feedback'),
-                where('read', '==', false),
-                limit(20)
-            ));
-            return snap.docs.map(d => ({
-                id: d.id, _collection: 'parent_feedback', _type: 'parent_feedback',
-                title: `Feedback from ${d.data().parentName || 'a parent'}`,
-                message: `Student: ${d.data().studentName || 'N/A'} · ${(d.data().message || '').slice(0, 80)}`,
-                createdAt: d.data().submittedAt || d.data().timestamp || d.data().createdAt,
-                read: false,
-                actionTab: 'feedback'
-            }));
-        });
-        notifs.push(...feedbackNotifs);
-
-        // 4. Pending recall requests — single where, sort client-side
-        const recallNotifs = await safeQuery(async () => {
-            const snap = await getDocs(query(
-                collection(db, 'recall_requests'),
-                where('status', '==', 'pending'),
-                limit(20)
-            ));
-            return snap.docs.map(d => ({
-                id: d.id, _collection: 'recall_requests', _type: 'recall_request',
-                title: `Recall request: ${d.data().studentName || 'Student'}`,
-                message: `Tutor: ${d.data().tutorName || d.data().tutorEmail || 'N/A'} · Waiting for approval`,
-                createdAt: d.data().createdAt,
-                read: false,
-                actionTab: 'breaks'
-            }));
-        });
-        notifs.push(...recallNotifs);
-
-        // 5. Students on break (single where, filter by date client-side, no breakNotifRead needed)
-        const breakNotifs = await safeQuery(async () => {
-            const snap = await getDocs(query(
-                collection(db, 'students'),
-                where('summerBreak', '==', true),
-                limit(30)
-            ));
-            return snap.docs
-                .filter(d => {
-                    if (d.data().breakNotifRead === true) return false;
-                    const bd = d.data().breakDate?.toDate ? d.data().breakDate.toDate() : null;
-                    return bd && bd > sevenDaysAgo;
-                })
-                .map(d => ({
-                    id: d.id, _collection: 'students', _type: 'student_break',
-                    title: `${d.data().studentName || 'Student'} placed on break`,
-                    message: `Tutor: ${d.data().tutorName || 'N/A'} · Break started ${d.data().breakDate?.toDate ? d.data().breakDate.toDate().toLocaleDateString() : ''}`,
-                    createdAt: d.data().breakDate,
-                    read: false,
-                    actionTab: 'breaks'
-                }));
-        });
-        notifs.push(...breakNotifs);
-
-        // 6. Tutors who completed placement tests — single where, filter acknowledged client-side
-        const placementNotifs = await safeQuery(async () => {
-            const snap = await getDocs(query(
-                collection(db, 'tutors'),
-                where('placementTestStatus', '==', 'completed'),
-                limit(20)
-            ));
-            return snap.docs
-                .filter(d => d.data().placementTestAcknowledged !== true)
-                .map(d => ({
-                    id: d.id, _collection: 'tutors', _type: 'placement_test',
-                    title: `Placement test completed: ${d.data().name || d.data().email}`,
-                    message: `${d.data().name || d.data().email} has completed their placement test`,
-                    createdAt: d.data().placementTestDate || d.data().updatedAt,
-                    read: false,
-                    actionTab: 'tutors'
-                }));
-        });
-        notifs.push(...placementNotifs);
-
-        // 7. New enrollments — single where (createdAt range), filter managementSeen client-side
-        const enrollNotifs = await safeQuery(async () => {
-            const snap = await getDocs(query(
-                collection(db, 'enrollments'),
-                where('createdAt', '>', Timestamp.fromDate(threeDaysAgo)),
-                limit(20)
-            ));
-            return snap.docs
-                .filter(d => d.data().managementSeen !== true)
-                .map(d => ({
-                    id: d.id, _collection: 'enrollments', _type: 'new_enrollment',
-                    title: `New enrollment: ${d.data().studentName || 'Student'}`,
-                    message: `${d.data().parentName || 'Parent'} enrolled ${d.data().studentName || 'a student'}`,
-                    createdAt: d.data().createdAt,
-                    read: false,
-                    actionTab: 'enrollments'
-                }));
-        });
-        notifs.push(...enrollNotifs);
-
-        // Sort by timestamp descending
-        notifs.sort((a, b) => {
-            const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
-            const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
-            return tb - ta;
-        });
-
-        allNotifications = notifs;
-        const unreadCount = notifs.filter(n => !n.read).length;
-        badge.textContent = unreadCount > 9 ? '9+' : String(unreadCount);
-        badge.classList.toggle('hidden', unreadCount === 0);
-        return notifs;
-    }
-
-    // ── Mark a single notification as read based on its source collection ──
-    async function markNotifRead(notif) {
-        try {
-            if (notif._collection === 'management_notifications') {
-                await updateDoc(doc(db, 'management_notifications', notif.id), { read: true });
-            } else if (notif._collection === 'tutor_to_management_messages') {
-                await updateDoc(doc(db, 'tutor_to_management_messages', notif.id), { managementRead: true });
-            } else if (notif._collection === 'parent_feedback') {
-                await updateDoc(doc(db, 'parent_feedback', notif.id), { read: true });
-            } else if (notif._collection === 'students' && notif._type === 'student_break') {
-                await updateDoc(doc(db, 'students', notif.id), { breakNotifRead: true });
-            } else if (notif._collection === 'tutors' && notif._type === 'placement_test') {
-                await updateDoc(doc(db, 'tutors', notif.id), { placementTestAcknowledged: true });
-            } else if (notif._collection === 'enrollments') {
-                await updateDoc(doc(db, 'enrollments', notif.id), { managementSeen: true });
-            }
-        } catch(e) { console.warn('Could not mark notif read:', e.message); }
-    }
-
-    // ── Mark all as read ──
-    async function markAllRead() {
-        const batch = writeBatch(db);
-        const batchUpdates = [];
-        try {
-            // management_notifications
-            const snap1 = await getDocs(query(collection(db, 'management_notifications'), where('read', '==', false)));
-            snap1.docs.forEach(d => batch.update(d.ref, { read: true }));
-            // tutor messages
-            const snap2 = await getDocs(query(collection(db, 'tutor_to_management_messages'), where('managementRead', '==', false)));
-            snap2.docs.forEach(d => batch.update(d.ref, { managementRead: true }));
-            // parent feedback
-            const snap3 = await getDocs(query(collection(db, 'parent_feedback'), where('read', '==', false)));
-            snap3.docs.forEach(d => batch.update(d.ref, { read: true }));
-            await batch.commit();
-        } catch(e) { console.warn('Mark all read partial error:', e.message); }
-    }
-
-    // Start polling
-    loadAllNotifications();
-    if (window._notifPollInterval) clearInterval(window._notifPollInterval);
-    window._notifPollInterval = setInterval(loadAllNotifications, 30000);
-
-    // ── Bell click → show notification panel ──
-    bellBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const existing = document.getElementById('notification-panel');
-        if (existing) { existing.remove(); return; }
-
-        const notifications = await loadAllNotifications();
-        const unreadCount = notifications.filter(n => !n.read).length;
-
-        const panel = document.createElement('div');
-        panel.id = 'notification-panel';
-        panel.className = 'fixed top-16 right-4 w-96 max-w-[95vw] bg-white rounded-xl shadow-2xl border border-gray-200 z-[9999] overflow-hidden';
-
-        // Group by type for summary
-        const typeCounts = {};
-        notifications.filter(n => !n.read).forEach(n => { typeCounts[n._type] = (typeCounts[n._type] || 0) + 1; });
-        const summaryHTML = Object.entries(typeCounts).map(([type, count]) => {
-            const cfg = TYPE_CONFIG[type] || { icon: '🔔', label: type };
-            return `<span class="inline-flex items-center gap-1 text-xs bg-gray-100 rounded-full px-2 py-0.5">${cfg.icon} <span class="font-semibold">${count}</span> ${cfg.label}</span>`;
-        }).join(' ');
-
-        panel.innerHTML = `
-            <div class="bg-green-700 text-white px-4 py-3 flex justify-between items-center">
-                <div>
-                    <span class="font-bold text-base">🔔 Notifications</span>
-                    <span class="ml-2 bg-white text-green-700 text-xs font-bold rounded-full px-2 py-0.5">${unreadCount} unread</span>
-                </div>
-                <button id="close-notif-panel" class="text-white hover:text-gray-200 text-xl leading-none">&times;</button>
-            </div>
-            ${summaryHTML ? `<div class="px-4 py-2 bg-gray-50 border-b flex flex-wrap gap-1">${summaryHTML}</div>` : ''}
-            <div class="max-h-[420px] overflow-y-auto divide-y" id="notif-list">
-                ${notifications.length === 0
-                    ? '<p class="text-gray-500 text-sm text-center py-8">✅ You\'re all caught up!</p>'
-                    : notifications.slice(0, 40).map(n => {
-                        const cfg = TYPE_CONFIG[n._type] || { icon: '🔔', color: 'border-l-gray-400', label: '' };
-                        const date = n.createdAt?.toDate ? n.createdAt.toDate().toLocaleString() : '';
-                        const unreadClass = !n.read ? `border-l-4 ${cfg.color} bg-gray-50` : '';
-                        return `
-                            <div class="p-3 hover:bg-blue-50 cursor-pointer notif-item transition-colors ${unreadClass}" 
-                                data-idx="${notifications.indexOf(n)}"
-                                data-tab="${n.actionTab || ''}">
-                                <div class="flex items-start gap-2">
-                                    <span class="text-lg leading-none mt-0.5">${cfg.icon}</span>
-                                    <div class="flex-1 min-w-0">
-                                        <div class="flex justify-between items-start gap-2">
-                                            <p class="text-sm font-semibold text-gray-800 leading-snug">${escapeHtml(n.title)}</p>
-                                            ${!n.read ? '<span class="shrink-0 w-2 h-2 rounded-full bg-blue-500 mt-1.5"></span>' : ''}
-                                        </div>
-                                        <p class="text-xs text-gray-600 mt-0.5 leading-snug">${escapeHtml(n.message)}</p>
-                                        <p class="text-[10px] text-gray-400 mt-1">${date}</p>
-                                    </div>
-                                </div>
-                            </div>`;
-                    }).join('')
-                }
-            </div>
-            ${unreadCount > 0 ? `
-                <div class="p-3 border-t flex justify-between items-center bg-gray-50">
-                    <span class="text-xs text-gray-500">${notifications.length} total notifications</span>
-                    <button id="mark-all-read-btn" class="text-xs font-semibold text-blue-600 hover:text-blue-800 border border-blue-200 rounded px-3 py-1 hover:bg-blue-50 transition-colors">
-                        ✓ Mark all as read
-                    </button>
-                </div>` : ''}
-        `;
-        document.body.appendChild(panel);
-
-        document.getElementById('close-notif-panel').addEventListener('click', () => panel.remove());
-
-        document.getElementById('mark-all-read-btn')?.addEventListener('click', async () => {
-            await markAllRead();
-            panel.remove();
-            loadAllNotifications();
-        });
-
-        panel.querySelectorAll('.notif-item').forEach(item => {
-            item.addEventListener('click', async () => {
-                const idx = parseInt(item.dataset.idx);
-                const notif = notifications[idx];
-                if (notif && !notif.read) await markNotifRead(notif);
-                panel.remove();
-                loadAllNotifications();
-                // Navigate to relevant tab if actionTab is set
-                if (notif?.actionTab) {
-                    const navMap = {
-                        messaging:   'navMessaging',
-                        feedback:    'navParentFeedback',
-                        breaks:      'navBreaks',
-                        tutors:      'navTutorManagement',
-                        enrollments: 'navEnrollments',
-                    };
-                    const navId = navMap[notif.actionTab];
-                    if (navId) {
-                        const navBtn = document.getElementById(navId);
-                        if (navBtn) navBtn.click();
-                    }
-                }
-            });
-        });
-
-        document.addEventListener('click', (ev) => {
-            if (!panel.contains(ev.target) && ev.target !== bellBtn) panel.remove();
-        }, { once: true });
-    });
+    // Bell click toggles the panel
+    bellBtn.addEventListener('click', e => { e.stopPropagation(); _buildNotifPanel(bellBtn); });
 }
 
 // ======================================================
-// SECTION: MANAGEMENT ACTIVITY LOG (second button)
+// SECTION: MANAGEMENT ACTIVITY LOG (Staff Profile Modal)
 // ======================================================
+
+function _fmtTs(ts) {
+    if (!ts) return '—';
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    return d.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function _renderActivityRows(container, docs) {
+    if (!docs || docs.length === 0) {
+        container.innerHTML = `
+            <div class="flex flex-col items-center py-10 text-gray-400">
+                <i class="fas fa-clipboard-list text-3xl mb-2 opacity-40"></i>
+                <p class="text-sm">No recent activity found.</p>
+            </div>`;
+        return;
+    }
+    const sorted = [...docs].sort((a, b) => {
+        const ta = a.data().timestamp?.toDate?.() || new Date(0);
+        const tb = b.data().timestamp?.toDate?.() || new Date(0);
+        return tb - ta;
+    }).slice(0, 20);
+
+    container.innerHTML = sorted.map(d => {
+        const r = d.data();
+        return `
+            <div class="flex items-start gap-3 px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+                <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center shrink-0 mt-0.5">
+                    <i class="fas fa-bolt text-green-600 text-xs"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-800 leading-snug">${escapeHtml(r.action || 'Action')}</p>
+                    ${r.details ? `<p class="text-xs text-gray-500 mt-0.5 break-words">${escapeHtml(r.details)}</p>` : ''}
+                    <p class="text-[10px] text-gray-400 mt-1">${_fmtTs(r.timestamp)}</p>
+                </div>
+            </div>`;
+    }).join('');
+}
 
 async function showManagementActivityLog() {
     const existing = document.getElementById('activity-log-modal');
     if (existing) { existing.remove(); return; }
-    
-    const staffName = window.userData?.name || 'Unknown';
-    const staffEmail = window.userData?.email || '';
-    const staffRole = window.userData?.role || '';
-    
+
+    const userEmail = window.userData?.email || '';
+    const staffName = window.userData?.name  || 'Unknown';
+    const staffRole = window.userData?.role  || '';
+
     const modal = document.createElement('div');
     modal.id = 'activity-log-modal';
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[9990] flex items-center justify-center p-4 overflow-y-auto';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
     modal.innerHTML = `
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-screen overflow-y-auto">
-            <div class="bg-green-700 text-white px-6 py-4 rounded-t-xl flex justify-between items-center">
+        <div id="activity-log-box" class="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col" style="max-height:90vh;">
+            <!-- Header -->
+            <div class="bg-green-700 text-white px-6 py-4 rounded-t-xl flex justify-between items-center shrink-0">
                 <div>
-                    <h2 class="text-xl font-bold">👤 Management Profile</h2>
-                    <p class="text-green-200 text-sm">${staffEmail}</p>
+                    <h2 class="text-lg font-bold flex items-center gap-2">
+                        <i class="fas fa-user-circle"></i> Staff Profile
+                    </h2>
+                    <p class="text-green-200 text-xs mt-0.5">${escapeHtml(userEmail)}</p>
                 </div>
-                <button id="close-activity-log" class="text-white hover:text-gray-200 text-2xl leading-none">&times;</button>
+                <button id="close-activity-log"
+                    class="text-white hover:text-gray-200 text-2xl leading-none w-8 h-8 flex items-center
+                           justify-center rounded-full hover:bg-green-600 transition-colors" aria-label="Close">&times;</button>
             </div>
-            <div class="p-6">
-                <div class="bg-green-50 rounded-xl p-4 mb-6">
-                    <p class="font-bold text-green-800 text-lg">${staffName}</p>
-                    <p class="text-green-700 capitalize">${staffRole}</p>
-                    <p class="text-sm text-gray-500 mt-1">Logged in: ${new Date().toLocaleString()}</p>
+            <!-- Profile card -->
+            <div class="px-6 pt-5 pb-4 border-b border-gray-100 shrink-0">
+                <div class="flex items-center gap-4 bg-green-50 rounded-xl p-4">
+                    <div class="w-14 h-14 rounded-full bg-green-200 flex items-center justify-center text-2xl font-bold text-green-800 shrink-0">
+                        ${escapeHtml(staffName.charAt(0).toUpperCase())}
+                    </div>
+                    <div class="min-w-0">
+                        <p class="font-bold text-gray-900 text-base truncate">${escapeHtml(staffName)}</p>
+                        <p class="text-sm text-green-700 capitalize">${escapeHtml(staffRole)}</p>
+                        <p class="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                            <i class="fas fa-clock text-gray-400"></i> Logged in: ${_fmtTs(new Date())}
+                        </p>
+                    </div>
                 </div>
-                <h3 class="font-bold text-gray-700 mb-3">Recent Actions</h3>
-                <div id="activity-log-list" class="space-y-2 max-h-64 overflow-y-auto">
-                    <p class="text-gray-400 text-sm text-center py-4">Loading activity log...</p>
+            </div>
+            <!-- Activity header -->
+            <div class="px-6 pt-4 pb-2 flex justify-between items-center shrink-0">
+                <h3 class="font-bold text-gray-700 flex items-center gap-2">
+                    <i class="fas fa-history text-green-600"></i> Last 20 Actions
+                    <span class="text-[10px] bg-green-100 text-green-700 rounded-full px-2 py-0.5 font-semibold">● LIVE</span>
+                </h3>
+                <button id="clear-my-log-btn"
+                    class="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400
+                           rounded px-3 py-1 hover:bg-red-50 transition-colors flex items-center gap-1">
+                    <i class="fas fa-trash-alt"></i> Clear My Log
+                </button>
+            </div>
+            <!-- Scrollable list -->
+            <div id="activity-log-list" class="flex-1 overflow-y-auto">
+                <div class="flex flex-col items-center py-10 text-gray-400">
+                    <i class="fas fa-spinner fa-spin text-2xl mb-2 text-green-400"></i>
+                    <p class="text-sm">Loading activity…</p>
                 </div>
+            </div>
+            <!-- Footer -->
+            <div class="px-6 py-3 border-t border-gray-100 shrink-0 flex justify-end">
+                <button id="close-activity-log-footer"
+                    class="text-sm text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-400
+                           rounded-lg px-4 py-1.5 hover:bg-gray-50 transition-colors">Close</button>
             </div>
         </div>
     `;
     document.body.appendChild(modal);
-    
-    document.getElementById('close-activity-log').addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
-    
-    // Load activity log
-    try {
-        const snap = await getDocs(query(
-            collection(db, 'management_activity'),
-            where('userEmail', '==', staffEmail),
-            orderBy('timestamp', 'desc'),
-            limit(20)
-        ));
-        const logEl = document.getElementById('activity-log-list');
-        if (!logEl) return;
-        if (snap.empty) {
-            logEl.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">No recent activity found.</p>';
-        } else {
-            logEl.innerHTML = snap.docs.map(d => {
-                const a = d.data();
-                const date = a.timestamp?.toDate ? a.timestamp.toDate().toLocaleString() : '';
-                return `
-                    <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                        <p class="text-sm font-medium text-gray-700">${a.action || 'Action'}</p>
-                        <p class="text-xs text-gray-500">${a.details || ''}</p>
-                        <p class="text-xs text-gray-400 mt-1">${date}</p>
-                    </div>
-                `;
-            }).join('');
+
+    const logList = modal.querySelector('#activity-log-list');
+
+    // Live listener — single where(), sort client-side
+    if (_activityUnsub) { try { _activityUnsub(); } catch(_) {} }
+    _activityUnsub = onSnapshot(
+        query(collection(db, 'management_activity'), where('userEmail', '==', userEmail), limit(20)),
+        snap => _renderActivityRows(logList, snap.docs),
+        err  => {
+            console.warn('management_activity listener:', err.message);
+            if (logList) logList.innerHTML = '<p class="text-sm text-center text-gray-400 py-8">Activity log unavailable.</p>';
         }
-    } catch(e) {
-        const logEl = document.getElementById('activity-log-list');
-        if (logEl) logEl.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">Activity log not available.</p>';
+    );
+
+    // Clear My Log
+    modal.querySelector('#clear-my-log-btn').addEventListener('click', async () => {
+        if (!confirm('Delete all of your activity log entries? This cannot be undone.')) return;
+        const btn = modal.querySelector('#clear-my-log-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Clearing…';
+        try {
+            const snap = await getDocs(
+                query(collection(db, 'management_activity'), where('userEmail', '==', userEmail), limit(100))
+            );
+            const batch = writeBatch(db);
+            snap.docs.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+        } catch(e) { console.warn('clearMyLog error:', e.message); }
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-trash-alt"></i> Clear My Log';
+        }, 1200);
+    });
+
+    // Close helpers
+    function closeModal() {
+        if (_activityUnsub) { try { _activityUnsub(); } catch(_) {} _activityUnsub = null; }
+        modal.remove();
     }
+    modal.querySelector('#close-activity-log').addEventListener('click', closeModal);
+    modal.querySelector('#close-activity-log-footer').addEventListener('click', closeModal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+    function onEsc(e) { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', onEsc); } }
+    document.addEventListener('keydown', onEsc);
 }
 
 window.showManagementActivityLog = showManagementActivityLog;
@@ -12101,8 +12263,8 @@ onAuthStateChanged(auth, async (user) => {
                 
                 setupSidebarToggle();
                 
-                // Initialize notifications bell
-                setTimeout(() => initManagementNotifications(), 500);
+                // Initialize notifications bell (real-time listeners — no setTimeout needed)
+                initManagementNotifications();
                 
                 // Wire activity log button
                 const activityBtn = document.getElementById('activityLogBtn');
@@ -12112,6 +12274,7 @@ onAuthStateChanged(auth, async (user) => {
                 
                 if (sidebarLogoutBtn) {
                     sidebarLogoutBtn.addEventListener('click', () => {
+                        if (window._teardownBellListeners) window._teardownBellListeners();
                         signOut(auth).then(() => {
                             window.location.href = "management-auth.html";
                         });
