@@ -1802,7 +1802,7 @@ async function loadAcademicsData(selectedStudent = null) {
                         
                         // Build homework HTML - SIMPLIFIED
                         homeworkHtml += `
-                            <div class="bg-white border ${isOverdue ? 'border-red-200' : 'border-gray-200'} rounded-lg p-4 shadow-sm mb-4" data-homework-id="${homeworkId}">
+                            <div class="bg-white border ${isOverdue ? 'border-red-200' : 'border-gray-200'} rounded-lg p-4 shadow-sm mb-4" data-homework-id="${homeworkId}" data-student-id="${studentId}">
                                 <div class="flex justify-between items-start mb-3">
                                     <div>
                                         <h5 class="font-medium text-gray-800 text-lg">${safeTitle}</h5>
@@ -3678,6 +3678,34 @@ function scanAndInjectButtons() {
         const textContent = card.textContent || "";
         if (!textContent.includes('Due:')) return;
 
+        // Read the homework doc ID and student ID stamped on the card at render time.
+        // This avoids title-based lookups (which break on special characters or
+        // subject-only docs) and wrong-student lookups when "All Students" is shown.
+        const homeworkId = card.dataset.homeworkId;
+        const studentId  = card.dataset.studentId;
+
+        if (!homeworkId || !studentId) {
+            // Card was rendered without data attributes — fall back to title approach
+            const btnContainer = document.createElement('div');
+            btnContainer.className = 'mt-4 pt-3 border-t border-gray-100 flex justify-end gc-inject-btn fade-in';
+            btnContainer.innerHTML = `
+                <button class="flex items-center gap-2 bg-white text-blue-600 border border-blue-200 px-4 py-2 rounded-full text-sm font-medium hover:bg-blue-50 transition-colors shadow-sm group">
+                    <span class="group-hover:scale-110 transition-transform">📤</span> 
+                    <span>Turn In / View Details</span>
+                </button>
+            `;
+            const btn = btnContainer.querySelector('button');
+            btn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const titleEl = card.querySelector('h5');
+                const titleText = titleEl ? titleEl.textContent.trim() : '';
+                if (titleText) findAndOpenHomework(titleText);
+            };
+            card.appendChild(btnContainer);
+            return;
+        }
+
         const btnContainer = document.createElement('div');
         btnContainer.className = 'mt-4 pt-3 border-t border-gray-100 flex justify-end gc-inject-btn fade-in';
         btnContainer.innerHTML = `
@@ -3691,10 +3719,7 @@ function scanAndInjectButtons() {
         btn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            
-            const titleEl = card.querySelector('h5');
-            const titleText = titleEl ? titleEl.textContent.trim() : '';
-            if (titleText) findAndOpenHomework(titleText);
+            openHomeworkById(homeworkId, studentId);
         };
 
         card.appendChild(btnContainer);
@@ -3755,6 +3780,32 @@ function findAndOpenHomework(titleText) {
         })
         .catch(err => {
             console.error("Error finding homework:", err);
+            showMessage('Error loading assignment.', 'error');
+        });
+}
+
+// Direct lookup by Firestore doc ID + student ID.
+// Used by scanAndInjectButtons when data attributes are available on the card.
+// Never fails due to title mismatch or wrong-student selection.
+function openHomeworkById(homeworkId, studentId) {
+    showMessage('Opening classroom...', 'success');
+
+    db.collection('homework_assignments')
+        .doc(homeworkId)
+        .get()
+        .then(doc => {
+            if (!doc.exists) {
+                showMessage('Could not find assignment details.', 'error');
+                return;
+            }
+            const hwData = { id: doc.id, ...doc.data() };
+            if (!hwData.dueTimestamp && hwData.dueDate) {
+                hwData.dueTimestamp = getTimestamp(hwData.dueDate);
+            }
+            openGoogleClassroomModal(hwData, studentId);
+        })
+        .catch(err => {
+            console.error("Error loading homework by ID:", err);
             showMessage('Error loading assignment.', 'error');
         });
 }
