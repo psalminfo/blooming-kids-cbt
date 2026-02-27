@@ -5,7 +5,7 @@
 
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc, deleteField, orderBy, onSnapshot, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { onAuthStateChanged, signOut, browserLocalPersistence, setPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 /*******************************************************************************
  * SECTION 2: STYLES & CSS (REMOVED – MOVED TO HTML)
@@ -7177,11 +7177,20 @@ window.__fbUpdateDoc  = updateDoc;
 window.db = db;
 
 // Opens grading in a dedicated new browser tab for full-screen annotation experience
-window.openGradingInNewTab = function(homeworkId) {
-    // Store IDs in sessionStorage so grading.html can read them
-    sessionStorage.setItem('grading_hw_id',     homeworkId);
-    sessionStorage.setItem('grading_tutor_email', window.tutorData?.email || '');
-    sessionStorage.setItem('grading_tutor_name',  window.tutorData?.name  || '');
+window.openGradingInNewTab = async function(homeworkId) {
+    // ── Switch this portal's auth to LOCAL persistence before opening the tab.
+    //    firebaseConfig.js uses SESSION persistence (tab-isolated) by default.
+    //    Switching to LOCAL writes the auth token to IndexedDB/localStorage so
+    //    grading.html (which also runs as 'tutor-portal' + LOCAL) can read it.
+    try {
+        await setPersistence(auth, browserLocalPersistence);
+    } catch (e) {
+        console.warn('openGradingInNewTab: could not switch to LOCAL persistence —', e.message);
+    }
+    // Store IDs in localStorage (cross-tab, unlike sessionStorage) as fallback
+    localStorage.setItem('grading_hw_id',       homeworkId);
+    localStorage.setItem('grading_tutor_email', window.tutorData?.email || '');
+    localStorage.setItem('grading_tutor_name',  window.tutorData?.name  || '');
     // Build query string too (belt and suspenders)
     const p = new URLSearchParams({
         hw:    homeworkId,
