@@ -13,6 +13,9 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
 
+    <!-- Shared Firebase config — initialises compat bridge (window.db / window.auth) -->
+    <script type="module" src="firebaseConfig.js"></script>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
     
@@ -395,14 +398,6 @@
                     </div>
                     <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                         <!-- Buttons will be added here by JavaScript -->
-                        <button onclick="showFeedbackModal()" 
-                                class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 btn-glow flex items-center justify-center">
-                            <span class="mr-2">💬</span> Send Feedback
-                        </button>
-                        <button onclick="showResponsesModal()" 
-                                class="bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition-all duration-200 btn-glow flex items-center justify-center">
-                            <span class="mr-2">📨</span> Responses
-                        </button>
                         <button onclick="logout()" 
                                 class="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition-all duration-200 btn-glow flex items-center justify-center">
                             <span class="mr-2">🚪</span> Logout
@@ -614,112 +609,9 @@
         <div class="text-center mt-12">
             <p class="text-green-800 font-semibold">BLOOMING KIDS HOUSE</p>
             <p class="text-green-600 text-sm">Where Every Child Blossoms</p>
-            <div class="mt-4 flex justify-center space-x-4">
-                <button onclick="document.getElementById('privacyModal').classList.remove('hidden')" class="text-green-600 hover:text-green-800 text-xs underline">Privacy Policy</button>
-                <button onclick="document.getElementById('termsModal').classList.remove('hidden')" class="text-green-600 hover:text-green-800 text-xs underline">Terms of Service</button>
-            </div>
         </div>
     </div>
 
-    <!-- Privacy Policy Modal -->
-    <div id="privacyModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
-        <div class="bg-white rounded-2xl p-6 md:p-8 max-w-3xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-2xl font-bold text-gray-800">Privacy Policy</h3>
-                <button onclick="document.getElementById('privacyModal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
-            </div>
-            <div class="text-gray-700 text-sm space-y-4 leading-relaxed">
-                <p><strong>Effective Date:</strong> February 27, 2026 &nbsp;|&nbsp; <strong>Last Updated:</strong> February 27, 2026</p>
-
-                <p>Blooming Kids House ("we," "us," "our") operates this Parent Portal to provide parents and guardians with secure access to their children's academic progress reports, homework assignments, and related educational data. This Privacy Policy explains how we collect, use, store, and protect your personal information in compliance with the General Data Protection Regulation (GDPR), the California Consumer Privacy Act (CCPA), and the Nigeria Data Protection Act (NDPA) 2023.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">1. Information We Collect</h4>
-                <p><strong>Account Information:</strong> When you register, we collect your phone number, email address, and a password. We also generate a unique referral code for your account.</p>
-                <p><strong>Children's Data:</strong> We access your children's student records, academic assessment results, monthly progress reports, homework assignments, session topics, and tutor feedback. This data is linked to your account via phone number or email matching.</p>
-                <p><strong>Usage Data:</strong> We store authentication state and basic preferences (e.g., "Remember Me" email) in your browser's local storage.</p>
-                <p><strong>Uploaded Content:</strong> Homework submissions uploaded via the Cloudinary upload widget are stored in our Cloudinary account.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">2. How We Use Your Information</h4>
-                <p>We use your data exclusively to: authenticate your identity, display your children's academic reports and homework, enable homework submission and grade viewing, operate the referral rewards program, process feedback you submit, and send password reset emails.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">3. Data Storage &amp; Security</h4>
-                <p>Your data is stored in Google Firebase (Firestore database and Firebase Authentication), hosted within Google Cloud infrastructure. Uploaded files are stored via Cloudinary. All data transmission uses TLS encryption. We implement XSS protection, input sanitization, and URL validation in our application code. Firebase Security Rules restrict database access to authorized users.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">4. Data Sharing</h4>
-                <p>We do not sell, rent, or share your personal information with third parties for marketing purposes. Data may be shared with: Firebase/Google Cloud (infrastructure provider), Cloudinary (file storage), and tutors/staff who submit and review academic reports.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">5. Shared Parent Access</h4>
-                <p>Our portal supports shared access: if you add a secondary contact (mother's/father's phone or guardian email) in Settings, that person can register their own account and view the same child's reports. You are responsible for only adding contacts who have legitimate parental/guardian authority.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">6. Your Rights</h4>
-                <p><strong>Under GDPR (EU residents):</strong> You have the right to access, rectify, erase, restrict processing, data portability, and object to processing of your personal data. Contact us to exercise these rights.</p>
-                <p><strong>Under CCPA (California residents):</strong> You have the right to know what personal information we collect, request deletion, and opt out of the sale of personal information. We do not sell personal information.</p>
-                <p><strong>Under NDPA (Nigeria residents):</strong> You have the right to be informed about data processing, access your data, request correction, and withdraw consent.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">7. Data Retention</h4>
-                <p>Account data is retained for as long as your account is active. Academic reports are retained for the duration of your child's enrollment plus 3 years. You may request account deletion at any time by contacting us.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">8. Children's Privacy</h4>
-                <p>This portal processes children's educational data with the consent of their parent or legal guardian. We do not knowingly collect personal data from children without parental consent. All children's data is accessible only to authorized parents, guardians, and school staff.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">9. Cookies &amp; Local Storage</h4>
-                <p>We use browser local storage to maintain login state and "Remember Me" preferences. We do not use third-party tracking cookies or analytics scripts.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">10. Contact</h4>
-                <p>For privacy inquiries, data requests, or complaints, contact us at: <strong>info@bloomingkidshouse.com</strong></p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Terms of Service Modal -->
-    <div id="termsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
-        <div class="bg-white rounded-2xl p-6 md:p-8 max-w-3xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-2xl font-bold text-gray-800">Terms of Service</h3>
-                <button onclick="document.getElementById('termsModal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
-            </div>
-            <div class="text-gray-700 text-sm space-y-4 leading-relaxed">
-                <p><strong>Effective Date:</strong> February 27, 2026</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">1. Acceptance</h4>
-                <p>By creating an account or using this Parent Portal, you agree to these Terms of Service and our Privacy Policy. If you do not agree, please do not use this service.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">2. Eligibility</h4>
-                <p>This portal is intended for use by parents and legal guardians of students enrolled at Blooming Kids House. You must be at least 18 years old to register.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">3. Account Responsibilities</h4>
-                <p>You are responsible for maintaining the confidentiality of your password and for all activity under your account. Notify us immediately of any unauthorized access. You agree to provide accurate and complete registration information.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">4. Permitted Use</h4>
-                <p>You may use this portal to: view your children's academic reports and progress, submit and manage homework assignments, participate in the referral program, submit feedback to school staff, and manage your family's profile settings.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">5. Prohibited Conduct</h4>
-                <p>You may not: attempt to access other parents' or students' data, use automated tools to scrape or extract data, interfere with the portal's operation, submit false or misleading feedback, or share your login credentials with unauthorized persons.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">6. Referral Program</h4>
-                <p>Referral rewards (&#8358;5,000 per qualifying referral) are subject to verification by Blooming Kids House. A referral qualifies when the referred student completes their first month of enrollment. Blooming Kids House reserves the right to modify or terminate the referral program at any time.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">7. Intellectual Property</h4>
-                <p>All content, design, and code of this portal are the property of Blooming Kids House. Academic reports and assessment data remain the intellectual property of Blooming Kids House and its tutors.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">8. Disclaimer</h4>
-                <p>This portal is provided "as is." We make no warranties regarding uninterrupted service, data accuracy, or fitness for a particular purpose. Report data is provided by tutors and assessors; Blooming Kids House is not liable for errors in submitted reports.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">9. Limitation of Liability</h4>
-                <p>To the maximum extent permitted by law, Blooming Kids House shall not be liable for any indirect, incidental, or consequential damages arising from your use of this portal.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">10. Modifications</h4>
-                <p>We may update these Terms at any time. Continued use after changes constitutes acceptance. We will notify registered users of material changes via email.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">11. Governing Law</h4>
-                <p>These Terms are governed by the laws of the Federal Republic of Nigeria. Disputes shall be resolved in the courts of Lagos, Nigeria.</p>
-
-                <h4 class="font-bold text-gray-900 mt-4">12. Contact</h4>
-                <p>For questions about these Terms, contact us at: <strong>legal@bloomingkidshouse.com</strong></p>
-            </div>
-        </div>
-    </div>
-
-    <script src="parent.js"></script>
+    <script type="module" src="parent.js"></script>
 </body>
 </html>
