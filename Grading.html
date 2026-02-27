@@ -254,23 +254,53 @@ body {
 </div>
 
 
+<!-- ── Portal name override ───────────────────────────────────────────────
+     MUST be set before the module import so firebaseConfig.js picks it up
+     and reuses the same named Firebase app ("tutor-portal") that the tutor
+     portal tab already initialised — giving us access to its auth state.
+─────────────────────────────────────────────────────────────────────── -->
+<script>window.__portalName = 'tutor-portal';</script>
+
 <!-- Firebase module script -->
 <script type="module">
 import { auth, db } from './firebaseConfig.js';
-import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import {
+  onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence
+} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { doc, getDoc, updateDoc, addDoc, collection } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
+// ── Params — URL query string is the primary source; localStorage is the
+//    fallback (tutor.js stores to localStorage before opening this tab).
 const params = new URLSearchParams(location.search);
-const hwId   = params.get('hw')    || sessionStorage.getItem('grading_hw_id')       || '';
-const tEmail = params.get('tutor') || sessionStorage.getItem('grading_tutor_email') || '';
-const tName  = params.get('name')  || sessionStorage.getItem('grading_tutor_name')  || '';
+const hwId   = params.get('hw')    || localStorage.getItem('grading_hw_id')       || '';
+const tEmail = params.get('tutor') || localStorage.getItem('grading_tutor_email') || '';
+const tName  = params.get('name')  || localStorage.getItem('grading_tutor_name')  || '';
+
+// ── Switch to LOCAL persistence so we can read the auth token that
+//    tutor.js wrote to IndexedDB/localStorage before opening this tab.
+//    (firebaseConfig.js sets SESSION by default; we override for this page.)
+try {
+  await setPersistence(auth, browserLocalPersistence);
+} catch (e) {
+  console.warn('grading.html: could not set LOCAL persistence —', e.message);
+}
 
 // Expose to the plain script below
 window._G = { db, doc, updateDoc, addDoc, collection, hwId, tEmail, tName, hw: null };
 
-onAuthStateChanged(auth, async user => {
+// ── One-shot auth check — resolves after Firebase finishes hydrating from
+//    storage. The old streaming listener would permanently show "Not logged
+//    in" whenever it received the initial null emission before hydration
+//    finished, and never recover even when the real user arrived.
+const user = await new Promise(resolve => {
+  const unsub = onAuthStateChanged(auth, u => { unsub(); resolve(u); });
+});
+
+(async () => {
   if (!user) {
-    showLoadErr('🔒', 'Not logged in.', 'Please log in from the Tutor Portal first.');
+    showLoadErr('🔒', 'Not logged in.', 'Please log in from the Tutor Portal first, then click Review again.');
     return;
   }
   if (!hwId) {
@@ -315,7 +345,7 @@ onAuthStateChanged(auth, async user => {
   } catch (err) {
     showLoadErr('❌', 'Error loading.', err.message);
   }
-});
+})();
 
 function loadContent(hw) {
   const area = document.getElementById('canvas-area');
