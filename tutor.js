@@ -1912,9 +1912,191 @@ let btnFloatingMsg = null;
 let btnFloatingInbox = null;
 
 // --- LISTENERS (Memory Management) ---
-let unsubInboxListener = null;
-let unsubChatListener = null;
-let unsubUnreadListener = null;
+let unsubInboxListener   = null;
+let unsubChatListener    = null;
+let unsubUnreadListener  = null;
+
+// --- PERSISTENT SESSION LISTENERS (set up once on login, torn down on signOut) ---
+let _unsubNotifListener    = null;  // tutor_notifications onSnapshot
+let _unsubMgmtReplyListener = null; // tutor_to_management_messages onSnapshot
+let _notifDocs = [];                // live cache of tutor_notification docs
+let _seenNotifIds = new Set();      // IDs we've already alerted on
+let _notifListenerReady = false;    // suppresses audio on first-load batch
+let _tutorAudioCtx = null;          // Web Audio API context (lazy)
+let _unsubNotifListPanel = null;    // per-modal onSnapshot for the alerts list panel
+
+// ── Audio: two-note chime (no external files) ──
+function _tutorPlayChime() {
+    if (!_tutorAudioCtx) {
+        try { _tutorAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        catch(e) { return; }
+    }
+    const ctx = _tutorAudioCtx;
+    if (ctx.state === 'suspended') ctx.resume();
+    function note(freq, start, dur) {
+        const osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'sine'; osc.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(0.15, start + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+        osc.start(start); osc.stop(start + dur);
+    }
+    const t = ctx.currentTime;
+    note(880,  t,       0.3);
+    note(1109, t + 0.18, 0.4);
+}
+
+// ── Slide-in toast (top-right, 6-second auto-dismiss) ──
+function _tutorShowToast(title, message, icon) {
+    if (!document.getElementById('_tutor-toast-css')) {
+        const s = document.createElement('style'); s.id = '_tutor-toast-css';
+        s.textContent = `
+            @keyframes _ttrIn  { from{transform:translateX(110%);opacity:0} to{transform:translateX(0);opacity:1} }
+            @keyframes _ttrOut { from{transform:translateX(0);opacity:1}   to{transform:translateX(110%);opacity:0} }
+            ._tutor-toast            { animation:_ttrIn  0.35s cubic-bezier(.22,.68,0,1.2) forwards; }
+            ._tutor-toast.dismissing { animation:_ttrOut 0.28s ease-in forwards; }
+        `;
+        document.head.appendChild(s);
+    }
+    const offset = document.querySelectorAll('._tutor-toast').length * 80;
+    const t = document.createElement('div');
+    t.className = '_tutor-toast';
+    t.style.cssText = `position:fixed;top:${68 + offset}px;right:14px;z-index:99999;`
+        + `display:flex;align-items:flex-start;gap:10px;`
+        + `background:#fff;border:1px solid #e5e7eb;border-radius:14px;`
+        + `box-shadow:0 8px 32px rgba(0,0,0,.18);padding:12px 14px;`
+        + `width:290px;max-width:92vw;cursor:pointer;`;
+    t.innerHTML = `
+        <span style="font-size:1.4rem;line-height:1;flex-shrink:0;margin-top:1px;">${icon||'🔔'}</span>
+        <div style="flex:1;min-width:0;">
+            <div style="font-weight:700;font-size:.82rem;color:#1f2937;line-height:1.3;margin-bottom:2px;">${msgEscapeHtml(title)}</div>
+            <div style="font-size:.73rem;color:#6b7280;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${msgEscapeHtml(message)}</div>
+        </div>
+        <button style="background:none;border:none;color:#d1d5db;font-size:1.1rem;cursor:pointer;line-height:1;flex-shrink:0;padding:0;">&times;</button>
+    `;
+    document.body.appendChild(t);
+    function dismiss() {
+        t.classList.add('dismissing');
+        t.addEventListener('animationend', () => t.remove(), { once: true });
+    }
+    t.querySelector('button').addEventListener('click', e => { e.stopPropagation(); dismiss(); });
+    t.addEventListener('click', dismiss);
+    const timer = setTimeout(dismiss, 6000);
+    t.addEventListener('animationend', () => clearTimeout(timer), { once: true });
+}
+
+// ── Badge refresh: reads from live in-memory state ──
+function _refreshTutorBadges() {
+    const unreadNotifs  = _notifDocs.filter(d => d.data().read === false).length;
+    const convUnread    = msgSectionUnreadCount; // kept live by initializeUnreadListener
+    const total         = unreadNotifs + convUnread;
+
+    // Update floating button badges
+    [document.querySelector('.floating-messaging-btn'), document.querySelector('.floating-inbox-btn')].forEach(btn => {
+        if (!btn) return;
+        let badge = btn.querySelector('.unread-badge');
+        if (total > 0) {
+            if (!badge) { badge = document.createElement('span'); badge.className = 'unread-badge'; btn.appendChild(badge); }
+            badge.textContent = total > 99 ? '99+' : total;
+            badge.style.display = '';
+        } else if (badge) {
+            badge.style.display = 'none';
+        }
+    });
+
+    // Update badge inside open inbox modal
+    const modalBadge = document.querySelector('#notif-badge-count');
+    if (modalBadge) modalBadge.textContent = unreadNotifs > 0 ? unreadNotifs : '';
+}
+
+// ── Teardown: call on signOut ──
+function _teardownTutorListeners() {
+    if (_unsubNotifListener)     { try { _unsubNotifListener();     } catch(_) {} _unsubNotifListener     = null; }
+    if (_unsubMgmtReplyListener) { try { _unsubMgmtReplyListener(); } catch(_) {} _unsubMgmtReplyListener = null; }
+    if (_unsubNotifListPanel)    { try { _unsubNotifListPanel();    } catch(_) {} _unsubNotifListPanel    = null; }
+    _notifDocs = [];
+    _seenNotifIds.clear();
+    _notifListenerReady = false;
+}
+window._teardownTutorListeners = _teardownTutorListeners;
+
+// ── Main init: called once on login ──
+function initPersistentTutorListeners(tutorData) {
+    _teardownTutorListeners(); // clean up any stale session
+
+    const email   = tutorData.email;
+    const tutorId = tutorData.messagingId || tutorData.id;
+
+    // 1. tutor_notifications — live cache + badge + chime/toast on new arrivals
+    //    Single where() only; no compound index needed.
+    _unsubNotifListener = onSnapshot(
+        query(collection(db, 'tutor_notifications'), where('tutorEmail', '==', email), limit(50)),
+        snap => {
+            _notifDocs = snap.docs; // update live cache
+
+            // Detect genuinely new docs (added since page load)
+            snap.docChanges().forEach(ch => {
+                if (ch.type !== 'added') return;
+                const id   = ch.doc.id;
+                const data = ch.doc.data();
+                if (_seenNotifIds.has(id)) return;
+                _seenNotifIds.add(id);
+                if (!_notifListenerReady) return; // suppress first batch
+
+                // Play chime + show toast for any new unread notification
+                if (data.read === false) {
+                    const icon = data.type === 'management_reply' ? '📩'
+                               : data.type === 'broadcast'        ? '📢'
+                               : data.type === 'new_student'      ? '👤'
+                               : '🔔';
+                    _tutorPlayChime();
+                    _tutorShowToast(data.title || data.subject || 'New Notification', data.message || '', icon);
+                }
+            });
+
+            // Seed seen-set on first load (no chime for existing docs)
+            if (!_notifListenerReady) {
+                snap.docs.forEach(d => _seenNotifIds.add(d.id));
+                _notifListenerReady = true;
+            }
+
+            _refreshTutorBadges();
+
+            // If the notifications panel is open, re-render it live
+            const container = document.querySelector('#notifications-list');
+            if (container) _renderNotifList(container, snap.docs);
+        },
+        err => console.warn('tutor_notifications listener:', err.message)
+    );
+
+    // 2. tutor_to_management_messages — alert tutor on management replies
+    //    Single where() only.
+    _unsubMgmtReplyListener = onSnapshot(
+        query(collection(db, 'tutor_to_management_messages'), where('tutorEmail', '==', email), limit(20)),
+        snap => {
+            snap.docChanges().forEach(ch => {
+                if (ch.type !== 'modified') return; // only care about replies being added
+                const data = ch.doc.data();
+                if (!data.replied) return;
+                const lastReply = Array.isArray(data.managementReplies) && data.managementReplies.length > 0
+                    ? data.managementReplies[data.managementReplies.length - 1]
+                    : null;
+                if (!lastReply) return;
+                // Only alert if reply is recent (within last 60 seconds)
+                const repliedAt = lastReply.repliedAt?.toDate ? lastReply.repliedAt.toDate() : new Date(lastReply.repliedAt || 0);
+                if (Date.now() - repliedAt.getTime() > 60000) return;
+                _tutorPlayChime();
+                _tutorShowToast(
+                    `📩 Reply: ${data.subject || 'Your message'}`,
+                    lastReply.message || 'Management replied to your message',
+                    '📩'
+                );
+            });
+        },
+        err => console.warn('tutor_to_management_messages listener:', err.message)
+    );
+}
 
 // --- UTILITY FUNCTIONS ---
 
@@ -1978,7 +2160,7 @@ function initializeFloatingMessagingButton() {
 // --- BACKGROUND LISTENERS ---
 
 function initializeUnreadListener() {
-    const tutorId = window.tutorData.messagingId || window.tutorData.id;
+    const tutorId    = window.tutorData.messagingId || window.tutorData.id;
     const tutorEmail = window.tutorData.email;
     if (unsubUnreadListener) unsubUnreadListener();
 
@@ -1987,7 +2169,7 @@ function initializeUnreadListener() {
         where("participants", "array-contains", tutorId)
     );
 
-    unsubUnreadListener = onSnapshot(q, async (snapshot) => {
+    unsubUnreadListener = onSnapshot(q, (snapshot) => {
         let count = 0;
         snapshot.forEach(doc => {
             const data = doc.data();
@@ -1996,20 +2178,9 @@ function initializeUnreadListener() {
             }
         });
         
-        // Also count unread tutor_notifications
-        if (tutorEmail) {
-            try {
-                const nSnap = await getDocs(query(
-                    collection(db, "tutor_notifications"),
-                    where("tutorEmail", "==", tutorEmail),
-                    where("read", "==", false)
-                ));
-                count += nSnap.size;
-            } catch(e) { /* ignore */ }
-        }
-        
         msgSectionUnreadCount = count;
-        updateFloatingBadges();
+        // Badge refresh uses in-memory _notifDocs (kept live by initPersistentTutorListeners)
+        _refreshTutorBadges();
     });
 }
 
@@ -2021,20 +2192,8 @@ window.updateUnreadMessageCount = function() {
 };
 
 function updateFloatingBadges() {
-    const updateBadge = (btn) => {
-        if (!btn) return;
-        const existing = btn.querySelector('.unread-badge');
-        if (existing) existing.remove();
-
-        if (msgSectionUnreadCount > 0) {
-            const badge = document.createElement('span');
-            badge.className = 'unread-badge';
-            badge.textContent = msgSectionUnreadCount > 99 ? '99+' : msgSectionUnreadCount;
-            btn.appendChild(badge);
-        }
-    };
-    updateBadge(btnFloatingMsg);
-    updateBadge(btnFloatingInbox);
+    // Delegates to the unified badge refresh which reads live in-memory state
+    _refreshTutorBadges();
 }
 
 // --- FEATURE 1: SEND MESSAGE MODAL (SIMPLIFIED – unified selectable list) ---
@@ -2637,34 +2796,109 @@ function closeInbox(modal) {
     modal.remove();
 }
 
-async function loadNotificationBadge(modal) {
-    try {
-        const tutorEmail = window.tutorData?.email;
-        const tutorId = window.tutorData?.id;
-        if (!tutorEmail) return;
+function loadNotificationBadge(modal) {
+    // Reads from in-memory _notifDocs — no Firestore read needed.
+    // _refreshTutorBadges also updates the modal badge via #notif-badge-count.
+    _refreshTutorBadges();
+}
 
-        // Count unread tutor_notifications
-        const q = query(collection(db, "tutor_notifications"), where("tutorEmail", "==", tutorEmail), where("read", "==", false));
-        const snap = await getDocs(q);
-        let count = snap.size;
+// ── Reusable renderer: called by both loadTutorNotifications and the live listener ──
+function _renderNotifList(container, notifDocs) {
+    const tutorId    = window.tutorData?.id;
+    const tutorEmail = window.tutorData?.email;
 
-        // Also count conversations with unread replies from others
-        try {
-            const convQ = query(collection(db, "conversations"), where("tutorEmail", "==", tutorEmail));
-            const convSnap = await getDocs(convQ);
-            convSnap.forEach(d => {
-                const c = d.data();
-                if (c.lastSenderId && c.lastSenderId !== tutorId && (c.unreadCount || 0) > 0) count++;
-            });
-        } catch(e) {}
+    // Sort by createdAt descending client-side
+    const sorted = [...notifDocs].sort((a, b) => {
+        const ta = a.data().createdAt?.toDate?.() || new Date(0);
+        const tb = b.data().createdAt?.toDate?.() || new Date(0);
+        return tb - ta;
+    });
 
-        const badge = modal?.querySelector('#notif-badge-count');
-        if (badge) badge.textContent = count > 0 ? count : '';
+    // Build the notifications section
+    let notifHTML = '';
+    if (sorted.length > 0) {
+        const unreadCount = sorted.filter(d => !d.data().read).length;
+        notifHTML += `<div style="padding:8px 14px;background:#eff6ff;font-size:.68rem;font-weight:800;color:#1d4ed8;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #dbeafe;">🔔 System Notifications (${sorted.length}${unreadCount > 0 ? ` · ${unreadCount} unread` : ''})</div>`;
+    }
 
-        // Also update the floating inbox button badge
-        const floatingBadge = document.querySelector('.floating-inbox-btn .unread-badge');
-        if (floatingBadge) { floatingBadge.textContent = count > 0 ? count : ''; floatingBadge.style.display = count > 0 ? '' : 'none'; }
-    } catch(e) { console.warn('Badge load error:', e); }
+    sorted.forEach(d => {
+        const notif   = d.data();
+        const isUnread = !notif.read;
+        const time     = notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleDateString('en-NG', {day:'numeric',month:'short',year:'numeric'}) : '';
+        const typeIcon = notif.type === 'broadcast'        ? '📢'
+                       : notif.type === 'management_reply' ? '📩'
+                       : notif.type === 'new_student'      ? '👤'
+                       : notif.type === 'student_approved' ? '✅'
+                       : '🔔';
+        const priorityStyle = notif.priority === 'urgent'    ? 'border-left:4px solid #ef4444;'
+                            : notif.priority === 'important' ? 'border-left:4px solid #f59e0b;'
+                            : 'border-left:4px solid #10b981;';
+
+        const el = document.createElement('div');
+        el.dataset.docId = d.id;
+        el.style.cssText = `padding:12px 14px;border-bottom:1px solid #f3f4f6;cursor:pointer;${isUnread ? 'background:#eff6ff;' : 'background:#fff;'}${priorityStyle}`;
+        el.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+                <div style="font-weight:${isUnread?'700':'600'};font-size:0.8rem;color:#1f2937;">${typeIcon} ${msgEscapeHtml(notif.title || notif.subject || (notif.type||'').replace(/_/g,' ') || 'Notification')}</div>
+                ${isUnread ? '<span style="background:#ef4444;color:#fff;border-radius:9999px;padding:1px 7px;font-size:0.65rem;font-weight:700;">NEW</span>' : ''}
+            </div>
+            <div style="font-size:0.75rem;color:#374151;line-height:1.4;">${msgEscapeHtml((notif.message||'').substring(0,120))}${(notif.message||'').length>120?'…':''}</div>
+            <div style="font-size:0.7rem;color:#9ca3af;margin-top:4px;">📅 ${time}${notif.senderDisplay ? ' · From: '+msgEscapeHtml(notif.senderDisplay) : ''}</div>
+        `;
+        el.onmouseover = () => { el.style.background = '#f0fdf4'; };
+        el.onmouseout  = () => { el.style.background = isUnread ? '#eff6ff' : '#fff'; };
+        el.onclick = async () => {
+            // Mark as read immediately in Firestore — listener will update _notifDocs automatically
+            try { await updateDoc(doc(db, 'tutor_notifications', d.id), { read: true }); } catch(e){}
+            el.style.background = '#fff';
+            el.querySelector('[style*="border-radius:9999px"]')?.remove?.();
+
+            // Show full message in right panel
+            const modal  = el.closest('[id^="inbox"]') || document.querySelector('.enhanced-messaging-modal') || document.body;
+            const chatTitle = modal.querySelector?.('#chat-title');
+            const chatMsgs  = modal.querySelector?.('#chat-messages');
+            const chatInp   = modal.querySelector?.('#chat-inputs');
+            if (chatTitle) chatTitle.textContent = `${typeIcon} ${notif.title || notif.subject || 'Notification'}`;
+            if (chatInp)   chatInp.style.display = 'none';
+
+            if (chatMsgs) {
+                if (notif.type === 'new_student') {
+                    const subjectsDisplay = Array.isArray(notif.subjects) ? notif.subjects.join(', ') : (notif.subjects || 'N/A');
+                    chatMsgs.innerHTML = `
+                        <div style="background:#fff;border-radius:16px;padding:0;box-shadow:0 2px 12px rgba(0,0,0,.1);overflow:hidden;margin:8px;">
+                            <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:18px 20px;display:flex;align-items:center;gap:12px;">
+                                <div style="width:44px;height:44px;background:rgba(255,255,255,.2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0;">👤</div>
+                                <div><div style="color:#fff;font-weight:900;font-size:1rem;">New Student Assigned!</div><div style="color:#bfdbfe;font-size:.78rem;margin-top:2px;">From Management · ${msgEscapeHtml(time)}</div></div>
+                            </div>
+                            <div style="padding:18px 20px;">
+                                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                                    <div style="width:44px;height:44px;border-radius:12px;background:#dbeafe;color:#1d4ed8;font-weight:900;font-size:1.1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${msgEscapeHtml((notif.studentName||'?').charAt(0).toUpperCase())}</div>
+                                    <div><div style="font-weight:800;font-size:1rem;color:#1e293b;">${msgEscapeHtml(notif.studentName||'N/A')}</div><div style="font-size:.78rem;color:#64748b;">${msgEscapeHtml(notif.grade||'')}</div></div>
+                                </div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:.82rem;">
+                                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;"><div style="font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">📅 Schedule</div><div style="font-weight:700;color:#1e293b;">${msgEscapeHtml(notif.academicDays||'N/A')}</div><div style="color:#64748b;">${msgEscapeHtml(notif.academicTime||'')}</div></div>
+                                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;"><div style="font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">📚 Subjects</div><div style="font-weight:700;color:#1e293b;">${msgEscapeHtml(subjectsDisplay)}</div></div>
+                                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;"><div style="font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">👨‍👩‍👧 Parent</div><div style="font-weight:700;color:#1e293b;">${msgEscapeHtml(notif.parentName||'N/A')}</div><div style="color:#64748b;">${msgEscapeHtml(notif.parentPhone||'')}</div></div>
+                                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;"><div style="font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">💰 Fee</div><div style="font-weight:800;color:#065f46;font-size:.95rem;">₦${(notif.studentFee||0).toLocaleString()}</div></div>
+                                </div>
+                                ${notif.parentEmail ? `<div style="margin-top:10px;background:#eff6ff;border-radius:8px;padding:8px 12px;font-size:.78rem;color:#1d4ed8;">✉️ ${msgEscapeHtml(notif.parentEmail)}</div>` : ''}
+                                <div style="margin-top:14px;background:#d1fae5;border-radius:10px;padding:10px 14px;font-size:.8rem;color:#065f46;font-weight:600;">✅ This student's schedule has been automatically added to your Schedule Management tab.</div>
+                            </div>
+                        </div>`;
+                } else {
+                    chatMsgs.innerHTML = `
+                        <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.1);margin:8px;">
+                            <div style="font-weight:800;font-size:1rem;color:#1f2937;margin-bottom:8px;">${typeIcon} ${msgEscapeHtml(notif.title || notif.subject || 'Notification')}</div>
+                            ${notif.priority && notif.priority !== 'normal' ? `<div style="display:inline-block;background:${notif.priority==='urgent'?'#fee2e2':'#fef3c7'};color:${notif.priority==='urgent'?'#991b1b':'#92400e'};padding:2px 10px;border-radius:999px;font-size:0.75rem;font-weight:700;margin-bottom:10px;">${notif.priority.toUpperCase()}</div>` : ''}
+                            <p style="color:#374151;line-height:1.6;white-space:pre-wrap;">${msgEscapeHtml(notif.message||'')}</p>
+                            ${notif.fileUrl ? `<div style="margin-top:12px;">${notif.fileType==='image' ? `<img src="${msgEscapeHtml(notif.fileUrl)}" style="max-width:100%;border-radius:10px;cursor:pointer;" onclick="window.open('${msgEscapeHtml(notif.fileUrl)}','_blank')">` : `<a href="${msgEscapeHtml(notif.fileUrl)}" target="_blank" style="color:#2563eb;text-decoration:underline;font-size:.875rem;">📎 View Attachment</a>`}</div>` : ''}
+                            <div style="margin-top:16px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:0.75rem;color:#9ca3af;">From: ${msgEscapeHtml(notif.senderDisplay || notif.sentBy || 'Management')} · ${time}</div>
+                        </div>`;
+                }
+            }
+        };
+        container.appendChild(el);
+    });
 }
 
 async function loadTutorNotifications(modal) {
@@ -2672,35 +2906,20 @@ async function loadTutorNotifications(modal) {
     if (!container) return;
     container.innerHTML = '<div style="padding:16px;text-align:center;"><div class="spinner" style="margin:auto;"></div></div>';
     const tutorEmail = window.tutorData?.email;
-    const tutorId = window.tutorData?.id;
+    const tutorId    = window.tutorData?.id;
     if (!tutorEmail) { container.innerHTML = '<div style="padding:16px;color:#9ca3af;text-align:center;">No email found.</div>'; return; }
-    
+
     try {
-        // ── Part A: unread message replies from conversations ──
+        // ── Part A: unread message replies from conversations (two complementary queries merged) ──
         let replyItems = [];
         try {
-            // Look for conversations where someone else sent the last message
-            const convQ = query(
-                collection(db, "conversations"),
-                where("tutorEmail", "==", tutorEmail)
-            );
-            const convSnap = await getDocs(convQ);
-            convSnap.forEach(d => {
-                const c = d.data();
-                // Only show if last message was from someone else and there are unread messages
-                if (c.lastSenderId && c.lastSenderId !== tutorId && (c.unreadCount || 0) > 0) {
-                    replyItems.push({ id: d.id, ...c });
-                }
-            });
-            // Also check by participants
-            const convQ2 = query(
-                collection(db, "conversations"),
-                where("participants", "array-contains", tutorId)
-            );
-            const convSnap2 = await getDocs(convQ2);
-            const seen = new Set(replyItems.map(r => r.id));
-            convSnap2.forEach(d => {
-                if (seen.has(d.id)) return;
+            const [convSnap1, convSnap2] = await Promise.all([
+                getDocs(query(collection(db, 'conversations'), where('tutorEmail',    '==',            tutorEmail))),
+                getDocs(query(collection(db, 'conversations'), where('participants', 'array-contains', tutorId))),
+            ]);
+            const seen = new Set();
+            [...convSnap1.docs, ...convSnap2.docs].forEach(d => {
+                if (seen.has(d.id)) return; seen.add(d.id);
                 const c = d.data();
                 if (c.lastSenderId && c.lastSenderId !== tutorId && (c.unreadCount || 0) > 0) {
                     replyItems.push({ id: d.id, ...c });
@@ -2713,13 +2932,9 @@ async function loadTutorNotifications(modal) {
             });
         } catch(e) { console.warn('Reply fetch error:', e); }
 
-        // ── Part B: tutor_notifications ──
-        const q = query(collection(db, "tutor_notifications"), where("tutorEmail", "==", tutorEmail), orderBy("createdAt", "desc"), limit(50));
-        const snap = await getDocs(q);
-        
         container.innerHTML = '';
 
-        // ── Render reply notifications first ──
+        // ── Render reply notifications ──
         if (replyItems.length > 0) {
             const replyHeader = document.createElement('div');
             replyHeader.style.cssText = 'padding:8px 14px;background:#f0fdf4;font-size:.68rem;font-weight:800;color:#15803d;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #dcfce7;';
@@ -2728,13 +2943,12 @@ async function loadTutorNotifications(modal) {
 
             replyItems.forEach(conv => {
                 const otherName = conv.studentName || conv.tutorName || 'Someone';
-                const lastMsg = conv.lastMessage || '';
-                const lastTime = conv.lastMessageTimestamp?.toDate
+                const lastMsg   = conv.lastMessage || '';
+                const lastTime  = conv.lastMessageTimestamp?.toDate
                     ? conv.lastMessageTimestamp.toDate().toLocaleDateString('en-NG', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
                     : '';
-                const unread = conv.unreadCount || 0;
-
-                const el = document.createElement('div');
+                const unread    = conv.unreadCount || 0;
+                const el        = document.createElement('div');
                 el.style.cssText = 'padding:12px 14px;border-bottom:1px solid #f3f4f6;cursor:pointer;background:#f0fdf4;border-left:4px solid #16a34a;';
                 el.innerHTML = `
                     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
@@ -2747,7 +2961,6 @@ async function loadTutorNotifications(modal) {
                 el.onmouseover = () => { el.style.background = '#dcfce7'; };
                 el.onmouseout  = () => { el.style.background = '#f0fdf4'; };
                 el.onclick = () => {
-                    // Switch to Chats tab and open this conversation
                     const tabBtn = modal.querySelector('#tab-messages');
                     if (tabBtn) { window.switchInboxTab('messages', tabBtn); }
                     setTimeout(() => msgLoadChat(conv.id, otherName, modal, tutorId), 100);
@@ -2756,119 +2969,21 @@ async function loadTutorNotifications(modal) {
             });
         }
 
-        if (snap.empty && replyItems.length === 0) {
+        // ── Part B: tutor_notifications — render from live in-memory cache ──
+        // _notifDocs is kept live by initPersistentTutorListeners.
+        // If empty (e.g. listener not yet fired), fall back to a single getDocs.
+        const liveDocs = _notifDocs.length > 0
+            ? _notifDocs
+            : (await getDocs(query(collection(db, 'tutor_notifications'), where('tutorEmail', '==', tutorEmail), limit(50)))).docs;
+
+        if (liveDocs.length === 0 && replyItems.length === 0) {
             container.innerHTML = '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:0.875rem;">No notifications yet.</div>';
             return;
         }
 
-        if (!snap.empty) {
-            const notifHeader = document.createElement('div');
-            notifHeader.style.cssText = 'padding:8px 14px;background:#eff6ff;font-size:.68rem;font-weight:800;color:#1d4ed8;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #dbeafe;';
-            notifHeader.textContent = `🔔 System Notifications (${snap.size})`;
-            container.appendChild(notifHeader);
-        }
-        
-        snap.forEach(d => {
-            const notif = d.data();
-            const isUnread = !notif.read;
-            const time = notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleDateString('en-NG', {day:'numeric',month:'short',year:'numeric'}) : '';
-            const typeIcon = notif.type === 'broadcast' ? '📢' : notif.type === 'new_student' ? '👤' : notif.type === 'student_approved' ? '✅' : '🔔';
-            const priorityStyle = notif.priority === 'urgent' ? 'border-left:4px solid #ef4444;' : notif.priority === 'important' ? 'border-left:4px solid #f59e0b;' : 'border-left:4px solid #10b981;';
-            
-            const el = document.createElement('div');
-            el.style.cssText = `padding:12px 14px;border-bottom:1px solid #f3f4f6;cursor:pointer;${isUnread ? 'background:#eff6ff;' : 'background:#fff;'}${priorityStyle}`;
-            el.innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
-                    <div style="font-weight:${isUnread?'700':'600'};font-size:0.8rem;color:#1f2937;">${typeIcon} ${msgEscapeHtml(notif.title || notif.subject || notif.type?.replace(/_/g,' ') || 'Notification')}</div>
-                    ${isUnread ? '<span style="background:#ef4444;color:#fff;border-radius:9999px;padding:1px 7px;font-size:0.65rem;font-weight:700;">NEW</span>' : ''}
-                </div>
-                <div style="font-size:0.75rem;color:#374151;line-height:1.4;">${msgEscapeHtml((notif.message||'').substring(0,120))}${(notif.message||'').length>120?'…':''}</div>
-                <div style="font-size:0.7rem;color:#9ca3af;margin-top:4px;">📅 ${time}${notif.senderDisplay ? ' · From: '+msgEscapeHtml(notif.senderDisplay) : ''}</div>
-            `;
-            el.onmouseover = () => { el.style.background = '#f0fdf4'; };
-            el.onmouseout = () => { el.style.background = isUnread ? '#eff6ff' : '#fff'; };
-            el.onclick = async () => {
-                // Mark as read
-                try { await updateDoc(doc(db, "tutor_notifications", d.id), { read: true }); } catch(e){}
-                el.style.background = '#fff';
-                // Show full message in right panel
-                modal.querySelector('#chat-title').textContent = `${typeIcon} ${notif.title || notif.subject || 'Notification'}`;
-                modal.querySelector('#chat-inputs').style.display = 'none';
+        _renderNotifList(container, liveDocs);
+        _refreshTutorBadges();
 
-                // Rich card for new_student type — matches assign-new-class style
-                if (notif.type === 'new_student') {
-                    const subjectsDisplay = Array.isArray(notif.subjects) ? notif.subjects.join(', ') : (notif.subjects || 'N/A');
-                    modal.querySelector('#chat-messages').innerHTML = `
-                        <div style="background:#fff;border-radius:16px;padding:0;box-shadow:0 2px 12px rgba(0,0,0,.1);overflow:hidden;margin:8px;">
-                            <!-- Header banner -->
-                            <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:18px 20px;display:flex;align-items:center;gap:12px;">
-                                <div style="width:44px;height:44px;background:rgba(255,255,255,.2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0;">👤</div>
-                                <div>
-                                    <div style="color:#fff;font-weight:900;font-size:1rem;">New Student Assigned!</div>
-                                    <div style="color:#bfdbfe;font-size:.78rem;margin-top:2px;">From Management · ${msgEscapeHtml(time)}</div>
-                                </div>
-                            </div>
-                            <!-- Body -->
-                            <div style="padding:18px 20px;">
-                                <!-- Student name + grade -->
-                                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-                                    <div style="width:44px;height:44px;border-radius:12px;background:#dbeafe;color:#1d4ed8;font-weight:900;font-size:1.1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                                        ${msgEscapeHtml((notif.studentName||'?').charAt(0).toUpperCase())}
-                                    </div>
-                                    <div>
-                                        <div style="font-weight:800;font-size:1rem;color:#1e293b;">${msgEscapeHtml(notif.studentName||'N/A')}</div>
-                                        <div style="font-size:.78rem;color:#64748b;">${msgEscapeHtml(notif.grade||'')}</div>
-                                    </div>
-                                </div>
-                                <!-- Details grid -->
-                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:.82rem;">
-                                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;">
-                                        <div style="font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">📅 Schedule</div>
-                                        <div style="font-weight:700;color:#1e293b;">${msgEscapeHtml(notif.academicDays||'N/A')}</div>
-                                        <div style="color:#64748b;">${msgEscapeHtml(notif.academicTime||'')}</div>
-                                    </div>
-                                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;">
-                                        <div style="font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">📚 Subjects</div>
-                                        <div style="font-weight:700;color:#1e293b;">${msgEscapeHtml(subjectsDisplay)}</div>
-                                    </div>
-                                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;">
-                                        <div style="font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">👨‍👩‍👧 Parent</div>
-                                        <div style="font-weight:700;color:#1e293b;">${msgEscapeHtml(notif.parentName||'N/A')}</div>
-                                        <div style="color:#64748b;">${msgEscapeHtml(notif.parentPhone||'')}</div>
-                                    </div>
-                                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;">
-                                        <div style="font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">💰 Fee</div>
-                                        <div style="font-weight:800;color:#065f46;font-size:.95rem;">₦${(notif.studentFee||0).toLocaleString()}</div>
-                                    </div>
-                                </div>
-                                ${notif.parentEmail ? `<div style="margin-top:10px;background:#eff6ff;border-radius:8px;padding:8px 12px;font-size:.78rem;color:#1d4ed8;">✉️ ${msgEscapeHtml(notif.parentEmail)}</div>` : ''}
-                                <div style="margin-top:14px;background:#d1fae5;border-radius:10px;padding:10px 14px;font-size:.8rem;color:#065f46;font-weight:600;">
-                                    ✅ This student's schedule has been automatically added to your Schedule Management tab.
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    modal.querySelector('#chat-messages').innerHTML = `
-                        <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.1);margin:8px;">
-                            <div style="font-weight:800;font-size:1rem;color:#1f2937;margin-bottom:8px;">${typeIcon} ${msgEscapeHtml(notif.title || notif.subject || 'Notification')}</div>
-                            ${notif.priority && notif.priority !== 'normal' ? `<div style="display:inline-block;background:${notif.priority==='urgent'?'#fee2e2':'#fef3c7'};color:${notif.priority==='urgent'?'#991b1b':'#92400e'};padding:2px 10px;border-radius:999px;font-size:0.75rem;font-weight:700;margin-bottom:10px;">${notif.priority.toUpperCase()}</div>` : ''}
-                            <p style="color:#374151;line-height:1.6;white-space:pre-wrap;">${msgEscapeHtml(notif.message||'')}</p>
-                            ${notif.fileUrl ? `<div style="margin-top:12px;">${notif.fileType==='image' ? `<img src="${msgEscapeHtml(notif.fileUrl)}" style="max-width:100%;border-radius:10px;cursor:pointer;" onclick="window.open('${msgEscapeHtml(notif.fileUrl)}','_blank')">` : `<a href="${msgEscapeHtml(notif.fileUrl)}" target="_blank" style="color:#2563eb;text-decoration:underline;font-size:.875rem;">📎 View Attachment</a>`}</div>` : ''}
-                            <div style="margin-top:16px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:0.75rem;color:#9ca3af;">
-                                From: ${msgEscapeHtml(notif.senderDisplay || notif.sentBy || 'Management')} · ${time}
-                            </div>
-                        </div>
-                    `;
-                }
-                // Reload badge
-                loadNotificationBadge(modal);
-            };
-            container.appendChild(el);
-        });
-        
-        // Update badge
-        loadNotificationBadge(modal);
     } catch(err) {
         console.error('Load notifications error:', err);
         container.innerHTML = '<div style="padding:16px;color:#ef4444;text-align:center;">Failed to load notifications.</div>';
@@ -6167,18 +6282,16 @@ async function initTutorApp() {
                 // Auto-sync student schedules on login
                 setTimeout(() => autoSyncStudentSchedules(tutorData), 3000);
                 
+                // Set up all persistent real-time listeners immediately (no delay, no polling)
+                initPersistentTutorListeners(tutorData);
+
                 // Initialize floating messaging and inbox buttons
-                setTimeout(() => {
-                    initializeFloatingMessagingButton();
-                    updateUnreadMessageCount(); // Check for unread messages
-                    
-                    // Set up periodic refresh of unread count (every 30 seconds)
-                    setInterval(updateUnreadMessageCount, 30000);
-                }, 1000);
-                
+                initializeFloatingMessagingButton();
+
+                // Schedule manager (async, can be deferred slightly)
                 setTimeout(async () => {
                     await initScheduleManager(tutorData);
-                }, 2000);
+                }, 500);
             } else {
                 console.error("No matching tutor found.");
                 document.getElementById('mainContent').innerHTML = `
@@ -6199,6 +6312,10 @@ async function initTutorApp() {
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
+            _teardownTutorListeners();
+            if (unsubUnreadListener)  { try { unsubUnreadListener();  } catch(_) {} }
+            if (unsubInboxListener)   { try { unsubInboxListener();   } catch(_) {} }
+            if (unsubChatListener)    { try { unsubChatListener();    } catch(_) {} }
             signOut(auth).then(() => {
                 window.location.href = 'tutor-auth.html';
             }).catch(error => {
