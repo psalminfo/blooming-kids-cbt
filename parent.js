@@ -2971,6 +2971,22 @@ class UnifiedAuthManager {
             welcomeMessage.textContent = `Welcome, ${this.currentUser.parentName}!`;
         }
 
+        // ── NEW: populate header greeting and show header actions ──
+        const headerActions  = document.getElementById("headerActions");
+        const headerGreeting = document.getElementById("headerGreeting");
+        if (headerGreeting && this.currentUser) {
+            headerGreeting.textContent = `Hello, ${this.currentUser.parentName.split(' ')[0]}! 👋`;
+        }
+        if (headerActions) headerActions.style.display = "flex";
+
+        // ── NEW: ensure the Reports tab is visually active on first load ──
+        const reportTab = document.getElementById("reportTab");
+        if (reportTab) {
+            reportTab.classList.add("active");
+            reportTab.classList.remove("tab-inactive-main");
+            reportTab.classList.add("tab-active-main");
+        }
+
         localStorage.setItem('isAuthenticated', 'true');
     }
 
@@ -3061,6 +3077,10 @@ async function manualRefreshReportsV2() {
 
 // ADD MANUAL REFRESH BUTTON
 function addManualRefreshButton() {
+    // In the new design the refresh is triggered from the welcome bar or can
+    // be a floating button; skip DOM injection if the new layout is detected.
+    if (document.querySelector('.dashboard-welcome-bar')) return;
+
     const welcomeSection = document.querySelector('.bg-green-50');
     if (!welcomeSection) return;
     
@@ -3085,6 +3105,9 @@ function addManualRefreshButton() {
 
 // ADD LOGOUT BUTTON
 function addLogoutButton() {
+    // New design already has logout buttons inline — skip injection
+    if (document.querySelector('.dashboard-welcome-bar')) return;
+
     const welcomeSection = document.querySelector('.bg-green-50');
     if (!welcomeSection) return;
     
@@ -4028,10 +4051,14 @@ function switchTab(tab) {
     const signUpForm = document.getElementById('signUpForm');
 
     if (tab === 'signin') {
+        // Legacy classes
         signInTab?.classList.remove('tab-inactive');
         signInTab?.classList.add('tab-active');
         signUpTab?.classList.remove('tab-active');
         signUpTab?.classList.add('tab-inactive');
+        // New auth-tab-btn classes
+        signInTab?.classList.add('active');
+        signUpTab?.classList.remove('active');
         signInForm?.classList.remove('hidden');
         signUpForm?.classList.add('hidden');
     } else {
@@ -4039,6 +4066,9 @@ function switchTab(tab) {
         signUpTab?.classList.add('tab-active');
         signInTab?.classList.remove('tab-active');
         signInTab?.classList.add('tab-inactive');
+        // New auth-tab-btn classes
+        signUpTab?.classList.add('active');
+        signInTab?.classList.remove('active');
         signUpForm?.classList.remove('hidden');
         signInForm?.classList.add('hidden');
     }
@@ -4054,35 +4084,42 @@ function switchMainTab(tab) {
     const rewardsContentArea = document.getElementById('rewardsContentArea');
     const settingsContentArea = document.getElementById('settingsContentArea');
     
-    reportTab?.classList.remove('tab-active-main');
-    reportTab?.classList.add('tab-inactive-main');
-    academicsTab?.classList.remove('tab-active-main');
-    academicsTab?.classList.add('tab-inactive-main');
-    rewardsTab?.classList.remove('tab-active-main');
-    rewardsTab?.classList.add('tab-inactive-main');
+    // Remove active from all tabs (legacy + new classes)
+    [reportTab, academicsTab, rewardsTab].forEach(btn => {
+        btn?.classList.remove('tab-active-main', 'active');
+        btn?.classList.add('tab-inactive-main');
+    });
     
     reportContentArea?.classList.add('hidden');
     academicsContentArea?.classList.add('hidden');
     rewardsContentArea?.classList.add('hidden');
     settingsContentArea?.classList.add('hidden');
     
-    if (tab === 'reports') {
+    if (tab === 'reports' || tab === 'report') {
         reportTab?.classList.remove('tab-inactive-main');
-        reportTab?.classList.add('tab-active-main');
+        reportTab?.classList.add('tab-active-main', 'active');
         reportContentArea?.classList.remove('hidden');
     } else if (tab === 'academics') {
         academicsTab?.classList.remove('tab-inactive-main');
-        academicsTab?.classList.add('tab-active-main');
+        academicsTab?.classList.add('tab-active-main', 'active');
         academicsContentArea?.classList.remove('hidden');
-        loadAcademicsData();
+        // Only load if content is empty (cached after first load)
+        const academicsContent = document.getElementById('academicsContent');
+        if (!academicsContent || !academicsContent.innerHTML.trim() ||
+            academicsContent.innerHTML.includes('Loading')) {
+            loadAcademicsData();
+        }
     } else if (tab === 'rewards') {
         rewardsTab?.classList.remove('tab-inactive-main');
-        rewardsTab?.classList.add('tab-active-main');
+        rewardsTab?.classList.add('tab-active-main', 'active');
         rewardsContentArea?.classList.remove('hidden');
-        
         const user = auth.currentUser;
         if (user) {
-            loadReferralRewards(user.uid);
+            const rewardsContent = document.getElementById('rewardsContent');
+            if (!rewardsContent || !rewardsContent.innerHTML.trim() ||
+                rewardsContent.innerHTML.includes('Loading')) {
+                loadReferralRewards(user.uid);
+            }
         }
     }
 }
@@ -5814,3 +5851,587 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
 // ============================================================================
 // END OF PARENT.JS - PRODUCTION READY
 // ============================================================================
+
+// ============================================================================
+// ██████████████████████████████████████████████████████████████████████████
+// NEW FEATURES — ADDED BY PARENT PORTAL REDESIGN
+// ██████████████████████████████████████████████████████████████████████████
+// ============================================================================
+
+// ============================================================================
+// ADD STUDENT MODAL — Step-based enrolment using enrollment portal logic
+// ============================================================================
+
+let _addStudentStep = 1;
+
+/**
+ * showAddStudentModal()
+ * Opens the "Add Another Student" multi-step modal.
+ */
+function showAddStudentModal() {
+    const modal = document.getElementById('addStudentModal');
+    if (!modal) return;
+
+    // Reset to step 1
+    _addStudentStep = 1;
+    _updateAddStudentStepUI();
+
+    // Set default start date to 1st of next month
+    const nextMonth = new Date();
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    nextMonth.setDate(1);
+    const el = document.getElementById('newStudentStartDate');
+    if (el) el.value = nextMonth.toISOString().split('T')[0];
+
+    // Reset all picker chips
+    document.querySelectorAll('#newStudentSubjects .picker-chip,#newStudentDays .picker-chip')
+        .forEach(c => c.classList.remove('selected'));
+
+    // Clear text fields
+    ['newStudentName','newStudentDob','newStudentGender','newStudentActualGrade',
+     'newStudentFeeGroup','newStudentStartHour','newStudentEndHour',
+     'newStudentSessions','newStudentTutor'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+
+    modal.classList.remove('hidden');
+}
+
+/**
+ * hideAddStudentModal()
+ */
+function hideAddStudentModal() {
+    const modal = document.getElementById('addStudentModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+/**
+ * togglePickerChip(el)
+ * Toggles the "selected" class on subject/day picker chips.
+ */
+function togglePickerChip(el) {
+    el.classList.toggle('selected');
+}
+
+/**
+ * _updateAddStudentStepUI()
+ * Shows the correct step panel and updates the stepper bar / buttons.
+ */
+function _updateAddStudentStepUI() {
+    // Update step panels
+    for (let i = 1; i <= 3; i++) {
+        const panel = document.getElementById(`add-step-${i}`);
+        if (panel) panel.classList.toggle('active', i === _addStudentStep);
+
+        const bar = document.getElementById(`step-bar-${i}`);
+        if (bar) {
+            bar.classList.remove('active', 'done');
+            if (i < _addStudentStep)  bar.classList.add('done');
+            if (i === _addStudentStep) bar.classList.add('active');
+        }
+    }
+
+    // Update nav buttons
+    const prevBtn   = document.getElementById('addStudentPrevBtn');
+    const nextBtn   = document.getElementById('addStudentNextBtn');
+    const submitBtn = document.getElementById('addStudentSubmitBtn');
+
+    if (prevBtn)   prevBtn.style.display   = _addStudentStep > 1 ? 'block' : 'none';
+    if (nextBtn)   nextBtn.classList.toggle('hidden', _addStudentStep === 3);
+    if (submitBtn) submitBtn.classList.toggle('hidden', _addStudentStep !== 3);
+}
+
+/**
+ * addStudentNext()
+ * Validates the current step then advances to the next.
+ */
+function addStudentNext() {
+    if (_addStudentStep === 1) {
+        const name  = document.getElementById('newStudentName')?.value.trim();
+        const dob   = document.getElementById('newStudentDob')?.value;
+        const grade = document.getElementById('newStudentActualGrade')?.value;
+        const group = document.getElementById('newStudentFeeGroup')?.value;
+
+        if (!name || !dob || !grade || !group) {
+            showMessage('Please fill in all required fields (Name, DOB, Grade, Tuition Level)', 'error');
+            return;
+        }
+    }
+
+    if (_addStudentStep === 2) {
+        const days = document.querySelectorAll('#newStudentDays .picker-chip.selected');
+        if (days.length === 0) {
+            showMessage('Please select at least one preferred day', 'error');
+            return;
+        }
+    }
+
+    if (_addStudentStep === 3) {
+        // Show review - handled separately
+        return;
+    }
+
+    _addStudentStep = Math.min(3, _addStudentStep + 1);
+    _updateAddStudentStepUI();
+
+    // On step 3, populate the review panel
+    if (_addStudentStep === 3) {
+        _populateAddStudentReview();
+    }
+}
+
+/**
+ * addStudentPrev()
+ * Goes back a step.
+ */
+function addStudentPrev() {
+    _addStudentStep = Math.max(1, _addStudentStep - 1);
+    _updateAddStudentStepUI();
+}
+
+/**
+ * _populateAddStudentReview()
+ * Fills the review panel (step 3) with the collected data.
+ */
+function _populateAddStudentReview() {
+    const reviewDiv = document.getElementById('addStudentReview');
+    if (!reviewDiv) return;
+
+    const name    = document.getElementById('newStudentName')?.value.trim() || '—';
+    const gender  = document.getElementById('newStudentGender')?.value || '—';
+    const dob     = document.getElementById('newStudentDob')?.value || '—';
+    const grade   = document.getElementById('newStudentActualGrade')?.value || '—';
+    const group   = document.getElementById('newStudentFeeGroup')?.value || '—';
+    const start   = document.getElementById('newStudentStartDate')?.value || '—';
+    const sessions = document.getElementById('newStudentSessions')?.value || 'Not specified';
+    const tutor   = document.getElementById('newStudentTutor')?.value || 'No preference';
+
+    const subjects = Array.from(
+        document.querySelectorAll('#newStudentSubjects .picker-chip.selected')
+    ).map(c => c.dataset.subject);
+
+    const days = Array.from(
+        document.querySelectorAll('#newStudentDays .picker-chip.selected')
+    ).map(c => c.dataset.day);
+
+    const startHour = document.getElementById('newStudentStartHour')?.value;
+    const endHour   = document.getElementById('newStudentEndHour')?.value;
+    const timeStr   = startHour && endHour
+        ? `${_formatHour(startHour)} – ${_formatHour(endHour)}`
+        : 'Not specified';
+
+    const gradeLabels = {
+        'preschool':'Preschool', 'kindergarten':'Kindergarten',
+        'grade1':'Grade 1','grade2':'Grade 2','grade3':'Grade 3',
+        'grade4':'Grade 4','grade5':'Grade 5','grade6':'Grade 6',
+        'grade7':'Grade 7','grade8':'Grade 8','grade9':'Grade 9',
+        'grade10':'Grade 10','grade11':'Grade 11','grade12':'Grade 12'
+    };
+
+    const groupLabels = {
+        'preschool':'Preschool – Grade 1','grade2-4':'Grade 2 – 4',
+        'grade5-8':'Grade 5 – 8','grade9-12':'Grade 9 – 12'
+    };
+
+    reviewDiv.innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
+            ${_reviewRow('👤 Full Name', escapeHtml(name))}
+            ${_reviewRow('⚧ Gender', escapeHtml(gender))}
+            ${_reviewRow('🎂 Date of Birth', escapeHtml(dob))}
+            ${_reviewRow('🎓 School Grade', escapeHtml(gradeLabels[grade] || grade))}
+            ${_reviewRow('📊 Tuition Level', escapeHtml(groupLabels[group] || group))}
+            ${_reviewRow('📅 Start Date', escapeHtml(start))}
+            ${_reviewRow('📚 Subjects', subjects.length ? escapeHtml(subjects.join(', ')) : '<em style="color:#9CA3AF">None selected (extracurricular/test prep only)</em>')}
+            ${_reviewRow('📆 Days', escapeHtml(days.join(', ')))}
+            ${_reviewRow('🕐 Class Time', escapeHtml(timeStr))}
+            ${_reviewRow('🔄 Sessions/Week', escapeHtml(sessions))}
+            ${_reviewRow('👩‍🏫 Tutor Pref.', escapeHtml(tutor))}
+        </table>
+    `;
+}
+
+function _reviewRow(label, value) {
+    return `
+        <tr style="border-bottom:1px solid #D1FAE5;">
+            <td style="padding:8px 4px;font-weight:600;color:#065f46;width:42%;">${label}</td>
+            <td style="padding:8px 4px;color:#374151;">${value}</td>
+        </tr>
+    `;
+}
+
+function _formatHour(h) {
+    const hour = parseInt(h);
+    const suffix = hour < 12 ? 'AM' : 'PM';
+    const display = hour % 12 || 12;
+    return `${display}:00 ${suffix}`;
+}
+
+/**
+ * submitNewStudent()
+ * Saves the new student to pending_students collection with the parent's phone
+ * number so comprehensiveFindChildren() will pick them up immediately.
+ * Mirrors the data structure used in the enrollment portal.
+ */
+async function submitNewStudent() {
+    const submitBtn  = document.getElementById('addStudentSubmitBtn');
+    const submitText = document.getElementById('addStudentSubmitText');
+    const spinner    = document.getElementById('addStudentSubmitSpinner');
+
+    if (submitBtn) submitBtn.disabled = true;
+    if (spinner)   spinner.classList.remove('hidden');
+    if (submitText) submitText.textContent = 'Saving…';
+
+    try {
+        const user = auth.currentUser;
+        if (!user) throw new Error('You must be signed in.');
+
+        // Fetch parent's phone number from their profile
+        const userDoc = await db.collection('parent_users').doc(user.uid).get();
+        if (!userDoc.exists) throw new Error('Parent profile not found.');
+        const parentData = userDoc.data();
+        const parentPhone   = parentData.normalizedPhone || parentData.phone || '';
+        const parentEmail   = parentData.email || '';
+        const parentName    = parentData.parentName || 'Parent';
+
+        // Collect form data
+        const name    = document.getElementById('newStudentName')?.value.trim();
+        const gender  = document.getElementById('newStudentGender')?.value;
+        const dob     = document.getElementById('newStudentDob')?.value;
+        const grade   = document.getElementById('newStudentActualGrade')?.value;
+        const group   = document.getElementById('newStudentFeeGroup')?.value;
+        const start   = document.getElementById('newStudentStartDate')?.value;
+        const sessions = document.getElementById('newStudentSessions')?.value || '';
+        const tutor   = document.getElementById('newStudentTutor')?.value || '';
+
+        const subjects = Array.from(
+            document.querySelectorAll('#newStudentSubjects .picker-chip.selected')
+        ).map(c => c.dataset.subject);
+
+        const days = Array.from(
+            document.querySelectorAll('#newStudentDays .picker-chip.selected')
+        ).map(c => c.dataset.day);
+
+        const startHour = document.getElementById('newStudentStartHour')?.value || '';
+        const endHour   = document.getElementById('newStudentEndHour')?.value || '';
+        const schedule  = days.length && startHour && endHour
+            ? `${days.join(', ')} from ${_formatHour(startHour)} to ${_formatHour(endHour)}`
+            : days.join(', ');
+
+        if (!name) throw new Error('Student name is required.');
+
+        // Build Firestore document — matches the schema used by enrollment portal
+        // and expected by comprehensiveFindChildren() (which checks parentPhone field)
+        const studentDoc = {
+            studentName:      name,
+            name:             name,
+            gender:           gender,
+            dob:              dob,
+            actualGrade:      grade,
+            grade:            group,
+            startDate:        start,
+            selectedSubjects: subjects,
+            academicDays:     days,
+            academicSchedule: schedule,
+            academicTime:     startHour && endHour ? `${startHour}:${endHour}` : '',
+            academicSessions: sessions,
+            preferredTutor:   tutor,
+            // Phone fields — used by comprehensiveFindChildren for suffix matching
+            parentPhone:      parentPhone,
+            parentEmail:      parentEmail,
+            parentName:       parentName,
+            parentUid:        user.uid,
+            status:           'pending',
+            addedFromPortal:  true,
+            createdAt:        firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt:        firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        // Save to pending_students — comprehensiveFindChildren already searches this collection
+        const docRef = await db.collection('pending_students').add(studentDoc);
+
+        console.log('✅ New student saved to pending_students:', docRef.id);
+
+        // Invalidate cache so the dashboard reloads fresh
+        dataCache.invalidate();
+
+        showMessage(`${name} has been added! They will appear in your dashboard shortly.`, 'success');
+        hideAddStudentModal();
+
+        // Reload reports and academics to show the new student
+        setTimeout(() => {
+            if (window.authManager && authManager.currentUser) {
+                loadAllReportsForParent(authManager.currentUser.normalizedPhone, user.uid, true);
+                // Clear academics cache to force reload on next tab visit
+                const ac = document.getElementById('academicsContent');
+                if (ac) ac.innerHTML = '';
+            }
+        }, 1500);
+
+    } catch (err) {
+        console.error('submitNewStudent error:', err);
+        showMessage(`Failed to add student: ${err.message}`, 'error');
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+        if (spinner)   spinner.classList.add('hidden');
+        if (submitText) submitText.textContent = '✅ Submit Enrolment';
+    }
+}
+
+// ============================================================================
+// PRIVACY POLICY & TERMS OF USE MODAL
+// ============================================================================
+
+const _PRIVACY_CONTENT = {
+    privacy: {
+        title: '🔒 Privacy Policy',
+        body: `
+<div class="policy-section">
+    <h4>1. Information We Collect</h4>
+    <p>We collect personal information that you provide directly to us when you create an account, enrol a student, or contact us. This includes names, email addresses, phone numbers, and academic information relating to enrolled students.</p>
+</div>
+<div class="policy-section">
+    <h4>2. How We Use Your Information</h4>
+    <p>We use the information we collect to provide, maintain, and improve our tutoring services; to communicate with you about sessions, assignments, and reports; to process enrolments and payments; and to comply with legal obligations.</p>
+</div>
+<div class="policy-section">
+    <h4>3. Information Sharing</h4>
+    <p>We do not sell, trade, or rent your personal information to third parties. Information is shared only with tutors and staff assigned to your child's sessions, and only to the extent necessary to deliver educational services.</p>
+</div>
+<div class="policy-section">
+    <h4>4. Data Security</h4>
+    <p>We implement industry-standard security measures including encrypted data storage via Google Firebase, HTTPS-only transmission, and session-based authentication. However, no system is 100% secure and we cannot guarantee absolute security.</p>
+</div>
+<div class="policy-section">
+    <h4>5. Student Data (Children Under 18)</h4>
+    <p>We collect academic data about minors solely for educational service delivery. Parents/guardians retain full rights to access, correct, or request deletion of their child's data by contacting us at support@bloomingkidshouse.com.</p>
+</div>
+<div class="policy-section">
+    <h4>6. Cookies &amp; Local Storage</h4>
+    <p>We use browser local storage to remember your login preference ("Remember Me") and session state. No third-party tracking cookies are used in this portal.</p>
+</div>
+<div class="policy-section">
+    <h4>7. Data Retention</h4>
+    <p>Student and parent data is retained for the duration of enrolment plus 2 years. You may request earlier deletion by contacting support.</p>
+</div>
+<div class="policy-section">
+    <h4>8. Contact Us</h4>
+    <p>For privacy questions or data requests, email us at <a href="mailto:support@bloomingkidshouse.com" style="color:var(--green-primary);">support@bloomingkidshouse.com</a>.</p>
+</div>
+<p style="font-size:0.78rem;color:#9CA3AF;margin-top:16px;font-family:'DM Sans',sans-serif;">Last updated: January 2025</p>`
+    },
+    terms: {
+        title: '📜 Terms of Use',
+        body: `
+<div class="policy-section">
+    <h4>1. Acceptance of Terms</h4>
+    <p>By accessing and using the Blooming Kids House Parent Portal, you agree to be bound by these Terms of Use. If you do not agree with any part of these terms, please discontinue use immediately.</p>
+</div>
+<div class="policy-section">
+    <h4>2. Account Responsibilities</h4>
+    <p>You are responsible for maintaining the confidentiality of your login credentials and for all activities that occur under your account. Notify us immediately of any unauthorised use of your account.</p>
+</div>
+<div class="policy-section">
+    <h4>3. Permitted Use</h4>
+    <p>This portal is provided exclusively for parents and guardians of enrolled students to monitor academic progress, communicate with staff, manage enrolments, and access reports. Any other use is prohibited.</p>
+</div>
+<div class="policy-section">
+    <h4>4. Prohibited Activities</h4>
+    <p>You may not use this portal to: share login credentials with unauthorised parties; attempt to access other users' data; upload malicious content; or circumvent any security measures.</p>
+</div>
+<div class="policy-section">
+    <h4>5. Intellectual Property</h4>
+    <p>All content, reports, and materials generated by Blooming Kids House tutors remain the intellectual property of Blooming Kids House. Reports are for personal, non-commercial use only.</p>
+</div>
+<div class="policy-section">
+    <h4>6. Disclaimer</h4>
+    <p>This portal is provided "as is" without warranties of any kind. We are not liable for any interruptions in service, data loss, or indirect damages arising from your use of the portal.</p>
+</div>
+<div class="policy-section">
+    <h4>7. Changes to Terms</h4>
+    <p>We reserve the right to update these Terms of Use at any time. Continued use of the portal after changes constitutes acceptance of the revised terms.</p>
+</div>
+<div class="policy-section">
+    <h4>8. Governing Law</h4>
+    <p>These terms are governed by the laws of the Federal Republic of Nigeria.</p>
+</div>
+<p style="font-size:0.78rem;color:#9CA3AF;margin-top:16px;font-family:'DM Sans',sans-serif;">Last updated: January 2025</p>`
+    }
+};
+
+/**
+ * showPrivacyModal(type = 'privacy')
+ * Opens the Privacy Policy or Terms of Use modal.
+ */
+function showPrivacyModal(type = 'privacy') {
+    const modal     = document.getElementById('privacyModal');
+    const titleEl   = document.getElementById('privacyModalTitle');
+    const bodyEl    = document.getElementById('privacyModalBody');
+
+    if (!modal || !titleEl || !bodyEl) return;
+
+    const content = _PRIVACY_CONTENT[type] || _PRIVACY_CONTENT.privacy;
+    titleEl.textContent = content.title;
+    bodyEl.innerHTML    = content.body;
+    modal.classList.remove('hidden');
+}
+
+/**
+ * hidePrivacyModal()
+ */
+function hidePrivacyModal() {
+    const modal = document.getElementById('privacyModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+// ============================================================================
+// REPORT DOWNLOAD — Enhanced with reliable PDF generation
+// ============================================================================
+
+/**
+ * downloadReportAsPDF(elementId, fileName)
+ * Generates a PDF from any visible element using html2pdf.js
+ */
+function downloadReportAsPDF(elementId, fileName) {
+    const element = document.getElementById(elementId);
+    if (!element) {
+        showMessage('Report element not found. Please expand the report first.', 'error');
+        return;
+    }
+
+    if (typeof html2pdf === 'undefined') {
+        showMessage('PDF library not loaded. Please refresh the page and try again.', 'error');
+        return;
+    }
+
+    const safeFileName = (fileName || 'BKH_Report').replace(/[^a-zA-Z0-9_\-]/g, '_') + '.pdf';
+
+    showMessage('Generating PDF…', 'success');
+
+    const opt = {
+        margin:      [0.5, 0.5, 0.5, 0.5],
+        filename:    safeFileName,
+        image:       { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false },
+        jsPDF:       { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(element).save().catch(err => {
+        console.error('PDF generation error:', err);
+        showMessage('PDF generation failed. Try a different browser.', 'error');
+    });
+}
+
+// ============================================================================
+// ACADEMICS — Enhanced display with real subject/schedule data from student record
+// ============================================================================
+
+/**
+ * buildStudentInfoTiles(studentData)
+ * Creates the schedule/subject info tiles shown in the academics panel
+ * using the actual data stored in the student's Firestore record.
+ * This augments the existing loadAcademicsData function output.
+ */
+function buildStudentInfoTiles(studentData) {
+    if (!studentData) return '';
+
+    const data = studentData.data || studentData;
+
+    const subjects = data.selectedSubjects?.length
+        ? data.selectedSubjects.join(', ')
+        : data.subjects?.join(', ') || 'Not specified';
+
+    const schedule = data.academicSchedule
+        || (data.academicDays?.length
+            ? `${data.academicDays.join(', ')} ${data.academicTime ? '(' + data.academicTime + ')' : ''}`
+            : null)
+        || 'Not specified';
+
+    const grade = data.actualGrade || data.grade || data.schoolGrade || 'Not specified';
+    const tutor = data.preferredTutor || data.tutorPreference || data.tutor || 'No preference';
+    const sessions = data.academicSessions || data.sessions || 'Not specified';
+
+    return `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;" class="student-info-tiles">
+            <div class="info-tile">
+                <span class="info-tile-icon">📚</span>
+                <div class="info-tile-text">
+                    <h5>Subjects</h5>
+                    <p>${escapeHtml(subjects)}</p>
+                </div>
+            </div>
+            <div class="info-tile">
+                <span class="info-tile-icon">📅</span>
+                <div class="info-tile-text">
+                    <h5>Class Schedule</h5>
+                    <p>${escapeHtml(schedule)}</p>
+                </div>
+            </div>
+            <div class="info-tile">
+                <span class="info-tile-icon">🎓</span>
+                <div class="info-tile-text">
+                    <h5>Grade Level</h5>
+                    <p>${escapeHtml(grade)}</p>
+                </div>
+            </div>
+            <div class="info-tile">
+                <span class="info-tile-icon">🔄</span>
+                <div class="info-tile-text">
+                    <h5>Sessions / Week</h5>
+                    <p>${escapeHtml(String(sessions))}</p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Patch loadAcademicsData to inject info tiles
+const _originalLoadAcademicsData = window.loadAcademicsData || (typeof loadAcademicsData === 'function' ? loadAcademicsData : null);
+
+window.loadAcademicsData = async function(selectedStudent = null) {
+    // Call the original function first
+    if (_originalLoadAcademicsData) {
+        await _originalLoadAcademicsData(selectedStudent);
+    }
+
+    // After the original renders, inject the student info tiles if missing
+    setTimeout(() => {
+        const academicsContent = document.getElementById('academicsContent');
+        if (!academicsContent) return;
+
+        // Find student section headers and inject tiles before them if not already present
+        const studentHeaders = academicsContent.querySelectorAll('[class*="from-green-100"]');
+        studentHeaders.forEach(header => {
+            const studentNameEl = header.querySelector('h2');
+            if (!studentNameEl) return;
+
+            const studentName = studentNameEl.textContent.trim().split(' ')[0]; // first word
+            const studentInfo = allStudentData.find(s =>
+                capitalize(s.name).startsWith(studentName)
+            );
+
+            if (studentInfo && !header.nextElementSibling?.classList.contains('student-info-tiles')) {
+                const tilesDiv = document.createElement('div');
+                tilesDiv.innerHTML = buildStudentInfoTiles(studentInfo);
+                header.after(tilesDiv.firstElementChild);
+            }
+        });
+    }, 300);
+};
+
+// ============================================================================
+// EXPORT NEW GLOBALS
+// ============================================================================
+
+window.showAddStudentModal  = showAddStudentModal;
+window.hideAddStudentModal  = hideAddStudentModal;
+window.addStudentNext       = addStudentNext;
+window.addStudentPrev       = addStudentPrev;
+window.togglePickerChip     = togglePickerChip;
+window.submitNewStudent     = submitNewStudent;
+window.showPrivacyModal     = showPrivacyModal;
+window.hidePrivacyModal     = hidePrivacyModal;
+window.downloadReportAsPDF  = downloadReportAsPDF;
+window.buildStudentInfoTiles = buildStudentInfoTiles;
+
+console.log('✅ Parent Portal redesign additions loaded — Add Student, Privacy, Enhanced Academics');
