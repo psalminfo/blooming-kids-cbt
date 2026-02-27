@@ -1053,6 +1053,7 @@ class ScheduleManager {
         const timeOpts = sel => this.TIME_SLOTS.map(s=>`<option value="${escapeHtml(s.value)}" ${s.value===sel?'selected':''}>${escapeHtml(s.label)}</option>`).join('');
 
         const row = document.createElement('div');
+        row.className = 'time-slot-row';
         row.style.cssText = `background:${S.bg};border:1.5px solid ${S.border};border-radius:14px;padding:13px 15px;transition:all .15s;`;
         row.innerHTML = `
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
@@ -1125,15 +1126,18 @@ class ScheduleManager {
         let isValid = true;
 
         rows.forEach(row => {
+            if (!isValid) return;
             const day = row.querySelector('.day-select').value;
             const start = row.querySelector('.start-select').value;
             const end = row.querySelector('.end-select').value;
 
-            if (start === end) {
-                this.showAlert('Start and End time cannot be the same', 'error');
+            const v = validateScheduleTime(start, end);
+            if (!v.valid) {
+                this.showAlert(v.message, 'error');
                 isValid = false;
+                return;
             }
-            schedule.push({ day, start, end });
+            schedule.push({ day, start, end, isOvernight: v.isOvernight || false, duration: v.duration });
         });
 
         if (!isValid) return;
@@ -2847,6 +2851,38 @@ async function loadTutorNotifications(modal) {
                             studentId: 'management', studentName: 'Admin (Management)'
                         }, { merge: true });
                     } catch(ce) { console.warn('Ensure conv doc err:', ce); }
+
+                    // Also seed this specific notification message into the conversation
+                    // so it shows up in the chat history
+                    try {
+                        const msgContent = notif.message || notif.title || 'Message from Management';
+                        // Check if this exact message already exists (avoid duplicates)
+                        const existQ = query(
+                            collection(db, "conversations", mgmtConvId, "messages"),
+                            where("content", "==", msgContent),
+                            where("senderId", "==", "management"),
+                            limit(1)
+                        );
+                        const existSnap = await getDocs(existQ);
+                        if (existSnap.empty) {
+                            await addDoc(collection(db, "conversations", mgmtConvId, "messages"), {
+                                content: msgContent,
+                                subject: notif.subject || notif.title || '',
+                                senderId: 'management',
+                                senderName: notif.senderDisplay || 'Admin (Management)',
+                                senderRole: 'management',
+                                createdAt: notif.createdAt || new Date(),
+                                read: true
+                            });
+                            // Update conversation last message
+                            await updateDoc(doc(db, "conversations", mgmtConvId), {
+                                lastMessage: msgContent.substring(0, 200),
+                                lastMessageTimestamp: notif.createdAt || new Date(),
+                                lastSenderId: 'management'
+                            });
+                        }
+                    } catch(seedErr) { console.warn('Seed mgmt message to chat err:', seedErr); }
+
                     // Switch to Chats tab and open conversation
                     const tabBtn = modal.querySelector('#tab-messages');
                     if (tabBtn) { window.switchInboxTab('messages', tabBtn); }
@@ -3000,6 +3036,74 @@ function msgStartInboxListener(modal) {
         if (unsub1) unsub1();
         if (unsub2) unsub2();
     };
+
+    // ═══ AUTO-ENSURE MANAGEMENT CONVERSATION ═══
+    // If there are management_message or management_reply notifications, ensure
+    // a conversation doc exists so it appears in the Chats tab (not just Alerts).
+    (async () => {
+        try {
+            const mgmtNotifQ = query(
+                collection(db, "tutor_notifications"),
+                where("tutorEmail", "==", tutorEmail),
+                where("type", "in", ["management_message", "management_reply"]),
+                limit(1)
+            );
+            const mgmtSnap = await getDocs(mgmtNotifQ);
+            if (!mgmtSnap.empty) {
+                const myId = window.tutorData?.messagingId || tutorId;
+                const mgmtConvId = [myId, 'management'].sort().join('_');
+                // Create conversation doc if it doesn't exist (merge so we don't overwrite existing messages)
+                await setDoc(doc(db, "conversations", mgmtConvId), {
+                    participants: [tutorId, 'management'],
+                    participantDetails: {
+                        [tutorId]: { name: tutor.name || '', role: 'tutor', email: tutorEmail },
+                        'management': { name: 'Admin (Management)', role: 'management' }
+                    },
+                    tutorId: tutorId,
+                    tutorEmail: tutorEmail,
+                    tutorName: tutor.name || '',
+                    studentId: 'management',
+                    studentName: 'Admin (Management)'
+                }, { merge: true });
+
+                // Seed the first message from the latest management notification if no messages subcollection exists yet
+                const msgsSnap = await getDocs(query(collection(db, "conversations", mgmtConvId, "messages"), limit(1)));
+                if (msgsSnap.empty) {
+                    // Pull the latest management notification to seed the conversation
+                    const seedQ = query(
+                        collection(db, "tutor_notifications"),
+                        where("tutorEmail", "==", tutorEmail),
+                        where("type", "in", ["management_message", "management_reply"]),
+                        orderBy("createdAt", "desc"),
+                        limit(5)
+                    );
+                    const seedSnap = await getDocs(seedQ);
+                    for (const nd of seedSnap.docs) {
+                        const n = nd.data();
+                        await addDoc(collection(db, "conversations", mgmtConvId, "messages"), {
+                            content: n.message || n.title || 'Message from Management',
+                            subject: n.subject || n.title || '',
+                            senderId: 'management',
+                            senderName: n.senderDisplay || 'Admin (Management)',
+                            senderRole: 'management',
+                            createdAt: n.createdAt || new Date(),
+                            read: !!n.read
+                        });
+                    }
+                    // Update conversation metadata with the latest message
+                    if (!seedSnap.empty) {
+                        const latest = seedSnap.docs[0].data();
+                        await updateDoc(doc(db, "conversations", mgmtConvId), {
+                            lastMessage: (latest.message || latest.title || 'Message from Management').substring(0, 200),
+                            lastMessageTimestamp: latest.createdAt || new Date(),
+                            lastSenderId: 'management',
+                            unreadCount: seedSnap.docs.filter(d => !d.data().read).length
+                        });
+                    }
+                }
+            }
+        } catch(e) { console.warn('Auto-ensure management conversation error:', e); }
+    })();
 }
 
 function msgRenderInboxList(conversations, container, modal, tutorId) {
