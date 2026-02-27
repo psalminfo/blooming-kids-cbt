@@ -2325,32 +2325,23 @@ function showEnhancedMessagingModal() {
                     read: false
                 });
 
-                // ── If sending to management, ALSO write to tutor_to_management_messages ──
+                // ═══ BRIDGE: Also write to management inbox collection ═══
                 if (targetId === 'management' || targetRole === 'management') {
-                    await addDoc(collection(db, "tutor_to_management_messages"), {
-                        tutorId: tutor.id,
-                        tutorEmail: tutor.email || '',
-                        tutorName: tutor.name || '',
-                        subject: subject || '',
-                        message: content || '',
-                        imageUrl: imageUrl || null,
-                        isUrgent: isUrgent,
-                        createdAt: now,
-                        managementRead: false,
-                        replied: false,
-                        managementReplies: [],
-                        conversationId: convId
-                    });
-                    // Also create a management_notifications entry for the bell
-                    await addDoc(collection(db, "management_notifications"), {
-                        type: 'tutor_message',
-                        title: `New message from ${tutor.name || 'Tutor'}`,
-                        message: (content || '📷 Image').substring(0, 200),
-                        tutorEmail: tutor.email || '',
-                        tutorName: tutor.name || '',
-                        read: false,
-                        createdAt: now
-                    });
+                    try {
+                        await addDoc(collection(db, "tutor_to_management_messages"), {
+                            tutorId: tutor.id, tutorEmail: tutor.email || '', tutorName: tutor.name || '',
+                            subject: subject || '', message: content || '', imageUrl: imageUrl || null,
+                            isUrgent: isUrgent, createdAt: now,
+                            managementRead: false, replied: false, managementReplies: [],
+                            conversationId: convId
+                        });
+                        await addDoc(collection(db, "management_notifications"), {
+                            type: 'tutor_message', title: 'Message from ' + (tutor.name || 'Tutor'),
+                            message: (content || '📷 Image').substring(0, 200),
+                            tutorEmail: tutor.email || '', tutorName: tutor.name || '',
+                            read: false, createdAt: now
+                        });
+                    } catch(bridgeErr) { console.warn('Management bridge write failed:', bridgeErr); }
                 }
             }
 
@@ -2522,7 +2513,7 @@ async function msgProcessSendToStudents(modal) {
                 participants: [tutor.id, target.id],
                 participantDetails: {
                     [tutor.id]: { name: tutor.name, role: 'tutor', email: tutor.email },
-                    [target.id]: { name: target.name, role: target.recipientType || 'student' }
+                    [target.id]: { name: target.name, role: target.id === 'management' ? 'management' : 'student' }
                 },
                 tutorId: tutor.id,
                 tutorEmail: tutor.email,
@@ -2547,36 +2538,27 @@ async function msgProcessSendToStudents(modal) {
                 read: false
             });
 
-            // ── If sending to management, ALSO write to tutor_to_management_messages ──
+            // ═══ BRIDGE: Also write to management inbox collection ═══
             if (target.id === 'management' || type === 'management') {
-                await addDoc(collection(db, "tutor_to_management_messages"), {
-                    tutorId: tutor.id,
-                    tutorEmail: tutor.email || '',
-                    tutorName: tutor.name || '',
-                    subject: subject || '',
-                    message: content || '',
-                    imageUrl: imageUrl || null,
-                    isUrgent: isUrgent,
-                    createdAt: now,
-                    managementRead: false,
-                    replied: false,
-                    managementReplies: [],
-                    conversationId: convId
-                });
-                // Also create a management_notifications entry for the bell
-                await addDoc(collection(db, "management_notifications"), {
-                    type: 'tutor_message',
-                    title: `New message from ${tutor.name || 'Tutor'}`,
-                    message: (content || '📷 Image').substring(0, 200),
-                    tutorEmail: tutor.email || '',
-                    tutorName: tutor.name || '',
-                    read: false,
-                    createdAt: now
-                });
+                try {
+                    await addDoc(collection(db, "tutor_to_management_messages"), {
+                        tutorId: tutor.id, tutorEmail: tutor.email || '', tutorName: tutor.name || '',
+                        subject: subject || '', message: content || '', imageUrl: imageUrl || null,
+                        isUrgent: isUrgent, createdAt: now,
+                        managementRead: false, replied: false, managementReplies: [],
+                        conversationId: convId
+                    });
+                    await addDoc(collection(db, "management_notifications"), {
+                        type: 'tutor_message', title: 'Message from ' + (tutor.name || 'Tutor'),
+                        message: (content || '📷 Image').substring(0, 200),
+                        tutorEmail: tutor.email || '', tutorName: tutor.name || '',
+                        read: false, createdAt: now
+                    });
+                } catch(bridgeErr) { console.warn('Management bridge write failed:', bridgeErr); }
             }
         }
         modal.remove();
-        showCustomAlert(`✅ Message sent to ${targets.length} recipient${targets.length !== 1 ? 's' : ''}!`);
+        showCustomAlert(`✅ Message sent to ${targets.length} student${targets.length !== 1 ? 's' : ''}!`);
     } catch (e) {
         console.error('Messaging error:', e);
         showCustomAlert('❌ Error: ' + e.message);
@@ -2829,8 +2811,8 @@ async function loadTutorNotifications(modal) {
             const notif = d.data();
             const isUnread = !notif.read;
             const time = notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleDateString('en-NG', {day:'numeric',month:'short',year:'numeric'}) : '';
-            const typeIcon = notif.type === 'broadcast' ? '📢' : notif.type === 'new_student' ? '👤' : notif.type === 'student_approved' ? '✅' : '🔔';
-            const priorityStyle = notif.priority === 'urgent' ? 'border-left:4px solid #ef4444;' : notif.priority === 'important' ? 'border-left:4px solid #f59e0b;' : 'border-left:4px solid #10b981;';
+            const typeIcon = notif.type === 'broadcast' ? '📢' : notif.type === 'new_student' ? '👤' : notif.type === 'student_approved' ? '✅' : notif.type === 'management_message' ? '🏢' : notif.type === 'management_reply' ? '💬' : '🔔';
+            const priorityStyle = notif.priority === 'urgent' ? 'border-left:4px solid #ef4444;' : notif.priority === 'important' ? 'border-left:4px solid #f59e0b;' : (notif.type === 'management_message' || notif.type === 'management_reply') ? 'border-left:4px solid #3b82f6;' : 'border-left:4px solid #10b981;';
             
             const el = document.createElement('div');
             el.style.cssText = `padding:12px 14px;border-bottom:1px solid #f3f4f6;cursor:pointer;${isUnread ? 'background:#eff6ff;' : 'background:#fff;'}${priorityStyle}`;
@@ -2840,7 +2822,7 @@ async function loadTutorNotifications(modal) {
                     ${isUnread ? '<span style="background:#ef4444;color:#fff;border-radius:9999px;padding:1px 7px;font-size:0.65rem;font-weight:700;">NEW</span>' : ''}
                 </div>
                 <div style="font-size:0.75rem;color:#374151;line-height:1.4;">${msgEscapeHtml((notif.message||'').substring(0,120))}${(notif.message||'').length>120?'…':''}</div>
-                <div style="font-size:0.7rem;color:#9ca3af;margin-top:4px;">📅 ${time}${notif.senderDisplay ? ' · From: '+msgEscapeHtml(notif.senderDisplay) : ''}</div>
+                <div style="font-size:0.7rem;color:#9ca3af;margin-top:4px;">📅 ${time}${notif.senderDisplay ? ' · From: '+msgEscapeHtml(notif.senderDisplay) : ''}${(notif.type==='management_message'||notif.type==='management_reply') ? ' · <span style="color:#2563eb;font-weight:700;">Tap to reply →</span>' : ''}</div>
             `;
             el.onmouseover = () => { el.style.background = '#f0fdf4'; };
             el.onmouseout = () => { el.style.background = isUnread ? '#eff6ff' : '#fff'; };
@@ -2848,7 +2830,32 @@ async function loadTutorNotifications(modal) {
                 // Mark as read
                 try { await updateDoc(doc(db, "tutor_notifications", d.id), { read: true }); } catch(e){}
                 el.style.background = '#fff';
-                // Show full message in right panel
+
+                // ═══ MANAGEMENT MESSAGES: Open real chat for reply ═══
+                if (notif.type === 'management_message' || notif.type === 'management_reply') {
+                    const myId = window.tutorData?.messagingId || window.tutorData?.id;
+                    const mgmtConvId = [myId, 'management'].sort().join('_');
+                    // Ensure conversation doc exists
+                    try {
+                        await setDoc(doc(db, "conversations", mgmtConvId), {
+                            participants: [window.tutorData.id, 'management'],
+                            participantDetails: {
+                                [window.tutorData.id]: { name: window.tutorData.name, role: 'tutor', email: window.tutorData.email || '' },
+                                'management': { name: 'Admin (Management)', role: 'management' }
+                            },
+                            tutorId: window.tutorData.id, tutorEmail: window.tutorData.email || '', tutorName: window.tutorData.name || '',
+                            studentId: 'management', studentName: 'Admin (Management)'
+                        }, { merge: true });
+                    } catch(ce) { console.warn('Ensure conv doc err:', ce); }
+                    // Switch to Chats tab and open conversation
+                    const tabBtn = modal.querySelector('#tab-messages');
+                    if (tabBtn) { window.switchInboxTab('messages', tabBtn); }
+                    setTimeout(() => msgLoadChat(mgmtConvId, 'Admin (Management)', modal, window.tutorData.id), 200);
+                    loadNotificationBadge(modal);
+                    return;
+                }
+
+                // ═══ OTHER NOTIFICATIONS: Show static content ═══
                 modal.querySelector('#chat-title').textContent = `${typeIcon} ${notif.title || notif.subject || 'Notification'}`;
                 modal.querySelector('#chat-inputs').style.display = 'none';
 
@@ -3116,31 +3123,23 @@ function msgLoadChat(convId, name, modal, tutorId) {
                 unreadCount: cur + 1
             });
 
-            // ── If this conversation involves management, also write to management inbox ──
+            // ═══ BRIDGE: mirror follow-up to management inbox if this is a management conv ═══
             if (convId.includes('management')) {
-                await addDoc(collection(db, "tutor_to_management_messages"), {
-                    tutorId: tutorId,
-                    tutorEmail: window.tutorData.email || '',
-                    tutorName: window.tutorData.name || '',
-                    subject: '',
-                    message: txt || '📷 Image',
-                    imageUrl: imageUrl || null,
-                    isUrgent: false,
-                    createdAt: now,
-                    managementRead: false,
-                    replied: false,
-                    managementReplies: [],
-                    conversationId: convId
-                });
-                await addDoc(collection(db, "management_notifications"), {
-                    type: 'tutor_message',
-                    title: `Follow-up from ${window.tutorData.name || 'Tutor'}`,
-                    message: (txt || '📷 Image').substring(0, 200),
-                    tutorEmail: window.tutorData.email || '',
-                    tutorName: window.tutorData.name || '',
-                    read: false,
-                    createdAt: now
-                });
+                try {
+                    await addDoc(collection(db, "tutor_to_management_messages"), {
+                        tutorId: tutorId, tutorEmail: window.tutorData.email || '', tutorName: window.tutorData.name || '',
+                        subject: '', message: txt || '📷 Image', imageUrl: imageUrl || null,
+                        isUrgent: false, createdAt: now,
+                        managementRead: false, replied: false, managementReplies: [],
+                        conversationId: convId
+                    });
+                    await addDoc(collection(db, "management_notifications"), {
+                        type: 'tutor_message', title: 'Follow-up from ' + (window.tutorData.name || 'Tutor'),
+                        message: (txt || '📷 Image').substring(0, 200),
+                        tutorEmail: window.tutorData.email || '', tutorName: window.tutorData.name || '',
+                        read: false, createdAt: now
+                    });
+                } catch(bridgeErr) { console.warn('Management bridge follow-up failed:', bridgeErr); }
             }
 
             input.value = '';
