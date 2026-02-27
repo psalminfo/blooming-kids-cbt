@@ -11193,20 +11193,27 @@ async function renderManagementMessagingPanel(container) {
         listEl.innerHTML = `<div class="text-center py-10 text-gray-400"><i class="fas fa-spinner fa-spin text-3xl mb-3 block"></i><p>Loading inbox...</p></div>`;
 
         _inboxUnsub = onSnapshot(
-            query(collection(db, 'tutor_to_management_messages'), limit(100)),
+            query(collection(db, 'tutor_to_management_messages'), orderBy('createdAt', 'desc'), limit(100)),
             (snap) => {
                 let msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                // Already ordered desc by Firestore, but keep client-side sort as safety net
                 msgs.sort((a, b) => {
                     const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
                     const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
                     return tb - ta;
                 });
-                _cachedInbox = msgs.slice(0, 50);
+                _cachedInbox = msgs;
                 renderInbox(inboxFilter);
             },
             (err) => {
-                console.warn('Inbox listener err:', err.message);
-                if (listEl) listEl.innerHTML = `<p class="text-red-500 text-sm text-center py-6">Failed to load inbox: ${err.message}</p>`;
+                console.error('Inbox listener error:', err);
+                if (listEl) listEl.innerHTML = `
+                    <div class="text-center py-10 text-red-400">
+                        <i class="fas fa-exclamation-triangle text-3xl mb-3 block"></i>
+                        <p class="font-medium">Failed to load inbox</p>
+                        <p class="text-sm mt-1">${escapeHtml(err.message)}</p>
+                        <button onclick="startInboxListener()" class="mt-3 text-sm text-blue-600 hover:underline">Try again</button>
+                    </div>`;
             }
         );
     }
