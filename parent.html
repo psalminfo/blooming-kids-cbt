@@ -3,689 +3,476 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
-    <meta name="robots" content="noindex, nofollow" />
-    <title>Parent Portal — Blooming Kids House</title>
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>Parent Portal - Blooming Kids House</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-    <link rel="stylesheet" href="style.css" />
     <link rel="icon" href="favicon.ico" />
 
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-    <script src="firebaseParentConfig.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
 
-    <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
+    
+    <!-- Global Phone Number Support -->
     <script src="https://cdn.jsdelivr.net/npm/libphonenumber-js@1.9.6/bundle/libphonenumber-js.min.js"></script>
 
     <style>
-        /* ===================================================
-           PORTAL DESIGN SYSTEM — Blooming Kids House
-           =================================================== */
-        :root {
-            --forest:     #0a3d1f;
-            --pine:       #1a5c35;
-            --emerald:    #2d8a53;
-            --mint:       #10b981;
-            --lightmint:  #34d399;
-            --cream:      #fef9f0;
-        }
-
-        *, *::before, *::after { box-sizing: border-box; }
-
         body {
-            font-family: 'DM Sans', sans-serif;
-            margin: 0;
+            background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 50%, #d1fae5 100%);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             min-height: 100vh;
-            overflow-x: hidden;
-            color: #111827;
         }
-
-        /* ===== TOAST ===== */
-        #toastContainer { position: fixed; top: 1.25rem; right: 1.25rem; z-index: 9999; pointer-events: none; }
-
-        .message-toast {
-            background: #065f46;
-            color: #fff;
-            padding: 0.85rem 1.25rem;
-            border-radius: 12px;
-            font-size: 0.9rem;
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .logo-glow {
+            filter: drop-shadow(0 0 15px rgba(34, 197, 94, 0.3));
+        }
+        .card-glow {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .btn-glow {
+            box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.3), 0 2px 4px -1px rgba(34, 197, 94, 0.1);
+            transition: all 0.3s ease;
+        }
+        .btn-glow:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(34, 197, 94, 0.4), 0 4px 6px -2px rgba(34, 197, 94, 0.2);
+        }
+        .input-focus:focus {
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+            border-color: #10b981;
+        }
+        .hidden { 
+            display: none !important; 
+        }
+        /* Auth Tabs */
+        .tab-active {
+            background-color: #059669;
+            color: white;
+        }
+        .tab-inactive {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        /* Main Content Tabs */
+        .tab-active-main {
+            background-color: #10b981;
+            color: white;
+            position: relative;
+        }
+        .tab-inactive-main {
+            background-color: #ecfdf5;
+            color: #059669;
+            position: relative;
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #10b981;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        .loading-spinner-small {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #10b981;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            color: white;
             font-weight: 500;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.25);
-            animation: toastIn 0.35s cubic-bezier(0.34,1.56,0.64,1) both;
-            max-width: 360px;
-            border-left: 4px solid #34d399;
-            margin-bottom: 0.5rem;
-            pointer-events: auto;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
         }
-        .message-toast.error   { background: #991b1b; border-left-color: #f87171; }
-        .message-toast.success { background: #065f46; border-left-color: #34d399;  }
-        .message-toast.warning { background: #92400e; border-left-color: #fbbf24;  }
-
-        @keyframes toastIn {
-            from { opacity: 0; transform: translateX(80px) scale(0.9); }
-            to   { opacity: 1; transform: translateX(0);              }
+        .toast.show {
+            transform: translateX(0);
         }
-
-        .hidden { display: none !important; }
-
-        /* ===== AUTH WRAPPER ===== */
-        #authWrapper { display: flex; min-height: 100vh; }
-
-        /* --- LEFT brand panel --- */
-        .auth-brand-panel {
-            flex: 0 0 46%;
-            background: linear-gradient(160deg, #051d0e 0%, #0a3d1f 40%, #1a5c35 100%);
+        .toast.success {
+            background-color: #10b981;
+        }
+        .toast.error {
+            background-color: #ef4444;
+        }
+        .toast.warning {
+            background-color: #f59e0b;
+        }
+        .response-bubble {
+            background-color: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 8px;
+        }
+        .response-header {
+            font-weight: 600;
+            color: #065f46;
+            margin-bottom: 4px;
+        }
+        /* Accordion Styles */
+        .accordion-header {
+            transition: all 0.3s ease;
+        }
+        .accordion-header:hover {
+            background-color: #bbf7d0 !important;
+        }
+        /* Slide Down Animation */
+        .slide-down {
+            animation: slideDown 0.3s ease-out;
+        }
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+                max-height: 0;
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+                max-height: 5000px;
+            }
+        }
+        .preserve-whitespace {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        /* Notification Badge */
+        .notification-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background-color: #ef4444;
+            color: white;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            min-width: 1.25rem;
+            height: 1.25rem;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            position: relative;
-            overflow: hidden;
-            padding: 3rem 2.5rem;
+            padding: 0 0.25rem;
+            animation: pulse 2s infinite;
         }
-
-        .auth-brand-panel::before {
-            content: '';
-            position: absolute; inset: 0;
-            background-image:
-                radial-gradient(ellipse at 20% 20%, rgba(16,185,129,0.14) 0%, transparent 60%),
-                radial-gradient(ellipse at 80% 80%, rgba(45,138,83,0.17) 0%, transparent 60%);
-            pointer-events: none;
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
         }
-
-        .orb { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.16; animation: floatOrb 12s ease-in-out infinite; }
-        .orb-1 { width: 280px; height: 280px; background: #10b981; top: -80px; right: -60px; }
-        .orb-2 { width: 200px; height: 200px; background: #34d399; bottom: 40px; left: -40px; animation-delay: -4s; }
-        .orb-3 { width: 160px; height: 160px; background: #059669; top: 55%;  right: 10%;  animation-delay: -7s; }
-
-        @keyframes floatOrb {
-            0%, 100% { transform: translateY(0); }
-            50%       { transform: translateY(-28px); }
+        /* Message urgent styling */
+        .urgent-message {
+            border-left: 4px solid #ef4444;
+            background-color: #fef2f2;
         }
-
-        .leaf-bg {
-            position: absolute; inset: 0;
-            opacity: 0.055;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cpath fill='%2334d399' d='M30 5C20 5 8 14 8 30s12 24 22 24c0 0-6-12-6-24S30 8 30 5z'/%3E%3C/svg%3E");
-            background-size: 60px 60px;
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
         }
-
-        .brand-logo {
-            width: 86px; filter: drop-shadow(0 0 22px rgba(52,211,153,0.5));
-            margin-bottom: 1.75rem; position: relative; z-index: 1;
-            animation: logoPulse 4s ease-in-out infinite;
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
         }
-
-        @keyframes logoPulse {
-            0%, 100% { filter: drop-shadow(0 0 18px rgba(52,211,153,0.4)); }
-            50%       { filter: drop-shadow(0 0 38px rgba(52,211,153,0.75)); }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
         }
-
-        .brand-eyebrow {
-            font-size: 0.76rem; font-weight: 500;
-            color: rgba(52,211,153,0.75);
-            letter-spacing: 0.22em; text-transform: uppercase;
-            position: relative; z-index: 1; margin-bottom: 0.6rem;
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a1;
         }
-
-        .brand-headline {
-            font-family: 'Playfair Display', serif;
-            font-size: clamp(1.75rem, 3vw, 2.4rem);
-            font-weight: 700; color: #fef9f0;
-            text-align: center; line-height: 1.3;
-            position: relative; z-index: 1; margin-bottom: 1.2rem;
+        /* Academics Section Specific */
+        .academics-student-selector {
+            background: linear-gradient(to right, #3b82f6, #1d4ed8);
+            color: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
         }
-
-        .brand-headline span {
-            background: linear-gradient(90deg, #34d399, #6ee7b7);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+        .topic-item {
+            transition: all 0.2s ease;
+            border-left: 4px solid #3b82f6;
         }
-
-        .brand-desc {
-            font-size: 0.88rem; color: rgba(254,249,240,0.6);
-            text-align: center; line-height: 1.8; max-width: 298px;
-            position: relative; z-index: 1; margin-bottom: 1.75rem;
+        .topic-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
         }
-
-        .brand-divider {
-            width: 50px; height: 2px;
-            background: linear-gradient(90deg, transparent, #34d399, transparent);
-            margin: 0 auto 1.6rem; position: relative; z-index: 1;
+        .homework-item {
+            transition: all 0.2s ease;
+            border-left: 4px solid #8b5cf6;
         }
-
-        .brand-features { display: flex; flex-direction: column; gap: 0.6rem; width: 100%; max-width: 285px; position: relative; z-index: 1; }
-
-        .brand-feat {
-            display: flex; align-items: center; gap: 0.6rem;
-            background: rgba(52,211,153,0.09); border: 1px solid rgba(52,211,153,0.17);
-            border-radius: 10px; padding: 0.58rem 0.85rem;
-            color: rgba(254,249,240,0.82); font-size: 0.84rem; font-weight: 500;
-            transition: background 0.2s;
+        .homework-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
         }
-        .brand-feat:hover { background: rgba(52,211,153,0.15); }
-
-        /* --- RIGHT form panel --- */
-        .auth-form-panel {
-            flex: 1; background: #f4f7f5;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            padding: 2.5rem 2rem;
-            position: relative; overflow-y: auto;
+        .status-overdue {
+            background-color: #fef2f2;
+            color: #dc2626;
+            border-color: #fca5a5;
         }
-
-        .auth-form-panel::before {
-            content: '';
-            position: absolute; top: -80px; right: -80px;
-            width: 280px; height: 280px;
-            background: radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 70%);
-            pointer-events: none;
+        .status-pending {
+            background-color: #eff6ff;
+            color: #1d4ed8;
+            border-color: #93c5fd;
         }
-
-        .auth-card {
-            background: #fff;
-            border-radius: 22px;
-            box-shadow: 0 16px 56px rgba(0,0,0,0.09), 0 4px 14px rgba(0,0,0,0.05);
-            width: 100%; max-width: 430px;
-            padding: 2.25rem 2rem;
-            position: relative; z-index: 1;
-        }
-
-        /* Auth tabs */
-        .auth-tabs {
-            display: flex; background: #f3f4f6;
-            border-radius: 11px; padding: 4px; margin-bottom: 1.6rem;
-        }
-
-        .auth-tab-btn {
-            flex: 1; padding: 0.58rem 0.75rem;
-            border: none; border-radius: 8px;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 0.875rem; font-weight: 600;
-            cursor: pointer; transition: all 0.22s;
-            color: #9ca3af; background: transparent;
-            box-shadow: none !important;
-        }
-
-        .auth-tab-btn.tab-active {
-            background: #fff !important;
-            color: #0a3d1f !important;
-            box-shadow: 0 1px 6px rgba(0,0,0,0.1) !important;
-        }
-
-        .auth-tab-btn.tab-inactive {
-            background: transparent !important;
-            color: #9ca3af !important;
-        }
-
-        .auth-heading { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 700; color: #0a3d1f; margin: 0 0 0.3rem; text-align: center; }
-        .auth-subhead { color: #6b7280; font-size: 0.875rem; text-align: center; margin: 0 0 1.5rem; }
-
-        /* Form elements */
-        .portal-label { display: block; font-size: 0.8rem; font-weight: 600; color: #374151; margin-bottom: 0.38rem; letter-spacing: 0.03em; }
-
-        .portal-input {
-            width: 100%; padding: 0.72rem 1rem;
-            border: 1.5px solid #e5e7eb; border-radius: 10px;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 0.925rem; color: #111827 !important;
-            background: #fafafa;
-            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
-            outline: none; margin-bottom: 0.9rem;
-        }
-
-        .portal-input:focus { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,0.12); background: #fff; }
-        .portal-input::placeholder { color: #9ca3af; }
-
-        /* Password wrapper */
-        .pw-wrap { position: relative; margin-bottom: 0.9rem; }
-        .pw-wrap .portal-input { padding-right: 2.6rem; margin-bottom: 0; }
-
-        .pwd-toggle {
-            position: absolute; right: 0.8rem; top: 50%; transform: translateY(-50%);
-            background: none; border: none; cursor: pointer; color: #9ca3af;
-            padding: 0; font-size: 1rem; box-shadow: none !important; transition: color 0.2s;
-        }
-        .pwd-toggle:hover { color: #10b981; }
-
-        .remember-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; }
-        .remember-lbl { display: flex; align-items: center; gap: 0.45rem; font-size: 0.85rem; color: #6b7280; cursor: pointer; }
-        .remember-lbl input { accent-color: #10b981; width: 15px; height: 15px; }
-
-        .forgot-link { font-size: 0.85rem; color: #10b981; font-weight: 600; background: none; border: none; cursor: pointer; padding: 0; box-shadow: none !important; transition: color 0.2s; }
-        .forgot-link:hover { color: #059669; }
-
-        /* CTA button */
-        .portal-btn {
-            width: 100%; padding: 0.85rem 1.25rem; border: none; border-radius: 11px;
-            background: linear-gradient(135deg, #10b981, #059669);
-            color: #fff; font-family: 'DM Sans', sans-serif;
-            font-size: 0.975rem; font-weight: 700;
-            cursor: pointer; transition: all 0.22s;
-            box-shadow: 0 4px 16px rgba(16,185,129,0.35);
-            display: flex; align-items: center; justify-content: center; gap: 0.5rem;
-        }
-        .portal-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(16,185,129,0.45); }
-        .portal-btn:active { transform: translateY(0); }
-        .portal-btn:disabled { opacity: 0.65; cursor: not-allowed; transform: none; }
-
-        .portal-spinner {
-            border: 2px solid rgba(255,255,255,0.35); border-top: 2px solid #fff;
-            border-radius: 50%; width: 17px; height: 17px;
-            animation: spin 0.8s linear infinite; flex-shrink: 0;
-        }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* Auth loader overlay */
-        #authLoader {
-            position: fixed; inset: 0; background: rgba(255,255,255,0.8);
-            backdrop-filter: blur(6px);
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 9998;
-        }
-        #authLoader.hidden { display: none !important; }
-
-        .loader-ring {
-            width: 50px; height: 50px;
-            border: 4px solid rgba(16,185,129,0.18); border-top: 4px solid #10b981;
-            border-radius: 50%; animation: spin 0.9s linear infinite; margin-bottom: 1rem;
-        }
-        #authLoader p { color: #0a3d1f; font-weight: 600; font-size: 1rem; }
-
-        /* ===== DASHBOARD ===== */
-        #reportArea { background: #f4f7f5; min-height: 100vh; }
-
-        /* Header */
-        .welcome-banner {
-            background: linear-gradient(135deg, #0a3d1f 0%, #1a5c35 55%, #2d8a53 100%);
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid rgba(52,211,153,0.12);
-            position: sticky; top: 0; z-index: 100;
-        }
-
-        .welcome-inner {
-            max-width: 1400px; margin: 0 auto;
-            display: flex; flex-wrap: wrap; align-items: center;
-            justify-content: space-between; gap: 0.875rem;
-        }
-
-        .welcome-brand { display: flex; align-items: center; gap: 0.75rem; }
-        .welcome-brand img { height: 36px; filter: drop-shadow(0 0 6px rgba(52,211,153,0.35)); }
-        .welcome-brand-text h2 { font-family: 'Playfair Display', serif; font-size: 0.95rem; color: #fef9f0; margin: 0; }
-        #welcomeMessage { font-size: 0.77rem; color: rgba(52,211,153,0.9); font-weight: 500; }
-
-        .header-actions { display: flex; flex-wrap: wrap; gap: 0.45rem; }
-
-        .header-btn {
-            display: flex; align-items: center; gap: 0.375rem;
-            padding: 0.5rem 0.9rem; border-radius: 8px;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 0.82rem; font-weight: 600;
-            cursor: pointer; transition: all 0.2s; border: none; white-space: nowrap;
-        }
-
-        .hbtn-ghost { background: rgba(255,255,255,0.1); color: rgba(254,249,240,0.88); border: 1px solid rgba(255,255,255,0.14) !important; box-shadow: none !important; }
-        .hbtn-ghost:hover { background: rgba(255,255,255,0.18); transform: translateY(-1px); }
-        .hbtn-danger { background: rgba(239,68,68,0.14); color: #fca5a5; border: 1px solid rgba(239,68,68,0.22) !important; box-shadow: none !important; }
-        .hbtn-danger:hover { background: rgba(239,68,68,0.24); transform: translateY(-1px); }
-
-        /* Tab bar */
-        .main-tab-bar { background: #fff; border-bottom: 1px solid #e5e7eb; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-        .main-tab-bar-inner { max-width: 1400px; margin: 0 auto; display: flex; }
-
-        .main-tab {
-            flex: 1; padding: 0.85rem 0.5rem;
-            border: none; background: transparent;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 0.875rem; font-weight: 600; color: #6b7280;
-            cursor: pointer; transition: all 0.2s; position: relative;
-            display: flex; align-items: center; justify-content: center; gap: 0.4rem;
-            border-bottom: 3px solid transparent; box-shadow: none !important;
-        }
-
-        .main-tab.tab-active-main   { color: #0a3d1f !important; border-bottom-color: #10b981; }
-        .main-tab.tab-inactive-main { color: #6b7280 !important; border-bottom-color: transparent; }
-        .main-tab:hover:not(.tab-active-main) { color: #374151; background: #f9fafb; }
-
-        /* Dash content */
-        .dash-body { max-width: 1400px; margin: 0 auto; padding: 1.75rem 1.5rem; }
-
-        .dash-section-title { font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 700; color: #0a3d1f; margin-bottom: 1.25rem; }
-
-        .portal-card { background: #fff; border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.065); border: 1px solid #f0f0f0; }
-
-        /* ===== ANIMATIONS & LEGACY CLASSES ===== */
-        .fade-in { animation: fadeIn 0.4s ease-in-out both; }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(8px); }
-            to   { opacity: 1; transform: translateY(0);   }
-        }
-
-        .slide-down { animation: slideDown 0.3s ease-out both; }
-
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-8px); }
-            to   { opacity: 1; transform: translateY(0);    }
-        }
-
-        .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e4e4e4 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 6px; }
-        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-        .skeleton-text  { height: 1em;   margin-bottom: 0.5em; }
-        .skeleton-title { height: 1.8em; width: 60%; margin-bottom: 1em; }
-        .skeleton-card  { height: 140px; border-radius: 10px; margin-bottom: 1rem; }
-
-        .loading-spinner       { border: 3px solid rgba(0,0,0,0.08); border-top: 3px solid #10b981; border-radius: 50%; width: 38px; height: 38px; animation: spin 0.9s linear infinite; }
-        .loading-spinner-small { border: 2px solid rgba(0,0,0,0.08); border-top: 2px solid #10b981; border-radius: 50%; width: 16px;  height: 16px;  animation: spin 0.9s linear infinite; display: inline-block; vertical-align: middle; }
-
-        .accordion-content { overflow: hidden; transition: all 0.35s cubic-bezier(0.4,0,0.2,1); }
-        .accordion-content.hidden { max-height: 0 !important; opacity: 0; padding-top: 0 !important; padding-bottom: 0 !important; }
-        .accordion-content:not(.hidden) { max-height: 5000px; opacity: 1; }
-
-        .progress-accordion-content { overflow: hidden; transition: all 0.4s cubic-bezier(0.4,0,0.2,1); }
-        .progress-accordion-content.hidden { max-height: 0 !important; opacity: 0; transform: translateY(-8px); }
-        .progress-accordion-content:not(.hidden) { max-height: 5000px; opacity: 1; transform: translateY(0); }
-
-        .accordion-header { transition: all 0.25s ease; }
-        .accordion-header:hover { background-color: #bbf7d0 !important; }
-
-        .notification-badge { position: absolute; top: -6px; right: -6px; background: #ef4444; color: #fff; border-radius: 9999px; font-size: 0.7rem; font-weight: 700; min-width: 1.2rem; height: 1.2rem; display: flex; align-items: center; justify-content: center; padding: 0 0.25rem; animation: pulseScale 2s infinite; }
-        @keyframes pulseScale { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
-
-        .preserve-whitespace { white-space: pre-wrap; word-break: break-word; }
-        .urgent-message { border-left: 4px solid #ef4444; background: #fef2f2; }
-        .response-bubble { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 0.75rem 1rem; margin-top: 0.5rem; }
-        .response-header { font-weight: 700; color: #065f46; margin-bottom: 0.25rem; font-size: 0.875rem; }
-
-        /* Legacy classes used by JS-generated HTML */
-        .btn-glow { box-shadow: 0 4px 14px rgba(16,185,129,0.3); transition: all 0.25s; }
-        .btn-glow:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(16,185,129,0.4); }
-        .card-glow { box-shadow: 0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04); }
-        .logo-glow { filter: drop-shadow(0 0 12px rgba(34,197,94,0.3)); }
-        .input-focus:focus { box-shadow: 0 0 0 3px rgba(16,185,129,0.12); border-color: #10b981; }
-
-        /* Tab class aliases (JS adds these by name) */
-        .tab-active     { background-color: #059669 !important; color: white !important; }
-        .tab-inactive   { background-color: #d1fae5 !important; color: #065f46 !important; }
-
-        /* Ensure inputs always readable */
-        input, select, textarea { color: #111827 !important; }
-
-        /* Modal */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 9990; padding: 1rem; }
-        .modal-card { background: #fff; border-radius: 20px; box-shadow: 0 24px 80px rgba(0,0,0,0.2); width: 100%; overflow: hidden; }
-        .modal-header { background: linear-gradient(135deg, #0a3d1f, #1a5c35); padding: 1.1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; }
-        .modal-header h3 { font-family: 'Playfair Display', serif; color: #fef9f0; font-size: 1.15rem; margin: 0; }
-        .modal-close-btn { background: rgba(255,255,255,0.15); border: none; color: #fef9f0; width: 30px; height: 30px; border-radius: 7px; font-size: 1.25rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: none !important; transition: background 0.2s; }
-        .modal-close-btn:hover { background: rgba(255,255,255,0.25); }
-        .modal-body { padding: 1.5rem; max-height: calc(90vh - 60px); overflow-y: auto; }
-
-        /* Academics */
-        .topic-item    { transition: all 0.2s; border-left: 4px solid #3b82f6; }
-        .topic-item:hover { transform: translateX(4px); }
-        .homework-item { transition: all 0.2s; border-left: 4px solid #8b5cf6; }
-        .homework-item:hover { transform: translateX(4px); }
-
-        /* Mobile */
-        @media (max-width: 820px) {
-            #authWrapper { flex-direction: column; }
-            .auth-brand-panel { flex: 0 0 auto; padding: 2rem 1.5rem; }
-            .brand-features { display: none; }
-            .auth-form-panel { padding: 1.5rem 1.25rem; }
-            .auth-card { padding: 1.75rem 1.25rem; max-width: 100%; }
-            .main-tab { font-size: 0.76rem; padding: 0.7rem 0.35rem; }
-            .dash-body { padding: 1.25rem 1rem; }
-            .welcome-banner { position: static; }
+        .status-submitted {
+            background-color: #f0fdf4;
+            color: #15803d;
+            border-color: #86efac;
         }
     </style>
 </head>
-<body>
+<body class="flex flex-col items-center p-4">
     <div id="toastContainer"></div>
 
-    <!-- Global auth loader overlay -->
-    <div id="authLoader" class="hidden">
-        <div class="loader-ring"></div>
-        <p>Processing… please wait</p>
-    </div>
-
-    <!-- ================================================
-         AUTH SPLIT-SCREEN
-         ================================================ -->
-    <div id="authWrapper">
-
-        <!-- LEFT — Brand -->
-        <div class="auth-brand-panel">
-            <div class="leaf-bg"></div>
-            <div class="orb orb-1"></div>
-            <div class="orb orb-2"></div>
-            <div class="orb orb-3"></div>
-
-            <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg"
-                 alt="Blooming Kids House Logo" class="brand-logo" />
-
-            <p class="brand-eyebrow">Parent Portal</p>
-
-            <h1 class="brand-headline">Where Every Child<br><span>Blossoms</span></h1>
-
-            <p class="brand-desc">
-                Securely access your children's reports, track academic progress,
-                and stay connected with their tutors — all in one place.
-            </p>
-
-            <div class="brand-divider"></div>
-
-            <div class="brand-features">
-                <div class="brand-feat"><span>📊</span> Real-time progress reports</div>
-                <div class="brand-feat"><span>📚</span> Academic assignments &amp; tracking</div>
-                <div class="brand-feat"><span>🎁</span> Referral rewards dashboard</div>
-                <div class="brand-feat"><span>🔒</span> Secure, private &amp; encrypted</div>
-            </div>
+    <div class="w-full max-w-6xl">
+        <div class="text-center mb-8">
+            <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
+                 alt="Blooming Kids House Logo" 
+                 class="h-20 w-auto mx-auto logo-glow mb-4">
+            <h1 class="text-4xl font-bold text-green-800 mb-2">Parent Portal</h1>
+            <p class="text-green-600 text-lg">Secure Access to Your Children's Progress Reports</p>
         </div>
 
-        <!-- RIGHT — Form Panel -->
-        <div class="auth-form-panel">
-            <div id="authArea" class="auth-card fade-in">
-
-                <!-- Tab switcher -->
-                <div class="auth-tabs">
-                    <button id="signInTab"  class="auth-tab-btn tab-active"   onclick="switchTab('signin')">Sign In</button>
-                    <button id="signUpTab"  class="auth-tab-btn tab-inactive" onclick="switchTab('signup')">Create Account</button>
-                </div>
-
-                <!-- SIGN IN FORM -->
-                <div id="signInForm">
-                    <p class="auth-heading">Welcome back</p>
-                    <p class="auth-subhead">Sign in to access your children's portal</p>
-
-                    <label class="portal-label" for="loginIdentifier">Phone Number or Email</label>
-                    <input id="loginIdentifier" type="text" placeholder="Enter your phone or email"
-                           class="portal-input" autocomplete="username" required />
-
-                    <label class="portal-label" for="loginPassword">Password</label>
-                    <div class="pw-wrap">
-                        <input id="loginPassword" type="password" placeholder="Enter your password"
-                               class="portal-input" autocomplete="current-password" required />
-                        <button type="button" class="pwd-toggle" onclick="togglePwd('loginPassword',this)">👁</button>
-                    </div>
-
-                    <div class="remember-row" style="margin-top:0.45rem;">
-                        <label class="remember-lbl">
-                            <input id="rememberMe" type="checkbox" /> Remember me
-                        </label>
-                        <button id="forgotPasswordBtn" class="forgot-link">Forgot password?</button>
-                    </div>
-
-                    <button id="signInBtn" class="portal-btn">
-                        <span id="signInText">Sign In</span>
-                        <div id="signInSpinner" class="portal-spinner hidden"></div>
-                    </button>
-
-                    <p style="text-align:center;margin-top:1.1rem;font-size:0.83rem;color:#6b7280;">
-                        New here?
-                        <button onclick="switchTab('signup')" style="background:none;border:none;color:#10b981;font-weight:700;cursor:pointer;padding:0;box-shadow:none !important;">Create an account</button>
-                    </p>
-                </div>
-
-                <!-- SIGN UP FORM -->
-                <div id="signUpForm" class="hidden">
-                    <p class="auth-heading">Create account</p>
-                    <p class="auth-subhead">Join Blooming Kids House family today</p>
-
-                    <label class="portal-label" for="signupPhone">Phone Number</label>
-                    <div id="phoneInputContainer">
-                        <!-- JS injects country code dropdown as sibling before signupPhone -->
-                        <input id="signupPhone" type="tel" placeholder="Enter phone number"
-                               class="portal-input" autocomplete="tel" required />
-                    </div>
-
-                    <label class="portal-label" for="signupEmail">Email Address</label>
-                    <input id="signupEmail" type="email" placeholder="Enter your email address"
-                           class="portal-input" autocomplete="email" required />
-
-                    <label class="portal-label" for="signupPassword">Password</label>
-                    <div class="pw-wrap">
-                        <input id="signupPassword" type="password" placeholder="Minimum 6 characters"
-                               class="portal-input" autocomplete="new-password" required minlength="6" />
-                        <button type="button" class="pwd-toggle" onclick="togglePwd('signupPassword',this)">👁</button>
-                    </div>
-
-                    <label class="portal-label" for="signupConfirmPassword">Confirm Password</label>
-                    <div class="pw-wrap">
-                        <input id="signupConfirmPassword" type="password" placeholder="Confirm your password"
-                               class="portal-input" autocomplete="new-password" required minlength="6" />
-                        <button type="button" class="pwd-toggle" onclick="togglePwd('signupConfirmPassword',this)">👁</button>
-                    </div>
-
-                    <button id="signUpBtn" class="portal-btn" style="margin-top:0.5rem;">
-                        <span id="signUpText">Create Account</span>
-                        <div id="signUpSpinner" class="portal-spinner hidden"></div>
-                    </button>
-
-                    <p style="text-align:center;margin-top:1.1rem;font-size:0.83rem;color:#6b7280;">
-                        Already have an account?
-                        <button onclick="switchTab('signin')" style="background:none;border:none;color:#10b981;font-weight:700;cursor:pointer;padding:0;box-shadow:none !important;">Sign in</button>
-                    </p>
-                </div>
-
-            </div><!-- /authArea -->
-
-            <p style="margin-top:1.5rem;font-size:0.76rem;color:#9ca3af;text-align:center;">
-                &copy; 2025 Blooming Kids House &nbsp;&middot;&nbsp; Where Every Child Blossoms
-            </p>
-        </div><!-- /auth-form-panel -->
-    </div><!-- /authWrapper -->
-
-
-    <!-- ================================================
-         DASHBOARD AREA
-         ================================================ -->
-    <div id="reportArea" class="hidden fade-in">
-
-        <!-- Sticky header -->
-        <div class="welcome-banner">
-            <div class="welcome-inner">
-                <div class="welcome-brand">
-                    <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="BKH Logo" />
-                    <div class="welcome-brand-text">
-                        <h2>Blooming Kids House</h2>
-                        <div id="welcomeMessage">Welcome!</div>
-                    </div>
-                </div>
-                <div class="header-actions">
-                    <button onclick="showFeedbackModal()"  class="header-btn hbtn-ghost"><span>📝</span> Feedback</button>
-                    <button onclick="showResponsesModal()" class="header-btn hbtn-ghost"><span>📨</span> Responses</button>
-                    <button onclick="logout()"             class="header-btn hbtn-danger"><span>🚪</span> Logout</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Main tab bar -->
-        <div class="main-tab-bar">
-            <div class="main-tab-bar-inner">
-                <button id="reportTab"    class="main-tab tab-active-main"  onclick="switchMainTab('reports')">
-                    <span>📄</span> Progress Reports
+        <div id="authArea" class="bg-white rounded-2xl card-glow p-8 mb-8 fade-in">
+            <div class="flex mb-6 rounded-xl overflow-hidden border border-green-200">
+                <button id="signInTab" class="flex-1 py-3 font-semibold tab-active transition-all duration-200">
+                    Sign In
                 </button>
-                <button id="academicsTab" class="main-tab tab-inactive-main" style="position:relative" onclick="switchMainTab('academics')">
-                    <span>📚</span> Academics
-                </button>
-                <button id="rewardsTab"   class="main-tab tab-inactive-main" onclick="switchMainTab('rewards')">
-                    <span>🎁</span> Rewards
+                <button id="signUpTab" class="flex-1 py-3 font-semibold tab-inactive transition-all duration-200">
+                    Sign Up
                 </button>
             </div>
-        </div>
 
-        <!-- Content -->
-        <div class="dash-body">
-
-            <!-- Reports -->
-            <div id="reportContentArea">
-                <h2 class="dash-section-title">Your Children's Reports</h2>
-
-                <div id="reportsLoading" class="hidden text-center py-12">
-                    <div class="loading-spinner mx-auto"></div>
-                    <p class="text-green-700 font-semibold mt-4">Loading reports…</p>
-                </div>
-
-                <div id="reportsEmpty" class="hidden text-center py-16 portal-card p-10">
-                    <div style="font-size:3.5rem;margin-bottom:1rem;">📬</div>
-                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Reports Available Yet</h3>
-                    <p class="text-gray-500 max-w-md mx-auto">No progress reports are available for your children at this time. Check back after your child's next session.</p>
-                </div>
-
-                <div id="reportContent" class="space-y-6">
-                    <!-- Inserted by JS -->
-                </div>
-            </div>
-
-            <!-- Academics -->
-            <div id="academicsContentArea" class="hidden">
-                <h2 class="dash-section-title">Academic Progress &amp; Assignments</h2>
-                <div id="academicsStudentDropdown" class="mb-6"></div>
-                <div id="academicsContent" class="portal-card p-6" style="min-height:400px;">
-                    <!-- Inserted by JS -->
-                </div>
-            </div>
-
-            <!-- Rewards -->
-            <div id="rewardsContentArea" class="hidden">
-                <h2 class="dash-section-title">Parent Referral Rewards</h2>
-                <div id="rewardsContent" class="portal-card p-6" style="min-height:400px;">
-                    <!-- Inserted by JS -->
-                </div>
-            </div>
-
-        </div><!-- /dash-body -->
-    </div><!-- /reportArea -->
-
-
-    <!-- ================================================
-         MODALS
-         ================================================ -->
-
-    <!-- Feedback Modal -->
-    <div id="feedbackModal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:570px;">
-            <div class="modal-header">
-                <h3>Send Feedback</h3>
-                <button class="modal-close-btn" onclick="hideFeedbackModal()">&#215;</button>
-            </div>
-            <div class="modal-body">
-                <p style="color:#6b7280;font-size:0.875rem;margin-bottom:1.25rem;">We value your feedback! Fill in the form below and we'll respond within 24–48 hours.</p>
-                <div class="space-y-3">
+            <div id="signInForm">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Welcome Back</h2>
+                
+                <div class="space-y-4">
                     <div>
-                        <label for="feedbackCategory" class="portal-label">Category *</label>
-                        <select id="feedbackCategory" class="portal-input" required>
+                        <label for="loginIdentifier" class="block text-sm font-medium text-gray-700 mb-2">
+                            Phone Number or Email
+                        </label>
+                        <input id="loginIdentifier" 
+                               type="text" 
+                               placeholder="Enter your phone number or email"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required>
+                    </div>
+                    
+                    <div>
+                        <label for="loginPassword" class="block text-sm font-medium text-gray-700 mb-2">
+                            Password
+                        </label>
+                        <input id="loginPassword" 
+                               type="password" 
+                               placeholder="Enter your password"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required>
+                    </div>
+
+                    <div class="flex items-center">
+                        <input id="rememberMe" type="checkbox" class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
+                        <label for="rememberMe" class="ml-2 block text-sm text-gray-700">
+                            Remember me
+                        </label>
+                    </div>
+                    
+                    <button id="signInBtn" 
+                            class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
+                        <span id="signInText">Sign In</span>
+                        <div id="signInSpinner" class="loading-spinner hidden"></div>
+                    </button>
+
+                    <div class="text-center">
+                        <button id="forgotPasswordBtn" class="text-green-600 hover:text-green-800 text-sm transition-colors duration-200">
+                            Forgot Password?
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="signUpForm" class="hidden">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Create Account</h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label for="signupPhone" class="block text-sm font-medium text-gray-700 mb-2">
+                            Phone Number
+                        </label>
+                        <div id="phoneInputContainer">
+                            <!-- Country code dropdown will be inserted here by JavaScript -->
+                            <input id="signupPhone" 
+                                   type="tel" 
+                                   placeholder="Enter your phone number (any format)"
+                                   class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                                   required>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="signupEmail" class="block text-sm font-medium text-gray-700 mb-2">
+                            Email Address
+                        </label>
+                        <input id="signupEmail" 
+                               type="email" 
+                               placeholder="Enter your email address"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required>
+                    </div>
+                    
+                    <div>
+                        <label for="signupPassword" class="block text-sm font-medium text-gray-700 mb-2">
+                            Password
+                        </label>
+                        <input id="signupPassword" 
+                               type="password" 
+                               placeholder="Minimum 6 characters"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required minlength="6">
+                    </div>
+                    
+                    <div>
+                        <label for="signupConfirmPassword" class="block text-sm font-medium text-gray-700 mb-2">
+                            Confirm Password
+                        </label>
+                        <input id="signupConfirmPassword" 
+                               type="password" 
+                               placeholder="Confirm your password"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required minlength="6">
+                    </div>
+                    
+                    <button id="signUpBtn" 
+                            class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
+                        <span id="signUpText">Create Account</span>
+                        <div id="signUpSpinner" class="loading-spinner hidden"></div>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="authLoader" class="hidden text-center mt-4">
+                <div class="loading-spinner"></div>
+                <p class="text-green-600 font-semibold mt-2">Processing... Please wait.</p>
+            </div>
+        </div>
+
+        <div id="reportArea" class="hidden fade-in">
+            <div class="bg-green-50 border-l-4 border-green-600 p-6 rounded-lg mb-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h2 id="welcomeMessage" class="text-2xl font-bold text-green-800">Welcome!</h2>
+                        <p class="text-green-600">Thank you for being part of Blooming Kids House family</p>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                        <!-- Buttons will be added here by JavaScript -->
+                        <button onclick="logout()" 
+                                class="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition-all duration-200 btn-glow flex items-center justify-center">
+                            <span class="mr-2">🚪</span> Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex mb-6 rounded-xl overflow-hidden shadow-lg border border-green-200">
+                <button id="reportTab" class="flex-1 py-3 font-semibold tab-active-main hover:bg-green-500 transition-all duration-200">
+                    <span class="mr-2">📄</span> Progress Reports
+                </button>
+                <button id="academicsTab" class="flex-1 py-3 font-semibold tab-inactive-main hover:bg-green-100 transition-all duration-200">
+                    <span class="mr-2">📚</span> Academics
+                </button>
+                <button id="rewardsTab" class="flex-1 py-3 font-semibold tab-inactive-main hover:bg-green-100 transition-all duration-200">
+                    <span class="mr-2">🎁</span> Rewards Dashboard
+                </button>
+            </div>
+
+            <div id="reportContentArea">
+                <h2 class="text-2xl font-bold text-green-800 mb-6">Your Children's Reports</h2>
+                
+                <div id="reportsLoading" class="hidden text-center py-8">
+                    <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+                    <p class="text-green-600 font-semibold mt-4">Loading reports...</p>
+                </div>
+                
+                <div id="reportsEmpty" class="hidden text-center py-12 bg-white rounded-xl card-glow">
+                    <div class="text-6xl mb-4">📬</div>
+                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Reports Available</h3>
+                    <p class="text-gray-500 max-w-md mx-auto">No progress reports are available for your children at this time. Please check back later.</p>
+                </div>
+                
+                <div id="reportContent" class="space-y-6">
+                    <!-- Accordion reports will be inserted here by JavaScript -->
+                </div>
+            </div>
+            
+            <div id="academicsContentArea" class="hidden">
+                <h2 class="text-2xl font-bold text-green-800 mb-6">Academic Progress & Assignments</h2>
+                
+                <!-- Student Selection Dropdown Container -->
+                <div id="academicsStudentDropdown" class="mb-6">
+                    <!-- Student dropdown will be inserted here by JavaScript -->
+                </div>
+                
+                <div id="academicsContent" class="bg-white rounded-xl card-glow p-6 min-h-[400px]">
+                    <!-- Academics data will be inserted here by JavaScript -->
+                </div>
+            </div>
+            
+            <div id="rewardsContentArea" class="hidden">
+                <h2 class="text-2xl font-bold text-green-800 mb-6">Parent Referral Rewards</h2>
+                <div id="rewardsContent" class="bg-white rounded-xl card-glow p-6 min-h-[400px]">
+                    <!-- Rewards data will be inserted here by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Feedback Modal -->
+        <div id="feedbackModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+            <div class="bg-white rounded-2xl p-6 md:p-8 max-w-2xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800">Send Feedback</h3>
+                    <button onclick="hideFeedbackModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
+                        &times;
+                    </button>
+                </div>
+                
+                <p class="text-gray-600 mb-6">We value your feedback! Please fill out the form below.</p>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label for="feedbackCategory" class="block text-sm font-medium text-gray-700 mb-2">
+                            Category *
+                        </label>
+                        <select id="feedbackCategory" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                                required>
                             <option value="">Select category</option>
                             <option value="Feedback">General Feedback</option>
                             <option value="Request">Special Request</option>
@@ -693,9 +480,14 @@
                             <option value="Suggestion">Suggestion</option>
                         </select>
                     </div>
+
                     <div>
-                        <label for="feedbackPriority" class="portal-label">Priority *</label>
-                        <select id="feedbackPriority" class="portal-input" required>
+                        <label for="feedbackPriority" class="block text-sm font-medium text-gray-700 mb-2">
+                            Priority *
+                        </label>
+                        <select id="feedbackPriority" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                                required>
                             <option value="">Select priority</option>
                             <option value="Low">Low</option>
                             <option value="Medium">Medium</option>
@@ -703,136 +495,117 @@
                             <option value="Urgent">Urgent</option>
                         </select>
                     </div>
+
                     <div>
-                        <label for="feedbackStudent" class="portal-label">Regarding Student *</label>
-                        <select id="feedbackStudent" class="portal-input" required>
+                        <label for="feedbackStudent" class="block text-sm font-medium text-gray-700 mb-2">
+                            Regarding Student *
+                        </label>
+                        <select id="feedbackStudent" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                                required>
                             <option value="">Select student</option>
                         </select>
                     </div>
+
                     <div>
-                        <label for="feedbackMessage" class="portal-label">Your Message *</label>
-                        <textarea id="feedbackMessage" rows="5"
-                                  placeholder="Please describe your feedback in detail…"
-                                  class="portal-input preserve-whitespace"
-                                  style="resize:vertical;margin-bottom:0;" required></textarea>
+                        <label for="feedbackMessage" class="block text-sm font-medium text-gray-700 mb-2">
+                            Your Message *
+                        </label>
+                        <textarea id="feedbackMessage" 
+                                  rows="6"
+                                  placeholder="Please provide details about your feedback..."
+                                  class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200 preserve-whitespace"
+                                  required></textarea>
                     </div>
-                    <div style="display:flex;gap:0.75rem;padding-top:0.35rem;">
-                        <button id="submitFeedbackBtn" class="portal-btn" style="flex:1;">
+                    
+                    <div class="flex flex-col sm:flex-row gap-2 pt-4">
+                        <button id="submitFeedbackBtn" 
+                                class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
                             <span id="submitFeedbackText">Submit Feedback</span>
-                            <div id="submitFeedbackSpinner" class="portal-spinner hidden"></div>
+                            <div id="submitFeedbackSpinner" class="loading-spinner hidden"></div>
                         </button>
-                        <button onclick="hideFeedbackModal()"
-                                style="flex:1;padding:0.85rem;border:1.5px solid #e5e7eb;border-radius:11px;background:#fff;color:#6b7280;font-family:'DM Sans',sans-serif;font-weight:600;cursor:pointer;font-size:0.95rem;box-shadow:none !important;">
+                        <button onclick="hideFeedbackModal()" 
+                                class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">
                             Cancel
                         </button>
                     </div>
                 </div>
+
+                <div class="mt-6 text-center">
+                    <p class="text-sm text-gray-500">
+                        Your feedback is important to us. We'll respond within 24-48 hours.
+                    </p>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Responses Modal -->
-    <div id="responsesModal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:680px;">
-            <div class="modal-header">
-                <h3>&#128232; Admin Responses</h3>
-                <button class="modal-close-btn" onclick="hideResponsesModal()">&#215;</button>
-            </div>
-            <div class="modal-body">
-                <p style="color:#6b7280;font-size:0.875rem;margin-bottom:1.25rem;">Responses from our staff to your submitted feedback.</p>
-                <div id="responsesContent" class="space-y-4"></div>
-                <div style="margin-top:1.5rem;text-align:center;">
-                    <button onclick="hideResponsesModal()"
-                            style="padding:0.75rem 2rem;border:1.5px solid #e5e7eb;border-radius:11px;background:#fff;color:#6b7280;font-family:'DM Sans',sans-serif;font-weight:600;cursor:pointer;box-shadow:none !important;">
+        <!-- Admin Responses Modal -->
+        <div id="responsesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+            <div class="bg-white rounded-2xl p-6 md:p-8 max-w-4xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800">📨 Admin Responses</h3>
+                    <button onclick="hideResponsesModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
+                        &times;
+                    </button>
+                </div>
+                
+                <p class="text-gray-600 mb-6">Responses from our staff to your feedback.</p>
+                
+                <div id="responsesContent" class="space-y-4">
+                    <!-- Responses will be inserted here by JavaScript -->
+                </div>
+
+                <div class="mt-6 text-center">
+                    <button onclick="hideResponsesModal()" 
+                            class="bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 transition-all duration-200">
                         Close
                     </button>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Password Reset Modal -->
-    <div id="passwordResetModal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:420px;">
-            <div class="modal-header">
-                <h3>Reset Password</h3>
-                <button id="cancelResetBtn" class="modal-close-btn">&#215;</button>
-            </div>
-            <div class="modal-body">
-                <p style="color:#6b7280;font-size:0.875rem;text-align:center;margin-bottom:1.25rem;">Enter your registered email and we'll send you a reset link.</p>
-                <label for="resetEmail" class="portal-label">Email Address</label>
-                <input id="resetEmail" type="email" placeholder="Enter your registered email" class="portal-input" required />
-                <div style="display:flex;gap:0.75rem;">
-                    <button id="sendResetBtn" class="portal-btn" style="flex:1;">
-                        <span id="sendResetText">Send Reset Link</span>
-                        <div id="sendResetSpinner" class="portal-spinner hidden"></div>
-                    </button>
+        <div id="passwordResetModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+            <div class="bg-white rounded-2xl p-6 md:p-8 max-w-md w-full mx-auto card-glow">
+                <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Reset Password</h3>
+                <p class="text-gray-600 mb-4 text-center">Enter your email address to receive a password reset link.</p>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label for="resetEmail" class="block text-sm font-medium text-gray-700 mb-2">
+                            Email Address
+                        </label>
+                        <input id="resetEmail" 
+                               type="email" 
+                               placeholder="Enter your registered email"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                               required>
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <button id="sendResetBtn" 
+                                class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
+                            <span id="sendResetText">Send Reset Link</span>
+                            <div id="sendResetSpinner" class="loading-spinner hidden"></div>
+                        </button>
+                        <button id="cancelResetBtn" 
+                                class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">
+                            Cancel
+                        </button>
+                    </div>
                 </div>
-                <div id="resetLoader" class="hidden text-center" style="margin-top:1rem;">
+                
+                <div id="resetLoader" class="hidden text-center mt-4">
                     <div class="loading-spinner mx-auto"></div>
-                    <p style="color:#10b981;font-weight:600;margin-top:0.5rem;font-size:0.875rem;">Sending reset link…</p>
+                    <p class="text-green-600 font-semibold mt-2">Sending reset link...</p>
                 </div>
             </div>
         </div>
+
+        <div class="text-center mt-12">
+            <p class="text-green-800 font-semibold">BLOOMING KIDS HOUSE</p>
+            <p class="text-green-600 text-sm">Where Every Child Blossoms</p>
+        </div>
     </div>
-
-
-    <!-- ================================================
-         INLINE SCRIPTS
-         ================================================ -->
-    <script>
-        // Password toggle
-        function togglePwd(id, btn) {
-            var inp = document.getElementById(id);
-            if (!inp) return;
-            if (inp.type === 'password') {
-                inp.type = 'text';
-                btn.textContent = '\uD83D\uDE48'; // 🙈
-            } else {
-                inp.type = 'password';
-                btn.textContent = '\uD83D\uDC41';  // 👁
-            }
-        }
-
-        // Bridge: sync authWrapper visibility with authArea hidden state
-        // The JS shows/hides #authArea — we mirror that to #authWrapper so the
-        // split-screen disappears when the dashboard loads.
-        document.addEventListener('DOMContentLoaded', function() {
-            var authWrapper  = document.getElementById('authWrapper');
-            var authAreaEl   = document.getElementById('authArea');
-            var reportAreaEl = document.getElementById('reportArea');
-
-            if (!authAreaEl || !authWrapper) return;
-
-            // Watch for class changes on authArea
-            var obs = new MutationObserver(function() {
-                var hidden = authAreaEl.classList.contains('hidden');
-                authWrapper.style.display = hidden ? 'none' : '';
-            });
-            obs.observe(authAreaEl, { attributes: true, attributeFilter: ['class'] });
-
-            // Patch authManager methods once available
-            var patchTimer = setInterval(function() {
-                if (!window.authManager) return;
-                clearInterval(patchTimer);
-
-                var origDash = window.authManager.showDashboardUI.bind(window.authManager);
-                var origAuth = window.authManager.showAuthScreen.bind(window.authManager);
-
-                window.authManager.showDashboardUI = function() {
-                    origDash();
-                    if (authWrapper) authWrapper.style.display = 'none';
-                    if (reportAreaEl) reportAreaEl.classList.remove('hidden');
-                };
-
-                window.authManager.showAuthScreen = function() {
-                    origAuth();
-                    if (authWrapper) authWrapper.style.display = '';
-                    if (reportAreaEl) reportAreaEl.classList.add('hidden');
-                };
-            }, 80);
-        });
-    </script>
 
     <script src="parent.js"></script>
 </body>
