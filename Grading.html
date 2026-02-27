@@ -257,7 +257,6 @@ body {
 <!-- Firebase module script -->
 <script type="module">
 import { auth, db } from './firebaseConfig.js';
-import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { doc, getDoc, updateDoc, addDoc, collection } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const params = new URLSearchParams(location.search);
@@ -268,17 +267,23 @@ const tName  = params.get('name')  || sessionStorage.getItem('grading_tutor_name
 // Expose to the plain script below
 window._G = { db, doc, updateDoc, addDoc, collection, hwId, tEmail, tName, hw: null };
 
-onAuthStateChanged(auth, async user => {
-  if (!user) {
-    showLoadErr('🔒', 'Not logged in.', 'Please log in from the Tutor Portal first.');
-    return;
-  }
-  if (!hwId) {
-    showLoadErr('⚠️', 'No assignment ID.', 'Open this page via the Review button in the portal.');
-    return;
-  }
-
+// ========== FIX: Wait for auth to be fully restored ==========
+(async () => {
   try {
+    // Wait for Firebase Auth to finish initialising (restores session from storage)
+    await auth.authStateReady();
+
+    const user = auth.currentUser;
+    if (!user) {
+      showLoadErr('🔒', 'Not logged in.', 'Please log in from the Tutor Portal first.');
+      return;
+    }
+
+    if (!hwId) {
+      showLoadErr('⚠️', 'No assignment ID.', 'Open this page via the Review button in the portal.');
+      return;
+    }
+
     const snap = await getDoc(doc(db, 'homework_assignments', hwId));
     if (!snap.exists()) {
       showLoadErr('📭', 'Assignment not found.', 'It may have been deleted.');
@@ -315,7 +320,8 @@ onAuthStateChanged(auth, async user => {
   } catch (err) {
     showLoadErr('❌', 'Error loading.', err.message);
   }
-});
+})();
+// ===============================================================
 
 function loadContent(hw) {
   const area = document.getElementById('canvas-area');
