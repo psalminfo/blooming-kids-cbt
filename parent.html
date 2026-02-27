@@ -13,8 +13,93 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
 
-    <!-- Shared Firebase config — initialises compat bridge (window.db / window.auth) -->
-    <script type="module" src="firebaseConfig.js"></script>
+    <!-- ─────────────────────────────────────────────────────────────────────
+         PARENT PORTAL — FIREBASE COMPAT BRIDGE
+         
+         WHY THIS EXISTS
+         ───────────────
+         firebaseConfig.js uses the v10 modular SDK and exports db / auth as
+         ES-module named exports.  parent.js uses the v9 compat SDK and reads
+         window.db / window.auth — those are completely different instances and
+         the two styles cannot share them.
+
+         This inline script initialises the COMPAT SDK (already loaded above via
+         the three firebase-*-compat CDN tags) with:
+           • the same dev/prod environment detection as firebaseConfig.js
+           • the same per-portal named-app isolation ("parent-portal")
+           • the same session-scoped auth persistence
+         …then stores the resulting instances on window so parent.js finds them.
+
+         OTHER PORTALS are unaffected — each has its own named Firebase app, so
+         signing into this portal never touches admin / tutor / management auth.
+         ──────────────────────────────────────────────────────────────────────── -->
+    <script>
+    (function () {
+
+        // ── 1. Mirror the environment detection from firebaseConfig.js ───────
+        var hostname = window.location.hostname;
+        var isDev =
+            hostname === 'localhost' ||
+            hostname === '127.0.0.1' ||
+            hostname.includes('bkhdevelop.netlify.app');
+
+        var mainConfig = {
+            apiKey:            'AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg',
+            authDomain:        'bloomingkidsassessment.firebaseapp.com',
+            projectId:         'bloomingkidsassessment',
+            storageBucket:     'bloomingkidsassessment.appspot.com',
+            messagingSenderId: '238975054977',
+            appId:             '1:238975054977:web:87c70b4db044998a204980'
+        };
+
+        var devConfig = {
+            apiKey:            'AIzaSyAu36oLPNsk0TPKVIwCzEHe9oOtJ7cZQXA',
+            authDomain:        'blooming-kids-dev.firebaseapp.com',
+            projectId:         'blooming-kids-dev',
+            storageBucket:     'blooming-kids-dev.firebasestorage.app',
+            messagingSenderId: '336022609689',
+            appId:             '1:336022609689:web:ad5a0a74dcac011f21ef88'
+        };
+
+        var config = isDev ? devConfig : mainConfig;
+
+        // Mirror window.firebaseConfig that firebaseConfig.js also sets,
+        // in case any other inline script on this page reads it.
+        window.firebaseConfig = config;
+
+        // ── 2. Mirror the per-portal named-app isolation ─────────────────────
+        // firebaseConfig.js auto-detects "parent-portal" for any URL that
+        // contains "parent" in the path — we hard-code it here for clarity.
+        var APP_NAME = 'parent-portal';
+
+        var app;
+        try {
+            app = firebase.app(APP_NAME);        // reuse if already initialised
+        } catch (e) {
+            app = firebase.initializeApp(config, APP_NAME);
+        }
+
+        // ── 3. Auth — session-scoped per tab (mirrors firebaseConfig.js) ─────
+        var authInst = firebase.auth(app);
+        authInst
+            .setPersistence(firebase.auth.Auth.Persistence.SESSION)
+            .catch(function (err) {
+                console.warn('Parent portal: could not set auth persistence:', err.message);
+            });
+
+        // ── 4. Expose services on window for parent.js ───────────────────────
+        window.db      = firebase.firestore(app);
+        window.auth    = authInst;
+        window.storage = firebase.storage ? firebase.storage(app) : null;
+
+        console.log(
+            '🔗 Parent portal compat bridge ready |',
+            isDev ? '🛠️ DEVELOPMENT' : '🚀 PRODUCTION',
+            '| app:', APP_NAME
+        );
+
+    })();
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
