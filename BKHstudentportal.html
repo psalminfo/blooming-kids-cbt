@@ -7,6 +7,10 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+</script>
 
 <!-- Firebase SDK — fixed: was 12.0.0 (does not exist), now 10.12.2 -->
 <script type="module">
@@ -62,6 +66,9 @@ details[open] > summary .chev { transform:rotate(90deg); }
 .annot-tool-btn:hover:not(.active) { background:#d1d5db; }
 .color-dot { width:20px; height:20px; border-radius:50%; cursor:pointer; border:3px solid transparent; transition:border-color .15s; flex-shrink:0; }
 .color-dot.active { border-color:#059669; }
+/* PDF annotate loading */
+.annot-loading { text-align:center; padding:40px; color:#9ca3af; }
+.annot-loading i { font-size:2rem; margin-bottom:10px; display:block; animation:spin 1s linear infinite; }
 /* Ws tab styles */
 .ws-tab-btn { padding:10px 18px; font-size:.875rem; font-weight:600; border-bottom:2px solid transparent; transition:all .15s; cursor:pointer; background:none; border-left:none; border-right:none; border-top:none; }
 .ws-tab-btn.active { color:#059669; border-bottom-color:#059669; }
@@ -846,8 +853,10 @@ window.openWorkspace = async (assignmentId) => {
     const a = snap.data();
 
     const fileUrl = a.fileUrl || a.attachmentUrl || (a.attachments && a.attachments[0]?.url) || '';
-    const ext = (a.fileName || fileUrl || '').split('.').pop().toLowerCase();
-    const isImage = ['jpg','jpeg','png','gif','webp'].includes(ext);
+    const ext = (a.fileName || fileUrl || '').split('.').pop().split('?')[0].toLowerCase();
+    const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
+    const isPdf = ext === 'pdf' || fileUrl.toLowerCase().includes('.pdf');
+    const isViewable = isImage || isPdf;
 
     const modal = document.createElement('div');
     modal.id = 'ws-modal-' + assignmentId;
@@ -902,6 +911,8 @@ window.openWorkspace = async (assignmentId) => {
                 <div class="border border-gray-200 rounded-xl overflow-hidden">
                     ${isImage
                         ? `<img src="${escH(fileUrl)}" class="w-full object-contain" style="max-height:380px;">`
+                        : isPdf
+                        ? `<iframe src="https://docs.google.com/gview?url=${encodeURIComponent(fileUrl)}&embedded=true" class="w-full" style="height:480px;border:none;" allowfullscreen></iframe>`
                         : `<iframe src="${escH(fileUrl)}" class="w-full" style="height:380px;border:none;" allowfullscreen></iframe>`
                     }
                 </div>
@@ -926,11 +937,29 @@ window.openWorkspace = async (assignmentId) => {
                     <button onclick="undoAnnot('${assignmentId}')" class="ml-1 px-2 py-1 text-xs bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300" title="Undo"><i class="fas fa-undo"></i></button>
                     <button onclick="clearAnnotCanvas('${assignmentId}')" class="px-2 py-1 text-xs bg-red-100 text-red-600 rounded-lg hover:bg-red-200" title="Clear"><i class="fas fa-trash-alt"></i></button>
                 </div>
-                ${isImage && fileUrl
-                    ? `<div style="position:relative;display:inline-block;width:100%;max-width:100%;">
-                        <img id="annot-bg-${assignmentId}" src="${escH(fileUrl)}" style="max-width:100%;display:block;border-radius:10px;border:1px solid #e5e7eb;" crossorigin="anonymous">
+                ${isPdf && fileUrl
+                    ? `<div id="annot-pdf-controls-${assignmentId}" class="flex items-center gap-2 mb-2 text-xs">
+                        <button onclick="annotPdfPage('${assignmentId}',-1)" class="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 font-bold">◀ Prev</button>
+                        <span id="annot-pdf-pageinfo-${assignmentId}" class="text-gray-500">Page 1 / ?</span>
+                        <button onclick="annotPdfPage('${assignmentId}',1)" class="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 font-bold">Next ▶</button>
+                      </div>
+                      <div id="annot-wrapper-${assignmentId}" style="position:relative;display:inline-block;width:100%;max-width:100%;">
+                        <canvas id="annot-bg-canvas-${assignmentId}" style="display:block;border-radius:10px;border:1px solid #e5e7eb;max-width:100%;"></canvas>
+                        <canvas id="annot-canvas-${assignmentId}" style="position:absolute;top:0;left:0;cursor:crosshair;border-radius:10px;"></canvas>
+                      </div>`
+                    : isImage && fileUrl
+                    ? `<div id="annot-wrapper-${assignmentId}" style="position:relative;display:inline-block;width:100%;max-width:100%;">
+                        <img id="annot-bg-${assignmentId}" src="${escH(fileUrl)}" style="max-width:100%;display:block;border-radius:10px;border:1px solid #e5e7eb;">
                         <canvas id="annot-canvas-${assignmentId}" style="position:absolute;top:0;left:0;cursor:crosshair;border-radius:10px;"></canvas>
                        </div>`
+                    : fileUrl
+                    ? `<div id="annot-wrapper-${assignmentId}" style="position:relative;display:inline-block;width:100%;max-width:100%;">
+                        <div id="annot-file-frame-${assignmentId}" style="width:100%;min-height:500px;border-radius:10px;border:1px solid #e5e7eb;overflow:hidden;background:#fff;">
+                            <iframe src="${escH(fileUrl)}" style="width:100%;height:500px;border:none;" id="annot-iframe-${assignmentId}"></iframe>
+                        </div>
+                        <canvas id="annot-canvas-${assignmentId}" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:10px;pointer-events:auto;"></canvas>
+                       </div>
+                       <p class="text-xs text-amber-600 mt-1"><i class="fas fa-info-circle mr-1"></i>Drawing on top of the document. Your annotations are saved as an overlay image.</p>`
                     : `<canvas id="annot-canvas-${assignmentId}" width="580" height="380"
                         style="border:2px dashed #d1d5db;border-radius:12px;cursor:crosshair;display:block;background:#fff;max-width:100%;"></canvas>`
                 }
@@ -981,7 +1010,14 @@ window.openWorkspace = async (assignmentId) => {
         drawing:false,
         history:[],
         ctx:null,
-        _zoom:1
+        _zoom:1,
+        fileUrl: fileUrl,
+        isImage: isImage,
+        isPdf: isPdf,
+        ext: ext,
+        _pdfDoc: null,
+        _pdfPage: 1,
+        _pdfTotal: 0
     };
 };
 
@@ -989,25 +1025,78 @@ window.openWorkspace = async (assignmentId) => {
 function initAnnotCanvas(id, isImage, fileUrl) {
     const canvas = document.getElementById('annot-canvas-' + id);
     if (!canvas) return;
+    const s = _annotState[id];
+    const isPdf = s && s.isPdf;
 
+    // ─── PDF: render via PDF.js ───
+    if (isPdf && fileUrl && window.pdfjsLib) {
+        const bgCanvas = document.getElementById('annot-bg-canvas-' + id);
+        if (!bgCanvas) return;
+        
+        const loadPdf = async () => {
+            try {
+                const pdfDoc = await pdfjsLib.getDocument({ url: fileUrl, withCredentials: false }).promise;
+                if (s) { s._pdfDoc = pdfDoc; s._pdfTotal = pdfDoc.numPages; s._pdfPage = 1; }
+                const info = document.getElementById('annot-pdf-pageinfo-' + id);
+                if (info) info.textContent = 'Page 1 / ' + pdfDoc.numPages;
+                await renderPdfPage(id, 1);
+            } catch(err) {
+                console.error('PDF load error:', err);
+                // Fallback: try loading via Google Docs Viewer as image
+                bgCanvas.style.display = 'none';
+                const wrapper = document.getElementById('annot-wrapper-' + id);
+                if (wrapper) {
+                    const fallbackFrame = document.createElement('iframe');
+                    fallbackFrame.src = 'https://docs.google.com/gview?url=' + encodeURIComponent(fileUrl) + '&embedded=true';
+                    fallbackFrame.style.cssText = 'width:100%;height:600px;border:none;border-radius:10px;';
+                    wrapper.insertBefore(fallbackFrame, canvas);
+                    canvas.style.width = '100%';
+                    canvas.style.height = '600px';
+                    canvas.width = 800;
+                    canvas.height = 600;
+                }
+            }
+        };
+        loadPdf();
+
+        const ctx = canvas.getContext('2d');
+        if (s) s.ctx = ctx;
+        _saveAnnotHistory(id);
+        _attachCanvasListeners(canvas, id);
+        return;
+    }
+
+    // ─── IMAGE: load as background ───
     if (isImage && fileUrl) {
         const img = document.getElementById('annot-bg-' + id);
         if (img) {
             const applySize = () => {
-                canvas.width = img.offsetWidth || 580;
-                canvas.height = img.offsetHeight || 380;
-                canvas.style.width = img.offsetWidth + 'px';
-                canvas.style.height = img.offsetHeight + 'px';
+                if (img.naturalWidth === 0 && img.offsetWidth === 0) return;
+                const w = img.offsetWidth || img.naturalWidth || 580;
+                const h = img.offsetHeight || img.naturalHeight || 380;
+                canvas.width = w;
+                canvas.height = h;
+                canvas.style.width = w + 'px';
+                canvas.style.height = h + 'px';
             };
             
-            // Apply size immediately if image is loaded
-            if (img.complete) {
+            // Handle image load errors (CORS etc.) — reload without crossorigin
+            img.onerror = () => {
+                console.warn('Image load failed, retrying via proxy...');
+                // Try Google proxy as fallback
+                if (!img.dataset.retried) {
+                    img.dataset.retried = '1';
+                    img.src = fileUrl; // retry as-is (sometimes the first load just fails)
+                }
+            };
+
+            if (img.complete && img.naturalWidth > 0) {
                 applySize();
             } else {
                 img.onload = applySize;
             }
             
-            // Add ResizeObserver to handle responsive layout changes
+            // ResizeObserver for responsive layout
             if (window.ResizeObserver) {
                 const observer = new ResizeObserver(() => {
                     if (img.offsetWidth > 0) {
@@ -1015,16 +1104,15 @@ function initAnnotCanvas(id, isImage, fileUrl) {
                         canvas.height = img.offsetHeight;
                         canvas.style.width = img.offsetWidth + 'px';
                         canvas.style.height = img.offsetHeight + 'px';
-                        
-                        // Restore drawing history if any
-                        const s = _annotState[id];
-                        if (s && s.history && s.history.length > 0) {
-                            const lastState = s.history[s.history.length - 1];
+                        // Restore drawing
+                        const st = _annotState[id];
+                        if (st && st.history && st.history.length > 0) {
+                            const lastState = st.history[st.history.length - 1];
                             if (lastState && lastState !== 'data:,') {
                                 const tempImg = new Image();
                                 tempImg.onload = () => {
-                                    s.ctx.clearRect(0, 0, canvas.width, canvas.height);
-                                    s.ctx.drawImage(tempImg, 0, 0, canvas.width, canvas.height);
+                                    st.ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                    st.ctx.drawImage(tempImg, 0, 0, canvas.width, canvas.height);
                                 };
                                 tempImg.src = lastState;
                             }
@@ -1037,6 +1125,32 @@ function initAnnotCanvas(id, isImage, fileUrl) {
         }
     }
 
+    // ─── OTHER FILES (iframe overlay) ───
+    if (!isImage && !isPdf && fileUrl) {
+        const frame = document.getElementById('annot-file-frame-' + id);
+        if (frame) {
+            const frameH = frame.offsetHeight || 500;
+            const frameW = frame.offsetWidth || 800;
+            canvas.width = frameW;
+            canvas.height = frameH;
+            canvas.style.width = frameW + 'px';
+            canvas.style.height = frameH + 'px';
+            // Resize when wrapper changes
+            if (window.ResizeObserver) {
+                const observer = new ResizeObserver(() => {
+                    const w = frame.offsetWidth || 800;
+                    const h = frame.offsetHeight || 500;
+                    canvas.width = w;
+                    canvas.height = h;
+                    canvas.style.width = w + 'px';
+                    canvas.style.height = h + 'px';
+                });
+                observer.observe(frame);
+                _resizeObservers[id] = observer;
+            }
+        }
+    }
+
     const ctx = canvas.getContext('2d');
     if (!_annotState[id]) {
         _annotState[id] = { tool:'pen', color:'#1f2937', size:3, drawing:false, history:[], ctx, _zoom:1 };
@@ -1044,8 +1158,62 @@ function initAnnotCanvas(id, isImage, fileUrl) {
         _annotState[id].ctx = ctx;
     }
     _saveAnnotHistory(id);
+    _attachCanvasListeners(canvas, id);
+}
 
-    // Set up event listeners
+// ─── PDF page rendering ───
+async function renderPdfPage(id, pageNum) {
+    const s = _annotState[id];
+    if (!s || !s._pdfDoc) return;
+    try {
+        const page = await s._pdfDoc.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 1.5 });
+        const bgCanvas = document.getElementById('annot-bg-canvas-' + id);
+        const annotCanvas = document.getElementById('annot-canvas-' + id);
+        if (!bgCanvas || !annotCanvas) return;
+
+        bgCanvas.width = viewport.width;
+        bgCanvas.height = viewport.height;
+        bgCanvas.style.width = viewport.width + 'px';
+        bgCanvas.style.height = viewport.height + 'px';
+
+        annotCanvas.width = viewport.width;
+        annotCanvas.height = viewport.height;
+        annotCanvas.style.width = viewport.width + 'px';
+        annotCanvas.style.height = viewport.height + 'px';
+
+        const bgCtx = bgCanvas.getContext('2d');
+        await page.render({ canvasContext: bgCtx, viewport }).promise;
+
+        // Update annotState ctx
+        if (s) {
+            s.ctx = annotCanvas.getContext('2d');
+            s.history = [];
+            _saveAnnotHistory(id);
+        }
+
+        const info = document.getElementById('annot-pdf-pageinfo-' + id);
+        if (info) info.textContent = 'Page ' + pageNum + ' / ' + s._pdfTotal;
+    } catch(err) {
+        console.error('PDF page render error:', err);
+    }
+}
+
+window.annotPdfPage = (id, delta) => {
+    const s = _annotState[id];
+    if (!s || !s._pdfDoc) return;
+    const newPage = s._pdfPage + delta;
+    if (newPage < 1 || newPage > s._pdfTotal) return;
+    s._pdfPage = newPage;
+    renderPdfPage(id, newPage);
+};
+
+// ─── Attach canvas listeners (extracted to avoid duplication) ───
+function _attachCanvasListeners(canvas, id) {
+    // Prevent duplicate listeners
+    if (canvas.dataset.listenersAttached) return;
+    canvas.dataset.listenersAttached = '1';
+
     canvas.addEventListener('mousedown', e => _annotStart(e, id, canvas));
     canvas.addEventListener('mousemove', e => _annotDraw(e, id, canvas));
     canvas.addEventListener('mouseup',   () => _annotStop(id));
@@ -1190,28 +1358,41 @@ window.wsTab = (id, tab) => {
         if (btn) btn.classList.toggle('active', t === tab);
     });
     
-    // FIX: Properly initialize and size canvas when switching to annotate tab
+    // Initialize annotation canvas when switching to annotate tab
     if (tab === 'annotate') {
-        const canvas = document.getElementById('annot-canvas-'+id);
-        const bgImg = document.getElementById('annot-bg-'+id);
-        
-        if (!_annotState[id] || !_annotState[id].ctx) {
-            // Initialize canvas if not already done
-            const isImage = !!bgImg;
-            const fileUrl = bgImg ? bgImg.src : '';
+        const s = _annotState[id];
+        if (!s || !s.ctx) {
+            // Initialize canvas using stored metadata
+            const isImage = s ? s.isImage : !!document.getElementById('annot-bg-'+id);
+            const fileUrl = s ? s.fileUrl : (document.getElementById('annot-bg-'+id)?.src || '');
             initAnnotCanvas(id, isImage, fileUrl);
-        } else if (bgImg) {
-            // Resync canvas size with image (important for responsive layouts)
-            setTimeout(() => {
-                const canvas = document.getElementById('annot-canvas-'+id);
-                const bgImg = document.getElementById('annot-bg-'+id);
-                if (canvas && bgImg && bgImg.complete) {
-                    canvas.width = bgImg.offsetWidth || 580;
-                    canvas.height = bgImg.offsetHeight || 380;
-                    canvas.style.width = bgImg.offsetWidth + 'px';
-                    canvas.style.height = bgImg.offsetHeight + 'px';
-                }
-            }, 50);
+        } else {
+            // Resync canvas size for images
+            const bgImg = document.getElementById('annot-bg-'+id);
+            if (bgImg) {
+                setTimeout(() => {
+                    const canvas = document.getElementById('annot-canvas-'+id);
+                    if (canvas && bgImg && bgImg.complete && bgImg.naturalWidth > 0) {
+                        canvas.width = bgImg.offsetWidth || 580;
+                        canvas.height = bgImg.offsetHeight || 380;
+                        canvas.style.width = bgImg.offsetWidth + 'px';
+                        canvas.style.height = bgImg.offsetHeight + 'px';
+                    }
+                }, 50);
+            }
+            // Resync for iframe-overlay files
+            const frame = document.getElementById('annot-file-frame-'+id);
+            if (frame) {
+                setTimeout(() => {
+                    const canvas = document.getElementById('annot-canvas-'+id);
+                    if (canvas && frame) {
+                        canvas.width = frame.offsetWidth || 800;
+                        canvas.height = frame.offsetHeight || 500;
+                        canvas.style.width = frame.offsetWidth + 'px';
+                        canvas.style.height = frame.offsetHeight + 'px';
+                    }
+                }, 50);
+            }
         }
     }
     
@@ -1227,10 +1408,41 @@ function _updateAnnotPreview(id) {
     const hasContent = Array.from(data).some((v,i) => i%4===3 && v>0);
     if (hasContent) {
         preview.classList.remove('hidden');
-        previewImg.src = canvas.toDataURL('image/png');
+        // Merge background + annotation for PDF/image
+        previewImg.src = _getMergedAnnotation(id);
     } else {
         preview.classList.add('hidden');
     }
+}
+
+// Merge background (PDF page or image) with annotation canvas into single image
+function _getMergedAnnotation(id) {
+    const annotCanvas = document.getElementById('annot-canvas-'+id);
+    if (!annotCanvas) return '';
+    const s = _annotState[id];
+
+    // Create a temp canvas to composite layers
+    const merged = document.createElement('canvas');
+    merged.width = annotCanvas.width;
+    merged.height = annotCanvas.height;
+    const mCtx = merged.getContext('2d');
+
+    // Draw background layer first (PDF canvas or image)
+    const bgCanvas = document.getElementById('annot-bg-canvas-'+id);
+    const bgImg = document.getElementById('annot-bg-'+id);
+    if (bgCanvas && bgCanvas.width > 0) {
+        mCtx.drawImage(bgCanvas, 0, 0, merged.width, merged.height);
+    } else if (bgImg && bgImg.complete && bgImg.naturalWidth > 0) {
+        try { mCtx.drawImage(bgImg, 0, 0, merged.width, merged.height); } catch(e) {}
+    } else {
+        // White background for iframe-overlay or blank canvas
+        mCtx.fillStyle = '#fff';
+        mCtx.fillRect(0, 0, merged.width, merged.height);
+    }
+
+    // Draw annotation overlay on top
+    mCtx.drawImage(annotCanvas, 0, 0);
+    return merged.toDataURL('image/png');
 }
 
 // ── SUBMIT WORK (with annotation upload) ──
@@ -1260,9 +1472,11 @@ window.submitWork = async (id) => {
             const data = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
             const hasContent = Array.from(data).some((v,i) => i%4===3 && v>0);
             if (hasContent) {
-                const blob = await new Promise(r => canvas.toBlob(r,'image/png'));
+                // Get merged image (background + annotations)
+                const mergedDataUrl = _getMergedAnnotation(id);
+                const mergedBlob = await (await fetch(mergedDataUrl)).blob();
                 const fd = new FormData();
-                fd.append('file', blob, 'annotation.png');
+                fd.append('file', mergedBlob, 'annotation.png');
                 fd.append('upload_preset', CLOUDINARY.preset);
                 const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY.cloudName}/upload`, {method:'POST',body:fd});
                 const d = await res.json();
