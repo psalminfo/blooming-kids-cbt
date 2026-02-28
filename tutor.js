@@ -7044,11 +7044,16 @@ function _renderHomeworkInbox(container, snapshot) {
                                                 <span>Due: ${escapeHtml(a.dueDate || '—')}</span>
                                                 ${submittedDate ? `<span>Submitted: ${escapeHtml(submittedDate)}</span>` : ''}
                                                 ${a.score != null ? `<span class="font-bold text-blue-600">Score: ${escapeHtml(String(a.score))}/100</span>` : ''}
+                                                ${a.annotationUrl ? `<span style="background:#d1fae5;color:#065f46;font-weight:700;padding:1px 7px;border-radius:999px;">✏️ Annotated</span>` : ''}
+                                                ${(() => {
+                                                    const count = (a.attachments||[]).length || (a.files||[]).length || (a.fileUrls||[]).length || (a.fileUrl ? 1 : 0);
+                                                    return count > 1 ? `<span style="background:#eff6ff;color:#1d4ed8;font-weight:700;padding:1px 7px;border-radius:999px;">📎 ${count} files</span>` : '';
+                                                })()}
                                             </div>
                                         </div>
                                         <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
                                             <span class="text-xs font-bold px-2 py-0.5 rounded-full ${statusColor}">${statusLabel}</span>
-                                            ${a.status === 'submitted' ? `<button onclick="openGradingInNewTab('${escapeHtml(a.id)}')" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;padding:5px 12px;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;" title="Review & annotate submission">✏️ Review</button>` : ''}
+                                            ${a.status === 'submitted' ? `<button onclick="openGradingModal('${escapeHtml(a.id)}')" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;padding:5px 12px;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;" title="Review & annotate submission">✏️ Review</button>` : ''}
                                         </div>
                                     </div>
                                 </div>`;
@@ -7086,8 +7091,6 @@ async function openGradingModal(homeworkId) {
         hwData = { id: docSnap.id, ...docSnap.data() };
     } catch (e) { overlay.remove(); document.body.style.overflow=''; showCustomAlert('Error loading: ' + e.message); return; }
 
-    const submissionUrl    = hwData.submissionUrl   || hwData.fileUrl || '';
-    const referenceUrl     = hwData.fileUrl         || '';
     const studentName      = hwData.studentName     || 'Student';
     const title            = hwData.title           || 'Untitled';
     const description      = hwData.description     || '';
@@ -7098,58 +7101,169 @@ async function openGradingModal(homeworkId) {
     const tutorName        = window.tutorData?.name  || '';
     const isAlreadyGraded  = hwData.status === 'graded';
 
-    // Smart file preview
-    const rawExt = (submissionUrl.split('?')[0].split('.').pop() || '').toLowerCase();
-    const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(rawExt);
-    const isPDF   = rawExt === 'pdf';
+    // ── Build full list of ALL original assignment files ──
+    const _getAllOrigFiles = (d) => {
+        const seen = new Set(); const files = [];
+        const add = (url, name) => {
+            if (!url || seen.has(url)) return; seen.add(url);
+            const ext = (url.split('?')[0].split('.').pop()||'').toLowerCase();
+            files.push({ url, name: name || url.split('/').pop().split('?')[0] || 'File', ext });
+        };
+        if (Array.isArray(d.attachments)) d.attachments.forEach(f => add(f?.url||f, f?.name||f?.fileName));
+        if (Array.isArray(d.files))       d.files.forEach(f => add(f?.url||f, f?.name||f?.fileName));
+        if (Array.isArray(d.fileUrls))    d.fileUrls.forEach((u,i) => add(u, d.fileNames?.[i]));
+        add(d.fileUrl, d.fileName);
+        add(d.attachmentUrl, d.attachmentFileName);
+        return files;
+    };
 
-    let previewHTML = '';
-    if (submissionUrl) {
-        if (isImage) {
-            previewHTML = `
-                <div>
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-                        <span style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">✏️ Annotate Submission</span>
-                        <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;" id="anno-tools">
-                            <button onclick="annoSetTool('pen')" id="tool-pen" style="padding:5px 10px;border-radius:8px;border:1.5px solid #3b82f6;background:#eff6ff;color:#2563eb;font-size:.75rem;font-weight:700;cursor:pointer;">✏️ Pen</button>
-                            <button onclick="annoSetTool('highlight')" id="tool-highlight" style="padding:5px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.75rem;font-weight:700;cursor:pointer;">🟡 Highlight</button>
-                            <button onclick="annoSetTool('arrow')" id="tool-arrow" style="padding:5px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.75rem;font-weight:700;cursor:pointer;">➡️ Arrow</button>
-                            <input type="color" id="anno-color" value="#ef4444" title="Pen color" style="width:32px;height:32px;padding:2px;border-radius:8px;border:1.5px solid #e2e8f0;cursor:pointer;">
-                            <button onclick="annoUndo()" style="padding:5px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.75rem;font-weight:700;cursor:pointer;">↩️ Undo</button>
-                            <button onclick="annoClear()" style="padding:5px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.75rem;font-weight:700;cursor:pointer;">🗑️ Clear</button>
-                            <button onclick="annoSave()" style="padding:5px 10px;border-radius:8px;border:none;background:linear-gradient(135deg,#059669,#047857);color:#fff;font-size:.75rem;font-weight:700;cursor:pointer;">💾 Save Image</button>
-                        </div>
-                    </div>
-                    <div style="position:relative;display:inline-block;width:100%;border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.15);">
-                        <img id="anno-base-img" src="${escapeHtml(submissionUrl)}" alt="Student submission"
-                            style="max-width:100%;display:block;user-select:none;" crossorigin="anonymous"
-                            onload="initAnnotationCanvas(this)">
-                        <canvas id="anno-canvas" style="position:absolute;top:0;left:0;cursor:crosshair;touch-action:none;"></canvas>
-                    </div>
-                    <p style="font-size:.72rem;color:#9ca3af;margin-top:6px;text-align:center;">Draw directly on the image · annotations are saved with your feedback</p>
-                </div>`;
-        } else if (isPDF) {
-            previewHTML = `<iframe src="${escapeHtml(submissionUrl)}" title="Student submission"
-                style="width:100%;height:65vh;min-height:460px;border:none;border-radius:10px;background:#f9fafb;display:block;"></iframe>`;
-        } else {
-            const fileIcons = {doc:'📝',docx:'📝',ppt:'📊',pptx:'📊',xls:'📈',xlsx:'📈',txt:'📄',zip:'🗜️',mp4:'🎬',mp3:'🎵'};
-            previewHTML = `
-                <div style="display:flex;flex-direction:column;align-items:center;padding:60px 20px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border-radius:12px;border:2px dashed #7dd3fc;">
-                    <div style="font-size:4rem;margin-bottom:16px;">${fileIcons[rawExt]||'📎'}</div>
-                    <p style="font-weight:700;color:#0369a1;font-size:1.1rem;margin-bottom:6px;">${escapeHtml(hwData.fileName||'Submitted File')}</p>
-                    <p style="color:#64748b;font-size:.85rem;margin-bottom:20px;">Click below to open and review</p>
-                    <a href="${escapeHtml(submissionUrl)}" target="_blank"
-                        style="background:#0369a1;color:#fff;padding:12px 28px;border-radius:10px;text-decoration:none;font-weight:700;">📂 Open File ↗</a>
-                </div>`;
-        }
-    } else {
-        previewHTML = `
-            <div style="text-align:center;padding:60px 20px;background:#fef9c3;border-radius:12px;border:2px dashed #fde047;">
-                <div style="font-size:3rem;margin-bottom:12px;">⚠️</div>
-                <p style="color:#92400e;font-weight:700;">No file attached yet</p>
-                <p style="color:#a16207;font-size:.85rem;margin-top:6px;">The student has not uploaded a file.</p>
+    // ── Build full list of ALL student submission files ──
+    const _getAllSubFiles = (d) => {
+        const seen = new Set(); const files = [];
+        const add = (url, name) => {
+            if (!url || seen.has(url)) return; seen.add(url);
+            const ext = (url.split('?')[0].split('.').pop()||'').toLowerCase();
+            files.push({ url, name: name || url.split('/').pop().split('?')[0] || 'File', ext });
+        };
+        // Annotated file first (most important — student's annotated work)
+        add(d.annotationUrl, 'Annotated Submission');
+        // Then any separately uploaded work file
+        add(d.submissionUrl, d.submissionFileName || d.fileName);
+        // Then text notes if there were any (skip — text is in studentWork field)
+        return files;
+    };
+
+    const origFiles = _getAllOrigFiles(hwData);
+    const subFiles  = _getAllSubFiles(hwData);
+    const studentWork = hwData.studentWork || '';
+
+    // ── Helper: render a single file for viewing ──
+    const _renderFileView = (f, label, idx, canAnnotate) => {
+        const { url, ext, name } = f;
+        const isImg  = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
+        const isPDF  = ext === 'pdf';
+        const isDoc  = ['doc','docx'].includes(ext);
+        const isPPT  = ['ppt','pptx'].includes(ext);
+        const isXLS  = ['xls','xlsx'].includes(ext);
+        const isViewableInBrowser = isImg || isPDF || isDoc || isPPT || isXLS;
+        const fileIcons = {doc:'📝',docx:'📝',ppt:'📊',pptx:'📊',xls:'📈',xlsx:'📈',txt:'📄',zip:'🗜️',mp4:'🎬',mp3:'🎵'};
+
+        let html = '';
+        if (label) {
+            html += `<div style="font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+                ${label}
+                <a href="${escapeHtml(url)}" target="_blank" style="font-weight:600;color:#2563eb;text-transform:none;letter-spacing:0;font-size:.7rem;text-decoration:none;margin-left:auto;">Open in tab ↗</a>
             </div>`;
+        }
+
+        if (isImg) {
+            if (canAnnotate) {
+                html += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="anno-tools-${idx}">
+                    <button onclick="annoSetTool('pen',${idx})" id="tool-pen-${idx}" style="padding:4px 10px;border-radius:7px;border:1.5px solid #3b82f6;background:#eff6ff;color:#2563eb;font-size:.72rem;font-weight:700;cursor:pointer;">✏️ Pen</button>
+                    <button onclick="annoSetTool('highlight',${idx})" id="tool-highlight-${idx}" style="padding:4px 10px;border-radius:7px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.72rem;font-weight:700;cursor:pointer;">🟡 Highlight</button>
+                    <button onclick="annoSetTool('arrow',${idx})" id="tool-arrow-${idx}" style="padding:4px 10px;border-radius:7px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.72rem;font-weight:700;cursor:pointer;">➡️ Arrow</button>
+                    <input type="color" id="anno-color-${idx}" value="#ef4444" style="width:28px;height:28px;padding:1px;border-radius:7px;border:1.5px solid #e2e8f0;cursor:pointer;">
+                    <button onclick="annoUndo(${idx})" style="padding:4px 10px;border-radius:7px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.72rem;font-weight:700;cursor:pointer;">↩️ Undo</button>
+                    <button onclick="annoClear(${idx})" style="padding:4px 10px;border-radius:7px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:.72rem;font-weight:700;cursor:pointer;">🗑️ Clear</button>
+                    <button onclick="annoSave(${idx})" style="padding:4px 10px;border-radius:7px;border:none;background:linear-gradient(135deg,#059669,#047857);color:#fff;font-size:.72rem;font-weight:700;cursor:pointer;">💾 Save</button>
+                </div>`;
+            }
+            html += `<div style="position:relative;display:inline-block;width:100%;border-radius:10px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,.12);">
+                <img id="anno-base-img-${idx}" src="${escapeHtml(url)}" alt="${escapeHtml(name)}"
+                    style="max-width:100%;display:block;user-select:none;" crossorigin="anonymous"
+                    onload="initAnnotationCanvas(this,${idx})">
+                <canvas id="anno-canvas-${idx}" style="position:absolute;top:0;left:0;cursor:${canAnnotate?'crosshair':'default'};touch-action:none;pointer-events:${canAnnotate?'auto':'none'};"></canvas>
+            </div>`;
+        } else if (isPDF) {
+            html += `<iframe src="${escapeHtml(url)}" title="${escapeHtml(name)}"
+                style="width:100%;height:60vh;min-height:420px;border:none;border-radius:10px;background:#f9fafb;display:block;"></iframe>`;
+        } else if (isDoc || isPPT || isXLS) {
+            // Use Office Online viewer for Word/PowerPoint/Excel
+            const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
+            html += `<iframe src="${escapeHtml(viewerUrl)}" title="${escapeHtml(name)}"
+                style="width:100%;height:60vh;min-height:420px;border:none;border-radius:10px;background:#f9fafb;display:block;"></iframe>
+            <p style="font-size:.7rem;color:#94a3b8;margin-top:4px;text-align:center;">Viewing with Microsoft Office Online</p>`;
+        } else {
+            html += `<div style="display:flex;flex-direction:column;align-items:center;padding:40px 20px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border-radius:12px;border:2px dashed #7dd3fc;">
+                <div style="font-size:3.5rem;margin-bottom:12px;">${fileIcons[ext]||'📎'}</div>
+                <p style="font-weight:700;color:#0369a1;margin-bottom:4px;">${escapeHtml(name)}</p>
+                <p style="color:#64748b;font-size:.82rem;margin-bottom:16px;">Click to open and review</p>
+                <a href="${escapeHtml(url)}" target="_blank"
+                    style="background:#0369a1;color:#fff;padding:10px 24px;border-radius:10px;text-decoration:none;font-weight:700;font-size:.875rem;">📂 Open File ↗</a>
+            </div>`;
+        }
+        return html;
+    };
+
+    // ── Build the LEFT panel HTML ──
+    let leftPanelHTML = '';
+
+    // 1. Annotated student submission (annotationUrl) — shown prominently first
+    if (hwData.annotationUrl) {
+        const annotExt = (hwData.annotationUrl.split('?')[0].split('.').pop()||'').toLowerCase();
+        const annotIsImg = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(annotExt);
+        leftPanelHTML += `<div style="background:#ecfdf5;border:2px solid #6ee7b7;border-radius:12px;padding:14px;margin-bottom:16px;">
+            <div style="font-size:.72rem;font-weight:800;color:#065f46;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+                <span>✅ Student's Annotated Submission</span>
+                <a href="${escapeHtml(hwData.annotationUrl)}" target="_blank" style="font-weight:600;color:#059669;text-transform:none;letter-spacing:0;font-size:.7rem;margin-left:auto;">Open full size ↗</a>
+            </div>
+            ${annotIsImg
+                ? `<img src="${escapeHtml(hwData.annotationUrl)}" alt="Student annotated submission"
+                    style="max-width:100%;border-radius:8px;display:block;box-shadow:0 2px 12px rgba(0,0,0,.1);">`
+                : `<iframe src="${escapeHtml(hwData.annotationUrl)}" style="width:100%;height:55vh;border:none;border-radius:8px;background:#fff;display:block;"></iframe>`
+            }
+        </div>`;
     }
+
+    // 2. Student's separately-uploaded file (submissionUrl, if different from annotation)
+    const extraSubFiles = subFiles.filter(f => f.url !== hwData.annotationUrl);
+    if (extraSubFiles.length > 0) {
+        leftPanelHTML += `<div style="margin-bottom:16px;">`;
+        extraSubFiles.forEach((f, i) => {
+            leftPanelHTML += `<div style="margin-bottom:12px;">${_renderFileView(f, `📤 Student Upload ${extraSubFiles.length>1?i+1:''}`, i+100, true)}</div>`;
+        });
+        leftPanelHTML += `</div>`;
+    }
+
+    // 3. Student text answer
+    if (studentWork) {
+        leftPanelHTML += `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:16px;">
+            <div style="font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:8px;">📝 Student's Written Answer</div>
+            <div style="font-size:.875rem;color:#334155;line-height:1.7;white-space:pre-wrap;">${escapeHtml(studentWork)}</div>
+        </div>`;
+    }
+
+    // 4. If nothing submitted yet
+    if (!hwData.annotationUrl && extraSubFiles.length === 0 && !studentWork) {
+        leftPanelHTML += `<div style="text-align:center;padding:48px 20px;background:#fef9c3;border-radius:12px;border:2px dashed #fde047;margin-bottom:16px;">
+            <div style="font-size:2.8rem;margin-bottom:10px;">⏳</div>
+            <p style="color:#92400e;font-weight:700;">No submission yet</p>
+            <p style="color:#a16207;font-size:.82rem;margin-top:4px;">The student has not submitted their work.</p>
+        </div>`;
+    }
+
+    // 5. Original assignment files (reference) — shown below submission
+    if (origFiles.length > 0) {
+        leftPanelHTML += `<div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;padding:14px;">
+            <div style="font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#1d4ed8;margin-bottom:10px;">📎 Original Assignment File${origFiles.length>1?'s':''} (${origFiles.length})</div>`;
+        // Tab buttons if multiple
+        if (origFiles.length > 1) {
+            leftPanelHTML += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;" id="orig-file-tabs">
+                ${origFiles.map((f,i) => `<button onclick="switchOrigFile(${i})"
+                    id="orig-tab-${i}"
+                    style="padding:4px 10px;border-radius:7px;border:${i===0?'1.5px solid #2563eb':'1.5px solid #bfdbfe'};background:${i===0?'#2563eb':'#fff'};color:${i===0?'#fff':'#2563eb'};font-size:.7rem;font-weight:700;cursor:pointer;">${escapeHtml(f.name)}</button>`).join('')}
+            </div>`;
+        }
+        leftPanelHTML += `<div id="orig-file-viewer">`;
+        leftPanelHTML += _renderFileView(origFiles[0], null, 200, false);
+        leftPanelHTML += `</div></div>`;
+    }
+
+    // Store orig files data for tab switching
+    const origFilesJson = JSON.stringify(origFiles.map(f => ({ url: f.url, name: f.name, ext: f.ext })));
+    leftPanelHTML += `<script>window._origFiles=${origFilesJson};</script>`;
+
+    const previewHTML = leftPanelHTML; // assigned for compatibility with rest of function
 
     // Build full overlay UI
     overlay.innerHTML = `
@@ -7174,33 +7288,6 @@ async function openGradingModal(homeworkId) {
 
             <!-- LEFT: document viewer -->
             <div style="overflow-y:auto;padding:20px;background:#f1f5f9;">
-                ${referenceUrl && referenceUrl !== submissionUrl ? (() => {
-                    const refExt = (referenceUrl.split('?')[0].split('.').pop() || '').toLowerCase();
-                    const refIsImg = ['jpg','jpeg','png','gif','webp','svg'].includes(refExt);
-                    const refIsPDF = refExt === 'pdf';
-                    if (refIsImg) {
-                        return `<div style="margin-bottom:14px;border:1.5px solid #bfdbfe;border-radius:10px;overflow:hidden;background:#eff6ff;">
-                            <div style="background:#eff6ff;padding:7px 12px;font-size:.72rem;font-weight:700;color:#1d4ed8;display:flex;align-items:center;justify-content:space-between;">
-                                <span>📎 Original Assignment Reference</span>
-                                <a href="${escapeHtml(referenceUrl)}" target="_blank" style="color:#2563eb;text-decoration:none;font-size:.7rem;">Open full size ↗</a>
-                            </div>
-                            <img src="${escapeHtml(referenceUrl)}" alt="Assignment reference" style="width:100%;max-height:260px;object-fit:contain;background:#fff;display:block;">
-                        </div>`;
-                    } else if (refIsPDF) {
-                        return `<div style="margin-bottom:14px;border:1.5px solid #bfdbfe;border-radius:10px;overflow:hidden;">
-                            <div style="background:#eff6ff;padding:7px 12px;font-size:.72rem;font-weight:700;color:#1d4ed8;display:flex;align-items:center;justify-content:space-between;">
-                                <span>📎 Original Assignment Reference (PDF)</span>
-                                <a href="${escapeHtml(referenceUrl)}" target="_blank" style="color:#2563eb;text-decoration:none;font-size:.7rem;">Open in tab ↗</a>
-                            </div>
-                            <iframe src="${escapeHtml(referenceUrl)}" style="width:100%;height:260px;border:none;display:block;background:#f9fafb;"></iframe>
-                        </div>`;
-                    } else {
-                        return `<a href="${escapeHtml(referenceUrl)}" target="_blank"
-                            style="display:inline-flex;align-items:center;gap:6px;color:#2563eb;font-size:.8rem;text-decoration:none;margin-bottom:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:6px 12px;">
-                            📎 Open Original Assignment Reference ↗
-                        </a>`;
-                    }
-                })() : ''}
                 ${previewHTML}
                 ${description ? `
                 <div style="margin-top:16px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
@@ -7253,22 +7340,24 @@ async function openGradingModal(homeworkId) {
         </div>
     </div>`;
 
-    // ── Annotation canvas system ────────────────────────────────
-    let annoTool = 'pen';
-    let annoDrawing = false;
-    let annoHistory = []; // snapshots for undo
-    let annoCtx = null;
-    let annoStartX = 0, annoStartY = 0;
-    let annoTempSnap = null;
+    // ── Annotation canvas system (multi-canvas indexed) ──────────────
+    const _annoStates = {}; // idx → { tool, drawing, history, ctx, startX, startY, tempSnap }
 
-    window.initAnnotationCanvas = function(img) {
-        const canvas = document.getElementById('anno-canvas');
+    function _getAnnoState(idx) {
+        if (!_annoStates[idx]) _annoStates[idx] = { tool:'pen', drawing:false, history:[], ctx:null, startX:0, startY:0, tempSnap:null };
+        return _annoStates[idx];
+    }
+
+    window.initAnnotationCanvas = function(img, idx) {
+        idx = idx == null ? 0 : idx;
+        const canvas = document.getElementById('anno-canvas-' + idx);
         if (!canvas || !img) return;
-        canvas.width  = img.naturalWidth  || img.offsetWidth;
-        canvas.height = img.naturalHeight || img.offsetHeight;
+        canvas.width  = img.naturalWidth  || img.offsetWidth  || 800;
+        canvas.height = img.naturalHeight || img.offsetHeight || 600;
         canvas.style.width  = img.offsetWidth  + 'px';
         canvas.style.height = img.offsetHeight + 'px';
-        annoCtx = canvas.getContext('2d');
+        const st = _getAnnoState(idx);
+        st.ctx = canvas.getContext('2d');
 
         function getPos(e) {
             const r = canvas.getBoundingClientRect();
@@ -7279,58 +7368,87 @@ async function openGradingModal(homeworkId) {
             return { x: (clientX - r.left) * scaleX, y: (clientY - r.top) * scaleY };
         }
 
-        canvas.addEventListener('mousedown',  e => { annoDrawing=true; const p=getPos(e); annoStartX=p.x; annoStartY=p.y; annoTempSnap=annoCtx.getImageData(0,0,canvas.width,canvas.height); if(annoTool==='pen'||annoTool==='highlight'){annoCtx.beginPath();annoCtx.moveTo(p.x,p.y);} });
-        canvas.addEventListener('mousemove',  e => { if(!annoDrawing)return; const p=getPos(e); if(annoTool==='pen'){annoCtx.strokeStyle=document.getElementById('anno-color')?.value||'#ef4444';annoCtx.lineWidth=3;annoCtx.lineCap='round';annoCtx.globalAlpha=1;annoCtx.lineTo(p.x,p.y);annoCtx.stroke();} else if(annoTool==='highlight'){annoCtx.strokeStyle='#fef08a';annoCtx.lineWidth=18;annoCtx.lineCap='round';annoCtx.globalAlpha=0.5;annoCtx.lineTo(p.x,p.y);annoCtx.stroke();} else if(annoTool==='arrow'){annoCtx.putImageData(annoTempSnap,0,0);drawArrow(annoCtx,annoStartX,annoStartY,p.x,p.y,document.getElementById('anno-color')?.value||'#ef4444');} });
-        canvas.addEventListener('mouseup',    e => { if(!annoDrawing)return; annoDrawing=false; annoCtx.globalAlpha=1; annoHistory.push(annoCtx.getImageData(0,0,canvas.width,canvas.height)); });
-        canvas.addEventListener('mouseleave', e => { if(annoDrawing){annoDrawing=false;annoCtx.globalAlpha=1;annoHistory.push(annoCtx.getImageData(0,0,canvas.width,canvas.height));} });
-        canvas.addEventListener('touchstart', e => { e.preventDefault(); const p=getPos(e); canvas.dispatchEvent(new MouseEvent('mousedown',{clientX:p.x,clientY:p.y})); }, {passive:false});
-        canvas.addEventListener('touchmove',  e => { e.preventDefault(); const p=getPos(e); canvas.dispatchEvent(new MouseEvent('mousemove',{clientX:e.touches[0].clientX,clientY:e.touches[0].clientY})); }, {passive:false});
-        canvas.addEventListener('touchend',   e => { canvas.dispatchEvent(new MouseEvent('mouseup',{})); }, {passive:false});
+        canvas.addEventListener('mousedown', e => {
+            st.drawing = true;
+            const p = getPos(e); st.startX = p.x; st.startY = p.y;
+            st.tempSnap = st.ctx.getImageData(0, 0, canvas.width, canvas.height);
+            if (st.tool === 'pen' || st.tool === 'highlight') { st.ctx.beginPath(); st.ctx.moveTo(p.x, p.y); }
+        });
+        canvas.addEventListener('mousemove', e => {
+            if (!st.drawing) return;
+            const p = getPos(e);
+            const col = document.getElementById('anno-color-' + idx)?.value || '#ef4444';
+            if (st.tool === 'pen') {
+                st.ctx.strokeStyle = col; st.ctx.lineWidth = 3; st.ctx.lineCap = 'round'; st.ctx.globalAlpha = 1;
+                st.ctx.lineTo(p.x, p.y); st.ctx.stroke();
+            } else if (st.tool === 'highlight') {
+                st.ctx.strokeStyle = '#fef08a'; st.ctx.lineWidth = 18; st.ctx.lineCap = 'round'; st.ctx.globalAlpha = 0.5;
+                st.ctx.lineTo(p.x, p.y); st.ctx.stroke();
+            } else if (st.tool === 'arrow') {
+                st.ctx.putImageData(st.tempSnap, 0, 0);
+                _drawArrow(st.ctx, st.startX, st.startY, p.x, p.y, col);
+            }
+        });
+        canvas.addEventListener('mouseup', () => {
+            if (!st.drawing) return; st.drawing = false; st.ctx.globalAlpha = 1;
+            st.history.push(st.ctx.getImageData(0, 0, canvas.width, canvas.height));
+        });
+        canvas.addEventListener('mouseleave', () => {
+            if (st.drawing) { st.drawing = false; st.ctx.globalAlpha = 1; st.history.push(st.ctx.getImageData(0, 0, canvas.width, canvas.height)); }
+        });
+        canvas.addEventListener('touchstart', e => { e.preventDefault(); const p = getPos(e); canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY })); }, { passive: false });
+        canvas.addEventListener('touchmove', e => { e.preventDefault(); canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY })); }, { passive: false });
+        canvas.addEventListener('touchend', e => { canvas.dispatchEvent(new MouseEvent('mouseup', {})); }, { passive: false });
     };
 
-    function drawArrow(ctx, x1, y1, x2, y2, color) {
-        const hw=12, hl=18;
-        const angle=Math.atan2(y2-y1,x2-x1);
-        ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=3; ctx.globalAlpha=1;
-        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    function _drawArrow(ctx, x1, y1, x2, y2, color) {
+        const hl = 18;
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 3; ctx.globalAlpha = 1;
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(x2,y2);
-        ctx.lineTo(x2-hl*Math.cos(angle-Math.PI/7),y2-hl*Math.sin(angle-Math.PI/7));
-        ctx.lineTo(x2-hl*Math.cos(angle+Math.PI/7),y2-hl*Math.sin(angle+Math.PI/7));
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - hl * Math.cos(angle - Math.PI/7), y2 - hl * Math.sin(angle - Math.PI/7));
+        ctx.lineTo(x2 - hl * Math.cos(angle + Math.PI/7), y2 - hl * Math.sin(angle + Math.PI/7));
         ctx.closePath(); ctx.fill();
     }
 
-    window.annoSetTool = function(t) {
-        annoTool = t;
+    window.annoSetTool = function(t, idx) {
+        idx = idx == null ? 0 : idx;
+        const st = _getAnnoState(idx); st.tool = t;
         ['pen','highlight','arrow'].forEach(tt => {
-            const btn = document.getElementById('tool-'+tt);
-            if (btn) { btn.style.background=t===tt?'#eff6ff':'#f8fafc'; btn.style.border=t===tt?'1.5px solid #3b82f6':'1.5px solid #e2e8f0'; btn.style.color=t===tt?'#2563eb':'#64748b'; }
+            const btn = document.getElementById('tool-' + tt + '-' + idx);
+            if (btn) {
+                btn.style.background = t === tt ? '#eff6ff' : '#f8fafc';
+                btn.style.border = t === tt ? '1.5px solid #3b82f6' : '1.5px solid #e2e8f0';
+                btn.style.color = t === tt ? '#2563eb' : '#64748b';
+            }
         });
     };
 
-    window.annoUndo = function() {
-        const canvas = document.getElementById('anno-canvas');
-        if (!canvas || !annoCtx) return;
-        annoHistory.pop();
-        if (annoHistory.length > 0) {
-            annoCtx.putImageData(annoHistory[annoHistory.length-1], 0, 0);
-        } else {
-            annoCtx.clearRect(0, 0, canvas.width, canvas.height);
-        }
+    window.annoUndo = function(idx) {
+        idx = idx == null ? 0 : idx;
+        const st = _getAnnoState(idx);
+        const canvas = document.getElementById('anno-canvas-' + idx);
+        if (!canvas || !st.ctx) return;
+        st.history.pop();
+        if (st.history.length > 0) { st.ctx.putImageData(st.history[st.history.length - 1], 0, 0); }
+        else { st.ctx.clearRect(0, 0, canvas.width, canvas.height); }
     };
 
-    window.annoClear = function() {
-        const canvas = document.getElementById('anno-canvas');
-        if (!canvas || !annoCtx) return;
-        annoCtx.clearRect(0, 0, canvas.width, canvas.height);
-        annoHistory = [];
+    window.annoClear = function(idx) {
+        idx = idx == null ? 0 : idx;
+        const st = _getAnnoState(idx);
+        const canvas = document.getElementById('anno-canvas-' + idx);
+        if (!canvas || !st.ctx) return;
+        st.ctx.clearRect(0, 0, canvas.width, canvas.height); st.history = [];
     };
 
-    window.annoSave = function() {
-        const canvas = document.getElementById('anno-canvas');
-        const img = document.getElementById('anno-base-img');
-        if (!canvas || !img || !annoCtx) return;
-        // Composite: draw base image + annotations onto a new canvas
+    window.annoSave = function(idx) {
+        idx = idx == null ? 0 : idx;
+        const canvas = document.getElementById('anno-canvas-' + idx);
+        const img = document.getElementById('anno-base-img-' + idx);
+        if (!canvas || !img) return;
         const merged = document.createElement('canvas');
         merged.width = canvas.width; merged.height = canvas.height;
         const mc = merged.getContext('2d');
@@ -7340,8 +7458,46 @@ async function openGradingModal(homeworkId) {
         link.download = 'annotated_submission.png';
         link.href = merged.toDataURL('image/png');
         link.click();
-        // Also store dataURL in a hidden field so the save handler can optionally upload it
         window._annoDataURL = merged.toDataURL('image/png');
+    };
+
+    // Switch original file tab
+    window.switchOrigFile = function(idx) {
+        const files = window._origFiles || [];
+        const f = files[idx]; if (!f) return;
+        // Update tab buttons
+        files.forEach((_, i) => {
+            const btn = document.getElementById('orig-tab-' + i);
+            if (!btn) return;
+            btn.style.background = i === idx ? '#2563eb' : '#fff';
+            btn.style.color = i === idx ? '#fff' : '#2563eb';
+            btn.style.border = i === idx ? '1.5px solid #2563eb' : '1.5px solid #bfdbfe';
+        });
+        const viewer = document.getElementById('orig-file-viewer');
+        if (!viewer) return;
+        const { url, ext, name } = f;
+        const isImg = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
+        const isPDF = ext === 'pdf';
+        const isDoc = ['doc','docx'].includes(ext);
+        const isPPT = ['ppt','pptx'].includes(ext);
+        const isXLS = ['xls','xlsx'].includes(ext);
+        const fileIcons = { doc:'📝',docx:'📝',ppt:'📊',pptx:'📊',xls:'📈',xlsx:'📈',txt:'📄',zip:'🗜️',mp4:'🎬',mp3:'🎵' };
+        let html = '';
+        if (isImg) {
+            html = `<img src="${url.replace(/"/g,'&quot;')}" alt="${name.replace(/"/g,'&quot;')}" style="max-width:100%;border-radius:8px;display:block;">`;
+        } else if (isPDF) {
+            html = `<iframe src="${url.replace(/"/g,'&quot;')}" style="width:100%;height:55vh;border:none;border-radius:8px;background:#f9fafb;display:block;"></iframe>`;
+        } else if (isDoc || isPPT || isXLS) {
+            const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
+            html = `<iframe src="${viewerUrl.replace(/"/g,'&quot;')}" style="width:100%;height:55vh;border:none;border-radius:8px;background:#f9fafb;display:block;"></iframe>
+                    <p style="font-size:.68rem;color:#94a3b8;margin-top:4px;text-align:center;">Microsoft Office Online viewer</p>`;
+        } else {
+            html = `<div style="text-align:center;padding:32px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border-radius:10px;border:2px dashed #7dd3fc;">
+                <div style="font-size:3rem;margin-bottom:10px;">${fileIcons[ext]||'📎'}</div>
+                <a href="${url.replace(/"/g,'&quot;')}" target="_blank" style="background:#0369a1;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:700;font-size:.875rem;">📂 Open ${name.replace(/</g,'&lt;')} ↗</a>
+            </div>`;
+        }
+        viewer.innerHTML = html;
     };
     // ── End annotation canvas system ─────────────────────────
 
@@ -7482,4 +7638,3 @@ window.showScheduleCalendarModal = showScheduleCalendarModal;
 window.renderCourses = renderCourses;
 window.loadCourseMaterials = loadCourseMaterials;
 window.uploadCourseMaterial = uploadCourseMaterial;
-
