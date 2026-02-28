@@ -2465,21 +2465,62 @@ async function msgLoadRecipientsByStudentId(type, container) {
             container.innerHTML = `<div style="padding:12px 16px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;font-size:.85rem;color:#1d4ed8;font-weight:600;">📢 Broadcast to all ${students.length} active students</div>`;
             container.dataset.allStudents = JSON.stringify(students.map(s => ({ id: s.id, name: s.studentName })));
         } else if (type === 'parent') {
-            // Load parents from parent_users collection
+            // Build parent list ONLY from this tutor's own students
             try {
-                const parentSnap = await getDocs(collection(db, 'parent_users'));
-                const parents = [];
-                parentSnap.forEach(d => {
-                    const p = d.data();
-                    if (p.uid || d.id) parents.push({ id: p.uid || d.id, name: p.name || p.displayName || p.email || 'Parent', email: p.email || '' });
+                // Step 1: collect unique parents from the already-loaded students list
+                const seenPhones = new Set();
+                const parentCandidates = []; // { name, email, phone, studentName }
+                students.forEach(s => {
+                    const phone = (s.parentPhone || '').trim();
+                    if (phone && !seenPhones.has(phone)) {
+                        seenPhones.add(phone);
+                        parentCandidates.push({
+                            name:        s.parentName  || s.parentEmail || 'Parent',
+                            email:       s.parentEmail || '',
+                            phone,
+                            studentName: s.studentName || ''
+                        });
+                    }
                 });
+
+                // Step 2: look up each parent's uid in parent_users by phone so convId works
+                const parents = [];
+                await Promise.all(parentCandidates.map(async (pc) => {
+                    try {
+                        // Try exact phone, then strip leading zero and prepend +234
+                        let snap = await getDocs(query(collection(db, 'parent_users'), where('phone', '==', pc.phone)));
+                        if (snap.empty) {
+                            const alt = pc.phone.startsWith('0') ? '+234' + pc.phone.slice(1) : pc.phone;
+                            snap = await getDocs(query(collection(db, 'parent_users'), where('phone', '==', alt)));
+                        }
+                        if (!snap.empty) {
+                            const d = snap.docs[0];
+                            const p = d.data();
+                            parents.push({
+                                id:          p.uid || d.id,
+                                name:        p.name || p.displayName || pc.name,
+                                email:       p.email || pc.email,
+                                studentName: pc.studentName
+                            });
+                        } else {
+                            // Parent not yet in parent_users — still show them using phone as id fallback
+                            parents.push({ id: pc.phone, name: pc.name, email: pc.email, studentName: pc.studentName });
+                        }
+                    } catch(e) {
+                        parents.push({ id: pc.phone, name: pc.name, email: pc.email, studentName: pc.studentName });
+                    }
+                }));
+
+                // Sort alphabetically by name
+                parents.sort((a, b) => a.name.localeCompare(b.name));
+
                 container.innerHTML = `
                     <div style="position:relative;margin-bottom:6px;">
                         <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                         <input type="text" placeholder="Search parent by name…" style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.82rem;outline:none;box-sizing:border-box;" oninput="filterRecipientList('parent-recipient-list', this.value)">
                     </div>
                     <div id="parent-recipient-list" style="max-height:180px;overflow-y:auto;border:1.5px solid #e2e8f0;border-radius:10px;padding:4px;">
-                        ${parents.length === 0 ? '<div style="padding:12px;text-align:center;color:#9ca3af;font-size:.82rem;">No parents found</div>' : parents.map(p => `
+                        ${parents.length === 0 ? '<div style="padding:12px;text-align:center;color:#9ca3af;font-size:.82rem;">No parents found for your students</div>' : parents.map(p => `
                         <div class="recipient-list-item" data-id="${escapeHtml(p.id)}" data-name="${escapeHtml(p.name)}" data-type="parent"
                             style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .12s;"
                             onmouseover="this.style.background='#f5f3ff'" onmouseout="if(!this.classList.contains('selected'))this.style.background=''"
@@ -2487,7 +2528,7 @@ async function msgLoadRecipientsByStudentId(type, container) {
                             <div style="width:28px;height:28px;border-radius:50%;background:#fce7f3;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.78rem;color:#be185d;flex-shrink:0;">${escapeHtml((p.name||'?').charAt(0).toUpperCase())}</div>
                             <div>
                                 <div style="font-size:.85rem;font-weight:600;color:#1e293b;">${escapeHtml(p.name)}</div>
-                                ${p.email ? `<div style="font-size:.72rem;color:#94a3b8;">${escapeHtml(p.email)}</div>` : ''}
+                                <div style="font-size:.72rem;color:#94a3b8;">Parent of ${escapeHtml(p.studentName)}${p.email ? ' · ' + escapeHtml(p.email) : ''}</div>
                             </div>
                         </div>`).join('')}
                     </div>
