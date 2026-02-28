@@ -8,6 +8,40 @@ import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writ
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 /*******************************************************************************
+ * REAL-TIME LISTENER MANAGEMENT SYSTEM
+ * Tracks all onSnapshot listeners by group (tab name) so they can be properly
+ * cleaned up when switching tabs to prevent memory leaks.
+ ******************************************************************************/
+const _rtListeners = {}; // { groupName: [unsubscribeFn, ...] }
+
+/** Register a listener unsubscribe function under a named group */
+function registerListener(group, unsubscribeFn) {
+    if (!_rtListeners[group]) _rtListeners[group] = [];
+    _rtListeners[group].push(unsubscribeFn);
+}
+
+/** Cleanup all listeners for a specific group */
+function cleanupListeners(group) {
+    if (_rtListeners[group]) {
+        _rtListeners[group].forEach(unsub => {
+            try { unsub(); } catch(e) { console.warn('Listener cleanup error:', e); }
+        });
+        _rtListeners[group] = [];
+    }
+}
+
+/** Cleanup listeners for all tab-specific groups (keeps global ones like 'unread') */
+function cleanupTabListeners() {
+    const tabGroups = ['dashboard', 'inbox', 'archive', 'students', 'schedule', 'courses', 'reports'];
+    tabGroups.forEach(g => cleanupListeners(g));
+}
+
+/** Cleanup ALL listeners including global ones */
+function cleanupAllListeners() {
+    Object.keys(_rtListeners).forEach(g => cleanupListeners(g));
+}
+
+/*******************************************************************************
  * SECTION 2: STYLES & CSS (REMOVED – MOVED TO HTML)
  ******************************************************************************/
 
@@ -492,6 +526,9 @@ function showCustomAlert(message) {
 
 // Update active tab with smooth fade transition
 function updateActiveTab(activeTabId) {
+    // Clean up tab-specific real-time listeners when switching tabs
+    cleanupTabListeners();
+
     const navTabs = ['navDashboard', 'navStudentDatabase', 'navScheduleManagement', 'navAcademic', 'navCourses'];
     navTabs.forEach(tabId => {
         const tab = document.getElementById(tabId);
@@ -3953,105 +3990,174 @@ async function loadAcademicArchive(tutor) {
     if (!container) return;
     container.innerHTML = `<div class="text-center py-6"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading archive…</p></div>`;
 
+    // Cleanup previous archive listeners
+    cleanupListeners('archive');
+
     try {
-        const [topicsSnap, hwSnap] = await Promise.all([
-            getDocs(query(collection(db, 'daily_topics'), where('tutorEmail', '==', tutor.email))),
-            getDocs(query(collection(db, 'homework_assignments'), where('tutorEmail', '==', tutor.email)))
-        ]);
+        const topicsQuery = query(collection(db, 'daily_topics'), where('tutorEmail', '==', tutor.email));
+        const hwQuery = query(collection(db, 'homework_assignments'), where('tutorEmail', '==', tutor.email));
 
-        // Organise by month
-        const months = {}; // 'YYYY-MM' → { topics:[], hw:[] }
+        // Track data from both real-time listeners
+        let _archiveData = { topics: null, hw: null };
 
-        topicsSnap.docs.forEach(d => {
-            const data = d.data();
-            const date = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || '');
-            if (isNaN(date.getTime())) return;
-            const mk = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
-            if (!months[mk]) months[mk] = { topics:[], hw:[] };
-            months[mk].topics.push({ date, text: data.topics || '', studentId: data.studentId });
-        });
-
-        hwSnap.docs.forEach(d => {
-            const data = d.data();
-            const raw = data.assignedAt || data.createdAt || data.uploadedAt;
-            const date = raw?.toDate ? raw.toDate() : new Date(raw || '');
-            if (isNaN(date.getTime())) return;
-            const mk = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
-            if (!months[mk]) months[mk] = { topics:[], hw:[] };
-            months[mk].hw.push({ date, title: data.title || 'Homework', subject: data.subject || '', studentName: data.studentName || '', score: data.score, feedback: data.feedback, status: data.status });
-        });
-
-        const sortedMonths = Object.keys(months).sort((a,b) => b.localeCompare(a));
-
-        if (sortedMonths.length === 0) {
-            container.innerHTML = '<p class="text-center text-gray-400 py-6">No academic records found yet.</p>';
-            return;
+        function _renderWhenReady() {
+            if (!_archiveData.topics || !_archiveData.hw) return;
+            _renderAcademicArchive(container, _archiveData);
         }
 
-        container.innerHTML = `<div class="space-y-2" id="archive-accordion"></div>`;
-        const accordion = document.getElementById('archive-accordion');
+        // Real-time: daily topics
+        registerListener('archive', onSnapshot(topicsQuery, snap => {
+            _archiveData.topics = snap;
+            _renderWhenReady();
+        }, err => console.error('Archive topics listener error:', err)));
 
-        sortedMonths.forEach(mk => {
-            const { topics, hw } = months[mk];
-            const [y, m] = mk.split('-');
-            const label = new Date(parseInt(y), parseInt(m)-1, 1).toLocaleString('en-NG', { month:'long', year:'numeric' });
-
-            const item = document.createElement('details');
-            item.className = 'bg-white border border-gray-200 rounded-xl overflow-hidden';
-            item.innerHTML = `
-            <summary class="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 list-none">
-                <div class="flex-1">
-                    <span class="font-semibold text-gray-800">${escapeHtml(label)}</span>
-                </div>
-                <div class="flex gap-3 flex-shrink-0">
-                    <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-bold">${topics.length} topics</span>
-                    <span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs font-bold">${hw.length} H/W</span>
-                </div>
-                <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
-            </summary>
-            <div class="border-t border-gray-100 divide-y divide-gray-50">
-                <!-- Topics -->
-                ${topics.length > 0 ? `
-                <div class="p-3">
-                    <h4 class="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">📚 Topics Entered</h4>
-                    <div class="space-y-1.5">
-                        ${topics.sort((a,b) => b.date-a.date).map(t => `
-                        <div class="flex items-start gap-2 bg-blue-50 rounded-lg px-3 py-2">
-                            <span class="text-xs text-gray-400 flex-shrink-0 mt-0.5">${t.date.toLocaleDateString('en-NG', {day:'2-digit',month:'short'})}</span>
-                            <span class="text-sm text-gray-700">${escapeHtml(t.text)}</span>
-                        </div>`).join('')}
-                    </div>
-                </div>` : ''}
-                <!-- Homework -->
-                ${hw.length > 0 ? `
-                <div class="p-3">
-                    <h4 class="text-xs font-bold text-amber-600 uppercase tracking-wide mb-2">📝 Homework Assigned</h4>
-                    <div class="space-y-1.5">
-                        ${hw.sort((a,b) => b.date-a.date).map(h => `
-                        <div class="flex items-start justify-between bg-amber-50 rounded-lg px-3 py-2 gap-2">
-                            <div class="flex items-start gap-2 min-w-0">
-                                <span class="text-xs text-gray-400 flex-shrink-0 mt-0.5">${h.date.toLocaleDateString('en-NG', {day:'2-digit',month:'short'})}</span>
-                                <div class="min-w-0">
-                                    <div class="flex items-center gap-1.5 flex-wrap">
-                                        <span class="text-sm text-gray-700 font-medium">${escapeHtml(h.title)}</span>
-                                        ${h.subject ? `<span style="display:inline-flex;align-items:center;background:#ede9fe;color:#5b21b6;font-size:.65rem;font-weight:700;padding:1px 7px;border-radius:99px;border:1px solid #ddd6fe;white-space:nowrap;">📚 ${escapeHtml(h.subject)}</span>` : ''}
-                                    </div>
-                                    ${h.studentName ? `<div class="text-xs text-gray-400">${escapeHtml(h.studentName)}</div>` : ''}
-                                    ${h.feedback ? `<div class="text-xs text-gray-500 italic mt-0.5">"${escapeHtml(h.feedback)}"</div>` : ''}
-                                </div>
-                            </div>
-                            ${h.score ? `<span class="bg-white border border-amber-200 text-amber-700 px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0">${escapeHtml(String(h.score))}/100</span>` : ''}
-                        </div>`).join('')}
-                    </div>
-                </div>` : ''}
-            </div>`;
-            accordion.appendChild(item);
-        });
+        // Real-time: homework assignments
+        registerListener('archive', onSnapshot(hwQuery, snap => {
+            _archiveData.hw = snap;
+            _renderWhenReady();
+        }, err => console.error('Archive homework listener error:', err)));
 
     } catch (err) {
         console.error('Archive error:', err);
         container.innerHTML = `<p class="text-red-500 text-center py-4">Error loading archive: ${escapeHtml(err.message)}</p>`;
     }
+}
+
+/** Internal: render the academic archive from combined snapshot data */
+function _renderAcademicArchive(container, archiveData) {
+    // Organise by month
+    const months = {}; // 'YYYY-MM' → { topics:[], hw:[] }
+
+    archiveData.topics.docs.forEach(d => {
+        const data = d.data();
+        const date = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || '');
+        if (isNaN(date.getTime())) return;
+        const mk = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+        if (!months[mk]) months[mk] = { topics:[], hw:[] };
+        months[mk].topics.push({ date, text: data.topics || '', studentId: data.studentId, studentName: data.studentName || '' });
+    });
+
+    archiveData.hw.docs.forEach(d => {
+        const data = d.data();
+        // Use multiple date fallbacks to capture all homework
+        const raw = data.assignedDate || data.createdAt || data.uploadedAt || data.assignedAt;
+        const date = raw?.toDate ? raw.toDate() : new Date(raw || '');
+        if (isNaN(date.getTime())) return;
+        const mk = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+        if (!months[mk]) months[mk] = { topics:[], hw:[] };
+        months[mk].hw.push({
+            date,
+            title: data.title || 'Homework',
+            description: data.description || '',
+            subject: data.subject || '',
+            studentName: data.studentName || '',
+            score: data.score,
+            feedback: data.feedback || data.tutorAnnotations || '',
+            status: data.status || 'assigned',
+            dueDate: data.dueDate || '',
+            submittedAt: data.submittedAt,
+        });
+    });
+
+    const sortedMonths = Object.keys(months).sort((a,b) => b.localeCompare(a));
+
+    if (sortedMonths.length === 0) {
+        container.innerHTML = '<p class="text-center text-gray-400 py-6">No academic records found yet.</p>';
+        return;
+    }
+
+    container.innerHTML = `<div class="space-y-2" id="archive-accordion"></div>`;
+    const accordion = document.getElementById('archive-accordion');
+
+    sortedMonths.forEach((mk, idx) => {
+        const { topics, hw } = months[mk];
+        const [y, m] = mk.split('-');
+        const label = new Date(parseInt(y), parseInt(m)-1, 1).toLocaleString('en-NG', { month:'long', year:'numeric' });
+
+        // Status breakdown counts
+        const assignedCount = hw.filter(h => h.status === 'assigned' || h.status === 'pending').length;
+        const submittedCount = hw.filter(h => h.status === 'submitted').length;
+        const gradedCount = hw.filter(h => h.status === 'graded').length;
+
+        const item = document.createElement('details');
+        item.className = 'bg-white border border-gray-200 rounded-xl overflow-hidden';
+        // Open most recent month by default
+        if (idx === 0) item.open = true;
+
+        item.innerHTML = `
+        <summary class="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 list-none">
+            <div class="flex-1">
+                <span class="font-semibold text-gray-800">${escapeHtml(label)}</span>
+                <div class="flex gap-2 mt-1 flex-wrap">
+                    ${assignedCount > 0 ? `<span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-[.65rem] font-bold">${assignedCount} assigned</span>` : ''}
+                    ${submittedCount > 0 ? `<span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[.65rem] font-bold">${submittedCount} submitted</span>` : ''}
+                    ${gradedCount > 0 ? `<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[.65rem] font-bold">${gradedCount} graded</span>` : ''}
+                </div>
+            </div>
+            <div class="flex gap-3 flex-shrink-0">
+                <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-bold">${topics.length} topics</span>
+                <span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs font-bold">${hw.length} H/W</span>
+            </div>
+            <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+        </summary>
+        <div class="border-t border-gray-100 divide-y divide-gray-50">
+            <!-- Topics -->
+            ${topics.length > 0 ? `
+            <div class="p-3">
+                <h4 class="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">📚 Topics Entered</h4>
+                <div class="space-y-1.5">
+                    ${topics.sort((a,b) => b.date-a.date).map(t => `
+                    <div class="flex items-start gap-2 bg-blue-50 rounded-lg px-3 py-2">
+                        <span class="text-xs text-gray-400 flex-shrink-0 mt-0.5">${t.date.toLocaleDateString('en-NG', {day:'2-digit',month:'short'})}</span>
+                        <span class="text-sm text-gray-700 flex-1">${escapeHtml(t.text)}</span>
+                        ${t.studentName ? `<span class="text-[.65rem] text-blue-500 font-semibold flex-shrink-0">${escapeHtml(t.studentName)}</span>` : ''}
+                    </div>`).join('')}
+                </div>
+            </div>` : ''}
+            <!-- Homework -->
+            ${hw.length > 0 ? `
+            <div class="p-3">
+                <h4 class="text-xs font-bold text-amber-600 uppercase tracking-wide mb-2">📝 Homework Assigned</h4>
+                <div class="space-y-2">
+                    ${hw.sort((a,b) => b.date-a.date).map(h => {
+                        const statusColor = h.status === 'graded' ? 'text-green-700 bg-green-100' :
+                                            h.status === 'submitted' ? 'text-amber-700 bg-amber-100' : 'text-gray-600 bg-gray-200';
+                        const statusLabel = h.status === 'graded' ? 'Graded' :
+                                            h.status === 'submitted' ? 'Submitted' : 'Assigned';
+                        const subDate = (() => {
+                            if (!h.submittedAt) return null;
+                            const d = h.submittedAt?.toDate ? h.submittedAt.toDate() : new Date(h.submittedAt);
+                            return isNaN(d.getTime()) ? null : d.toLocaleDateString('en-NG', {day:'2-digit',month:'short',year:'numeric'});
+                        })();
+                        return `
+                    <div class="bg-amber-50 rounded-lg px-3 py-2.5 border border-amber-100">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex items-start gap-2 min-w-0 flex-1">
+                                <span class="text-xs text-gray-400 flex-shrink-0 mt-0.5">${h.date.toLocaleDateString('en-NG', {day:'2-digit',month:'short'})}</span>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="text-sm text-gray-700 font-medium">${escapeHtml(h.title)}</span>
+                                        ${h.subject ? `<span style="display:inline-flex;align-items:center;background:#ede9fe;color:#5b21b6;font-size:.65rem;font-weight:700;padding:1px 7px;border-radius:99px;border:1px solid #ddd6fe;white-space:nowrap;">📚 ${escapeHtml(h.subject)}</span>` : ''}
+                                        <span class="text-[.65rem] font-bold px-2 py-0.5 rounded-full ${statusColor}">${statusLabel}</span>
+                                    </div>
+                                    ${h.studentName ? `<div class="text-xs text-gray-500 mt-0.5"><strong>Student:</strong> ${escapeHtml(h.studentName)}</div>` : ''}
+                                    ${h.description ? `<div class="text-xs text-gray-500 mt-0.5" style="white-space:pre-wrap;word-break:break-word;max-height:60px;overflow:hidden;">${escapeHtml(h.description.substring(0, 200))}${h.description.length > 200 ? '…' : ''}</div>` : ''}
+                                    <div class="flex gap-3 mt-1 text-[.65rem] text-gray-400 flex-wrap">
+                                        ${h.dueDate ? `<span>Due: ${escapeHtml(h.dueDate)}</span>` : ''}
+                                        ${subDate ? `<span>Submitted: ${subDate}</span>` : ''}
+                                    </div>
+                                    ${h.feedback ? `<div class="text-xs text-gray-600 italic mt-1 bg-white rounded px-2 py-1 border border-gray-100">"${escapeHtml(h.feedback.substring(0,150))}${h.feedback.length > 150 ? '…' : ''}"</div>` : ''}
+                                </div>
+                            </div>
+                            ${h.score != null ? `<span class="bg-white border border-amber-200 text-amber-700 px-2.5 py-1 rounded-full text-xs font-bold flex-shrink-0">${escapeHtml(String(h.score))}/100</span>` : ''}
+                        </div>
+                    </div>`;
+                    }).join('')}
+                </div>
+            </div>` : ''}
+        </div>`;
+        accordion.appendChild(item);
+    });
 }
 
 /*******************************************************************************
@@ -4256,27 +4362,11 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
             </div></div>`;
     }
 
-    try {
-        // Fetch active students (not on break) to use as a filter
-        const activeStudentsSnap = await getDocs(query(
-            collection(db, 'students'),
-            where('tutorEmail', '==', tutorEmail)
-        ));
-        const activeStudentIds = new Set();
-        const activeStudentMap = {};
-        const breakOrTransitionNames = new Set(); // extra name-based guard
-        activeStudentsSnap.docs.forEach(d => {
-            const s = d.data();
-            // Exclude: on break, archived/graduated/transferred, OR actively transitioning
-            if (!s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status)) {
-                activeStudentIds.add(d.id);
-                activeStudentMap[d.id] = s;
-            } else {
-                // Track names of excluded students so we can also filter by name
-                if (s.studentName) breakOrTransitionNames.add(s.studentName.trim().toLowerCase());
-            }
-        });
+    // Cleanup previous dashboard listeners
+    cleanupListeners('dashboard');
 
+    try {
+        // Set up real-time queries
         let assessmentsQuery = query(
             collection(db, "student_results"), 
             where("tutorEmail", "==", tutorEmail)
@@ -4294,104 +4384,149 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
             creativeWritingQuery = query(creativeWritingQuery, where("parentName", "==", parentName));
         }
 
-        const [assessmentsSnapshot, creativeWritingSnapshot] = await Promise.all([
-            getDocs(assessmentsQuery),
-            getDocs(creativeWritingQuery)
-        ]);
+        const activeStudentsQuery = query(
+            collection(db, 'students'),
+            where('tutorEmail', '==', tutorEmail)
+        );
 
-        let pendingItems = []; // { studentName, grade } — simple list
-        let gradedHTML = '';
-        let pendingCount = 0;
-        let gradedCount = 0;
+        // Track data from all three listeners for combined rendering
+        let _rtData = { assessments: null, creativeWriting: null, activeStudents: null };
 
-        assessmentsSnapshot.forEach(docSnap => {
-            const data = docSnap.data();
-            // Skip break / inactive students — by ID or by name fallback
-            if (data.studentId && !activeStudentIds.has(data.studentId)) return;
-            if (!data.studentId && data.studentName && breakOrTransitionNames.has(data.studentName.trim().toLowerCase())) return;
-
-            const needsFeedback = data.answers && data.answers.some(answer => 
-                answer.type === 'creative-writing' && 
-                (!answer.tutorReport || answer.tutorReport.trim() === '')
-            );
-
-            if (needsFeedback) {
-                if (!statusFilter || statusFilter === 'pending') {
-                    pendingItems.push({ studentName: data.studentName || 'Unknown', grade: data.grade || 'N/A' });
-                    pendingCount++;
-                }
-            } else {
-                if (!statusFilter || statusFilter === 'graded') {
-                    gradedHTML += buildReportCard(docSnap, data, false);
-                    gradedCount++;
-                }
-            }
-        });
-
-        creativeWritingSnapshot.forEach(docSnap => {
-            const data = docSnap.data();
-            if (data.studentId && !activeStudentIds.has(data.studentId)) return;
-            if (!data.studentId && data.studentName && breakOrTransitionNames.has(data.studentName.trim().toLowerCase())) return;
-
-            const needsFeedback = !data.tutorReport || data.tutorReport.trim() === '';
-
-            if (needsFeedback) {
-                if (!statusFilter || statusFilter === 'pending') {
-                    pendingItems.push({ studentName: data.studentName || 'Unknown', grade: data.grade || 'N/A' });
-                    pendingCount++;
-                }
-            } else {
-                if (!statusFilter || statusFilter === 'graded') {
-                    gradedHTML += buildCreativeWritingCard(docSnap, data);
-                    gradedCount++;
-                }
-            }
-        });
-
-        // Render pending list — compact, name + grade only
-        const pendingCountEl = document.getElementById('pending-count');
-        if (pendingCountEl) pendingCountEl.textContent = pendingCount;
-
-        if (pendingItems.length === 0) {
-            pendingReportsContainer.innerHTML = `
-                <div class="card"><div class="card-body text-center">
-                    <div style="font-size:2.5rem;margin-bottom:8px;">🎉</div>
-                    <p class="text-gray-500 font-medium">All caught up! No pending submissions.</p>
-                </div></div>`;
-        } else {
-            const ACOLORS = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
-            pendingReportsContainer.innerHTML = `
-                <div class="card">
-                    <div class="card-body p-0">
-                        ${pendingItems.map((item, i) => {
-                            const initials = (item.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-                            const color = ACOLORS[(item.studentName||'').charCodeAt(0) % ACOLORS.length];
-                            return `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;${i < pendingItems.length-1 ? 'border-bottom:1px solid #f1f5f9;' : ''}transition:background .1s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
-                                <div style="width:34px;height:34px;border-radius:10px;background:${color};color:#fff;font-weight:800;font-size:.72rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml(initials)}</div>
-                                <div style="flex:1;min-width:0;">
-                                    <div style="font-size:.875rem;font-weight:700;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.studentName)}</div>
-                                    ${item.grade && item.grade !== 'N/A' ? `<div style="font-size:.72rem;color:#94a3b8;">${escapeHtml(item.grade)}</div>` : ''}
-                                </div>
-                                <div style="background:#fef3c7;color:#92400e;font-size:.68rem;font-weight:800;padding:3px 8px;border-radius:999px;flex-shrink:0;">PENDING</div>
-                            </div>`;
-                        }).join('')}
-                    </div>
-                </div>`;
+        function _renderWhenReady() {
+            if (!_rtData.assessments || !_rtData.creativeWriting || !_rtData.activeStudents) return;
+            _renderDashboardReports(_rtData, tutorEmail, statusFilter);
         }
 
-        if (gradedReportsContainer) {
-            gradedReportsContainer.innerHTML = gradedHTML ||
-                `<div class="card"><div class="card-body text-center text-gray-500">No graded submissions yet.</div></div>`;
-        }
+        // Real-time: active students
+        registerListener('dashboard', onSnapshot(activeStudentsQuery, snap => {
+            _rtData.activeStudents = snap;
+            _renderWhenReady();
+        }, err => console.error('Dashboard students listener error:', err)));
 
-        // Attach submit feedback listeners
-        attachSubmitReportListeners();
+        // Real-time: student results
+        registerListener('dashboard', onSnapshot(assessmentsQuery, snap => {
+            _rtData.assessments = snap;
+            _renderWhenReady();
+        }, err => console.error('Dashboard assessments listener error:', err)));
 
-    } catch (error) {
-        console.error("Error loading reports:", error);
-        if (pendingReportsContainer) pendingReportsContainer.innerHTML =
-            `<div class="card"><div class="card-body text-center text-red-500">Error loading submissions.</div></div>`;
+        // Real-time: creative writing
+        registerListener('dashboard', onSnapshot(creativeWritingQuery, snap => {
+            _rtData.creativeWriting = snap;
+            _renderWhenReady();
+        }, err => console.error('Dashboard creative writing listener error:', err)));
+
+    } catch(error) {
+        console.error("Error loading tutor reports:", error);
+        if (pendingReportsContainer) pendingReportsContainer.innerHTML = '<p class="text-red-500 text-center py-4">Error loading submissions.</p>';
     }
+}
+
+/** Internal: render dashboard reports from combined real-time snapshot data */
+function _renderDashboardReports(rtData, tutorEmail, statusFilter) {
+    const pendingReportsContainer = document.getElementById('pendingReportsContainer');
+    const gradedReportsContainer = document.getElementById('gradedReportsContainer');
+    if (!pendingReportsContainer) return;
+
+    // Build active student filters
+    const activeStudentIds = new Set();
+    const activeStudentMap = {};
+    const breakOrTransitionNames = new Set();
+    rtData.activeStudents.docs.forEach(d => {
+        const s = d.data();
+        if (!s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status)) {
+            activeStudentIds.add(d.id);
+            activeStudentMap[d.id] = s;
+        } else {
+            if (s.studentName) breakOrTransitionNames.add(s.studentName.trim().toLowerCase());
+        }
+    });
+
+    let pendingItems = [];
+    let gradedHTML = '';
+    let pendingCount = 0;
+    let gradedCount = 0;
+
+    rtData.assessments.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data.studentId && !activeStudentIds.has(data.studentId)) return;
+        if (!data.studentId && data.studentName && breakOrTransitionNames.has(data.studentName.trim().toLowerCase())) return;
+
+        const needsFeedback = data.answers && data.answers.some(answer => 
+            answer.type === 'creative-writing' && 
+            (!answer.tutorReport || answer.tutorReport.trim() === '')
+        );
+
+        if (needsFeedback) {
+            if (!statusFilter || statusFilter === 'pending') {
+                pendingItems.push({ studentName: data.studentName || 'Unknown', grade: data.grade || 'N/A' });
+                pendingCount++;
+            }
+        } else {
+            if (!statusFilter || statusFilter === 'graded') {
+                gradedHTML += buildReportCard(docSnap, data, false);
+                gradedCount++;
+            }
+        }
+    });
+
+    rtData.creativeWriting.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data.studentId && !activeStudentIds.has(data.studentId)) return;
+        if (!data.studentId && data.studentName && breakOrTransitionNames.has(data.studentName.trim().toLowerCase())) return;
+
+        const needsFeedback = !data.tutorReport || data.tutorReport.trim() === '';
+
+        if (needsFeedback) {
+            if (!statusFilter || statusFilter === 'pending') {
+                pendingItems.push({ studentName: data.studentName || 'Unknown', grade: data.grade || 'N/A' });
+                pendingCount++;
+            }
+        } else {
+            if (!statusFilter || statusFilter === 'graded') {
+                gradedHTML += buildCreativeWritingCard(docSnap, data);
+                gradedCount++;
+            }
+        }
+    });
+
+    // Render pending list
+    const pendingCountEl = document.getElementById('pending-count');
+    if (pendingCountEl) pendingCountEl.textContent = pendingCount;
+
+    if (pendingItems.length === 0) {
+        pendingReportsContainer.innerHTML = `
+            <div class="card"><div class="card-body text-center">
+                <div style="font-size:2.5rem;margin-bottom:8px;">🎉</div>
+                <p class="text-gray-500 font-medium">All caught up! No pending submissions.</p>
+            </div></div>`;
+    } else {
+        const ACOLORS = ['#6366f1','#0891b2','#059669','#d97706','#dc2626','#7c3aed'];
+        pendingReportsContainer.innerHTML = `
+            <div class="card">
+                <div class="card-body p-0">
+                    ${pendingItems.map((item, i) => {
+                        const initials = (item.studentName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+                        const color = ACOLORS[(item.studentName||'').charCodeAt(0) % ACOLORS.length];
+                        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;${i < pendingItems.length-1 ? 'border-bottom:1px solid #f1f5f9;' : ''}transition:background .1s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+                            <div style="width:34px;height:34px;border-radius:10px;background:${color};color:#fff;font-weight:800;font-size:.72rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml(initials)}</div>
+                            <div style="flex:1;min-width:0;">
+                                <div style="font-size:.875rem;font-weight:700;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.studentName)}</div>
+                                ${item.grade && item.grade !== 'N/A' ? `<div style="font-size:.72rem;color:#94a3b8;">${escapeHtml(item.grade)}</div>` : ''}
+                            </div>
+                            <div style="background:#fef3c7;color:#92400e;font-size:.68rem;font-weight:800;padding:3px 8px;border-radius:999px;flex-shrink:0;">PENDING</div>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>`;
+    }
+
+    if (gradedReportsContainer) {
+        gradedReportsContainer.innerHTML = gradedHTML ||
+            `<div class="card"><div class="card-body text-center text-gray-500">No graded submissions yet.</div></div>`;
+    }
+
+    // Attach submit feedback listeners
+    attachSubmitReportListeners();
 }
 
 // Helper: Build a standard report card HTML string
@@ -6717,171 +6852,196 @@ async function loadHomeworkInbox(tutorEmail) {
     if (!container) return;
     container.innerHTML = '<div class="text-center py-6"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500">Loading submissions…</p></div>';
 
+    // Cleanup any previous inbox listeners
+    cleanupListeners('inbox');
+
     try {
-        // Query all homework by this tutor (both name and email)
-        let q = query(
+        // Set up real-time listener by tutor name first, then email fallback
+        const q1 = query(
             collection(db, "homework_assignments"),
             where("tutorName", "==", window.tutorData.name)
         );
-        let snapshot = await getDocs(q);
+        const q2 = query(
+            collection(db, "homework_assignments"),
+            where("tutorEmail", "==", tutorEmail)
+        );
 
-        if (snapshot.empty) {
-            q = query(collection(db, "homework_assignments"), where("tutorEmail", "==", tutorEmail));
-            snapshot = await getDocs(q);
-        }
+        let useFallback = false;
 
-        if (snapshot.empty) {
-            container.innerHTML = `<div class="text-center py-6"><div class="text-3xl mb-2">📭</div><p class="text-gray-500">No homework assignments sent yet.</p></div>`;
-            const badge = document.getElementById('inbox-count');
-            if (badge) badge.textContent = '0';
-            return;
-        }
-
-        // Group all assignments by studentId
-        const studentMap = {}; // { studentId: { name, assignments: [] } }
-        snapshot.forEach(d => {
-            const data = { id: d.id, ...d.data() };
-            const sid = data.studentId || data.studentName || 'unknown';
-            if (!studentMap[sid]) {
-                studentMap[sid] = { name: data.studentName || 'Unknown', assignments: [] };
+        // Primary listener by tutorName
+        registerListener('inbox', onSnapshot(q1, (snapshot) => {
+            if (snapshot.empty && !useFallback) {
+                // Try email fallback — set up second listener
+                useFallback = true;
+                registerListener('inbox', onSnapshot(q2, (snap2) => {
+                    _renderHomeworkInbox(container, snap2);
+                }, err => {
+                    console.error("Inbox fallback listener error:", err);
+                    container.innerHTML = '<p class="text-red-500 text-center py-4">Error loading homework archive.</p>';
+                }));
+            } else if (!useFallback) {
+                _renderHomeworkInbox(container, snapshot);
             }
-            studentMap[sid].assignments.push(data);
-        });
-
-        // Count pending submissions
-        let pendingTotal = 0;
-        Object.values(studentMap).forEach(s => {
-            s.assignments.forEach(a => { if (a.status === 'submitted') pendingTotal++; });
-            // Sort newest first
-            s.assignments.sort((a, b) => {
-                const getTs = x => x.assignedDate?.toDate ? x.assignedDate.toDate() : new Date(x.assignedDate || x.createdAt || 0);
-                return getTs(b) - getTs(a);
-            });
-        });
-
-        const badge = document.getElementById('inbox-count');
-        if (badge) badge.textContent = pendingTotal > 0 ? pendingTotal : '✓';
-
-        // Render per-student cards
-        const sortedStudents = Object.entries(studentMap).sort((a, b) => {
-            // Students with pending submissions first
-            const aPending = a[1].assignments.filter(x => x.status === 'submitted').length;
-            const bPending = b[1].assignments.filter(x => x.status === 'submitted').length;
-            return bPending - aPending;
-        });
-
-        let html = '<div class="space-y-3">';
-        sortedStudents.forEach(([sid, student]) => {
-            const pending = student.assignments.filter(a => a.status === 'submitted').length;
-            const graded  = student.assignments.filter(a => a.status === 'graded').length;
-            const total   = student.assignments.length;
-
-            // Group by month for accordion
-            const byMonth = {};
-            student.assignments.forEach(a => {
-                const raw = a.assignedDate || a.createdAt;
-                const d = raw?.toDate ? raw.toDate() : new Date(raw || 0);
-                if (isNaN(d.getTime())) return;
-                const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-                if (!byMonth[mk]) byMonth[mk] = [];
-                byMonth[mk].push(a);
-            });
-
-            const monthKeys = Object.keys(byMonth).sort((a,b) => b.localeCompare(a));
-
-            html += `
-            <details class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                <summary class="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 list-none select-none">
-                    <div class="w-10 h-10 rounded-full ${pending > 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'} flex items-center justify-center font-bold text-base flex-shrink-0">
-                        ${escapeHtml((student.name||'?').charAt(0))}
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <div class="font-semibold text-gray-800">${escapeHtml(student.name)}</div>
-                        <div class="text-xs text-gray-400">${total} assignment${total!==1?'s':''} · ${graded} graded</div>
-                    </div>
-                    <div class="flex gap-2 flex-shrink-0">
-                        ${pending > 0 ? `<span class="bg-amber-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">${pending} to review</span>` : '<span class="bg-green-100 text-green-700 text-xs font-bold px-2.5 py-1 rounded-full">All clear</span>'}
-                    </div>
-                </summary>
-
-                <!-- Per-month accordion inside -->
-                <div class="border-t border-gray-100">
-                    ${monthKeys.map(mk => {
-                        const [y, m] = mk.split('-');
-                        const label = new Date(parseInt(y), parseInt(m)-1, 1).toLocaleString('en-NG', { month:'long', year:'numeric' });
-                        const items = byMonth[mk];
-                        return `
-                        <details class="border-b border-gray-50 last:border-0">
-                            <summary class="flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-gray-50 list-none select-none">
-                                <span class="text-sm font-semibold text-gray-600">${escapeHtml(label)}</span>
-                                <span class="ml-auto text-xs text-gray-400">${items.length} item${items.length!==1?'s':''}</span>
-                                <i class="fas fa-chevron-right text-gray-300 text-xs ml-1"></i>
-                            </summary>
-                            <div class="px-5 pb-4 space-y-2 bg-gray-50">
-                                ${items.map(a => {
-                                    const assignedDate = (() => {
-                                        const raw = a.assignedDate || a.createdAt;
-                                        const d = raw?.toDate ? raw.toDate() : new Date(raw || 0);
-                                        return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleDateString('en-NG');
-                                    })();
-                                    const submittedDate = (() => {
-                                        if (!a.submittedAt) return null;
-                                        const d = a.submittedAt?.toDate ? a.submittedAt.toDate() : new Date(a.submittedAt);
-                                        return isNaN(d.getTime()) ? null : d.toLocaleDateString('en-NG');
-                                    })();
-                                    const statusColor = a.status === 'graded' ? 'text-green-700 bg-green-100' :
-                                                        a.status === 'submitted' ? 'text-amber-700 bg-amber-100' : 'text-gray-600 bg-gray-100';
-                                    const statusLabel = a.status === 'graded' ? 'Graded' :
-                                                        a.status === 'submitted' ? 'Submitted — Needs Review' : 'Assigned';
-                                    return `
-                                    <div class="bg-white border border-gray-200 rounded-lg p-3">
-                                        <div class="flex items-start justify-between gap-2">
-                                            <div class="flex-1 min-w-0">
-                                                <div class="flex items-center gap-2 flex-wrap mb-1">
-                                                    <div class="font-medium text-gray-800 text-sm">${escapeHtml(a.title || 'Untitled')}</div>
-                                                    ${a.subject ? `<span style="display:inline-flex;align-items:center;gap:3px;background:#ede9fe;color:#5b21b6;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap;border:1px solid #ddd6fe;">📚 ${escapeHtml(a.subject)}</span>` : ''}
-                                                </div>
-                                                ${a.description ? `<div class="text-xs text-gray-500 mt-1" style="white-space:pre-wrap;word-break:break-word;">${
-                                                    // Linkify URLs in description
-                                                    escapeHtml(a.description).replace(/(https?:\/\/[^\s&"<>]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;">$1</a>')
-                                                }</div>` : ''}
-                                                ${(() => {
-                                                    const allAttachments = a.attachments || [];
-                                                    if (allAttachments.length === 0 && a.fileUrl) allAttachments.push({ url: a.fileUrl, name: a.fileName || 'File', isLink: false });
-                                                    if (allAttachments.length === 0) return '';
-                                                    return `<div class="flex flex-wrap gap-1.5 mt-1.5">${allAttachments.map(att => {
-                                                        const label = escapeHtml(att.name || 'Attachment');
-                                                        const icon = att.isLink ? '🔗' : '📄';
-                                                        return `<a href="${escapeHtml(att.url)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;background:#eff6ff;color:#1d4ed8;font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:6px;text-decoration:none;border:1px solid #bfdbfe;">${icon} ${label}</a>`;
-                                                    }).join('')}</div>`;
-                                                })()}
-                                                <div class="flex gap-3 mt-1.5 text-xs text-gray-400 flex-wrap">
-                                                    <span>Assigned: ${escapeHtml(assignedDate)}</span>
-                                                    <span>Due: ${escapeHtml(a.dueDate || '—')}</span>
-                                                    ${submittedDate ? `<span>Submitted: ${escapeHtml(submittedDate)}</span>` : ''}
-                                                    ${a.score != null ? `<span class="font-bold text-blue-600">Score: ${escapeHtml(String(a.score))}/100</span>` : ''}
-                                                </div>
-                                            </div>
-                                            <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
-                                                <span class="text-xs font-bold px-2 py-0.5 rounded-full ${statusColor}">${statusLabel}</span>
-                                                ${a.status === 'submitted' ? `<button onclick="openGradingInNewTab('${escapeHtml(a.id)}')" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;padding:5px 12px;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;" title="Review & annotate submission">✏️ Review</button>` : ''}
-                                            </div>
-                                        </div>
-                                    </div>`;
-                                }).join('')}
-                            </div>
-                        </details>`;
-                    }).join('')}
-                </div>
-            </details>`;
-        });
-        html += '</div>';
-        container.innerHTML = html;
+        }, err => {
+            console.error("Inbox listener error:", err);
+            container.innerHTML = '<p class="text-red-500 text-center py-4">Error loading homework archive.</p>';
+        }));
 
     } catch (error) {
         console.error("Inbox Error:", error);
         container.innerHTML = '<p class="text-red-500 text-center py-4">Error loading homework archive.</p>';
     }
+}
+
+/** Internal: render the homework inbox from a Firestore snapshot */
+function _renderHomeworkInbox(container, snapshot) {
+    if (snapshot.empty) {
+        container.innerHTML = `<div class="text-center py-6"><div class="text-3xl mb-2">📭</div><p class="text-gray-500">No homework assignments sent yet.</p></div>`;
+        const badge = document.getElementById('inbox-count');
+        if (badge) badge.textContent = '0';
+        return;
+    }
+
+    // Group all assignments by studentId
+    const studentMap = {}; // { studentId: { name, assignments: [] } }
+    snapshot.forEach(d => {
+        const data = { id: d.id, ...d.data() };
+        const sid = data.studentId || data.studentName || 'unknown';
+        if (!studentMap[sid]) {
+            studentMap[sid] = { name: data.studentName || 'Unknown', assignments: [] };
+        }
+        studentMap[sid].assignments.push(data);
+    });
+
+    // Count pending submissions
+    let pendingTotal = 0;
+    Object.values(studentMap).forEach(s => {
+        s.assignments.forEach(a => { if (a.status === 'submitted') pendingTotal++; });
+        // Sort newest first
+        s.assignments.sort((a, b) => {
+            const getTs = x => x.assignedDate?.toDate ? x.assignedDate.toDate() : new Date(x.assignedDate || x.createdAt || 0);
+            return getTs(b) - getTs(a);
+        });
+    });
+
+    const badge = document.getElementById('inbox-count');
+    if (badge) badge.textContent = pendingTotal > 0 ? pendingTotal : '✓';
+
+    // Render per-student cards
+    const sortedStudents = Object.entries(studentMap).sort((a, b) => {
+        // Students with pending submissions first
+        const aPending = a[1].assignments.filter(x => x.status === 'submitted').length;
+        const bPending = b[1].assignments.filter(x => x.status === 'submitted').length;
+        return bPending - aPending;
+    });
+
+    let html = '<div class="space-y-3">';
+    sortedStudents.forEach(([sid, student]) => {
+        const pending = student.assignments.filter(a => a.status === 'submitted').length;
+        const graded  = student.assignments.filter(a => a.status === 'graded').length;
+        const total   = student.assignments.length;
+
+        // Group by month for accordion
+        const byMonth = {};
+        student.assignments.forEach(a => {
+            const raw = a.assignedDate || a.createdAt;
+            const d = raw?.toDate ? raw.toDate() : new Date(raw || 0);
+            if (isNaN(d.getTime())) return;
+            const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+            if (!byMonth[mk]) byMonth[mk] = [];
+            byMonth[mk].push(a);
+        });
+
+        const monthKeys = Object.keys(byMonth).sort((a,b) => b.localeCompare(a));
+
+        html += `
+        <details class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <summary class="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 list-none select-none">
+                <div class="w-10 h-10 rounded-full ${pending > 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'} flex items-center justify-center font-bold text-base flex-shrink-0">
+                    ${escapeHtml((student.name||'?').charAt(0))}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="font-semibold text-gray-800">${escapeHtml(student.name)}</div>
+                    <div class="text-xs text-gray-400">${total} assignment${total!==1?'s':''} · ${graded} graded</div>
+                </div>
+                <div class="flex gap-2 flex-shrink-0">
+                    ${pending > 0 ? `<span class="bg-amber-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">${pending} to review</span>` : '<span class="bg-green-100 text-green-700 text-xs font-bold px-2.5 py-1 rounded-full">All clear</span>'}
+                </div>
+            </summary>
+
+            <!-- Per-month accordion inside -->
+            <div class="border-t border-gray-100">
+                ${monthKeys.map(mk => {
+                    const [y, m] = mk.split('-');
+                    const label = new Date(parseInt(y), parseInt(m)-1, 1).toLocaleString('en-NG', { month:'long', year:'numeric' });
+                    const items = byMonth[mk];
+                    return `
+                    <details class="border-b border-gray-50 last:border-0">
+                        <summary class="flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-gray-50 list-none select-none">
+                            <span class="text-sm font-semibold text-gray-600">${escapeHtml(label)}</span>
+                            <span class="ml-auto text-xs text-gray-400">${items.length} item${items.length!==1?'s':''}</span>
+                            <i class="fas fa-chevron-right text-gray-300 text-xs ml-1"></i>
+                        </summary>
+                        <div class="px-5 pb-4 space-y-2 bg-gray-50">
+                            ${items.map(a => {
+                                const assignedDate = (() => {
+                                    const raw = a.assignedDate || a.createdAt;
+                                    const d = raw?.toDate ? raw.toDate() : new Date(raw || 0);
+                                    return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleDateString('en-NG');
+                                })();
+                                const submittedDate = (() => {
+                                    if (!a.submittedAt) return null;
+                                    const d = a.submittedAt?.toDate ? a.submittedAt.toDate() : new Date(a.submittedAt);
+                                    return isNaN(d.getTime()) ? null : d.toLocaleDateString('en-NG');
+                                })();
+                                const statusColor = a.status === 'graded' ? 'text-green-700 bg-green-100' :
+                                                    a.status === 'submitted' ? 'text-amber-700 bg-amber-100' : 'text-gray-600 bg-gray-100';
+                                const statusLabel = a.status === 'graded' ? 'Graded' :
+                                                    a.status === 'submitted' ? 'Submitted — Needs Review' : 'Assigned';
+                                return `
+                                <div class="bg-white border border-gray-200 rounded-lg p-3">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center gap-2 flex-wrap mb-1">
+                                                <div class="font-medium text-gray-800 text-sm">${escapeHtml(a.title || 'Untitled')}</div>
+                                                ${a.subject ? `<span style="display:inline-flex;align-items:center;gap:3px;background:#ede9fe;color:#5b21b6;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap;border:1px solid #ddd6fe;">📚 ${escapeHtml(a.subject)}</span>` : ''}
+                                            </div>
+                                            ${a.description ? `<div class="text-xs text-gray-500 mt-1" style="white-space:pre-wrap;word-break:break-word;">${
+                                                // Linkify URLs in description
+                                                escapeHtml(a.description).replace(/(https?:\/\/[^\s&"<>]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;">$1</a>')
+                                            }</div>` : ''}
+                                            ${(() => {
+                                                const allAttachments = a.attachments || [];
+                                                if (allAttachments.length === 0 && a.fileUrl) allAttachments.push({ url: a.fileUrl, name: a.fileName || 'File', isLink: false });
+                                                if (allAttachments.length === 0) return '';
+                                                return `<div class="flex flex-wrap gap-1.5 mt-1.5">${allAttachments.map(att => {
+                                                    const label = escapeHtml(att.name || 'Attachment');
+                                                    const icon = att.isLink ? '🔗' : '📄';
+                                                    return `<a href="${escapeHtml(att.url)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;background:#eff6ff;color:#1d4ed8;font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:6px;text-decoration:none;border:1px solid #bfdbfe;">${icon} ${label}</a>`;
+                                                }).join('')}</div>`;
+                                            })()}
+                                            <div class="flex gap-3 mt-1.5 text-xs text-gray-400 flex-wrap">
+                                                <span>Assigned: ${escapeHtml(assignedDate)}</span>
+                                                <span>Due: ${escapeHtml(a.dueDate || '—')}</span>
+                                                ${submittedDate ? `<span>Submitted: ${escapeHtml(submittedDate)}</span>` : ''}
+                                                ${a.score != null ? `<span class="font-bold text-blue-600">Score: ${escapeHtml(String(a.score))}/100</span>` : ''}
+                                            </div>
+                                        </div>
+                                        <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
+                                            <span class="text-xs font-bold px-2 py-0.5 rounded-full ${statusColor}">${statusLabel}</span>
+                                            ${a.status === 'submitted' ? `<button onclick="openGradingInNewTab('${escapeHtml(a.id)}')" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;padding:5px 12px;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;" title="Review & annotate submission">✏️ Review</button>` : ''}
+                                        </div>
+                                    </div>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </details>`;
+                }).join('')}
+            </div>
+        </details>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
 }
 
 // ==========================================
