@@ -89,6 +89,7 @@ async function updateStaffPermissions(staffEmail, newRole) {
         tabs: { 
             viewTutorManagement: false, 
             viewPayAdvice: false, 
+            viewTenureBonus: false,
             viewTutorReports: false, 
             viewSummerBreak: false, 
             viewPendingApprovals: false, 
@@ -106,6 +107,8 @@ async function updateStaffPermissions(staffEmail, newRole) {
         actions: { 
             canDownloadReports: false, 
             canExportPayAdvice: false, 
+            canApplyTenureBonus: false,
+            canManualAdjustFee: false,
             canEndSummerBreak: false, 
             canEditStudents: false, 
             canDeleteStudents: false 
@@ -115,6 +118,7 @@ async function updateStaffPermissions(staffEmail, newRole) {
         tabs: { 
             viewTutorManagement: false, 
             viewPayAdvice: false, 
+            viewTenureBonus: false,
             viewTutorReports: false, 
             viewSummerBreak: false, 
             viewPendingApprovals: false, 
@@ -132,6 +136,8 @@ async function updateStaffPermissions(staffEmail, newRole) {
         actions: { 
             canDownloadReports: false, 
             canExportPayAdvice: false, 
+            canApplyTenureBonus: false,
+            canManualAdjustFee: false,
             canEndSummerBreak: false, 
             canEditStudents: false, 
             canDeleteStudents: false 
@@ -141,6 +147,7 @@ async function updateStaffPermissions(staffEmail, newRole) {
         tabs: { 
             viewTutorManagement: true, 
             viewPayAdvice: false, 
+            viewTenureBonus: false,
             viewTutorReports: true, 
             viewSummerBreak: true, 
             viewPendingApprovals: true, 
@@ -158,6 +165,8 @@ async function updateStaffPermissions(staffEmail, newRole) {
         actions: { 
             canDownloadReports: false, 
             canExportPayAdvice: false, 
+            canApplyTenureBonus: false,
+            canManualAdjustFee: false,
             canEndSummerBreak: false, 
             canEditStudents: true, 
             canDeleteStudents: false 
@@ -167,6 +176,7 @@ async function updateStaffPermissions(staffEmail, newRole) {
         tabs: { 
             viewTutorManagement: true, 
             viewPayAdvice: true, 
+            viewTenureBonus: true,
             viewTutorReports: true, 
             viewSummerBreak: true, 
             viewPendingApprovals: true, 
@@ -184,6 +194,8 @@ async function updateStaffPermissions(staffEmail, newRole) {
         actions: { 
             canDownloadReports: true, 
             canExportPayAdvice: true, 
+            canApplyTenureBonus: true,
+            canManualAdjustFee: true,
             canEndSummerBreak: true, 
             canEditStudents: true, 
             canDeleteStudents: true 
@@ -193,6 +205,7 @@ async function updateStaffPermissions(staffEmail, newRole) {
         tabs: { 
             viewTutorManagement: true, 
             viewPayAdvice: true, 
+            viewTenureBonus: true,
             viewTutorReports: true, 
             viewSummerBreak: true, 
             viewPendingApprovals: true, 
@@ -210,6 +223,8 @@ async function updateStaffPermissions(staffEmail, newRole) {
         actions: { 
             canDownloadReports: true, 
             canExportPayAdvice: true, 
+            canApplyTenureBonus: true,
+            canManualAdjustFee: true,
             canEndSummerBreak: true, 
             canEditStudents: true, 
             canDeleteStudents: true 
@@ -2593,6 +2608,7 @@ async function openPermissionsModal(staffId) {
                         <div class="grid grid-cols-2 gap-2">
                             <label class="flex items-center"><input type="checkbox" id="p-viewTutorManagement" class="mr-2" ${permissions.tabs?.viewTutorManagement ? 'checked' : ''}> Tutor & Student List</label>
                             <label class="flex items-center"><input type="checkbox" id="p-viewPayAdvice" class="mr-2" ${permissions.tabs?.viewPayAdvice ? 'checked' : ''}> Pay Advice</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewTenureBonus" class="mr-2" ${permissions.tabs?.viewTenureBonus ? 'checked' : ''}> <span class="text-yellow-700">🏆 Tenure Bonus</span></label>
                             <label class="flex items-center"><input type="checkbox" id="p-viewTutorReports" class="mr-2" ${permissions.tabs?.viewTutorReports ? 'checked' : ''}> Tutor Reports</label>
                             <label class="flex items-center"><input type="checkbox" id="p-viewSummerBreak" class="mr-2" ${permissions.tabs?.viewSummerBreak ? 'checked' : ''}> Summer Break</label>
                             <label class="flex items-center"><input type="checkbox" id="p-viewPendingApprovals" class="mr-2" ${permissions.tabs?.viewPendingApprovals ? 'checked' : ''}> Pending Approvals</label>
@@ -2610,6 +2626,8 @@ async function openPermissionsModal(staffId) {
                         <h4 class="font-semibold mb-2">Specific Actions:</h4>
                         <label class="flex items-center"><input type="checkbox" id="p-canDownloadReports" class="mr-2" ${permissions.actions?.canDownloadReports ? 'checked' : ''}> Can Download Reports</label>
                         <label class="flex items-center"><input type="checkbox" id="p-canExportPayAdvice" class="mr-2" ${permissions.actions?.canExportPayAdvice ? 'checked' : ''}> Can Export Pay Advice</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canApplyTenureBonus" class="mr-2" ${permissions.actions?.canApplyTenureBonus ? 'checked' : ''}> <span class="text-yellow-700">Can Apply Tenure Bonus</span></label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canManualAdjustFee" class="mr-2" ${permissions.actions?.canManualAdjustFee ? 'checked' : ''}> <span class="text-yellow-700">Can Manual Adjust Fee</span></label>
                         <label class="flex items-center"><input type="checkbox" id="p-canEndSummerBreak" class="mr-2" ${permissions.actions?.canEndSummerBreak ? 'checked' : ''}> Can End Summer Break</label>
                         <label class="flex items-center"><input type="checkbox" id="p-canEditStudents" class="mr-2" ${permissions.actions?.canEditStudents ? 'checked' : ''}> Can Edit Students</label>
                         <label class="flex items-center"><input type="checkbox" id="p-canDeleteStudents" class="mr-2" ${permissions.actions?.canDeleteStudents ? 'checked' : ''}> Can Delete Students</label>
@@ -2635,6 +2653,7 @@ async function openPermissionsModal(staffId) {
             tabs: { 
                 viewTutorManagement: document.getElementById('p-viewTutorManagement').checked, 
                 viewPayAdvice: document.getElementById('p-viewPayAdvice').checked, 
+                viewTenureBonus: document.getElementById('p-viewTenureBonus').checked,
                 viewTutorReports: document.getElementById('p-viewTutorReports').checked, 
                 viewSummerBreak: document.getElementById('p-viewSummerBreak').checked, 
                 viewPendingApprovals: document.getElementById('p-viewPendingApprovals').checked, 
@@ -2652,6 +2671,8 @@ async function openPermissionsModal(staffId) {
             actions: { 
                 canDownloadReports: document.getElementById('p-canDownloadReports').checked, 
                 canExportPayAdvice: document.getElementById('p-canExportPayAdvice').checked, 
+                canApplyTenureBonus: document.getElementById('p-canApplyTenureBonus').checked,
+                canManualAdjustFee: document.getElementById('p-canManualAdjustFee').checked,
                 canEndSummerBreak: document.getElementById('p-canEndSummerBreak').checked, 
                 canEditStudents: document.getElementById('p-canEditStudents').checked, 
                 canDeleteStudents: document.getElementById('p-canDeleteStudents').checked 
