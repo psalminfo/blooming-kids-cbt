@@ -2433,21 +2433,24 @@ async function msgLoadRecipientsByStudentId(type, container) {
             container.innerHTML = `
                 <div style="position:relative;margin-bottom:6px;">
                     <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                    <input id="student-search-box" type="text" placeholder="Search student by name…" style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.82rem;outline:none;box-sizing:border-box;" oninput="filterStudentDropdown(this.value)">
+                    <input id="student-search-box" type="text" placeholder="Search student by name…" style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.82rem;outline:none;box-sizing:border-box;" oninput="filterRecipientList('student-recipient-list', this.value)">
                 </div>
-                <select id="sel-recipient" class="form-input" size="5" style="width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:4px;font-size:.85rem;outline:none;max-height:160px;overflow-y:auto;">
-                    <option value="">— Select student —</option>
-                    ${students.map(s => `<option value="${escapeHtml(s.id)}" data-name="${escapeHtml(s.studentName)}">${escapeHtml(s.studentName)} (${escapeHtml(s.grade)})</option>`).join('')}
-                </select>`;
+                <div id="student-recipient-list" style="max-height:180px;overflow-y:auto;border:1.5px solid #e2e8f0;border-radius:10px;padding:4px;">
+                    ${students.length === 0 ? '<div style="padding:12px;text-align:center;color:#9ca3af;font-size:.82rem;">No active students found</div>' : students.map(s => `
+                    <div class="recipient-list-item" data-id="${escapeHtml(s.id)}" data-name="${escapeHtml(s.studentName)}" data-type="student"
+                        style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .12s;"
+                        onmouseover="this.style.background='#f5f3ff'" onmouseout="if(!this.classList.contains('selected'))this.style.background=''"
+                        onclick="selectRecipientItem(this,'student-recipient-list')">
+                        <div style="width:28px;height:28px;border-radius:50%;background:#e0e7ff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.78rem;color:#4f46e5;flex-shrink:0;">${escapeHtml((s.studentName||'?').charAt(0).toUpperCase())}</div>
+                        <div>
+                            <div style="font-size:.85rem;font-weight:600;color:#1e293b;">${escapeHtml(s.studentName)}</div>
+                            <div style="font-size:.72rem;color:#94a3b8;">${escapeHtml(s.grade)}</div>
+                        </div>
+                    </div>`).join('')}
+                </div>
+                <input type="hidden" id="sel-recipient-id" value="">
+                <input type="hidden" id="sel-recipient-name" value="">`;
             window._studentListForSearch = students;
-            window.filterStudentDropdown = function(q) {
-                const sel = document.getElementById('sel-recipient');
-                if (!sel) return;
-                const lq = q.toLowerCase().trim();
-                Array.from(sel.options).forEach(opt => {
-                    opt.hidden = lq && !opt.text.toLowerCase().includes(lq);
-                });
-            };
         } else if (type === 'group') {
             container.innerHTML = `
                 <div style="max-height:160px;overflow-y:auto;border:1.5px solid #e2e8f0;border-radius:10px;padding:6px;">
@@ -2473,12 +2476,23 @@ async function msgLoadRecipientsByStudentId(type, container) {
                 container.innerHTML = `
                     <div style="position:relative;margin-bottom:6px;">
                         <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                        <input type="text" placeholder="Search parent by name…" style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.82rem;outline:none;box-sizing:border-box;" oninput="(function(q){const s=document.getElementById('sel-recipient');if(!s)return;Array.from(s.options).forEach(o=>o.hidden=q.trim()&&!o.text.toLowerCase().includes(q.toLowerCase()));}).call(this,this.value)">
+                        <input type="text" placeholder="Search parent by name…" style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.82rem;outline:none;box-sizing:border-box;" oninput="filterRecipientList('parent-recipient-list', this.value)">
                     </div>
-                    <select id="sel-recipient" size="5" style="width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:4px;font-size:.85rem;outline:none;max-height:160px;" data-recipient-type="parent">
-                        <option value="">— Select parent —</option>
-                        ${parents.map(p => `<option value="${escapeHtml(p.id)}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)}${p.email ? ' · '+escapeHtml(p.email) : ''}</option>`).join('')}
-                    </select>`;
+                    <div id="parent-recipient-list" style="max-height:180px;overflow-y:auto;border:1.5px solid #e2e8f0;border-radius:10px;padding:4px;">
+                        ${parents.length === 0 ? '<div style="padding:12px;text-align:center;color:#9ca3af;font-size:.82rem;">No parents found</div>' : parents.map(p => `
+                        <div class="recipient-list-item" data-id="${escapeHtml(p.id)}" data-name="${escapeHtml(p.name)}" data-type="parent"
+                            style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .12s;"
+                            onmouseover="this.style.background='#f5f3ff'" onmouseout="if(!this.classList.contains('selected'))this.style.background=''"
+                            onclick="selectRecipientItem(this,'parent-recipient-list')">
+                            <div style="width:28px;height:28px;border-radius:50%;background:#fce7f3;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.78rem;color:#be185d;flex-shrink:0;">${escapeHtml((p.name||'?').charAt(0).toUpperCase())}</div>
+                            <div>
+                                <div style="font-size:.85rem;font-weight:600;color:#1e293b;">${escapeHtml(p.name)}</div>
+                                ${p.email ? `<div style="font-size:.72rem;color:#94a3b8;">${escapeHtml(p.email)}</div>` : ''}
+                            </div>
+                        </div>`).join('')}
+                    </div>
+                    <input type="hidden" id="sel-recipient-id" value="">
+                    <input type="hidden" id="sel-recipient-name" value="">`;
             } catch(e) {
                 container.innerHTML = `<div class="p-3 bg-red-50 text-red-600 text-sm rounded">Could not load parents: ${escapeHtml(e.message)}</div>`;
             }
@@ -2498,12 +2512,23 @@ async function msgLoadRecipientsByStudentId(type, container) {
                 container.innerHTML = `
                     <div style="position:relative;margin-bottom:6px;">
                         <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                        <input type="text" placeholder="Search tutor by name…" style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.82rem;outline:none;box-sizing:border-box;" oninput="(function(q){const s=document.getElementById('sel-recipient');if(!s)return;Array.from(s.options).forEach(o=>o.hidden=q&&!o.text.toLowerCase().includes(q.toLowerCase()));}).call(this,this.value)">
+                        <input type="text" placeholder="Search tutor by name…" style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.82rem;outline:none;box-sizing:border-box;" oninput="filterRecipientList('tutor-recipient-list', this.value)">
                     </div>
-                    <select id="sel-recipient" class="form-input" size="5" style="width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:4px;font-size:.85rem;outline:none;max-height:160px;" data-recipient-type="tutor">
-                        <option value="">— Select tutor —</option>
-                        ${tutors.map(t => `<option value="${escapeHtml(t.id)}" data-name="${escapeHtml(t.name)}">${escapeHtml(t.name)}${t.email ? ' · '+escapeHtml(t.email) : ''}</option>`).join('')}
-                    </select>`;
+                    <div id="tutor-recipient-list" style="max-height:180px;overflow-y:auto;border:1.5px solid #e2e8f0;border-radius:10px;padding:4px;">
+                        ${tutors.length === 0 ? '<div style="padding:12px;text-align:center;color:#9ca3af;font-size:.82rem;">No other tutors found</div>' : tutors.map(t => `
+                        <div class="recipient-list-item" data-id="${escapeHtml(t.id)}" data-name="${escapeHtml(t.name)}" data-type="tutor"
+                            style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .12s;"
+                            onmouseover="this.style.background='#f5f3ff'" onmouseout="if(!this.classList.contains('selected'))this.style.background=''"
+                            onclick="selectRecipientItem(this,'tutor-recipient-list')">
+                            <div style="width:28px;height:28px;border-radius:50%;background:#dcfce7;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.78rem;color:#16a34a;flex-shrink:0;">${escapeHtml((t.name||'?').charAt(0).toUpperCase())}</div>
+                            <div>
+                                <div style="font-size:.85rem;font-weight:600;color:#1e293b;">${escapeHtml(t.name)}</div>
+                                ${t.email ? `<div style="font-size:.72rem;color:#94a3b8;">${escapeHtml(t.email)}</div>` : ''}
+                            </div>
+                        </div>`).join('')}
+                    </div>
+                    <input type="hidden" id="sel-recipient-id" value="">
+                    <input type="hidden" id="sel-recipient-name" value="">`;
             } catch(e) {
                 container.innerHTML = `<div style="padding:10px;background:#fef2f2;color:#dc2626;border-radius:10px;font-size:.82rem;">Could not load tutors: ${escapeHtml(e.message)}</div>`;
             }
@@ -2528,9 +2553,10 @@ async function msgProcessSendToStudents(modal) {
     let targets = []; // { id: studentId, name: studentName }
 
     if (type === 'individual') {
-        const sel = modal.querySelector('#sel-recipient');
-        if (!sel.value) { showCustomAlert('Please select a student.'); return; }
-        targets.push({ id: sel.value, name: sel.options[sel.selectedIndex].dataset.name });
+        const selId = modal.querySelector('#sel-recipient-id');
+        const selName = modal.querySelector('#sel-recipient-name');
+        if (!selId || !selId.value) { showCustomAlert('Please select a student.'); return; }
+        targets.push({ id: selId.value, name: selName.value });
     } else if (type === 'group') {
         modal.querySelectorAll('.chk-recipient:checked').forEach(c => targets.push({ id: c.value, name: c.dataset.name }));
         if (!targets.length) { showCustomAlert('Please select at least one student.'); return; }
@@ -2538,9 +2564,10 @@ async function msgProcessSendToStudents(modal) {
         try { targets = JSON.parse(modal.querySelector('#recipient-loader').dataset.allStudents || '[]'); } catch(e) {}
         if (!targets.length) { showCustomAlert('No active students found.'); return; }
     } else if (type === 'parent' || type === 'tutor') {
-        const sel = modal.querySelector('#sel-recipient');
-        if (!sel || !sel.value) { showCustomAlert('Please select a recipient.'); return; }
-        targets.push({ id: sel.value, name: sel.options[sel.selectedIndex].dataset.name, recipientType: type });
+        const selId = modal.querySelector('#sel-recipient-id');
+        const selName = modal.querySelector('#sel-recipient-name');
+        if (!selId || !selId.value) { showCustomAlert('Please select a recipient.'); return; }
+        targets.push({ id: selId.value, name: selName.value, recipientType: type });
     } else if (type === 'management') {
         targets = [{ id: 'management', name: 'Admin' }];
     }
@@ -7654,6 +7681,45 @@ window.openGradingInNewTab = function(homeworkId) {
     const url = `./grading.html?${p.toString()}`;
     const tab = window.open(url, '_blank');
     if (!tab) showCustomAlert('Pop-up blocked — please allow pop-ups and try again.');
+};
+
+
+// ── RECIPIENT LIST HELPERS (used by student / parent / tutor new-message search) ──
+
+/**
+ * Filter a recipient list by hiding items that don't match the query.
+ * Works on real DOM divs so it's reliable across all browsers.
+ */
+window.filterRecipientList = function(listId, query) {
+    const list = document.getElementById(listId);
+    if (!list) return;
+    const lq = query.toLowerCase().trim();
+    list.querySelectorAll('.recipient-list-item').forEach(item => {
+        const name = (item.dataset.name || '').toLowerCase();
+        item.style.display = (!lq || name.includes(lq)) ? '' : 'none';
+    });
+};
+
+/**
+ * Highlight the clicked item and write its id/name into the hidden inputs
+ * so the send logic can pick them up regardless of list type.
+ */
+window.selectRecipientItem = function(el, listId) {
+    const list = document.getElementById(listId);
+    if (list) {
+        list.querySelectorAll('.recipient-list-item').forEach(i => {
+            i.classList.remove('selected');
+            i.style.background = '';
+        });
+    }
+    el.classList.add('selected');
+    el.style.background = '#ede9fe';
+
+    // Write into hidden inputs so send logic can read them
+    const idInput   = document.getElementById('sel-recipient-id');
+    const nameInput = document.getElementById('sel-recipient-name');
+    if (idInput)   idInput.value   = el.dataset.id   || '';
+    if (nameInput) nameInput.value = el.dataset.name || '';
 };
 
 window.showDailyTopicModal = showDailyTopicModal;
