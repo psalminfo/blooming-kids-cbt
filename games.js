@@ -301,7 +301,7 @@
             const panel=document.getElementById('ttt-mode-panel');
             if(mode==='ai'){
                 panel.innerHTML=`<button onclick="bkTTT_start()" style="width:100%;padding:13px;background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;border:none;border-radius:13px;font-weight:800;cursor:pointer;font-size:.9rem;box-shadow:0 4px 14px rgba(99,102,241,.35);">▶ Start Game</button>`;
-                window.bkTTT_start=()=>{state.gameActive=true;state.tttMode='ai';state.tttBoard=Array(9).fill(null);state.tttTurn='X';renderTTT(null,null);};
+                window.bkTTT_start=()=>{state.tttMode='ai';state.tttBoard=Array(9).fill(null);state.tttTurn='X';renderTTT(null,null);};
             } else {
                 renderTTTOnlinePanel(panel);
             }
@@ -387,7 +387,6 @@
     function subscribeToOnlineTTT(gameId) {
         if(!db()||!DC()||!SN()) return;
         if(state.tttUnsub) state.tttUnsub();
-        state.gameActive=true;
         state.tttUnsub = SN()(DC()(db(),'ttt_games',gameId), snap => {
             if(!snap.exists()) return;
             const g = snap.data();
@@ -409,46 +408,48 @@
         const isDraw   = !winner && b.every(x=>x);
 
         let statusText, statusBg;
-        if(winner){statusText='\u{1F3C6} '+(winner==='X'?'X':'O')+' wins!';statusBg='linear-gradient(135deg,#d1fae5,#ecfdf5)';}
-        else if(isDraw){statusText='\u{1F91D} Draw!';statusBg='#f8fafc';}
-        else if(isOnline && !myTurn){statusText='\u23F3 Waiting for opponent\u2026';statusBg='#fef3c7';}
-        else{statusText=(state.tttTurn==='X'?'Your turn (\u2715)':'AI/Opponent turn (\u2B55)');statusBg='#eef2ff';}
+        if(winner){statusText=`🏆 ${winner==='X'?'X':'O'} wins!`;statusBg='linear-gradient(135deg,#d1fae5,#ecfdf5)';}
+        else if(isDraw){statusText='🤝 Draw!';statusBg='#f8fafc';}
+        else if(isOnline && !myTurn){statusText='⏳ Waiting for opponent…';statusBg='#fef3c7';}
+        else{statusText=`${b[0]===null?'':''} ${state.tttTurn==='X'?'Your turn (✕)':'AI/Opponent turn (⭕)'}`;statusBg='#eef2ff';}
 
-        // Build board cells
-        const boardCells = b.map((cell,i)=>{
-            const wl=tttWinLine(b); const isW=wl&&wl.includes(i);
-            const bg=isW?(cell==='X'?'linear-gradient(135deg,#fde68a,#fbbf24)':'linear-gradient(135deg,#ddd6fe,#c4b5fd)'):cell?'#f8fafc':'linear-gradient(135deg,#f8fafc,#eef2ff)';
-            const bc=isW?(cell==='X'?'#f59e0b':'#8b5cf6'):cell?'#e2e8f0':'#c7d2fe';
-            const clickable=!cell&&!winner&&!isDraw&&(state.tttMode!=='online'||myTurn);
-            let cellContent = cell==='X'?'\u2715':cell==='O'?'\u2B55':'';
-            let cellColor = cell==='X'?'#d97706':cell==='O'?'#7c3aed':'transparent';
-            let hoverAttr = '';
-            if(clickable){
-                hoverAttr = ' onmouseover="this.style.background=\'#e0e7ff\';this.style.borderColor=\'#818cf8\';this.style.transform=\'scale(1.06)\'" onmouseout="this.style.background=\'linear-gradient(135deg,#f8fafc,#eef2ff)\';this.style.borderColor=\'#c7d2fe\';this.style.transform=\'scale(1)\'"';
-            }
-            return '<button class="ttt-c" data-i="'+i+'" style="width:100%;aspect-ratio:1;min-height:72px;border-radius:13px;border:2.5px solid '+bc+';background:'+bg+';font-size:1.8rem;font-weight:900;color:'+cellColor+';cursor:'+(clickable?'pointer':'default')+';box-shadow:'+(isW?'0 0 0 3px '+(cell==='X'?'rgba(245,158,11,.3)':'rgba(139,92,246,.3)'):'0 2px 8px rgba(0,0,0,.06)')+';transition:all .18s ease;display:flex;align-items:center;justify-content:center;line-height:1;"'+hoverAttr+'>'+cellContent+'</button>';
-        }).join('');
-
-        c.innerHTML = '<div style="width:100%;">'
-            + '<div style="display:flex;justify-content:space-between;margin-bottom:12px;">'
-            + '<div style="font-weight:900;color:#1e1b4b;font-size:.9rem;">\u274C\u2B55 Tic-Tac-Toe '+(isOnline?'<span style="font-size:.65rem;background:#eef2ff;color:#4338ca;padding:2px 8px;border-radius:999px;margin-left:4px;">ONLINE</span>':'')+'</div>'
-            + '<button onclick="window.bkGoMenu()" style="font-size:.68rem;color:#64748b;background:#f1f5f9;border:none;padding:4px 10px;border-radius:999px;cursor:pointer;">\u2190 Menu</button>'
-            + '</div>'
-            // Scoreboard
-            + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px;width:100%;">'
-            + '<div style="text-align:center;background:linear-gradient(135deg,#fef3c7,#fef9c3);border-radius:11px;padding:8px;border:1.5px solid '+(state.tttTurn==='X'&&!winLine&&!isDraw?'#f59e0b':'#fde68a')+';"><div style="font-size:1.1rem;font-weight:900;color:#d97706;">\u2715</div><div style="font-size:1.1rem;font-weight:900;color:#92400e;">'+sc.X+'</div><div style="font-size:.6rem;color:#a16207;font-weight:700;">YOU</div></div>'
-            + '<div style="text-align:center;background:#f8fafc;border-radius:11px;padding:8px;border:1.5px solid #e2e8f0;"><div style="font-size:.9rem;">\u{1F91D}</div><div style="font-size:1.1rem;font-weight:900;color:#374151;">'+sc.draws+'</div><div style="font-size:.6rem;color:#9ca3af;font-weight:700;">DRAWS</div></div>'
-            + '<div style="text-align:center;background:linear-gradient(135deg,#ede9fe,#e0e7ff);border-radius:11px;padding:8px;border:1.5px solid '+(state.tttTurn==='O'&&!winLine&&!isDraw?'#8b5cf6':'#ddd6fe')+';"><div style="font-size:1.1rem;font-weight:900;color:#7c3aed;">\u2B55</div><div style="font-size:1.1rem;font-weight:900;color:#5b21b6;">'+sc.O+'</div><div style="font-size:.6rem;color:#6d28d9;font-weight:700;">'+(isOnline?'TUTOR':'AI')+'</div></div>'
-            + '</div>'
-            // Status
-            + '<div style="text-align:center;padding:10px;border-radius:10px;background:'+statusBg+';font-weight:800;font-size:.85rem;color:#1e1b4b;margin-bottom:12px;min-height:40px;display:flex;align-items:center;justify-content:center;">'+statusText+'</div>'
-            // Board
-            + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;width:100%;max-width:310px;margin-left:auto;margin-right:auto;">'
-            + boardCells
-            + '</div>'
-            // New Round button
-            + '<button id="ttt-new" style="width:100%;padding:11px;background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;border:none;border-radius:12px;font-weight:800;cursor:pointer;font-size:.85rem;">\u{1F504} New Round</button>'
-            + '</div>';
+        c.innerHTML=`
+            <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
+                <div style="font-weight:900;color:#1e1b4b;font-size:.9rem;">❌⭕ Tic-Tac-Toe ${isOnline?'<span style="font-size:.65rem;background:#eef2ff;color:#4338ca;padding:2px 8px;border-radius:999px;margin-left:4px;">ONLINE</span>':''}</div>
+                <button onclick="window.bkGoMenu()" style="font-size:.68rem;color:#64748b;background:#f1f5f9;border:none;padding:4px 10px;border-radius:999px;cursor:pointer;">← Menu</button>
+            </div>
+            <!-- Scoreboard -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px;">
+                <div style="text-align:center;background:linear-gradient(135deg,#fef3c7,#fef9c3);border-radius:11px;padding:8px;border:1.5px solid ${state.tttTurn==='X'&&!winLine&&!isDraw?'#f59e0b':'#fde68a'};">
+                    <div style="font-size:1.1rem;font-weight:900;color:#d97706;">✕</div>
+                    <div style="font-size:1.1rem;font-weight:900;color:#92400e;">${sc.X}</div>
+                    <div style="font-size:.6rem;color:#a16207;font-weight:700;">YOU</div>
+                </div>
+                <div style="text-align:center;background:#f8fafc;border-radius:11px;padding:8px;border:1.5px solid #e2e8f0;">
+                    <div style="font-size:.9rem;">🤝</div>
+                    <div style="font-size:1.1rem;font-weight:900;color:#374151;">${sc.draws}</div>
+                    <div style="font-size:.6rem;color:#9ca3af;font-weight:700;">DRAWS</div>
+                </div>
+                <div style="text-align:center;background:linear-gradient(135deg,#ede9fe,#e0e7ff);border-radius:11px;padding:8px;border:1.5px solid ${state.tttTurn==='O'&&!winLine&&!isDraw?'#8b5cf6':'#ddd6fe'};">
+                    <div style="font-size:1.1rem;font-weight:900;color:#7c3aed;">⭕</div>
+                    <div style="font-size:1.1rem;font-weight:900;color:#5b21b6;">${sc.O}</div>
+                    <div style="font-size:.6rem;color:#6d28d9;font-weight:700;">${isOnline?'TUTOR':'AI'}</div>
+                </div>
+            </div>
+            <!-- Status -->
+            <div style="text-align:center;padding:8px;border-radius:10px;background:${statusBg};font-weight:800;font-size:.82rem;color:#374151;margin-bottom:12px;">${statusText}</div>
+            <!-- Board -->
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
+                ${b.map((cell,i)=>{
+                    const wl=tttWinLine(b);const isW=wl&&wl.includes(i);
+                    const bg=isW?(cell==='X'?'linear-gradient(135deg,#fde68a,#fbbf24)':'linear-gradient(135deg,#ddd6fe,#c4b5fd)'):cell?'#f8fafc':'#fff';
+                    const bc=isW?(cell==='X'?'#f59e0b':'#8b5cf6'):cell?'#e2e8f0':'#e0e7ff';
+                    const clickable=!cell&&!winner&&!isDraw&&(state.tttMode!=='online'||myTurn);
+                    return `<button class="ttt-c" data-i="${i}" style="aspect-ratio:1;border-radius:13px;border:2px solid ${bc};background:${bg};font-size:1.6rem;font-weight:900;color:${cell==='X'?'#d97706':cell==='O'?'#7c3aed':'transparent'};cursor:${clickable?'pointer':'default'};box-shadow:${isW?'0 0 0 3px '+(cell==='X'?'rgba(245,158,11,.25)':'rgba(139,92,246,.25)'):'none'};transition:all .15s;" ${clickable?`onmouseover="this.style.background='#f0f0ff';this.style.borderColor='#a5b4fc'" onmouseout="this.style.background='#fff';this.style.borderColor='#e0e7ff'"`:''}>
+                        ${cell==='X'?'✕':cell==='O'?'⭕':''}</button>`;
+                }).join('')}
+            </div>
+            <button id="ttt-new" style="width:100%;padding:11px;background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;border:none;border-radius:12px;font-weight:800;cursor:pointer;font-size:.85rem;">🔄 New Round</button>`;
 
         // Cell click handlers
         document.querySelectorAll('.ttt-c').forEach(btn=>{
@@ -456,11 +457,10 @@
         });
         document.getElementById('ttt-new').onclick=()=>{
             if(isOnline&&gameId){ resetOnlineTTT(gameId); }
-            else { state.tttBoard=Array(9).fill(null);state.tttTurn='X';state.gameActive=true;renderTTT(null,null); }
+            else { state.tttBoard=Array(9).fill(null);state.tttTurn='X';renderTTT(null,null); }
         };
         window.bkGoMenu = showMainMenu;
     }
-
 
     function tttMove(idx, gameId=null) {
         const b=state.tttBoard;
