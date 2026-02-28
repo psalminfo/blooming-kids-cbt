@@ -59,7 +59,13 @@ details[open] > summary .chev { transform:rotate(90deg); }
 .chev { display:inline-block; transition:transform .2s; }
 @keyframes spin { to{transform:rotate(360deg)} }
 /* Annotation canvas styles */
-.annot-toolbar { display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:8px 10px; background:#f8fafc; border-radius:10px; border:1px solid #e5e7eb; margin-bottom:10px; }
+.annot-toolbar {
+    display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+    padding:8px 10px; background:#f8fafc;
+    border-radius:10px; border:1px solid #e5e7eb; margin-bottom:10px;
+    position:sticky; top:0; z-index:40;
+    box-shadow:0 2px 8px rgba(0,0,0,0.08);
+}
 .annot-tool-btn { width:32px; height:32px; border-radius:8px; border:2px solid transparent; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:.75rem; transition:all .15s; }
 .annot-tool-btn.active { border-color:#059669; background:#ecfdf5; color:#059669; }
 .annot-tool-btn:not(.active) { background:#e5e7eb; color:#4b5563; }
@@ -71,6 +77,28 @@ details[open] > summary .chev { transform:rotate(90deg); }
 .annot-loading i { font-size:2rem; margin-bottom:10px; display:block; animation:spin 1s linear infinite; }
 /* Select tool styles */
 .annot-tool-btn[title="Select & Move"].active { border-color:#3b82f6; background:#eff6ff; color:#3b82f6; }
+/* Inline text input overlay */
+#annot-text-input-overlay {
+    position:fixed; z-index:9999; display:none;
+    background:#fff; border:2px solid #059669; border-radius:8px;
+    box-shadow:0 4px 16px rgba(0,0,0,0.18); padding:4px;
+    flex-direction:column; gap:4px; min-width:220px;
+}
+#annot-text-input-overlay.visible { display:flex; }
+#annot-text-input-box {
+    border:none; outline:none; font-family:'Inter',sans-serif;
+    font-size:16px; font-weight:600; padding:6px 8px;
+    resize:none; min-height:60px; width:100%; border-radius:4px;
+    background:#f8fafc; color:#1f2937;
+}
+#annot-text-input-actions { display:flex; gap:4px; justify-content:flex-end; }
+#annot-text-input-actions button { padding:4px 12px; border-radius:6px; font-size:.75rem; font-weight:600; cursor:pointer; border:none; }
+#annot-text-ok  { background:#059669; color:#fff; }
+#annot-text-ok:hover { background:#047857; }
+#annot-text-cancel { background:#e5e7eb; color:#4b5563; }
+#annot-text-cancel:hover { background:#d1d5db; }
+/* Font size selector in toolbar */
+.annot-font-size { width:44px; height:28px; border:1px solid #d1d5db; border-radius:6px; font-size:.75rem; background:#fff; cursor:pointer; text-align:center; }
 /* Ws tab styles */
 .ws-tab-btn { padding:10px 18px; font-size:.875rem; font-weight:600; border-bottom:2px solid transparent; transition:all .15s; cursor:pointer; background:none; border-left:none; border-right:none; border-top:none; }
 .ws-tab-btn.active { color:#059669; border-bottom-color:#059669; }
@@ -931,10 +959,19 @@ window.openWorkspace = async (assignmentId) => {
                     <span class="text-xs font-semibold text-gray-500">Tool:</span>
                     <button id="tool-select-${assignmentId}" class="annot-tool-btn" onclick="setAnnotTool('${assignmentId}','select')" title="Select & Move"><i class="fas fa-mouse-pointer"></i></button>
                     <button id="tool-pen-${assignmentId}" class="annot-tool-btn active" onclick="setAnnotTool('${assignmentId}','pen')" title="Pen"><i class="fas fa-pen"></i></button>
+                    <button id="tool-highlighter-${assignmentId}" class="annot-tool-btn" onclick="setAnnotTool('${assignmentId}','highlighter')" title="Highlighter"><i class="fas fa-highlighter"></i></button>
                     <button id="tool-text-${assignmentId}" class="annot-tool-btn" onclick="setAnnotTool('${assignmentId}','text')" title="Add Text"><i class="fas fa-font"></i></button>
+                    <button id="tool-rect-${assignmentId}" class="annot-tool-btn" onclick="setAnnotTool('${assignmentId}','rect')" title="Rectangle"><i class="fas fa-square" style="font-size:.6rem;"></i></button>
+                    <button id="tool-circle-${assignmentId}" class="annot-tool-btn" onclick="setAnnotTool('${assignmentId}','circle')" title="Circle"><i class="fas fa-circle" style="font-size:.6rem;"></i></button>
+                    <button id="tool-arrow-${assignmentId}" class="annot-tool-btn" onclick="setAnnotTool('${assignmentId}','arrow')" title="Arrow"><i class="fas fa-arrow-right"></i></button>
+                    <button id="tool-line-${assignmentId}" class="annot-tool-btn" onclick="setAnnotTool('${assignmentId}','line')" title="Line"><i class="fas fa-minus"></i></button>
                     <button id="tool-eraser-${assignmentId}" class="annot-tool-btn" onclick="setAnnotTool('${assignmentId}','eraser')" title="Eraser"><i class="fas fa-eraser"></i></button>
                     <span class="text-xs font-semibold text-gray-500 ml-1">Size:</span>
                     <input type="range" id="brush-size-${assignmentId}" min="1" max="20" value="3" class="w-20" oninput="window._annotState&amp;&amp;window._annotState['${assignmentId}']&amp;&amp;(window._annotState['${assignmentId}'].size=+this.value)">
+                    <span class="text-xs font-semibold text-gray-500 ml-1">Font:</span>
+                    <select class="annot-font-size" onchange="window._annotState&amp;&amp;window._annotState['${assignmentId}']&amp;&amp;(window._annotState['${assignmentId}'].fontSize=+this.value)">
+                        <option value="14">14</option><option value="18" selected>18</option><option value="24">24</option><option value="32">32</option><option value="48">48</option>
+                    </select>
                     <span class="text-xs font-semibold text-gray-500 ml-1">Color:</span>
                     ${colorDots}
                     <button onclick="undoAnnot('${assignmentId}')" class="ml-1 px-2 py-1 text-xs bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300" title="Undo"><i class="fas fa-undo"></i></button>
@@ -1029,6 +1066,7 @@ window.openWorkspace = async (assignmentId) => {
         tool:'pen',
         color:'#1f2937',
         size:3,
+        fontSize:18,
         drawing:false,
         history:[],
         ctx:null,
@@ -1041,7 +1079,10 @@ window.openWorkspace = async (assignmentId) => {
         _pdfPage: 1,
         _pdfTotal: 0,
         _pageAnnotations: {},   // pageNum → dataURL of annotation canvas
-        _sel: null              // { img, x, y, w, h, dragOffX, dragOffY, phase:'select'|'drag' }
+        _sel: null,             // { startX, startY, x, y, w, h, phase:'select'|'float'|'drag', img, dragOffX, dragOffY }
+        _shapeStart: null,      // { x, y } for shape drawing start
+        _shapeSnapshot: null,   // canvas dataURL snapshot before live shape preview
+        _textPending: null      // { canvasX, canvasY, assignId }
     };
 };
 
@@ -1330,20 +1371,48 @@ function _commitSelection(id) {
     const s = _annotState[id]; if (!s || !s._sel) return;
     const c = document.getElementById('annot-canvas-'+id); if (!c) return;
     const sel = s._sel;
-    // Stamp the floating selection onto the canvas at its current position
-    if (sel.img) {
-        s.ctx.drawImage(sel.img, sel.x, sel.y, sel.w, sel.h);
+    // Restore snapshot (original canvas without the selection cut)
+    // Then draw the moved content at new position
+    if (sel._snapshot) {
+        const snapImg = new Image();
+        snapImg.onload = () => {
+            s.ctx.clearRect(0, 0, c.width, c.height);
+            s.ctx.drawImage(snapImg, 0, 0);
+            // Erase original area
+            s.ctx.clearRect(sel._origX, sel._origY, sel.w, sel.h);
+            // Draw content at new position
+            if (sel.img) s.ctx.drawImage(sel.img, sel.x, sel.y, sel.w, sel.h);
+            s._sel = null;
+            _saveAnnotHistory(id);
+        };
+        snapImg.src = sel._snapshot;
+    } else {
+        if (sel.img) s.ctx.drawImage(sel.img, sel.x, sel.y, sel.w, sel.h);
+        s._sel = null;
+        _saveAnnotHistory(id);
     }
-    s._sel = null;
-    _saveAnnotHistory(id);
-    // Redraw without selection rect overlay
-    _redrawAnnotCanvas(id);
 }
 
-function _redrawAnnotCanvas(id) {
+function _cancelSelection(id) {
+    const s = _annotState[id]; if (!s || !s._sel) return;
+    const c = document.getElementById('annot-canvas-'+id); if (!c) return;
+    // Restore snapshot — discard move
+    if (s._sel._snapshot) {
+        const snapImg = new Image();
+        snapImg.onload = () => {
+            s.ctx.clearRect(0, 0, c.width, c.height);
+            s.ctx.drawImage(snapImg, 0, 0);
+            s._sel = null;
+        };
+        snapImg.src = s._sel._snapshot;
+    } else {
+        s._sel = null;
+    }
+}
+
+function _redrawAnnotCanvas(id, cb) {
     const s = _annotState[id]; if (!s) return;
     const c = document.getElementById('annot-canvas-'+id); if (!c) return;
-    // Restore from last history state (the clean canvas without selection rect)
     if (s.history.length > 0) {
         const last = s.history[s.history.length - 1];
         if (last && last !== 'data:,') {
@@ -1351,8 +1420,8 @@ function _redrawAnnotCanvas(id) {
             img.onload = () => {
                 s.ctx.clearRect(0, 0, c.width, c.height);
                 s.ctx.drawImage(img, 0, 0, c.width, c.height);
-                // Draw floating selection if exists
                 if (s._sel) _drawSelectionOverlay(id);
+                if (cb) cb();
             };
             img.src = last;
             return;
@@ -1360,38 +1429,108 @@ function _redrawAnnotCanvas(id) {
     }
     s.ctx.clearRect(0, 0, c.width, c.height);
     if (s._sel) _drawSelectionOverlay(id);
+    if (cb) cb();
 }
 
 function _drawSelectionOverlay(id) {
     const s = _annotState[id]; if (!s || !s._sel) return;
     const sel = s._sel;
-    // Draw the floating image
-    if (sel.img) {
+    // Draw the content being moved at its current position
+    if (sel.phase !== 'select' && sel.img) {
         s.ctx.drawImage(sel.img, sel.x, sel.y, sel.w, sel.h);
     }
-    // Draw selection rectangle border (marching ants)
+    // Draw marching-ants selection rectangle
+    const rx = sel.phase === 'select' ? Math.min(sel.startX, sel.x) : sel.x;
+    const ry = sel.phase === 'select' ? Math.min(sel.startY, sel.y) : sel.y;
+    const rw = sel.phase === 'select' ? sel.w : sel.w;
+    const rh = sel.phase === 'select' ? sel.h : sel.h;
     s.ctx.save();
-    s.ctx.strokeStyle = '#059669';
-    s.ctx.lineWidth = 2;
-    s.ctx.setLineDash([6, 4]);
-    s.ctx.strokeRect(sel.x, sel.y, sel.w, sel.h);
-    // Corner handles
-    const hs = 6;
-    s.ctx.fillStyle = '#059669';
-    s.ctx.setLineDash([]);
-    [[sel.x, sel.y],[sel.x+sel.w, sel.y],[sel.x, sel.y+sel.h],[sel.x+sel.w, sel.y+sel.h]].forEach(([cx,cy]) => {
-        s.ctx.fillRect(cx - hs/2, cy - hs/2, hs, hs);
-    });
+    s.ctx.strokeStyle = '#3b82f6';
+    s.ctx.lineWidth = 1.5;
+    s.ctx.setLineDash([6, 3]);
+    s.ctx.strokeRect(rx, ry, rw, rh);
+    if (sel.phase !== 'select') {
+        // Fill hint
+        s.ctx.fillStyle = 'rgba(59,130,246,0.05)';
+        s.ctx.fillRect(rx, ry, rw, rh);
+        // Corner handles
+        const hs = 8; s.ctx.setLineDash([]); s.ctx.fillStyle = '#3b82f6';
+        [[rx,ry],[rx+rw,ry],[rx,ry+rh],[rx+rw,ry+rh]].forEach(([cx,cy]) => {
+            s.ctx.beginPath(); s.ctx.arc(cx, cy, hs/2, 0, Math.PI*2); s.ctx.fill();
+        });
+    }
     s.ctx.restore();
+}
+
+// ── Shape drawing helpers ──
+function _drawShape(ctx, tool, x1, y1, x2, y2, color, size) {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = size;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.setLineDash([]);
+    const w = x2 - x1, h = y2 - y1;
+    if (tool === 'rect') {
+        ctx.strokeRect(x1, y1, w, h);
+    } else if (tool === 'circle') {
+        ctx.beginPath();
+        ctx.ellipse(x1 + w/2, y1 + h/2, Math.abs(w/2), Math.abs(h/2), 0, 0, Math.PI*2);
+        ctx.stroke();
+    } else if (tool === 'line') {
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    } else if (tool === 'arrow') {
+        const dx = x2 - x1, dy = y2 - y1;
+        const angle = Math.atan2(dy, dx);
+        const headLen = Math.min(30, Math.sqrt(dx*dx+dy*dy)*0.35) + size*2;
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI/6), y2 - headLen * Math.sin(angle - Math.PI/6));
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI/6), y2 - headLen * Math.sin(angle + Math.PI/6));
+        ctx.stroke();
+    }
+    ctx.restore();
 }
 
 function _annotStart(e, id, canvas) {
     const s = _annotState[id]; if (!s) return;
     const pos = _getPos(e, canvas);
 
+    // Close any open text overlay if clicking elsewhere
+    const textOverlay = document.getElementById('annot-text-input-overlay');
+    if (textOverlay && textOverlay.classList.contains('visible') && s._textPending && s._textPending.assignId === id) {
+        window._annotTextOk();
+        return;
+    }
+
+    // ── TEXT tool — show inline overlay ──
+    if (s.tool === 'text') {
+        s._textPending = { canvasX: pos.x, canvasY: pos.y, assignId: id };
+        const canvasRect = canvas.getBoundingClientRect();
+        const screenX = canvasRect.left + (pos.x * (canvasRect.width / canvas.width));
+        const screenY = canvasRect.top  + (pos.y * (canvasRect.height / canvas.height));
+        const overlay = document.getElementById('annot-text-input-overlay');
+        const box = document.getElementById('annot-text-input-box');
+        if (overlay && box) {
+            box.value = '';
+            box.style.color = s.color;
+            box.style.fontSize = s.fontSize + 'px';
+            const ow = 240, oh = 110;
+            let ox = Math.min(screenX, window.innerWidth - ow - 8);
+            let oy = Math.min(screenY, window.innerHeight - oh - 8);
+            overlay.style.left = Math.max(8, ox) + 'px';
+            overlay.style.top  = Math.max(8, oy) + 'px';
+            overlay.classList.add('visible');
+            setTimeout(() => box.focus(), 40);
+        }
+        return;
+    }
+
     // ── SELECT tool ──
     if (s.tool === 'select') {
-        // If we have a floating selection, check if click is inside it → start dragging
+        // If we have a floating selection, check if click is inside → start dragging
         if (s._sel && s._sel.phase === 'float') {
             const sel = s._sel;
             if (pos.x >= sel.x && pos.x <= sel.x + sel.w && pos.y >= sel.y && pos.y <= sel.y + sel.h) {
@@ -1401,34 +1540,30 @@ function _annotStart(e, id, canvas) {
                 s.drawing = true;
                 return;
             } else {
-                // Clicked outside — commit the selection and start fresh
+                // Clicked outside — commit and start fresh
                 _commitSelection(id);
             }
         }
-        // Start drawing a new selection rectangle
-        s._sel = { img: null, x: pos.x, y: pos.y, w: 0, h: 0, startX: pos.x, startY: pos.y, dragOffX: 0, dragOffY: 0, phase: 'select' };
+        // Start drawing a new selection rectangle (NO cutting yet)
+        s._sel = { phase: 'select', startX: pos.x, startY: pos.y, x: pos.x, y: pos.y, w: 0, h: 0, img: null, _origX:0, _origY:0, _snapshot: null };
         s.drawing = true;
         return;
     }
 
-    // ── If there's a floating selection and user switches to another tool, commit it first ──
-    if (s._sel && s._sel.phase === 'float') {
-        _commitSelection(id);
-    }
+    // ── If there's a floating selection and user uses another tool, commit it ──
+    if (s._sel && s._sel.phase === 'float') { _commitSelection(id); }
 
-    // ── TEXT tool ──
-    if (s.tool === 'text') {
-        const txt = prompt('Enter text to add to annotation:');
-        if (txt) {
-            s.ctx.font = `bold ${Math.max(14, s.size*5)}px Inter, sans-serif`;
-            s.ctx.fillStyle = s.color;
-            s.ctx.fillText(txt, pos.x, pos.y);
-            _saveAnnotHistory(id);
-        }
+    // ── Shape tools (rect, circle, line, arrow) ──
+    const SHAPE_TOOLS = ['rect','circle','line','arrow'];
+    if (SHAPE_TOOLS.includes(s.tool)) {
+        // Save snapshot before shape starts
+        s._shapeStart = { x: pos.x, y: pos.y };
+        s._shapeSnapshot = canvas.toDataURL();
+        s.drawing = true;
         return;
     }
 
-    // ── PEN / ERASER ──
+    // ── PEN / HIGHLIGHTER / ERASER ──
     s.drawing = true;
     s.ctx.beginPath();
     s.ctx.moveTo(pos.x, pos.y);
@@ -1445,15 +1580,14 @@ function _annotDraw(e, id, canvas) {
         sel.y = Math.min(sel.startY, pos.y);
         sel.w = Math.abs(pos.x - sel.startX);
         sel.h = Math.abs(pos.y - sel.startY);
-        // Redraw canvas and show selection rect
         _redrawAnnotCanvas(id);
-        // Draw the selection rectangle (visual feedback)
+        // Draw live selection rectangle
         s.ctx.save();
         s.ctx.strokeStyle = '#3b82f6';
         s.ctx.lineWidth = 1.5;
         s.ctx.setLineDash([6, 3]);
         s.ctx.strokeRect(sel.x, sel.y, sel.w, sel.h);
-        s.ctx.fillStyle = 'rgba(59,130,246,0.08)';
+        s.ctx.fillStyle = 'rgba(59,130,246,0.06)';
         s.ctx.fillRect(sel.x, sel.y, sel.w, sel.h);
         s.ctx.restore();
         return;
@@ -1467,9 +1601,37 @@ function _annotDraw(e, id, canvas) {
         return;
     }
 
+    // ── SHAPE TOOLS: live preview ──
+    const SHAPE_TOOLS = ['rect','circle','line','arrow'];
+    if (SHAPE_TOOLS.includes(s.tool) && s._shapeStart && s._shapeSnapshot) {
+        // Restore snapshot then draw preview
+        const snapImg = new Image();
+        snapImg.onload = () => {
+            s.ctx.clearRect(0, 0, canvas.width, canvas.height);
+            s.ctx.drawImage(snapImg, 0, 0);
+            _drawShape(s.ctx, s.tool, s._shapeStart.x, s._shapeStart.y, pos.x, pos.y, s.color, s.size);
+        };
+        snapImg.src = s._shapeSnapshot;
+        return;
+    }
+
     // ── ERASER ──
     if (s.tool === 'eraser') {
         s.ctx.clearRect(pos.x - s.size*2, pos.y - s.size*2, s.size*4, s.size*4);
+        return;
+    }
+
+    // ── HIGHLIGHTER ──
+    if (s.tool === 'highlighter') {
+        s.ctx.save();
+        s.ctx.globalAlpha = 0.35;
+        s.ctx.strokeStyle = s.color;
+        s.ctx.lineWidth = s.size * 5;
+        s.ctx.lineCap = 'square';
+        s.ctx.lineJoin = 'square';
+        s.ctx.lineTo(pos.x, pos.y);
+        s.ctx.stroke();
+        s.ctx.restore();
         return;
     }
 
@@ -1485,32 +1647,24 @@ function _annotDraw(e, id, canvas) {
 function _annotStop(id) {
     const s = _annotState[id]; if (!s) return;
 
-    // ── SELECT: finished drawing selection rect → lift the area ──
+    // ── SELECT: finished drawing selection rect → lift the area without cutting ──
     if (s.tool === 'select' && s._sel && s._sel.phase === 'select' && s.drawing) {
         s.drawing = false;
         const sel = s._sel;
-        // Need minimum size to count
-        if (sel.w < 4 || sel.h < 4) {
-            s._sel = null;
-            _redrawAnnotCanvas(id);
-            return;
-        }
+        if (sel.w < 4 || sel.h < 4) { s._sel = null; _redrawAnnotCanvas(id); return; }
         const c = document.getElementById('annot-canvas-'+id); if (!c) return;
-        // Capture the selected region as an image
+        // Capture selected pixels as image (for preview when dragging)
         const selCanvas = document.createElement('canvas');
-        selCanvas.width = sel.w;
-        selCanvas.height = sel.h;
-        const selCtx = selCanvas.getContext('2d');
-        selCtx.drawImage(c, sel.x, sel.y, sel.w, sel.h, 0, 0, sel.w, sel.h);
+        selCanvas.width = sel.w; selCanvas.height = sel.h;
+        selCanvas.getContext('2d').drawImage(c, sel.x, sel.y, sel.w, sel.h, 0, 0, sel.w, sel.h);
         const selImg = new Image();
         selImg.onload = () => {
             sel.img = selImg;
+            sel._origX = sel.x; sel._origY = sel.y;
+            // Save a snapshot of the canvas BEFORE erasing the selected area
+            sel._snapshot = c.toDataURL();
             sel.phase = 'float';
-            // Erase the original area from the canvas
-            s.ctx.clearRect(sel.x, sel.y, sel.w, sel.h);
-            _saveAnnotHistory(id); // save the state with area cut out
-            // Draw the floating selection overlay
-            _drawSelectionOverlay(id);
+            _redrawAnnotCanvas(id);
         };
         selImg.src = selCanvas.toDataURL();
         return;
@@ -1519,13 +1673,25 @@ function _annotStop(id) {
     // ── SELECT: finished dragging ──
     if (s.tool === 'select' && s._sel && s._sel.phase === 'drag' && s.drawing) {
         s.drawing = false;
-        s._sel.phase = 'float'; // back to float, user can drag again or click away to commit
+        s._sel.phase = 'float';
         _redrawAnnotCanvas(id);
+        return;
+    }
+
+    // ── SHAPE TOOLS: commit final shape ──
+    const SHAPE_TOOLS = ['rect','circle','line','arrow'];
+    if (SHAPE_TOOLS.includes(s.tool) && s._shapeStart && s._shapeSnapshot && s.drawing) {
+        s.drawing = false;
+        // The shape is already drawn in the live preview; just save history
+        s._shapeStart = null;
+        s._shapeSnapshot = null;
+        _saveAnnotHistory(id);
         return;
     }
 
     if (!s.drawing) return;
     s.drawing = false;
+    if (s.tool === 'highlighter') { s.ctx.restore && s.ctx.restore(); }
     _saveAnnotHistory(id);
 }
 
@@ -1533,8 +1699,49 @@ function _saveAnnotHistory(id) {
     const s = _annotState[id]; if (!s) return;
     const c = document.getElementById('annot-canvas-'+id); if (!c) return;
     s.history.push(c.toDataURL());
-    if (s.history.length > 30) s.history.shift();
+    if (s.history.length > 40) s.history.shift();
 }
+
+// ── Inline text overlay handlers ──
+window._annotTextOk = () => {
+    const overlay = document.getElementById('annot-text-input-overlay');
+    const box = document.getElementById('annot-text-input-box');
+    if (!overlay || !box) return;
+    // Find which assignment is active
+    let id = null;
+    for (const key of Object.keys(_annotState)) {
+        if (_annotState[key]._textPending && _annotState[key]._textPending.assignId === key) { id = key; break; }
+    }
+    // Try all states
+    if (!id) {
+        for (const key of Object.keys(_annotState)) {
+            if (_annotState[key]._textPending) { id = key; break; }
+        }
+    }
+    overlay.classList.remove('visible');
+    if (!id) return;
+    const s = _annotState[id];
+    const txt = box.value.trim();
+    if (txt && s && s.ctx && s._textPending) {
+        const { canvasX, canvasY } = s._textPending;
+        s.ctx.save();
+        s.ctx.font = `bold ${s.fontSize || 18}px Inter, sans-serif`;
+        s.ctx.fillStyle = s.color;
+        s.ctx.globalAlpha = 1;
+        // Multi-line support
+        const lines = txt.split('\n');
+        const lineH = (s.fontSize || 18) * 1.35;
+        lines.forEach((line, i) => s.ctx.fillText(line, canvasX, canvasY + i * lineH));
+        s.ctx.restore();
+        _saveAnnotHistory(id);
+    }
+    s._textPending = null;
+};
+window._annotTextCancel = () => {
+    const overlay = document.getElementById('annot-text-input-overlay');
+    if (overlay) overlay.classList.remove('visible');
+    for (const key of Object.keys(_annotState)) { _annotState[key]._textPending = null; }
+};
 
 window.setAnnotTool = (id, tool) => {
     const s = _annotState[id]; if (!s) return;
@@ -1543,26 +1750,34 @@ window.setAnnotTool = (id, tool) => {
     if (s._sel && s._sel.phase === 'float' && tool !== 'select') {
         _commitSelection(id);
     }
+    // Close text overlay
+    const overlay = document.getElementById('annot-text-input-overlay');
+    if (overlay && overlay.classList.contains('visible')) window._annotTextCancel();
 
     s.tool = tool;
-    ['select','pen','text','eraser'].forEach(t => {
+    const allTools = ['select','pen','highlighter','text','rect','circle','arrow','line','eraser'];
+    allTools.forEach(t => {
         const btn = document.getElementById('tool-'+t+'-'+id);
         if (!btn) return;
         btn.classList.toggle('active', t === tool);
     });
     const hints = {
-        select: '<i class="fas fa-mouse-pointer mr-1"></i>Select — drag a rectangle to select, then move it',
-        pen: '<i class="fas fa-pen mr-1"></i>Pen — click and drag to draw',
-        text: '<i class="fas fa-font mr-1"></i>Text — click on canvas to add a label',
-        eraser: '<i class="fas fa-eraser mr-1"></i>Eraser — drag to erase areas'
+        select:      '<i class="fas fa-mouse-pointer mr-1"></i>Select — drag a rectangle to pick, then drag to move',
+        pen:         '<i class="fas fa-pen mr-1"></i>Pen — click and drag to draw',
+        highlighter: '<i class="fas fa-highlighter mr-1"></i>Highlighter — drag to highlight text',
+        text:        '<i class="fas fa-font mr-1"></i>Text — click where you want to type',
+        rect:        '<i class="fas fa-square mr-1"></i>Rectangle — drag to draw a rectangle',
+        circle:      '<i class="fas fa-circle mr-1"></i>Circle — drag to draw an ellipse',
+        arrow:       '<i class="fas fa-arrow-right mr-1"></i>Arrow — drag to draw an arrow',
+        line:        '<i class="fas fa-minus mr-1"></i>Line — drag to draw a straight line',
+        eraser:      '<i class="fas fa-eraser mr-1"></i>Eraser — drag to erase areas'
     };
     const hint = document.getElementById('annot-hint-'+id);
     if (hint) hint.innerHTML = hints[tool] || '';
 
-    // Update cursor
     const canvas = document.getElementById('annot-canvas-'+id);
     if (canvas) {
-        canvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
+        canvas.style.cursor = tool === 'select' ? 'default' : tool === 'text' ? 'text' : 'crosshair';
     }
 };
 
@@ -1577,15 +1792,9 @@ window.setAnnotColor = (id, color) => {
 
 window.undoAnnot = (id) => {
     const s = _annotState[id]; if (!s) return;
-    // If there's a floating selection, discard it (undo the cut)
+    // If there's a floating selection, cancel it (restore original)
     if (s._sel) {
-        s._sel = null;
-        if (s.history.length > 0) {
-            const c = document.getElementById('annot-canvas-'+id); if (!c) return;
-            const img = new Image();
-            img.onload = () => { s.ctx.clearRect(0,0,c.width,c.height); s.ctx.drawImage(img,0,0); };
-            img.src = s.history[s.history.length-1];
-        }
+        _cancelSelection(id);
         return;
     }
     if (s.history.length < 2) return;
@@ -1932,19 +2141,25 @@ window.submitAnnotation = async (id) => {
         await updateDoc(doc(db,'homework_assignments',id), {
             status: 'submitted',
             submittedAt: new Date(),
-            annotationUrl: annotUrl
+            annotationUrl: annotUrl,
+            annotationSubmittedAt: new Date(),
+            hasAnnotation: true
         });
 
-        // 4) Send to tutor's conversation
+        // 4) Send to tutor's conversation AND create tutor notification
         if (window.currentStudent) {
             try {
                 const convSnap = await getDocs(query(collection(db,'conversations'), where('studentId','==',window.currentStudent.id)));
                 const convId = convSnap.docs[0]?.id;
+                const convData = convSnap.docs[0]?.data();
+                const tutorId = convData?.tutorId || convData?.teacherId || null;
+
                 if (convId) {
                     const assignSnap = await getDoc(doc(db,'homework_assignments',id));
                     const aTitle = assignSnap.exists() ? (assignSnap.data().title||'Assignment') : 'Assignment';
                     const pageCount = s && s._pageAnnotations ? Object.keys(s._pageAnnotations).filter(k => s._pageAnnotations[k] && s._pageAnnotations[k] !== '').length : 0;
                     const pageNote = pageCount > 1 ? ` (${pageCount} pages annotated)` : '';
+                    // Message in conversation
                     await addDoc(collection(db,'conversations',convId,'messages'), {
                         content: `📝 Annotated work for: "${aTitle}"${pageNote}`,
                         imageUrl: annotUrl,
@@ -1952,16 +2167,36 @@ window.submitAnnotation = async (id) => {
                         senderName: window.currentStudent.name,
                         senderRole: 'student',
                         createdAt: new Date(),
-                        read: false
+                        read: false,
+                        type: 'annotation_submission',
+                        assignmentId: id,
+                        assignmentTitle: aTitle,
+                        annotationUrl: annotUrl
                     });
                     const cSnap = await getDoc(doc(db,'conversations',convId));
                     const cur = cSnap.exists() ? (cSnap.data().unreadCount||0) : 0;
                     await updateDoc(doc(db,'conversations',convId), {
-                        lastMessage: '📝 Submitted annotated work',
+                        lastMessage: `📝 ${window.currentStudent.name} submitted annotated work: "${aTitle}"`,
                         lastMessageTimestamp: new Date(),
                         lastSenderId: window.currentStudent.id,
-                        unreadCount: cur + 1
+                        unreadCount: cur + 1,
+                        hasUnreadAnnotation: true
                     });
+                    // Dedicated tutor notification doc
+                    if (tutorId) {
+                        await addDoc(collection(db,'tutor_notifications'), {
+                            tutorId: tutorId,
+                            type: 'annotation_submitted',
+                            studentId: window.currentStudent.id,
+                            studentName: window.currentStudent.name,
+                            assignmentId: id,
+                            assignmentTitle: aTitle,
+                            annotationUrl: annotUrl,
+                            convId: convId,
+                            createdAt: new Date(),
+                            read: false
+                        });
+                    }
                 }
             } catch(msgErr) { console.warn('Could not send to conversation:', msgErr); }
         }
@@ -2046,6 +2281,8 @@ window.submitWork = async (id) => {
             try {
                 const convSnap = await getDocs(query(collection(db,'conversations'), where('studentId','==',window.currentStudent.id)));
                 const convId = convSnap.docs[0]?.id;
+                const convData = convSnap.docs[0]?.data();
+                const tutorId = convData?.tutorId || convData?.teacherId || null;
                 if (convId) {
                     const assignSnap = await getDoc(doc(db,'homework_assignments',id));
                     const aTitle = assignSnap.exists() ? (assignSnap.data().title||'Assignment') : 'Assignment';
@@ -2057,16 +2294,37 @@ window.submitWork = async (id) => {
                         senderName: window.currentStudent.name,
                         senderRole: 'student',
                         createdAt: new Date(),
-                        read: false
+                        read: false,
+                        type: annotUrl ? 'annotation_submission' : 'work_submission',
+                        assignmentId: id,
+                        assignmentTitle: aTitle,
+                        ...(annotUrl ? {annotationUrl: annotUrl} : {})
                     });
                     const cSnap = await getDoc(doc(db,'conversations',convId));
                     const cur = cSnap.exists() ? (cSnap.data().unreadCount||0) : 0;
                     await updateDoc(doc(db,'conversations',convId), {
-                        lastMessage: annotUrl ? '📎 Submitted annotated work' : '📎 Submitted work',
+                        lastMessage: annotUrl ? `📎 ${window.currentStudent.name} submitted annotated work` : `📎 ${window.currentStudent.name} submitted work`,
                         lastMessageTimestamp: new Date(),
                         lastSenderId: window.currentStudent.id,
-                        unreadCount: cur + 1
+                        unreadCount: cur + 1,
+                        ...(annotUrl ? {hasUnreadAnnotation: true} : {})
                     });
+                    // Dedicated tutor notification doc
+                    if (tutorId) {
+                        await addDoc(collection(db,'tutor_notifications'), {
+                            tutorId: tutorId,
+                            type: annotUrl ? 'annotation_submitted' : 'work_submitted',
+                            studentId: window.currentStudent.id,
+                            studentName: window.currentStudent.name,
+                            assignmentId: id,
+                            assignmentTitle: aTitle,
+                            ...(annotUrl ? {annotationUrl: annotUrl} : {}),
+                            ...(subUrl ? {submissionUrl: subUrl} : {}),
+                            convId: convId,
+                            createdAt: new Date(),
+                            read: false
+                        });
+                    }
                 }
             } catch(msgErr) { console.warn('Could not send to conversation:', msgErr); }
         }
@@ -2825,5 +3083,13 @@ async function loadLeaderboard(){
 
 }); // end DOMContentLoaded
 </script>
+<!-- Inline annotation text input overlay -->
+<div id="annot-text-input-overlay">
+    <textarea id="annot-text-input-box" placeholder="Type your text here..." rows="3"></textarea>
+    <div id="annot-text-input-actions">
+        <button id="annot-text-cancel" onclick="window._annotTextCancel()">Cancel</button>
+        <button id="annot-text-ok" onclick="window._annotTextOk()">Add Text ✓</button>
+    </div>
+</div>
 </body>
 </html>
