@@ -349,9 +349,27 @@ const user = await new Promise(resolve => {
 
 function loadContent(hw) {
   const area = document.getElementById('canvas-area');
+  const url = hw.submissionUrl || hw.imageUrl || hw.fileUrl || '';
+  const fileName = hw.fileName || hw.submissionFileName || url.split('/').pop().split('?')[0] || '';
 
-  if (hw.imageUrl || hw.fileUrl) {
-    const url = hw.imageUrl || hw.fileUrl;
+  // Determine file extension
+  function getExtFromUrl(u) {
+    try { return new URL(u).pathname.split('.').pop().toLowerCase(); } catch(e) { return ''; }
+  }
+  const ext = (fileName.split('.').pop() || getExtFromUrl(url) || '').toLowerCase();
+
+  // File type categories
+  const imageExts = ['jpg','jpeg','png','gif','webp','bmp','svg','tiff','ico'];
+  const pdfExts = ['pdf'];
+  const docExts = ['doc','docx','odt','rtf'];
+  const spreadsheetExts = ['xls','xlsx','csv'];
+  const presentationExts = ['ppt','pptx'];
+  const videoExts = ['mp4','webm','ogg','avi','mov','mkv'];
+  const audioExts = ['mp3','wav','ogg','m4a','aac','flac','wma'];
+  const textExts = ['txt','csv','json','xml','html','css','js','py','java','c','cpp','md','yaml','yml','log','ini','sh','bat','ts','rb','php','sql'];
+
+  if (url && imageExts.includes(ext)) {
+    // ── IMAGE: Full annotation canvas support ──
     const img = document.createElement('img');
     img.id           = 'hw-img';
     img.crossOrigin  = 'anonymous';
@@ -381,9 +399,108 @@ function loadContent(hw) {
       area.innerHTML = infoBox('🖼️', 'Image unavailable.', 'The file may have expired. You can still write feedback and save the grade.');
     };
 
-    img.src = url; // set src after event handlers
+    img.src = url;
+
+  } else if (url && pdfExts.includes(ext)) {
+    // ── PDF: Embedded iframe viewer ──
+    area.innerHTML = `
+      <div style="display:flex;flex-direction:column;height:100%;min-height:500px;">
+        <div style="padding:8px 12px;background:#f1f5f9;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:8px;border-bottom:1px solid #e2e8f0;">
+          <span style="font-size:1.2rem;">📄</span>
+          <span style="font-size:.8rem;font-weight:700;color:#334155;">PDF Document</span>
+          <a href="${url}" target="_blank" rel="noopener" style="margin-left:auto;font-size:.72rem;color:#2563eb;text-decoration:underline;">Open in new tab ↗</a>
+        </div>
+        <iframe src="${url}" style="flex:1;width:100%;min-height:500px;border:none;border-radius:0 0 10px 10px;" allowfullscreen></iframe>
+      </div>`;
+
+  } else if (url && (docExts.includes(ext) || spreadsheetExts.includes(ext) || presentationExts.includes(ext))) {
+    // ── DOCUMENTS / SPREADSHEETS / PRESENTATIONS: Google Docs viewer ──
+    const encodedUrl = encodeURIComponent(url);
+    const typeLabel = docExts.includes(ext) ? 'Document' : spreadsheetExts.includes(ext) ? 'Spreadsheet' : 'Presentation';
+    const typeIcon = docExts.includes(ext) ? '📝' : spreadsheetExts.includes(ext) ? '📊' : '📽️';
+    area.innerHTML = `
+      <div style="display:flex;flex-direction:column;height:100%;min-height:500px;">
+        <div style="padding:8px 12px;background:#f1f5f9;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:8px;border-bottom:1px solid #e2e8f0;">
+          <span style="font-size:1.2rem;">${typeIcon}</span>
+          <span style="font-size:.8rem;font-weight:700;color:#334155;">${typeLabel}: ${fileName || ext.toUpperCase()}</span>
+          <a href="${url}" target="_blank" rel="noopener" style="margin-left:auto;font-size:.72rem;color:#2563eb;text-decoration:underline;">Download ↗</a>
+        </div>
+        <iframe src="https://docs.google.com/gview?url=${encodedUrl}&embedded=true" style="flex:1;width:100%;min-height:500px;border:none;border-radius:0 0 10px 10px;" allowfullscreen></iframe>
+      </div>`;
+
+  } else if (url && videoExts.includes(ext)) {
+    // ── VIDEO: Native HTML5 player ──
+    area.innerHTML = `
+      <div style="display:flex;flex-direction:column;height:100%;">
+        <div style="padding:8px 12px;background:#f1f5f9;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:8px;border-bottom:1px solid #e2e8f0;">
+          <span style="font-size:1.2rem;">🎬</span>
+          <span style="font-size:.8rem;font-weight:700;color:#334155;">Video Submission</span>
+          <a href="${url}" target="_blank" rel="noopener" style="margin-left:auto;font-size:.72rem;color:#2563eb;text-decoration:underline;">Download ↗</a>
+        </div>
+        <div style="background:#000;border-radius:0 0 10px 10px;padding:16px;display:flex;align-items:center;justify-content:center;">
+          <video controls style="max-width:100%;max-height:70vh;border-radius:8px;" preload="metadata">
+            <source src="${url}" type="video/${ext === 'mov' ? 'quicktime' : ext === 'mkv' ? 'x-matroska' : ext === 'avi' ? 'x-msvideo' : ext}">
+            Your browser does not support this video format.
+          </video>
+        </div>
+      </div>`;
+
+  } else if (url && audioExts.includes(ext)) {
+    // ── AUDIO: Native HTML5 player ──
+    area.innerHTML = `
+      <div style="padding:40px;text-align:center;">
+        <div style="font-size:3rem;margin-bottom:16px;">🎵</div>
+        <p style="font-weight:700;color:#334155;margin-bottom:4px;">Audio Submission</p>
+        <p style="font-size:.8rem;color:#94a3b8;margin-bottom:20px;">${fileName || 'Audio file'}</p>
+        <audio controls style="width:100%;max-width:500px;margin:0 auto;">
+          <source src="${url}" type="audio/${ext === 'm4a' ? 'mp4' : ext === 'wma' ? 'x-ms-wma' : ext}">
+          Your browser does not support this audio format.
+        </audio>
+        <div style="margin-top:12px;"><a href="${url}" target="_blank" rel="noopener" style="font-size:.75rem;color:#2563eb;text-decoration:underline;">Download audio file ↗</a></div>
+      </div>`;
+
+  } else if (url && textExts.includes(ext)) {
+    // ── TEXT/CODE: Fetch and display with formatting ──
+    area.innerHTML = `<div style="padding:24px;text-align:center;"><div class="spinner" style="margin:0 auto 12px;"></div><p style="color:#94a3b8;font-size:.85rem;">Loading text file…</p></div>`;
+    fetch(url)
+      .then(r => r.text())
+      .then(text => {
+        const lines = text.split('\n');
+        const numbered = lines.map((line, i) => 
+          `<tr><td style="color:#94a3b8;text-align:right;padding:0 12px 0 8px;user-select:none;font-size:.72rem;border-right:1px solid #e5e7eb;min-width:36px;">${i+1}</td><td style="padding:0 8px;white-space:pre-wrap;word-break:break-all;">${line.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td></tr>`
+        ).join('');
+        area.innerHTML = `
+          <div style="display:flex;flex-direction:column;height:100%;">
+            <div style="padding:8px 12px;background:#f1f5f9;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:8px;border-bottom:1px solid #e2e8f0;">
+              <span style="font-size:1.2rem;">📃</span>
+              <span style="font-size:.8rem;font-weight:700;color:#334155;">${fileName || 'Text file'} (${lines.length} lines)</span>
+              <a href="${url}" target="_blank" rel="noopener" style="margin-left:auto;font-size:.72rem;color:#2563eb;text-decoration:underline;">Download ↗</a>
+            </div>
+            <div style="flex:1;overflow:auto;max-height:70vh;background:#fafbfc;border-radius:0 0 10px 10px;">
+              <table style="font-family:'Fira Code',monospace,monospace;font-size:.78rem;line-height:1.6;border-collapse:collapse;width:100%;">${numbered}</table>
+            </div>
+          </div>`;
+      })
+      .catch(() => {
+        area.innerHTML = infoBox('📃', 'Could not load text file.', 'The file may require authentication. <a href="' + url + '" target="_blank" style="color:#2563eb;text-decoration:underline;">Try downloading directly ↗</a>');
+      });
+
+  } else if (url) {
+    // ── UNKNOWN FILE TYPE: Try Google Docs viewer with download fallback ──
+    const encodedUrl = encodeURIComponent(url);
+    area.innerHTML = `
+      <div style="display:flex;flex-direction:column;height:100%;min-height:400px;">
+        <div style="padding:8px 12px;background:#f1f5f9;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:8px;border-bottom:1px solid #e2e8f0;">
+          <span style="font-size:1.2rem;">📎</span>
+          <span style="font-size:.8rem;font-weight:700;color:#334155;">File: ${fileName || 'Attachment'}</span>
+          <a href="${url}" target="_blank" rel="noopener" style="margin-left:auto;font-size:.72rem;color:#2563eb;text-decoration:underline;">Download ↗</a>
+        </div>
+        <iframe src="https://docs.google.com/gview?url=${encodedUrl}&embedded=true" style="flex:1;width:100%;min-height:400px;border:none;border-radius:0 0 10px 10px;" allowfullscreen
+          onerror="this.parentElement.innerHTML='${infoBox('📎','Preview unavailable.','<a href=\\'' + url + '\\' target=\\'_blank\\' style=\\'color:#2563eb;text-decoration:underline;\\'>Download the file ↗</a> to view it locally.')}'"></iframe>
+      </div>`;
 
   } else if (hw.answer || hw.content || hw.question) {
+    // ── TEXT SUBMISSION (inline text) ──
     const text = hw.answer || hw.content || hw.question || '';
     const div  = document.createElement('div');
     div.id = 'text-submission';
