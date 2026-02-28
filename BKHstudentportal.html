@@ -358,8 +358,8 @@ let _notifUnsubscribers    = [];
 let _notifData             = { pending: 0, pendingDocs: [], messages: 0, materials: [], convs: [] };
 let _notifLoaded           = false;
 let _prevNotifTotal        = 0;
-const _annotState          = {};
-const _resizeObservers     = {};
+const _annotState          = window._annotState = {};
+const _resizeObservers     = window._resizeObservers = {};
 
 // ══════════════════════════════════════════
 // ── NOTIFICATION SOUNDS (Web Audio API) ──
@@ -931,35 +931,40 @@ window.openWorkspace = async (assignmentId) => {
                     <button id="tool-text-${assignmentId}" class="annot-tool-btn" onclick="setAnnotTool('${assignmentId}','text')" title="Add Text"><i class="fas fa-font"></i></button>
                     <button id="tool-eraser-${assignmentId}" class="annot-tool-btn" onclick="setAnnotTool('${assignmentId}','eraser')" title="Eraser"><i class="fas fa-eraser"></i></button>
                     <span class="text-xs font-semibold text-gray-500 ml-1">Size:</span>
-                    <input type="range" id="brush-size-${assignmentId}" min="1" max="20" value="3" class="w-20" oninput="_annotState['${assignmentId}']&&(_annotState['${assignmentId}'].size=+this.value)">
+                    <input type="range" id="brush-size-${assignmentId}" min="1" max="20" value="3" class="w-20" oninput="window._annotState&amp;&amp;window._annotState['${assignmentId}']&amp;&amp;(window._annotState['${assignmentId}'].size=+this.value)">
                     <span class="text-xs font-semibold text-gray-500 ml-1">Color:</span>
                     ${colorDots}
                     <button onclick="undoAnnot('${assignmentId}')" class="ml-1 px-2 py-1 text-xs bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300" title="Undo"><i class="fas fa-undo"></i></button>
                     <button onclick="clearAnnotCanvas('${assignmentId}')" class="px-2 py-1 text-xs bg-red-100 text-red-600 rounded-lg hover:bg-red-200" title="Clear"><i class="fas fa-trash-alt"></i></button>
                 </div>
-                ${isPdf && fileUrl
-                    ? `<div id="annot-pdf-controls-${assignmentId}" class="flex items-center gap-2 mb-2 text-xs">
-                        <button onclick="annotPdfPage('${assignmentId}',-1)" class="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 font-bold">◀ Prev</button>
-                        <span id="annot-pdf-pageinfo-${assignmentId}" class="text-gray-500">Page 1 / ?</span>
-                        <button onclick="annotPdfPage('${assignmentId}',1)" class="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 font-bold">Next ▶</button>
-                      </div>
-                      <div id="annot-wrapper-${assignmentId}" style="position:relative;display:inline-block;width:100%;max-width:100%;">
-                        <canvas id="annot-bg-canvas-${assignmentId}" style="display:block;border-radius:10px;border:1px solid #e5e7eb;max-width:100%;"></canvas>
+                ${fileUrl
+                    ? `<div id="annot-wrapper-${assignmentId}" style="position:relative;display:inline-block;width:100%;max-width:100%;min-height:200px;">
+                        ${isImage
+                            ? `<img id="annot-bg-${assignmentId}" src="${escH(fileUrl)}" style="max-width:100%;display:block;border-radius:10px;border:1px solid #e5e7eb;" onerror="this.style.display='none';document.getElementById('annot-fallback-${assignmentId}').style.display='block';">
+                               <div id="annot-fallback-${assignmentId}" style="display:none;width:100%;height:500px;border-radius:10px;border:1px solid #e5e7eb;overflow:hidden;">
+                                   <iframe src="${escH(fileUrl)}" style="width:100%;height:100%;border:none;"></iframe>
+                               </div>`
+                            : isPdf
+                            ? `<div id="annot-bg-frame-${assignmentId}" style="width:100%;height:600px;border-radius:10px;border:1px solid #e5e7eb;overflow:hidden;background:#f5f5f5;">
+                                   <div id="annot-pdf-loading-${assignmentId}" style="text-align:center;padding:40px;color:#9ca3af;">
+                                       <i class="fas fa-spinner fa-spin" style="font-size:2rem;margin-bottom:10px;display:block;"></i>
+                                       <span>Loading PDF...</span>
+                                   </div>
+                                   <canvas id="annot-bg-canvas-${assignmentId}" style="display:none;max-width:100%;"></canvas>
+                                   <iframe id="annot-bg-iframe-${assignmentId}" style="display:none;width:100%;height:100%;border:none;"></iframe>
+                               </div>
+                               <div id="annot-pdf-controls-${assignmentId}" class="hidden flex items-center gap-2 mt-2 text-xs">
+                                   <button onclick="annotPdfPage('${assignmentId}',-1)" class="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 font-bold">◀ Prev</button>
+                                   <span id="annot-pdf-pageinfo-${assignmentId}" class="text-gray-500">Page 1 / ?</span>
+                                   <button onclick="annotPdfPage('${assignmentId}',1)" class="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 font-bold">Next ▶</button>
+                               </div>`
+                            : `<div id="annot-bg-frame-${assignmentId}" style="width:100%;height:500px;border-radius:10px;border:1px solid #e5e7eb;overflow:hidden;">
+                                   <iframe src="${escH(fileUrl)}" style="width:100%;height:100%;border:none;"></iframe>
+                               </div>`
+                        }
                         <canvas id="annot-canvas-${assignmentId}" style="position:absolute;top:0;left:0;cursor:crosshair;border-radius:10px;"></canvas>
-                      </div>`
-                    : isImage && fileUrl
-                    ? `<div id="annot-wrapper-${assignmentId}" style="position:relative;display:inline-block;width:100%;max-width:100%;">
-                        <img id="annot-bg-${assignmentId}" src="${escH(fileUrl)}" style="max-width:100%;display:block;border-radius:10px;border:1px solid #e5e7eb;">
-                        <canvas id="annot-canvas-${assignmentId}" style="position:absolute;top:0;left:0;cursor:crosshair;border-radius:10px;"></canvas>
-                       </div>`
-                    : fileUrl
-                    ? `<div id="annot-wrapper-${assignmentId}" style="position:relative;display:inline-block;width:100%;max-width:100%;">
-                        <div id="annot-file-frame-${assignmentId}" style="width:100%;min-height:500px;border-radius:10px;border:1px solid #e5e7eb;overflow:hidden;background:#fff;">
-                            <iframe src="${escH(fileUrl)}" style="width:100%;height:500px;border:none;" id="annot-iframe-${assignmentId}"></iframe>
-                        </div>
-                        <canvas id="annot-canvas-${assignmentId}" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:10px;pointer-events:auto;"></canvas>
                        </div>
-                       <p class="text-xs text-amber-600 mt-1"><i class="fas fa-info-circle mr-1"></i>Drawing on top of the document. Your annotations are saved as an overlay image.</p>`
+                       ${!isImage ? '<p class="text-xs text-amber-600 mt-1"><i class="fas fa-info-circle mr-1"></i>Draw your annotations directly on top of the document.</p>' : ''}`
                     : `<canvas id="annot-canvas-${assignmentId}" width="580" height="380"
                         style="border:2px dashed #d1d5db;border-radius:12px;cursor:crosshair;display:block;background:#fff;max-width:100%;"></canvas>`
                 }
@@ -1022,101 +1027,54 @@ window.openWorkspace = async (assignmentId) => {
 };
 
 // ── ANNOTATION CANVAS ENGINE ──
-function initAnnotCanvas(id, isImage, fileUrl) {
+function initAnnotCanvas(id) {
     const canvas = document.getElementById('annot-canvas-' + id);
     if (!canvas) return;
     const s = _annotState[id];
-    const isPdf = s && s.isPdf;
+    if (!s) return;
+    const { isImage, isPdf, fileUrl } = s;
 
-    // ─── PDF: render via PDF.js ───
-    if (isPdf && fileUrl && window.pdfjsLib) {
-        const bgCanvas = document.getElementById('annot-bg-canvas-' + id);
-        if (!bgCanvas) return;
-        
-        const loadPdf = async () => {
-            try {
-                const pdfDoc = await pdfjsLib.getDocument({ url: fileUrl, withCredentials: false }).promise;
-                if (s) { s._pdfDoc = pdfDoc; s._pdfTotal = pdfDoc.numPages; s._pdfPage = 1; }
-                const info = document.getElementById('annot-pdf-pageinfo-' + id);
-                if (info) info.textContent = 'Page 1 / ' + pdfDoc.numPages;
-                await renderPdfPage(id, 1);
-            } catch(err) {
-                console.error('PDF load error:', err);
-                // Fallback: try loading via Google Docs Viewer as image
-                bgCanvas.style.display = 'none';
-                const wrapper = document.getElementById('annot-wrapper-' + id);
-                if (wrapper) {
-                    const fallbackFrame = document.createElement('iframe');
-                    fallbackFrame.src = 'https://docs.google.com/gview?url=' + encodeURIComponent(fileUrl) + '&embedded=true';
-                    fallbackFrame.style.cssText = 'width:100%;height:600px;border:none;border-radius:10px;';
-                    wrapper.insertBefore(fallbackFrame, canvas);
-                    canvas.style.width = '100%';
-                    canvas.style.height = '600px';
-                    canvas.width = 800;
-                    canvas.height = 600;
-                }
-            }
-        };
-        loadPdf();
-
-        const ctx = canvas.getContext('2d');
-        if (s) s.ctx = ctx;
-        _saveAnnotHistory(id);
-        _attachCanvasListeners(canvas, id);
-        return;
+    // Helper: size the annotation canvas to match something
+    function sizeCanvasTo(w, h) {
+        canvas.width = w;
+        canvas.height = h;
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
     }
 
-    // ─── IMAGE: load as background ───
+    // ─── IMAGE background ───
     if (isImage && fileUrl) {
         const img = document.getElementById('annot-bg-' + id);
         if (img) {
             const applySize = () => {
-                if (img.naturalWidth === 0 && img.offsetWidth === 0) return;
                 const w = img.offsetWidth || img.naturalWidth || 580;
                 const h = img.offsetHeight || img.naturalHeight || 380;
-                canvas.width = w;
-                canvas.height = h;
-                canvas.style.width = w + 'px';
-                canvas.style.height = h + 'px';
-            };
-            
-            // Handle image load errors (CORS etc.) — reload without crossorigin
-            img.onerror = () => {
-                console.warn('Image load failed, retrying via proxy...');
-                // Try Google proxy as fallback
-                if (!img.dataset.retried) {
-                    img.dataset.retried = '1';
-                    img.src = fileUrl; // retry as-is (sometimes the first load just fails)
-                }
+                sizeCanvasTo(w, h);
             };
 
             if (img.complete && img.naturalWidth > 0) {
                 applySize();
             } else {
-                img.onload = applySize;
+                img.addEventListener('load', applySize);
             }
-            
-            // ResizeObserver for responsive layout
+
+            // Handle image load failure — show fallback iframe
+            img.addEventListener('error', () => {
+                const fb = document.getElementById('annot-fallback-' + id);
+                if (fb) {
+                    fb.style.display = 'block';
+                    img.style.display = 'none';
+                    sizeCanvasTo(fb.offsetWidth || 800, fb.offsetHeight || 500);
+                }
+            });
+
+            // ResizeObserver
             if (window.ResizeObserver) {
                 const observer = new ResizeObserver(() => {
-                    if (img.offsetWidth > 0) {
-                        canvas.width = img.offsetWidth;
-                        canvas.height = img.offsetHeight;
-                        canvas.style.width = img.offsetWidth + 'px';
-                        canvas.style.height = img.offsetHeight + 'px';
-                        // Restore drawing
-                        const st = _annotState[id];
-                        if (st && st.history && st.history.length > 0) {
-                            const lastState = st.history[st.history.length - 1];
-                            if (lastState && lastState !== 'data:,') {
-                                const tempImg = new Image();
-                                tempImg.onload = () => {
-                                    st.ctx.clearRect(0, 0, canvas.width, canvas.height);
-                                    st.ctx.drawImage(tempImg, 0, 0, canvas.width, canvas.height);
-                                };
-                                tempImg.src = lastState;
-                            }
-                        }
+                    const el = img.offsetWidth > 0 ? img : document.getElementById('annot-fallback-' + id);
+                    if (el && el.offsetWidth > 0) {
+                        sizeCanvasTo(el.offsetWidth, el.offsetHeight);
+                        _restoreAnnotHistory(id);
                     }
                 });
                 observer.observe(img);
@@ -1125,40 +1083,94 @@ function initAnnotCanvas(id, isImage, fileUrl) {
         }
     }
 
-    // ─── OTHER FILES (iframe overlay) ───
-    if (!isImage && !isPdf && fileUrl) {
-        const frame = document.getElementById('annot-file-frame-' + id);
-        if (frame) {
-            const frameH = frame.offsetHeight || 500;
-            const frameW = frame.offsetWidth || 800;
-            canvas.width = frameW;
-            canvas.height = frameH;
-            canvas.style.width = frameW + 'px';
-            canvas.style.height = frameH + 'px';
-            // Resize when wrapper changes
+    // ─── PDF background ───
+    else if (isPdf && fileUrl) {
+        const frameContainer = document.getElementById('annot-bg-frame-' + id);
+        const bgCanvas = document.getElementById('annot-bg-canvas-' + id);
+        const bgIframe = document.getElementById('annot-bg-iframe-' + id);
+        const loadingEl = document.getElementById('annot-pdf-loading-' + id);
+        const controlsEl = document.getElementById('annot-pdf-controls-' + id);
+
+        // Try PDF.js first, then fall back to Google Docs Viewer iframe
+        const tryPdfJs = async () => {
+            if (!window.pdfjsLib) throw new Error('PDF.js not loaded');
+            const pdfDoc = await pdfjsLib.getDocument({ url: fileUrl }).promise;
+            s._pdfDoc = pdfDoc;
+            s._pdfTotal = pdfDoc.numPages;
+            s._pdfPage = 1;
+            if (loadingEl) loadingEl.style.display = 'none';
+            if (bgCanvas) bgCanvas.style.display = 'block';
+            if (controlsEl) controlsEl.classList.remove('hidden');
+            await renderPdfPage(id, 1);
+        };
+
+        const fallbackToGoogleViewer = () => {
+            console.warn('PDF.js failed, using Google Docs Viewer');
+            if (loadingEl) loadingEl.style.display = 'none';
+            if (bgIframe) {
+                bgIframe.src = 'https://docs.google.com/gview?url=' + encodeURIComponent(fileUrl) + '&embedded=true';
+                bgIframe.style.display = 'block';
+            }
+            // Size canvas to match frame
+            const h = frameContainer ? (frameContainer.offsetHeight || 600) : 600;
+            const w = frameContainer ? (frameContainer.offsetWidth || 800) : 800;
+            sizeCanvasTo(w, h);
+        };
+
+        tryPdfJs().catch(fallbackToGoogleViewer);
+
+        // ResizeObserver for frame
+        if (frameContainer && window.ResizeObserver) {
+            const observer = new ResizeObserver(() => {
+                if (frameContainer.offsetWidth > 0 && !s._pdfDoc) {
+                    sizeCanvasTo(frameContainer.offsetWidth, frameContainer.offsetHeight);
+                }
+            });
+            observer.observe(frameContainer);
+            _resizeObservers[id] = observer;
+        }
+    }
+
+    // ─── Other files (iframe overlay) ───
+    else if (fileUrl) {
+        const frameContainer = document.getElementById('annot-bg-frame-' + id);
+        if (frameContainer) {
+            const w = frameContainer.offsetWidth || 800;
+            const h = frameContainer.offsetHeight || 500;
+            sizeCanvasTo(w, h);
             if (window.ResizeObserver) {
                 const observer = new ResizeObserver(() => {
-                    const w = frame.offsetWidth || 800;
-                    const h = frame.offsetHeight || 500;
-                    canvas.width = w;
-                    canvas.height = h;
-                    canvas.style.width = w + 'px';
-                    canvas.style.height = h + 'px';
+                    sizeCanvasTo(frameContainer.offsetWidth || 800, frameContainer.offsetHeight || 500);
                 });
-                observer.observe(frame);
+                observer.observe(frameContainer);
                 _resizeObservers[id] = observer;
             }
         }
     }
 
+    // ─── No file — blank canvas already has width/height in HTML ───
+
+    // Initialize drawing context
     const ctx = canvas.getContext('2d');
-    if (!_annotState[id]) {
-        _annotState[id] = { tool:'pen', color:'#1f2937', size:3, drawing:false, history:[], ctx, _zoom:1 };
-    } else {
-        _annotState[id].ctx = ctx;
-    }
+    s.ctx = ctx;
     _saveAnnotHistory(id);
     _attachCanvasListeners(canvas, id);
+}
+
+// Restore last drawing state after resize
+function _restoreAnnotHistory(id) {
+    const s = _annotState[id];
+    if (!s || !s.history || s.history.length === 0) return;
+    const lastState = s.history[s.history.length - 1];
+    if (!lastState || lastState === 'data:,') return;
+    const c = document.getElementById('annot-canvas-' + id);
+    if (!c) return;
+    const tempImg = new Image();
+    tempImg.onload = () => {
+        s.ctx.clearRect(0, 0, c.width, c.height);
+        s.ctx.drawImage(tempImg, 0, 0, c.width, c.height);
+    };
+    tempImg.src = lastState;
 }
 
 // ─── PDF page rendering ───
@@ -1167,15 +1179,26 @@ async function renderPdfPage(id, pageNum) {
     if (!s || !s._pdfDoc) return;
     try {
         const page = await s._pdfDoc.getPage(pageNum);
-        const viewport = page.getViewport({ scale: 1.5 });
         const bgCanvas = document.getElementById('annot-bg-canvas-' + id);
         const annotCanvas = document.getElementById('annot-canvas-' + id);
+        const frameContainer = document.getElementById('annot-bg-frame-' + id);
         if (!bgCanvas || !annotCanvas) return;
+
+        // Calculate scale to fit container width
+        const containerW = (frameContainer ? frameContainer.offsetWidth : bgCanvas.parentElement?.offsetWidth) || 800;
+        const baseViewport = page.getViewport({ scale: 1 });
+        const scale = Math.max(1, containerW / baseViewport.width);
+        const viewport = page.getViewport({ scale });
 
         bgCanvas.width = viewport.width;
         bgCanvas.height = viewport.height;
         bgCanvas.style.width = viewport.width + 'px';
         bgCanvas.style.height = viewport.height + 'px';
+
+        // Resize frame container to match rendered page
+        if (frameContainer) {
+            frameContainer.style.height = viewport.height + 'px';
+        }
 
         annotCanvas.width = viewport.width;
         annotCanvas.height = viewport.height;
@@ -1183,14 +1206,15 @@ async function renderPdfPage(id, pageNum) {
         annotCanvas.style.height = viewport.height + 'px';
 
         const bgCtx = bgCanvas.getContext('2d');
+        // White background first
+        bgCtx.fillStyle = '#ffffff';
+        bgCtx.fillRect(0, 0, viewport.width, viewport.height);
         await page.render({ canvasContext: bgCtx, viewport }).promise;
 
-        // Update annotState ctx
-        if (s) {
-            s.ctx = annotCanvas.getContext('2d');
-            s.history = [];
-            _saveAnnotHistory(id);
-        }
+        // Reset annotation layer for new page
+        s.ctx = annotCanvas.getContext('2d');
+        s.history = [];
+        _saveAnnotHistory(id);
 
         const info = document.getElementById('annot-pdf-pageinfo-' + id);
         if (info) info.textContent = 'Page ' + pageNum + ' / ' + s._pdfTotal;
@@ -1210,7 +1234,6 @@ window.annotPdfPage = (id, delta) => {
 
 // ─── Attach canvas listeners (extracted to avoid duplication) ───
 function _attachCanvasListeners(canvas, id) {
-    // Prevent duplicate listeners
     if (canvas.dataset.listenersAttached) return;
     canvas.dataset.listenersAttached = '1';
 
@@ -1319,31 +1342,30 @@ window.clearAnnotCanvas = (id) => {
 /** Zoom controls for annotation workspace */
 window.annotZoom = (id, delta) => {
     const s = _annotState[id];
-    const container = document.getElementById('annot-canvas-'+id)?.parentElement;
+    const wrapper = document.getElementById('annot-wrapper-'+id);
     const bgImg = document.getElementById('annot-bg-'+id);
+    const bgCanvas = document.getElementById('annot-bg-canvas-'+id);
     const canvas = document.getElementById('annot-canvas-'+id);
-    if (!container || !canvas) return;
+    if (!wrapper || !canvas) return;
 
     // Initialize zoom state if needed
     if (!s._zoom) s._zoom = 1;
 
     if (delta === 'fit') {
-        // Fit to container width
-        const parentW = container.parentElement?.clientWidth || container.clientWidth;
+        const parentW = wrapper.parentElement?.clientWidth || wrapper.clientWidth;
         const canvasW = canvas.width || 580;
         s._zoom = Math.min(parentW / canvasW, 2);
     } else {
         s._zoom = Math.max(0.25, Math.min(4, s._zoom + delta));
     }
 
-    // Apply transform
     const scale = s._zoom;
     const transformCSS = `transform-origin:top left;transform:scale(${scale});`;
     if (bgImg) bgImg.style.cssText += transformCSS;
+    if (bgCanvas) bgCanvas.style.cssText += transformCSS;
     canvas.style.cssText += transformCSS;
-    // Adjust container to match scaled dimensions
-    container.style.width = (canvas.width * scale) + 'px';
-    container.style.height = (canvas.height * scale) + 'px';
+    wrapper.style.width = (canvas.width * scale) + 'px';
+    wrapper.style.height = (canvas.height * scale) + 'px';
 
     // Update label
     const label = document.getElementById('zoom-level-'+id);
@@ -1362,37 +1384,29 @@ window.wsTab = (id, tab) => {
     if (tab === 'annotate') {
         const s = _annotState[id];
         if (!s || !s.ctx) {
-            // Initialize canvas using stored metadata
-            const isImage = s ? s.isImage : !!document.getElementById('annot-bg-'+id);
-            const fileUrl = s ? s.fileUrl : (document.getElementById('annot-bg-'+id)?.src || '');
-            initAnnotCanvas(id, isImage, fileUrl);
+            // Small delay to let the tab content become visible so offsetWidth/Height work
+            setTimeout(() => initAnnotCanvas(id), 80);
         } else {
-            // Resync canvas size for images
-            const bgImg = document.getElementById('annot-bg-'+id);
-            if (bgImg) {
-                setTimeout(() => {
-                    const canvas = document.getElementById('annot-canvas-'+id);
-                    if (canvas && bgImg && bgImg.complete && bgImg.naturalWidth > 0) {
-                        canvas.width = bgImg.offsetWidth || 580;
-                        canvas.height = bgImg.offsetHeight || 380;
-                        canvas.style.width = bgImg.offsetWidth + 'px';
-                        canvas.style.height = bgImg.offsetHeight + 'px';
-                    }
-                }, 50);
-            }
-            // Resync for iframe-overlay files
-            const frame = document.getElementById('annot-file-frame-'+id);
-            if (frame) {
-                setTimeout(() => {
-                    const canvas = document.getElementById('annot-canvas-'+id);
-                    if (canvas && frame) {
-                        canvas.width = frame.offsetWidth || 800;
-                        canvas.height = frame.offsetHeight || 500;
-                        canvas.style.width = frame.offsetWidth + 'px';
-                        canvas.style.height = frame.offsetHeight + 'px';
-                    }
-                }, 50);
-            }
+            // Resync canvas size after tab switch
+            setTimeout(() => {
+                const canvas = document.getElementById('annot-canvas-'+id);
+                if (!canvas) return;
+                const bgImg = document.getElementById('annot-bg-'+id);
+                const bgFrame = document.getElementById('annot-bg-frame-'+id);
+                if (bgImg && bgImg.complete && bgImg.naturalWidth > 0 && bgImg.offsetWidth > 0) {
+                    canvas.width = bgImg.offsetWidth;
+                    canvas.height = bgImg.offsetHeight;
+                    canvas.style.width = bgImg.offsetWidth + 'px';
+                    canvas.style.height = bgImg.offsetHeight + 'px';
+                    _restoreAnnotHistory(id);
+                } else if (bgFrame && bgFrame.offsetWidth > 0) {
+                    canvas.width = bgFrame.offsetWidth;
+                    canvas.height = bgFrame.offsetHeight;
+                    canvas.style.width = bgFrame.offsetWidth + 'px';
+                    canvas.style.height = bgFrame.offsetHeight + 'px';
+                    _restoreAnnotHistory(id);
+                }
+            }, 80);
         }
     }
     
