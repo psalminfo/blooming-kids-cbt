@@ -67,6 +67,15 @@ details[open] > summary .chev { transform:rotate(90deg); }
 .ws-tab-btn.active { color:#059669; border-bottom-color:#059669; }
 .ws-tab-btn:not(.active) { color:#6b7280; }
 .ws-tab-btn:not(.active):hover { color:#059669; }
+/* Responsive workspace modal */
+@media (max-width: 640px) {
+    .ws-modal-container { max-width:100vw!important; width:100vw!important; height:100vh!important; max-height:100vh!important; border-radius:0!important; }
+    .annot-toolbar { padding:6px 8px; gap:4px; }
+    .annot-tool-btn { width:28px; height:28px; font-size:.65rem; }
+}
+@media (min-width: 641px) and (max-width: 1024px) {
+    .ws-modal-container { max-width:92vw!important; width:92vw!important; }
+}
 /* Notif ring animation */
 @keyframes bellRing { 0%,100%{transform:rotate(0)} 20%{transform:rotate(-15deg)} 40%{transform:rotate(15deg)} 60%{transform:rotate(-10deg)} 80%{transform:rotate(10deg)} }
 .bell-ring { animation: bellRing 0.6s ease; }
@@ -841,14 +850,23 @@ window.openWorkspace = async (assignmentId) => {
         .map(c => `<span class="color-dot active" data-color="${c}" onclick="setAnnotColor('${assignmentId}','${c}')" style="background:${c};"></span>`).join('');
 
     modal.innerHTML = `
-    <div class="bg-white rounded-2xl w-full max-w-3xl flex flex-col" style="max-height:92vh;">
+    <div class="bg-white rounded-2xl w-full flex flex-col ws-modal-container" style="max-width:95vw;width:95vw;height:95vh;max-height:95vh;">
         <!-- Header -->
         <div class="flex justify-between items-center px-5 py-4 border-b flex-shrink-0">
             <div>
                 <h3 class="font-bold text-gray-800 text-base">${escH(a.title||'Assignment')}</h3>
                 ${a.subject ? `<p class="text-xs text-gray-400">${escH(a.subject)}</p>` : ''}
             </div>
-            <button onclick="document.getElementById('ws-modal-${assignmentId}').remove()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            <div class="flex items-center gap-3">
+                <!-- Zoom controls -->
+                <div class="flex items-center gap-1 bg-gray-100 rounded-lg px-2 py-1" id="zoom-controls-${assignmentId}">
+                    <button onclick="annotZoom('${assignmentId}',-0.25)" class="text-xs font-bold text-gray-600 hover:text-gray-900 px-1.5 py-0.5 rounded hover:bg-gray-200" title="Zoom out">−</button>
+                    <span id="zoom-level-${assignmentId}" class="text-[.65rem] font-mono text-gray-500 min-w-[36px] text-center">100%</span>
+                    <button onclick="annotZoom('${assignmentId}',0.25)" class="text-xs font-bold text-gray-600 hover:text-gray-900 px-1.5 py-0.5 rounded hover:bg-gray-200" title="Zoom in">+</button>
+                    <button onclick="annotZoom('${assignmentId}','fit')" class="text-[.65rem] font-semibold text-blue-600 hover:text-blue-800 px-1.5 py-0.5 rounded hover:bg-blue-50 ml-1" title="Fit to view">Fit</button>
+                </div>
+                <button onclick="document.getElementById('ws-modal-${assignmentId}').remove()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            </div>
         </div>
         <!-- Tabs -->
         <div class="flex border-b flex-shrink-0 bg-gray-50 px-2">
@@ -1076,6 +1094,40 @@ window.clearAnnotCanvas = (id) => {
     _saveAnnotHistory(id);
 };
 
+/** Zoom controls for annotation workspace */
+window.annotZoom = (id, delta) => {
+    const s = _annotState[id];
+    const container = document.getElementById('annot-canvas-'+id)?.parentElement;
+    const bgImg = document.getElementById('annot-bg-'+id);
+    const canvas = document.getElementById('annot-canvas-'+id);
+    if (!container || !canvas) return;
+
+    // Initialize zoom state if needed
+    if (!s._zoom) s._zoom = 1;
+
+    if (delta === 'fit') {
+        // Fit to container width
+        const parentW = container.parentElement?.clientWidth || container.clientWidth;
+        const canvasW = canvas.width || 580;
+        s._zoom = Math.min(parentW / canvasW, 2);
+    } else {
+        s._zoom = Math.max(0.25, Math.min(4, s._zoom + delta));
+    }
+
+    // Apply transform
+    const scale = s._zoom;
+    const transformCSS = `transform-origin:top left;transform:scale(${scale});`;
+    if (bgImg) bgImg.style.cssText += transformCSS;
+    canvas.style.cssText += transformCSS;
+    // Adjust container to match scaled dimensions
+    container.style.width = (canvas.width * scale) + 'px';
+    container.style.height = (canvas.height * scale) + 'px';
+
+    // Update label
+    const label = document.getElementById('zoom-level-'+id);
+    if (label) label.textContent = Math.round(scale * 100) + '%';
+};
+
 window.wsTab = (id, tab) => {
     ['view','annotate','submit'].forEach(t => {
         const content = document.getElementById('wscontent-'+t+'-'+id);
@@ -1275,7 +1327,7 @@ function initRealtimeNotifications() {
     _notifUnsubscribers.forEach(u => u());
     _notifUnsubscribers = [];
 
-    // 1. Live pending assignments listener
+    // 1. Live pending assignments listener — also updates dashboard widgets
     const q1 = query(collection(db,'homework_assignments'), where('studentId','==',student.id), where('status','in',['assigned','pending']));
     _notifUnsubscribers.push(onSnapshot(q1, snap => {
         const prev = _notifData.pending;
@@ -1286,7 +1338,38 @@ function initRealtimeNotifications() {
             _ringBell();
         }
         _updateNotifBadge();
+        // Update dashboard pending tasks count
+        const pendEl = document.getElementById('dash-pending-count');
+        if (pendEl) pendEl.textContent = snap.size;
     }, err => console.warn('Notif assignments listener:', err)));
+
+    // 1b. ALL homework listener — for average grade, graded count, due-soon
+    const q1b = query(collection(db,'homework_assignments'), where('studentId','==',student.id));
+    _notifUnsubscribers.push(onSnapshot(q1b, snap => {
+        let totalScore = 0, gradedCount = 0, dueSoon = 0;
+        const now = new Date();
+        snap.docs.forEach(d => {
+            const data = d.data();
+            if (data.status === 'graded' && data.score != null) {
+                totalScore += Number(data.score);
+                gradedCount++;
+            }
+            if ((data.status === 'assigned' || data.status === 'pending') && data.dueDate) {
+                const due = new Date(data.dueDate);
+                if (!isNaN(due.getTime()) && (due - now) < 48*3600000 && due > now) dueSoon++;
+            }
+        });
+        // Update dashboard average grade
+        const avgEl = document.getElementById('dash-avg-grade');
+        if (avgEl && gradedCount > 0) {
+            const avg = Math.round(totalScore / gradedCount);
+            const letter = avg >= 90 ? 'A' : avg >= 80 ? 'B' : avg >= 70 ? 'C' : avg >= 60 ? 'D' : 'F';
+            avgEl.textContent = avg + '% (' + letter + ')';
+        }
+        // Update due-soon indicator
+        const dueEl = document.getElementById('dash-due-soon');
+        if (dueEl) dueEl.textContent = dueSoon > 0 ? dueSoon + ' due soon' : '';
+    }, err => console.warn('Notif all-homework listener:', err)));
 
     // 2. Live conversations (messages) listener
     const q2 = query(collection(db,'conversations'), where('studentId','==',student.id));
@@ -1320,6 +1403,38 @@ function initRealtimeNotifications() {
         }
         _updateNotifBadge();
     }, err => console.warn('Notif materials listener:', err)));
+
+    // 4. Daily topics listener — real-time topic updates
+    if (student.tutorEmail) {
+        const q4 = query(collection(db,'daily_topics'), where('studentId','==',student.id), orderBy('createdAt','desc'), limit(5));
+        _notifUnsubscribers.push(onSnapshot(q4, snap => {
+            if (_notifLoaded && snap.docChanges().some(c => c.type === 'added')) {
+                // Subtle notification for new topics
+                playNotifSound('general');
+            }
+        }, err => console.warn('Notif topics listener:', err)));
+    }
+
+    // 5. Student document listener — schedule, subjects, grade changes
+    if (student.id) {
+        const studentDocRef = doc(db, 'students', student.id);
+        _notifUnsubscribers.push(onSnapshot(studentDocRef, snap => {
+            if (!snap.exists()) return;
+            const data = snap.data();
+            // Auto-update schedule widgets when tutor modifies schedule
+            const schedEl = document.getElementById('dash-schedule-info');
+            if (schedEl && data.schedule) {
+                // Update the stored student data
+                window.currentStudent = { ...window.currentStudent, ...data, id: snap.id };
+            }
+            // Update subjects display
+            const subjEl = document.getElementById('dash-subjects');
+            if (subjEl && data.subjects) {
+                const subjs = Array.isArray(data.subjects) ? data.subjects : [data.subjects];
+                subjEl.textContent = subjs.join(', ');
+            }
+        }, err => console.warn('Student doc listener:', err)));
+    }
 
     _notifLoaded = true;
 }
