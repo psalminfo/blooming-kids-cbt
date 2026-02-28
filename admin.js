@@ -1576,15 +1576,15 @@ async function renderTutorManagementPanel(container) {
            
              </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Report Submission:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="report-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="report-status-label" class="ml-3 text-sm font-medium"></span></label></div>
-                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Tutors Can Add Students:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="tutor-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="tutor-add-status-label" class="ml-3 text-sm font-medium"></span></label></div>
-                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Enable Summer Break:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="summer-break-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="summer-break-status-label" class="ml-3 text-sm font-medium"></span></label></div>
-                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Student Fees (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-fees-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-fees-status-label" class="ml-3 text-sm font-medium"></span></label></div>
-                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Edit/Delete (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="edit-delete-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="edit-delete-status-label" class="ml-3 text-sm font-medium"></span></label></div>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Report Submission:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="report-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="report-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Tutors Can Add Students:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="tutor-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="tutor-add-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Enable Summer Break:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="summer-break-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="summer-break-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Student Fees (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-fees-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-fees-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Edit/Delete (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="edit-delete-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="edit-delete-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 
-                 <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Direct Student Add (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></div>
-                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Transition Button:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-transition-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-transition-status-label" class="ml-3 text-sm font-medium"></span></label></div>
-                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Preschool-2 Add/Transition:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="preschool-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="preschool-add-status-label" class="ml-3 text-sm font-medium"></span></label></div>
+                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Direct Student Add (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Transition Button:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-transition-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-transition-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Preschool-2 Add/Transition:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="preschool-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="preschool-add-status-label" class="ml-3 text-sm font-medium"></span></label></label>
             </div>
         </div>
         
@@ -1621,86 +1621,46 @@ async function renderTutorManagementPanel(container) {
 
 function setupTutorManagementListeners() {
     const settingsDocRef = doc(db, "settings", "global_settings");
-
-    // ── Unsubscribe previous listener to prevent duplicates ──
-    if (window._adminSettingsUnsub) {
-        try { window._adminSettingsUnsub(); } catch(e) {}
-    }
-
-    const TOGGLE_MAP = { 
-        'isReportEnabled': 'report', 
-        'isTutorAddEnabled': 'tutor-add', 
-        'isSummerBreakEnabled': 'summer-break', 
-        'showStudentFees': 'show-fees', 
-        'showEditDeleteButtons': 'edit-delete', 
-        'bypassPendingApproval': 'bypass-approval',
-        'showTransitionButton': 'show-transition',
-        'preschoolAddTransition': 'preschool-add'
-    };
-
-    // ── Real-time listener for settings (single-doc, efficient) ──
-    window._adminSettingsUnsub = onSnapshot(settingsDocRef, (docSnap) => {
+    // EFFICIENT: This single-doc listener is kept for real-time settings updates.
+    onSnapshot(settingsDocRef, (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
             globalSettings = data;
 
-            for (const key in TOGGLE_MAP) {
-                const type = TOGGLE_MAP[key];
+            const toggleMap = { 
+                'isReportEnabled': 'report', 
+                'isTutorAddEnabled': 'tutor-add', 
+                'isSummerBreakEnabled': 'summer-break', 
+                'showStudentFees': 'show-fees', 
+                'showEditDeleteButtons': 'edit-delete', 
+                'bypassPendingApproval': 'bypass-approval',
+                'showTransitionButton': 'show-transition',
+                'preschoolAddTransition': 'preschool-add'
+            };
+
+            for (const key in toggleMap) {
+                const type = toggleMap[key];
                 const toggle = document.getElementById(`${type}-toggle`);
                 const label = document.getElementById(`${type}-status-label`);
                 if (toggle && label) {
                     toggle.checked = !!data[key];
                     label.textContent = data[key] ? 'Enabled' : 'Disabled';
-                    label.style.color = data[key] ? '#16a34a' : '#dc2626';
                 }
             }
             if (activeTutorId) {
                 renderSelectedTutorDetailsFromCache(activeTutorId);
             }
         }
-    }, (error) => {
-        console.error('Settings listener error:', error);
     });
-
-    // ── Helper: write a single setting to Firestore with visual feedback ──
-    async function toggleSetting(fieldName, toggleId, checked) {
-        const label = document.getElementById(`${TOGGLE_MAP[fieldName]}-status-label`);
-        const prevText = label ? label.textContent : '';
-        try {
-            if (label) { label.textContent = 'Saving…'; label.style.color = '#f59e0b'; }
-            await setDoc(settingsDocRef, { 
-                [fieldName]: checked, 
-                lastUpdated: new Date() 
-            }, { merge: true });
-            // onSnapshot will update the label automatically
-        } catch (err) {
-            console.error(`Toggle error (${fieldName}):`, err);
-            // Revert toggle on error
-            const toggle = document.getElementById(toggleId);
-            if (toggle) toggle.checked = !checked;
-            if (label) { label.textContent = 'Error! ' + prevText; label.style.color = '#dc2626'; }
-            alert('Failed to update setting: ' + err.message);
-        }
-    }
-
-    // ── Attach change listeners to all toggles ──
-    const FIELD_TO_TOGGLE = {
-        'isReportEnabled': 'report-toggle',
-        'isTutorAddEnabled': 'tutor-add-toggle',
-        'isSummerBreakEnabled': 'summer-break-toggle',
-        'showStudentFees': 'show-fees-toggle',
-        'showEditDeleteButtons': 'edit-delete-toggle',
-        'bypassPendingApproval': 'bypass-approval-toggle',
-        'showTransitionButton': 'show-transition-toggle',
-        'preschoolAddTransition': 'preschool-add-toggle'
-    };
-
-    for (const [field, toggleId] of Object.entries(FIELD_TO_TOGGLE)) {
-        const el = document.getElementById(toggleId);
-        if (el) {
-            el.addEventListener('change', (e) => toggleSetting(field, toggleId, e.target.checked));
-        }
-    }
+    // Attach listeners to toggles to update Firestore
+    document.getElementById('report-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isReportEnabled: e.target.checked }));
+    document.getElementById('tutor-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isTutorAddEnabled: e.target.checked }));
+    document.getElementById('summer-break-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isSummerBreakEnabled: e.target.checked }));
+    document.getElementById('show-fees-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { showStudentFees: e.target.checked }));
+    document.getElementById('edit-delete-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { showEditDeleteButtons: e.target.checked }));
+    document.getElementById('bypass-approval-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { bypassPendingApproval: e.target.checked }));
+    document.getElementById('show-transition-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { showTransitionButton: e.target.checked }));
+    document.getElementById('preschool-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { preschoolAddTransition: e.target.checked }));
     
     // UI Interaction Listeners
     document.getElementById('tutor-select').addEventListener('change', e => {
