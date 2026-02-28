@@ -10322,16 +10322,12 @@ async function renderMasterPortalPanel(container) {
         if (searchInput) {
             searchInput.addEventListener('input', () => {
                 const term = searchInput.value.toLowerCase().trim();
-                
-                // Toggle clear button visibility
                 if (searchClear) searchClear.classList.toggle('hidden', !term);
-                
                 let visibleCount = 0;
                 tutorCards.forEach(card => {
                     const header = card.querySelector('.accordion-header');
                     const nameEl = header ? header.querySelector('.font-bold.text-gray-800') : null;
                     const tutorName = nameEl ? nameEl.textContent.toLowerCase() : '';
-                    
                     if (!term || tutorName.includes(term)) {
                         card.style.display = '';
                         visibleCount++;
@@ -10339,8 +10335,6 @@ async function renderMasterPortalPanel(container) {
                         card.style.display = 'none';
                     }
                 });
-                
-                // Show result count when filtering
                 if (searchCount) {
                     if (term) {
                         searchCount.textContent = `Showing ${visibleCount} of ${totalTutors} tutors`;
@@ -10350,8 +10344,6 @@ async function renderMasterPortalPanel(container) {
                     }
                 }
             });
-            
-            // Clear button
             if (searchClear) {
                 searchClear.addEventListener('click', () => {
                     searchInput.value = '';
@@ -10800,6 +10792,485 @@ function escHtml(str) {
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ======================================================
+// SECTION 8B: USER DIRECTORY PANEL
+// ======================================================
+
+async function renderUserDirectoryPanel(container) {
+    container.innerHTML = `
+    <div class="space-y-4">
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">📋 User Directory</h2>
+                <p class="text-sm text-gray-500">All Tutors, Students & Parents</p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                <button id="ud-refresh-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 text-sm">
+                    <i class="fas fa-sync-alt mr-1"></i> Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+                <div class="text-3xl font-black text-blue-700" id="ud-tutor-count">—</div>
+                <div class="text-xs text-blue-600 font-semibold uppercase tracking-wide mt-1">Tutors</div>
+            </div>
+            <div class="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+                <div class="text-3xl font-black text-green-700" id="ud-student-count">—</div>
+                <div class="text-xs text-green-600 font-semibold uppercase tracking-wide mt-1">Students</div>
+            </div>
+            <div class="bg-purple-50 border border-purple-200 rounded-xl p-4 text-center">
+                <div class="text-3xl font-black text-purple-700" id="ud-parent-count">—</div>
+                <div class="text-xs text-purple-600 font-semibold uppercase tracking-wide mt-1">Parents</div>
+            </div>
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+                <div class="text-3xl font-black text-amber-700" id="ud-total-count">—</div>
+                <div class="text-xs text-amber-600 font-semibold uppercase tracking-wide mt-1">Total Users</div>
+            </div>
+        </div>
+
+        <!-- Search + Tab Switcher -->
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+            <div class="flex flex-col sm:flex-row gap-3">
+                <div class="relative flex-1">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                    <input type="text" id="ud-search" placeholder="Search by name, email, phone..." 
+                        class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm" autocomplete="off">
+                </div>
+                <div class="flex bg-gray-100 rounded-xl p-1 gap-1 flex-shrink-0">
+                    <button class="ud-tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white" data-tab="tutors">Tutors</button>
+                    <button class="ud-tab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-200" data-tab="students">Students</button>
+                    <button class="ud-tab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-200" data-tab="parents">Parents</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="ud-loading" class="text-center py-12">
+            <div class="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+            <p class="text-gray-500">Loading user data…</p>
+        </div>
+
+        <!-- Content Area -->
+        <div id="ud-content" class="hidden"></div>
+    </div>
+    `;
+
+    // State
+    let udTutors = [], udStudents = [], udParents = [];
+    let currentTab = 'tutors';
+
+    // Tab switching
+    container.querySelectorAll('.ud-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            container.querySelectorAll('.ud-tab-btn').forEach(b => {
+                b.classList.remove('bg-blue-600', 'text-white');
+                b.classList.add('text-gray-600');
+            });
+            btn.classList.add('bg-blue-600', 'text-white');
+            btn.classList.remove('text-gray-600');
+            currentTab = btn.dataset.tab;
+            renderCurrentTab();
+        });
+    });
+
+    // Search
+    const searchInput = document.getElementById('ud-search');
+    searchInput.addEventListener('input', () => renderCurrentTab());
+
+    // Refresh
+    document.getElementById('ud-refresh-btn').addEventListener('click', () => loadAllUserData(true));
+
+    function renderCurrentTab() {
+        const term = (searchInput.value || '').toLowerCase().trim();
+        const contentEl = document.getElementById('ud-content');
+        if (!contentEl) return;
+
+        if (currentTab === 'tutors') renderTutorsTable(contentEl, term);
+        else if (currentTab === 'students') renderStudentsTable(contentEl, term);
+        else if (currentTab === 'parents') renderParentsTable(contentEl, term);
+    }
+
+    // ---- TUTORS TABLE ----
+    function renderTutorsTable(el, term) {
+        const filtered = udTutors.filter(t => {
+            const searchStr = `${t.name} ${t.email} ${t.phone || ''}`.toLowerCase();
+            return !term || searchStr.includes(term);
+        });
+
+        el.innerHTML = `
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="p-3 bg-gray-50 border-b text-xs text-gray-500">${filtered.length} tutor${filtered.length !== 1 ? 's' : ''} found</div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide bg-gray-50">
+                            <th class="text-left py-3 px-4">#</th>
+                            <th class="text-left py-3 px-4">Name</th>
+                            <th class="text-left py-3 px-4">Email</th>
+                            <th class="text-left py-3 px-4">Phone</th>
+                            <th class="text-center py-3 px-4">Students</th>
+                            <th class="text-center py-3 px-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filtered.length === 0 ? `<tr><td colspan="6" class="text-center py-8 text-gray-400">No tutors found.</td></tr>` :
+                        filtered.map((t, i) => `
+                        <tr class="border-b border-gray-50 hover:bg-gray-50">
+                            <td class="py-3 px-4 text-gray-400 text-xs">${i + 1}</td>
+                            <td class="py-3 px-4 font-semibold text-gray-800">${escapeHtml(t.name)}</td>
+                            <td class="py-3 px-4 text-gray-600 text-xs">${escapeHtml(t.email || '—')}</td>
+                            <td class="py-3 px-4 text-gray-600">${escapeHtml(t.phone || '—')}</td>
+                            <td class="py-3 px-4 text-center">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${t.studentCount > 0 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}">
+                                    ${t.studentCount}
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 text-center">
+                                <button onclick="window._udEditTutor('${t.id}')" class="text-blue-600 hover:text-blue-800 text-xs font-semibold mr-2"><i class="fas fa-edit"></i> Edit</button>
+                                <button onclick="window._udDeleteTutor('${t.id}', '${escapeHtml(t.name)}')" class="text-red-600 hover:text-red-800 text-xs font-semibold"><i class="fas fa-trash"></i> Delete</button>
+                            </td>
+                        </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+    }
+
+    // ---- STUDENTS TABLE ----
+    function renderStudentsTable(el, term) {
+        const filtered = udStudents.filter(s => {
+            const searchStr = `${s.studentName} ${s.parentName || ''} ${s.parentEmail || ''} ${s.grade || ''}`.toLowerCase();
+            return !term || searchStr.includes(term);
+        });
+
+        el.innerHTML = `
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="p-3 bg-gray-50 border-b text-xs text-gray-500">${filtered.length} student${filtered.length !== 1 ? 's' : ''} found</div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide bg-gray-50">
+                            <th class="text-left py-3 px-4">#</th>
+                            <th class="text-left py-3 px-4">Student Name</th>
+                            <th class="text-left py-3 px-4">Grade</th>
+                            <th class="text-left py-3 px-4">Parent</th>
+                            <th class="text-left py-3 px-4">Tutor</th>
+                            <th class="text-left py-3 px-4">Subjects</th>
+                            <th class="text-center py-3 px-4">Status</th>
+                            <th class="text-center py-3 px-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filtered.length === 0 ? `<tr><td colspan="8" class="text-center py-8 text-gray-400">No students found.</td></tr>` :
+                        filtered.map((s, i) => {
+                            const statusColor = s.summerBreak ? 'bg-yellow-100 text-yellow-800' : 
+                                                ['archived','graduated','transferred'].includes(s.status) ? 'bg-red-100 text-red-800' : 
+                                                'bg-green-100 text-green-800';
+                            const statusLabel = s.summerBreak ? 'On Break' : 
+                                                ['archived','graduated','transferred'].includes(s.status) ? capitalize(s.status) : 'Active';
+                            return `
+                            <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                <td class="py-3 px-4 text-gray-400 text-xs">${i + 1}</td>
+                                <td class="py-3 px-4 font-semibold text-gray-800">${escapeHtml(s.studentName || '—')}</td>
+                                <td class="py-3 px-4 text-gray-600">${escapeHtml(s.grade || '—')}</td>
+                                <td class="py-3 px-4 text-gray-600 text-xs">${escapeHtml(s.parentName || s.parentEmail || '—')}</td>
+                                <td class="py-3 px-4 text-gray-600 text-xs">${escapeHtml(s.tutorName || s.tutorEmail || '—')}</td>
+                                <td class="py-3 px-4 text-xs text-gray-500">${escapeHtml((s.subjects || []).join(', ') || '—')}</td>
+                                <td class="py-3 px-4 text-center">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${statusColor}">${statusLabel}</span>
+                                </td>
+                                <td class="py-3 px-4 text-center">
+                                    <button onclick="window._udEditStudent('${s.id}')" class="text-blue-600 hover:text-blue-800 text-xs font-semibold mr-2"><i class="fas fa-edit"></i> Edit</button>
+                                    <button onclick="window._udDeleteStudent('${s.id}', '${escapeHtml(s.studentName)}')" class="text-red-600 hover:text-red-800 text-xs font-semibold"><i class="fas fa-trash"></i> Delete</button>
+                                </td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+    }
+
+    // ---- PARENTS TABLE ----
+    function renderParentsTable(el, term) {
+        const filtered = udParents.filter(p => {
+            const searchStr = `${p.name} ${p.email} ${p.phone || ''}`.toLowerCase();
+            return !term || searchStr.includes(term);
+        });
+
+        el.innerHTML = `
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="p-3 bg-gray-50 border-b text-xs text-gray-500">${filtered.length} parent${filtered.length !== 1 ? 's' : ''} found</div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide bg-gray-50">
+                            <th class="text-left py-3 px-4">#</th>
+                            <th class="text-left py-3 px-4">Name</th>
+                            <th class="text-left py-3 px-4">Email</th>
+                            <th class="text-left py-3 px-4">Phone</th>
+                            <th class="text-center py-3 px-4">Children</th>
+                            <th class="text-center py-3 px-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filtered.length === 0 ? `<tr><td colspan="6" class="text-center py-8 text-gray-400">No parents found.</td></tr>` :
+                        filtered.map((p, i) => `
+                        <tr class="border-b border-gray-50 hover:bg-gray-50">
+                            <td class="py-3 px-4 text-gray-400 text-xs">${i + 1}</td>
+                            <td class="py-3 px-4 font-semibold text-gray-800">${escapeHtml(p.name || '—')}</td>
+                            <td class="py-3 px-4 text-gray-600 text-xs">${escapeHtml(p.email || '—')}</td>
+                            <td class="py-3 px-4 text-gray-600">${escapeHtml(p.phone || '—')}</td>
+                            <td class="py-3 px-4 text-center">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${p.childCount > 0 ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-500'}">
+                                    ${p.childCount}
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 text-center">
+                                <button onclick="window._udEditParent('${p.id}')" class="text-blue-600 hover:text-blue-800 text-xs font-semibold mr-2"><i class="fas fa-edit"></i> Edit</button>
+                                <button onclick="window._udDeleteParent('${p.id}', '${escapeHtml(p.name)}')" class="text-red-600 hover:text-red-800 text-xs font-semibold"><i class="fas fa-trash"></i> Delete</button>
+                            </td>
+                        </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+    }
+
+    // ---- EDIT MODALS ----
+    window._udEditTutor = async function(tutorId) {
+        const tutor = udTutors.find(t => t.id === tutorId);
+        if (!tutor) return;
+        const modalHtml = `
+        <div id="ud-edit-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div class="relative p-6 bg-white w-full max-w-md rounded-lg shadow-xl">
+                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="document.getElementById('ud-edit-modal').remove()">&times;</button>
+                <h3 class="text-xl font-bold mb-4 text-blue-700"><i class="fas fa-edit mr-2"></i>Edit Tutor</h3>
+                <div class="space-y-3">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                        <input type="text" id="ud-edit-name" value="${escapeHtml(tutor.name || '')}" class="w-full p-2 border rounded-lg"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" id="ud-edit-email" value="${escapeHtml(tutor.email || '')}" class="w-full p-2 border rounded-lg bg-gray-100" readonly></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <input type="text" id="ud-edit-phone" value="${escapeHtml(tutor.phone || '')}" class="w-full p-2 border rounded-lg"></div>
+                </div>
+                <div class="flex justify-end gap-3 mt-5">
+                    <button onclick="document.getElementById('ud-edit-modal').remove()" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 text-sm">Cancel</button>
+                    <button id="ud-save-tutor-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">Save Changes</button>
+                </div>
+            </div>
+        </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        document.getElementById('ud-save-tutor-btn').addEventListener('click', async () => {
+            const name = document.getElementById('ud-edit-name').value.trim();
+            const phone = document.getElementById('ud-edit-phone').value.trim();
+            if (!name) { alert('Name is required.'); return; }
+            try {
+                await updateDoc(doc(db, 'tutors', tutorId), { name: sanitizeInput(name, 200), phone: sanitizeInput(phone, 50) });
+                alert('Tutor updated!');
+                document.getElementById('ud-edit-modal').remove();
+                await logManagementActivity('Edit Tutor', `Edited tutor: ${name}`);
+                await loadAllUserData(true);
+            } catch(e) { alert('Error: ' + e.message); }
+        });
+    };
+
+    window._udEditStudent = async function(studentId) {
+        const student = udStudents.find(s => s.id === studentId);
+        if (!student) return;
+        const modalHtml = `
+        <div id="ud-edit-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div class="relative p-6 bg-white w-full max-w-md rounded-lg shadow-xl">
+                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="document.getElementById('ud-edit-modal').remove()">&times;</button>
+                <h3 class="text-xl font-bold mb-4 text-green-700"><i class="fas fa-edit mr-2"></i>Edit Student</h3>
+                <div class="space-y-3">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label>
+                        <input type="text" id="ud-edit-sname" value="${escapeHtml(student.studentName || '')}" class="w-full p-2 border rounded-lg"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Grade</label>
+                        <select id="ud-edit-grade" class="w-full p-2 border rounded-lg">${buildGradeOptions(student.grade || '')}</select></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Parent Name</label>
+                        <input type="text" id="ud-edit-pname" value="${escapeHtml(student.parentName || '')}" class="w-full p-2 border rounded-lg"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Parent Email</label>
+                        <input type="email" id="ud-edit-pemail" value="${escapeHtml(student.parentEmail || '')}" class="w-full p-2 border rounded-lg"></div>
+                </div>
+                <div class="flex justify-end gap-3 mt-5">
+                    <button onclick="document.getElementById('ud-edit-modal').remove()" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 text-sm">Cancel</button>
+                    <button id="ud-save-student-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">Save Changes</button>
+                </div>
+            </div>
+        </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        document.getElementById('ud-save-student-btn').addEventListener('click', async () => {
+            const sname = document.getElementById('ud-edit-sname').value.trim();
+            const grade = document.getElementById('ud-edit-grade').value;
+            const pname = document.getElementById('ud-edit-pname').value.trim();
+            const pemail = document.getElementById('ud-edit-pemail').value.trim();
+            if (!sname) { alert('Student name is required.'); return; }
+            try {
+                await updateDoc(doc(db, 'students', studentId), { 
+                    studentName: sanitizeInput(sname, 200), 
+                    grade: grade,
+                    parentName: sanitizeInput(pname, 200),
+                    parentEmail: sanitizeInput(pemail, 200)
+                });
+                alert('Student updated!');
+                document.getElementById('ud-edit-modal').remove();
+                await logManagementActivity('Edit Student', `Edited student: ${sname}`);
+                await loadAllUserData(true);
+            } catch(e) { alert('Error: ' + e.message); }
+        });
+    };
+
+    window._udEditParent = async function(parentId) {
+        const parent = udParents.find(p => p.id === parentId);
+        if (!parent) return;
+        const modalHtml = `
+        <div id="ud-edit-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div class="relative p-6 bg-white w-full max-w-md rounded-lg shadow-xl">
+                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="document.getElementById('ud-edit-modal').remove()">&times;</button>
+                <h3 class="text-xl font-bold mb-4 text-purple-700"><i class="fas fa-edit mr-2"></i>Edit Parent</h3>
+                <div class="space-y-3">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                        <input type="text" id="ud-edit-parent-name" value="${escapeHtml(parent.name || '')}" class="w-full p-2 border rounded-lg"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" id="ud-edit-parent-email" value="${escapeHtml(parent.email || '')}" class="w-full p-2 border rounded-lg bg-gray-100" readonly></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <input type="text" id="ud-edit-parent-phone" value="${escapeHtml(parent.phone || '')}" class="w-full p-2 border rounded-lg"></div>
+                </div>
+                <div class="flex justify-end gap-3 mt-5">
+                    <button onclick="document.getElementById('ud-edit-modal').remove()" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 text-sm">Cancel</button>
+                    <button id="ud-save-parent-btn" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">Save Changes</button>
+                </div>
+            </div>
+        </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        document.getElementById('ud-save-parent-btn').addEventListener('click', async () => {
+            const name = document.getElementById('ud-edit-parent-name').value.trim();
+            const phone = document.getElementById('ud-edit-parent-phone').value.trim();
+            if (!name) { alert('Name is required.'); return; }
+            try {
+                await updateDoc(doc(db, 'parent_users', parentId), { name: sanitizeInput(name, 200), phone: sanitizeInput(phone, 50) });
+                alert('Parent updated!');
+                document.getElementById('ud-edit-modal').remove();
+                await logManagementActivity('Edit Parent', `Edited parent: ${name}`);
+                await loadAllUserData(true);
+            } catch(e) { alert('Error: ' + e.message); }
+        });
+    };
+
+    // ---- DELETE HANDLERS ----
+    window._udDeleteTutor = async function(tutorId, name) {
+        if (!confirm(`Are you sure you want to delete tutor "${name}"? This cannot be undone.`)) return;
+        try {
+            await deleteDoc(doc(db, 'tutors', tutorId));
+            alert('Tutor deleted.');
+            await logManagementActivity('Delete Tutor', `Deleted tutor: ${name}`);
+            invalidateCache('tutors');
+            await loadAllUserData(true);
+        } catch(e) { alert('Error: ' + e.message); }
+    };
+
+    window._udDeleteStudent = async function(studentId, name) {
+        if (!confirm(`Are you sure you want to delete student "${name}"? This cannot be undone.`)) return;
+        try {
+            await deleteDoc(doc(db, 'students', studentId));
+            alert('Student deleted.');
+            await logManagementActivity('Delete Student', `Deleted student: ${name}`);
+            invalidateCache('students');
+            await loadAllUserData(true);
+        } catch(e) { alert('Error: ' + e.message); }
+    };
+
+    window._udDeleteParent = async function(parentId, name) {
+        if (!confirm(`Are you sure you want to delete parent "${name}"? This cannot be undone.`)) return;
+        try {
+            await deleteDoc(doc(db, 'parent_users', parentId));
+            alert('Parent deleted.');
+            await logManagementActivity('Delete Parent', `Deleted parent: ${name}`);
+            await loadAllUserData(true);
+        } catch(e) { alert('Error: ' + e.message); }
+    };
+
+    // ---- DATA LOADING ----
+    async function loadAllUserData(force = false) {
+        const loadingEl = document.getElementById('ud-loading');
+        const contentEl = document.getElementById('ud-content');
+        if (loadingEl) loadingEl.classList.remove('hidden');
+        if (contentEl) contentEl.classList.add('hidden');
+
+        try {
+            const [tutorsSnap, studentsSnap, parentsSnap] = await Promise.all([
+                getDocs(query(collection(db, 'tutors'), orderBy('name'))),
+                getDocs(collection(db, 'students')),
+                getDocs(collection(db, 'parent_users'))
+            ]);
+
+            const allStudents = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+            // Build student counts per tutor
+            const studentCountByTutor = {};
+            allStudents.forEach(s => {
+                const key = s.tutorEmail || '';
+                studentCountByTutor[key] = (studentCountByTutor[key] || 0) + 1;
+            });
+
+            // Build tutor name map for student display
+            const tutorNameMap = {};
+            tutorsSnap.docs.forEach(d => {
+                const data = d.data();
+                tutorNameMap[data.email] = data.name;
+            });
+
+            // Build child count per parent email
+            const childCountByParent = {};
+            allStudents.forEach(s => {
+                const key = (s.parentEmail || '').toLowerCase();
+                if (key) childCountByParent[key] = (childCountByParent[key] || 0) + 1;
+            });
+
+            udTutors = tutorsSnap.docs.map(d => {
+                const data = d.data();
+                return { id: d.id, ...data, studentCount: studentCountByTutor[data.email] || 0 };
+            });
+
+            udStudents = allStudents.map(s => ({
+                ...s,
+                tutorName: tutorNameMap[s.tutorEmail] || ''
+            }));
+
+            udParents = parentsSnap.docs.map(d => {
+                const data = d.data();
+                return { id: d.id, ...data, childCount: childCountByParent[(data.email || '').toLowerCase()] || 0 };
+            });
+
+            // Update counters
+            document.getElementById('ud-tutor-count').textContent = udTutors.length;
+            document.getElementById('ud-student-count').textContent = udStudents.length;
+            document.getElementById('ud-parent-count').textContent = udParents.length;
+            document.getElementById('ud-total-count').textContent = udTutors.length + udStudents.length + udParents.length;
+
+            if (loadingEl) loadingEl.classList.add('hidden');
+            if (contentEl) contentEl.classList.remove('hidden');
+
+            renderCurrentTab();
+
+        } catch(err) {
+            console.error('User Directory load error:', err);
+            if (loadingEl) loadingEl.innerHTML = `<p class="text-red-500">Error loading data: ${err.message}</p>`;
+        }
+    }
+
+    // Initial load
+    await loadAllUserData();
+}
+
 // SECTION 9: NAVIGATION & AUTHENTICATION
 // ======================================================
 
@@ -10842,6 +11313,13 @@ const navigationGroups = {
         items: [
             { id: "navMasterPortal", label: "Management Portal", icon: "fas fa-table", fn: renderMasterPortalPanel, perm: "viewMasterPortal" },
             { id: "navAcademicFollowUp", label: "Academic Follow-Up", icon: "fas fa-graduation-cap", fn: renderAcademicFollowUpPanel, perm: "viewMasterPortal" }
+        ]
+    },
+    "userDirectory": {
+        icon: "fas fa-address-book",
+        label: "User Directory",
+        items: [
+            { id: "navUserDirectory", label: "User Directory", icon: "fas fa-address-book", fn: renderUserDirectoryPanel, perm: "viewUserDirectory" }
         ]
     },
     "communication": {
@@ -11008,7 +11486,8 @@ const allNavItems = {
     navInactiveTutors: { fn: renderInactiveTutorsPanel, perm: 'viewInactiveTutors', label: 'Inactive Tutors' },
     navArchivedStudents: { fn: renderArchivedStudentsPanel, perm: 'viewArchivedStudents', label: 'Archived Students' },
     navMasterPortal: { fn: renderMasterPortalPanel, perm: 'viewMasterPortal', label: 'Management Portal' },
-    navAcademicFollowUp: { fn: renderAcademicFollowUpPanel, perm: 'viewMasterPortal', label: 'Academic Follow-Up' }
+    navAcademicFollowUp: { fn: renderAcademicFollowUpPanel, perm: 'viewMasterPortal', label: 'Academic Follow-Up' },
+    navUserDirectory: { fn: renderUserDirectoryPanel, perm: 'viewUserDirectory', label: 'User Directory' }
 };
 
 window.closeManagementModal = function(modalId) {
