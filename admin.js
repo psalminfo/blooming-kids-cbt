@@ -98,6 +98,7 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewInactiveTutors: false,
             viewArchivedStudents: false,
             viewMasterPortal: false,   // Management Portal tab
+            viewReferralsAdmin: false, // Referral Management tab
             canQA: false,              // QA Session Observation button
             canQC: false               // Lesson Plan QC button
         }, 
@@ -122,6 +123,7 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewInactiveTutors: false,
             viewArchivedStudents: false,
             viewMasterPortal: false,   // Management Portal tab
+            viewReferralsAdmin: false, // Referral Management tab
             canQA: false,              // QA Session Observation button
             canQC: false               // Lesson Plan QC button
         }, 
@@ -146,6 +148,7 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewInactiveTutors: true,
             viewArchivedStudents: true,
             viewMasterPortal: true,    // Managers can see the Master View
+            viewReferralsAdmin: true,  // Managers can see Referral Management
             canQA: false,              // Only QA officers rate sessions
             canQC: false               // Only QC officers rate lesson plans
         }, 
@@ -170,6 +173,7 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewInactiveTutors: true,
             viewArchivedStudents: true,
             viewMasterPortal: true,    // Directors can see the Master View
+            viewReferralsAdmin: true,  // Directors can see Referral Management
             canQA: true,               // Directors can do QA ratings
             canQC: true                // Directors can do QC ratings
         }, 
@@ -194,6 +198,7 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewInactiveTutors: true,
             viewArchivedStudents: true,
             viewMasterPortal: true,    // Admins have full access
+            viewReferralsAdmin: true,  // Admins can see Referral Management
             canQA: true,               // Admins can do QA ratings
             canQC: true                // Admins can do QC ratings
         }, 
@@ -2909,4 +2914,3 @@ if (document.readyState === 'loading') {
 // ========================================================
 // END OF SAFE INITIALIZATION SCRIPT
 // ========================================================
-
