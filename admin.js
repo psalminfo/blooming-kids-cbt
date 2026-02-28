@@ -97,11 +97,11 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewEnrollments: false,
             viewInactiveTutors: false,
             viewArchivedStudents: false,
-            viewMasterPortal: false,   // Management Portal tab
-            viewReferralsAdmin: false,  // Referral Management
-            viewUserDirectory: false,   // User Directory
-            canQA: false,              // QA Session Observation button
-            canQC: false               // Lesson Plan QC button
+            viewMasterPortal: false,
+            viewReferralsAdmin: false,
+            viewUserDirectory: false,
+            canQA: false,
+            canQC: false
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -123,11 +123,11 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewEnrollments: false,
             viewInactiveTutors: false,
             viewArchivedStudents: false,
-            viewMasterPortal: false,   // Management Portal tab
-            viewReferralsAdmin: false,  // Referral Management
-            viewUserDirectory: false,   // User Directory
-            canQA: false,              // QA Session Observation button
-            canQC: false               // Lesson Plan QC button
+            viewMasterPortal: false,
+            viewReferralsAdmin: false,
+            viewUserDirectory: false,
+            canQA: false,
+            canQC: false
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -149,11 +149,11 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewEnrollments: true,
             viewInactiveTutors: true,
             viewArchivedStudents: true,
-            viewMasterPortal: true,    // Managers can see the Master View
-            viewReferralsAdmin: true,   // Referral Management
-            viewUserDirectory: true,    // User Directory
-            canQA: false,              // Only QA officers rate sessions
-            canQC: false               // Only QC officers rate lesson plans
+            viewMasterPortal: true,
+            viewReferralsAdmin: true,
+            viewUserDirectory: true,
+            canQA: false,
+            canQC: false
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -175,11 +175,11 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewEnrollments: true,
             viewInactiveTutors: true,
             viewArchivedStudents: true,
-            viewMasterPortal: true,    // Directors can see the Master View
-            viewReferralsAdmin: true,   // Referral Management
-            viewUserDirectory: true,    // User Directory
-            canQA: true,               // Directors can do QA ratings
-            canQC: true                // Directors can do QC ratings
+            viewMasterPortal: true,
+            viewReferralsAdmin: true,
+            viewUserDirectory: true,
+            canQA: true,
+            canQC: true
         }, 
         actions: { 
             canDownloadReports: true, 
@@ -201,11 +201,11 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewEnrollments: true,
             viewInactiveTutors: true,
             viewArchivedStudents: true,
-            viewMasterPortal: true,    // Admins have full access
-            viewReferralsAdmin: true,   // Referral Management
-            viewUserDirectory: true,    // User Directory
-            canQA: true,               // Admins can do QA ratings
-            canQC: true                // Admins can do QC ratings
+            viewMasterPortal: true,
+            viewReferralsAdmin: true,
+            viewUserDirectory: true,
+            canQA: true,
+            canQC: true
         }, 
         actions: { 
             canDownloadReports: true, 
@@ -736,4 +736,2189 @@ async function renderContentManagerPanel(container) {
                     
                     <div class="mb-4">
                         <label class="font-bold">Upload JSON with Passage Content:</label>
-                        <input type="file" id="bulk-passage-json-upload" class="w-full mt-1 border p-2 rounded
+                        <input type="file" id="bulk-passage-json-upload" class="w-full mt-1 border p-2 rounded" accept=".json">
+                        <p class="text-xs text-gray-500 mt-1">
+                            Upload a JSON file with passage content structured like your test file
+                        </p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="font-bold">Or Paste Passage Content JSON:</label>
+                        <textarea id="bulk-passage-json-textarea" class="w-full p-2 border rounded h-40 mt-1 font-mono text-sm" placeholder='Paste JSON like: {
+  "passages": [
+    {
+      "title": "A Picture of Peace",
+      "content": "Full passage content here..."
+    }
+  ]
+}'></textarea>
+                    </div>
+                    
+                    <div id="bulk-passage-match-preview" class="mb-4" style="display:none;">
+                        <p class="font-semibold mb-2">Passage Matching Preview:</p>
+                        <div id="bulk-passage-match-list" class="space-y-2 max-h-60 overflow-y-auto border rounded p-2 bg-white"></div>
+                    </div>
+                    
+                    <button id="bulk-passage-json-upload-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 w-full">
+                        Upload All Passages to Firestore
+                    </button>
+                    <div id="bulk-passage-json-upload-status" class="mt-2 text-sm"></div>
+                </div>
+                
+                <!-- Single Image Upload Section -->
+                <div class="p-4 border rounded-md mb-6">
+                    <h4 class="text-xl font-semibold mb-2">4. Add Missing Images (Single)</h4>
+                    <select id="image-select" class="w-full p-2 border rounded mt-1 mb-2"></select>
+                    <div id="image-preview-container" class="my-2" style="display:none;">
+                        <p class="font-semibold text-sm">Image to be replaced:</p>
+                        <img id="image-preview" src="" class="border rounded max-w-xs mt-1"/>
+                    </div>
+                    <label class="font-bold mt-2">Upload New Image:</label>
+                    <input type="file" id="image-upload-input" class="w-full mt-1 border p-2 rounded" accept="image/*">
+                    <button id="update-image-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Upload & Save Image to Firestore</button>
+                </div>
+
+                <!-- Bulk Image Upload Section -->
+                <div class="p-4 border rounded-md bg-blue-50">
+                    <h4 class="text-xl font-semibold mb-2">5. Bulk Image Upload (One-to-One Matching)</h4>
+                    <p class="text-sm text-gray-600 mb-4">
+                        Upload multiple images at once. Each numbered image matches ONE specific question:<br>
+                        • <strong>1.jpg</strong> → matches <strong>m4_2022_q1</strong><br>
+                        • <strong>2.jpg</strong> → matches <strong>m4_2022_q2</strong><br>
+                        • <strong>5.png</strong> → matches <strong>m4_2022_q5</strong>
+                    </p>
+                    
+                    <div class="mb-4">
+                        <label class="font-bold">Select Numbered Images:</label>
+                        <input type="file" id="bulk-image-upload-input" class="w-full mt-1 border p-2 rounded" accept="image/*" multiple>
+                        <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple images</p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <input type="checkbox" id="overwrite-existing-checkbox" class="mr-2">
+                        <label for="overwrite-existing-checkbox" class="text-sm font-medium text-gray-700">
+                            Overwrite existing images
+                        </label>
+                        <p class="text-xs text-gray-500 ml-6">
+                            When checked: Replaces ALL matched questions' images. When unchecked: Only fills missing images.
+                        </p>
+                    </div>
+                    
+                    <div id="bulk-upload-preview" class="mb-4" style="display:none;">
+                        <p class="font-semibold mb-2">Selected Images for Upload:</p>
+                        <div id="bulk-image-list" class="space-y-2 max-h-40 overflow-y-auto"></div>
+                    </div>
+                    
+                    <button id="bulk-upload-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full">
+                        Upload All Images & Update Questions
+                    </button>
+                    <div id="bulk-upload-status" class="mt-2 text-sm"></div>
+                </div>
+                
+                <p id="status" class="mt-4 font-bold"></p>
+            </div>
+        </div>
+    `;
+    setupContentManager();
+}
+
+async function setupContentManager() {
+    const GITHUB_USER = 'psalminfo';
+    const GITHUB_REPO = 'blooming-kids-cbt';
+    const GITHUB_IMAGE_PREVIEW_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/images/`;
+    const API_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/`;
+
+    const loaderStatus = document.getElementById('loader-status');
+    const workspace = document.getElementById('manager-workspace');
+    const testFileSelect = document.getElementById('test-file-select');
+    const loadTestBtn = document.getElementById('load-test-btn');
+    const forceReloadCheckbox = document.getElementById('force-reload-checkbox');
+    const status = document.getElementById('status');
+    
+    let loadedTestData = null;
+    let currentTestDocId = null;
+
+    // Cloudinary configuration
+    const CLOUDINARY_CLOUD_NAME = 'dy2hxcyaf';
+    const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
+    const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
+    async function uploadImageToCloudinary(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+        const res = await fetch(CLOUDINARY_UPLOAD_URL, { method: 'POST', body: formData });
+        if (!res.ok) throw new Error("Image upload failed");
+        const data = await res.json();
+        return data.secure_url;
+    }
+
+    async function discoverFiles() {
+        try {
+            const response = await fetch(API_URL);
+            if (!response.ok) throw new Error(`Cannot access repository. Check username/repo. Status: ${response.status}`);
+            const files = await response.json();
+            testFileSelect.innerHTML = '<option value="">-- Select a Test File --</option>';
+            const jsonFiles = files.filter(file => file.name.endsWith('.json'));
+            if (jsonFiles.length === 0) {
+                 testFileSelect.innerHTML = '<option value="">No .json files found.</option>';
+                 return;
+            }
+            jsonFiles.forEach(file => {
+                const option = document.createElement('option');
+                option.value = file.download_url;
+                option.textContent = file.name;
+                testFileSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error discovering files:', error);
+            loaderStatus.innerHTML = `<p class="text-red-500"><strong>Error discovering files:</strong> ${error.message}</p>`;
+        }
+    }
+
+    loadTestBtn.addEventListener('click', async () => {
+        const url = testFileSelect.value;
+        const fileName = testFileSelect.options[testFileSelect.selectedIndex].text;
+        currentTestDocId = fileName.replace('.json', ''); 
+        const forceReload = forceReloadCheckbox.checked;
+
+        if (!url) {
+            loaderStatus.innerHTML = `<p class="text-yellow-600">Please select a file.</p>`;
+            return;
+        }
+
+        loaderStatus.innerHTML = `<p class="text-blue-600">Checking for test...</p>`;
+        workspace.style.display = 'none';
+        status.textContent = '';
+
+        try {
+            const testDocRef = doc(db, "tests", currentTestDocId);
+            const docSnap = await getDoc(testDocRef);
+
+            if (!forceReload && docSnap.exists()) {
+                console.log("Loading saved progress from Firestore.");
+                loaderStatus.innerHTML = `<p class="text-green-600 font-bold">✅ Loaded saved version from Firestore!</p>`;
+                loadedTestData = docSnap.data();
+            } else {
+                const logMessage = forceReload ? "Force Reload activated. Fetching from GitHub." : "No saved version. Loading template from GitHub.";
+                console.log(logMessage);
+                loaderStatus.innerHTML = `<p class="text-blue-600">Loading latest version from GitHub...</p>`;
+                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Could not fetch file from GitHub. Status: ${response.status}`);
+                const githubData = await response.json();
+                
+                if (forceReload && docSnap.exists()) {
+                    const existingData = docSnap.data();
+                    loadedTestData = preserveImageUrls(githubData, existingData);
+                    loaderStatus.innerHTML += `<p class="text-green-600 font-bold">✅ Preserved existing Cloudinary images!</p>`;
+                } else {
+                    loadedTestData = githubData;
+                }
+                
+                await setDoc(testDocRef, loadedTestData);
+                loaderStatus.innerHTML = `<p class="text-green-600 font-bold">✅ Synced latest version from GitHub to Firestore!</p>`;
+            }
+            
+            if (!loadedTestData || !loadedTestData.tests) throw new Error("Invalid test file format.");
+            
+            document.getElementById('loaded-file-name').textContent = `Editing: ${fileName}`;
+            workspace.style.display = 'block';
+            populateDropdowns();
+
+        } catch (error) {
+            console.error("Error loading test data:", error);
+            loaderStatus.innerHTML = `<p class="text-red-500"><strong>Error:</strong> ${error.message}</p>`;
+        }
+    });
+
+    function preserveImageUrls(newData, existingData) {
+        if (!existingData.tests || !newData.tests) return newData;
+        
+        const preservedData = JSON.parse(JSON.stringify(newData));
+        
+        preservedData.tests.forEach((newTest, testIndex) => {
+            const existingTest = existingData.tests[testIndex];
+            if (!existingTest) return;
+            
+            if (newTest.questions && existingTest.questions) {
+                newTest.questions.forEach((newQuestion, questionIndex) => {
+                    const existingQuestion = existingTest.questions[questionIndex];
+                    if (existingQuestion && existingQuestion.imageUrl) {
+                        preservedData.tests[testIndex].questions[questionIndex].imageUrl = existingQuestion.imageUrl;
+                        if (preservedData.tests[testIndex].questions[questionIndex].imagePlaceholder) {
+                            delete preservedData.tests[testIndex].questions[questionIndex].imagePlaceholder;
+                        }
+                    }
+                });
+            }
+        });
+        
+        return preservedData;
+    }
+
+    const passageSelect = document.getElementById('passage-select');
+    const passageContent = document.getElementById('passage-content');
+    const imageSelect = document.getElementById('image-select');
+    const imageUploadInput = document.getElementById('image-upload-input');
+    const updatePassageBtn = document.getElementById('update-passage-btn');
+    const updateImageBtn = document.getElementById('update-image-btn');
+    const imagePreviewContainer = document.getElementById('image-preview-container');
+    const imagePreview = document.getElementById('image-preview');
+
+    // Bulk passage upload elements
+    const bulkPassageJsonUpload = document.getElementById('bulk-passage-json-upload');
+    const bulkPassageJsonTextarea = document.getElementById('bulk-passage-json-textarea');
+    const bulkPassageMatchPreview = document.getElementById('bulk-passage-match-preview');
+    const bulkPassageMatchList = document.getElementById('bulk-passage-match-list');
+    const bulkPassageJsonUploadBtn = document.getElementById('bulk-passage-json-upload-btn');
+    const bulkPassageJsonUploadStatus = document.getElementById('bulk-passage-json-upload-status');
+
+    // Bulk image upload elements
+    const bulkImageUploadInput = document.getElementById('bulk-image-upload-input');
+    const overwriteExistingCheckbox = document.getElementById('overwrite-existing-checkbox');
+    const bulkUploadPreview = document.getElementById('bulk-upload-preview');
+    const bulkImageList = document.getElementById('bulk-image-list');
+    const bulkUploadBtn = document.getElementById('bulk-upload-btn');
+    const bulkUploadStatus = document.getElementById('bulk-upload-status');
+
+    function populateDropdowns() {
+        passageSelect.innerHTML = '<option value="">-- Select an incomplete passage --</option>';
+        imageSelect.innerHTML = '<option value="">-- Select a question needing an image --</option>';
+        imagePreviewContainer.style.display = 'none';
+        
+        loadedTestData.tests.forEach((test, testIndex) => {
+             (test.passages || []).forEach((passage, passageIndex) => {
+                if (passage.content && passage.content.includes("TO BE UPLOADED")) {
+                    const option = document.createElement('option');
+                    option.value = `${testIndex}-${passageIndex}`;
+                    option.textContent = `[${test.subject} G${test.grade}] ${passage.title}`;
+                    passageSelect.appendChild(option);
+                }
+             });
+             (test.questions || []).forEach((question, questionIndex) => {
+                if (question.imagePlaceholder && !question.imageUrl) {
+                     const option = document.createElement('option');
+                     option.value = `${testIndex}-${questionIndex}`;
+                     option.textContent = `[${test.subject} G${test.grade}] Q-ID ${question.questionId}`;
+                     imageSelect.appendChild(option);
+                }
+             });
+        });
+    }
+
+    passageSelect.addEventListener('change', e => {
+        if (!e.target.value) { passageContent.value = ''; return; }
+        const [testIndex, passageIndex] = e.target.value.split('-');
+        passageContent.value = loadedTestData.tests[testIndex].passages[passageIndex].content || '';
+    });
+
+    imageSelect.addEventListener('change', e => {
+        if (!e.target.value) {
+            imagePreviewContainer.style.display = 'none';
+            return;
+        }
+        const [testIndex, questionIndex] = e.target.value.split('-');
+        const question = loadedTestData.tests[testIndex].questions[questionIndex];
+        const imageName = question.imagePlaceholder;
+        
+        if (imageName) {
+            imagePreview.src = GITHUB_IMAGE_PREVIEW_URL + imageName;
+            imagePreviewContainer.style.display = 'block';
+        } else {
+            imagePreviewContainer.style.display = 'none';
+        }
+    });
+    
+    updatePassageBtn.addEventListener('click', async () => {
+        const selected = passageSelect.value;
+        if (!selected) {
+            status.textContent = 'Please select a passage first.';
+            status.style.color = 'orange';
+            return;
+        }
+        status.textContent = 'Saving passage to Firestore...';
+        status.style.color = 'blue';
+
+        const [testIndex, passageIndex] = selected.split('-');
+        loadedTestData.tests[testIndex].passages[passageIndex].content = passageContent.value;
+        
+        try {
+            const testDocRef = doc(db, "tests", currentTestDocId);
+            await setDoc(testDocRef, loadedTestData);
+            status.textContent = `✅ Passage saved successfully!`;
+            status.style.color = 'green';
+            passageContent.value = '';
+            populateDropdowns();
+        } catch (error) {
+            status.textContent = `❌ Error saving passage: ${error.message}`;
+            status.style.color = 'red';
+            console.error("Firestore update error:", error);
+        }
+    });
+
+    updateImageBtn.addEventListener('click', async () => {
+        const selectedImage = imageSelect.value;
+        const file = imageUploadInput.files[0];
+        if (!selectedImage || !file) {
+            status.textContent = 'Please select a question and an image file.';
+            status.style.color = 'orange';
+            return;
+        }
+
+        try {
+            status.textContent = 'Uploading image...';
+            status.style.color = 'blue';
+            const imageUrl = await uploadImageToCloudinary(file);
+            
+            status.textContent = 'Saving URL to Firestore...';
+            const [testIndex, questionIndex] = selectedImage.split('-');
+            loadedTestData.tests[testIndex].questions[questionIndex].imageUrl = imageUrl;
+            delete loadedTestData.tests[testIndex].questions[questionIndex].imagePlaceholder;
+
+            const testDocRef = doc(db, "tests", currentTestDocId);
+            await setDoc(testDocRef, loadedTestData);
+            
+            status.textContent = `✅ Image URL saved successfully!`;
+            status.style.color = 'green';
+            imageUploadInput.value = '';
+            populateDropdowns();
+        } catch (error) {
+            console.error('Error saving image:', error);
+            status.textContent = `❌ Error: ${error.message}`;
+            status.style.color = 'red';
+        }
+    });
+
+    // ==================== BULK PASSAGE UPLOAD FUNCTIONALITY ====================
+    
+    // Function to find passages that need content
+    function findPassagesNeedingContent() {
+        const passagesNeedingContent = [];
+        
+        if (!loadedTestData || !loadedTestData.tests) return passagesNeedingContent;
+        
+        loadedTestData.tests.forEach((test, testIndex) => {
+            (test.passages || []).forEach((passage, passageIndex) => {
+                // Look for passages that have placeholder content or need real content
+                if (passage.content && (
+                    passage.content.includes("[Full passage text from PDF") || 
+                    passage.content.includes("TO BE UPLOADED") ||
+                    passage.content.includes("[This is a paired passage entry") ||
+                    passage.content.length < 100 // Very short content likely needs replacement
+                )) {
+                    passagesNeedingContent.push({
+                        testIndex,
+                        passageIndex,
+                        passageId: passage.passageId,
+                        title: passage.title,
+                        currentContent: passage.content,
+                        testSubject: test.subject,
+                        testGrade: test.grade
+                    });
+                }
+            });
+        });
+        
+        return passagesNeedingContent;
+    }
+
+    // Function to match uploaded passages with existing passages by title
+    function matchPassagesByTitle(uploadedPassages, existingPassages) {
+        const matches = [];
+        const usedUploadedIndices = new Set();
+        
+        existingPassages.forEach(existingPassage => {
+            let bestMatch = null;
+            let bestMatchIndex = -1;
+            
+            // Try to find exact title match first
+            uploadedPassages.forEach((uploadedPassage, uploadedIndex) => {
+                if (usedUploadedIndices.has(uploadedIndex)) return;
+                
+                if (uploadedPassage.title === existingPassage.title) {
+                    bestMatch = uploadedPassage;
+                    bestMatchIndex = uploadedIndex;
+                    return;
+                }
+            });
+            
+            // If no exact match, try partial match
+            if (!bestMatch) {
+                uploadedPassages.forEach((uploadedPassage, uploadedIndex) => {
+                    if (usedUploadedIndices.has(uploadedIndex)) return;
+                    
+                    if (existingPassage.title.includes(uploadedPassage.title) || 
+                        uploadedPassage.title.includes(existingPassage.title)) {
+                        bestMatch = uploadedPassage;
+                        bestMatchIndex = uploadedIndex;
+                        return;
+                    }
+                });
+            }
+            
+            if (bestMatch) {
+                usedUploadedIndices.add(bestMatchIndex);
+                matches.push({
+                    existingPassage,
+                    uploadedPassage: bestMatch,
+                    matchType: 'title'
+                });
+            } else {
+                matches.push({
+                    existingPassage,
+                    uploadedPassage: null,
+                    matchType: 'no-match'
+                });
+            }
+        });
+        
+        return matches;
+    }
+
+    // Handle bulk passage JSON input
+    function handleBulkPassageJsonInput() {
+        const file = bulkPassageJsonUpload.files[0];
+        const jsonText = bulkPassageJsonTextarea.value.trim();
+        
+        const existingPassages = findPassagesNeedingContent();
+        
+        if (existingPassages.length === 0) {
+            bulkPassageMatchPreview.style.display = 'none';
+            bulkPassageJsonUploadStatus.textContent = 'No passages found that need content updates.';
+            bulkPassageJsonUploadStatus.style.color = 'orange';
+            return;
+        }
+        
+        let uploadedPassages = [];
+        
+        try {
+            if (file) {
+                // Read from file
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const jsonData = JSON.parse(e.target.result);
+                        uploadedPassages = extractPassagesFromJson(jsonData);
+                        displayPassageMatches(uploadedPassages, existingPassages);
+                    } catch (error) {
+                        bulkPassageJsonUploadStatus.textContent = `Error parsing JSON file: ${error.message}`;
+                        bulkPassageJsonUploadStatus.style.color = 'red';
+                    }
+                };
+                reader.readAsText(file);
+            } else if (jsonText) {
+                // Read from textarea
+                const jsonData = JSON.parse(jsonText);
+                uploadedPassages = extractPassagesFromJson(jsonData);
+                displayPassageMatches(uploadedPassages, existingPassages);
+            } else {
+                bulkPassageMatchPreview.style.display = 'none';
+                bulkPassageJsonUploadStatus.textContent = 'Please provide passage content JSON.';
+                bulkPassageJsonUploadStatus.style.color = 'orange';
+            }
+        } catch (error) {
+            bulkPassageJsonUploadStatus.textContent = `Error: ${error.message}`;
+            bulkPassageJsonUploadStatus.style.color = 'red';
+        }
+    }
+
+    // Extract passages from various JSON structures
+    function extractPassagesFromJson(jsonData) {
+        let passages = [];
+        
+        // Handle different JSON structures
+        if (Array.isArray(jsonData)) {
+            // Direct array of passages
+            passages = jsonData;
+        } else if (jsonData.passages && Array.isArray(jsonData.passages)) {
+            // Object with passages array
+            passages = jsonData.passages;
+        } else if (jsonData.tests && Array.isArray(jsonData.tests)) {
+            // Full test structure - extract passages from all tests
+            jsonData.tests.forEach(test => {
+                if (test.passages && Array.isArray(test.passages)) {
+                    passages = passages.concat(test.passages);
+                }
+            });
+        }
+        
+        return passages;
+    }
+
+    // Display matching preview
+    function displayPassageMatches(uploadedPassages, existingPassages) {
+        const matches = matchPassagesByTitle(uploadedPassages, existingPassages);
+        
+        bulkPassageMatchList.innerHTML = '';
+        
+        let matchedCount = 0;
+        let unmatchedCount = 0;
+        
+        matches.forEach((match, index) => {
+            const matchItem = document.createElement('div');
+            matchItem.className = 'flex justify-between items-start p-2 bg-gray-50 rounded text-sm';
+            
+            let statusHtml = '';
+            let statusColor = 'text-gray-500';
+            
+            if (match.uploadedPassage) {
+                matchedCount++;
+                statusHtml = `
+                    <div class="text-green-600 font-semibold">✓ MATCHED</div>
+                    <div class="text-xs text-gray-600 mt-1">Content length: ${match.uploadedPassage.content?.length || 0} chars</div>
+                `;
+                statusColor = 'text-green-600';
+            } else {
+                unmatchedCount++;
+                statusHtml = '<div class="text-orange-600 font-semibold">✗ NO MATCH</div>';
+                statusColor = 'text-orange-600';
+            }
+            
+            matchItem.innerHTML = `
+                <div class="flex-1">
+                    <div class="font-semibold">${match.existingPassage.title}</div>
+                    <div class="text-xs text-gray-600">${match.existingPassage.testSubject} G${match.existingPassage.testGrade} • ${match.existingPassage.passageId}</div>
+                    <div class="text-xs text-gray-500 mt-1 truncate">Current: "${match.existingPassage.currentContent.substring(0, 50)}..."</div>
+                </div>
+                <div class="ml-4 text-right ${statusColor}">
+                    ${statusHtml}
+                </div>
+            `;
+            bulkPassageMatchList.appendChild(matchItem);
+        });
+        
+        bulkPassageMatchPreview.style.display = 'block';
+        bulkPassageJsonUploadStatus.textContent = `Found ${matchedCount} matches out of ${existingPassages.length} passages needing content.`;
+        bulkPassageJsonUploadStatus.style.color = matchedCount > 0 ? 'blue' : 'orange';
+    }
+
+    // Main bulk passage upload function
+    bulkPassageJsonUploadBtn.addEventListener('click', async () => {
+        const existingPassages = findPassagesNeedingContent();
+        
+        if (existingPassages.length === 0) {
+            bulkPassageJsonUploadStatus.textContent = 'No passages found that need content updates.';
+            bulkPassageJsonUploadStatus.style.color = 'orange';
+            return;
+        }
+        
+        let uploadedPassages = [];
+        
+        try {
+            const file = bulkPassageJsonUpload.files[0];
+            const jsonText = bulkPassageJsonTextarea.value.trim();
+            
+            if (file) {
+                const text = await readFileAsText(file);
+                const jsonData = JSON.parse(text);
+                uploadedPassages = extractPassagesFromJson(jsonData);
+            } else if (jsonText) {
+                const jsonData = JSON.parse(jsonText);
+                uploadedPassages = extractPassagesFromJson(jsonData);
+            } else {
+                bulkPassageJsonUploadStatus.textContent = 'Please provide passage content first.';
+                bulkPassageJsonUploadStatus.style.color = 'orange';
+                return;
+            }
+            
+            const matches = matchPassagesByTitle(uploadedPassages, existingPassages);
+            const validMatches = matches.filter(match => match.uploadedPassage);
+            
+            if (validMatches.length === 0) {
+                bulkPassageJsonUploadStatus.textContent = 'No matching passages found. Check your titles.';
+                bulkPassageJsonUploadStatus.style.color = 'orange';
+                return;
+            }
+            
+            bulkPassageJsonUploadStatus.textContent = `Updating ${validMatches.length} passages...`;
+            bulkPassageJsonUploadStatus.style.color = 'blue';
+            bulkPassageJsonUploadBtn.disabled = true;
+            
+            // Update passages in the loaded data
+            let updatedCount = 0;
+            
+            validMatches.forEach(match => {
+                if (match.uploadedPassage && match.uploadedPassage.content) {
+                    loadedTestData.tests[match.existingPassage.testIndex]
+                        .passages[match.existingPassage.passageIndex]
+                        .content = match.uploadedPassage.content;
+                    updatedCount++;
+                }
+            });
+            
+            // Save to Firestore
+            if (updatedCount > 0) {
+                bulkPassageJsonUploadStatus.textContent = `Saving ${updatedCount} passages to Firestore...`;
+                
+                const testDocRef = doc(db, "tests", currentTestDocId);
+                await setDoc(testDocRef, loadedTestData);
+                
+                bulkPassageJsonUploadStatus.textContent = `✅ Success! ${updatedCount} passages updated successfully!`;
+                bulkPassageJsonUploadStatus.style.color = 'green';
+                
+                // Reset form and refresh
+                bulkPassageJsonUpload.value = '';
+                bulkPassageJsonTextarea.value = '';
+                bulkPassageMatchPreview.style.display = 'none';
+                populateDropdowns();
+            } else {
+                bulkPassageJsonUploadStatus.textContent = 'No passages were updated.';
+                bulkPassageJsonUploadStatus.style.color = 'orange';
+            }
+            
+        } catch (error) {
+            console.error('Bulk passage upload error:', error);
+            bulkPassageJsonUploadStatus.textContent = `❌ Error: ${error.message}`;
+            bulkPassageJsonUploadStatus.style.color = 'red';
+        } finally {
+            bulkPassageJsonUploadBtn.disabled = false;
+        }
+    });
+
+    // Add event listeners for bulk passage upload
+    bulkPassageJsonUpload.addEventListener('change', handleBulkPassageJsonInput);
+    bulkPassageJsonTextarea.addEventListener('input', handleBulkPassageJsonInput);
+
+    // Helper function to read file as text
+    function readFileAsText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = e => resolve(e.target.result);
+            reader.onerror = reject;
+            reader.readAsText(file);
+        });
+    }
+
+    // ==================== BULK IMAGE UPLOAD FUNCTIONALITY ====================
+    
+    bulkImageUploadInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files);
+        bulkImageList.innerHTML = '';
+        
+        if (files.length === 0) {
+            bulkUploadPreview.style.display = 'none';
+            return;
+        }
+        
+        bulkUploadPreview.style.display = 'block';
+        
+        files.forEach((file, index) => {
+            const fileName = file.name;
+            const number = extractNumberFromFileName(fileName);
+            const questionLocation = findQuestionByNumber(number, overwriteExistingCheckbox.checked);
+            
+            const fileItem = document.createElement('div');
+            fileItem.className = 'flex justify-between items-center p-2 bg-white border rounded';
+            
+            let statusText = 'No number found in filename';
+            let statusColor = 'text-red-600';
+            
+            if (number) {
+                if (questionLocation) {
+                    const hasExistingImage = questionLocation.question.imageUrl;
+                    const questionId = questionLocation.question.questionId;
+                    statusText = `→ ${number}.jpg → Q-ID: ${questionId} ${hasExistingImage ? '(will overwrite)' : '(new image)'}`;
+                    statusColor = hasExistingImage ? 'text-orange-600' : 'text-green-600';
+                } else {
+                    statusText = `→ ${number}.jpg (no matching question found)`;
+                    statusColor = 'text-gray-500';
+                }
+            }
+            
+            fileItem.innerHTML = `
+                <span class="text-sm">${fileName}</span>
+                <span class="text-xs ${statusColor}">
+                    ${statusText}
+                </span>
+            `;
+            bulkImageList.appendChild(fileItem);
+        });
+    });
+
+    function extractNumberFromFileName(fileName) {
+        const match = fileName.match(/(\d+)\./); // Get number before file extension
+        return match ? parseInt(match[1]) : null;
+    }
+
+    function findQuestionByNumber(number, overwriteMode = false) {
+        if (!number) return null;
+        
+        // Build the expected question ID pattern for this number
+        const expectedQuestionId = `q${number}`;
+        
+        for (let testIndex = 0; testIndex < loadedTestData.tests.length; testIndex++) {
+            const test = loadedTestData.tests[testIndex];
+            if (test.questions) {
+                for (let questionIndex = 0; questionIndex < test.questions.length; questionIndex++) {
+                    const question = test.questions[questionIndex];
+                    
+                    // Check if question ID ends with the expected pattern (q1, q2, q5, etc.)
+                    if (question.questionId.endsWith(expectedQuestionId)) {
+                        // In overwrite mode, match ALL questions with this pattern
+                        // In normal mode, only match questions that need images (have placeholder but no URL)
+                        if (overwriteMode || (question.imagePlaceholder && !question.imageUrl)) {
+                            return { testIndex, questionIndex, question };
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    bulkUploadBtn.addEventListener('click', async () => {
+        const files = Array.from(bulkImageUploadInput.files);
+        const overwriteMode = overwriteExistingCheckbox.checked;
+        
+        if (files.length === 0) {
+            bulkUploadStatus.textContent = 'Please select some images first.';
+            bulkUploadStatus.style.color = 'orange';
+            return;
+        }
+
+        bulkUploadStatus.textContent = `Starting bulk upload of ${files.length} images (${overwriteMode ? 'OVERWRITE mode' : 'FILL mode'})...`;
+        bulkUploadStatus.style.color = 'blue';
+        bulkUploadBtn.disabled = true;
+
+        try {
+            let successfulUploads = 0;
+            let skippedUploads = 0;
+            let overwrittenUploads = 0;
+            
+            // Process each file
+            for (const file of files) {
+                const number = extractNumberFromFileName(file.name);
+                
+                if (!number) {
+                    console.log(`Skipping ${file.name} - no number found in filename`);
+                    skippedUploads++;
+                    continue;
+                }
+                
+                const questionLocation = findQuestionByNumber(number, overwriteMode);
+                
+                if (!questionLocation) {
+                    console.log(`Skipping ${file.name} - no matching question found for number ${number}${overwriteMode ? '' : ' or question already has image'}`);
+                    skippedUploads++;
+                    continue;
+                }
+                
+                // Upload image to Cloudinary
+                bulkUploadStatus.textContent = `Uploading ${file.name} for question ${number}...`;
+                const imageUrl = await uploadImageToCloudinary(file);
+                
+                // Update the ONE matched question
+                const hadExistingImage = !!loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imageUrl;
+                loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imageUrl = imageUrl;
+                
+                // Remove placeholder when adding image
+                if (loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imagePlaceholder) {
+                    delete loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imagePlaceholder;
+                }
+                
+                successfulUploads++;
+                if (hadExistingImage) overwrittenUploads++;
+                
+                bulkUploadStatus.textContent = `✅ Uploaded ${file.name} → Q-ID ${questionLocation.question.questionId} (${successfulUploads}/${files.length})`;
+            }
+            
+            // Save all changes to Firestore
+            if (successfulUploads > 0) {
+                bulkUploadStatus.textContent = `Saving ${successfulUploads} image links to Firestore...`;
+                const testDocRef = doc(db, "tests", currentTestDocId);
+                await setDoc(testDocRef, loadedTestData);
+                
+                let resultMessage = `✅ Success! ${successfulUploads} images processed.`;
+                if (overwrittenUploads > 0) {
+                    resultMessage += ` ${overwrittenUploads} existing images were replaced.`;
+                }
+                if (skippedUploads > 0) {
+                    resultMessage += ` ${skippedUploads} files skipped.`;
+                }
+                
+                bulkUploadStatus.textContent = resultMessage;
+                bulkUploadStatus.style.color = 'green';
+            } else {
+                bulkUploadStatus.textContent = 'No images were successfully processed. Check file names contain numbers.';
+                bulkUploadStatus.style.color = 'orange';
+            }
+            
+            // Reset and refresh
+            bulkImageUploadInput.value = '';
+            bulkUploadPreview.style.display = 'none';
+            populateDropdowns();
+            
+        } catch (error) {
+            console.error('Bulk upload error:', error);
+            bulkUploadStatus.textContent = `❌ Bulk upload failed: ${error.message}`;
+            bulkUploadStatus.style.color = 'red';
+        } finally {
+            bulkUploadBtn.disabled = false;
+        }
+    });
+
+    discoverFiles();
+}
+
+// ##################################################################
+// # SECTION 3: TUTOR MANAGEMENT (OPTIMIZED WITH ADDITIONAL CONTROLS)
+// ##################################################################
+
+let globalSettings = {};
+
+async function renderTutorManagementPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+             <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-green-700">Global Settings</h2>
+                <button id="refresh-tutor-data-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh Data</button>
+           
+             </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Report Submission:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="report-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="report-status-label" class="ml-3 text-sm font-medium"></span></label></div>
+                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Tutors Can Add Students:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="tutor-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="tutor-add-status-label" class="ml-3 text-sm font-medium"></span></label></div>
+                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Enable Summer Break:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="summer-break-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="summer-break-status-label" class="ml-3 text-sm font-medium"></span></label></div>
+                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Student Fees (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-fees-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-fees-status-label" class="ml-3 text-sm font-medium"></span></label></div>
+                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Edit/Delete (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="edit-delete-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="edit-delete-status-label" class="ml-3 text-sm font-medium"></span></label></div>
+                
+                 <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Direct Student Add (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></div>
+                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Transition Button:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-transition-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-transition-status-label" class="ml-3 text-sm font-medium"></span></label></div>
+                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Preschool-2 Add/Transition:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="preschool-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="preschool-add-status-label" class="ml-3 text-sm font-medium"></span></label></div>
+            </div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-start mb-4">
+      
+                 <h3 class="text-2xl font-bold text-green-700">Manage Tutors</h3>
+                <div class="flex space-x-4">
+                    <div class="bg-blue-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-blue-800 text-sm">Total Tutors</h4><p id="tutor-count-badge" class="text-2xl text-blue-600 font-extrabold">0</p></div>
+                    <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Students</h4><p id="student-count-badge" class="text-2xl text-green-600 font-extrabold">0</p></div>
+  
+                 </div>
+            </div>
+
+            <div class="mb-4">
+                <label for="global-search-bar" class="block font-semibold">Search Student, Parent, or Tutor:</label>
+                <input type="search" id="global-search-bar" class="w-full p-2 border rounded mt-1" placeholder="Start typing a name...">
+           
+             </div>
+            <div id="global-search-results" class="mb-4"></div>
+
+            <div id="tutor-management-area">
+                <div class="mb-4">
+                    <label for="tutor-select" class="block font-semibold">Select Tutor Manually:</label>
+                    <select id="tutor-select" class="w-full p-2 border rounded mt-1"></select>
+    
+                 </div>
+                <div id="selected-tutor-details" class="mt-4"><p class="text-gray-500">Please select a tutor to view details.</p></div>
+            </div>
+        </div>
+    `;
+    setupTutorManagementListeners();
+}
+
+function setupTutorManagementListeners() {
+    const settingsDocRef = doc(db, "settings", "global_settings");
+
+    // ── Unsubscribe previous listener to prevent duplicates ──
+    if (window._adminSettingsUnsub) {
+        try { window._adminSettingsUnsub(); } catch(e) {}
+    }
+
+    const TOGGLE_MAP = { 
+        'isReportEnabled': 'report', 
+        'isTutorAddEnabled': 'tutor-add', 
+        'isSummerBreakEnabled': 'summer-break', 
+        'showStudentFees': 'show-fees', 
+        'showEditDeleteButtons': 'edit-delete', 
+        'bypassPendingApproval': 'bypass-approval',
+        'showTransitionButton': 'show-transition',
+        'preschoolAddTransition': 'preschool-add'
+    };
+
+    // ── Real-time listener for settings (single-doc, efficient) ──
+    window._adminSettingsUnsub = onSnapshot(settingsDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            globalSettings = data;
+
+            for (const key in TOGGLE_MAP) {
+                const type = TOGGLE_MAP[key];
+                const toggle = document.getElementById(`${type}-toggle`);
+                const label = document.getElementById(`${type}-status-label`);
+                if (toggle && label) {
+                    toggle.checked = !!data[key];
+                    label.textContent = data[key] ? 'Enabled' : 'Disabled';
+                    label.style.color = data[key] ? '#16a34a' : '#dc2626';
+                }
+            }
+            if (activeTutorId) {
+                renderSelectedTutorDetailsFromCache(activeTutorId);
+            }
+        }
+    }, (error) => {
+        console.error('Settings listener error:', error);
+    });
+
+    // ── Helper: write a single setting to Firestore with visual feedback ──
+    async function toggleSetting(fieldName, toggleId, checked) {
+        const label = document.getElementById(`${TOGGLE_MAP[fieldName]}-status-label`);
+        const prevText = label ? label.textContent : '';
+        try {
+            if (label) { label.textContent = 'Saving…'; label.style.color = '#f59e0b'; }
+            await setDoc(settingsDocRef, { 
+                [fieldName]: checked, 
+                lastUpdated: new Date() 
+            }, { merge: true });
+            // onSnapshot will update the label automatically
+        } catch (err) {
+            console.error(`Toggle error (${fieldName}):`, err);
+            // Revert toggle on error
+            const toggle = document.getElementById(toggleId);
+            if (toggle) toggle.checked = !checked;
+            if (label) { label.textContent = 'Error! ' + prevText; label.style.color = '#dc2626'; }
+            alert('Failed to update setting: ' + err.message);
+        }
+    }
+
+    // ── Attach change listeners to all toggles ──
+    const FIELD_TO_TOGGLE = {
+        'isReportEnabled': 'report-toggle',
+        'isTutorAddEnabled': 'tutor-add-toggle',
+        'isSummerBreakEnabled': 'summer-break-toggle',
+        'showStudentFees': 'show-fees-toggle',
+        'showEditDeleteButtons': 'edit-delete-toggle',
+        'bypassPendingApproval': 'bypass-approval-toggle',
+        'showTransitionButton': 'show-transition-toggle',
+        'preschoolAddTransition': 'preschool-add-toggle'
+    };
+
+    for (const [field, toggleId] of Object.entries(FIELD_TO_TOGGLE)) {
+        const el = document.getElementById(toggleId);
+        if (el) {
+            el.addEventListener('change', (e) => toggleSetting(field, toggleId, e.target.checked));
+        }
+    }
+    
+    // UI Interaction Listeners
+    document.getElementById('tutor-select').addEventListener('change', e => {
+        activeTutorId = e.target.value;
+        renderSelectedTutorDetailsFromCache(activeTutorId);
+    });
+    document.getElementById('global-search-bar').addEventListener('input', handleGlobalSearch);
+    document.getElementById('refresh-tutor-data-btn').addEventListener('click', () => fetchTutorManagementData(true));
+    
+    fetchTutorManagementData(); // Initial fetch
+}
+
+async function fetchTutorManagementData(forceRefresh = false) {
+    if (forceRefresh) {
+        invalidateCache('tutors');
+        invalidateCache('students');
+    }
+
+    try {
+        const tutorSelect = document.getElementById('tutor-select');
+        const detailsContainer = document.getElementById('selected-tutor-details');
+        if (tutorSelect) tutorSelect.innerHTML = '<option>Loading Data...</option>';
+        if (detailsContainer) detailsContainer.innerHTML = '';
+        if (!sessionCache.tutors) {
+            const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), orderBy("name")));
+            const tutorsData = {};
+            tutorsSnapshot.forEach(doc => {
+                tutorsData[doc.id] = { id: doc.id, ...doc.data() };
+            });
+            saveToLocalStorage('tutors', tutorsData);
+        }
+        if (!sessionCache.students) {
+            const studentsSnapshot = await getDocs(collection(db, "students"));
+            saveToLocalStorage('students', studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }
+
+        renderTutorManagementFromCache();
+    } catch (error) {
+        console.error("Error fetching tutor management data:", error);
+        document.getElementById('tutor-management-area').innerHTML = '<p class="text-red-500">Failed to load data.</p>';
+    }
+}
+
+function renderTutorManagementFromCache() {
+    const tutorsData = sessionCache.tutors || {};
+    const studentsData = sessionCache.students || [];
+    const tutorSelect = document.getElementById('tutor-select');
+    
+    if (!tutorSelect) return;
+    tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
+    Object.values(tutorsData).forEach(tutor => {
+        const option = document.createElement('option');
+        option.value = tutor.id;
+        option.textContent = `${tutor.name} (${tutor.email})`;
+        tutorSelect.appendChild(option);
+    });
+    document.getElementById('tutor-count-badge').textContent = Object.keys(tutorsData).length;
+    document.getElementById('student-count-badge').textContent = studentsData.length;
+
+    if (activeTutorId && tutorsData[activeTutorId]) {
+        tutorSelect.value = activeTutorId;
+        renderSelectedTutorDetailsFromCache(activeTutorId);
+    } else {
+         document.getElementById('selected-tutor-details').innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
+    }
+}
+
+function handleGlobalSearch(e) {
+    const searchTerm = e.target.value.toLowerCase().trim();
+    const searchResultsContainer = document.getElementById('global-search-results');
+    const tutorManagementArea = document.getElementById('tutor-management-area');
+    const tutorSelect = document.getElementById('tutor-select');
+
+    if (searchTerm.length < 2) {
+        searchResultsContainer.innerHTML = '';
+        tutorManagementArea.style.display = 'block';
+        return;
+    }
+    
+    tutorManagementArea.style.display = 'none';
+    const students = sessionCache.students || [];
+    const tutors = sessionCache.tutors || {};
+    const tutorsByEmail = Object.values(tutors).reduce((acc, tutor) => {
+        acc[tutor.email] = tutor;
+        return acc;
+    }, {});
+    const studentResults = students.filter(student => 
+        student.studentName?.toLowerCase().includes(searchTerm) ||
+        student.parentName?.toLowerCase().includes(searchTerm)
+    );
+    const tutorResults = Object.values(tutors).filter(tutor => 
+        tutor.name?.toLowerCase().includes(searchTerm) ||
+        tutor.email?.toLowerCase().includes(searchTerm)
+    );
+    let html = `<h4 class="font-bold mb-2">Search Results:</h4>`;
+    if (tutorResults.length > 0) {
+        html += `<h5 class="font-semibold mt-4 mb-2">${tutorResults.length} matching tutor(s) found:</h5><ul class="space-y-2 border rounded-lg p-2 mb-4">${tutorResults.map(tutor => `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md"><div><p class="font-semibold">${tutor.name} (${tutor.email})</p></div><div class="flex space-x-2"><button class="manage-tutor-from-search-btn bg-blue-500 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-600" data-tutor-id="${tutor.id}">Manage</button></div></li>`).join('')}</ul>`;
+    }
+    if (studentResults.length > 0) {
+        html += `<h5 class="font-semibold mt-4 mb-2">${studentResults.length} matching student(s) found:</h5><ul class="space-y-2 border rounded-lg p-2">${studentResults.map(student => { const tutor = tutorsByEmail[student.tutorEmail] || { id: '', name: 'Unassigned' }; return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md"><div><p class="font-semibold">${student.studentName} (Parent: ${student.parentName || 'N/A'})</p><p class="text-sm text-gray-600">Assigned to: ${tutor.name}</p></div><button class="manage-tutor-from-search-btn bg-blue-500 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-600" data-tutor-id="${tutor.id}">Manage Tutor</button></li>` }).join('')}</ul>`;
+    }
+    searchResultsContainer.innerHTML = (studentResults.length || tutorResults.length) ? html : `<p class="text-gray-500">No matches found.</p>`;
+    searchResultsContainer.querySelectorAll('.manage-tutor-from-search-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const tutorId = e.currentTarget.dataset.tutorId;
+            if (tutorId) {
+                activeTutorId = tutorId;
+                tutorSelect.value = tutorId;
+                renderSelectedTutorDetailsFromCache(tutorId);
+                document.getElementById('global-search-bar').value = '';
+                searchResultsContainer.innerHTML = '';
+                tutorManagementArea.style.display = 'block';
+            }
+        });
+    });
+}
+
+function resetStudentForm() {
+    const form = document.querySelector('.add-student-form');
+    if (!form) return;
+    form.querySelector('#new-parent-name').value = '';
+    form.querySelector('#new-parent-phone').value = '';
+    form.querySelector('#new-student-name').value = '';
+    form.querySelector('#new-student-grade').value = '';
+    form.querySelector('#new-student-subjects').value = '';
+    form.querySelector('#new-student-days').value = '';
+    form.querySelector('#new-student-fee').value = '';
+
+    const actionButton = form.querySelector('#add-student-btn');
+    if (actionButton) {
+        actionButton.textContent = 'Add Student';
+        delete actionButton.dataset.editingId;
+    }
+    const cancelButton = form.querySelector('#cancel-edit-btn');
+    if (cancelButton) {
+        cancelButton.remove();
+    }
+}
+
+function renderSelectedTutorDetailsFromCache(tutorId) {
+    const container = document.getElementById('selected-tutor-details');
+    if (!tutorId || !sessionCache.tutors) {
+        container.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
+        return;
+    }
+    const tutor = sessionCache.tutors[tutorId];
+    const assignedStudents = (sessionCache.students || []).filter(s => s.tutorEmail === tutor.email);
+    const studentsListHTML = assignedStudents.map(student => {
+        const feeDisplay = globalSettings.showStudentFees ? ` - Fee: ₦${(student.studentFee || 0).toLocaleString()}` : '';
+        const editDeleteButtons = `
+            <button class="edit-student-btn text-blue-500 hover:text-blue-700 font-semibold" data-student-id="${student.id}" data-parent-name="${student.parentName || ''}" data-parent-phone="${student.parentPhone || ''}" data-student-name="${student.studentName}" data-grade="${student.grade}" data-subjects="${(student.subjects || []).join(', ')}" data-days="${student.days}" data-fee="${student.studentFee}">Edit</button>
+            <button class="delete-student-btn text-red-500 hover:text-red-700 font-semibold" data-student-id="${student.id}">Delete</button>
+        `;
+        return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md" data-student-name="${student.studentName.toLowerCase()}"><span>${student.studentName} (${student.grade || 'N/A'})${feeDisplay}</span><div class="flex items-center space-x-2">${editDeleteButtons}</div></li>`;
+    }).join('');
+    const gradeOptions = Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
+    const dayOptions = Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
+    container.innerHTML = `
+        <div class="p-4 border rounded-lg shadow-sm bg-blue-50">
+            <div class="flex items-center justify-between mb-4">
+                <div><h4 class="font-bold text-xl">${tutor.name} (${assignedStudents.length} students)</h4><p class="text-gray-600">${tutor.email}</p></div>
+                <div class="flex items-center space-x-4"><label class="flex items-center space-x-2"><span class="font-semibold">Management Staff:</span><input type="checkbox" id="management-staff-toggle" class="h-5 w-5" ${tutor.isManagementStaff ? 'checked' : ''}></label><button id="delete-tutor-btn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Delete Tutor</button></div>
+            </div>
+            <div class="mb-4"><p><strong>Students Assigned to ${tutor.name}:</strong></p><input type="search" id="student-filter-bar" placeholder="Filter this list..." class="w-full p-2 border rounded mt-2 mb-2"><ul id="students-list-ul" class="space-y-2 mt-2">${studentsListHTML || '<p class="text-gray-500">No students assigned.</p>'}</ul></div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4">
+                <div class="add-student-form space-y-2">
+                    <h5 class="font-semibold text-gray-700">Add/Edit Student Details:</h5>
+                    <input type="text" id="new-parent-name" class="w-full p-2 border rounded" placeholder="Parent Name">
+                    <input type="text" id="new-parent-phone" class="w-full p-2 border rounded" placeholder="Parent Phone Number">
+                    <input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Student Name">
+                    <select id="new-student-grade" class="w-full p-2 border rounded"><option value="">Select Grade</option>${gradeOptions}</select>
+                    <input type="text" id="new-student-subjects" class="w-full p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
+                    <select id="new-student-days" class="w-full p-2 border rounded"><option value="">Select Days per Week</option>${dayOptions}</select>
+                    <input type="number" id="new-student-fee" class="w-full p-2 border rounded" placeholder="Student Fee (₦)">
+                    <button id="add-student-btn" class="bg-green-600 text-white w-full px-4 py-2 rounded hover:bg-green-700">Add Student</button>
+                </div>
+ 
+                 <div class="import-students-form">
+                    <h5 class="font-semibold text-gray-700">Import Students for ${tutor.name}:</h5>
+                    <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>parentName, parentPhone, studentName, grade, subjects, days, studentFee</strong></p>
+                    <input type="file" id="student-import-file" class="w-full text-sm border rounded p-1" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+           
+                  <button id="import-students-btn" class="bg-blue-600 text-white w-full px-4 py-2 rounded mt-2 hover:bg-blue-700">Import Students</button>
+                  <p id="import-status" class="text-sm mt-2"></p>
+                </div>
+            </div>
+        </div>`;
+    // --- Attach Listeners for the newly created elements ---
+    document.getElementById('management-staff-toggle').addEventListener('change', (e) => updateDoc(doc(db, "tutors", tutorId), { isManagementStaff: e.target.checked }));
+    document.getElementById('delete-tutor-btn').addEventListener('click', async () => {
+        if (assignedStudents.length > 0) {
+            alert(`Cannot delete tutor "${tutor.name}" because they have ${assignedStudents.length} student(s) assigned. Please reassign or delete these students first.`);
+            return;
+        }
+        if (confirm(`Are you sure you want to delete tutor "${tutor.name}"? This action cannot be undone.`)) {
+            try {
+                await deleteDoc(doc(db, "tutors", tutorId));
+                alert(`Tutor "${tutor.name}" has been successfully deleted.`);
+                invalidateCache('tutors'); // Invalidate
+                activeTutorId = null;
+                fetchTutorManagementData();
+      
+             } catch (error) { console.error("Error deleting tutor:", error); alert(`Error deleting tutor: ${error.message}`); }
+        }
+    });
+    document.getElementById('student-filter-bar').addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        document.querySelectorAll('#students-list-ul li').forEach(li => {
+            li.style.display = (li.dataset.studentName || '').includes(searchTerm) ? 'flex' : 'none';
+        });
+    });
+    document.getElementById('add-student-btn').addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        const editingId = btn.dataset.editingId;
+        const studentData = {
+            parentName: document.getElementById('new-parent-name').value,
+            parentPhone: document.getElementById('new-parent-phone').value,
+            studentName: document.getElementById('new-student-name').value,
+            grade: document.getElementById('new-student-grade').value,
+            subjects: document.getElementById('new-student-subjects').value.split(',').map(s => s.trim()),
+            days: document.getElementById('new-student-days').value,
+            studentFee: parseFloat(document.getElementById('new-student-fee').value),
+            tutorEmail: tutor.email,
+        };
+      
+         if (studentData.studentName && studentData.grade && !isNaN(studentData.studentFee)) {
+            if (editingId) {
+                await updateDoc(doc(db, "students", editingId), studentData);
+            } else {
+                studentData.summerBreak = false;
+                await addDoc(collection(db, "students"), studentData);
+            }
+            invalidateCache('students'); // Invalidate
+            fetchTutorManagementData(); // Refetch and re-render
+            resetStudentForm();
+        } else {
+            alert('Please fill in Student Name, Grade, and Fee correctly.');
+        }
+    });
+
+    document.getElementById('import-students-btn').addEventListener('click', () => handleStudentImport(tutor));
+
+    container.querySelectorAll('.edit-student-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const data = e.currentTarget.dataset;
+            document.getElementById('new-parent-name').value = data.parentName;
+            document.getElementById('new-parent-phone').value = data.parentPhone || '';
+            document.getElementById('new-student-name').value = data.studentName;
+            document.getElementById('new-student-grade').value = data.grade;
+            document.getElementById('new-student-subjects').value = data.subjects;
+            document.getElementById('new-student-days').value = data.days;
+            document.getElementById('new-student-fee').value = data.fee;
+
+            const actionButton = document.getElementById('add-student-btn');
+            actionButton.textContent = 'Update Student';
+            actionButton.dataset.editingId = data.studentId;
+
+            if (!document.getElementById('cancel-edit-btn')) {
+                const cancelButton = document.createElement('button');
+                cancelButton.id = 'cancel-edit-btn';
+                cancelButton.textContent = 'Cancel Edit';
+                cancelButton.className = 'bg-gray-500 text-white w-full px-4 py-2 rounded hover:bg-gray-600 mt-2';
+                actionButton.insertAdjacentElement('afterend', cancelButton);
+                cancelButton.addEventListener('click', resetStudentForm);
+            }
+        });
+    });
+    container.querySelectorAll('.delete-student-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+        if (confirm('Are you sure you want to delete this student?')) {
+            await deleteDoc(doc(db, "students", e.target.dataset.studentId));
+            invalidateCache('students'); // Invalidate
+            fetchTutorManagementData(); // Refetch and re-render
+        }
+    }));
+}
+
+async function handleStudentImport(tutor) {
+    const fileInput = document.getElementById('student-import-file');
+    const statusEl = document.getElementById('import-status');
+    if (!fileInput.files[0]) return statusEl.textContent = "Please select a file first.";
+    if (!tutor) return statusEl.textContent = "Error: No tutor selected.";
+    statusEl.textContent = "Reading file...";
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet);
+            if (json.length === 0) throw new Error("Sheet is empty or format is incorrect.");
+            statusEl.textContent = `Importing ${json.length} students...`;
+            const batch = writeBatch(db);
+            json.forEach(row => {
+                const studentDocRef = doc(collection(db, "students"));
+                const studentData = {
+                    parentName: row['parentName'] || '',
+                    parentPhone: row['parentPhone'] || '',
+                    studentName: row['studentName'],
+                    grade: row['grade'],
+                    subjects: (row['subjects'] || '').toString().split(',').map(s => s.trim()), 
+                    days: row['days'],
+                    studentFee: parseFloat(row['studentFee']),
+                    tutorEmail: tutor.email,
+                    summerBreak: false
+                };
+                if (!studentData.studentName || isNaN(studentData.studentFee)) return;
+                batch.set(studentDocRef, studentData);
+            });
+            await batch.commit();
+            statusEl.textContent = `✅ Successfully imported ${json.length} students for ${tutor.name}.`;
+            fileInput.value = '';
+            invalidateCache('students'); // Invalidate
+            fetchTutorManagementData();
+        } catch (error) {
+            statusEl.textContent = `❌ Error: ${error.message}`;
+            console.error(error);
+        }
+    };
+    reader.readAsArrayBuffer(fileInput.files[0]);
+}
+
+// ##################################################################
+// # SECTION 4: TUTOR REPORTS PANEL (OPTIMIZED)
+// ##################################################################
+async function renderTutorReportsPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <div class="flex justify-between items-start mb-4">
+                 <h2 class="text-2xl font-bold text-green-700">Tutor Reports</h2>
+                 <div class="flex items-center space-x-4">
+                     <div class="bg-blue-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-blue-800 text-sm">Tutors Submitted</h4><p id="report-tutor-count" class="text-2xl text-blue-600 font-extrabold">0</p></div>
+                    <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Reports</h4><p id="report-count" class="text-2xl text-green-600 font-extrabold">0</p></div>
+                    <button id="refresh-reports-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+                </div>
+            </div>
+            <div id="tutor-reports-list" class="space-y-4"><p class="text-gray-500 text-center">Loading reports...</p></div>
+        </div>
+    `;
+    document.getElementById('refresh-reports-btn').addEventListener('click', () => fetchAndRenderTutorReports(true));
+    fetchAndRenderTutorReports();
+}
+
+async function fetchAndRenderTutorReports(forceRefresh = false) {
+    if (forceRefresh) invalidateCache('reports');
+    try {
+        if (!sessionCache.reports) {
+            document.getElementById('tutor-reports-list').innerHTML = `<p class="text-gray-500 text-center">Fetching reports from server...</p>`;
+            const snapshot = await getDocs(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc")));
+            saveToLocalStorage('reports', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }
+        renderTutorReportsFromCache();
+    } catch (error) {
+        console.error("Error fetching reports:", error);
+        document.getElementById('tutor-reports-list').innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
+    }
+}
+
+function renderTutorReportsFromCache() {
+    const reportsListContainer = document.getElementById('tutor-reports-list');
+    const reports = sessionCache.reports || [];
+    const tutorCountEl = document.getElementById('report-tutor-count');
+    const reportCountEl = document.getElementById('report-count');
+    if (reports.length === 0) {
+        reportsListContainer.innerHTML = `<p class="text-gray-500 text-center">No reports have been submitted yet.</p>`;
+        tutorCountEl.textContent = 0;
+        reportCountEl.textContent = 0;
+        return;
+    }
+
+    const reportsByTutor = {};
+    reports.forEach(report => {
+        const tutorEmail = report.tutorEmail;
+        if (!reportsByTutor[tutorEmail]) {
+            reportsByTutor[tutorEmail] = { name: report.tutorName || tutorEmail, reports: [] };
+        }
+        reportsByTutor[tutorEmail].reports.push(report);
+    });
+    tutorCountEl.textContent = Object.keys(reportsByTutor).length;
+    reportCountEl.textContent = reports.length;
+
+    reportsListContainer.innerHTML = Object.values(reportsByTutor).map(tutorData => {
+        const reportLinks = tutorData.reports.map(report => `
+            <li class="flex justify-between items-center p-2 bg-gray-50 rounded-md">
+                <span>${report.studentName} - ${new Date(report.submittedAt.seconds * 1000).toLocaleDateString()}</span>
+                <button class="download-single-report-btn bg-blue-500 text-white px-3 py-1 text-sm rounded hover:bg-blue-600" data-report-id="${report.id}">Download PDF</button>
+            </li>
+        `).join('');
+        return `
+            <div class="border rounded-lg shadow-sm">
+                <details>
+                    <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg">
+                        <div>${tutorData.name} 
+                         <span class="ml-2 text-sm font-normal text-gray-500">(${tutorData.reports.length} reports)</span></div>
+                        <button class="download-all-btn bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" data-tutor-email="${tutorData.reports[0].tutorEmail}">Download All as ZIP</button>
+                    </summary>
+                    <div class="p-4 border-t"><ul class="space-y-2">${reportLinks}</ul></div>
+                </details>
+            </div>
+        `;
+    }).join('');
+
+    reportsListContainer.querySelectorAll('.download-single-report-btn').forEach(button => {
+        button.addEventListener('click', (e) => { e.stopPropagation(); downloadAdminReport(e.target.dataset.reportId); });
+    });
+    reportsListContainer.querySelectorAll('.download-all-btn').forEach(button => {
+        button.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const tutorEmail = e.target.dataset.tutorEmail;
+            const reportsToDownload = reportsByTutor[tutorEmail].reports;
+            button.textContent = 'Zipping...';
+            button.disabled = true;
+            try {
+                const zip = new JSZip();
+                for (const report of reportsToDownload) {
+                    const pdfBlob = await downloadAdminReport(report.id, true); 
+                    if (pdfBlob) {
+                        const fileName = `${report.studentName}_${new Date(report.submittedAt.seconds * 1000).toLocaleDateString().replace(/\//g, '-')}.pdf`;
+                        zip.file(fileName, pdfBlob);
+                    }
+                }
+                const content = await zip.generateAsync({ type: "blob" });
+                saveAs(content, `${reportsByTutor[tutorEmail].name}_Reports.zip`);
+            } catch (error) { 
+                console.error("Error creating ZIP file:", error); 
+                alert("An error occurred while creating the ZIP file.");
+            } finally { 
+                button.textContent = 'Download All as ZIP'; 
+                button.disabled = false;
+            }
+        });
+    });
+}
+
+async function downloadAdminReport(reportId, returnBlob = false) {
+    try {
+        const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
+        if (!reportDoc.exists()) throw new Error("Report not found!");
+        const reportData = reportDoc.data();
+        let parentEmail = 'N/A';
+        if (reportData.studentId) {
+            const studentDoc = await getDoc(doc(db, "students", reportData.studentId));
+            if (studentDoc.exists()) {
+                parentEmail = studentDoc.data().parentEmail || 'N/A';
+            }
+        }
+        const logoUrl = "https://github.com/psalminfo/blooming-kids-cbt/blob/main/logo.png";
+        const reportTemplate = `<div style="font-family: Arial, sans-serif; padding: 2rem; max-width: 800px; margin: auto;"><div style="text-align: center; margin-bottom: 2rem;"><img src="${logoUrl}" alt="Company Logo" style="height: 80px; margin-bottom: 1rem;"><h3 style="font-size: 1.8rem; font-weight: bold; color: #15803d; margin: 0;">Blooming Kids House</h3><h1 style="font-size: 1.2rem; font-weight: bold; color: #166534; margin-top: 0.5rem;">MONTHLY LEARNING REPORT</h1><p style="color: #4b5563;">Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;"><p><strong>Student's Name:</strong> ${reportData.studentName}</p><p><strong>Parent's Email:</strong> ${parentEmail}</p><p><strong>Grade:</strong> ${reportData.grade}</p><p><strong>Tutor's Name:</strong> ${reportData.tutorName}</p></div>${Object.entries({"INTRODUCTION": reportData.introduction, "TOPICS & REMARKS": reportData.topics, "PROGRESS AND ACHIEVEMENTS": reportData.progress,"STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses, "RECOMMENDATIONS": reportData.recommendations, "GENERAL TUTOR'S COMMENTS": reportData.generalComments}).map(([title, content]) => `<div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;"><h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a;">${title}</h2><p style="line-height: 1.6; white-space: pre-wrap;">${content || 'N/A'}</p></div>`).join('')}<div style="margin-top: 3rem; text-align: right;"><p>Best regards,</p><p style="font-weight: bold;">${reportData.tutorName}</p></div></div>`;
+        const opt = { margin: 0.5, filename: `${reportData.studentName}_report.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
+        if (returnBlob) {
+            return await html2pdf().from(reportTemplate).set(opt).outputPdf('blob');
+        } else {
+            html2pdf().from(reportTemplate).set(opt).save();
+        }
+    } 
+    catch (error) {
+        console.error("Error generating PDF:", error);
+        alert(`Failed to download report: ${error.message}`);
+        return null; 
+    }
+}
+
+// ##################################################################
+// # SECTION 5: PAY ADVICE PANEL (CORRECTED)
+// ##################################################################
+
+async function renderPayAdvicePanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor Pay Advice</h2>
+           
+             <div class="bg-gray-100 p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div><label for="start-date" class="block text-sm font-medium text-gray-700">Start Date</label><input type="date" id="start-date" class="mt-1 block w-full p-2 border rounded-md"></div>
+                <div><label for="end-date" class="block text-sm font-medium text-gray-700">End Date</label><input type="date" id="end-date" class="mt-1 block w-full p-2 border rounded-md"></div>
+                <div class="flex items-center space-x-4 col-span-2"><div class="bg-blue-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-blue-800 text-sm">Active Tutors</h4><p id="pay-tutor-count" class="text-2xl text-blue-600 font-extrabold">0</p></div><div class="bg-green-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-green-800 text-sm">Total Students</h4><p id="pay-student-count" class="text-2xl text-green-600 font-extrabold">0</p></div><button id="export-pay-csv-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 h-full">Export CSV</button></div>
+            </div>
+            <div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium uppercase">Tutor</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Students</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Student Fees</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Mgmt. Fee</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Total Pay</th></tr></thead><tbody id="pay-advice-table-body" class="divide-y divide-gray-200"><tr><td colspan="5" class="text-center py-4">Select a date range.</td></tr></tbody></table></div>
+        </div>
+    `;
+    const startDateInput = document.getElementById('start-date');
+    const endDateInput = document.getElementById('end-date');
+    const handleDateChange = () => {
+        const startDate = startDateInput.value ?
+        new Date(startDateInput.value) : null;
+        const endDate = endDateInput.value ? new Date(endDateInput.value) : null;
+        if (startDate && endDate) {
+            endDate.setHours(23, 59, 59, 999);
+            loadPayAdviceData(startDate, endDate);
+        }
+    };
+    startDateInput.addEventListener('change', handleDateChange);
+    endDateInput.addEventListener('change', handleDateChange);
+}
+
+async function loadPayAdviceData(startDate, endDate) {
+    const tableBody = document.getElementById('pay-advice-table-body');
+    tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4">Loading pay data...</td></tr>`;
+
+    try {
+        const startTimestamp = Timestamp.fromDate(startDate);
+        const endTimestamp = Timestamp.fromDate(endDate);
+        const reportsQuery = query(collection(db, "tutor_submissions"), where("submittedAt", ">=", startTimestamp), where("submittedAt", "<=", endTimestamp));
+        const reportsSnapshot = await getDocs(reportsQuery);
+        const activeTutorEmails = [...new Set(reportsSnapshot.docs.map(doc => doc.data().tutorEmail))];
+
+        if (activeTutorEmails.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4">No tutors submitted reports in this period.</td></tr>`;
+            document.getElementById('pay-tutor-count').textContent = 0;
+            document.getElementById('pay-student-count').textContent = 0;
+            return;
+        }
+
+        // Fetch tutors by chunking the email list
+        const fetchTutorsInChunks = async (emails) => {
+            if (emails.length === 0) return [];
+            const chunks = [];
+            for (let i = 0; i < emails.length; i += 30) {
+                chunks.push(emails.slice(i, i + 30));
+            }
+            const queryPromises = chunks.map(chunk =>
+                getDocs(query(collection(db, "tutors"), where("email", "in", chunk)))
+            );
+            const querySnapshots = await Promise.all(queryPromises);
+            return querySnapshots.flatMap(snapshot => snapshot.docs);
+        };
+
+        // Fetch both tutors (in chunks) and all students concurrently.
+        const [tutorDocs, studentsSnapshot] = await Promise.all([
+            fetchTutorsInChunks(activeTutorEmails),
+            getDocs(collection(db, "students"))
+        ]);
+
+        const allStudents = studentsSnapshot.docs.map(doc => doc.data());
+        let totalStudentCount = 0;
+        const payData = [];
+        tutorDocs.forEach(doc => {
+            const tutor = doc.data();
+            const assignedStudents = allStudents.filter(s => s.tutorEmail === tutor.email);
+            const totalStudentFees = assignedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
+            const managementFee = (tutor.isManagementStaff && tutor.managementFee) ? tutor.managementFee : 0;
+            totalStudentCount += assignedStudents.length;
+            payData.push({ 
+                tutorName: tutor.name, 
+                studentCount: assignedStudents.length, 
+                totalStudentFees: totalStudentFees, 
+                managementFee: managementFee, 
+                totalPay: totalStudentFees + managementFee 
+            });
+        });
+
+        document.getElementById('pay-tutor-count').textContent = payData.length;
+        document.getElementById('pay-student-count').textContent = totalStudentCount;
+        tableBody.innerHTML = payData.map(d => `<tr><td class="px-6 py-4">${d.tutorName}</td><td class="px-6 py-4">${d.studentCount}</td><td class="px-6 py-4">₦${d.totalStudentFees.toFixed(2)}</td><td class="px-6 py-4">₦${d.managementFee.toFixed(2)}</td><td class="px-6 py-4 font-bold">₦${d.totalPay.toFixed(2)}</td></tr>`).join('');
+        
+        document.getElementById('export-pay-csv-btn').onclick = () => {
+            const csv = convertPayAdviceToCSV(payData);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `Pay_Advice_${startDate.toISOString().split('T')[0]}_to_${endDate.toISOString().split('T')[0]}.csv`;
+            link.click();
+        };
+    } catch (error) {
+        console.error("Error loading pay advice data:", error);
+        tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500">Failed to load pay data. Check console.</td></tr>`;
+    }
+}
+
+// ##################################################################
+// # SECTION 6: SUMMER BREAK PANEL (OPTIMIZED WITH SEARCH & SORT)
+// ##################################################################
+async function renderSummerBreakPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-green-700">Students on Summer Break</h2>
+                <div class="flex items-center space-x-2">
+                    <button id="refresh-break-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+                    <button id="sort-alphabetically-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">Sort A-Z</button>
+                </div>
+            </div>
+            
+            <!-- Search Bar -->
+            <div class="mb-6">
+                <label for="break-student-search" class="block text-sm font-medium text-gray-700 mb-2">
+                    Search Students by Name, Tutor, or Grade:
+                </label>
+                <div class="relative">
+                    <input 
+                        type="search" 
+                        id="break-student-search" 
+                        class="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                        placeholder="Type to search students..."
+                    >
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between mt-2">
+                    <p id="break-student-count" class="text-sm text-gray-600">
+                        Loading students...
+                    </p>
+                    <button id="clear-search-btn" class="text-sm text-blue-600 hover:text-blue-800 hidden">
+                        Clear Search
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Student List -->
+            <div id="break-students-list" class="space-y-4">
+                <p class="text-gray-500 text-center">Loading students...</p>
+            </div>
+            
+            <!-- No Results Message -->
+            <div id="no-break-results" class="hidden text-center p-8 border-2 border-dashed border-gray-300 rounded-lg">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No students found</h3>
+                <p class="mt-1 text-sm text-gray-500">Try adjusting your search or filter</p>
+            </div>
+        </div>
+    `;
+    
+    // Add event listeners
+    document.getElementById('refresh-break-btn').addEventListener('click', () => fetchAndRenderBreakStudents(true));
+    document.getElementById('sort-alphabetically-btn').addEventListener('click', sortBreakStudentsAlphabetically);
+    document.getElementById('break-student-search').addEventListener('input', handleBreakStudentSearch);
+    document.getElementById('clear-search-btn').addEventListener('click', clearBreakStudentSearch);
+    
+    fetchAndRenderBreakStudents();
+}
+
+async function fetchAndRenderBreakStudents(forceRefresh = false) {
+    if (forceRefresh) invalidateCache('breakStudents');
+    
+    try {
+        if (!sessionCache.breakStudents) {
+            document.getElementById('break-students-list').innerHTML = `<p class="text-gray-500 text-center">Fetching data...</p>`;
+            const snapshot = await getDocs(query(collection(db, "students"), where("summerBreak", "==", true)));
+            
+            // Sort alphabetically by default
+            const students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+                .sort((a, b) => a.studentName?.localeCompare(b.studentName || ''));
+            
+            saveToLocalStorage('breakStudents', students);
+        }
+        
+        renderBreakStudentsFromCache();
+    } catch(error) {
+        console.error("Error fetching summer break students:", error);
+        document.getElementById('break-students-list').innerHTML = `<p class="text-red-500">Failed to load data.</p>`;
+    }
+}
+
+function renderBreakStudentsFromCache() {
+    const listContainer = document.getElementById('break-students-list');
+    const countContainer = document.getElementById('break-student-count');
+    const noResultsContainer = document.getElementById('no-break-results');
+    const clearSearchBtn = document.getElementById('clear-search-btn');
+    
+    let breakStudents = sessionCache.breakStudents || [];
+    
+    // Apply search filter if there's a search term
+    const searchTerm = document.getElementById('break-student-search').value.toLowerCase().trim();
+    if (searchTerm) {
+        breakStudents = breakStudents.filter(student => 
+            student.studentName?.toLowerCase().includes(searchTerm) ||
+            student.tutorEmail?.toLowerCase().includes(searchTerm) ||
+            student.grade?.toString().includes(searchTerm) ||
+            student.parentName?.toLowerCase().includes(searchTerm)
+        );
+        clearSearchBtn.classList.remove('hidden');
+    } else {
+        clearSearchBtn.classList.add('hidden');
+    }
+    
+    // Update count
+    const totalStudents = sessionCache.breakStudents?.length || 0;
+    const filteredCount = breakStudents.length;
+    
+    if (searchTerm) {
+        countContainer.textContent = `Showing ${filteredCount} of ${totalStudents} students matching "${searchTerm}"`;
+    } else {
+        countContainer.textContent = `Total: ${totalStudents} students on summer break`;
+    }
+    
+    // Show/hide no results message
+    if (breakStudents.length === 0) {
+        listContainer.innerHTML = '';
+        noResultsContainer.classList.remove('hidden');
+        return;
+    } else {
+        noResultsContainer.classList.add('hidden');
+    }
+    
+    // Render student list
+    listContainer.innerHTML = breakStudents.map(student => {
+        return `
+            <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors duration-200">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <div class="flex items-center mb-2">
+                            <svg class="h-5 w-5 text-yellow-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                            </svg>
+                            <h3 class="font-semibold text-lg text-gray-800">${student.studentName}</h3>
+                            ${student.grade ? `<span class="ml-2 px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Grade ${student.grade}</span>` : ''}
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-600">
+                            <div>
+                                <span class="font-medium">Tutor:</span>
+                                <span class="ml-2">${student.tutorEmail || 'Not assigned'}</span>
+                            </div>
+                            <div>
+                                <span class="font-medium">Parent:</span>
+                                <span class="ml-2">${student.parentName || 'Not specified'}</span>
+                            </div>
+                            ${student.subjects?.length > 0 ? `
+                                <div>
+                                    <span class="font-medium">Subjects:</span>
+                                    <span class="ml-2">${student.subjects.join(', ')}</span>
+                                </div>
+                            ` : ''}
+                            ${student.studentFee ? `
+                                <div>
+                                    <span class="font-medium">Fee:</span>
+                                    <span class="ml-2">₦${student.studentFee.toLocaleString()}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-col items-end space-y-2">
+                        <button 
+                            class="remove-break-btn bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded transition-colors duration-200 flex items-center"
+                            data-student-id="${student.id}"
+                        >
+                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            End Break
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    // Add event listeners to remove buttons
+    listContainer.querySelectorAll('.remove-break-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            if (confirm(`End summer break for this student? They will return to active status.`)) {
+                const studentId = e.currentTarget.dataset.studentId;
+                await updateDoc(doc(db, "students", studentId), { summerBreak: false });
+                
+                // Update caches
+                invalidateCache('students');
+                invalidateCache('breakStudents');
+                
+                // Re-fetch and re-render
+                fetchAndRenderBreakStudents();
+            }
+        });
+    });
+}
+
+function sortBreakStudentsAlphabetically() {
+    if (!sessionCache.breakStudents) return;
+    
+    // Sort students alphabetically by name
+    const sortedStudents = [...sessionCache.breakStudents].sort((a, b) => 
+        (a.studentName || '').localeCompare(b.studentName || '')
+    );
+    
+    // Update cache with sorted data
+    sessionCache.breakStudents = sortedStudents;
+    saveToLocalStorage('breakStudents', sortedStudents);
+    
+    // Re-render the list
+    renderBreakStudentsFromCache();
+    
+    // Show success message
+    const sortBtn = document.getElementById('sort-alphabetically-btn');
+    const originalText = sortBtn.textContent;
+    sortBtn.textContent = 'Sorted!';
+    sortBtn.classList.remove('bg-purple-600');
+    sortBtn.classList.add('bg-green-600');
+    
+    setTimeout(() => {
+        sortBtn.textContent = originalText;
+        sortBtn.classList.remove('bg-green-600');
+        sortBtn.classList.add('bg-purple-600');
+    }, 1500);
+}
+
+function handleBreakStudentSearch(e) {
+    const searchTerm = e.target.value.toLowerCase().trim();
+    renderBreakStudentsFromCache();
+}
+
+function clearBreakStudentSearch() {
+    document.getElementById('break-student-search').value = '';
+    renderBreakStudentsFromCache();
+}
+
+// ##################################################################
+// # SECTION 7: STAFF PANEL (OPTIMIZED)
+// ##################################################################
+async function renderStaffPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-green-700">Staff Management</h2>
+                <button id="refresh-staff-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+            
+             </div>
+            <p class="text-sm text-gray-600 mb-4">Assign a role to apply default permissions, then click "Manage Permissions" to customize.</p>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium uppercase">Name</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Email</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Assign Role</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Actions</th></tr></thead><tbody id="staff-table-body" class="bg-white divide-y divide-gray-200"><p>Loading staff...</p></tbody></table>
+          
+             </div>
+        </div>
+    `;
+    document.getElementById('refresh-staff-btn').addEventListener('click', () => fetchAndRenderStaff(true));
+    fetchAndRenderStaff();
+}
+
+async function fetchAndRenderStaff(forceRefresh = false) {
+    if (forceRefresh) invalidateCache('staff');
+    try {
+        if (!sessionCache.staff) {
+            document.getElementById('staff-table-body').innerHTML = `<tr><td colspan="4" class="text-center p-4">Fetching staff data...</td></tr>`;
+            const snapshot = await getDocs(collection(db, "staff"));
+            saveToLocalStorage('staff', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }
+        renderStaffFromCache();
+    } catch(error) {
+        console.error("Error fetching staff:", error);
+        document.getElementById('staff-table-body').innerHTML = `<tr><td colspan="4" class="text-center p-4 text-red-500">Failed to load staff data.</td></tr>`;
+    }
+}
+
+function renderStaffFromCache() {
+    const tableBody = document.getElementById('staff-table-body');
+    const staffList = sessionCache.staff || [];
+    const ROLE_PERMISSIONS = {
+        pending: {}, tutor: {}, manager: {}, director: {}, admin: {}
+    };
+    tableBody.innerHTML = staffList.map(staff => {
+        const optionsHTML = Object.keys(ROLE_PERMISSIONS).map(role => `<option value="${role}" ${staff.role === role ? 'selected' : ''}>${capitalize(role)}</option>`).join('');
+        return `
+            <tr>
+                <td class="px-6 py-4 font-medium">${staff.name}</td><td class="px-6 py-4">${staff.email}</td>
+                <td class="px-6 py-4"><select data-email="${staff.email}" data-original-role="${staff.role}" class="role-select p-2 border rounded bg-white">${optionsHTML}</select></td>
+        
+                 <td class="px-6 py-4"><button data-id="${staff.id}" class="manage-permissions-btn bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Manage Permissions</button></td>
+            </tr>
+        `;
+    }).join('');
+    document.querySelectorAll('.role-select').forEach(select => {
+        select.addEventListener('change', async (e) => {
+            if (confirm(`Change role to "${capitalize(e.target.value)}"? This will apply default permissions.`)) {
+                await updateStaffPermissions(e.target.dataset.email, e.target.value);
+            } else {
+                e.target.value = e.target.dataset.originalRole;
+            }
+        });
+    });
+    document.querySelectorAll('.manage-permissions-btn').forEach(button => {
+        button.addEventListener('click', (e) => openPermissionsModal(e.target.dataset.id));
+    });
+}
+
+async function openPermissionsModal(staffId) {
+    const staffDoc = await getDoc(doc(db, "staff", staffId));
+    if (!staffDoc.exists()) return alert("Staff member not found.");
+    const staffData = staffDoc.data();
+    const permissions = staffData.permissions || { tabs: {}, actions: {} };
+    const modalHTML = `
+        <div id="permissions-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg shadow-xl p-8 max-w-lg w-full">
+                <h3 class="text-2xl font-bold mb-4">Edit Permissions for ${staffData.name}</h3><p class="text-sm text-gray-500 mb-4">Current Role: <span class="font-semibold">${capitalize(staffData.role)}</span></p>
+                <div class="space-y-4">
+                    <div class="border-t pt-4">
+                        <h4 class="font-semibold mb-2">Tab Visibility:</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="flex items-center"><input type="checkbox" id="p-viewTutorManagement" class="mr-2" ${permissions.tabs?.viewTutorManagement ? 'checked' : ''}> Tutor & Student List</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewPayAdvice" class="mr-2" ${permissions.tabs?.viewPayAdvice ? 'checked' : ''}> Pay Advice</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewTutorReports" class="mr-2" ${permissions.tabs?.viewTutorReports ? 'checked' : ''}> Tutor Reports</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewSummerBreak" class="mr-2" ${permissions.tabs?.viewSummerBreak ? 'checked' : ''}> Summer Break</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewPendingApprovals" class="mr-2" ${permissions.tabs?.viewPendingApprovals ? 'checked' : ''}> Pending Approvals</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewStaffManagement" class="mr-2" ${permissions.tabs?.viewStaffManagement ? 'checked' : ''}> Staff Management</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewParentFeedback" class="mr-2" ${permissions.tabs?.viewParentFeedback ? 'checked' : ''}> Parent Feedback</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewEnrollments" class="mr-2" ${permissions.tabs?.viewEnrollments ? 'checked' : ''}> Enrollments</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewInactiveTutors" class="mr-2" ${permissions.tabs?.viewInactiveTutors ? 'checked' : ''}> Inactive Tutors</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewArchivedStudents" class="mr-2" ${permissions.tabs?.viewArchivedStudents ? 'checked' : ''}> Archived Students</label>
+                            <label class="flex items-center col-span-2"><input type="checkbox" id="p-viewMasterPortal" class="mr-2" ${permissions.tabs?.viewMasterPortal ? 'checked' : ''}> <span class="font-semibold text-emerald-700">🗂 Management Portal (Master View)</span></label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewReferralsAdmin" class="mr-2" ${permissions.tabs?.viewReferralsAdmin ? 'checked' : ''}> <span class="text-indigo-700">🤝 Referral Management</span></label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewUserDirectory" class="mr-2" ${permissions.tabs?.viewUserDirectory ? 'checked' : ''}> <span class="text-teal-700">📋 User Directory</span></label>
+                        </div>
+                    </div>
+                    <div class="border-t pt-4">
+                        <h4 class="font-semibold mb-2">Specific Actions:</h4>
+                        <label class="flex items-center"><input type="checkbox" id="p-canDownloadReports" class="mr-2" ${permissions.actions?.canDownloadReports ? 'checked' : ''}> Can Download Reports</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canExportPayAdvice" class="mr-2" ${permissions.actions?.canExportPayAdvice ? 'checked' : ''}> Can Export Pay Advice</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canEndSummerBreak" class="mr-2" ${permissions.actions?.canEndSummerBreak ? 'checked' : ''}> Can End Summer Break</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canEditStudents" class="mr-2" ${permissions.actions?.canEditStudents ? 'checked' : ''}> Can Edit Students</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canDeleteStudents" class="mr-2" ${permissions.actions?.canDeleteStudents ? 'checked' : ''}> Can Delete Students</label>
+                        <div class="border-t mt-3 pt-3">
+                            <h4 class="font-semibold mb-2 text-purple-700">🏅 QA / QC Rating Actions:</h4>
+                            <label class="flex items-center"><input type="checkbox" id="p-canQA" class="mr-2" ${permissions.tabs?.canQA ? 'checked' : ''}> <span class="text-purple-700">Can Rate Tutors — QA (Session Observation)</span></label>
+                            <label class="flex items-center mt-1"><input type="checkbox" id="p-canQC" class="mr-2" ${permissions.tabs?.canQC ? 'checked' : ''}> <span class="text-amber-700">Can Rate Tutors — QC (Lesson Plan Review)</span></label>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-4 mt-6">
+                    <button id="cancel-permissions" class="bg-gray-300 px-4 py-2 rounded">Cancel</button>
+                    <button id="save-permissions" class="bg-green-600 text-white px-4 py-2 rounded">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    const closeModal = () => document.getElementById('permissions-modal').remove();
+    document.getElementById('cancel-permissions').addEventListener('click', closeModal);
+    document.getElementById('save-permissions').addEventListener('click', async () => {
+        const newPermissions = {
+            tabs: { 
+                viewTutorManagement: document.getElementById('p-viewTutorManagement').checked, 
+                viewPayAdvice: document.getElementById('p-viewPayAdvice').checked, 
+                viewTutorReports: document.getElementById('p-viewTutorReports').checked, 
+                viewSummerBreak: document.getElementById('p-viewSummerBreak').checked, 
+                viewPendingApprovals: document.getElementById('p-viewPendingApprovals').checked, 
+                viewStaffManagement: document.getElementById('p-viewStaffManagement').checked, 
+                viewParentFeedback: document.getElementById('p-viewParentFeedback').checked,
+                viewEnrollments: document.getElementById('p-viewEnrollments').checked,
+                viewInactiveTutors: document.getElementById('p-viewInactiveTutors').checked,
+                viewArchivedStudents: document.getElementById('p-viewArchivedStudents').checked,
+                viewMasterPortal: document.getElementById('p-viewMasterPortal').checked,
+                viewReferralsAdmin: document.getElementById('p-viewReferralsAdmin').checked,
+                viewUserDirectory: document.getElementById('p-viewUserDirectory').checked,
+                canQA: document.getElementById('p-canQA').checked,
+                canQC: document.getElementById('p-canQC').checked
+            },
+            actions: { 
+                canDownloadReports: document.getElementById('p-canDownloadReports').checked, 
+                canExportPayAdvice: document.getElementById('p-canExportPayAdvice').checked, 
+                canEndSummerBreak: document.getElementById('p-canEndSummerBreak').checked, 
+                canEditStudents: document.getElementById('p-canEditStudents').checked, 
+                canDeleteStudents: document.getElementById('p-canDeleteStudents').checked 
+            }
+        };
+        await updateDoc(doc(db, "staff", staffId), { permissions: newPermissions });
+        alert("Custom permissions saved successfully!");
+        invalidateCache('staff');
+        fetchAndRenderStaff();
+        closeModal();
+    });
+}
+
+// ##################################################################
+// # SECTION 8: PENDING APPROVALS
+// ##################################################################
+async function renderPendingApprovalsPanel(container) {
+    container.innerHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">Pending Approvals</h2><div id="pending-list" class="space-y-4"></div>`;
+    const pendingListContainer = document.getElementById('pending-list');
+    pendingListContainer.innerHTML = `<p class="text-gray-500">Loading pending accounts...</p>`;
+    try {
+        const tutorsQuery = query(collection(db, "tutors"), where("status", "==", "pending"));
+        const studentsQuery = query(collection(db, "students"), where("approvalStatus", "==", "pending"));
+        const [tutorsSnap, studentsSnap] = await Promise.all([getDocs(tutorsQuery), getDocs(studentsQuery)]);
+        let pendingHTML = '';
+        tutorsSnap.forEach(doc => { const tutor = doc.data(); pendingHTML += `<div class="bg-white p-4 rounded-lg shadow-sm border border-yellow-200"><p class="font-semibold">${tutor.name} (Tutor)</p><p class="text-gray-600 text-sm">${tutor.email}</p><div class="mt-2 space-x-2"><button class="approve-btn bg-green-500 text-white px-3 py-1 rounded" data-id="${doc.id}" data-type="tutor">Approve</button><button class="reject-btn bg-red-500 text-white px-3 py-1 rounded" data-id="${doc.id}" data-type="tutor">Reject</button></div></div>`; });
+        studentsSnap.forEach(doc => { const student = doc.data(); pendingHTML += `<div class="bg-white p-4 rounded-lg shadow-sm border border-yellow-200"><p class="font-semibold">${student.studentName} (Student - Grade ${student.grade})</p><p class="text-gray-600 text-sm">Parent: ${student.parentName}</p><div class="mt-2 space-x-2"><button class="approve-btn bg-green-500 text-white px-3 py-1 rounded" data-id="${doc.id}" data-type="student">Approve</button><button class="reject-btn bg-red-500 text-white px-3 py-1 rounded" data-id="${doc.id}" data-type="student">Reject</button></div></div>`; });
+        pendingListContainer.innerHTML = pendingHTML || `<p class="text-gray-500">No pending accounts to review.</p>`;
+        document.querySelectorAll('.approve-btn').forEach(btn => btn.addEventListener('click', () => handleApproval(btn.dataset.id, btn.dataset.type, 'approved')));
+        document.querySelectorAll('.reject-btn').forEach(btn => btn.addEventListener('click', () => handleApproval(btn.dataset.id, btn.dataset.type, 'rejected')));
+    } catch (error) {
+        console.error("Error loading pending approvals:", error);
+        pendingListContainer.innerHTML = `<p class="text-red-500">Failed to load pending approvals.</p>`;
+    }
+}
+
+async function handleApproval(id, type, status) {
+    const collectionName = type === 'tutor' ? 'tutors' : 'students';
+    const docRef = doc(db, collectionName, id);
+    await updateDoc(docRef, { [type === 'tutor' ? 'status' : 'approvalStatus']: status });
+    alert(`${capitalize(type)} ${status} successfully.`);
+    // Invalidate caches since a tutor/student was added/removed from circulation
+    if (type === 'tutor') invalidateCache('tutors');
+    if (type === 'student') invalidateCache('students');
+    renderPendingApprovalsPanel(document.getElementById('main-content'));
+}
+
+// ##################################################################
+// # MAIN APP INITIALIZATION
+// ##################################################################
+onAuthStateChanged(auth, async (user) => {
+    const mainContent = document.getElementById('main-content');
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (user && user.email === ADMIN_EMAIL) {
+        mainContent.innerHTML = '';
+        const navItems = {
+            navDashboard: renderAdminPanel, 
+            navContent: renderContentManagerPanel, 
+            navTutorManagement: renderTutorManagementPanel,
+            navPayAdvice: renderPayAdvicePanel, 
+            navTutorReports: renderTutorReportsPanel, 
+            navSummerBreak: renderSummerBreakPanel,
+            navStaff: renderStaffPanel, 
+            navPendingApprovals: renderPendingApprovalsPanel
+        };
+        const setActiveNav = (activeId) => Object.keys(navItems).forEach(id => {
+            document.getElementById(id)?.classList.toggle('active', id === activeId);
+        });
+        Object.entries(navItems).forEach(([id, renderFn]) => {
+            const navElement = document.getElementById(id);
+            if (navElement) {
+                navElement.addEventListener('click', () => { 
+                    setActiveNav(id); 
+                    renderFn(mainContent); 
+                });
+            }
+        });
+        setActiveNav('navDashboard');
+        renderAdminPanel(mainContent);
+        logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "admin-auth.html"));
+    } else {
+        mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">You do not have permission to view this page.</p>`;
+        logoutBtn.classList.add('hidden');
+    }
+});
+
+// Helper functions for dashboard
+async function ensureDashboardData() {
+    if (!sessionCache.tutors || !sessionCache.students) {
+        try {
+            if (!sessionCache.tutors) {
+                const tutorsSnapshot = await getDocs(collection(db, "tutors"));
+                const tutorsData = {};
+                tutorsSnapshot.forEach(doc => {
+                    tutorsData[doc.id] = { id: doc.id, ...doc.data() };
+                });
+                saveToLocalStorage('tutors', tutorsData);
+            }
+            if (!sessionCache.students) {
+                const studentsSnapshot = await getDocs(collection(db, "students"));
+                saveToLocalStorage('students', studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            }
+        } catch (error) {
+            console.error("Error loading dashboard data:", error);
+        }
+    }
+}
+
+function loadCountersFromCache() {
+    document.getElementById('totalStudentsCount').textContent = sessionCache.students ? sessionCache.students.length : 0;
+    document.getElementById('totalTutorsCount').textContent = sessionCache.tutors ? Object.keys(sessionCache.tutors).length : 0;
+    
+    // Populate students per tutor dropdown
+    const select = document.getElementById('studentsPerTutorSelect');
+    if (select) {
+        select.innerHTML = '<option value="">All Tutors</option>';
+        if (sessionCache.tutors) {
+            Object.values(sessionCache.tutors).forEach(tutor => {
+                const studentCount = sessionCache.students ? 
+                    sessionCache.students.filter(s => s.tutorEmail === tutor.email).length : 0;
+                const option = document.createElement('option');
+                option.value = tutor.id;
+                option.textContent = `${tutor.name} (${studentCount} students)`;
+                select.appendChild(option);
+            });
+        }
+    }
+}
+
+function loadStudentDropdown() {
+    const select = document.getElementById('studentDropdown');
+    if (select) {
+        select.innerHTML = '<option value="">Select a student</option>';
+        if (sessionCache.students) {
+            sessionCache.students.forEach(student => {
+                const option = document.createElement('option');
+                option.value = student.id;
+                option.textContent = `${student.studentName} (Grade ${student.grade})`;
+                select.appendChild(option);
+            });
+        }
+    }
+}
+
+async function loadAndRenderReport(studentId) {
+    const reportContent = document.getElementById('reportContent');
+    if (!studentId) {
+        reportContent.innerHTML = '<p class="text-gray-500">Please select a student to view their report.</p>';
+        return;
+    }
+    
+    reportContent.innerHTML = '<p class="text-gray-500">Loading report...</p>';
+    
+    try {
+        // Fetch reports for this student
+        const reportsQuery = query(
+            collection(db, "tutor_submissions"),
+            where("studentId", "==", studentId),
+            orderBy("submittedAt", "desc")
+        );
+        const reportsSnapshot = await getDocs(reportsQuery);
+        
+        if (reportsSnapshot.empty) {
+            reportContent.innerHTML = '<p class="text-gray-500">No reports found for this student.</p>';
+            return;
+        }
+        
+        const reports = reportsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // Get student info
+        const student = sessionCache.students?.find(s => s.id === studentId);
+        const studentName = student ? student.studentName : 'Unknown Student';
+        
+        reportContent.innerHTML = `
+            <div class="bg-white p-4 rounded-lg shadow-sm">
+                <h3 class="text-lg font-semibold mb-2">Reports for ${studentName}</h3>
+                <div class="space-y-3">
+                    ${reports.map(report => `
+                        <div class="border rounded p-3">
+                            <div class="flex justify-between items-center mb-2">
+                                <h4 class="font-medium">${report.tutorName || 'Tutor'}</h4>
+                                <span class="text-sm text-gray-500">
+                                    ${new Date(report.submittedAt.seconds * 1000).toLocaleDateString()}
+                                </span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-2">${report.introduction?.substring(0, 100)}...</p>
+                            <button onclick="viewFullReport('${report.id}')" class="text-blue-600 hover:text-blue-800 text-sm">
+                                View Full Report
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error("Error loading report:", error);
+        reportContent.innerHTML = '<p class="text-red-500">Error loading report.</p>';
+    }
+}
+
+// Add missing function
+async function viewFullReport(reportId) {
+    // This would open a modal or new page with the full report
+    alert(`Would open full report ${reportId}`);
+}
+
+// Fix: Add missing function declaration for saveAs if not already defined
+if (typeof window.saveAs === 'undefined') {
+    window.saveAs = function(blob, filename) {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+}
+
+// ========================================================
+// DOCUMENT INITIALIZATION SCRIPT (Safe to add anywhere)
+// ========================================================
+
+// This ensures global_settings document exists for all branches
+// Runs once when admin panel loads, safe to add to any branch
+async function initializeGlobalSettings() {
+    try {
+        const settingsDocRef = doc(db, "settings", "global_settings");
+        const docSnap = await getDoc(settingsDocRef);
+        
+        if (!docSnap.exists()) {
+            // Document doesn't exist - create it with default values
+            await setDoc(settingsDocRef, {
+                isReportEnabled: true,
+                isTutorAddEnabled: true,
+                isSummerBreakEnabled: false,
+                showStudentFees: true,
+                showEditDeleteButtons: true,
+                bypassPendingApproval: false,
+                showTransitionButton: true,
+                preschoolAddTransition: true,
+                lastUpdated: Timestamp.now(),
+                createdAt: Timestamp.now()
+            });
+            console.log("✅ Created global_settings document with default values");
+        } else {
+            console.log("✅ global_settings document already exists");
+        }
+    } catch (error) {
+        console.error("⚠️ Error initializing global_settings:", error);
+    }
+}
+
+// Run initialization when auth state changes (safest place)
+onAuthStateChanged(auth, async (user) => {
+    if (user && user.email === ADMIN_EMAIL) {
+        // Initialize global_settings for any branch
+        await initializeGlobalSettings();
+    }
+});
+
+// Also run initialization on page load as backup
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeGlobalSettings);
+} else {
+    initializeGlobalSettings();
+}
+
+// ========================================================
+// END OF SAFE INITIALIZATION SCRIPT
+// ========================================================
