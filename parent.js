@@ -6164,6 +6164,19 @@ function _formatHour(h) {
 }
 
 /**
+ * updateAddStudentFees()
+ * Called from the HTML onchange handlers on the fee-group and sessions dropdowns.
+ * Recalculates and displays the fee estimate in real time as the user selects options.
+ */
+function updateAddStudentFees() {
+    const group    = document.getElementById('newStudentFeeGroup')?.value || '';
+    const sessions = document.getElementById('newStudentSessions')?.value || '';
+    const subjectCount = document.querySelectorAll('#newStudentSubjects .picker-chip.selected').length;
+
+    _calculateAndShowFee(group, sessions, subjectCount);
+}
+
+/**
  * submitNewStudent()
  * Saves the new student to pending_students collection with the parent's phone
  * number so comprehensiveFindChildren() will pick them up immediately.
@@ -6247,6 +6260,83 @@ async function submitNewStudent() {
         const docRef = await db.collection('pending_students').add(studentDoc);
 
         console.log('✅ New student saved to pending_students:', docRef.id);
+
+        // ── Also save to enrollments collection (mirrors enrollment portal behaviour) ──
+        const ACADEMIC_FEES = {
+            'preschool':  { 'twice': 80000,  'three': 95000,  'five': 150000 },
+            'grade2-4':   { 'twice': 95000,  'three': 110000, 'five': 170000 },
+            'grade5-8':   { 'twice': 105000, 'three': 120000, 'five': 180000 },
+            'grade9-12':  { 'twice': 110000, 'three': 135000, 'five': 200000 }
+        };
+        const ADDITIONAL_SUBJECT_FEE = 40000;
+        const BASE_SUBJECTS_INCLUDED = 2;
+
+        const baseFee = (ACADEMIC_FEES[group] && ACADEMIC_FEES[group][sessions]) || 0;
+        const extraSubjects = Math.max(0, subjects.length - BASE_SUBJECTS_INCLUDED);
+        const extraFee = extraSubjects * ADDITIONAL_SUBJECT_FEE;
+        const totalFee = baseFee + extraFee;
+
+        const enrollmentId = 'BKH-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5).toUpperCase();
+
+        const enrollmentData = {
+            id: enrollmentId,
+            parent: {
+                name:        parentName,
+                email:       parentEmail,
+                phone:       parentPhone,
+                countryCode: parentData.countryCode || '+234',
+                phoneNumber: (parentPhone || '').replace(/\D/g, '').slice(-10),
+                city:        parentData.city || '',
+                country:     parentData.country || 'Nigeria',
+                address:     parentData.address || ''
+            },
+            referral: {
+                code:          parentData.referralCode || '',
+                bankName:      '',
+                accountNumber: '',
+                accountName:   ''
+            },
+            students: [{
+                id:                1,
+                name:              name,
+                gender:            gender,
+                dob:               dob,
+                grade:             group,
+                actualGrade:       grade,
+                startDate:         start,
+                preferredTutor:    tutor || null,
+                academicSessions:  sessions || null,
+                selectedSubjects:  subjects,
+                academicDays:      days,
+                academicTime:      startHour && endHour ? `${startHour}:${endHour}` : '',
+                academicSchedule:  schedule,
+                extracurriculars:  [],
+                testPrep:          []
+            }],
+            summary: {
+                totalFee:              totalFee,
+                academicFee:           totalFee,
+                extracurricularFee:    0,
+                testPrepFee:           0,
+                proratedAmount:        0,
+                discountAmount:        0,
+                prorationExplanation:  ''
+            },
+            timestamp:       new Date().toISOString(),
+            lastSaved:       new Date().toISOString(),
+            createdAt:       new Date().toISOString(),
+            status:          'pending',
+            addedFromPortal: true,
+            parentUid:       user.uid
+        };
+
+        try {
+            await db.collection('enrollments').doc(enrollmentId).set(enrollmentData);
+            console.log('✅ Enrollment also saved to enrollments collection:', enrollmentId);
+        } catch (enrollErr) {
+            // Non-fatal: the pending_students entry already exists, so log and continue
+            console.warn('⚠️ Could not save to enrollments collection (non-fatal):', enrollErr);
+        }
 
         // Invalidate cache so the dashboard reloads fresh
         dataCache.invalidate();
@@ -6433,13 +6523,22 @@ function buildStudentInfoTiles(studentData) {
 
     const data = studentData.data || studentData;
 
-    const subjects = data.selectedSubjects?.length
-        ? data.selectedSubjects.join(', ')
-        : data.subjects?.join(', ') || 'Not specified';
+    // Safely convert to array — Firestore may store strings instead of arrays
+    const _toArray = (val) => {
+        if (Array.isArray(val)) return val;
+        if (typeof val === 'string' && val.trim()) return val.split(',').map(s => s.trim());
+        return [];
+    };
 
+    const subjectsArr = _toArray(data.selectedSubjects).length
+        ? _toArray(data.selectedSubjects)
+        : _toArray(data.subjects);
+    const subjects = subjectsArr.length ? subjectsArr.join(', ') : 'Not specified';
+
+    const daysArr = _toArray(data.academicDays);
     const schedule = data.academicSchedule
-        || (data.academicDays?.length
-            ? `${data.academicDays.join(', ')} ${data.academicTime ? '(' + data.academicTime + ')' : ''}`
+        || (daysArr.length
+            ? `${daysArr.join(', ')} ${data.academicTime ? '(' + data.academicTime + ')' : ''}`
             : null)
         || 'Not specified';
 
@@ -6525,6 +6624,7 @@ window.addStudentNext       = addStudentNext;
 window.addStudentPrev       = addStudentPrev;
 window.togglePickerChip     = togglePickerChip;
 window.submitNewStudent     = submitNewStudent;
+window.updateAddStudentFees = updateAddStudentFees;
 window.showPrivacyModal     = showPrivacyModal;
 window.hidePrivacyModal     = hidePrivacyModal;
 window.downloadReportAsPDF  = downloadReportAsPDF;
