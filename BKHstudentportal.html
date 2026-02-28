@@ -69,6 +69,8 @@ details[open] > summary .chev { transform:rotate(90deg); }
 /* PDF annotate loading */
 .annot-loading { text-align:center; padding:40px; color:#9ca3af; }
 .annot-loading i { font-size:2rem; margin-bottom:10px; display:block; animation:spin 1s linear infinite; }
+/* Select tool styles */
+.annot-tool-btn[title="Select & Move"].active { border-color:#3b82f6; background:#eff6ff; color:#3b82f6; }
 /* Ws tab styles */
 .ws-tab-btn { padding:10px 18px; font-size:.875rem; font-weight:600; border-bottom:2px solid transparent; transition:all .15s; cursor:pointer; background:none; border-left:none; border-right:none; border-top:none; }
 .ws-tab-btn.active { color:#059669; border-bottom-color:#059669; }
@@ -927,6 +929,7 @@ window.openWorkspace = async (assignmentId) => {
                 <p class="text-xs text-gray-500 mb-3">Use the tools below to annotate your assignment. Your annotation will be included when you submit.</p>
                 <div class="annot-toolbar">
                     <span class="text-xs font-semibold text-gray-500">Tool:</span>
+                    <button id="tool-select-${assignmentId}" class="annot-tool-btn" onclick="setAnnotTool('${assignmentId}','select')" title="Select & Move"><i class="fas fa-mouse-pointer"></i></button>
                     <button id="tool-pen-${assignmentId}" class="annot-tool-btn active" onclick="setAnnotTool('${assignmentId}','pen')" title="Pen"><i class="fas fa-pen"></i></button>
                     <button id="tool-text-${assignmentId}" class="annot-tool-btn" onclick="setAnnotTool('${assignmentId}','text')" title="Add Text"><i class="fas fa-font"></i></button>
                     <button id="tool-eraser-${assignmentId}" class="annot-tool-btn" onclick="setAnnotTool('${assignmentId}','eraser')" title="Eraser"><i class="fas fa-eraser"></i></button>
@@ -1036,7 +1039,9 @@ window.openWorkspace = async (assignmentId) => {
         ext: ext,
         _pdfDoc: null,
         _pdfPage: 1,
-        _pdfTotal: 0
+        _pdfTotal: 0,
+        _pageAnnotations: {},   // pageNum → dataURL of annotation canvas
+        _sel: null              // { img, x, y, w, h, dragOffX, dragOffY, phase:'select'|'drag' }
     };
 };
 
@@ -1225,7 +1230,6 @@ async function renderPdfPage(id, pageNum) {
         bgCanvas.style.width = viewport.width + 'px';
         bgCanvas.style.height = viewport.height + 'px';
 
-        // Resize frame container to match rendered page
         if (frameContainer) {
             frameContainer.style.height = viewport.height + 'px';
         }
@@ -1236,20 +1240,53 @@ async function renderPdfPage(id, pageNum) {
         annotCanvas.style.height = viewport.height + 'px';
 
         const bgCtx = bgCanvas.getContext('2d');
-        // White background first
         bgCtx.fillStyle = '#ffffff';
         bgCtx.fillRect(0, 0, viewport.width, viewport.height);
         await page.render({ canvasContext: bgCtx, viewport }).promise;
 
-        // Reset annotation layer for new page
+        // Update annotState ctx
         s.ctx = annotCanvas.getContext('2d');
-        s.history = [];
-        _saveAnnotHistory(id);
+
+        // ── Restore saved annotations for this page (if any) ──
+        const savedAnnot = s._pageAnnotations[pageNum];
+        if (savedAnnot && savedAnnot !== 'data:,') {
+            const restoreImg = new Image();
+            restoreImg.onload = () => {
+                s.ctx.clearRect(0, 0, annotCanvas.width, annotCanvas.height);
+                s.ctx.drawImage(restoreImg, 0, 0, annotCanvas.width, annotCanvas.height);
+                // Reset undo history for this page from saved state
+                s.history = [savedAnnot];
+            };
+            restoreImg.src = savedAnnot;
+        } else {
+            s.history = [];
+            _saveAnnotHistory(id);
+        }
 
         const info = document.getElementById('annot-pdf-pageinfo-' + id);
-        if (info) info.textContent = 'Page ' + pageNum + ' / ' + s._pdfTotal;
+        if (info) {
+            const hasAnnot = s._pageAnnotations[pageNum] && s._pageAnnotations[pageNum] !== '' && s._pageAnnotations[pageNum] !== 'data:,';
+            info.innerHTML = 'Page ' + pageNum + ' / ' + s._pdfTotal + (hasAnnot ? ' <span style="color:#059669;font-weight:700;" title="This page has annotations">●</span>' : '');
+        }
     } catch(err) {
         console.error('PDF page render error:', err);
+    }
+}
+
+// ── Save current page annotations before navigating away ──
+function _saveCurrentPageAnnot(id) {
+    const s = _annotState[id];
+    if (!s || !s.isPdf || !s._pdfPage) return;
+    const c = document.getElementById('annot-canvas-' + id);
+    if (!c || c.width === 0) return;
+    // Check if there's anything drawn
+    const data = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    const hasContent = Array.from(data).some((v, i) => i % 4 === 3 && v > 0);
+    if (hasContent) {
+        s._pageAnnotations[s._pdfPage] = c.toDataURL();
+    } else {
+        // Save empty marker so we know we visited this page
+        s._pageAnnotations[s._pdfPage] = '';
     }
 }
 
@@ -1258,6 +1295,13 @@ window.annotPdfPage = (id, delta) => {
     if (!s || !s._pdfDoc) return;
     const newPage = s._pdfPage + delta;
     if (newPage < 1 || newPage > s._pdfTotal) return;
+
+    // ── Save current page's annotation before leaving ──
+    _saveCurrentPageAnnot(id);
+
+    // Drop any active selection
+    if (s._sel) { _commitSelection(id); }
+
     s._pdfPage = newPage;
     renderPdfPage(id, newPage);
 };
@@ -1281,9 +1325,98 @@ function _getPos(e, canvas) {
     return { x:(e.clientX-r.left)*(canvas.width/r.width), y:(e.clientY-r.top)*(canvas.height/r.height) };
 }
 
+// ── Selection helpers ──
+function _commitSelection(id) {
+    const s = _annotState[id]; if (!s || !s._sel) return;
+    const c = document.getElementById('annot-canvas-'+id); if (!c) return;
+    const sel = s._sel;
+    // Stamp the floating selection onto the canvas at its current position
+    if (sel.img) {
+        s.ctx.drawImage(sel.img, sel.x, sel.y, sel.w, sel.h);
+    }
+    s._sel = null;
+    _saveAnnotHistory(id);
+    // Redraw without selection rect overlay
+    _redrawAnnotCanvas(id);
+}
+
+function _redrawAnnotCanvas(id) {
+    const s = _annotState[id]; if (!s) return;
+    const c = document.getElementById('annot-canvas-'+id); if (!c) return;
+    // Restore from last history state (the clean canvas without selection rect)
+    if (s.history.length > 0) {
+        const last = s.history[s.history.length - 1];
+        if (last && last !== 'data:,') {
+            const img = new Image();
+            img.onload = () => {
+                s.ctx.clearRect(0, 0, c.width, c.height);
+                s.ctx.drawImage(img, 0, 0, c.width, c.height);
+                // Draw floating selection if exists
+                if (s._sel) _drawSelectionOverlay(id);
+            };
+            img.src = last;
+            return;
+        }
+    }
+    s.ctx.clearRect(0, 0, c.width, c.height);
+    if (s._sel) _drawSelectionOverlay(id);
+}
+
+function _drawSelectionOverlay(id) {
+    const s = _annotState[id]; if (!s || !s._sel) return;
+    const sel = s._sel;
+    // Draw the floating image
+    if (sel.img) {
+        s.ctx.drawImage(sel.img, sel.x, sel.y, sel.w, sel.h);
+    }
+    // Draw selection rectangle border (marching ants)
+    s.ctx.save();
+    s.ctx.strokeStyle = '#059669';
+    s.ctx.lineWidth = 2;
+    s.ctx.setLineDash([6, 4]);
+    s.ctx.strokeRect(sel.x, sel.y, sel.w, sel.h);
+    // Corner handles
+    const hs = 6;
+    s.ctx.fillStyle = '#059669';
+    s.ctx.setLineDash([]);
+    [[sel.x, sel.y],[sel.x+sel.w, sel.y],[sel.x, sel.y+sel.h],[sel.x+sel.w, sel.y+sel.h]].forEach(([cx,cy]) => {
+        s.ctx.fillRect(cx - hs/2, cy - hs/2, hs, hs);
+    });
+    s.ctx.restore();
+}
+
 function _annotStart(e, id, canvas) {
     const s = _annotState[id]; if (!s) return;
     const pos = _getPos(e, canvas);
+
+    // ── SELECT tool ──
+    if (s.tool === 'select') {
+        // If we have a floating selection, check if click is inside it → start dragging
+        if (s._sel && s._sel.phase === 'float') {
+            const sel = s._sel;
+            if (pos.x >= sel.x && pos.x <= sel.x + sel.w && pos.y >= sel.y && pos.y <= sel.y + sel.h) {
+                sel.phase = 'drag';
+                sel.dragOffX = pos.x - sel.x;
+                sel.dragOffY = pos.y - sel.y;
+                s.drawing = true;
+                return;
+            } else {
+                // Clicked outside — commit the selection and start fresh
+                _commitSelection(id);
+            }
+        }
+        // Start drawing a new selection rectangle
+        s._sel = { img: null, x: pos.x, y: pos.y, w: 0, h: 0, startX: pos.x, startY: pos.y, dragOffX: 0, dragOffY: 0, phase: 'select' };
+        s.drawing = true;
+        return;
+    }
+
+    // ── If there's a floating selection and user switches to another tool, commit it first ──
+    if (s._sel && s._sel.phase === 'float') {
+        _commitSelection(id);
+    }
+
+    // ── TEXT tool ──
     if (s.tool === 'text') {
         const txt = prompt('Enter text to add to annotation:');
         if (txt) {
@@ -1294,6 +1427,8 @@ function _annotStart(e, id, canvas) {
         }
         return;
     }
+
+    // ── PEN / ERASER ──
     s.drawing = true;
     s.ctx.beginPath();
     s.ctx.moveTo(pos.x, pos.y);
@@ -1302,20 +1437,94 @@ function _annotStart(e, id, canvas) {
 function _annotDraw(e, id, canvas) {
     const s = _annotState[id]; if (!s || !s.drawing) return;
     const pos = _getPos(e, canvas);
+
+    // ── SELECT: drawing selection rectangle ──
+    if (s.tool === 'select' && s._sel && s._sel.phase === 'select') {
+        const sel = s._sel;
+        sel.x = Math.min(sel.startX, pos.x);
+        sel.y = Math.min(sel.startY, pos.y);
+        sel.w = Math.abs(pos.x - sel.startX);
+        sel.h = Math.abs(pos.y - sel.startY);
+        // Redraw canvas and show selection rect
+        _redrawAnnotCanvas(id);
+        // Draw the selection rectangle (visual feedback)
+        s.ctx.save();
+        s.ctx.strokeStyle = '#3b82f6';
+        s.ctx.lineWidth = 1.5;
+        s.ctx.setLineDash([6, 3]);
+        s.ctx.strokeRect(sel.x, sel.y, sel.w, sel.h);
+        s.ctx.fillStyle = 'rgba(59,130,246,0.08)';
+        s.ctx.fillRect(sel.x, sel.y, sel.w, sel.h);
+        s.ctx.restore();
+        return;
+    }
+
+    // ── SELECT: dragging floating selection ──
+    if (s.tool === 'select' && s._sel && s._sel.phase === 'drag') {
+        s._sel.x = pos.x - s._sel.dragOffX;
+        s._sel.y = pos.y - s._sel.dragOffY;
+        _redrawAnnotCanvas(id);
+        return;
+    }
+
+    // ── ERASER ──
     if (s.tool === 'eraser') {
         s.ctx.clearRect(pos.x - s.size*2, pos.y - s.size*2, s.size*4, s.size*4);
-    } else {
-        s.ctx.strokeStyle = s.color;
-        s.ctx.lineWidth = s.size;
-        s.ctx.lineCap = 'round';
-        s.ctx.lineJoin = 'round';
-        s.ctx.lineTo(pos.x, pos.y);
-        s.ctx.stroke();
+        return;
     }
+
+    // ── PEN ──
+    s.ctx.strokeStyle = s.color;
+    s.ctx.lineWidth = s.size;
+    s.ctx.lineCap = 'round';
+    s.ctx.lineJoin = 'round';
+    s.ctx.lineTo(pos.x, pos.y);
+    s.ctx.stroke();
 }
 
 function _annotStop(id) {
-    const s = _annotState[id]; if (!s || !s.drawing) return;
+    const s = _annotState[id]; if (!s) return;
+
+    // ── SELECT: finished drawing selection rect → lift the area ──
+    if (s.tool === 'select' && s._sel && s._sel.phase === 'select' && s.drawing) {
+        s.drawing = false;
+        const sel = s._sel;
+        // Need minimum size to count
+        if (sel.w < 4 || sel.h < 4) {
+            s._sel = null;
+            _redrawAnnotCanvas(id);
+            return;
+        }
+        const c = document.getElementById('annot-canvas-'+id); if (!c) return;
+        // Capture the selected region as an image
+        const selCanvas = document.createElement('canvas');
+        selCanvas.width = sel.w;
+        selCanvas.height = sel.h;
+        const selCtx = selCanvas.getContext('2d');
+        selCtx.drawImage(c, sel.x, sel.y, sel.w, sel.h, 0, 0, sel.w, sel.h);
+        const selImg = new Image();
+        selImg.onload = () => {
+            sel.img = selImg;
+            sel.phase = 'float';
+            // Erase the original area from the canvas
+            s.ctx.clearRect(sel.x, sel.y, sel.w, sel.h);
+            _saveAnnotHistory(id); // save the state with area cut out
+            // Draw the floating selection overlay
+            _drawSelectionOverlay(id);
+        };
+        selImg.src = selCanvas.toDataURL();
+        return;
+    }
+
+    // ── SELECT: finished dragging ──
+    if (s.tool === 'select' && s._sel && s._sel.phase === 'drag' && s.drawing) {
+        s.drawing = false;
+        s._sel.phase = 'float'; // back to float, user can drag again or click away to commit
+        _redrawAnnotCanvas(id);
+        return;
+    }
+
+    if (!s.drawing) return;
     s.drawing = false;
     _saveAnnotHistory(id);
 }
@@ -1324,24 +1533,37 @@ function _saveAnnotHistory(id) {
     const s = _annotState[id]; if (!s) return;
     const c = document.getElementById('annot-canvas-'+id); if (!c) return;
     s.history.push(c.toDataURL());
-    if (s.history.length > 25) s.history.shift();
+    if (s.history.length > 30) s.history.shift();
 }
 
 window.setAnnotTool = (id, tool) => {
     const s = _annotState[id]; if (!s) return;
+
+    // Commit any floating selection when switching tools
+    if (s._sel && s._sel.phase === 'float' && tool !== 'select') {
+        _commitSelection(id);
+    }
+
     s.tool = tool;
-    ['pen','text','eraser'].forEach(t => {
+    ['select','pen','text','eraser'].forEach(t => {
         const btn = document.getElementById('tool-'+t+'-'+id);
         if (!btn) return;
         btn.classList.toggle('active', t === tool);
     });
     const hints = {
+        select: '<i class="fas fa-mouse-pointer mr-1"></i>Select — drag a rectangle to select, then move it',
         pen: '<i class="fas fa-pen mr-1"></i>Pen — click and drag to draw',
         text: '<i class="fas fa-font mr-1"></i>Text — click on canvas to add a label',
         eraser: '<i class="fas fa-eraser mr-1"></i>Eraser — drag to erase areas'
     };
     const hint = document.getElementById('annot-hint-'+id);
     if (hint) hint.innerHTML = hints[tool] || '';
+
+    // Update cursor
+    const canvas = document.getElementById('annot-canvas-'+id);
+    if (canvas) {
+        canvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
+    }
 };
 
 window.setAnnotColor = (id, color) => {
@@ -1354,7 +1576,19 @@ window.setAnnotColor = (id, color) => {
 };
 
 window.undoAnnot = (id) => {
-    const s = _annotState[id]; if (!s || s.history.length < 2) return;
+    const s = _annotState[id]; if (!s) return;
+    // If there's a floating selection, discard it (undo the cut)
+    if (s._sel) {
+        s._sel = null;
+        if (s.history.length > 0) {
+            const c = document.getElementById('annot-canvas-'+id); if (!c) return;
+            const img = new Image();
+            img.onload = () => { s.ctx.clearRect(0,0,c.width,c.height); s.ctx.drawImage(img,0,0); };
+            img.src = s.history[s.history.length-1];
+        }
+        return;
+    }
+    if (s.history.length < 2) return;
     s.history.pop();
     const c = document.getElementById('annot-canvas-'+id); if (!c) return;
     const img = new Image();
@@ -1364,6 +1598,7 @@ window.undoAnnot = (id) => {
 
 window.clearAnnotCanvas = (id) => {
     const s = _annotState[id]; if (!s) return;
+    s._sel = null; // drop any selection
     const c = document.getElementById('annot-canvas-'+id); if (!c) return;
     s.ctx.clearRect(0,0,c.width,c.height);
     _saveAnnotHistory(id);
@@ -1448,8 +1683,17 @@ async function _updateAnnotPreview(id) {
     const preview = document.getElementById('annot-preview-'+id);
     const previewImg = document.getElementById('annot-preview-img-'+id);
     if (!canvas || !preview || !previewImg) return;
+    const s = _annotState[id];
+
+    // Check current canvas for content
     const data = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
-    const hasContent = Array.from(data).some((v,i) => i%4===3 && v>0);
+    let hasContent = Array.from(data).some((v,i) => i%4===3 && v>0);
+
+    // Also check saved page annotations for multi-page PDFs
+    if (!hasContent && s && s._pageAnnotations) {
+        hasContent = Object.values(s._pageAnnotations).some(v => v && v !== '' && v !== 'data:,');
+    }
+
     if (hasContent) {
         preview.classList.remove('hidden');
         previewImg.src = await _getMergedAnnotation(id);
@@ -1459,34 +1703,120 @@ async function _updateAnnotPreview(id) {
 }
 
 // ── Merge background + annotations into one image (async, CORS-safe) ──
+// For multi-page PDFs, merges ALL pages that have annotations into a single tall image
 async function _getMergedAnnotation(id) {
     const annotCanvas = document.getElementById('annot-canvas-'+id);
     if (!annotCanvas || annotCanvas.width === 0) return '';
     const s = _annotState[id];
 
+    // Commit any floating selection first
+    if (s && s._sel && s._sel.phase === 'float') { _commitSelection(id); }
+
+    // ── Multi-page PDF: save current page, then merge all annotated pages ──
+    if (s && s.isPdf && s._pdfDoc && s._pdfTotal > 1) {
+        _saveCurrentPageAnnot(id); // save current page before merging
+
+        // Collect all pages that have annotations
+        const annotatedPages = [];
+        for (let p = 1; p <= s._pdfTotal; p++) {
+            if (s._pageAnnotations[p] && s._pageAnnotations[p] !== '' && s._pageAnnotations[p] !== 'data:,') {
+                annotatedPages.push(p);
+            }
+        }
+        // If current page has drawings but wasn't saved yet (just drawn)
+        if (annotatedPages.length === 0) {
+            const data = annotCanvas.getContext('2d').getImageData(0,0,annotCanvas.width,annotCanvas.height).data;
+            const hasContent = Array.from(data).some((v,i) => i%4===3 && v>0);
+            if (hasContent) annotatedPages.push(s._pdfPage);
+        }
+
+        if (annotatedPages.length === 0) return '';
+
+        // Render each annotated page with its annotations
+        const pageImages = [];
+        for (const pageNum of annotatedPages) {
+            try {
+                const page = await s._pdfDoc.getPage(pageNum);
+                const baseVp = page.getViewport({ scale: 1 });
+                const pScale = Math.max(1, 800 / baseVp.width);
+                const vp = page.getViewport({ scale: pScale });
+
+                const pageCanvas = document.createElement('canvas');
+                pageCanvas.width = vp.width;
+                pageCanvas.height = vp.height;
+                const pCtx = pageCanvas.getContext('2d');
+                pCtx.fillStyle = '#ffffff';
+                pCtx.fillRect(0, 0, vp.width, vp.height);
+                await page.render({ canvasContext: pCtx, viewport: vp }).promise;
+
+                // Draw that page's annotations on top
+                const annotDataUrl = s._pageAnnotations[pageNum];
+                if (annotDataUrl && annotDataUrl !== 'data:,') {
+                    const annotImg = await new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = () => resolve(img);
+                        img.onerror = () => resolve(null);
+                        img.src = annotDataUrl;
+                    });
+                    if (annotImg) {
+                        pCtx.drawImage(annotImg, 0, 0, vp.width, vp.height);
+                    }
+                }
+
+                // Add page label
+                pCtx.save();
+                pCtx.fillStyle = 'rgba(0,0,0,0.5)';
+                pCtx.font = 'bold 14px Inter, sans-serif';
+                pCtx.fillText('Page ' + pageNum, 10, vp.height - 10);
+                pCtx.restore();
+
+                pageImages.push(pageCanvas);
+            } catch (e) { console.warn('Failed to render page', pageNum, e); }
+        }
+
+        if (pageImages.length === 0) return '';
+
+        // Stack all pages vertically with a small gap
+        const gap = 8;
+        const totalW = Math.max(...pageImages.map(c => c.width));
+        const totalH = pageImages.reduce((h, c) => h + c.height + gap, -gap);
+        const merged = document.createElement('canvas');
+        merged.width = totalW;
+        merged.height = totalH;
+        const mCtx = merged.getContext('2d');
+        mCtx.fillStyle = '#e5e7eb';
+        mCtx.fillRect(0, 0, totalW, totalH);
+        let yOff = 0;
+        for (const pc of pageImages) {
+            mCtx.drawImage(pc, 0, yOff);
+            yOff += pc.height + gap;
+        }
+        return merged.toDataURL('image/png');
+    }
+
+    // ── Single page / image / other file ──
     const merged = document.createElement('canvas');
     merged.width = annotCanvas.width;
     merged.height = annotCanvas.height;
     const mCtx = merged.getContext('2d');
 
-    // White base
     mCtx.fillStyle = '#ffffff';
     mCtx.fillRect(0, 0, merged.width, merged.height);
 
     let bgDrawn = false;
 
-    // 1) PDF.js bg canvas — already same-origin, just draw it
+    // 1) PDF.js bg canvas — already same-origin
     const bgCanvas = document.getElementById('annot-bg-canvas-'+id);
     if (bgCanvas && bgCanvas.width > 0 && bgCanvas.height > 0) {
         try { mCtx.drawImage(bgCanvas, 0, 0, merged.width, merged.height); bgDrawn = true; } catch(e) {}
     }
 
-    // 2) Prefetched same-origin blob image (avoids CORS taint)
+    // 2) Prefetched same-origin blob image
     if (!bgDrawn && s && s._bgOffscreenImg) {
         try { mCtx.drawImage(s._bgOffscreenImg, 0, 0, merged.width, merged.height); bgDrawn = true; } catch(e) {}
     }
 
-    // 3) Last resort — try fetch as blob right now
+    // 3) Live fetch as blob
     if (!bgDrawn && s && s.fileUrl && s.isImage) {
         try {
             const resp = await fetch(s.fileUrl, { mode:'cors' });
@@ -1504,13 +1834,11 @@ async function _getMergedAnnotation(id) {
         } catch(e) { console.warn('Could not fetch image for merge:', e); }
     }
 
-    // 4) For PDFs that fell back to Google Viewer — can't capture iframe,
-    //    but if we have the blob, render via PDF.js into the merged canvas directly
+    // 4) PDF.js re-render for single-page PDF
     if (!bgDrawn && s && s._pdfDoc && s._pdfPage) {
         try {
             const page = await s._pdfDoc.getPage(s._pdfPage);
             const vp = page.getViewport({ scale: merged.width / page.getViewport({scale:1}).width });
-            // Resize merged to match aspect ratio
             merged.height = vp.height;
             mCtx.fillStyle = '#ffffff';
             mCtx.fillRect(0, 0, merged.width, merged.height);
@@ -1530,11 +1858,21 @@ window.previewAnnotation = async (id) => {
     const preview = document.getElementById('annot-live-preview-'+id);
     const previewImg = document.getElementById('annot-live-preview-img-'+id);
     if (!preview || !previewImg) return;
+    const s = _annotState[id];
 
+    // Save current page first
+    if (s && s.isPdf) _saveCurrentPageAnnot(id);
+
+    // Check current canvas AND saved pages for any content
     const canvas = document.getElementById('annot-canvas-'+id);
-    if (!canvas || canvas.width === 0) return;
-    const data = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
-    const hasContent = Array.from(data).some((v,i) => i%4===3 && v>0);
+    let hasContent = false;
+    if (canvas && canvas.width > 0) {
+        const data = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+        hasContent = Array.from(data).some((v,i) => i%4===3 && v>0);
+    }
+    if (!hasContent && s && s._pageAnnotations) {
+        hasContent = Object.values(s._pageAnnotations).some(v => v && v !== '' && v !== 'data:,');
+    }
     if (!hasContent) {
         alert('Nothing drawn yet — use the tools above to annotate first.');
         return;
@@ -1553,10 +1891,21 @@ window.previewAnnotation = async (id) => {
 };
 
 window.submitAnnotation = async (id) => {
+    const s = _annotState[id];
+
+    // Save current page first
+    if (s && s.isPdf) _saveCurrentPageAnnot(id);
+
+    // Check current canvas AND saved pages
     const canvas = document.getElementById('annot-canvas-'+id);
-    if (!canvas || canvas.width === 0) { alert('Nothing to submit.'); return; }
-    const data = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
-    const hasContent = Array.from(data).some((v,i) => i%4===3 && v>0);
+    let hasContent = false;
+    if (canvas && canvas.width > 0) {
+        const data = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+        hasContent = Array.from(data).some((v,i) => i%4===3 && v>0);
+    }
+    if (!hasContent && s && s._pageAnnotations) {
+        hasContent = Object.values(s._pageAnnotations).some(v => v && v !== '' && v !== 'data:,');
+    }
     if (!hasContent) { alert('Nothing drawn yet — use the tools above to annotate first.'); return; }
 
     const btn = document.getElementById('annot-submit-btn-'+id);
@@ -1565,7 +1914,7 @@ window.submitAnnotation = async (id) => {
     btn.disabled = true;
 
     try {
-        // 1) Merge background + annotations
+        // 1) Merge background + annotations (handles multi-page)
         const mergedDataUrl = await _getMergedAnnotation(id);
         if (!mergedDataUrl) throw new Error('Failed to generate merged annotation');
 
@@ -1594,8 +1943,10 @@ window.submitAnnotation = async (id) => {
                 if (convId) {
                     const assignSnap = await getDoc(doc(db,'homework_assignments',id));
                     const aTitle = assignSnap.exists() ? (assignSnap.data().title||'Assignment') : 'Assignment';
+                    const pageCount = s && s._pageAnnotations ? Object.keys(s._pageAnnotations).filter(k => s._pageAnnotations[k] && s._pageAnnotations[k] !== '').length : 0;
+                    const pageNote = pageCount > 1 ? ` (${pageCount} pages annotated)` : '';
                     await addDoc(collection(db,'conversations',convId,'messages'), {
-                        content: `📝 Annotated work for: "${aTitle}"`,
+                        content: `📝 Annotated work for: "${aTitle}"${pageNote}`,
                         imageUrl: annotUrl,
                         senderId: window.currentStudent.id,
                         senderName: window.currentStudent.name,
@@ -1617,7 +1968,6 @@ window.submitAnnotation = async (id) => {
 
         // 5) Cleanup
         if (_resizeObservers[id]) { _resizeObservers[id].disconnect(); delete _resizeObservers[id]; }
-        const s = _annotState[id];
         if (s && s._bgBlobUrl) { URL.revokeObjectURL(s._bgBlobUrl); }
         document.getElementById('ws-modal-'+id)?.remove();
         playNotifSound('general');
@@ -1654,22 +2004,31 @@ window.submitWork = async (id) => {
 
         // Upload annotation canvas if student drew anything
         let annotUrl = '';
+        const _ss = _annotState[id];
+        // Save current page for multi-page PDFs
+        if (_ss && _ss.isPdf) _saveCurrentPageAnnot(id);
+        // Commit any floating selection
+        if (_ss && _ss._sel && _ss._sel.phase === 'float') _commitSelection(id);
+
         const canvas = document.getElementById('annot-canvas-'+id);
+        let hasAnnot = false;
         if (canvas && canvas.width > 0) {
             const data = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
-            const hasContent = Array.from(data).some((v,i) => i%4===3 && v>0);
-            if (hasContent) {
-                // Get merged image (background + annotations) — CORS-safe
-                const mergedDataUrl = await _getMergedAnnotation(id);
-                if (mergedDataUrl) {
-                    const mergedBlob = await (await fetch(mergedDataUrl)).blob();
-                    const fd = new FormData();
-                    fd.append('file', mergedBlob, 'annotation.png');
-                    fd.append('upload_preset', CLOUDINARY.preset);
-                    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY.cloudName}/upload`, {method:'POST',body:fd});
-                    const d = await res.json();
-                    annotUrl = d.secure_url || '';
-                }
+            hasAnnot = Array.from(data).some((v,i) => i%4===3 && v>0);
+        }
+        if (!hasAnnot && _ss && _ss._pageAnnotations) {
+            hasAnnot = Object.values(_ss._pageAnnotations).some(v => v && v !== '' && v !== 'data:,');
+        }
+        if (hasAnnot) {
+            const mergedDataUrl = await _getMergedAnnotation(id);
+            if (mergedDataUrl) {
+                const mergedBlob = await (await fetch(mergedDataUrl)).blob();
+                const fd = new FormData();
+                fd.append('file', mergedBlob, 'annotation.png');
+                fd.append('upload_preset', CLOUDINARY.preset);
+                const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY.cloudName}/upload`, {method:'POST',body:fd});
+                const d = await res.json();
+                annotUrl = d.secure_url || '';
             }
         }
 
