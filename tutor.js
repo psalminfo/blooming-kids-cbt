@@ -2221,15 +2221,40 @@ function showEnhancedMessagingModal() {
             studentDocs.filter(s => !s.summerBreak && !s.isTransitioning && !['archived','graduated','transferred'].includes(s.status))
                 .forEach(s => allContacts.push({ id: s.id, name: s.studentName || 'Student', role: 'student', extra: s.grade || '' }));
 
-            // 2. Parents
+            // 2. Parents — only parents of THIS tutor's own students
             try {
-                const parentSnap = await getDocs(collection(db, 'parent_users'));
-                parentSnap.forEach(d => {
-                    const p = d.data();
-                    const id = p.uid || d.id;
-                    const name = p.name || p.displayName || p.email || 'Parent';
-                    allContacts.push({ id, name, role: 'parent', extra: p.email || '' });
+                const seenPhones = new Set();
+                const parentCandidates = [];
+                studentDocs.forEach(s => {
+                    const phone = (s.parentPhone || '').trim();
+                    if (phone && !seenPhones.has(phone)) {
+                        seenPhones.add(phone);
+                        parentCandidates.push({
+                            name:        s.parentName || s.parentEmail || 'Parent',
+                            email:       s.parentEmail || '',
+                            phone,
+                            studentName: s.studentName || ''
+                        });
+                    }
                 });
+                await Promise.all(parentCandidates.map(async (pc) => {
+                    try {
+                        let snap = await getDocs(query(collection(db, 'parent_users'), where('phone', '==', pc.phone)));
+                        if (snap.empty) {
+                            const alt = pc.phone.startsWith('0') ? '+234' + pc.phone.slice(1) : pc.phone;
+                            snap = await getDocs(query(collection(db, 'parent_users'), where('phone', '==', alt)));
+                        }
+                        if (!snap.empty) {
+                            const d = snap.docs[0];
+                            const p = d.data();
+                            allContacts.push({ id: p.uid || d.id, name: p.name || p.displayName || pc.name, role: 'parent', extra: `Parent of ${pc.studentName}` });
+                        } else {
+                            allContacts.push({ id: pc.phone, name: pc.name, role: 'parent', extra: `Parent of ${pc.studentName}` });
+                        }
+                    } catch(e) {
+                        allContacts.push({ id: pc.phone, name: pc.name, role: 'parent', extra: `Parent of ${pc.studentName}` });
+                    }
+                }));
             } catch(e) {}
 
             // 3. Other tutors
