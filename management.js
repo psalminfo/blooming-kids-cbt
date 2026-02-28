@@ -4966,6 +4966,873 @@ async function exportPayAdviceAsXLS() {
 // Remove the old downloadMultipleXLSFiles and downloadAsXLS functions as they're no longer needed
 
 // ======================================================
+// SUBSECTION 4.1B: Tenure Bonus Panel
+// ======================================================
+
+// Tenure Bonus constants
+const TENURE_BONUS_AMOUNT = 10000; // ₦10,000 per student
+const TENURE_BONUS_EFFECTIVE_DATE = new Date('2026-03-01'); // March 1, 2026
+
+let tenureBonusTutors = [];
+let tenureBonusLogs = [];
+let tenureBonusActiveSubTab = 'all'; // 'all', 'eligible', 'notEligible'
+
+function calculateTenureDetails(employmentDate) {
+    if (!employmentDate) return { years: 0, months: 0, totalMonths: 0, label: 'N/A', isEligible: false };
+    try {
+        const start = new Date(employmentDate);
+        if (isNaN(start.getTime())) return { years: 0, months: 0, totalMonths: 0, label: 'N/A', isEligible: false };
+        const now = new Date();
+        let years = now.getFullYear() - start.getFullYear();
+        let months = now.getMonth() - start.getMonth();
+        if (now.getDate() < start.getDate()) months--;
+        if (months < 0) { years--; months += 12; }
+        const totalMonths = years * 12 + months;
+        const isEligible = totalMonths >= 12;
+        let label = '';
+        if (years > 0) label += `${years} year${years > 1 ? 's' : ''}`;
+        if (months > 0) label += `${years > 0 ? ', ' : ''}${months} month${months > 1 ? 's' : ''}`;
+        if (!label) label = 'Less than 1 month';
+        return { years, months, totalMonths, label, isEligible };
+    } catch (e) {
+        return { years: 0, months: 0, totalMonths: 0, label: 'N/A', isEligible: false };
+    }
+}
+
+async function renderTenureBonusPanel(container) {
+    const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
+    
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-green-700 flex items-center gap-2">
+                        <i class="fas fa-award text-yellow-500"></i> Tenure Bonus
+                    </h2>
+                    <p class="text-sm text-gray-500 mt-1">
+                        Tutors who complete 1 full year receive a one-time ₦10,000 increase per regular student fee (effective from March 1, 2026). Transitioning students are excluded. Bonuses auto-apply when this tab is opened.
+                    </p>
+                </div>
+                <div class="mt-3 md:mt-0 flex items-center gap-2">
+                    <button id="tb-refresh-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm font-medium">
+                        <i class="fas fa-sync-alt mr-1"></i> Refresh
+                    </button>
+                    <button id="tb-run-auto-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">
+                        <i class="fas fa-magic mr-1"></i> Re-check & Upgrade
+                    </button>
+                </div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                    <p class="text-xs font-bold text-blue-700 uppercase">Total Tutors</p>
+                    <p id="tb-total-count" class="text-2xl font-extrabold text-blue-800">0</p>
+                </div>
+                <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                    <p class="text-xs font-bold text-green-700 uppercase">1+ Year (Eligible)</p>
+                    <p id="tb-eligible-count" class="text-2xl font-extrabold text-green-800">0</p>
+                </div>
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
+                    <p class="text-xs font-bold text-yellow-700 uppercase">Under 1 Year</p>
+                    <p id="tb-not-eligible-count" class="text-2xl font-extrabold text-yellow-800">0</p>
+                </div>
+                <div class="bg-purple-50 border border-purple-200 rounded-lg p-3 text-center">
+                    <p class="text-xs font-bold text-purple-700 uppercase">Already Upgraded</p>
+                    <p id="tb-upgraded-count" class="text-2xl font-extrabold text-purple-800">0</p>
+                </div>
+            </div>
+
+            <!-- Search -->
+            <div class="mb-4">
+                <input type="text" id="tb-search-input" placeholder="Search by tutor name..." class="w-full md:w-80 p-2 border rounded-lg text-sm">
+            </div>
+
+            <!-- Sub-tabs -->
+            <div class="flex flex-wrap gap-2 mb-4 border-b pb-3">
+                <button data-tb-tab="all" class="tb-sub-tab px-4 py-2 rounded-lg text-sm font-medium bg-green-600 text-white">
+                    All Tutors
+                </button>
+                <button data-tb-tab="eligible" class="tb-sub-tab px-4 py-2 rounded-lg text-sm font-medium bg-gray-200 text-gray-700 hover:bg-gray-300">
+                    Over 1 Year
+                </button>
+                <button data-tb-tab="notEligible" class="tb-sub-tab px-4 py-2 rounded-lg text-sm font-medium bg-gray-200 text-gray-700 hover:bg-gray-300">
+                    Under 1 Year
+                </button>
+                <button data-tb-tab="updates" class="tb-sub-tab px-4 py-2 rounded-lg text-sm font-medium bg-gray-200 text-gray-700 hover:bg-gray-300">
+                    <i class="fas fa-history mr-1"></i> Upgrade Log
+                </button>
+            </div>
+
+            <!-- Tutor Table -->
+            <div id="tb-table-section">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase">Tutor Name</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase">Email</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase">Employment Date</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase">Tenure</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase">Regular Students</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase">Status</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tb-table-body" class="divide-y">
+                            <tr><td colspan="7" class="text-center py-8 text-gray-400">Loading tutors...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Upgrade Log Section (hidden by default) -->
+            <div id="tb-log-section" class="hidden">
+                <div class="bg-gray-50 rounded-lg p-4 border">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2"><i class="fas fa-history text-blue-500"></i> Upgrade Log</h3>
+                    <div id="tb-log-list" class="space-y-2 max-h-96 overflow-y-auto">
+                        <p class="text-gray-400 text-sm text-center py-4">Loading upgrade history...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Wire sub-tab clicks
+    document.querySelectorAll('.tb-sub-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tab = btn.dataset.tbTab;
+            tenureBonusActiveSubTab = tab;
+            document.querySelectorAll('.tb-sub-tab').forEach(b => {
+                b.classList.remove('bg-green-600', 'text-white');
+                b.classList.add('bg-gray-200', 'text-gray-700');
+            });
+            btn.classList.remove('bg-gray-200', 'text-gray-700');
+            btn.classList.add('bg-green-600', 'text-white');
+
+            if (tab === 'updates') {
+                document.getElementById('tb-table-section').classList.add('hidden');
+                document.getElementById('tb-log-section').classList.remove('hidden');
+                renderTenureBonusLog();
+            } else {
+                document.getElementById('tb-table-section').classList.remove('hidden');
+                document.getElementById('tb-log-section').classList.add('hidden');
+                renderTenureBonusTable();
+            }
+        });
+    });
+
+    // Wire search
+    document.getElementById('tb-search-input').addEventListener('input', () => {
+        renderTenureBonusTable();
+    });
+
+    // Wire refresh
+    document.getElementById('tb-refresh-btn').addEventListener('click', () => {
+        loadTenureBonusData();
+    });
+
+    // Wire auto-upgrade
+    document.getElementById('tb-run-auto-btn').addEventListener('click', () => {
+        runTenureAutoUpgrade();
+    });
+
+    // Load data
+    await loadTenureBonusData();
+}
+
+async function loadTenureBonusData() {
+    const tableBody = document.getElementById('tb-table-body');
+    if (tableBody) tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-gray-400"><i class="fas fa-spinner fa-spin mr-2"></i>Loading tutors...</td></tr>`;
+
+    try {
+        // Fetch all active tutors
+        const tutorsSnapshot = await getDocs(query(collection(db, "tutors")));
+        const allTutors = tutorsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+            .filter(t => !t.status || t.status === 'active');
+
+        // Fetch all active students (exclude transitioning, archived, graduated, transferred, summer break)
+        const studentsSnapshot = await getDocs(query(collection(db, "students")));
+        const allStudents = studentsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+            .filter(s => (!s.status || s.status === 'active' || s.status === 'approved') && !s.summerBreak && !s.isTransitioning && s.status !== 'archived' && s.status !== 'graduated' && s.status !== 'transferred');
+
+        // Fetch tenure bonus records
+        const bonusSnapshot = await getDocs(query(collection(db, "tenure_bonuses")));
+        const bonusRecords = {};
+        bonusSnapshot.docs.forEach(d => {
+            const data = d.data();
+            bonusRecords[data.tutorEmail] = { id: d.id, ...data };
+        });
+
+        // Fetch upgrade logs
+        const logsSnapshot = await getDocs(query(collection(db, "tenure_bonus_logs"), orderBy("timestamp", "desc")));
+        tenureBonusLogs = logsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        // Build tutor data with tenure info
+        tenureBonusTutors = allTutors.map(tutor => {
+            const tenure = calculateTenureDetails(tutor.employmentDate);
+            const tutorStudents = allStudents.filter(s => s.tutorEmail === tutor.email);
+            const bonusRecord = bonusRecords[tutor.email];
+            return {
+                ...tutor,
+                tenure,
+                students: tutorStudents,
+                studentCount: tutorStudents.length,
+                bonusApplied: !!bonusRecord,
+                bonusRecord: bonusRecord || null,
+                bonusDate: bonusRecord ? bonusRecord.appliedAt : null
+            };
+        });
+
+        // Sort: eligible first, then by tenure descending
+        tenureBonusTutors.sort((a, b) => {
+            if (a.tenure.isEligible && !b.tenure.isEligible) return -1;
+            if (!a.tenure.isEligible && b.tenure.isEligible) return 1;
+            return b.tenure.totalMonths - a.tenure.totalMonths;
+        });
+
+        // Update counters
+        const eligible = tenureBonusTutors.filter(t => t.tenure.isEligible);
+        const notEligible = tenureBonusTutors.filter(t => !t.tenure.isEligible);
+        const upgraded = tenureBonusTutors.filter(t => t.bonusApplied);
+
+        const totalEl = document.getElementById('tb-total-count');
+        const eligibleEl = document.getElementById('tb-eligible-count');
+        const notEligibleEl = document.getElementById('tb-not-eligible-count');
+        const upgradedEl = document.getElementById('tb-upgraded-count');
+
+        if (totalEl) totalEl.textContent = tenureBonusTutors.length;
+        if (eligibleEl) eligibleEl.textContent = eligible.length;
+        if (notEligibleEl) notEligibleEl.textContent = notEligible.length;
+        if (upgradedEl) upgradedEl.textContent = upgraded.length;
+
+        renderTenureBonusTable();
+
+        // Auto-apply: silently upgrade any eligible tutors who just clocked 1 year and haven't been upgraded yet
+        await silentAutoApplyTenureBonus();
+
+    } catch (err) {
+        console.error('Error loading tenure bonus data:', err);
+        if (tableBody) tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500">Failed to load data: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+// Silent auto-apply: runs every time the tab loads, automatically upgrades any tutor
+// who has JUST clocked 1 year and hasn't been upgraded yet. No confirmation needed.
+let _silentAutoRunning = false;
+async function silentAutoApplyTenureBonus() {
+    if (_silentAutoRunning) return; // prevent double-run
+    _silentAutoRunning = true;
+
+    try {
+        const now = new Date();
+        if (now < TENURE_BONUS_EFFECTIVE_DATE) { _silentAutoRunning = false; return; }
+
+        // Find tutors who are eligible (1+ year), NOT already upgraded, and have regular students
+        const toUpgrade = tenureBonusTutors.filter(t => t.tenure.isEligible && !t.bonusApplied && t.studentCount > 0);
+
+        if (toUpgrade.length === 0) { _silentAutoRunning = false; return; }
+
+        let successCount = 0;
+        let totalBonusApplied = 0;
+        const upgradedNames = [];
+
+        for (const tutor of toUpgrade) {
+            try {
+                const batch = writeBatch(db);
+                const updatedStudents = [];
+                const tBonus = TENURE_BONUS_AMOUNT * tutor.studentCount;
+
+                for (const student of tutor.students) {
+                    const oldFee = student.studentFee || 0;
+                    const newFee = oldFee + TENURE_BONUS_AMOUNT;
+                    const studentRef = doc(db, "students", student.id);
+                    batch.update(studentRef, { studentFee: newFee });
+                    updatedStudents.push({
+                        studentId: student.id,
+                        studentName: student.studentName || student.name || 'Unknown',
+                        oldFee,
+                        newFee
+                    });
+                }
+
+                const bonusRef = doc(collection(db, "tenure_bonuses"));
+                batch.set(bonusRef, {
+                    tutorEmail: tutor.email,
+                    tutorName: tutor.name,
+                    employmentDate: tutor.employmentDate || '',
+                    tenureMonths: tutor.tenure.totalMonths,
+                    studentCount: tutor.studentCount,
+                    bonusPerStudent: TENURE_BONUS_AMOUNT,
+                    totalBonus: tBonus,
+                    updatedStudents,
+                    appliedAt: Timestamp.now(),
+                    appliedBy: window.userData?.email || 'System (Auto)',
+                    type: 'auto_on_load'
+                });
+
+                const logRef = doc(collection(db, "tenure_bonus_logs"));
+                batch.set(logRef, {
+                    tutorEmail: tutor.email,
+                    tutorName: tutor.name,
+                    action: 'auto_upgrade',
+                    details: `Auto-applied on tab load: ₦${TENURE_BONUS_AMOUNT.toLocaleString()} × ${tutor.studentCount} regular student(s) = ₦${tBonus.toLocaleString()}`,
+                    studentDetails: updatedStudents,
+                    appliedBy: window.userData?.email || 'System (Auto)',
+                    appliedByName: window.userData?.name || 'System',
+                    timestamp: Timestamp.now()
+                });
+
+                await batch.commit();
+                successCount++;
+                totalBonusApplied += tBonus;
+                upgradedNames.push(tutor.name);
+            } catch (err) {
+                console.error(`Silent auto-upgrade failed for ${tutor.name}:`, err);
+            }
+        }
+
+        if (successCount > 0) {
+            await logManagementActivity('Auto Tenure Bonus', `Auto-upgraded ${successCount} tutor(s): ${upgradedNames.join(', ')}. Total: ₦${totalBonusApplied.toLocaleString()}`);
+            invalidateCache('students');
+
+            // Show a non-blocking toast notification
+            showTenureBonusToast(`✅ Auto-upgraded ${successCount} tutor(s) who just clocked 1 year: ${upgradedNames.join(', ')}`, 'success');
+
+            // Reload data to reflect changes (without re-triggering auto-apply since they're now upgraded)
+            _silentAutoRunning = false;
+            await loadTenureBonusData();
+            return;
+        }
+    } catch (err) {
+        console.error('Silent auto-apply error:', err);
+    }
+    _silentAutoRunning = false;
+}
+
+function showTenureBonusToast(message, type = 'success') {
+    const existing = document.getElementById('tb-toast');
+    if (existing) existing.remove();
+
+    const bgColor = type === 'success' ? 'bg-green-600' : 'bg-blue-600';
+    const toast = document.createElement('div');
+    toast.id = 'tb-toast';
+    toast.className = `fixed top-4 right-4 z-50 ${bgColor} text-white px-5 py-3 rounded-lg shadow-xl max-w-md text-sm font-medium flex items-center gap-2`;
+    toast.style.transition = 'opacity 0.5s';
+    toast.innerHTML = `<i class="fas fa-award"></i> <span>${escapeHtml(message)}</span>`;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 500);
+    }, 8000);
+}
+
+function renderTenureBonusTable() {
+    const tableBody = document.getElementById('tb-table-body');
+    if (!tableBody) return;
+
+    const searchTerm = (document.getElementById('tb-search-input')?.value || '').trim().toLowerCase();
+
+    let data = [...tenureBonusTutors];
+
+    // Filter by sub-tab
+    if (tenureBonusActiveSubTab === 'eligible') {
+        data = data.filter(t => t.tenure.isEligible);
+    } else if (tenureBonusActiveSubTab === 'notEligible') {
+        data = data.filter(t => !t.tenure.isEligible);
+    }
+
+    // Filter by search
+    if (searchTerm) {
+        data = data.filter(t => (t.name || '').toLowerCase().includes(searchTerm));
+    }
+
+    if (data.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-gray-400">No tutors found.</td></tr>`;
+        return;
+    }
+
+    tableBody.innerHTML = data.map(t => {
+        const empDate = t.employmentDate ? new Date(t.employmentDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not set';
+        const empYear = t.employmentDate ? new Date(t.employmentDate).getFullYear() : '—';
+
+        let statusBadge = '';
+        if (t.bonusApplied) {
+            const appliedDate = t.bonusRecord?.appliedAt?.toDate ? t.bonusRecord.appliedAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A';
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800"><i class="fas fa-check-circle"></i> Upgraded (${escapeHtml(appliedDate)})</span>`;
+        } else if (t.tenure.isEligible) {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800"><i class="fas fa-clock"></i> Pending Upgrade</span>`;
+        } else {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600"><i class="fas fa-hourglass-half"></i> Not Yet Eligible</span>`;
+        }
+
+        const tenureColor = t.tenure.isEligible ? 'text-green-700 font-bold' : 'text-gray-600';
+
+        return `
+            <tr class="${t.bonusApplied ? 'bg-green-50' : t.tenure.isEligible ? 'bg-orange-50' : ''}">
+                <td class="px-4 py-3 font-medium">${escapeHtml(t.name || 'N/A')}</td>
+                <td class="px-4 py-3 text-sm text-gray-600">${escapeHtml(t.email || 'N/A')}</td>
+                <td class="px-4 py-3 text-sm">
+                    <div>${escapeHtml(empDate)}</div>
+                    <div class="text-xs text-gray-400">${escapeHtml(String(empYear))}</div>
+                </td>
+                <td class="px-4 py-3 text-sm ${tenureColor}">${escapeHtml(t.tenure.label)}</td>
+                <td class="px-4 py-3 text-sm text-center">${t.studentCount}</td>
+                <td class="px-4 py-3">${statusBadge}</td>
+                <td class="px-4 py-3">
+                    <div class="flex flex-wrap gap-1">
+                        ${!t.bonusApplied && t.tenure.isEligible ? `
+                            <button class="tb-apply-btn bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs font-medium" data-email="${escapeHtml(t.email)}">
+                                <i class="fas fa-check mr-1"></i>Apply Bonus
+                            </button>
+                        ` : ''}
+                        <button class="tb-manual-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium" data-email="${escapeHtml(t.email)}" data-name="${escapeHtml(t.name)}">
+                            <i class="fas fa-edit mr-1"></i>Manual Adjust
+                        </button>
+                        ${t.bonusApplied ? `
+                            <button class="tb-view-btn bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs font-medium" data-email="${escapeHtml(t.email)}">
+                                <i class="fas fa-eye mr-1"></i>View
+                            </button>
+                        ` : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    // Wire apply bonus buttons
+    document.querySelectorAll('.tb-apply-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const email = e.currentTarget.dataset.email;
+            await applyTenureBonus(email);
+        });
+    });
+
+    // Wire manual adjust buttons
+    document.querySelectorAll('.tb-manual-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const email = e.currentTarget.dataset.email;
+            const name = e.currentTarget.dataset.name;
+            showManualFeeAdjustModal(email, name);
+        });
+    });
+
+    // Wire view buttons
+    document.querySelectorAll('.tb-view-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const email = e.currentTarget.dataset.email;
+            showTenureBonusDetails(email);
+        });
+    });
+}
+
+async function applyTenureBonus(tutorEmail) {
+    const tutor = tenureBonusTutors.find(t => t.email === tutorEmail);
+    if (!tutor) return alert('Tutor not found.');
+    if (tutor.bonusApplied) return alert('Bonus already applied for this tutor.');
+
+    const now = new Date();
+    if (now < TENURE_BONUS_EFFECTIVE_DATE) {
+        return alert(`Tenure bonus is only effective from March 1, 2026. Current date is before the effective date.`);
+    }
+
+    if (!tutor.tenure.isEligible) {
+        return alert('This tutor has not yet completed 1 full year of employment.');
+    }
+
+    if (tutor.studentCount === 0) {
+        return alert('This tutor currently has no active students. Bonus cannot be applied.');
+    }
+
+    const totalBonus = TENURE_BONUS_AMOUNT * tutor.studentCount;
+    const confirmed = confirm(
+        `Apply Tenure Bonus for ${tutor.name}?\n\n` +
+        `• Tenure: ${tutor.tenure.label}\n` +
+        `• Regular students (excl. transitioning): ${tutor.studentCount}\n` +
+        `• Bonus per student: ₦${TENURE_BONUS_AMOUNT.toLocaleString()}\n` +
+        `• Total fee increase: ₦${totalBonus.toLocaleString()}\n\n` +
+        `This will add ₦${TENURE_BONUS_AMOUNT.toLocaleString()} to each regular student's fee. Continue?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+        const batch = writeBatch(db);
+        const updatedStudents = [];
+
+        // Update each student's fee
+        for (const student of tutor.students) {
+            const oldFee = student.studentFee || 0;
+            const newFee = oldFee + TENURE_BONUS_AMOUNT;
+            const studentRef = doc(db, "students", student.id);
+            batch.update(studentRef, { studentFee: newFee });
+            updatedStudents.push({
+                studentId: student.id,
+                studentName: student.studentName || student.name || 'Unknown',
+                oldFee: oldFee,
+                newFee: newFee
+            });
+        }
+
+        // Create tenure bonus record
+        const bonusRef = doc(collection(db, "tenure_bonuses"));
+        batch.set(bonusRef, {
+            tutorEmail: tutor.email,
+            tutorName: tutor.name,
+            employmentDate: tutor.employmentDate || '',
+            tenureMonths: tutor.tenure.totalMonths,
+            studentCount: tutor.studentCount,
+            bonusPerStudent: TENURE_BONUS_AMOUNT,
+            totalBonus: totalBonus,
+            updatedStudents: updatedStudents,
+            appliedAt: Timestamp.now(),
+            appliedBy: window.userData?.email || 'Unknown',
+            type: 'automatic'
+        });
+
+        // Create log entry
+        const logRef = doc(collection(db, "tenure_bonus_logs"));
+        batch.set(logRef, {
+            tutorEmail: tutor.email,
+            tutorName: tutor.name,
+            action: 'bonus_applied',
+            details: `₦${TENURE_BONUS_AMOUNT.toLocaleString()} added to ${tutor.studentCount} student(s). Total: ₦${totalBonus.toLocaleString()}`,
+            studentDetails: updatedStudents,
+            appliedBy: window.userData?.email || 'Unknown',
+            appliedByName: window.userData?.name || 'Unknown',
+            timestamp: Timestamp.now()
+        });
+
+        await batch.commit();
+
+        await logManagementActivity('Tenure Bonus Applied', `Applied ₦${totalBonus.toLocaleString()} tenure bonus for ${tutor.name} (${tutor.studentCount} students)`);
+
+        alert(`✅ Tenure bonus applied successfully for ${tutor.name}!\n\n₦${TENURE_BONUS_AMOUNT.toLocaleString()} added to each of ${tutor.studentCount} regular student fee(s). Transitioning students excluded.`);
+
+        // Invalidate students cache since fees changed
+        invalidateCache('students');
+
+        // Reload data
+        await loadTenureBonusData();
+
+    } catch (err) {
+        console.error('Error applying tenure bonus:', err);
+        alert(`Failed to apply tenure bonus: ${err.message}`);
+    }
+}
+
+async function runTenureAutoUpgrade() {
+    const now = new Date();
+    if (now < TENURE_BONUS_EFFECTIVE_DATE) {
+        return alert(`Auto-upgrade is only available from March 1, 2026 onwards.`);
+    }
+
+    const eligibleNotUpgraded = tenureBonusTutors.filter(t => t.tenure.isEligible && !t.bonusApplied && t.studentCount > 0);
+
+    if (eligibleNotUpgraded.length === 0) {
+        return alert('No eligible tutors pending upgrade. All eligible tutors have already been upgraded, or no tutors have completed 1 year yet.');
+    }
+
+    const totalStudents = eligibleNotUpgraded.reduce((sum, t) => sum + t.studentCount, 0);
+    const totalBonus = totalStudents * TENURE_BONUS_AMOUNT;
+
+    const confirmed = confirm(
+        `Auto-Upgrade Summary\n\n` +
+        `• Tutors to upgrade: ${eligibleNotUpgraded.length}\n` +
+        `• Total students affected: ${totalStudents}\n` +
+        `• Bonus per student: ₦${TENURE_BONUS_AMOUNT.toLocaleString()}\n` +
+        `• Grand total increase: ₦${totalBonus.toLocaleString()}\n\n` +
+        `Tutors:\n${eligibleNotUpgraded.map(t => `  - ${t.name} (${t.studentCount} students)`).join('\n')}\n\n` +
+        `Proceed with auto-upgrade for all?`
+    );
+
+    if (!confirmed) return;
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const tutor of eligibleNotUpgraded) {
+        try {
+            const batch = writeBatch(db);
+            const updatedStudents = [];
+            const tBonus = TENURE_BONUS_AMOUNT * tutor.studentCount;
+
+            for (const student of tutor.students) {
+                const oldFee = student.studentFee || 0;
+                const newFee = oldFee + TENURE_BONUS_AMOUNT;
+                const studentRef = doc(db, "students", student.id);
+                batch.update(studentRef, { studentFee: newFee });
+                updatedStudents.push({
+                    studentId: student.id,
+                    studentName: student.studentName || student.name || 'Unknown',
+                    oldFee,
+                    newFee
+                });
+            }
+
+            const bonusRef = doc(collection(db, "tenure_bonuses"));
+            batch.set(bonusRef, {
+                tutorEmail: tutor.email,
+                tutorName: tutor.name,
+                employmentDate: tutor.employmentDate || '',
+                tenureMonths: tutor.tenure.totalMonths,
+                studentCount: tutor.studentCount,
+                bonusPerStudent: TENURE_BONUS_AMOUNT,
+                totalBonus: tBonus,
+                updatedStudents,
+                appliedAt: Timestamp.now(),
+                appliedBy: window.userData?.email || 'Unknown',
+                type: 'automatic_batch'
+            });
+
+            const logRef = doc(collection(db, "tenure_bonus_logs"));
+            batch.set(logRef, {
+                tutorEmail: tutor.email,
+                tutorName: tutor.name,
+                action: 'auto_upgrade',
+                details: `Auto-upgrade: ₦${TENURE_BONUS_AMOUNT.toLocaleString()} × ${tutor.studentCount} students = ₦${tBonus.toLocaleString()}`,
+                studentDetails: updatedStudents,
+                appliedBy: window.userData?.email || 'Unknown',
+                appliedByName: window.userData?.name || 'Unknown',
+                timestamp: Timestamp.now()
+            });
+
+            await batch.commit();
+            successCount++;
+        } catch (err) {
+            console.error(`Failed to upgrade ${tutor.name}:`, err);
+            failCount++;
+        }
+    }
+
+    await logManagementActivity('Batch Tenure Auto-Upgrade', `Upgraded ${successCount} tutors, ${failCount} failed. Total: ₦${totalBonus.toLocaleString()}`);
+
+    invalidateCache('students');
+
+    alert(`Auto-Upgrade Complete!\n\n✅ Successfully upgraded: ${successCount}\n${failCount > 0 ? `❌ Failed: ${failCount}` : ''}`);
+
+    await loadTenureBonusData();
+}
+
+function showManualFeeAdjustModal(tutorEmail, tutorName) {
+    const tutor = tenureBonusTutors.find(t => t.email === tutorEmail);
+    if (!tutor) return;
+
+    const studentRows = tutor.students.map(s => `
+        <tr>
+            <td class="px-3 py-2 text-sm">${escapeHtml(s.studentName || s.name || 'Unknown')}</td>
+            <td class="px-3 py-2 text-sm">₦${(s.studentFee || 0).toLocaleString()}</td>
+            <td class="px-3 py-2">
+                <input type="number" class="manual-fee-input w-24 p-1 border rounded text-sm text-right" data-student-id="${s.id}" value="${s.studentFee || 0}" min="0">
+            </td>
+        </tr>
+    `).join('');
+
+    const modalHtml = `
+        <div id="tb-manual-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+            <div class="bg-white rounded-xl shadow-2xl max-w-lg w-11/12 mx-auto my-8 overflow-hidden">
+                <div class="bg-blue-600 text-white p-4">
+                    <h3 class="text-lg font-bold"><i class="fas fa-edit mr-2"></i>Manual Fee Adjustment</h3>
+                    <p class="text-sm opacity-90">${escapeHtml(tutorName)}</p>
+                </div>
+                <div class="p-5">
+                    ${tutor.students.length === 0 ? `
+                        <p class="text-gray-500 text-center py-4">This tutor has no active students.</p>
+                    ` : `
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left text-xs font-medium uppercase">Student</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium uppercase">Current Fee</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium uppercase">New Fee</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y">${studentRows}</tbody>
+                            </table>
+                        </div>
+                        <div class="mt-3 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+                            <i class="fas fa-info-circle mr-1"></i> Edit the "New Fee" column for each student. Only changed fees will be saved.
+                        </div>
+                    `}
+                </div>
+                <div class="flex justify-end gap-2 p-4 bg-gray-50 border-t">
+                    <button id="tb-manual-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium">Cancel</button>
+                    ${tutor.students.length > 0 ? `<button id="tb-manual-save" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Save Changes</button>` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    document.getElementById('tb-manual-cancel').addEventListener('click', () => {
+        document.getElementById('tb-manual-modal')?.remove();
+    });
+
+    document.getElementById('tb-manual-save')?.addEventListener('click', async () => {
+        const inputs = document.querySelectorAll('.manual-fee-input');
+        const updates = [];
+        inputs.forEach(input => {
+            const studentId = input.dataset.studentId;
+            const newFee = parseFloat(input.value) || 0;
+            const student = tutor.students.find(s => s.id === studentId);
+            if (student && newFee !== (student.studentFee || 0)) {
+                updates.push({ studentId, studentName: student.studentName || student.name || 'Unknown', oldFee: student.studentFee || 0, newFee });
+            }
+        });
+
+        if (updates.length === 0) {
+            alert('No fee changes detected.');
+            return;
+        }
+
+        const confirmed = confirm(`Save fee changes for ${updates.length} student(s)?\n\n${updates.map(u => `${u.studentName}: ₦${u.oldFee.toLocaleString()} → ₦${u.newFee.toLocaleString()}`).join('\n')}`);
+        if (!confirmed) return;
+
+        try {
+            const batch = writeBatch(db);
+            updates.forEach(u => {
+                batch.update(doc(db, "students", u.studentId), { studentFee: u.newFee });
+            });
+
+            const logRef = doc(collection(db, "tenure_bonus_logs"));
+            batch.set(logRef, {
+                tutorEmail: tutorEmail,
+                tutorName: tutorName,
+                action: 'manual_adjust',
+                details: `Manual fee adjustment for ${updates.length} student(s)`,
+                studentDetails: updates,
+                appliedBy: window.userData?.email || 'Unknown',
+                appliedByName: window.userData?.name || 'Unknown',
+                timestamp: Timestamp.now()
+            });
+
+            await batch.commit();
+
+            await logManagementActivity('Manual Fee Adjustment', `Adjusted fees for ${updates.length} students under ${tutorName}`);
+
+            invalidateCache('students');
+
+            alert(`✅ Fee changes saved for ${updates.length} student(s).`);
+            document.getElementById('tb-manual-modal')?.remove();
+            await loadTenureBonusData();
+        } catch (err) {
+            console.error('Error saving manual fee adjustment:', err);
+            alert(`Failed to save: ${err.message}`);
+        }
+    });
+}
+
+function showTenureBonusDetails(tutorEmail) {
+    const tutor = tenureBonusTutors.find(t => t.email === tutorEmail);
+    if (!tutor || !tutor.bonusRecord) return;
+
+    const record = tutor.bonusRecord;
+    const appliedDate = record.appliedAt?.toDate ? record.appliedAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A';
+
+    const studentDetailsHtml = (record.updatedStudents || []).map(s => `
+        <tr>
+            <td class="px-3 py-2 text-sm">${escapeHtml(s.studentName)}</td>
+            <td class="px-3 py-2 text-sm">₦${(s.oldFee || 0).toLocaleString()}</td>
+            <td class="px-3 py-2 text-sm font-bold text-green-700">₦${(s.newFee || 0).toLocaleString()}</td>
+            <td class="px-3 py-2 text-sm text-green-600">+₦${TENURE_BONUS_AMOUNT.toLocaleString()}</td>
+        </tr>
+    `).join('');
+
+    const detailHtml = `
+        <div id="tb-detail-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+            <div class="bg-white rounded-xl shadow-2xl max-w-lg w-11/12 mx-auto my-8 overflow-hidden">
+                <div class="bg-green-600 text-white p-4">
+                    <h3 class="text-lg font-bold"><i class="fas fa-award mr-2"></i>Tenure Bonus Details</h3>
+                    <p class="text-sm opacity-90">${escapeHtml(tutor.name)}</p>
+                </div>
+                <div class="p-5 space-y-3">
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div class="bg-gray-50 p-3 rounded-lg"><span class="font-bold block text-gray-500 text-xs uppercase">Tenure</span>${escapeHtml(tutor.tenure.label)}</div>
+                        <div class="bg-gray-50 p-3 rounded-lg"><span class="font-bold block text-gray-500 text-xs uppercase">Applied On</span>${escapeHtml(appliedDate)}</div>
+                        <div class="bg-gray-50 p-3 rounded-lg"><span class="font-bold block text-gray-500 text-xs uppercase">Students</span>${record.studentCount || 0}</div>
+                        <div class="bg-gray-50 p-3 rounded-lg"><span class="font-bold block text-gray-500 text-xs uppercase">Total Bonus</span>₦${(record.totalBonus || 0).toLocaleString()}</div>
+                        <div class="bg-gray-50 p-3 rounded-lg col-span-2"><span class="font-bold block text-gray-500 text-xs uppercase">Applied By</span>${escapeHtml(record.appliedBy || 'Unknown')}</div>
+                    </div>
+                    ${studentDetailsHtml ? `
+                        <h4 class="font-bold text-gray-700 mt-4 mb-2">Student Fee Changes</h4>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-gray-50"><tr>
+                                    <th class="px-3 py-2 text-left text-xs font-medium uppercase">Student</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium uppercase">Old Fee</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium uppercase">New Fee</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium uppercase">Increase</th>
+                                </tr></thead>
+                                <tbody class="divide-y">${studentDetailsHtml}</tbody>
+                            </table>
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="flex justify-end p-4 bg-gray-50 border-t">
+                    <button id="tb-detail-close" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium">Close</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', detailHtml);
+    document.getElementById('tb-detail-close').addEventListener('click', () => {
+        document.getElementById('tb-detail-modal')?.remove();
+    });
+}
+
+function renderTenureBonusLog() {
+    const logList = document.getElementById('tb-log-list');
+    if (!logList) return;
+
+    if (tenureBonusLogs.length === 0) {
+        logList.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">No upgrade history yet.</p>';
+        return;
+    }
+
+    logList.innerHTML = tenureBonusLogs.map(log => {
+        const timestamp = log.timestamp?.toDate ? log.timestamp.toDate().toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
+
+        let iconClass = 'fas fa-check-circle text-green-500';
+        let bgClass = 'bg-green-50 border-green-200';
+        if (log.action === 'manual_adjust') {
+            iconClass = 'fas fa-edit text-blue-500';
+            bgClass = 'bg-blue-50 border-blue-200';
+        } else if (log.action === 'auto_upgrade') {
+            iconClass = 'fas fa-magic text-purple-500';
+            bgClass = 'bg-purple-50 border-purple-200';
+        }
+
+        const studentSummary = (log.studentDetails || []).map(s =>
+            `<span class="inline-block bg-white border rounded px-2 py-0.5 text-xs mr-1 mb-1">${escapeHtml(s.studentName)}: ₦${(s.oldFee || 0).toLocaleString()} → ₦${(s.newFee || 0).toLocaleString()}</span>`
+        ).join('');
+
+        return `
+            <div class="${bgClass} border rounded-lg p-3">
+                <div class="flex items-start gap-3">
+                    <i class="${iconClass} text-lg mt-0.5"></i>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex flex-wrap items-center gap-2 mb-1">
+                            <span class="font-bold text-sm">${escapeHtml(log.tutorName || 'Unknown')}</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-white border font-medium">${escapeHtml(log.action === 'manual_adjust' ? 'Manual' : log.action === 'auto_upgrade' ? 'Auto' : 'Applied')}</span>
+                        </div>
+                        <p class="text-sm text-gray-700">${escapeHtml(log.details || '')}</p>
+                        ${studentSummary ? `<div class="mt-2 flex flex-wrap">${studentSummary}</div>` : ''}
+                        <div class="flex flex-wrap gap-3 mt-2 text-xs text-gray-400">
+                            <span><i class="fas fa-clock mr-1"></i>${escapeHtml(timestamp)}</span>
+                            <span><i class="fas fa-user mr-1"></i>${escapeHtml(log.appliedByName || log.appliedBy || 'Unknown')}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// ======================================================
 // SUBSECTION 4.2: Referral Management Panel
 // ======================================================
 
@@ -10080,6 +10947,23 @@ async function renderMasterPortalPanel(container) {
             </div>
         </div>
 
+        <!-- Tutor Search Bar -->
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-search text-gray-400"></i>
+                </div>
+                <input type="text" id="master-portal-tutor-search" 
+                    placeholder="Search tutors by name..." 
+                    class="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    autocomplete="off">
+                <button id="master-portal-search-clear" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 hidden">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="master-portal-search-count" class="text-xs text-gray-400 mt-1.5 hidden"></div>
+        </div>
+
         <!-- Loading indicator -->
         <div id="master-portal-loading" class="text-center py-12">
             <div class="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
@@ -10294,6 +11178,35 @@ async function renderMasterPortalPanel(container) {
 
         document.getElementById('master-portal-loading').classList.add('hidden');
         listEl.classList.remove('hidden');
+
+        // --- Tutor Search Functionality ---
+        const searchInput = document.getElementById('master-portal-tutor-search');
+        const searchClear = document.getElementById('master-portal-search-clear');
+        const searchCount = document.getElementById('master-portal-search-count');
+        const tutorCards = listEl.querySelectorAll(':scope > div');
+        const totalTutors = tutorCards.length;
+
+        if (searchInput) {
+            searchInput.addEventListener('input', () => {
+                const term = searchInput.value.toLowerCase().trim();
+                if (searchClear) searchClear.classList.toggle('hidden', !term);
+                let visibleCount = 0;
+                tutorCards.forEach(card => {
+                    const header = card.querySelector('.accordion-header');
+                    const nameEl = header ? header.querySelector('.font-bold.text-gray-800') : null;
+                    const tutorName = nameEl ? nameEl.textContent.toLowerCase() : '';
+                    if (!term || tutorName.includes(term)) { card.style.display = ''; visibleCount++; }
+                    else { card.style.display = 'none'; }
+                });
+                if (searchCount) {
+                    if (term) { searchCount.textContent = `Showing ${visibleCount} of ${totalTutors} tutors`; searchCount.classList.remove('hidden'); }
+                    else { searchCount.classList.add('hidden'); }
+                }
+            });
+            if (searchClear) {
+                searchClear.addEventListener('click', () => { searchInput.value = ''; searchInput.dispatchEvent(new Event('input')); searchInput.focus(); });
+            }
+        }
 
         // After render, update gamification winner in Firestore if needed
         if (leadingTutor && leadingScore > 0) {
@@ -10734,6 +11647,457 @@ function escHtml(str) {
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ======================================================
+// SECTION 8B: USER DIRECTORY PANEL (NO ACTIVITY LOGGING)
+// ======================================================
+
+async function renderUserDirectoryPanel(container) {
+    container.innerHTML = `
+    <div class="space-y-4">
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">📋 User Directory</h2>
+                <p class="text-sm text-gray-500">All Tutors, Students & Parents</p>
+            </div>
+            <button id="ud-refresh-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 text-sm">
+                <i class="fas fa-sync-alt mr-1"></i> Refresh
+            </button>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+                <div class="text-3xl font-black text-blue-700" id="ud-tutor-count">—</div>
+                <div class="text-xs text-blue-600 font-semibold uppercase mt-1">Tutors</div>
+            </div>
+            <div class="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+                <div class="text-3xl font-black text-green-700" id="ud-student-count">—</div>
+                <div class="text-xs text-green-600 font-semibold uppercase mt-1">Students</div>
+            </div>
+            <div class="bg-purple-50 border border-purple-200 rounded-xl p-4 text-center">
+                <div class="text-3xl font-black text-purple-700" id="ud-parent-count">—</div>
+                <div class="text-xs text-purple-600 font-semibold uppercase mt-1">Parents</div>
+            </div>
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+                <div class="text-3xl font-black text-amber-700" id="ud-total-count">—</div>
+                <div class="text-xs text-amber-600 font-semibold uppercase mt-1">Total Users</div>
+            </div>
+        </div>
+
+        <!-- Search + Tab Switcher -->
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+            <div class="flex flex-col sm:flex-row gap-3">
+                <div class="relative flex-1">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-search text-gray-400"></i></div>
+                    <input type="text" id="ud-search" placeholder="Search by name, email, phone..."
+                        class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm" autocomplete="off">
+                </div>
+                <div class="flex bg-gray-100 rounded-xl p-1 gap-1 flex-shrink-0">
+                    <button class="ud-tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white" data-tab="tutors">Tutors</button>
+                    <button class="ud-tab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-200" data-tab="students">Students</button>
+                    <button class="ud-tab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-200" data-tab="parents">Parents</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bulk Action Bar (hidden by default) -->
+        <div id="ud-bulk-bar" class="hidden bg-indigo-50 border border-indigo-200 rounded-2xl p-3 flex items-center justify-between gap-3 flex-wrap">
+            <div class="flex items-center gap-2">
+                <span class="text-sm font-semibold text-indigo-800"><span id="ud-selected-count">0</span> selected</span>
+                <button id="ud-clear-selection-btn" class="text-xs text-indigo-600 hover:text-indigo-800 underline">Clear</button>
+            </div>
+            <div class="flex gap-2">
+                <button id="ud-bulk-delete-btn" class="bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-red-700">
+                    <i class="fas fa-trash mr-1"></i> Delete Selected
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="ud-loading" class="text-center py-12">
+            <div class="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+            <p class="text-gray-500">Loading user data…</p>
+        </div>
+
+        <!-- Content Area -->
+        <div id="ud-content" class="hidden"></div>
+    </div>
+    `;
+
+    // State
+    let udTutors = [], udStudents = [], udParents = [];
+    let currentTab = 'tutors';
+    let selectedIds = new Set();
+
+    // --- Helpers ---
+    function updateBulkBar() {
+        const bar = document.getElementById('ud-bulk-bar');
+        const countEl = document.getElementById('ud-selected-count');
+        if (bar && countEl) {
+            countEl.textContent = selectedIds.size;
+            bar.classList.toggle('hidden', selectedIds.size === 0);
+        }
+    }
+
+    function clearSelection() {
+        selectedIds.clear();
+        document.querySelectorAll('.ud-row-checkbox').forEach(cb => cb.checked = false);
+        const selectAll = document.getElementById('ud-select-all');
+        if (selectAll) selectAll.checked = false;
+        updateBulkBar();
+    }
+
+    // Tab switching
+    container.querySelectorAll('.ud-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            container.querySelectorAll('.ud-tab-btn').forEach(b => { b.classList.remove('bg-blue-600', 'text-white'); b.classList.add('text-gray-600'); });
+            btn.classList.add('bg-blue-600', 'text-white');
+            btn.classList.remove('text-gray-600');
+            currentTab = btn.dataset.tab;
+            clearSelection();
+            renderCurrentTab();
+        });
+    });
+
+    // Search
+    document.getElementById('ud-search').addEventListener('input', () => { clearSelection(); renderCurrentTab(); });
+
+    // Refresh
+    document.getElementById('ud-refresh-btn').addEventListener('click', () => { clearSelection(); loadAllUserData(); });
+
+    // Clear selection button
+    document.getElementById('ud-clear-selection-btn').addEventListener('click', clearSelection);
+
+    // Bulk delete
+    document.getElementById('ud-bulk-delete-btn').addEventListener('click', async () => {
+        if (selectedIds.size === 0) return;
+        const colName = currentTab === 'tutors' ? 'tutors' : currentTab === 'students' ? 'students' : 'parent_users';
+        const label = currentTab.slice(0, -1); // tutor / student / parent
+        if (!confirm(`Are you sure you want to delete ${selectedIds.size} ${currentTab}? This cannot be undone.`)) return;
+        try {
+            const batch = writeBatch(db);
+            selectedIds.forEach(id => batch.delete(doc(db, colName, id)));
+            await batch.commit();
+            alert(`${selectedIds.size} ${currentTab} deleted successfully.`);
+            clearSelection();
+            if (colName === 'tutors') invalidateCache('tutors');
+            if (colName === 'students') invalidateCache('students');
+            await loadAllUserData();
+        } catch(e) { alert('Error deleting: ' + e.message); }
+    });
+
+    function renderCurrentTab() {
+        const term = (document.getElementById('ud-search').value || '').toLowerCase().trim();
+        const contentEl = document.getElementById('ud-content');
+        if (!contentEl) return;
+        if (currentTab === 'tutors') renderTutorsTable(contentEl, term);
+        else if (currentTab === 'students') renderStudentsTable(contentEl, term);
+        else renderParentsTable(contentEl, term);
+    }
+
+    // --- Checkbox wiring helper ---
+    function wireCheckboxes(contentEl) {
+        const selectAll = contentEl.querySelector('#ud-select-all');
+        const rowCheckboxes = contentEl.querySelectorAll('.ud-row-checkbox');
+        if (selectAll) {
+            selectAll.addEventListener('change', () => {
+                rowCheckboxes.forEach(cb => {
+                    cb.checked = selectAll.checked;
+                    if (selectAll.checked) selectedIds.add(cb.dataset.id);
+                    else selectedIds.delete(cb.dataset.id);
+                });
+                updateBulkBar();
+            });
+        }
+        rowCheckboxes.forEach(cb => {
+            cb.addEventListener('change', () => {
+                if (cb.checked) selectedIds.add(cb.dataset.id);
+                else selectedIds.delete(cb.dataset.id);
+                if (selectAll) selectAll.checked = rowCheckboxes.length > 0 && [...rowCheckboxes].every(c => c.checked);
+                updateBulkBar();
+            });
+        });
+    }
+
+    // ---- TUTORS TABLE ----
+    function renderTutorsTable(el, term) {
+        const filtered = udTutors.filter(t => {
+            const s = `${t.name} ${t.email} ${t.phone || ''}`.toLowerCase();
+            return !term || s.includes(term);
+        });
+        el.innerHTML = `
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="p-3 bg-gray-50 border-b text-xs text-gray-500">${filtered.length} tutor${filtered.length !== 1 ? 's' : ''}</div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b text-xs text-gray-500 uppercase bg-gray-50">
+                            <th class="py-3 px-3 w-10"><input type="checkbox" id="ud-select-all" class="rounded"></th>
+                            <th class="text-left py-3 px-4">#</th>
+                            <th class="text-left py-3 px-4">Name</th>
+                            <th class="text-left py-3 px-4">Email</th>
+                            <th class="text-left py-3 px-4">Phone</th>
+                            <th class="text-center py-3 px-4">Students</th>
+                            <th class="text-center py-3 px-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filtered.length === 0 ? '<tr><td colspan="7" class="text-center py-8 text-gray-400">No tutors found.</td></tr>' :
+                        filtered.map((t, i) => `
+                        <tr class="border-b border-gray-50 hover:bg-gray-50">
+                            <td class="py-3 px-3"><input type="checkbox" class="ud-row-checkbox rounded" data-id="${t.id}" ${selectedIds.has(t.id) ? 'checked' : ''}></td>
+                            <td class="py-3 px-4 text-gray-400 text-xs">${i + 1}</td>
+                            <td class="py-3 px-4 font-semibold text-gray-800">${escapeHtml(t.name)}</td>
+                            <td class="py-3 px-4 text-gray-600 text-xs">${escapeHtml(t.email || '—')}</td>
+                            <td class="py-3 px-4 text-gray-600">${escapeHtml(t.phone || '—')}</td>
+                            <td class="py-3 px-4 text-center"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${t.studentCount > 0 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}">${t.studentCount}</span></td>
+                            <td class="py-3 px-4 text-center">
+                                <button onclick="window._udEdit('tutors','${t.id}')" class="text-blue-600 hover:text-blue-800 text-xs font-semibold mr-2"><i class="fas fa-edit"></i> Edit</button>
+                                <button onclick="window._udDel('tutors','${t.id}','${escapeHtml(t.name)}')" class="text-red-600 hover:text-red-800 text-xs font-semibold"><i class="fas fa-trash"></i> Delete</button>
+                            </td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+        wireCheckboxes(el);
+    }
+
+    // ---- STUDENTS TABLE ----
+    function renderStudentsTable(el, term) {
+        const filtered = udStudents.filter(s => {
+            const str = `${s.studentName} ${s.parentName || ''} ${s.parentEmail || ''} ${s.grade || ''} ${s.tutorName || ''}`.toLowerCase();
+            return !term || str.includes(term);
+        });
+        el.innerHTML = `
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="p-3 bg-gray-50 border-b text-xs text-gray-500">${filtered.length} student${filtered.length !== 1 ? 's' : ''}</div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b text-xs text-gray-500 uppercase bg-gray-50">
+                            <th class="py-3 px-3 w-10"><input type="checkbox" id="ud-select-all" class="rounded"></th>
+                            <th class="text-left py-3 px-4">#</th>
+                            <th class="text-left py-3 px-4">Student</th>
+                            <th class="text-left py-3 px-4">Grade</th>
+                            <th class="text-left py-3 px-4">Parent</th>
+                            <th class="text-left py-3 px-4">Tutor</th>
+                            <th class="text-left py-3 px-4">Subjects</th>
+                            <th class="text-center py-3 px-4">Status</th>
+                            <th class="text-center py-3 px-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filtered.length === 0 ? '<tr><td colspan="9" class="text-center py-8 text-gray-400">No students found.</td></tr>' :
+                        filtered.map((s, i) => {
+                            const sc = s.summerBreak ? 'bg-yellow-100 text-yellow-800' : ['archived','graduated','transferred'].includes(s.status) ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800';
+                            const sl = s.summerBreak ? 'On Break' : ['archived','graduated','transferred'].includes(s.status) ? capitalize(s.status) : 'Active';
+                            return `
+                            <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                <td class="py-3 px-3"><input type="checkbox" class="ud-row-checkbox rounded" data-id="${s.id}" ${selectedIds.has(s.id) ? 'checked' : ''}></td>
+                                <td class="py-3 px-4 text-gray-400 text-xs">${i + 1}</td>
+                                <td class="py-3 px-4 font-semibold text-gray-800">${escapeHtml(s.studentName || '—')}</td>
+                                <td class="py-3 px-4 text-gray-600">${escapeHtml(s.grade || '—')}</td>
+                                <td class="py-3 px-4 text-gray-600 text-xs">${escapeHtml(s.parentName || s.parentEmail || '—')}</td>
+                                <td class="py-3 px-4 text-gray-600 text-xs">${escapeHtml(s.tutorName || s.tutorEmail || '—')}</td>
+                                <td class="py-3 px-4 text-xs text-gray-500">${escapeHtml((s.subjects || []).join(', ') || '—')}</td>
+                                <td class="py-3 px-4 text-center"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${sc}">${sl}</span></td>
+                                <td class="py-3 px-4 text-center">
+                                    <button onclick="window._udEdit('students','${s.id}')" class="text-blue-600 hover:text-blue-800 text-xs font-semibold mr-2"><i class="fas fa-edit"></i> Edit</button>
+                                    <button onclick="window._udDel('students','${s.id}','${escapeHtml(s.studentName)}')" class="text-red-600 hover:text-red-800 text-xs font-semibold"><i class="fas fa-trash"></i> Delete</button>
+                                </td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+        wireCheckboxes(el);
+    }
+
+    // ---- PARENTS TABLE ----
+    function renderParentsTable(el, term) {
+        const filtered = udParents.filter(p => {
+            const s = `${p.name} ${p.email} ${p.phone || ''}`.toLowerCase();
+            return !term || s.includes(term);
+        });
+        el.innerHTML = `
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="p-3 bg-gray-50 border-b text-xs text-gray-500">${filtered.length} parent${filtered.length !== 1 ? 's' : ''}</div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b text-xs text-gray-500 uppercase bg-gray-50">
+                            <th class="py-3 px-3 w-10"><input type="checkbox" id="ud-select-all" class="rounded"></th>
+                            <th class="text-left py-3 px-4">#</th>
+                            <th class="text-left py-3 px-4">Name</th>
+                            <th class="text-left py-3 px-4">Email</th>
+                            <th class="text-left py-3 px-4">Phone</th>
+                            <th class="text-center py-3 px-4">Children</th>
+                            <th class="text-center py-3 px-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filtered.length === 0 ? '<tr><td colspan="7" class="text-center py-8 text-gray-400">No parents found.</td></tr>' :
+                        filtered.map((p, i) => `
+                        <tr class="border-b border-gray-50 hover:bg-gray-50">
+                            <td class="py-3 px-3"><input type="checkbox" class="ud-row-checkbox rounded" data-id="${p.id}" ${selectedIds.has(p.id) ? 'checked' : ''}></td>
+                            <td class="py-3 px-4 text-gray-400 text-xs">${i + 1}</td>
+                            <td class="py-3 px-4 font-semibold text-gray-800">${escapeHtml(p.name || '—')}</td>
+                            <td class="py-3 px-4 text-gray-600 text-xs">${escapeHtml(p.email || '—')}</td>
+                            <td class="py-3 px-4 text-gray-600">${escapeHtml(p.phone || '—')}</td>
+                            <td class="py-3 px-4 text-center"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${p.childCount > 0 ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-500'}">${p.childCount}</span></td>
+                            <td class="py-3 px-4 text-center">
+                                <button onclick="window._udEdit('parent_users','${p.id}')" class="text-blue-600 hover:text-blue-800 text-xs font-semibold mr-2"><i class="fas fa-edit"></i> Edit</button>
+                                <button onclick="window._udDel('parent_users','${p.id}','${escapeHtml(p.name)}')" class="text-red-600 hover:text-red-800 text-xs font-semibold"><i class="fas fa-trash"></i> Delete</button>
+                            </td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+        wireCheckboxes(el);
+    }
+
+    // ---- UNIFIED EDIT MODAL ----
+    window._udEdit = async function(colName, itemId) {
+        const item = colName === 'tutors' ? udTutors.find(t => t.id === itemId)
+                   : colName === 'students' ? udStudents.find(s => s.id === itemId)
+                   : udParents.find(p => p.id === itemId);
+        if (!item) return;
+
+        const isTutor = colName === 'tutors';
+        const isStudent = colName === 'students';
+        const isParent = colName === 'parent_users';
+        const title = isTutor ? 'Edit Tutor' : isStudent ? 'Edit Student' : 'Edit Parent';
+        const color = isTutor ? 'blue' : isStudent ? 'green' : 'purple';
+
+        let fieldsHtml = '';
+        if (isTutor) {
+            fieldsHtml = `
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Name</label><input type="text" id="ud-e-name" value="${escapeHtml(item.name || '')}" class="w-full p-2 border rounded-lg"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" id="ud-e-email" value="${escapeHtml(item.email || '')}" class="w-full p-2 border rounded-lg bg-gray-100" readonly></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Phone</label><input type="text" id="ud-e-phone" value="${escapeHtml(item.phone || '')}" class="w-full p-2 border rounded-lg"></div>`;
+        } else if (isStudent) {
+            fieldsHtml = `
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label><input type="text" id="ud-e-sname" value="${escapeHtml(item.studentName || '')}" class="w-full p-2 border rounded-lg"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Grade</label><select id="ud-e-grade" class="w-full p-2 border rounded-lg">${buildGradeOptions(item.grade || '')}</select></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Parent Name</label><input type="text" id="ud-e-pname" value="${escapeHtml(item.parentName || '')}" class="w-full p-2 border rounded-lg"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Parent Email</label><input type="email" id="ud-e-pemail" value="${escapeHtml(item.parentEmail || '')}" class="w-full p-2 border rounded-lg"></div>`;
+        } else {
+            fieldsHtml = `
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Name</label><input type="text" id="ud-e-name" value="${escapeHtml(item.name || '')}" class="w-full p-2 border rounded-lg"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" id="ud-e-email" value="${escapeHtml(item.email || '')}" class="w-full p-2 border rounded-lg bg-gray-100" readonly></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Phone</label><input type="text" id="ud-e-phone" value="${escapeHtml(item.phone || '')}" class="w-full p-2 border rounded-lg"></div>`;
+        }
+
+        const old = document.getElementById('ud-edit-modal');
+        if (old) old.remove();
+
+        document.body.insertAdjacentHTML('beforeend', `
+        <div id="ud-edit-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div class="relative p-6 bg-white w-full max-w-md rounded-lg shadow-xl">
+                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="document.getElementById('ud-edit-modal').remove()">&times;</button>
+                <h3 class="text-xl font-bold mb-4 text-${color}-700"><i class="fas fa-edit mr-2"></i>${title}</h3>
+                <div class="space-y-3">${fieldsHtml}</div>
+                <div class="flex justify-end gap-3 mt-5">
+                    <button onclick="document.getElementById('ud-edit-modal').remove()" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 text-sm">Cancel</button>
+                    <button id="ud-save-btn" class="px-4 py-2 bg-${color}-600 text-white rounded-lg hover:bg-${color}-700 text-sm">Save Changes</button>
+                </div>
+            </div>
+        </div>`);
+
+        document.getElementById('ud-save-btn').addEventListener('click', async () => {
+            try {
+                let updateData = {};
+                if (isTutor) {
+                    const name = document.getElementById('ud-e-name').value.trim();
+                    if (!name) { alert('Name is required.'); return; }
+                    updateData = { name: sanitizeInput(name, 200), phone: sanitizeInput(document.getElementById('ud-e-phone').value.trim(), 50) };
+                } else if (isStudent) {
+                    const sname = document.getElementById('ud-e-sname').value.trim();
+                    if (!sname) { alert('Student name is required.'); return; }
+                    updateData = {
+                        studentName: sanitizeInput(sname, 200),
+                        grade: document.getElementById('ud-e-grade').value,
+                        parentName: sanitizeInput(document.getElementById('ud-e-pname').value.trim(), 200),
+                        parentEmail: sanitizeInput(document.getElementById('ud-e-pemail').value.trim(), 200)
+                    };
+                } else {
+                    const name = document.getElementById('ud-e-name').value.trim();
+                    if (!name) { alert('Name is required.'); return; }
+                    updateData = { name: sanitizeInput(name, 200), phone: sanitizeInput(document.getElementById('ud-e-phone').value.trim(), 50) };
+                }
+                await updateDoc(doc(db, colName, itemId), updateData);
+                alert('Updated successfully!');
+                document.getElementById('ud-edit-modal').remove();
+                if (colName === 'tutors') invalidateCache('tutors');
+                if (colName === 'students') invalidateCache('students');
+                await loadAllUserData();
+            } catch(e) { alert('Error: ' + e.message); }
+        });
+    };
+
+    // ---- UNIFIED DELETE ----
+    window._udDel = async function(colName, itemId, name) {
+        if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+        try {
+            await deleteDoc(doc(db, colName, itemId));
+            alert('Deleted successfully.');
+            if (colName === 'tutors') invalidateCache('tutors');
+            if (colName === 'students') invalidateCache('students');
+            selectedIds.delete(itemId);
+            await loadAllUserData();
+        } catch(e) { alert('Error: ' + e.message); }
+    };
+
+    // ---- DATA LOADING ----
+    async function loadAllUserData() {
+        const loadingEl = document.getElementById('ud-loading');
+        const contentEl = document.getElementById('ud-content');
+        if (loadingEl) loadingEl.classList.remove('hidden');
+        if (contentEl) contentEl.classList.add('hidden');
+
+        try {
+            const [tutorsSnap, studentsSnap, parentsSnap] = await Promise.all([
+                getDocs(query(collection(db, 'tutors'), orderBy('name'))),
+                getDocs(collection(db, 'students')),
+                getDocs(collection(db, 'parent_users'))
+            ]);
+
+            const allStudents = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+            const studentCountByTutor = {};
+            allStudents.forEach(s => { const k = s.tutorEmail || ''; studentCountByTutor[k] = (studentCountByTutor[k] || 0) + 1; });
+
+            const tutorNameMap = {};
+            tutorsSnap.docs.forEach(d => { const data = d.data(); tutorNameMap[data.email] = data.name; });
+
+            const childCountByParent = {};
+            allStudents.forEach(s => { const k = (s.parentEmail || '').toLowerCase(); if (k) childCountByParent[k] = (childCountByParent[k] || 0) + 1; });
+
+            udTutors = tutorsSnap.docs.map(d => { const data = d.data(); return { id: d.id, ...data, studentCount: studentCountByTutor[data.email] || 0 }; });
+            udStudents = allStudents.map(s => ({ ...s, tutorName: tutorNameMap[s.tutorEmail] || '' }));
+            udParents = parentsSnap.docs.map(d => { const data = d.data(); return { id: d.id, ...data, childCount: childCountByParent[(data.email || '').toLowerCase()] || 0 }; });
+
+            document.getElementById('ud-tutor-count').textContent = udTutors.length;
+            document.getElementById('ud-student-count').textContent = udStudents.length;
+            document.getElementById('ud-parent-count').textContent = udParents.length;
+            document.getElementById('ud-total-count').textContent = udTutors.length + udStudents.length + udParents.length;
+
+            if (loadingEl) loadingEl.classList.add('hidden');
+            if (contentEl) contentEl.classList.remove('hidden');
+            renderCurrentTab();
+        } catch(err) {
+            console.error('User Directory load error:', err);
+            const loadingEl = document.getElementById('ud-loading');
+            if (loadingEl) loadingEl.innerHTML = `<p class="text-red-500">Error loading data: ${err.message}</p>`;
+        }
+    }
+
+    await loadAllUserData();
+}
+
 // SECTION 9: NAVIGATION & AUTHENTICATION
 // ======================================================
 
@@ -10757,7 +12121,8 @@ const navigationGroups = {
         label: "Financial",
         items: [
             { id: "navPayAdvice", label: "Pay Advice", icon: "fas fa-file-invoice-dollar", fn: renderPayAdvicePanel },
-            { id: "navReferralsAdmin", label: "Referral Management", icon: "fas fa-handshake", fn: renderReferralsAdminPanel }
+            { id: "navTenureBonus", label: "Tenure Bonus", icon: "fas fa-award", fn: renderTenureBonusPanel, perm: "viewPayAdvice" },
+            { id: "navReferralsAdmin", label: "Referral Management", icon: "fas fa-handshake", fn: renderReferralsAdminPanel, perm: "viewReferralsAdmin" }
         ]
     },
     "academics": {
@@ -10776,6 +12141,13 @@ const navigationGroups = {
         items: [
             { id: "navMasterPortal", label: "Management Portal", icon: "fas fa-table", fn: renderMasterPortalPanel, perm: "viewMasterPortal" },
             { id: "navAcademicFollowUp", label: "Academic Follow-Up", icon: "fas fa-graduation-cap", fn: renderAcademicFollowUpPanel, perm: "viewMasterPortal" }
+        ]
+    },
+    "userDirectory": {
+        icon: "fas fa-address-book",
+        label: "User Directory",
+        items: [
+            { id: "navUserDirectory", label: "User Directory", icon: "fas fa-address-book", fn: renderUserDirectoryPanel, perm: "viewUserDirectory" }
         ]
     },
     "communication": {
@@ -10803,8 +12175,7 @@ function initializeSidebarNavigation(staffData) {
         const visibleItems = group.items ? group.items.filter(item => {
             // Use explicit perm key if provided on the item, otherwise derive it
             const permKey = item.perm || getPermissionKey(item.id);
-            const hasPermission = item.id === 'navReferralsAdmin' || 
-                                !staffData.permissions || 
+            const hasPermission = !staffData.permissions || 
                                 !staffData.permissions.tabs || 
                                 staffData.permissions.tabs[permKey] === true;
             return hasPermission;
@@ -10933,6 +12304,7 @@ const allNavItems = {
     navDashboard: { fn: renderDashboardPanel, perm: 'viewDashboard', label: 'Dashboard' },
     navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement', label: 'Tutor Directory' },
     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice', label: 'Pay Advice' },
+    navTenureBonus: { fn: renderTenureBonusPanel, perm: 'viewPayAdvice', label: 'Tenure Bonus' },
     navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports', label: 'Tutor Reports' },
     navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak', label: 'Summer Break' },
     navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'viewPendingApprovals', label: 'Pending Approvals' },
@@ -10943,7 +12315,8 @@ const allNavItems = {
     navInactiveTutors: { fn: renderInactiveTutorsPanel, perm: 'viewInactiveTutors', label: 'Inactive Tutors' },
     navArchivedStudents: { fn: renderArchivedStudentsPanel, perm: 'viewArchivedStudents', label: 'Archived Students' },
     navMasterPortal: { fn: renderMasterPortalPanel, perm: 'viewMasterPortal', label: 'Management Portal' },
-    navAcademicFollowUp: { fn: renderAcademicFollowUpPanel, perm: 'viewMasterPortal', label: 'Academic Follow-Up' }
+    navAcademicFollowUp: { fn: renderAcademicFollowUpPanel, perm: 'viewMasterPortal', label: 'Academic Follow-Up' },
+    navUserDirectory: { fn: renderUserDirectoryPanel, perm: 'viewUserDirectory', label: 'User Directory' }
 };
 
 window.closeManagementModal = function(modalId) {
@@ -12199,4 +13572,3 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
-
