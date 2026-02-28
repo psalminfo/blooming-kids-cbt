@@ -97,9 +97,11 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewEnrollments: false,
             viewInactiveTutors: false,
             viewArchivedStudents: false,
-            viewMasterPortal: false,   // Management Portal tab
-            canQA: false,              // QA Session Observation button
-            canQC: false               // Lesson Plan QC button
+            viewMasterPortal: false,
+            viewReferralsAdmin: false,
+            viewUserDirectory: false,
+            canQA: false,
+            canQC: false
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -121,9 +123,11 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewEnrollments: false,
             viewInactiveTutors: false,
             viewArchivedStudents: false,
-            viewMasterPortal: false,   // Management Portal tab
-            canQA: false,              // QA Session Observation button
-            canQC: false               // Lesson Plan QC button
+            viewMasterPortal: false,
+            viewReferralsAdmin: false,
+            viewUserDirectory: false,
+            canQA: false,
+            canQC: false
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -145,9 +149,11 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewEnrollments: true,
             viewInactiveTutors: true,
             viewArchivedStudents: true,
-            viewMasterPortal: true,    // Managers can see the Master View
-            canQA: false,              // Only QA officers rate sessions
-            canQC: false               // Only QC officers rate lesson plans
+            viewMasterPortal: true,
+            viewReferralsAdmin: true,
+            viewUserDirectory: true,
+            canQA: false,
+            canQC: false
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -169,9 +175,11 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewEnrollments: true,
             viewInactiveTutors: true,
             viewArchivedStudents: true,
-            viewMasterPortal: true,    // Directors can see the Master View
-            canQA: true,               // Directors can do QA ratings
-            canQC: true                // Directors can do QC ratings
+            viewMasterPortal: true,
+            viewReferralsAdmin: true,
+            viewUserDirectory: true,
+            canQA: true,
+            canQC: true
         }, 
         actions: { 
             canDownloadReports: true, 
@@ -193,9 +201,11 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewEnrollments: true,
             viewInactiveTutors: true,
             viewArchivedStudents: true,
-            viewMasterPortal: true,    // Admins have full access
-            canQA: true,               // Admins can do QA ratings
-            canQC: true                // Admins can do QC ratings
+            viewMasterPortal: true,
+            viewReferralsAdmin: true,
+            viewUserDirectory: true,
+            canQA: true,
+            canQC: true
         }, 
         actions: { 
             canDownloadReports: true, 
@@ -1566,15 +1576,15 @@ async function renderTutorManagementPanel(container) {
            
              </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Report Submission:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="report-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="report-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Tutors Can Add Students:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="tutor-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="tutor-add-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Enable Summer Break:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="summer-break-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="summer-break-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Student Fees (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-fees-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-fees-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Edit/Delete (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="edit-delete-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="edit-delete-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Report Submission:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="report-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="report-status-label" class="ml-3 text-sm font-medium"></span></label></div>
+                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Tutors Can Add Students:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="tutor-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="tutor-add-status-label" class="ml-3 text-sm font-medium"></span></label></div>
+                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Enable Summer Break:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="summer-break-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="summer-break-status-label" class="ml-3 text-sm font-medium"></span></label></div>
+                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Student Fees (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-fees-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-fees-status-label" class="ml-3 text-sm font-medium"></span></label></div>
+                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Edit/Delete (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="edit-delete-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="edit-delete-status-label" class="ml-3 text-sm font-medium"></span></label></div>
                 
-                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Direct Student Add (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Transition Button:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-transition-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-transition-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Preschool-2 Add/Transition:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="preschool-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="preschool-add-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                 <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Direct Student Add (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></div>
+                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Transition Button:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-transition-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-transition-status-label" class="ml-3 text-sm font-medium"></span></label></div>
+                <div class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Preschool-2 Add/Transition:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="preschool-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="preschool-add-status-label" class="ml-3 text-sm font-medium"></span></label></div>
             </div>
         </div>
         
@@ -1611,46 +1621,86 @@ async function renderTutorManagementPanel(container) {
 
 function setupTutorManagementListeners() {
     const settingsDocRef = doc(db, "settings", "global_settings");
-    // EFFICIENT: This single-doc listener is kept for real-time settings updates.
-    onSnapshot(settingsDocRef, (docSnap) => {
+
+    // ── Unsubscribe previous listener to prevent duplicates ──
+    if (window._adminSettingsUnsub) {
+        try { window._adminSettingsUnsub(); } catch(e) {}
+    }
+
+    const TOGGLE_MAP = { 
+        'isReportEnabled': 'report', 
+        'isTutorAddEnabled': 'tutor-add', 
+        'isSummerBreakEnabled': 'summer-break', 
+        'showStudentFees': 'show-fees', 
+        'showEditDeleteButtons': 'edit-delete', 
+        'bypassPendingApproval': 'bypass-approval',
+        'showTransitionButton': 'show-transition',
+        'preschoolAddTransition': 'preschool-add'
+    };
+
+    // ── Real-time listener for settings (single-doc, efficient) ──
+    window._adminSettingsUnsub = onSnapshot(settingsDocRef, (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
             globalSettings = data;
 
-            const toggleMap = { 
-                'isReportEnabled': 'report', 
-                'isTutorAddEnabled': 'tutor-add', 
-                'isSummerBreakEnabled': 'summer-break', 
-                'showStudentFees': 'show-fees', 
-                'showEditDeleteButtons': 'edit-delete', 
-                'bypassPendingApproval': 'bypass-approval',
-                'showTransitionButton': 'show-transition',
-                'preschoolAddTransition': 'preschool-add'
-            };
-
-            for (const key in toggleMap) {
-                const type = toggleMap[key];
+            for (const key in TOGGLE_MAP) {
+                const type = TOGGLE_MAP[key];
                 const toggle = document.getElementById(`${type}-toggle`);
                 const label = document.getElementById(`${type}-status-label`);
                 if (toggle && label) {
                     toggle.checked = !!data[key];
                     label.textContent = data[key] ? 'Enabled' : 'Disabled';
+                    label.style.color = data[key] ? '#16a34a' : '#dc2626';
                 }
             }
             if (activeTutorId) {
                 renderSelectedTutorDetailsFromCache(activeTutorId);
             }
         }
+    }, (error) => {
+        console.error('Settings listener error:', error);
     });
-    // Attach listeners to toggles to update Firestore
-    document.getElementById('report-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isReportEnabled: e.target.checked }));
-    document.getElementById('tutor-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isTutorAddEnabled: e.target.checked }));
-    document.getElementById('summer-break-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isSummerBreakEnabled: e.target.checked }));
-    document.getElementById('show-fees-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { showStudentFees: e.target.checked }));
-    document.getElementById('edit-delete-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { showEditDeleteButtons: e.target.checked }));
-    document.getElementById('bypass-approval-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { bypassPendingApproval: e.target.checked }));
-    document.getElementById('show-transition-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { showTransitionButton: e.target.checked }));
-    document.getElementById('preschool-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { preschoolAddTransition: e.target.checked }));
+
+    // ── Helper: write a single setting to Firestore with visual feedback ──
+    async function toggleSetting(fieldName, toggleId, checked) {
+        const label = document.getElementById(`${TOGGLE_MAP[fieldName]}-status-label`);
+        const prevText = label ? label.textContent : '';
+        try {
+            if (label) { label.textContent = 'Saving…'; label.style.color = '#f59e0b'; }
+            await setDoc(settingsDocRef, { 
+                [fieldName]: checked, 
+                lastUpdated: new Date() 
+            }, { merge: true });
+            // onSnapshot will update the label automatically
+        } catch (err) {
+            console.error(`Toggle error (${fieldName}):`, err);
+            // Revert toggle on error
+            const toggle = document.getElementById(toggleId);
+            if (toggle) toggle.checked = !checked;
+            if (label) { label.textContent = 'Error! ' + prevText; label.style.color = '#dc2626'; }
+            alert('Failed to update setting: ' + err.message);
+        }
+    }
+
+    // ── Attach change listeners to all toggles ──
+    const FIELD_TO_TOGGLE = {
+        'isReportEnabled': 'report-toggle',
+        'isTutorAddEnabled': 'tutor-add-toggle',
+        'isSummerBreakEnabled': 'summer-break-toggle',
+        'showStudentFees': 'show-fees-toggle',
+        'showEditDeleteButtons': 'edit-delete-toggle',
+        'bypassPendingApproval': 'bypass-approval-toggle',
+        'showTransitionButton': 'show-transition-toggle',
+        'preschoolAddTransition': 'preschool-add-toggle'
+    };
+
+    for (const [field, toggleId] of Object.entries(FIELD_TO_TOGGLE)) {
+        const el = document.getElementById(toggleId);
+        if (el) {
+            el.addEventListener('change', (e) => toggleSetting(field, toggleId, e.target.checked));
+        }
+    }
     
     // UI Interaction Listeners
     document.getElementById('tutor-select').addEventListener('change', e => {
@@ -2552,6 +2602,8 @@ async function openPermissionsModal(staffId) {
                             <label class="flex items-center"><input type="checkbox" id="p-viewInactiveTutors" class="mr-2" ${permissions.tabs?.viewInactiveTutors ? 'checked' : ''}> Inactive Tutors</label>
                             <label class="flex items-center"><input type="checkbox" id="p-viewArchivedStudents" class="mr-2" ${permissions.tabs?.viewArchivedStudents ? 'checked' : ''}> Archived Students</label>
                             <label class="flex items-center col-span-2"><input type="checkbox" id="p-viewMasterPortal" class="mr-2" ${permissions.tabs?.viewMasterPortal ? 'checked' : ''}> <span class="font-semibold text-emerald-700">🗂 Management Portal (Master View)</span></label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewReferralsAdmin" class="mr-2" ${permissions.tabs?.viewReferralsAdmin ? 'checked' : ''}> <span class="text-indigo-700">🤝 Referral Management</span></label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewUserDirectory" class="mr-2" ${permissions.tabs?.viewUserDirectory ? 'checked' : ''}> <span class="text-teal-700">📋 User Directory</span></label>
                         </div>
                     </div>
                     <div class="border-t pt-4">
@@ -2592,6 +2644,8 @@ async function openPermissionsModal(staffId) {
                 viewInactiveTutors: document.getElementById('p-viewInactiveTutors').checked,
                 viewArchivedStudents: document.getElementById('p-viewArchivedStudents').checked,
                 viewMasterPortal: document.getElementById('p-viewMasterPortal').checked,
+                viewReferralsAdmin: document.getElementById('p-viewReferralsAdmin').checked,
+                viewUserDirectory: document.getElementById('p-viewUserDirectory').checked,
                 canQA: document.getElementById('p-canQA').checked,
                 canQC: document.getElementById('p-canQC').checked
             },
@@ -2830,65 +2884,24 @@ async function initializeGlobalSettings() {
         if (!docSnap.exists()) {
             // Document doesn't exist - create it with default values
             await setDoc(settingsDocRef, {
-                isReportEnabled: true,          // Default: reports enabled
-                isTutorAddEnabled: true,        // Default: tutors can add students
-                isSummerBreakEnabled: false,    // Default: summer break disabled
-                showStudentFees: true,          // Default: show fees
-                showEditDeleteButtons: true,    // Default: show edit/delete
-                bypassPendingApproval: false,   // Default: require approval
-                showTransitionButton: true,     // Default: show transition button
-                preschoolAddTransition: true,   // Default: allow preschool add/transition
-                lastUpdated: Timestamp.now(),   // Track when created/updated
-                createdAt: Timestamp.now()      // Track creation time
+                isReportEnabled: true,
+                isTutorAddEnabled: true,
+                isSummerBreakEnabled: false,
+                showStudentFees: true,
+                showEditDeleteButtons: true,
+                bypassPendingApproval: false,
+                showTransitionButton: true,
+                preschoolAddTransition: true,
+                lastUpdated: Timestamp.now(),
+                createdAt: Timestamp.now()
             });
-            
             console.log("✅ Created global_settings document with default values");
-            
-            // Also patch any existing toggle event listeners to use setDoc instead of updateDoc
-            patchToggleListeners();
         } else {
             console.log("✅ global_settings document already exists");
         }
     } catch (error) {
         console.error("⚠️ Error initializing global_settings:", error);
     }
-}
-
-// Safely patch toggle event listeners to use setDoc instead of updateDoc
-// This prevents the "No document to update" error
-function patchToggleListeners() {
-    // Wait a moment for DOM to be ready
-    setTimeout(() => {
-        const settingsDocRef = doc(db, "settings", "global_settings");
-        
-        // Helper function to patch a single toggle
-        const patchToggle = (toggleId, fieldName) => {
-            const toggle = document.getElementById(toggleId);
-            if (toggle) {
-                // Remove existing listeners (if any)
-                const newToggle = toggle.cloneNode(true);
-                toggle.parentNode.replaceChild(newToggle, toggle);
-                
-                // Add new listener with setDoc (merge: true)
-                newToggle.addEventListener('change', e => {
-                    setDoc(settingsDocRef, { [fieldName]: e.target.checked }, { merge: true })
-                        .catch(error => console.error(`Error updating ${fieldName}:`, error));
-                });
-            }
-        };
-        
-        // Patch all toggle switches
-        patchToggle('report-toggle', 'isReportEnabled');
-        patchToggle('tutor-add-toggle', 'isTutorAddEnabled');
-        patchToggle('summer-break-toggle', 'isSummerBreakEnabled');
-        patchToggle('show-fees-toggle', 'showStudentFees');
-        patchToggle('edit-delete-toggle', 'showEditDeleteButtons');
-        patchToggle('bypass-approval-toggle', 'bypassPendingApproval');
-        patchToggle('show-transition-toggle', 'showTransitionButton');
-        patchToggle('preschool-add-toggle', 'preschoolAddTransition');
-        
-        console.log("✅ Toggle listeners patched to use setDoc with merge");
-    }, 1000); // Wait 1 second for DOM
 }
 
 // Run initialization when auth state changes (safest place)
@@ -2909,4 +2922,3 @@ if (document.readyState === 'loading') {
 // ========================================================
 // END OF SAFE INITIALIZATION SCRIPT
 // ========================================================
-
