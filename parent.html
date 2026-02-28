@@ -609,6 +609,13 @@
             color: var(--muted);
             font-size: 0.79rem;
         }
+        .portal-footer-links {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 6px;
+        }
         .portal-footer-link {
             background: none;
             border: none;
@@ -889,15 +896,13 @@
     </div>
 </div>
 
-<!-- ===== FOOTER with privacy links ===== -->
+<!-- ===== FOOTER with privacy & terms links (Contact Support removed) ===== -->
 <footer class="portal-footer">
     <p>© 2025 Blooming Kids House · Where Every Child Blossoms 🌱</p>
     <div class="portal-footer-links">
         <button class="portal-footer-link" onclick="showPrivacyPolicy()">Privacy Policy</button>
         <span style="color:var(--muted);">|</span>
         <button class="portal-footer-link" onclick="showTerms()">Terms of Use</button>
-        <span style="color:var(--muted);">|</span>
-        <a href="/cdn-cgi/l/email-protection#..." class="portal-footer-link">Contact Support</a>
     </div>
 </footer>
 
@@ -917,14 +922,53 @@
     </div>
 </div>
 
-<!-- ===== PRIVACY POLICY MODAL ===== -->
+<!-- ===== PRIVACY POLICY / TERMS MODAL (reusable) ===== -->
 <div id="privacyPolicyModal">
     <div class="privacy-modal-content">
         <div class="privacy-modal-header">
-            <h3>🔒 Privacy Policy</h3>
+            <h3 id="modalTitle">🔒 Privacy Policy</h3>
             <button class="privacy-close" onclick="closePrivacyPolicy()">✕</button>
         </div>
-        <div class="privacy-modal-body">
+        <div class="privacy-modal-body" id="modalBody">
+            <!-- Content will be populated by JavaScript -->
+        </div>
+        <div class="privacy-modal-footer">
+            <button class="btn-primary" style="width:auto; padding:10px 20px;" onclick="closePrivacyPolicy()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== FAB, modals, etc. (original, unchanged) ===== -->
+<div class="fab-container" id="fabContainer" style="display:none;">
+    <!-- FAB content from original parent.html (omitted for brevity, but should be present) -->
+</div>
+<div id="fabModal" class="modal-overlay hidden">...</div>
+<div id="passwordResetModal" class="modal-overlay hidden">...</div>
+<div id="addStudentModal" class="modal-overlay hidden">...</div>
+<!-- Original privacyModal removed, now using the one above -->
+
+</div> <!-- /appRoot -->
+
+<!-- Load parent portal JS -->
+<script src="parent.js" defer></script>
+
+<!-- Privacy / cookie functions and modal content -->
+<script>
+(function() {
+    const CONSENT_KEY = "bkh_cookie_consent";
+    function showBanner() { const b = document.getElementById("privacyCookieBanner"); if(b) b.style.display = "block"; }
+    function hideBanner() { const b = document.getElementById("privacyCookieBanner"); if(b) b.style.display = "none"; }
+    window.acceptPrivacyCookies = function() { localStorage.setItem(CONSENT_KEY, "all"); hideBanner(); };
+    window.declinePrivacyCookies = function() { localStorage.setItem(CONSENT_KEY, "essential"); hideBanner(); };
+
+    // Modal functions
+    const modal = document.getElementById('privacyPolicyModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+
+    window.showPrivacyPolicy = function() {
+        modalTitle.innerHTML = '🔒 Privacy Policy';
+        modalBody.innerHTML = `
             <p style="font-size:0.8rem; color:#64748b; margin-bottom:16px;">Last updated: January 2025 | Blooming Kids House</p>
             <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Data We Collect</h3>
             <p>We collect personal information you provide during registration (name, email, phone number) and usage data (session activity, login times). For students under 13, we collect only what is strictly necessary to provide our services, in compliance with COPPA.</p>
@@ -942,40 +986,40 @@
             <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Children Privacy (COPPA)</h3>
             <p>We never knowingly collect personal data from children under 13 without verifiable parental consent. Parents may review, update, or delete their child's information by contacting us.</p>
             <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Contact Us</h3>
-            <p>For data requests or privacy concerns, contact: <strong>privacy@bloomingkidshouse.com</strong></p>
-        </div>
-        <div class="privacy-modal-footer">
-            <button class="btn-primary" style="width:auto; padding:10px 20px;" onclick="closePrivacyPolicy()">Close</button>
-        </div>
-    </div>
-</div>
+            <p>For data requests or privacy concerns, contact: <strong>info@bloomingkidshouse.com</strong></p>
+        `;
+        modal.style.display = 'flex';
+    };
 
-<!-- ===== FAB, modals, etc. (original, unchanged) ===== -->
-<div class="fab-container" id="fabContainer" style="display:none;">
-    <!-- FAB content from original parent.html (omitted for brevity, but should be present) -->
-</div>
-<div id="fabModal" class="modal-overlay hidden">...</div>
-<div id="passwordResetModal" class="modal-overlay hidden">...</div>
-<div id="addStudentModal" class="modal-overlay hidden">...</div>
-<div id="privacyModal" class="modal-overlay hidden">...</div>
+    window.showTerms = function() {
+        modalTitle.innerHTML = '📜 Terms of Use';
+        modalBody.innerHTML = `
+            <p style="font-size:0.8rem; color:#64748b; margin-bottom:16px;">Last updated: January 2025 | Blooming Kids House</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Acceptance of Terms</h3>
+            <p>By accessing or using the Blooming Kids House parent portal, you agree to be bound by these Terms of Use. If you do not agree, you may not use the service.</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Description of Service</h3>
+            <p>Blooming Kids House provides an online platform for parents to monitor their children's academic progress, communicate with tutors, manage payments, and access educational resources.</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">User Accounts</h3>
+            <p>You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account. You must immediately notify us of any unauthorized use.</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Payment Terms</h3>
+            <p>Fees for tutoring services are outlined in your enrollment agreement. Payments are processed through our secure payment gateway. Late payments may result in suspension of services.</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Intellectual Property</h3>
+            <p>All content on the portal, including logos, text, and software, is the property of Blooming Kids House and may not be reproduced without permission.</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Limitation of Liability</h3>
+            <p>Blooming Kids House shall not be liable for any indirect, incidental, or consequential damages arising from the use of the portal.</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Changes to Terms</h3>
+            <p>We reserve the right to modify these terms at any time. Continued use of the portal constitutes acceptance of the revised terms.</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Contact</h3>
+            <p>For questions about these Terms, contact: <strong>info@bloomingkidshouse.com</strong></p>
+        `;
+        modal.style.display = 'flex';
+    };
 
-</div> <!-- /appRoot -->
+    window.closePrivacyPolicy = function() {
+        modal.style.display = 'none';
+    };
 
-<!-- Load parent portal JS -->
-<script src="parent.js" defer></script>
-
-<!-- Privacy / cookie functions -->
-<script>
-(function() {
-    const CONSENT_KEY = "bkh_cookie_consent";
-    function showBanner() { const b = document.getElementById("privacyCookieBanner"); if(b) b.style.display = "block"; }
-    function hideBanner() { const b = document.getElementById("privacyCookieBanner"); if(b) b.style.display = "none"; }
-    window.acceptPrivacyCookies = function() { localStorage.setItem(CONSENT_KEY, "all"); hideBanner(); };
-    window.declinePrivacyCookies = function() { localStorage.setItem(CONSENT_KEY, "essential"); hideBanner(); };
-    window.showPrivacyPolicy = function() { const m = document.getElementById("privacyPolicyModal"); if(m) m.style.display = "flex"; };
-    window.closePrivacyPolicy = function() { const m = document.getElementById("privacyPolicyModal"); if(m) m.style.display = "none"; };
-    window.showTerms = function() { alert("Terms of Use would be displayed here."); };
-
+    // Show cookie banner if consent not given
     document.addEventListener("DOMContentLoaded", function() {
         if (!localStorage.getItem(CONSENT_KEY)) showBanner();
     });
