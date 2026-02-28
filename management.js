@@ -4978,29 +4978,37 @@ let tenureBonusLogs = [];
 let tenureBonusActiveSubTab = 'all'; // 'all', 'eligible', 'notEligible'
 
 function calculateTenureDetails(employmentDate) {
-    if (!employmentDate) return { years: 0, months: 0, totalMonths: 0, label: 'N/A', isEligible: false };
+    if (!employmentDate) return { years: 0, months: 0, totalMonths: 0, label: 'N/A', isOverOneYear: false, oneYearAnniversary: null, qualifiesForBonus: false };
     try {
         const start = new Date(employmentDate);
-        if (isNaN(start.getTime())) return { years: 0, months: 0, totalMonths: 0, label: 'N/A', isEligible: false };
+        if (isNaN(start.getTime())) return { years: 0, months: 0, totalMonths: 0, label: 'N/A', isOverOneYear: false, oneYearAnniversary: null, qualifiesForBonus: false };
         const now = new Date();
         let years = now.getFullYear() - start.getFullYear();
         let months = now.getMonth() - start.getMonth();
         if (now.getDate() < start.getDate()) months--;
         if (months < 0) { years--; months += 12; }
         const totalMonths = years * 12 + months;
-        const isEligible = totalMonths >= 12;
+        const isOverOneYear = totalMonths >= 12;
+
+        // Calculate the exact 1-year anniversary date
+        const oneYearAnniversary = new Date(start);
+        oneYearAnniversary.setFullYear(oneYearAnniversary.getFullYear() + 1);
+
+        // Tutor qualifies for bonus ONLY if their 1-year anniversary is ON or AFTER March 1, 2026
+        const qualifiesForBonus = oneYearAnniversary >= TENURE_BONUS_EFFECTIVE_DATE;
+
         let label = '';
         if (years > 0) label += `${years} year${years > 1 ? 's' : ''}`;
         if (months > 0) label += `${years > 0 ? ', ' : ''}${months} month${months > 1 ? 's' : ''}`;
         if (!label) label = 'Less than 1 month';
-        return { years, months, totalMonths, label, isEligible };
+        return { years, months, totalMonths, label, isOverOneYear, oneYearAnniversary, qualifiesForBonus };
     } catch (e) {
-        return { years: 0, months: 0, totalMonths: 0, label: 'N/A', isEligible: false };
+        return { years: 0, months: 0, totalMonths: 0, label: 'N/A', isOverOneYear: false, oneYearAnniversary: null, qualifiesForBonus: false };
     }
 }
 
 async function renderTenureBonusPanel(container) {
-    const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
+    const canApplyBonus = window.userData?.permissions?.actions?.canApplyTenureBonus === true;
     
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -5017,9 +5025,11 @@ async function renderTenureBonusPanel(container) {
                     <button id="tb-refresh-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm font-medium">
                         <i class="fas fa-sync-alt mr-1"></i> Refresh
                     </button>
+                    ${canApplyBonus ? `
                     <button id="tb-run-auto-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">
                         <i class="fas fa-magic mr-1"></i> Re-check & Upgrade
                     </button>
+                    ` : ''}
                 </div>
             </div>
 
@@ -5030,7 +5040,7 @@ async function renderTenureBonusPanel(container) {
                     <p id="tb-total-count" class="text-2xl font-extrabold text-blue-800">0</p>
                 </div>
                 <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-                    <p class="text-xs font-bold text-green-700 uppercase">1+ Year (Eligible)</p>
+                    <p class="text-xs font-bold text-green-700 uppercase">Bonus Eligible</p>
                     <p id="tb-eligible-count" class="text-2xl font-extrabold text-green-800">0</p>
                 </div>
                 <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
@@ -5132,8 +5142,8 @@ async function renderTenureBonusPanel(container) {
         loadTenureBonusData();
     });
 
-    // Wire auto-upgrade
-    document.getElementById('tb-run-auto-btn').addEventListener('click', () => {
+    // Wire auto-upgrade (only if button exists based on permission)
+    document.getElementById('tb-run-auto-btn')?.addEventListener('click', () => {
         runTenureAutoUpgrade();
     });
 
@@ -5184,17 +5194,20 @@ async function loadTenureBonusData() {
             };
         });
 
-        // Sort: eligible first, then by tenure descending
+        // Sort: bonus-eligible first, then over 1 year, then by tenure descending
         tenureBonusTutors.sort((a, b) => {
-            if (a.tenure.isEligible && !b.tenure.isEligible) return -1;
-            if (!a.tenure.isEligible && b.tenure.isEligible) return 1;
+            const aReady = a.tenure.isOverOneYear && a.tenure.qualifiesForBonus && !a.bonusApplied;
+            const bReady = b.tenure.isOverOneYear && b.tenure.qualifiesForBonus && !b.bonusApplied;
+            if (aReady && !bReady) return -1;
+            if (!aReady && bReady) return 1;
             return b.tenure.totalMonths - a.tenure.totalMonths;
         });
 
         // Update counters
-        const eligible = tenureBonusTutors.filter(t => t.tenure.isEligible);
-        const notEligible = tenureBonusTutors.filter(t => !t.tenure.isEligible);
+        const overOneYear = tenureBonusTutors.filter(t => t.tenure.isOverOneYear);
+        const underOneYear = tenureBonusTutors.filter(t => !t.tenure.isOverOneYear);
         const upgraded = tenureBonusTutors.filter(t => t.bonusApplied);
+        const bonusEligible = tenureBonusTutors.filter(t => t.tenure.isOverOneYear && t.tenure.qualifiesForBonus && !t.bonusApplied);
 
         const totalEl = document.getElementById('tb-total-count');
         const eligibleEl = document.getElementById('tb-eligible-count');
@@ -5202,8 +5215,8 @@ async function loadTenureBonusData() {
         const upgradedEl = document.getElementById('tb-upgraded-count');
 
         if (totalEl) totalEl.textContent = tenureBonusTutors.length;
-        if (eligibleEl) eligibleEl.textContent = eligible.length;
-        if (notEligibleEl) notEligibleEl.textContent = notEligible.length;
+        if (eligibleEl) eligibleEl.textContent = bonusEligible.length;
+        if (notEligibleEl) notEligibleEl.textContent = underOneYear.length;
         if (upgradedEl) upgradedEl.textContent = upgraded.length;
 
         renderTenureBonusTable();
@@ -5228,8 +5241,12 @@ async function silentAutoApplyTenureBonus() {
         const now = new Date();
         if (now < TENURE_BONUS_EFFECTIVE_DATE) { _silentAutoRunning = false; return; }
 
-        // Find tutors who are eligible (1+ year), NOT already upgraded, and have regular students
-        const toUpgrade = tenureBonusTutors.filter(t => t.tenure.isEligible && !t.bonusApplied && t.studentCount > 0);
+        // Only auto-apply if the current user has the canApplyTenureBonus permission
+        const canApply = window.userData?.permissions?.actions?.canApplyTenureBonus === true;
+        if (!canApply) { _silentAutoRunning = false; return; }
+
+        // Find tutors who are over 1 year, qualify for bonus (anniversary on/after March 1, 2026), NOT already upgraded, and have regular students
+        const toUpgrade = tenureBonusTutors.filter(t => t.tenure.isOverOneYear && t.tenure.qualifiesForBonus && !t.bonusApplied && t.studentCount > 0);
 
         if (toUpgrade.length === 0) { _silentAutoRunning = false; return; }
 
@@ -5338,9 +5355,9 @@ function renderTenureBonusTable() {
 
     // Filter by sub-tab
     if (tenureBonusActiveSubTab === 'eligible') {
-        data = data.filter(t => t.tenure.isEligible);
+        data = data.filter(t => t.tenure.isOverOneYear);
     } else if (tenureBonusActiveSubTab === 'notEligible') {
-        data = data.filter(t => !t.tenure.isEligible);
+        data = data.filter(t => !t.tenure.isOverOneYear);
     }
 
     // Filter by search
@@ -5353,24 +5370,54 @@ function renderTenureBonusTable() {
         return;
     }
 
+    const canApplyBonus = window.userData?.permissions?.actions?.canApplyTenureBonus === true;
+    const canManualAdjust = window.userData?.permissions?.actions?.canManualAdjustFee === true;
+
     tableBody.innerHTML = data.map(t => {
         const empDate = t.employmentDate ? new Date(t.employmentDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not set';
         const empYear = t.employmentDate ? new Date(t.employmentDate).getFullYear() : '—';
+        const anniversaryStr = t.tenure.oneYearAnniversary ? t.tenure.oneYearAnniversary.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+
+        // Determine status
+        // bonusApplied = already upgraded
+        // isOverOneYear + qualifiesForBonus + !bonusApplied = pending upgrade (show buttons)
+        // isOverOneYear + !qualifiesForBonus = pre-policy tutor (anniversary before March 2026, no buttons)
+        // !isOverOneYear + qualifiesForBonus = upcoming (hasn't clocked 1 year yet, but will qualify when they do)
+        // !isOverOneYear + !qualifiesForBonus = not eligible
 
         let statusBadge = '';
+        let rowClass = '';
+        let showApplyBtn = false;
+        let showManualBtn = false;
+        let showViewBtn = false;
+
         if (t.bonusApplied) {
             const appliedDate = t.bonusRecord?.appliedAt?.toDate ? t.bonusRecord.appliedAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A';
             statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800"><i class="fas fa-check-circle"></i> Upgraded (${escapeHtml(appliedDate)})</span>`;
-        } else if (t.tenure.isEligible) {
+            rowClass = 'bg-green-50';
+            showViewBtn = true;
+        } else if (t.tenure.isOverOneYear && t.tenure.qualifiesForBonus) {
             statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800"><i class="fas fa-clock"></i> Pending Upgrade</span>`;
+            rowClass = 'bg-orange-50';
+            showApplyBtn = canApplyBonus;
+            showManualBtn = canManualAdjust;
+        } else if (t.tenure.isOverOneYear && !t.tenure.qualifiesForBonus) {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-500"><i class="fas fa-ban"></i> Pre-Policy</span>
+                           <span class="block text-xs text-gray-400 mt-1">1yr anniversary: ${escapeHtml(anniversaryStr)} (before Mar 2026)</span>`;
+            rowClass = '';
+        } else if (!t.tenure.isOverOneYear && t.tenure.qualifiesForBonus) {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800"><i class="fas fa-hourglass-half"></i> Upcoming</span>
+                           <span class="block text-xs text-blue-400 mt-1">Qualifies on: ${escapeHtml(anniversaryStr)}</span>`;
+            rowClass = '';
         } else {
             statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600"><i class="fas fa-hourglass-half"></i> Not Yet Eligible</span>`;
+            rowClass = '';
         }
 
-        const tenureColor = t.tenure.isEligible ? 'text-green-700 font-bold' : 'text-gray-600';
+        const tenureColor = t.tenure.isOverOneYear ? 'text-green-700 font-bold' : 'text-gray-600';
 
         return `
-            <tr class="${t.bonusApplied ? 'bg-green-50' : t.tenure.isEligible ? 'bg-orange-50' : ''}">
+            <tr class="${rowClass}">
                 <td class="px-4 py-3 font-medium">${escapeHtml(t.name || 'N/A')}</td>
                 <td class="px-4 py-3 text-sm text-gray-600">${escapeHtml(t.email || 'N/A')}</td>
                 <td class="px-4 py-3 text-sm">
@@ -5382,15 +5429,17 @@ function renderTenureBonusTable() {
                 <td class="px-4 py-3">${statusBadge}</td>
                 <td class="px-4 py-3">
                     <div class="flex flex-wrap gap-1">
-                        ${!t.bonusApplied && t.tenure.isEligible ? `
+                        ${showApplyBtn ? `
                             <button class="tb-apply-btn bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs font-medium" data-email="${escapeHtml(t.email)}">
                                 <i class="fas fa-check mr-1"></i>Apply Bonus
                             </button>
                         ` : ''}
-                        <button class="tb-manual-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium" data-email="${escapeHtml(t.email)}" data-name="${escapeHtml(t.name)}">
-                            <i class="fas fa-edit mr-1"></i>Manual Adjust
-                        </button>
-                        ${t.bonusApplied ? `
+                        ${showManualBtn ? `
+                            <button class="tb-manual-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium" data-email="${escapeHtml(t.email)}" data-name="${escapeHtml(t.name)}">
+                                <i class="fas fa-edit mr-1"></i>Manual Adjust
+                            </button>
+                        ` : ''}
+                        ${showViewBtn ? `
                             <button class="tb-view-btn bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs font-medium" data-email="${escapeHtml(t.email)}">
                                 <i class="fas fa-eye mr-1"></i>View
                             </button>
@@ -5437,8 +5486,12 @@ async function applyTenureBonus(tutorEmail) {
         return alert(`Tenure bonus is only effective from March 1, 2026. Current date is before the effective date.`);
     }
 
-    if (!tutor.tenure.isEligible) {
+    if (!tutor.tenure.isOverOneYear) {
         return alert('This tutor has not yet completed 1 full year of employment.');
+    }
+
+    if (!tutor.tenure.qualifiesForBonus) {
+        return alert('This tutor does not qualify. Their 1-year anniversary was before March 1, 2026 (the policy effective date).');
     }
 
     if (tutor.studentCount === 0) {
@@ -5528,7 +5581,7 @@ async function runTenureAutoUpgrade() {
         return alert(`Auto-upgrade is only available from March 1, 2026 onwards.`);
     }
 
-    const eligibleNotUpgraded = tenureBonusTutors.filter(t => t.tenure.isEligible && !t.bonusApplied && t.studentCount > 0);
+    const eligibleNotUpgraded = tenureBonusTutors.filter(t => t.tenure.isOverOneYear && t.tenure.qualifiesForBonus && !t.bonusApplied && t.studentCount > 0);
 
     if (eligibleNotUpgraded.length === 0) {
         return alert('No eligible tutors pending upgrade. All eligible tutors have already been upgraded, or no tutors have completed 1 year yet.');
@@ -12121,7 +12174,7 @@ const navigationGroups = {
         label: "Financial",
         items: [
             { id: "navPayAdvice", label: "Pay Advice", icon: "fas fa-file-invoice-dollar", fn: renderPayAdvicePanel },
-            { id: "navTenureBonus", label: "Tenure Bonus", icon: "fas fa-award", fn: renderTenureBonusPanel, perm: "viewPayAdvice" },
+            { id: "navTenureBonus", label: "Tenure Bonus", icon: "fas fa-award", fn: renderTenureBonusPanel, perm: "viewTenureBonus" },
             { id: "navReferralsAdmin", label: "Referral Management", icon: "fas fa-handshake", fn: renderReferralsAdminPanel, perm: "viewReferralsAdmin" }
         ]
     },
@@ -12304,7 +12357,7 @@ const allNavItems = {
     navDashboard: { fn: renderDashboardPanel, perm: 'viewDashboard', label: 'Dashboard' },
     navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement', label: 'Tutor Directory' },
     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice', label: 'Pay Advice' },
-    navTenureBonus: { fn: renderTenureBonusPanel, perm: 'viewPayAdvice', label: 'Tenure Bonus' },
+    navTenureBonus: { fn: renderTenureBonusPanel, perm: 'viewTenureBonus', label: 'Tenure Bonus' },
     navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports', label: 'Tutor Reports' },
     navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak', label: 'Summer Break' },
     navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'viewPendingApprovals', label: 'Pending Approvals' },
