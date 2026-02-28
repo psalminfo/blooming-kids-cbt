@@ -6121,18 +6121,25 @@ onSnapshot(settingsDocRef, (docSnap) => {
         isBypassApprovalEnabled = data.bypassPendingApproval    ?? false;
         showStudentFees         = data.showStudentFees          ?? false;
         showEditDeleteButtons   = data.showEditDeleteButtons    ?? false;
-        
-        // 🆕 NEW FLAGS – you MUST declare these ONCE at the top of the file
-        //    (see instructions below)
         isTransitionAddEnabled  = data.showTransitionButton     ?? true;
         isPreschoolAddEnabled   = data.preschoolAddTransition   ?? true;
+
+        console.log('✅ Global settings updated:', {
+            isSubmissionEnabled, isTutorAddEnabled, isSummerBreakEnabled,
+            isBypassApprovalEnabled, showStudentFees, showEditDeleteButtons,
+            isTransitionAddEnabled, isPreschoolAddEnabled
+        });
 
         // Re‑render student database if it's currently visible
         const mainContent = document.getElementById('mainContent');
         if (mainContent && mainContent.querySelector('#student-list-view')) {
             renderStudentDatabase(mainContent, window.tutorData);
         }
+    } else {
+        console.warn('⚠️ global_settings document does not exist yet. Using defaults.');
     }
+}, (error) => {
+    console.error('❌ Settings listener error:', error);
 });
 
 /*******************************************************************************
