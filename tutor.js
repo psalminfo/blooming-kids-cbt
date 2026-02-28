@@ -66,6 +66,7 @@ let showStudentFees = false;
 let showEditDeleteButtons = false;
 let isTransitionAddEnabled = true;     
 let isPreschoolAddEnabled = true; 
+let isPlacementTestEnabled = false;    // OFF by default — admin must explicitly enable
 
 // Pay Scheme Configuration
 const PAY_SCHEMES = {
@@ -5030,8 +5031,13 @@ async function renderStudentDatabase(container, tutor) {
                     actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-collection="${escapeHtml(student.collection)}">Delete</button>`;
                 }
 
-                // ── SETTING 5: Placement Test (independent — only gated by grade eligibility and completion status) ──
-                if (isPlacementTestEligible(student.grade) && (student.placementTestStatus || '') !== 'completed') {
+                // ── SETTING 5: Placement Test (independent — gated by global toggle + grade eligibility + completion status) ──
+                // Only students added ON or AFTER Feb 26 2026 are eligible — older students are exempt
+                const PLACEMENT_CUTOFF = new Date('2026-02-26T00:00:00');
+                const studentCreatedAt = student.createdAt?.toDate ? student.createdAt.toDate() : (student.createdAt ? new Date(student.createdAt) : null);
+                const isNewEnoughForPlacement = studentCreatedAt && studentCreatedAt >= PLACEMENT_CUTOFF;
+
+                if (isPlacementTestEnabled && isNewEnoughForPlacement && isPlacementTestEligible(student.grade) && (student.placementTestStatus || '') !== 'completed') {
                     actionsHTML += `<button class="launch-placement-btn bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 text-xs font-semibold"
                         data-student-id="${escapeHtml(student.id)}"
                         data-student-name="${escapeHtml(student.studentName)}"
@@ -6133,6 +6139,7 @@ onSnapshot(settingsDocRef, (docSnap) => {
         showEditDeleteButtons   = data.showEditDeleteButtons    ?? false;
         isTransitionAddEnabled  = data.showTransitionButton     ?? true;
         isPreschoolAddEnabled   = data.preschoolAddTransition   ?? true;
+        isPlacementTestEnabled  = data.isPlacementTestEnabled   ?? false;
 
         console.log('✅ Global settings updated:', {
             isSubmissionEnabled, isTutorAddEnabled, isSummerBreakEnabled,
