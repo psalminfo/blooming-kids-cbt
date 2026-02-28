@@ -1,7 +1,7 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc, setDoc, deleteDoc, orderBy, writeBatch, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
-import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc, setDoc, deleteDoc, orderBy, writeBatch, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
 let activeTutorId = null;
@@ -96,7 +96,10 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewParentFeedback: false, 
             viewEnrollments: false,
             viewInactiveTutors: false,
-            viewArchivedStudents: false
+            viewArchivedStudents: false,
+            viewMasterPortal: false,   // Management Portal tab
+            canQA: false,              // QA Session Observation button
+            canQC: false               // Lesson Plan QC button
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -117,7 +120,10 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewParentFeedback: false, 
             viewEnrollments: false,
             viewInactiveTutors: false,
-            viewArchivedStudents: false
+            viewArchivedStudents: false,
+            viewMasterPortal: false,   // Management Portal tab
+            canQA: false,              // QA Session Observation button
+            canQC: false               // Lesson Plan QC button
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -138,7 +144,10 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewParentFeedback: true, 
             viewEnrollments: true,
             viewInactiveTutors: true,
-            viewArchivedStudents: true
+            viewArchivedStudents: true,
+            viewMasterPortal: true,    // Managers can see the Master View
+            canQA: false,              // Only QA officers rate sessions
+            canQC: false               // Only QC officers rate lesson plans
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -159,7 +168,10 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewParentFeedback: true, 
             viewEnrollments: true,
             viewInactiveTutors: true,
-            viewArchivedStudents: true
+            viewArchivedStudents: true,
+            viewMasterPortal: true,    // Directors can see the Master View
+            canQA: true,               // Directors can do QA ratings
+            canQC: true                // Directors can do QC ratings
         }, 
         actions: { 
             canDownloadReports: true, 
@@ -180,7 +192,10 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewParentFeedback: true, 
             viewEnrollments: true,
             viewInactiveTutors: true,
-            viewArchivedStudents: true
+            viewArchivedStudents: true,
+            viewMasterPortal: true,    // Admins have full access
+            canQA: true,               // Admins can do QA ratings
+            canQC: true                // Admins can do QC ratings
         }, 
         actions: { 
             canDownloadReports: true, 
@@ -1557,12 +1572,9 @@ async function renderTutorManagementPanel(container) {
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Student Fees (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-fees-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-fees-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Edit/Delete (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="edit-delete-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="edit-delete-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Direct Student Add (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Direct Student Add (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Transition Button:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-transition-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-transition-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Preschool-2 Add/Transition:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="preschool-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="preschool-add-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                
-                <!-- NEW TOGGLE: Enable Add Transitioning Button -->
-                <label class="flex items-center col-span-1"><span class="text-gray-700 font-semibold mr-4">Enable Add Transitioning:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="add-transitioning-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="add-transitioning-status-label" class="ml-3 text-sm font-medium"></span></label></label>
             </div>
         </div>
         
@@ -1613,8 +1625,7 @@ function setupTutorManagementListeners() {
                 'showEditDeleteButtons': 'edit-delete', 
                 'bypassPendingApproval': 'bypass-approval',
                 'showTransitionButton': 'show-transition',
-                'preschoolAddTransition': 'preschool-add',
-                'enableAddTransitioning': 'add-transitioning' // NEW: Add this mapping
+                'preschoolAddTransition': 'preschool-add'
             };
 
             for (const key in toggleMap) {
@@ -1640,9 +1651,6 @@ function setupTutorManagementListeners() {
     document.getElementById('bypass-approval-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { bypassPendingApproval: e.target.checked }));
     document.getElementById('show-transition-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { showTransitionButton: e.target.checked }));
     document.getElementById('preschool-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { preschoolAddTransition: e.target.checked }));
-    
-    // NEW: Add listener for add-transitioning toggle
-    document.getElementById('add-transitioning-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { enableAddTransitioning: e.target.checked }));
     
     // UI Interaction Listeners
     document.getElementById('tutor-select').addEventListener('change', e => {
@@ -2543,6 +2551,7 @@ async function openPermissionsModal(staffId) {
                             <label class="flex items-center"><input type="checkbox" id="p-viewEnrollments" class="mr-2" ${permissions.tabs?.viewEnrollments ? 'checked' : ''}> Enrollments</label>
                             <label class="flex items-center"><input type="checkbox" id="p-viewInactiveTutors" class="mr-2" ${permissions.tabs?.viewInactiveTutors ? 'checked' : ''}> Inactive Tutors</label>
                             <label class="flex items-center"><input type="checkbox" id="p-viewArchivedStudents" class="mr-2" ${permissions.tabs?.viewArchivedStudents ? 'checked' : ''}> Archived Students</label>
+                            <label class="flex items-center col-span-2"><input type="checkbox" id="p-viewMasterPortal" class="mr-2" ${permissions.tabs?.viewMasterPortal ? 'checked' : ''}> <span class="font-semibold text-emerald-700">🗂 Management Portal (Master View)</span></label>
                         </div>
                     </div>
                     <div class="border-t pt-4">
@@ -2552,6 +2561,11 @@ async function openPermissionsModal(staffId) {
                         <label class="flex items-center"><input type="checkbox" id="p-canEndSummerBreak" class="mr-2" ${permissions.actions?.canEndSummerBreak ? 'checked' : ''}> Can End Summer Break</label>
                         <label class="flex items-center"><input type="checkbox" id="p-canEditStudents" class="mr-2" ${permissions.actions?.canEditStudents ? 'checked' : ''}> Can Edit Students</label>
                         <label class="flex items-center"><input type="checkbox" id="p-canDeleteStudents" class="mr-2" ${permissions.actions?.canDeleteStudents ? 'checked' : ''}> Can Delete Students</label>
+                        <div class="border-t mt-3 pt-3">
+                            <h4 class="font-semibold mb-2 text-purple-700">🏅 QA / QC Rating Actions:</h4>
+                            <label class="flex items-center"><input type="checkbox" id="p-canQA" class="mr-2" ${permissions.tabs?.canQA ? 'checked' : ''}> <span class="text-purple-700">Can Rate Tutors — QA (Session Observation)</span></label>
+                            <label class="flex items-center mt-1"><input type="checkbox" id="p-canQC" class="mr-2" ${permissions.tabs?.canQC ? 'checked' : ''}> <span class="text-amber-700">Can Rate Tutors — QC (Lesson Plan Review)</span></label>
+                        </div>
                     </div>
                 </div>
                 <div class="flex justify-end space-x-4 mt-6">
@@ -2576,7 +2590,10 @@ async function openPermissionsModal(staffId) {
                 viewParentFeedback: document.getElementById('p-viewParentFeedback').checked,
                 viewEnrollments: document.getElementById('p-viewEnrollments').checked,
                 viewInactiveTutors: document.getElementById('p-viewInactiveTutors').checked,
-                viewArchivedStudents: document.getElementById('p-viewArchivedStudents').checked
+                viewArchivedStudents: document.getElementById('p-viewArchivedStudents').checked,
+                viewMasterPortal: document.getElementById('p-viewMasterPortal').checked,
+                canQA: document.getElementById('p-canQA').checked,
+                canQC: document.getElementById('p-canQC').checked
             },
             actions: { 
                 canDownloadReports: document.getElementById('p-canDownloadReports').checked, 
@@ -2821,7 +2838,6 @@ async function initializeGlobalSettings() {
                 bypassPendingApproval: false,   // Default: require approval
                 showTransitionButton: true,     // Default: show transition button
                 preschoolAddTransition: true,   // Default: allow preschool add/transition
-                enableAddTransitioning: true,   // NEW: Default: enable add transitioning button (true = enabled)
                 lastUpdated: Timestamp.now(),   // Track when created/updated
                 createdAt: Timestamp.now()      // Track creation time
             });
@@ -2832,14 +2848,6 @@ async function initializeGlobalSettings() {
             patchToggleListeners();
         } else {
             console.log("✅ global_settings document already exists");
-            
-            // NEW: Check if enableAddTransitioning field exists, if not, add it with default value
-            if (docSnap.data().enableAddTransitioning === undefined) {
-                await updateDoc(settingsDocRef, { 
-                    enableAddTransitioning: true 
-                });
-                console.log("✅ Added enableAddTransitioning field to existing global_settings document");
-            }
         }
     } catch (error) {
         console.error("⚠️ Error initializing global_settings:", error);
@@ -2878,7 +2886,6 @@ function patchToggleListeners() {
         patchToggle('bypass-approval-toggle', 'bypassPendingApproval');
         patchToggle('show-transition-toggle', 'showTransitionButton');
         patchToggle('preschool-add-toggle', 'preschoolAddTransition');
-        patchToggle('add-transitioning-toggle', 'enableAddTransitioning'); // NEW: Patch the new toggle
         
         console.log("✅ Toggle listeners patched to use setDoc with merge");
     }, 1000); // Wait 1 second for DOM
@@ -2902,3 +2909,4 @@ if (document.readyState === 'loading') {
 // ========================================================
 // END OF SAFE INITIALIZATION SCRIPT
 // ========================================================
+

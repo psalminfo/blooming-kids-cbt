@@ -3,20 +3,270 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Student Test - Blooming Kids House</title>
+    <title>Student Test · Blooming Kids House</title>
     <link rel="icon" href="favicon.ico" />
+    <!-- Tailwind (kept for layout utilities) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
     <link rel="stylesheet" href="style.css" />
     
-    <!-- Firebase for referral system -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(145deg, #e0f2e9 0%, #b8e0d2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            margin: 0;
+        }
+
+        .test-container {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            border-radius: 2.5rem;
+            box-shadow: 0 30px 60px -15px rgba(0, 70, 40, 0.4), 0 0 0 1px rgba(160, 210, 170, 0.4) inset;
+            padding: 2rem 2.5rem;
+            width: 100%;
+            transition: box-shadow 0.3s ease, transform 0.3s ease;
+        }
+        .test-container:hover {
+            box-shadow: 0 35px 70px -15px rgba(0, 90, 50, 0.5);
+        }
+
+        .test-container h1 {
+            font-weight: 700;
+            font-size: 2rem;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #0b4d3a, #1f8a5c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logout-btn {
+            background: rgba(250, 240, 150, 0.9);
+            border: none;
+            color: #1e5a3a;
+            font-weight: 600;
+            padding: 0.6rem 1.4rem;
+            border-radius: 40px;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 8px 20px -8px rgba(150, 130, 30, 0.3);
+            transition: all 0.2s ease;
+            font-size: 0.95rem;
+            border: 1px solid rgba(255, 245, 200, 0.7);
+            cursor: pointer;
+        }
+        .logout-btn:hover {
+            background: #f5e57a;
+            transform: scale(1.02);
+            box-shadow: 0 12px 24px -10px #b89e3c;
+            border-color: #ecd66e;
+        }
+
+        /* Question container – now larger and scrolls smoothly */
+        #question-container {
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+            max-height: 80vh;          /* Increased to show more questions */
+            overflow-y: auto;
+            padding-right: 0.75rem;
+            scroll-behavior: smooth;
+            overscroll-behavior: contain;
+        }
+
+        /* Custom scrollbar for webkit */
+        #question-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        #question-container::-webkit-scrollbar-track {
+            background: rgba(200, 230, 210, 0.5);
+            border-radius: 10px;
+        }
+        #question-container::-webkit-scrollbar-thumb {
+            background: #2e8b57;
+            border-radius: 10px;
+        }
+        #question-container::-webkit-scrollbar-thumb:hover {
+            background: #1e6b3f;
+        }
+
+        /* Question cards */
+        #question-container > div {
+            background: white;
+            border-radius: 2rem;
+            padding: 1.8rem 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 10px 30px rgba(70, 120, 90, 0.1), 0 2px 5px rgba(0,0,0,0.02);
+            border: 1px solid rgba(150, 200, 160, 0.4);
+            transition: transform 0.2s ease, box-shadow 0.3s ease;
+            animation: fadeInUp 0.4s ease-out;
+        }
+        #question-container > div:hover {
+            box-shadow: 0 20px 40px -8px rgba(50, 120, 80, 0.25);
+            transform: translateY(-3px);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        #question-container > div p:first-child {
+            font-weight: 600;
+            font-size: 1.3rem;
+            color: #1a4731;
+            margin-bottom: 1.2rem;
+            border-left: 5px solid #5fa06d;
+            padding-left: 1rem;
+        }
+
+        #question-container label {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin: 0.8rem 0;
+            padding: 0.6rem 1.2rem;
+            border-radius: 60px;
+            background: #f4fcf7;
+            border: 1.5px solid #c8e6d0;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+            font-size: 1.1rem;
+            color: #1d3b2c;
+        }
+        #question-container label:hover {
+            background: #e3f3e8;
+            border-color: #7fba8f;
+            box-shadow: 0 4px 12px rgba(80, 140, 100, 0.15);
+        }
+
+        #question-container input[type="radio"],
+        #question-container input[type="checkbox"] {
+            width: 1.4rem;
+            height: 1.4rem;
+            accent-color: #2e8b57;
+            margin-right: 0.25rem;
+            flex-shrink: 0;
+        }
+
+        #question-container textarea {
+            width: 100%;
+            padding: 1rem 1.3rem;
+            border: 1.5px solid #c5e0c2;
+            border-radius: 30px;
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            resize: vertical;
+            background: white;
+            transition: border 0.2s, box-shadow 0.2s;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.02);
+        }
+        #question-container textarea:focus {
+            border-color: #2e8b57;
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(70, 160, 100, 0.2), inset 0 1px 3px #eee;
+        }
+
+        #question-container p:only-child {
+            text-align: center;
+            font-size: 1.4rem;
+            font-weight: 400;
+            color: #2a6b47;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 2.5rem;
+            border-radius: 3rem;
+            backdrop-filter: blur(10px);
+            border: 1px dashed #9ec299;
+            letter-spacing: 0.3px;
+        }
+
+        #question-container p:only-child::after {
+            content: '...';
+            display: inline-block;
+            animation: dots 1.5s steps(4, end) infinite;
+            width: 2rem;
+            margin-left: 0.2rem;
+        }
+        @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+
+        #submit-test-btn {
+            background: linear-gradient(115deg, #1e6b44, #359f6b);
+            border: none;
+            color: white;
+            font-weight: 700;
+            font-size: 1.4rem;
+            padding: 1rem 3.5rem;
+            border-radius: 60px;
+            box-shadow: 0 20px 30px -12px #1a5f3a, 0 0 0 1px rgba(255, 255, 255, 0.4) inset;
+            transition: all 0.25s ease;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            width: auto;
+            min-width: 280px;
+            animation: subtlePulse 2s infinite;
+        }
+        #submit-test-btn:hover {
+            background: linear-gradient(115deg, #1f8a55, #3bb573);
+            transform: scale(1.03);
+            box-shadow: 0 25px 40px -12px #0f4f2a, 0 0 0 2px rgba(255, 255, 240, 0.6) inset;
+            animation: none;
+        }
+        #submit-test-btn:disabled {
+            opacity: 0.6;
+            transform: scale(0.98);
+            box-shadow: none;
+            background: #97bb9f;
+            cursor: not-allowed;
+            animation: none;
+        }
+
+        @keyframes subtlePulse {
+            0% { box-shadow: 0 20px 30px -12px #1a5f3a; }
+            50% { box-shadow: 0 20px 40px -8px #2e8b57; }
+            100% { box-shadow: 0 20px 30px -12px #1a5f3a; }
+        }
+
+        #submit-button-container {
+            margin: 2.8rem 0 0.8rem;
+        }
+
+        @media (max-width: 500px) {
+            .test-container { padding: 1.5rem; }
+            #submit-test-btn { font-size: 1.2rem; padding: 0.9rem 2rem; min-width: 200px; }
+            #question-container > div { padding: 1.5rem; }
+            #question-container p:only-child { font-size: 1.2rem; }
+        }
+    </style>
+    
+    <!-- Firebase -->
+    <!-- Firebase modular SDK is now used via firebaseConfig.js imports -->
 </head>
-<body class="bg-green-50 min-h-screen">
-    <div class="max-w-4xl mx-auto p-6">
+<body>
+    <div class="test-container max-w-4xl mx-auto p-6">
         <div class="flex justify-between items-center mb-4">
             <h1 class="text-xl font-bold text-green-800">Blooming Kids House Test</h1>
-            <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
+            <button onclick="logout()" class="logout-btn bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
         </div>
 
         <div id="question-container" class="space-y-4">
@@ -31,31 +281,39 @@
     </div>
 
     <script type="module">
-        // --- START: FIREBASE INITIALIZATION ---
-        if (typeof firebase !== 'undefined' && !firebase.apps.length) {
-            firebase.initializeApp({
-                apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
-                authDomain: "bloomingkidsassessment.firebaseapp.com",
-                projectId: "bloomingkidsassessment",
-                storageBucket: "bloomingkidsassessment.appspot.com",
-                messagingSenderId: "238975054977",
-                appId: "1:238975054977:web:87c70b4db044998a204980"
+        // --- MODULE IMPORTS MUST BE FIRST IN A MODULE SCRIPT ---
+        import { loadQuestions, clearTestSession } from './autoQuestionGen.js';
+        import { submitTestToFirebase } from './submitAnswers.js';
+        import { db as firestoreDb } from './firebaseConfig.js';
+        import { collection, query, where, limit, getDocs, addDoc, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        const REFERRAL_REWARD_AMOUNT = 5000;
+
+        // --- HELPER: Escape HTML (prevent XSS) ---
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return unsafe
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // --- KEYBOARD HANDLER: arrow keys scroll normally unless focused on a radio/checkbox ---
+        function setupKeyboardHandler() {
+            document.addEventListener('keydown', (e) => {
+                const active = document.activeElement;
+                // If a radio or checkbox is focused and arrow key pressed, prevent page scroll
+                if (active && (active.type === 'radio' || active.type === 'checkbox') && 
+                    (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+                    e.preventDefault();  // stops scrolling, allows radio change
+                }
+                // Otherwise, arrow keys will scroll the page naturally
             });
         }
-        const db = firebase.firestore();
-        const REFERRAL_REWARD_AMOUNT = 5000;
-        // --- END: FIREBASE INITIALIZATION ---
 
-        // --- START: MODULE IMPORTS (KEEP submitAnswers.js) ---
-        import { loadQuestions, getAnswerData, getAllLoadedQuestions, clearTestSession } from './autoQuestionGen.js';
-        import { submitTestToFirebase } from './submitAnswers.js';
-        // --- END: MODULE IMPORTS ---
-
-        // --- START: NEW REFERRAL & STUDENT REGISTRATION LOGIC ---
-        
-        /**
-         * Validates referral code and logs a pending transaction.
-         */
+        // --- REFERRAL LOGIC ---
         async function handleReferralLogic(code, studentName, studentUid) {
             const cleanCode = code.trim().toUpperCase();
             if (!cleanCode || cleanCode.length < 9) {
@@ -64,11 +322,11 @@
             }
 
             try {
-                // 1. Find the parent who owns this referral code
-                const parentQuery = await db.collection('parent_users')
-                    .where('referralCode', '==', cleanCode)
-                    .limit(1)
-                    .get();
+                const parentQuery = await getDocs(query(
+                    collection(firestoreDb, 'parent_users'),
+                    where('referralCode', '==', cleanCode),
+                    limit(1)
+                ));
 
                 if (parentQuery.empty) {
                     console.warn(`Referral Code ${cleanCode} is invalid or expired. Skipping logging.`);
@@ -78,74 +336,58 @@
                 const parentDoc = parentQuery.docs[0];
                 const referringParentUid = parentDoc.id;
 
-                // 2. Log the Pending Transaction
-                await db.collection('referral_transactions').add({
+                await addDoc(collection(firestoreDb, 'referral_transactions'), {
                     referringParentUid: referringParentUid,
                     referredStudentUid: studentUid,
                     referredStudentName: studentName,
                     referralCode: cleanCode,
                     rewardAmount: REFERRAL_REWARD_AMOUNT,
                     status: 'pending',
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    timestamp: serverTimestamp(),
                     ownerUid: referringParentUid
                 });
 
                 console.log(`Referral transaction logged successfully for Parent UID: ${referringParentUid}`);
-                
             } catch (error) {
                 console.error("Error during referral logic execution:", error);
             }
         }
 
-        /**
-         * Creates permanent student record in Firebase (NEW ADDITION)
-         */
-        async function createPermanentStudentRecord(studentName, parentEmail, parentPhone, tutorEmail, grade, country, referralCode) {
+        // --- GET STUDENT UID FROM LOCALSTORAGE ---
+        // The tutor dashboard already stores studentUid in localStorage when
+        // launching the placement test. We use that directly — no unauthenticated
+        // Firestore reads needed, which avoids permission errors.
+        function getStudentUidFromStorage() {
             try {
-                const studentData = {
-                    studentName: studentName,
-                    parentEmail: parentEmail,
-                    parentPhone: parentPhone,
-                    tutorEmail: tutorEmail,
-                    grade: grade,
-                    country: country,
-                    referralCodeUsed: referralCode.toUpperCase(),
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    lastActive: firebase.firestore.FieldValue.serverTimestamp()
-                };
-                
-                // Create permanent student record
-                const studentRef = await db.collection('students').add(studentData);
-                const studentUid = studentRef.id;
-                
-                console.log("Permanent student record created with ID:", studentUid);
-                return studentUid;
-                
-            } catch (error) {
-                console.error("Error creating student record:", error);
-                throw error;
+                const stored = JSON.parse(localStorage.getItem('studentData') || '{}');
+                return stored.studentUid || localStorage.getItem('studentUid') || null;
+            } catch (e) {
+                return localStorage.getItem('studentUid') || null;
             }
         }
-        // --- END: NEW REFERRAL & STUDENT REGISTRATION LOGIC ---
 
-        document.addEventListener('DOMContentLoaded', async () => {
+        // --- MAIN ---
+        async function initStudentTest() {
             const urlParams = new URLSearchParams(window.location.search);
+            
             const subject = urlParams.get('subject');
             const grade = urlParams.get('grade');
             const studentName = urlParams.get('studentName');
             const parentEmail = urlParams.get('parentEmail');
             const tutorEmail = urlParams.get('tutorEmail');
-            const studentCountry = urlParams.get('country');
-            const referralCode = urlParams.get('referralCode') || '';
+            // Country is now optional – if missing, it will be undefined (handled as empty string)
+            const studentCountry = urlParams.get('country') || '';
+            // Referral codes now come from parent enrollment, not URL params.
+            // We look up the parent's referral code from their Firestore document.
             const state = urlParams.get('state') || (subject === 'ela' ? 'creative-writing' : 'mcq');
 
-            if (!subject || !grade || !studentName || !parentEmail || !tutorEmail || !studentCountry) {
-                alert("Missing student info. Redirecting...");
-                window.location.href = "index.html";
+            // Only require essential fields (country is optional)
+            if (!subject || !grade || !studentName || !parentEmail || !tutorEmail) {
+                alert("Missing essential student information. Redirecting to login.");
+                window.location.href = "tutor.html";  // Redirect to tutor dashboard
                 return;
             }
 
-            // Get parentPhone from localStorage (from the login form)
             let parentPhone = '';
             try {
                 const studentData = JSON.parse(localStorage.getItem("studentData") || '{}');
@@ -154,20 +396,46 @@
                 console.log("Could not retrieve parentPhone from localStorage");
             }
 
+            if (!parentPhone) {
+                // parentPhone is optional — log warning but allow test to continue
+                console.warn("parentPhone not found in localStorage — continuing without it.");
+            }
+
+            // Referral code: optional. Check URL param first (legacy links), then look up
+            // from parent's Firestore record. Always defaults to '' — never blocks the test.
+            let referralCode = urlParams.get('referralCode') || '';
+
             try {
-                // STEP 1: Create permanent student record FIRST
-                const studentUid = await createPermanentStudentRecord(
-                    studentName, parentEmail, parentPhone, tutorEmail, grade, studentCountry, referralCode
-                );
+                // Use studentUid already stored in localStorage by tutor dashboard
+                const studentUid = getStudentUidFromStorage();
+                if (!studentUid) {
+                    console.warn("studentUid not found in localStorage — test will still load but status tracking may be limited.");
+                } else {
+                    console.log("Using studentUid from localStorage:", studentUid);
+                }
 
-                // Store studentUid for submitAnswers.js to use
-                const existingData = JSON.parse(localStorage.getItem("studentData") || '{}');
-                existingData.studentUid = studentUid;
-                localStorage.setItem("studentData", JSON.stringify(existingData));
+                // Look up parent's referral code from their enrollment record (best-effort, non-blocking)
+                try {
+                    const parentSnap = await getDocs(query(
+                        collection(firestoreDb, 'parent_users'),
+                        where('email', '==', parentEmail),
+                        limit(1)
+                    ));
+                    if (!parentSnap.empty) {
+                        // Only override if we don't already have one from the URL
+                        referralCode = referralCode || parentSnap.docs[0].data().referralCode || '';
+                        if (referralCode) console.log("Referral code resolved:", referralCode);
+                    }
+                } catch (refErr) {
+                    // Non-blocking — referral lookup is best-effort
+                    console.warn("Could not look up parent referral code:", refErr.message);
+                }
 
-                // STEP 2: Load questions using existing system
                 await loadQuestions(subject, grade, state);
                 document.getElementById("submit-button-container").style.display = 'flex';
+                
+                // Initialize keyboard handler after questions are loaded
+                setupKeyboardHandler();
 
             } catch (error) {
                 console.error("Error during setup:", error);
@@ -175,7 +443,6 @@
                     `<p class="text-red-600">Error loading test. Please try again.</p>`;
             }
 
-            // Setup submit button - USING ORIGINAL submitAnswers.js SYSTEM
             const submitBtn = document.getElementById("submit-test-btn");
             if (submitBtn) {
                 submitBtn.addEventListener('click', async () => {
@@ -183,27 +450,44 @@
                     submitBtn.textContent = 'Submitting...';
 
                     try {
-                        // STEP 3: Use ORIGINAL submitAnswers.js for test answers
                         await submitTestToFirebase(
                             subject, grade, studentName, parentEmail, 
                             tutorEmail, studentCountry, parentPhone
                         );
                         
-                        // STEP 4: Handle referral logic after successful submission
-                        if (referralCode) {
+                        if (referralCode && referralCode.trim()) {
                             try {
-                                const studentData = JSON.parse(localStorage.getItem("studentData") || '{}');
-                                const studentUid = studentData.studentUid;
+                                const studentUid = getStudentUidFromStorage();
                                 await handleReferralLogic(referralCode, studentName, studentUid);
                             } catch (referralError) {
                                 console.error("Referral logic failed (non-critical):", referralError);
                             }
                         }
+
+                        // ── PLACEMENT TEST STATUS: write back to Firestore so the tutor
+                        //    dashboard can show "✅ Test Completed" and clear after 1 hour ──
+                        try {
+                            const studentUid = getStudentUidFromStorage();
+                            if (studentUid) {
+                                await updateDoc(doc(firestoreDb, 'students', studentUid), {
+                                    placementTestStatus:      'completed',
+                                    placementTestCompletedAt: serverTimestamp(),
+                                    placementTestSubject:     subject
+                                });
+                                // Notify tutor dashboard tab to remove the button immediately
+                                try {
+                                    const bc = new BroadcastChannel('bkh_placement_complete');
+                                    bc.postMessage({ type: 'PLACEMENT_COMPLETED', studentUid });
+                                    bc.close();
+                                } catch (_) {}
+                                console.log("Placement test status written to Firestore for:", studentUid);
+                            }
+                        } catch (statusError) {
+                            console.error("Could not update placement test status (non-critical):", statusError);
+                        }
                         
-                        // Clear test session but keep student data
                         clearTestSession(false);
                         
-                        // Show success and redirect
                         document.getElementById("question-container").innerHTML = 
                             `<div class="text-center p-6 text-green-700 font-semibold text-xl">✅ Test Submitted Successfully! Redirecting...</div>`;
                         
@@ -216,11 +500,21 @@
                     }
                 });
             }
-        });
+        }  // end initStudentTest
 
+        // Run immediately if DOM ready (module scripts load after DOMContentLoaded)
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initStudentTest);
+        } else {
+            initStudentTest();
+        }
+
+        // --- FIXED LOGOUT: Always go to tutor.html, even if clearTestSession tries to redirect elsewhere ---
         window.logout = () => {
             clearTestSession(true);
-            window.location.href = 'index.html';
+            setTimeout(() => {
+                window.location.href = 'tutor.html';
+            }, 50);
         };
     </script>
 </body>

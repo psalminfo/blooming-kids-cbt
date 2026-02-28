@@ -3,43 +3,688 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Management Access - Blooming Kids House</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-</head>
-<body class="bg-gray-100 flex items-center justify-center h-screen">
-    <div class="w-full max-w-md">
-        <div class="bg-white shadow-md rounded-lg p-8">
-            <h1 class="text-2xl font-bold text-green-700 text-center mb-6">Management Portal Access</h1>
-            
-            <!-- Sign Up Form -->
-            <form id="signup-form">
-                <div id="signup-container">
-                    <h2 class="text-xl font-semibold mb-4">Create Account</h2>
-                    <input type="text" id="signup-name" placeholder="Full Name" class="w-full p-2 mb-4 border rounded" required>
-                    <input type="email" id="signup-email" placeholder="Email Address" class="w-full p-2 mb-4 border rounded" required>
-                    <input type="password" id="signup-password" placeholder="Password" class="w-full p-2 mb-4 border rounded" required>
-                    <button type="submit" id="signup-btn" class="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700">Sign Up</button>
-                    <p class="text-center mt-4 text-sm">Already have an account? <a href="#" id="show-signin" class="text-blue-600 hover:underline">Sign In</a></p>
-                </div>
-            </form>
+    <title>Management Portal — Blooming Kids House</title>
+    
+    <!-- Google Analytics (kept from tutor) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-NBTVEGH1SL"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-NBTVEGH1SL');
+    </script>
 
-            <!-- Sign In Form -->
-            <form id="signin-form">
-                <div id="signin-container" style="display: none;">
-                    <h2 class="text-xl font-semibold mb-4">Sign In</h2>
-                    <input type="email" id="signin-email" placeholder="Email Address" class="w-full p-2 mb-4 border rounded" required>
-                    <input type="password" id="signin-password" placeholder="Password" class="w-full p-2 mb-4 border rounded" required>
-                    <div class="text-right mb-4">
-                        <a href="#" id="forgot-password-link" class="text-sm text-blue-600 hover:underline">Forgot Password?</a>
-                    </div>
-                    <button type="submit" id="signin-btn" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Sign In</button>
-                    <p class="text-center mt-4 text-sm">Don't have an account? <a href="#" id="show-signup" class="text-blue-600 hover:underline">Sign Up</a></p>
-                </div>
-            </form>
-            
-            <p id="error-message" class="text-center mt-4"></p>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        /* ------------------------------------------------------------
+            EXACT same design system as tutor-auth.html (world‑class)
+        ------------------------------------------------------------ */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --sage: #4a7c59;
+            --sage-dark: #2f5240;
+            --sage-light: #e8f0ea;
+            --gold: #c9a84c;
+            --gold-light: #f5e8c8;
+            --cream: #faf8f4;
+            --ink: #1a1f1c;
+            --muted: #6b7873;
+            --border: #dde5de;
+            --white: #ffffff;
+            --error: #b94040;
+            --error-bg: #fdf0f0;
+            --success: #3a7a52;
+            --success-bg: #edf7f1;
+        }
+
+        html, body {
+            min-height: 100vh;
+            font-family: 'DM Sans', sans-serif;
+            background: var(--cream);
+            color: var(--ink);
+        }
+
+        /* Decorative background */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: 
+                radial-gradient(ellipse 80% 60% at 10% 20%, rgba(74,124,89,0.07) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 80% at 90% 80%, rgba(201,168,76,0.06) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(74,124,89,0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(74,124,89,0.04) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .page-wrapper {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        /* LEFT PANEL */
+        .brand-panel {
+            background: linear-gradient(160deg, var(--sage-dark) 0%, var(--sage) 60%, #5d9970 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 60px 48px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .brand-panel::before {
+            content: '';
+            position: absolute;
+            width: 500px; height: 500px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.08);
+            top: -150px; right: -150px;
+        }
+        .brand-panel::after {
+            content: '';
+            position: absolute;
+            width: 350px; height: 350px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.06);
+            bottom: -100px; left: -100px;
+        }
+
+        .brand-inner { position: relative; z-index: 1; text-align: center; }
+
+        .brand-logo {
+            width: 140px;
+            margin-bottom: 40px;
+            filter: brightness(0) invert(1);
+            opacity: 0.95;
+        }
+
+        .brand-tagline {
+            font-family: 'DM Serif Display', serif;
+            font-size: 2.6rem;
+            line-height: 1.15;
+            color: #fff;
+            margin-bottom: 20px;
+            letter-spacing: -0.5px;
+        }
+
+        .brand-tagline em {
+            font-style: italic;
+            color: var(--gold-light);
+        }
+
+        .brand-sub {
+            color: rgba(255,255,255,0.65);
+            font-size: 0.95rem;
+            font-weight: 300;
+            line-height: 1.6;
+            max-width: 280px;
+            margin: 0 auto 48px;
+        }
+
+        .brand-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .brand-pill {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.85);
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 6px 14px;
+            border-radius: 99px;
+            letter-spacing: 0.3px;
+            backdrop-filter: blur(4px);
+        }
+
+        /* Decorative dots */
+        .dots {
+            position: absolute;
+            bottom: 48px;
+            right: 48px;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            opacity: 0.25;
+        }
+        .dot {
+            width: 4px; height: 4px;
+            border-radius: 50%;
+            background: white;
+        }
+
+        /* RIGHT PANEL */
+        .form-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 60px 48px;
+            background: var(--white);
+        }
+
+        .form-container { width: 100%; max-width: 400px; }
+
+        /* Section header */
+        .section-header { margin-bottom: 36px; }
+        .section-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--gold);
+            margin-bottom: 10px;
+        }
+        .section-title {
+            font-family: 'DM Serif Display', serif;
+            font-size: 2rem;
+            color: var(--ink);
+            line-height: 1.2;
+        }
+        .section-title span { color: var(--sage); }
+
+        /* Message box (adapted for #error-message) */
+        .msg-box {
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+            display: none;  /* hidden by default */
+            align-items: flex-start;
+            gap: 10px;
+            line-height: 1.5;
+            border: 1px solid transparent;
+        }
+        .msg-box.error { background: var(--error-bg); color: var(--error); border-color: #f0c8c8; display: flex; }
+        .msg-box.success { background: var(--success-bg); color: var(--success); border-color: #bde0cc; display: flex; }
+        .msg-box.info { background: var(--sage-light); color: var(--sage-dark); border-color: var(--border); display: flex; }
+
+        /* Form elements */
+        .form-group {
+            position: relative;
+            margin-bottom: 18px;
+        }
+        .form-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--muted);
+            margin-bottom: 7px;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+        .input-wrap { position: relative; }
+        .input-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--muted);
+            pointer-events: none;
+            opacity: 0.5;
+        }
+        .form-input {
+            width: 100%;
+            padding: 13px 14px 13px 42px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.9rem;
+            color: var(--ink);
+            background: var(--cream);
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            outline: none;
+            transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+        }
+        .form-input:focus {
+            border-color: var(--sage);
+            background: var(--white);
+            box-shadow: 0 0 0 4px rgba(74,124,89,0.08);
+        }
+        .form-input::placeholder { color: #b0bab4; }
+
+        /* Password toggle */
+        .pw-toggle {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: var(--muted);
+            opacity: 0.5;
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 1rem;
+            transition: opacity 0.2s;
+        }
+        .pw-toggle:hover { opacity: 0.9; }
+
+        /* Remember me (custom checkbox) */
+        .remember-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 22px;
+        }
+        .remember-row input[type="checkbox"] { display: none; }
+        .custom-checkbox {
+            width: 18px; height: 18px;
+            border: 2px solid var(--border);
+            border-radius: 5px;
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .custom-checkbox.checked {
+            background: var(--sage);
+            border-color: var(--sage);
+        }
+        .custom-checkbox svg { display: none; }
+        .custom-checkbox.checked svg { display: block; }
+        .remember-label {
+            font-size: 0.83rem;
+            color: var(--muted);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        /* Strength bar (for signup) */
+        .strength-bar-wrap {
+            margin-top: 8px;
+            display: none;
+        }
+        .strength-bar-track {
+            height: 3px;
+            background: var(--border);
+            border-radius: 99px;
+            overflow: hidden;
+        }
+        .strength-bar-fill {
+            height: 100%;
+            border-radius: 99px;
+            transition: width 0.4s, background 0.4s;
+            width: 0%;
+        }
+        .strength-text {
+            font-size: 0.7rem;
+            margin-top: 5px;
+            color: var(--muted);
+        }
+
+        /* Buttons */
+        .btn-primary {
+            width: 100%;
+            padding: 14px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: white;
+            background: linear-gradient(135deg, var(--sage) 0%, var(--sage-dark) 100%);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+            letter-spacing: 0.3px;
+        }
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 60%);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(47,82,64,0.3); }
+        .btn-primary:hover::before { opacity: 1; }
+        .btn-primary:active { transform: translateY(0); }
+
+        .btn-primary.loading {
+            pointer-events: none;
+        }
+        .btn-primary.loading .btn-text { opacity: 0; }
+        .btn-primary.loading .btn-spinner { display: block; }
+        .btn-spinner {
+            display: none;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px; height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+
+        /* Links */
+        .form-footer {
+            margin-top: 22px;
+            text-align: center;
+        }
+        .form-footer p {
+            font-size: 0.82rem;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+        .text-link {
+            color: var(--sage);
+            font-weight: 500;
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        .text-link:hover { border-color: var(--sage); }
+        .text-link.gold { color: var(--gold); }
+        .text-link.gold:hover { border-color: var(--gold); }
+
+        /* Containers toggle (signup / signin) */
+        .auth-container {
+            animation: fadeIn 0.35s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Security badge */
+        .security-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-size: 0.72rem;
+            color: var(--muted);
+            margin-top: 28px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .page-wrapper { grid-template-columns: 1fr; }
+            .brand-panel {
+                padding: 40px 24px;
+                min-height: 220px;
+            }
+            .brand-tagline { font-size: 1.8rem; }
+            .brand-logo { width: 100px; margin-bottom: 20px; }
+            .brand-pills { display: none; }
+            .dots { display: none; }
+            .form-panel { padding: 40px 24px; }
+        }
+    </style>
+</head>
+<body>
+<div class="page-wrapper">
+
+    <!-- LEFT: Brand Panel (management flavour) -->
+    <div class="brand-panel">
+        <div class="brand-inner">
+            <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="brand-logo">
+            <h1 class="brand-tagline"><em>Lead</em> with insight</h1>
+            <p class="brand-sub">Management portal for scheduling, reporting & team coordination.</p>
+            <div class="brand-pills">
+                <span class="brand-pill">📊 Analytics</span>
+                <span class="brand-pill">👥 Staff</span>
+                <span class="brand-pill">🔒 Secure</span>
+                <span class="brand-pill">📈 Reports</span>
+            </div>
+        </div>
+        <!-- Decorative dot grid -->
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
         </div>
     </div>
-    <script type="module" src="management-auth.js"></script>
+
+    <!-- RIGHT: Form Panel (management auth) -->
+    <div class="form-panel">
+        <div class="form-container">
+
+            <!-- Message box (ID preserved for management-auth.js) -->
+            <div id="error-message" class="msg-box error" role="alert" style="display: none;">
+                <!-- JS will fill text, we keep structure simple: just text -->
+            </div>
+
+            <!-- SIGNUP CONTAINER (initially visible) -->
+            <div id="signup-container" class="auth-container">
+                <div class="section-header">
+                    <p class="section-label">New here?</p>
+                    <h2 class="section-title">Create your <span>account</span></h2>
+                </div>
+
+                <form id="signup-form" novalidate>
+                    <div class="form-group">
+                        <label class="form-label" for="signup-name">Full Name</label>
+                        <div class="input-wrap">
+                            <span class="input-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            </span>
+                            <input type="text" id="signup-name" class="form-input" placeholder="e.g. Sarah Mensah" required autocomplete="name">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="signup-email">Email Address</label>
+                        <div class="input-wrap">
+                            <span class="input-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                            </span>
+                            <input type="email" id="signup-email" class="form-input" placeholder="you@example.com" required autocomplete="email">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="signup-password">Password</label>
+                        <div class="input-wrap">
+                            <span class="input-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            </span>
+                            <input type="password" id="signup-password" class="form-input" placeholder="Min 6 chars + a number" required autocomplete="new-password">
+                            <button type="button" class="pw-toggle" id="toggleSignupPw" aria-label="Toggle password">
+                                <svg id="eyeSignupOpen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                <svg id="eyeSignupClosed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" x2="23" y1="1" y2="23"/></svg>
+                            </button>
+                        </div>
+                        <!-- strength bar (enhancement) -->
+                        <div class="strength-bar-wrap" id="strengthWrap">
+                            <div class="strength-bar-track">
+                                <div class="strength-bar-fill" id="strengthFill"></div>
+                            </div>
+                            <p class="strength-text" id="strengthText"></p>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary" id="signup-btn">
+                        <span class="btn-text">Create Account</span>
+                        <span class="btn-spinner"></span>
+                    </button>
+                </form>
+
+                <div class="form-footer">
+                    <p>Already have an account? <a href="#" id="show-signin" class="text-link">Log in here</a></p>
+                </div>
+            </div>
+
+            <!-- SIGNIN CONTAINER (initially hidden) -->
+            <div id="signin-container" class="auth-container" style="display: none;">
+                <div class="section-header">
+                    <p class="section-label">Welcome back</p>
+                    <h2 class="section-title">Sign in to <span>management</span></h2>
+                </div>
+
+                <form id="signin-form" novalidate>
+                    <div class="form-group">
+                        <label class="form-label" for="signin-email">Email Address</label>
+                        <div class="input-wrap">
+                            <span class="input-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                            </span>
+                            <input type="email" id="signin-email" class="form-input" placeholder="you@example.com" required autocomplete="email">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="signin-password">Password</label>
+                        <div class="input-wrap">
+                            <span class="input-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            </span>
+                            <input type="password" id="signin-password" class="form-input" placeholder="Your password" required autocomplete="current-password">
+                            <button type="button" class="pw-toggle" id="toggleLoginPw" aria-label="Toggle password">
+                                <svg id="eyeLoginOpen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                <svg id="eyeLoginClosed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" x2="23" y1="1" y2="23"/></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Remember me (extra, but harmless) -->
+                    <div class="remember-row">
+                        <input type="checkbox" id="rememberMe">
+                        <div class="custom-checkbox" id="checkboxDisplay" role="checkbox" aria-checked="false" tabindex="0">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                        </div>
+                        <label class="remember-label" for="rememberMe">Remember me for 30 days</label>
+                    </div>
+
+                    <button type="submit" class="btn-primary" id="signin-btn">
+                        <span class="btn-text">Sign In</span>
+                        <span class="btn-spinner"></span>
+                    </button>
+                </form>
+
+                <div class="form-footer">
+                    <p><a href="#" id="forgot-password-link" class="text-link gold">Forgot your password?</a></p>
+                    <p>Don't have an account? <a href="#" id="show-signup" class="text-link">Sign up free</a></p>
+                </div>
+            </div>
+
+            <!-- Security badge (same as tutor) -->
+            <div class="security-badge">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                Your data is safe with us · Encrypted and secure
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Original management-auth.js (kept exactly) -->
+<script type="module" src="management-auth.js"></script>
+
+<!-- Additional UI enhancements: password toggle, strength, custom checkbox (non‑intrusive) -->
+<script>
+    (function() {
+        // Password visibility toggle
+        function setupPasswordToggle(btnId, openId, closedId, inputId) {
+            const btn = document.getElementById(btnId);
+            if (!btn) return;
+            const openIcon = document.getElementById(openId);
+            const closedIcon = document.getElementById(closedId);
+            const input = document.getElementById(inputId);
+            btn.addEventListener('click', function() {
+                const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+                input.setAttribute('type', type);
+                if (openIcon && closedIcon) {
+                    if (type === 'text') {
+                        openIcon.style.display = 'none';
+                        closedIcon.style.display = 'block';
+                    } else {
+                        openIcon.style.display = 'block';
+                        closedIcon.style.display = 'none';
+                    }
+                }
+            });
+        }
+        setupPasswordToggle('toggleSignupPw', 'eyeSignupOpen', 'eyeSignupClosed', 'signup-password');
+        setupPasswordToggle('toggleLoginPw', 'eyeLoginOpen', 'eyeLoginClosed', 'signin-password');
+
+        // Password strength meter (only for signup)
+        const pwdInput = document.getElementById('signup-password');
+        const strengthWrap = document.getElementById('strengthWrap');
+        const strengthFill = document.getElementById('strengthFill');
+        const strengthText = document.getElementById('strengthText');
+        if (pwdInput && strengthWrap && strengthFill && strengthText) {
+            pwdInput.addEventListener('input', function() {
+                const val = pwdInput.value;
+                if (val.length === 0) {
+                    strengthWrap.style.display = 'none';
+                    return;
+                }
+                strengthWrap.style.display = 'block';
+                let strength = 0;
+                if (val.length >= 6) strength += 1;
+                if (/[0-9]/.test(val)) strength += 1;
+                if (/[^a-zA-Z0-9]/.test(val)) strength += 1;
+                const width = strength === 0 ? 5 : strength === 1 ? 30 : strength === 2 ? 60 : 100;
+                strengthFill.style.width = width + '%';
+                if (width <= 30) {
+                    strengthFill.style.background = '#b94040';
+                    strengthText.innerText = 'Weak — use at least 6 characters and a number';
+                } else if (width <= 60) {
+                    strengthFill.style.background = '#e68a2e';
+                    strengthText.innerText = 'Medium — add a special character for strong';
+                } else {
+                    strengthFill.style.background = '#3a7a52';
+                    strengthText.innerText = 'Strong password';
+                }
+            });
+        }
+
+        // Custom checkbox for "Remember me"
+        const rememberCheck = document.getElementById('rememberMe');
+        const customBox = document.getElementById('checkboxDisplay');
+        if (rememberCheck && customBox) {
+            customBox.addEventListener('click', function() {
+                rememberCheck.checked = !rememberCheck.checked;
+                if (rememberCheck.checked) {
+                    customBox.classList.add('checked');
+                    customBox.setAttribute('aria-checked', 'true');
+                } else {
+                    customBox.classList.remove('checked');
+                    customBox.setAttribute('aria-checked', 'false');
+                }
+            });
+            // init
+            if (rememberCheck.checked) customBox.classList.add('checked');
+        }
+
+        // Ensure the original management-auth.js can still control visibility of containers.
+        // The IDs #signup-container and #signin-container are used by management-auth.js to toggle.
+        // We also keep #show-signup and #show-signin links.
+        // (no interference)
+    })();
+</script>
 </body>
 </html>

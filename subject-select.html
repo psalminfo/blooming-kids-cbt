@@ -5,176 +5,146 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Select Subject - Blooming Kids House</title>
   <link rel="icon" href="favicon.ico" />
-  <!-- Google Font for a modern, friendly look -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
-  <!-- Tailwind (latest) for a solid base -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Custom modern styles -->
-  <style>
-    * {
-      font-family: 'Poppins', sans-serif;
-    }
-    body {
-      background: linear-gradient(145deg, #e0f7e8 0%, #c8e6d9 100%);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0;
-      padding: 1rem;
-      /* soft cloud pattern */
-      background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="30" r="18" fill="white" opacity="0.2"/><circle cx="70" cy="20" r="25" fill="white" opacity="0.15"/><circle cx="40" cy="80" r="22" fill="white" opacity="0.1"/><circle cx="85" cy="70" r="20" fill="white" opacity="0.1"/></svg>');
-      background-size: 200px 200px;
-    }
-    .glass-card {
-      background: rgba(255, 255, 255, 0.9);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border-radius: 2.5rem;
-      box-shadow: 0 20px 40px -10px rgba(0, 80, 50, 0.25), 0 8px 20px rgba(0,0,0,0.1);
-      border: 1px solid rgba(255,255,255,0.5);
-      animation: fadeInUp 0.5s ease-out;
-    }
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .subject-btn {
-      transition: all 0.2s ease;
-      box-shadow: 0 4px 6px -2px rgba(0, 100, 60, 0.2);
-      border: 1px solid rgba(255,255,240,0.6);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.75rem;
-    }
-    .subject-btn:hover {
-      transform: scale(1.02);
-      box-shadow: 0 10px 15px -3px rgba(0, 130, 80, 0.3);
-    }
-    .subject-btn:focus-visible {
-      outline: 3px solid #fbbf24;
-      outline-offset: 2px;
-    }
-    .logout-btn {
-      background: #fbbf24;
-      color: #1e3a2f;
-      font-weight: 600;
-      padding: 0.5rem 1.25rem;
-      border-radius: 9999px;
-      box-shadow: 0 4px 6px -2px rgba(0,0,0,0.1);
-      transition: all 0.15s ease;
-      border: 1px solid #fcd34d;
-    }
-    .logout-btn:hover {
-      background: #f59e0b;
-      transform: translateY(-2px);
-      box-shadow: 0 8px 12px -4px rgba(0,0,0,0.15);
-    }
-    .powered-badge {
-      background: rgba(255,255,255,0.7);
-      backdrop-filter: blur(4px);
-      border-radius: 40px;
-      padding: 0.4rem 1.2rem;
-      display: inline-block;
-      font-size: 0.8rem;
-      color: #2d6a4f;
-      border: 1px solid white;
-      font-weight: 500;
-    }
-    .grade-info {
-      background: #d1fae5;
-      border-radius: 40px;
-      padding: 0.5rem 1.2rem;
-      display: inline-block;
-      margin-top: 1.5rem;
-      font-size: 0.9rem;
-      color: #065f46;
-      font-weight: 500;
-      border: 1px solid #a7f3d0;
-    }
-  </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+  <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body class="bg-green-50 min-h-screen flex items-center justify-center">
 
-  <div class="glass-card w-full max-w-md p-8">
-    <!-- Header with logout -->
-    <div class="flex justify-between items-center mb-8">
-      <h1 class="text-3xl font-bold text-green-800 drop-shadow-sm">
-        📚 Subjects
-      </h1>
-      <button onclick="logout()" class="logout-btn">
-        ✕ Logout
-      </button>
+  <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-bold text-green-800">Select a Subject</h2>
+      <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 text-sm">Logout</button>
     </div>
 
-    <!-- Subject buttons will be injected here -->
-    <div id="subjectButtons" class="space-y-4"></div>
-
-    <!-- Powered by badge -->
-    <div class="text-center mt-10">
-      <span class="powered-badge">
-        POWERED BY <span style="color:#fbbf24; font-weight:700;">POG</span>
-      </span>
-    </div>
+    <div id="subjectButtons" class="space-y-4">
+      </div>
+    <p class="text-xs text-center mt-8 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
   </div>
 
-  <script>
-    // --- YOUR EXISTING SCRIPT (unchanged) ---
+<script>
+    // Global variable to hold student data
     let studentData = null;
 
+    // Subject data array
     const allSubjects = [
-        { id: 'math', name: 'Mathematics', icon: '🧮' },
-        { id: 'ela', name: 'English Language Arts', icon: '📖' },
-        { id: 'science', name: 'Science', icon: '🔬' },
-        { id: 'history', name: 'History', icon: '🏛️' },
-        { id: 'geography', name: 'Geography', icon: '🌍' }
+        { id: 'math', name: 'Mathematics' },
+        { id: 'ela', name: 'English Language Arts' },
+        { id: 'science', name: 'Science' },
+        { id: 'history', name: 'History' },
+        { id: 'geography', name: 'Geography' }
     ];
 
+    // Function to load subjects based on grade
     function loadSubjects(grade) {
       const subjectButtons = document.getElementById('subjectButtons');
-      subjectButtons.innerHTML = '';
+      subjectButtons.innerHTML = ''; // Clear previous buttons
 
+      // Filter subjects based on grade
       let availableSubjects = allSubjects;
       if (grade <= 4) {
         availableSubjects = allSubjects.filter(s => s.id === 'math' || s.id === 'ela');
       } else if (grade >= 5 && grade <= 7) {
         availableSubjects = allSubjects.filter(s => s.id === 'math' || s.id === 'ela' || s.id === 'science');
       }
+      // Grades 8-12 get all subjects
 
       availableSubjects.forEach(subject => {
         const button = document.createElement('button');
-        button.className = 'subject-btn w-full bg-gradient-to-r from-green-400 to-emerald-400 text-white py-4 rounded-2xl font-semibold text-lg';
-        button.innerHTML = `${subject.icon} ${subject.name}`;
+        button.className = 'w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition-colors duration-200';
+        button.textContent = subject.name;
         button.onclick = () => goToSubject(subject.id);
         subjectButtons.appendChild(button);
       });
 
+      // Show grade info
       const infoText = document.createElement('p');
-      infoText.className = 'grade-info';
+      infoText.className = 'text-sm text-gray-600 text-center mt-4';
       if (grade <= 4) {
-        infoText.textContent = `✨ Grade ${grade}: Math & English`;
+        infoText.textContent = `Grade ${grade}: Math and English available`;
       } else if (grade >= 5 && grade <= 7) {
-        infoText.textContent = `✨ Grade ${grade}: Math, English & Science`;
+        infoText.textContent = `Grade ${grade}: Math, English, and Science available`;
       } else {
-        infoText.textContent = `✨ Grade ${grade}: All subjects available`;
+        infoText.textContent = `Grade ${grade}: All subjects available`;
       }
       subjectButtons.appendChild(infoText);
     }
 
+    // ── Country-from-phone helper (mirrors logic in tutor.js) ──────────────────
+    function getCountryFromPhone(phone) {
+        if (!phone) return '';
+        const cleaned = phone.toString().trim().replace(/[\s\-().]/g, '');
+        let withPlus = cleaned;
+        if (!withPlus.startsWith('+')) {
+            if (withPlus.startsWith('0') && withPlus.length >= 10) {
+                withPlus = '+234' + withPlus.substring(1);
+            } else if (withPlus.startsWith('234') && withPlus.length >= 12) {
+                withPlus = '+' + withPlus;
+            } else {
+                withPlus = '+' + withPlus;
+            }
+        }
+        const CODE_MAP = [
+            ['+355','Albania'],['+213','Algeria'],['+244','Angola'],['+374','Armenia'],
+            ['+994','Azerbaijan'],['+973','Bahrain'],['+880','Bangladesh'],['+375','Belarus'],
+            ['+229','Benin'],['+591','Bolivia'],['+387','Bosnia'],['+267','Botswana'],
+            ['+673','Brunei'],['+226','Burkina Faso'],['+855','Cambodia'],['+237','Cameroon'],
+            ['+236','CAR'],['+235','Chad'],['+269','Comoros'],['+243','DR Congo'],
+            ['+242','Congo'],['+506','Costa Rica'],['+385','Croatia'],['+357','Cyprus'],
+            ['+253','Djibouti'],['+593','Ecuador'],['+503','El Salvador'],['+291','Eritrea'],
+            ['+372','Estonia'],['+268','Eswatini'],['+251','Ethiopia'],['+679','Fiji'],
+            ['+241','Gabon'],['+220','Gambia'],['+995','Georgia'],['+233','Ghana'],
+            ['+502','Guatemala'],['+224','Guinea'],['+245','Guinea-Bissau'],['+592','Guyana'],
+            ['+509','Haiti'],['+504','Honduras'],['+354','Iceland'],['+964','Iraq'],
+            ['+972','Israel'],['+962','Jordan'],['+254','Kenya'],['+965','Kuwait'],
+            ['+996','Kyrgyzstan'],['+856','Laos'],['+371','Latvia'],['+961','Lebanon'],
+            ['+266','Lesotho'],['+231','Liberia'],['+218','Libya'],['+370','Lithuania'],
+            ['+352','Luxembourg'],['+261','Madagascar'],['+265','Malawi'],['+960','Maldives'],
+            ['+223','Mali'],['+356','Malta'],['+222','Mauritania'],['+230','Mauritius'],
+            ['+373','Moldova'],['+976','Mongolia'],['+382','Montenegro'],['+212','Morocco'],
+            ['+258','Mozambique'],['+264','Namibia'],['+977','Nepal'],['+505','Nicaragua'],
+            ['+227','Niger'],['+234','Nigeria'],['+968','Oman'],['+507','Panama'],
+            ['+595','Paraguay'],['+974','Qatar'],['+250','Rwanda'],['+966','Saudi Arabia'],
+            ['+221','Senegal'],['+381','Serbia'],['+232','Sierra Leone'],['+252','Somalia'],
+            ['+211','South Sudan'],['+249','Sudan'],['+255','Tanzania'],['+228','Togo'],
+            ['+216','Tunisia'],['+256','Uganda'],['+971','UAE'],['+598','Uruguay'],
+            ['+998','Uzbekistan'],['+967','Yemen'],['+260','Zambia'],['+263','Zimbabwe'],
+            ['+20','Egypt'],['+27','South Africa'],['+30','Greece'],['+31','Netherlands'],
+            ['+32','Belgium'],['+33','France'],['+34','Spain'],['+36','Hungary'],
+            ['+39','Italy'],['+40','Romania'],['+41','Switzerland'],['+43','Austria'],
+            ['+44','United Kingdom'],['+45','Denmark'],['+46','Sweden'],['+47','Norway'],
+            ['+48','Poland'],['+49','Germany'],['+51','Peru'],['+52','Mexico'],
+            ['+54','Argentina'],['+55','Brazil'],['+56','Chile'],['+57','Colombia'],
+            ['+58','Venezuela'],['+60','Malaysia'],['+61','Australia'],['+62','Indonesia'],
+            ['+63','Philippines'],['+64','New Zealand'],['+65','Singapore'],['+66','Thailand'],
+            ['+81','Japan'],['+82','South Korea'],['+84','Vietnam'],['+86','China'],
+            ['+90','Turkey'],['+91','India'],['+92','Pakistan'],['+94','Sri Lanka'],
+            ['+95','Myanmar'],['+98','Iran'],['+1','United States'],['+7','Russia'],
+        ];
+        for (const [code, country] of CODE_MAP) {
+            if (withPlus.startsWith(code)) return country;
+        }
+        return '';
+    }
+
+    // CRITICAL UPDATE: Function to pass data to student.html
     function goToSubject(subject) {
+      // FIXED: read parentEmail with fallback to legacy key 'studentEmail'
+      const resolvedParentEmail = studentData.parentEmail || studentData.studentEmail || '';
+      // FIXED: derive country from phone if not already stored
+      const resolvedCountry = studentData.country || getCountryFromPhone(studentData.parentPhone || '') || '';
+
       const params = new URLSearchParams({
         subject: subject,
         studentName: studentData.studentName,
-        parentEmail: studentData.parentEmail,
+        parentEmail: resolvedParentEmail,
         grade: studentData.grade,
         tutorEmail: studentData.tutorEmail,
-        country: studentData.country,
+        country: resolvedCountry,
+        // CRITICAL ADDITION: This line ensures the referral code is passed!
         referralCode: studentData.referralCode || ''
       });
       
+      // AUTO-ADD creative-writing state for ELA
       if (subject === 'ela') {
         params.set('state', 'creative-writing');
       }
@@ -182,21 +152,25 @@
       window.location.href = `student.html?${params.toString()}`;
     }
 
+    // Initial load logic
     document.addEventListener('DOMContentLoaded', () => {
         const storedData = localStorage.getItem('studentData');
         if (storedData) {
             studentData = JSON.parse(storedData);
             loadSubjects(parseInt(studentData.grade));
         } else {
+            // If no data is found, redirect to login
             alert("Session expired or missing data. Please log in again.");
-            window.location.href = 'index.html';
+            window.location.href = 'tutor.html';
         }
     });
 
+    // The logout function
     window.logout = function() {
-      localStorage.clear();
-      window.location.href = 'index.html';
+      localStorage.clear(); // Clears the student's login data
+      window.location.href = 'tutor.html';
     };
-  </script>
+</script>
 </body>
 </html>
+

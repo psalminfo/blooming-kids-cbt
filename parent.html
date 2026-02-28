@@ -2,611 +2,1514 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Parent Portal - Blooming Kids House</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>Blooming Kids House Parent Portal</title>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-NBTVEGH1SL"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-NBTVEGH1SL');
+    </script>
+
+    <!-- Fonts: DM Sans + DM Serif Display -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Icons & Tailwind (for compatibility) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
     <link rel="icon" href="favicon.ico" />
 
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+    <!-- Firebase compat SDK (unchanged) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+
+    <!-- Firebase Compat Bridge -->
+    <script>
+    (function () {
+        var hostname = window.location.hostname;
+        var isDev = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.includes('bkhdevelop.netlify.app');
+        var mainConfig = { apiKey: 'AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg', authDomain: 'bloomingkidsassessment.firebaseapp.com', projectId: 'bloomingkidsassessment', storageBucket: 'bloomingkidsassessment.appspot.com', messagingSenderId: '238975054977', appId: '1:238975054977:web:87c70b4db044998a204980' };
+        var devConfig  = { apiKey: 'AIzaSyAu36oLPNsk0TPKVIwCzEHe9oOtJ7cZQXA', authDomain: 'blooming-kids-dev.firebaseapp.com', projectId: 'blooming-kids-dev', storageBucket: 'blooming-kids-dev.firebasestorage.app', messagingSenderId: '336022609689', appId: '1:336022609689:web:ad5a0a74dcac011f21ef88' };
+        var config = isDev ? devConfig : mainConfig;
+        window.firebaseConfig = config;
+        var APP_NAME = 'parent-portal';
+        var app;
+        try { app = firebase.app(APP_NAME); } catch (e) { app = firebase.initializeApp(config, APP_NAME); }
+        var authInst = firebase.auth(app);
+        authInst.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(err){ console.warn('Auth persistence:', err.message); });
+        window.db      = firebase.firestore(app);
+        window.auth    = authInst;
+        window.storage = firebase.storage(app);
+        console.log('Parent portal bridge ready |', isDev ? 'DEV' : 'PROD');
+    })();
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
-    
-    <!-- Global Phone Number Support -->
     <script src="https://cdn.jsdelivr.net/npm/libphonenumber-js@1.9.6/bundle/libphonenumber-js.min.js"></script>
 
     <style>
+        /* ---------- GLOBAL RESET & VARIABLES (leaf green & gold) ---------- */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --sage: #4a7c59;
+            --sage-dark: #2f5240;
+            --sage-light: #e8f0ea;
+            --gold: #c9a84c;
+            --gold-light: #f5e8c8;
+            --cream: #faf8f4;
+            --ink: #1a1f1c;
+            --muted: #6b7873;
+            --border: #dde5de;
+            --white: #ffffff;
+            --error: #b94040;
+            --error-bg: #fdf0f0;
+            --success: #3a7a52;
+            --success-bg: #edf7f1;
+            --surface: rgba(255,255,255,0.9);
+            --shadow-sm: 0 4px 12px rgba(0,0,0,0.04);
+            --shadow: 0 8px 24px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.02);
+            --shadow-lg: 0 20px 40px -12px rgba(47,82,64,0.35);
+            --radius: 10px;
+            --radius-lg: 20px;
+            --transition: all 0.2s ease;
+        }
+
         body {
-            background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 50%, #d1fae5 100%);
-            background-size: 400% 400%;
-            animation: gradient 15s ease infinite;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'DM Sans', sans-serif;
+            background: var(--cream);
+            color: var(--ink);
             min-height: 100vh;
-        }
-        @keyframes gradient {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-        .logo-glow {
-            filter: drop-shadow(0 0 15px rgba(34, 197, 94, 0.3));
-        }
-        .card-glow {
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
-        .btn-glow {
-            box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.3), 0 2px 4px -1px rgba(34, 197, 94, 0.1);
-            transition: all 0.3s ease;
-        }
-        .btn-glow:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(34, 197, 94, 0.4), 0 4px 6px -2px rgba(34, 197, 94, 0.2);
-        }
-        .input-focus:focus {
-            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
-            border-color: #10b981;
-        }
-        .hidden { 
-            display: none !important; 
-        }
-        /* Auth Tabs */
-        .tab-active {
-            background-color: #059669;
-            color: white;
-        }
-        .tab-inactive {
-            background-color: #d1fae5;
-            color: #065f46;
-        }
-        /* Main Content Tabs */
-        .tab-active-main {
-            background-color: #10b981;
-            color: white;
+            -webkit-font-smoothing: antialiased;
             position: relative;
         }
-        .tab-inactive-main {
-            background-color: #ecfdf5;
-            color: #059669;
-            position: relative;
-        }
-        .fade-in {
-            animation: fadeIn 0.5s ease-in;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .loading-spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #10b981;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            margin-right: 8px;
-            vertical-align: middle;
-        }
-        .loading-spinner-small {
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #10b981;
-            border-radius: 50%;
-            width: 16px;
-            height: 16px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            vertical-align: middle;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .toast {
+
+        /* Decorative background (subtle grid + radial) */
+        body::before {
+            content: '';
             position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 12px 20px;
-            border-radius: 8px;
-            color: white;
-            font-weight: 500;
-            z-index: 1000;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            transform: translateX(150%);
-            transition: transform 0.3s ease;
+            inset: 0;
+            background: 
+                radial-gradient(ellipse 80% 60% at 10% 20%, rgba(74,124,89,0.06) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 80% at 90% 80%, rgba(201,168,76,0.05) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
         }
-        .toast.show {
-            transform: translateX(0);
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(74,124,89,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(74,124,89,0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 0;
         }
-        .toast.success {
-            background-color: #10b981;
+
+        #appRoot { position: relative; z-index: 1; }
+        .hidden { display: none !important; }
+
+        /* ---------- SPLIT SCREEN AUTH (tutor‑auth style) ---------- */
+        .auth-split {
+            min-height: calc(100vh - 68px); /* header height */
+            display: grid;
+            grid-template-columns: 1fr 1fr;
         }
-        .toast.error {
-            background-color: #ef4444;
+        /* Brand Panel (left) */
+        .brand-panel {
+            background: linear-gradient(160deg, var(--sage-dark) 0%, var(--sage) 60%, #5d9970 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 60px 48px;
+            position: relative;
+            overflow: hidden;
         }
-        .toast.warning {
-            background-color: #f59e0b;
-        }
-        .response-bubble {
-            background-color: #f0fdf4;
-            border: 1px solid #bbf7d0;
-            border-radius: 12px;
-            padding: 12px;
-            margin-top: 8px;
-        }
-        .response-header {
-            font-weight: 600;
-            color: #065f46;
-            margin-bottom: 4px;
-        }
-        /* Accordion Styles */
-        .accordion-header {
-            transition: all 0.3s ease;
-        }
-        .accordion-header:hover {
-            background-color: #bbf7d0 !important;
-        }
-        /* Slide Down Animation */
-        .slide-down {
-            animation: slideDown 0.3s ease-out;
-        }
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-                max-height: 0;
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-                max-height: 5000px;
-            }
-        }
-        .preserve-whitespace {
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-        /* Notification Badge */
-        .notification-badge {
+        .brand-panel::before {
+            content: '';
             position: absolute;
-            top: -8px;
-            right: -8px;
-            background-color: #ef4444;
-            color: white;
-            border-radius: 9999px;
+            width: 500px; height: 500px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.08);
+            top: -150px; right: -150px;
+        }
+        .brand-panel::after {
+            content: '';
+            position: absolute;
+            width: 350px; height: 350px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.06);
+            bottom: -100px; left: -100px;
+        }
+        .brand-inner {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+        }
+        .brand-logo {
+            width: 140px;
+            margin-bottom: 40px;
+            filter: brightness(0) invert(1);
+            opacity: 0.95;
+        }
+        .brand-tagline {
+            font-family: 'DM Serif Display', serif;
+            font-size: 2.6rem;
+            line-height: 1.15;
+            color: #fff;
+            margin-bottom: 20px;
+            letter-spacing: -0.5px;
+        }
+        .brand-tagline em {
+            font-style: italic;
+            color: var(--gold-light);
+        }
+        .brand-sub {
+            color: rgba(255,255,255,0.7);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            max-width: 300px;
+            margin: 0 auto 48px;
+        }
+        .brand-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        .brand-pill {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.85);
             font-size: 0.75rem;
-            font-weight: bold;
-            min-width: 1.25rem;
-            height: 1.25rem;
+            font-weight: 500;
+            padding: 6px 14px;
+            border-radius: 99px;
+            backdrop-filter: blur(4px);
+        }
+        .dots {
+            position: absolute;
+            bottom: 48px;
+            right: 48px;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            opacity: 0.25;
+        }
+        .dot {
+            width: 4px; height: 4px;
+            border-radius: 50%;
+            background: white;
+        }
+
+        /* Form Panel (right) */
+        .form-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 60px 48px;
+            background: var(--white);
+        }
+        .form-container {
+            width: 100%;
+            max-width: 460px;
+        }
+
+        /* Auth card (original structure preserved) */
+        .auth-card {
+            background: transparent;
+            width: 100%;
+        }
+        .auth-card-hero {
+            display: none;
+        }
+        .auth-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+        .auth-tab-btn {
+            flex: 1;
+            padding: 10px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            background: var(--cream);
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--muted);
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: inherit;
+        }
+        .auth-tab-btn.active {
+            background: var(--sage);
+            border-color: var(--sage-dark);
+            color: white;
+        }
+
+        /* Form fields */
+        .field-group {
+            margin-bottom: 18px;
+        }
+        .field-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--muted);
+            margin-bottom: 7px;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+        .field-input {
+            width: 100%;
+            padding: 13px 14px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.9rem;
+            color: var(--ink);
+            background: var(--cream);
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius);
+            outline: none;
+            transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+        }
+        .field-input:focus {
+            border-color: var(--sage);
+            background: var(--white);
+            box-shadow: 0 0 0 4px rgba(74,124,89,0.08);
+        }
+        .field-input::placeholder {
+            color: #b0bab4;
+        }
+
+        /* Buttons */
+        .btn-primary {
+            width: 100%;
+            padding: 14px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: white;
+            background: linear-gradient(135deg, var(--sage) 0%, var(--sage-dark) 100%);
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+            letter-spacing: 0.3px;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 0 0.25rem;
-            animation: pulse 2s infinite;
+            gap: 8px;
         }
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(47,82,64,0.3);
         }
-        /* Message urgent styling */
-        .urgent-message {
-            border-left: 4px solid #ef4444;
-            background-color: #fef2f2;
+        .btn-primary:active { transform: translateY(0); }
+        .btn-primary .loading-spinner-small {
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            width: 16px; height: 16px;
         }
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
+
+        .btn-secondary {
+            background: var(--cream);
+            border: 1.5px solid var(--border);
+            color: var(--muted);
+            padding: 11px 18px;
+            border-radius: var(--radius);
+            font-weight: 600;
+            cursor: pointer;
         }
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 4px;
+
+        .forgot-link {
+            background: none;
+            border: none;
+            color: var(--gold);
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: underline;
+            text-decoration-color: transparent;
+            transition: var(--transition);
         }
-        ::-webkit-scrollbar-thumb {
-            background: #c1c1c1;
-            border-radius: 4px;
+        .forgot-link:hover { text-decoration-color: var(--gold); }
+
+        /* Remember me checkbox */
+        .flex.items-center {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
         }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #a1a1a1;
+        .flex.items-center input[type="checkbox"] {
+            width: 18px; height: 18px;
+            accent-color: var(--sage);
         }
-        /* Academics Section Specific */
-        .academics-student-selector {
-            background: linear-gradient(to right, #3b82f6, #1d4ed8);
+
+        /* Message box */
+        .msg-box {
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+            display: none;
+            align-items: flex-start;
+            gap: 10px;
+            border: 1px solid transparent;
+        }
+        .msg-box.visible { display: flex; }
+        .msg-box.error { background: var(--error-bg); color: var(--error); border-color: #f0c8c8; }
+        .msg-box.success { background: var(--success-bg); color: var(--success); border-color: #bde0cc; }
+        .msg-box.info { background: var(--sage-light); color: var(--sage-dark); border-color: var(--border); }
+
+        /* ---------- DASHBOARD STYLES ---------- */
+        .portal-header {
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 28px;
+            height: 68px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 200;
+            box-shadow: 0 4px 20px -8px rgba(0,0,0,0.1);
+        }
+        .portal-logo img { height: 44px; }
+        .portal-logo-text h1 { font-size: 1rem; font-weight: 700; color: var(--sage-dark); }
+        .portal-logo-text p { font-size: 0.68rem; color: var(--muted); }
+        .btn-logout-header {
+            background: rgba(201,168,76,0.12);
+            color: #b88c2e;
+            border: 1px solid rgba(201,168,76,0.3);
+            padding: 8px 16px;
+            border-radius: 99px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .btn-logout-header:hover {
+            background: rgba(201,168,76,0.2);
+            transform: translateY(-1px);
+        }
+
+        .dashboard-layout { max-width: 1240px; margin: 0 auto; padding: 22px 16px 80px; }
+        .dashboard-welcome-bar {
+            background: linear-gradient(135deg, var(--sage) 0%, var(--sage-dark) 100%);
+            border-radius: 1.75rem;
+            padding: 20px 26px;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
             color: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
+            box-shadow: 0 8px 28px -8px rgba(47,82,64,0.5);
         }
-        .topic-item {
-            transition: all 0.2s ease;
-            border-left: 4px solid #3b82f6;
+        .welcome-text h2 { font-size: 1.2rem; font-weight: 700; }
+        .welcome-text p { color: rgba(255,255,255,0.7); font-size: 0.82rem; }
+        .btn-add-student {
+            background: var(--gold);
+            color: #2d3f2d;
+            border: none;
+            padding: 9px 18px;
+            border-radius: 99px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
         }
-        .topic-item:hover {
-            transform: translateX(4px);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+        .btn-add-student:hover { background: #e0b95c; transform: translateY(-2px); }
+
+        .main-tabs {
+            display: flex;
+            background: rgba(0,0,0,0.02);
+            border-radius: 99px;
+            padding: 4px;
+            gap: 2px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(8px);
         }
-        .homework-item {
-            transition: all 0.2s ease;
-            border-left: 4px solid #8b5cf6;
+        .main-tab-btn {
+            flex: 1;
+            padding: 9px 12px;
+            border: none;
+            border-radius: 99px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
         }
-        .homework-item:hover {
-            transform: translateX(4px);
-            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+        .main-tab-btn.active {
+            background: white;
+            color: var(--sage-dark);
+            font-weight: 700;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
         }
-        .status-overdue {
-            background-color: #fef2f2;
-            color: #dc2626;
-            border-color: #fca5a5;
+
+        .card {
+            background: var(--surface);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
         }
-        .status-pending {
-            background-color: #eff6ff;
-            color: #1d4ed8;
-            border-color: #93c5fd;
+        .student-report-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            margin-bottom: 14px;
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
         }
-        .status-submitted {
-            background-color: #f0fdf4;
-            color: #15803d;
-            border-color: #86efac;
+        .student-report-card:hover { box-shadow: var(--shadow); }
+
+        .badge-green  { background: var(--sage-light); color: var(--sage-dark); }
+        .badge-yellow { background: var(--gold-light); color: #7d5f2a; }
+
+        /* Payments tab original design (adapted) */
+        .payments-soon {
+            text-align: center;
+            padding: 52px 24px;
+            background: var(--surface);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+        }
+        .payments-soon-icon { font-size: 3.8rem; margin-bottom: 14px; display: block; }
+        .payments-soon h2 { font-size: 1.4rem; font-weight: 800; color: var(--sage-dark); margin-bottom: 10px; letter-spacing: -0.02em; }
+        .payments-soon p { color: var(--muted); font-size: 0.88rem; max-width: 420px; margin: 0 auto; line-height: 1.65; }
+        .coin-spin { display: inline-block; animation: coinSpin 3s ease-in-out infinite; font-size: 2rem; margin-top: 14px; }
+        @keyframes coinSpin { 0%,100% { transform: rotateY(0deg); } 50% { transform: rotateY(180deg); } }
+
+        /* Feature cards */
+        .payment-feature-grid {
+            margin-top: 28px;
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .payment-feature-card {
+            background: rgba(74,124,89,0.1);
+            border: 1px solid rgba(74,124,89,0.2);
+            padding: 14px 22px;
+            border-radius: var(--radius);
+            text-align: center;
+        }
+        .payment-feature-card.gold {
+            background: rgba(201,168,76,0.1);
+            border-color: rgba(201,168,76,0.2);
+        }
+        .payment-feature-card.blue {
+            background: rgba(59,130,246,0.1);
+            border-color: rgba(59,130,246,0.2);
+        }
+        .payment-feature-icon { font-size: 1.6rem; }
+        .payment-feature-title { font-size: 0.76rem; font-weight: 700; color: var(--sage-dark); margin-top: 4px; }
+        .payment-feature-title.gold { color: #b88c2e; }
+        .payment-feature-title.blue { color: #1e3a8a; }
+        .payment-feature-sub { font-size: 0.7rem; color: var(--muted); }
+
+        /* Add Student Modal styles (preserved from original, with new colors) */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15,23,42,0.55);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 16px;
+        }
+        .modal-box {
+            background: white;
+            border-radius: 1.5rem;
+            width: 100%;
+            max-width: 580px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 32px 72px rgba(0,0,0,0.25);
+            animation: modalIn 0.3s cubic-bezier(0.4,0,0.2,1);
+        }
+        .modal-box-wide { max-width: 700px; }
+        @keyframes modalIn { from { opacity:0; transform:scale(0.95) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }
+        .modal-header {
+            padding: 20px 24px 16px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .modal-header h3 { font-size: 1.1rem; font-weight: 800; color: var(--sage-dark); margin: 0; }
+        .modal-close {
+            background: #f1f5f9;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            transition: var(--transition);
+        }
+        .modal-close:hover { background: #e2e8f0; color: var(--ink); }
+        .modal-body { padding: 20px 24px; }
+        .modal-footer {
+            padding: 12px 24px 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        /* Stepper */
+        .stepper { display: flex; gap: 7px; margin-bottom: 20px; }
+        .step-item { flex: 1; height: 4px; border-radius: 2px; background: #e2e8f0; transition: background 0.3s; }
+        .step-item.active { background: var(--sage); }
+        .step-item.done   { background: var(--sage-light); }
+        .step-panel { display: none; }
+        .step-panel.active { display: block; }
+
+        /* Picker chips */
+        .picker-grid { display: flex; flex-wrap: wrap; gap: 7px; }
+        .picker-chip {
+            padding: 6px 13px;
+            border: 1.5px solid var(--border);
+            border-radius: 99px;
+            font-size: 0.79rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            background: white;
+            color: var(--muted);
+        }
+        .picker-chip:hover { border-color: var(--sage); color: var(--sage); }
+        .picker-chip.selected { background: var(--sage); border-color: var(--sage); color: white; }
+
+        /* FAB (Floating Action Button) */
+        .fab-container {
+            position: fixed;
+            bottom: 22px;
+            right: 22px;
+            z-index: 500;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+        }
+        .fab-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            align-items: flex-end;
+            transition: var(--transition);
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(12px) scale(0.95);
+        }
+        .fab-menu.open {
+            pointer-events: auto;
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+        .fab-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 18px;
+            border-radius: 99px;
+            border: none;
+            font-size: 0.84rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: var(--shadow);
+            white-space: nowrap;
+        }
+        .fab-menu-item.feedback-item {
+            background: linear-gradient(135deg, #7c3aed, #6d28d9);
+            color: white;
+        }
+        .fab-menu-item.messages-item {
+            background: linear-gradient(135deg, var(--sage), var(--sage-dark));
+            color: white;
+        }
+        .fab-menu-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+        .fab-main {
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--sage), var(--sage-dark));
+            color: white;
+            border: none;
+            font-size: 1.25rem;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 8px 24px rgba(74,124,89,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .fab-main:hover {
+            transform: scale(1.08) rotate(10deg);
+            box-shadow: 0 20px 40px rgba(74,124,89,0.5);
+        }
+        .fab-main.open {
+            transform: rotate(45deg);
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+
+        /* Modal tabs (for fabModal) */
+        .modal-tab-nav {
+            display: flex;
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 18px;
+        }
+        .modal-tab-btn {
+            flex: 1;
+            padding: 11px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 0.84rem;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-family: inherit;
+            color: #64748b;
+            transition: var(--transition);
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+        }
+        .modal-tab-btn.active {
+            color: var(--sage-dark);
+            border-bottom-color: var(--sage);
+        }
+
+        /* ---------- PRIVACY MODAL & BANNER ---------- */
+        #privacyCookieBanner {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            z-index: 99999;
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            color: #fff;
+            padding: 16px 20px;
+            box-shadow: 0 -4px 24px rgba(0,0,0,.4);
+            font-family: inherit;
+            display: none;
+        }
+        #privacyPolicyModal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 999999;
+            background: rgba(0,0,0,.7);
+            backdrop-filter: blur(6px);
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .privacy-modal-content {
+            background: #fff;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 680px;
+            max-height: 88vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 32px 80px rgba(0,0,0,.5);
+        }
+        .privacy-modal-header {
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
+            padding: 18px 22px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: white;
+        }
+        .privacy-modal-header h3 { font-weight: 800; font-size: 1.05rem; }
+        .privacy-close {
+            background: rgba(255,255,255,.2);
+            border: none;
+            color: white;
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .privacy-modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            font-size: 0.875rem;
+            color: #475569;
+            line-height: 1.6;
+        }
+        .privacy-modal-footer {
+            padding: 14px 22px;
+            border-top: 1px solid #f1f5f9;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .portal-footer {
+            text-align: center;
+            padding: 22px 16px;
+            color: var(--muted);
+            font-size: 0.79rem;
+        }
+        .portal-footer-links {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 6px;
+        }
+        .portal-footer-link {
+            background: none;
+            border: none;
+            color: var(--sage);
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: underline;
+            text-decoration-color: transparent;
+        }
+        .portal-footer-link:hover { text-decoration-color: var(--sage); }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .auth-split { grid-template-columns: 1fr; }
+            .brand-panel { padding: 40px 24px; min-height: 220px; }
+            .brand-tagline { font-size: 1.8rem; }
+            .brand-pills, .dots { display: none; }
+            .form-panel { padding: 40px 24px; }
         }
     </style>
 </head>
-<body class="flex flex-col items-center p-4">
-    <div id="toastContainer"></div>
+<body>
 
-    <div class="w-full max-w-6xl">
-        <div class="text-center mb-8">
-            <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
-                 alt="Blooming Kids House Logo" 
-                 class="h-20 w-auto mx-auto logo-glow mb-4">
-            <h1 class="text-4xl font-bold text-green-800 mb-2">Parent Portal</h1>
-            <p class="text-green-600 text-lg">Secure Access to Your Children's Progress Reports</p>
+<div id="appRoot">
+
+<!-- ===== HEADER ===== -->
+<header class="portal-header">
+    <div class="portal-logo">
+        <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo">
+        <div class="portal-logo-text">
+            <h1>Blooming Kids House</h1>
+            <p>Parent Portal</p>
         </div>
+    </div>
+    <div class="portal-header-actions" id="headerActions" style="display:none;">
+        <span class="header-greeting" id="headerGreeting">Welcome!</span>
+        <button onclick="logout()" class="btn-logout-header">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span>Logout</span>
+        </button>
+    </div>
+</header>
 
-        <div id="authArea" class="bg-white rounded-2xl card-glow p-8 mb-8 fade-in">
-            <div class="flex mb-6 rounded-xl overflow-hidden border border-green-200">
-                <button id="signInTab" class="flex-1 py-3 font-semibold tab-active transition-all duration-200">
-                    Sign In
-                </button>
-                <button id="signUpTab" class="flex-1 py-3 font-semibold tab-inactive transition-all duration-200">
-                    Sign Up
-                </button>
-            </div>
-
-            <div id="signInForm">
-                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Welcome Back</h2>
-                
-                <div class="space-y-4">
-                    <div>
-                        <label for="loginIdentifier" class="block text-sm font-medium text-gray-700 mb-2">
-                            Phone Number or Email
-                        </label>
-                        <input id="loginIdentifier" 
-                               type="text" 
-                               placeholder="Enter your phone number or email"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required>
-                    </div>
-                    
-                    <div>
-                        <label for="loginPassword" class="block text-sm font-medium text-gray-700 mb-2">
-                            Password
-                        </label>
-                        <input id="loginPassword" 
-                               type="password" 
-                               placeholder="Enter your password"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required>
-                    </div>
-
-                    <div class="flex items-center">
-                        <input id="rememberMe" type="checkbox" class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
-                        <label for="rememberMe" class="ml-2 block text-sm text-gray-700">
-                            Remember me
-                        </label>
-                    </div>
-                    
-                    <button id="signInBtn" 
-                            class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
-                        <span id="signInText">Sign In</span>
-                        <div id="signInSpinner" class="loading-spinner hidden"></div>
-                    </button>
-
-                    <div class="text-center">
-                        <button id="forgotPasswordBtn" class="text-green-600 hover:text-green-800 text-sm transition-colors duration-200">
-                            Forgot Password?
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="signUpForm" class="hidden">
-                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Create Account</h2>
-                
-                <div class="space-y-4">
-                    <div>
-                        <label for="signupPhone" class="block text-sm font-medium text-gray-700 mb-2">
-                            Phone Number
-                        </label>
-                        <div id="phoneInputContainer">
-                            <!-- Country code dropdown will be inserted here by JavaScript -->
-                            <input id="signupPhone" 
-                                   type="tel" 
-                                   placeholder="Enter your phone number (any format)"
-                                   class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                                   required>
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <label for="signupEmail" class="block text-sm font-medium text-gray-700 mb-2">
-                            Email Address
-                        </label>
-                        <input id="signupEmail" 
-                               type="email" 
-                               placeholder="Enter your email address"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required>
-                    </div>
-                    
-                    <div>
-                        <label for="signupPassword" class="block text-sm font-medium text-gray-700 mb-2">
-                            Password
-                        </label>
-                        <input id="signupPassword" 
-                               type="password" 
-                               placeholder="Minimum 6 characters"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required minlength="6">
-                    </div>
-                    
-                    <div>
-                        <label for="signupConfirmPassword" class="block text-sm font-medium text-gray-700 mb-2">
-                            Confirm Password
-                        </label>
-                        <input id="signupConfirmPassword" 
-                               type="password" 
-                               placeholder="Confirm your password"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required minlength="6">
-                    </div>
-                    
-                    <button id="signUpBtn" 
-                            class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
-                        <span id="signUpText">Create Account</span>
-                        <div id="signUpSpinner" class="loading-spinner hidden"></div>
-                    </button>
-                </div>
-            </div>
-            
-            <div id="authLoader" class="hidden text-center mt-4">
-                <div class="loading-spinner"></div>
-                <p class="text-green-600 font-semibold mt-2">Processing... Please wait.</p>
+<!-- ===== AUTH SPLIT SCREEN ===== -->
+<div id="authArea" class="auth-split">
+    <!-- LEFT BRAND PANEL -->
+    <div class="brand-panel">
+        <div class="brand-inner">
+            <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House" class="brand-logo">
+            <h1 class="brand-tagline">Where <em>every</em> child blossoms</h1>
+            <p class="brand-sub">Your secure portal to track progress, communicate, and support your child's journey.</p>
+            <div class="brand-pills">
+                <span class="brand-pill">🌱 Progress Reports</span>
+                <span class="brand-pill">📚 Homework & Topics</span>
+                <span class="brand-pill">🔒 Secure Messaging</span>
+                <span class="brand-pill">🌟 Rewards Program</span>
             </div>
         </div>
-
-        <div id="reportArea" class="hidden fade-in">
-            <div class="bg-green-50 border-l-4 border-green-600 p-6 rounded-lg mb-6">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div>
-                        <h2 id="welcomeMessage" class="text-2xl font-bold text-green-800">Welcome!</h2>
-                        <p class="text-green-600">Thank you for being part of Blooming Kids House family</p>
-                    </div>
-                    <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                        <!-- Buttons will be added here by JavaScript -->
-                        <button onclick="logout()" 
-                                class="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition-all duration-200 btn-glow flex items-center justify-center">
-                            <span class="mr-2">🚪</span> Logout
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="flex mb-6 rounded-xl overflow-hidden shadow-lg border border-green-200">
-                <button id="reportTab" class="flex-1 py-3 font-semibold tab-active-main hover:bg-green-500 transition-all duration-200">
-                    <span class="mr-2">📄</span> Progress Reports
-                </button>
-                <button id="academicsTab" class="flex-1 py-3 font-semibold tab-inactive-main hover:bg-green-100 transition-all duration-200">
-                    <span class="mr-2">📚</span> Academics
-                </button>
-                <button id="rewardsTab" class="flex-1 py-3 font-semibold tab-inactive-main hover:bg-green-100 transition-all duration-200">
-                    <span class="mr-2">🎁</span> Rewards Dashboard
-                </button>
-            </div>
-
-            <div id="reportContentArea">
-                <h2 class="text-2xl font-bold text-green-800 mb-6">Your Children's Reports</h2>
-                
-                <div id="reportsLoading" class="hidden text-center py-8">
-                    <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
-                    <p class="text-green-600 font-semibold mt-4">Loading reports...</p>
-                </div>
-                
-                <div id="reportsEmpty" class="hidden text-center py-12 bg-white rounded-xl card-glow">
-                    <div class="text-6xl mb-4">📬</div>
-                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Reports Available</h3>
-                    <p class="text-gray-500 max-w-md mx-auto">No progress reports are available for your children at this time. Please check back later.</p>
-                </div>
-                
-                <div id="reportContent" class="space-y-6">
-                    <!-- Accordion reports will be inserted here by JavaScript -->
-                </div>
-            </div>
-            
-            <div id="academicsContentArea" class="hidden">
-                <h2 class="text-2xl font-bold text-green-800 mb-6">Academic Progress & Assignments</h2>
-                
-                <!-- Student Selection Dropdown Container -->
-                <div id="academicsStudentDropdown" class="mb-6">
-                    <!-- Student dropdown will be inserted here by JavaScript -->
-                </div>
-                
-                <div id="academicsContent" class="bg-white rounded-xl card-glow p-6 min-h-[400px]">
-                    <!-- Academics data will be inserted here by JavaScript -->
-                </div>
-            </div>
-            
-            <div id="rewardsContentArea" class="hidden">
-                <h2 class="text-2xl font-bold text-green-800 mb-6">Parent Referral Rewards</h2>
-                <div id="rewardsContent" class="bg-white rounded-xl card-glow p-6 min-h-[400px]">
-                    <!-- Rewards data will be inserted here by JavaScript -->
-                </div>
-            </div>
-        </div>
-
-        <!-- Feedback Modal -->
-        <div id="feedbackModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
-            <div class="bg-white rounded-2xl p-6 md:p-8 max-w-2xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-2xl font-bold text-gray-800">Send Feedback</h3>
-                    <button onclick="hideFeedbackModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
-                        &times;
-                    </button>
-                </div>
-                
-                <p class="text-gray-600 mb-6">We value your feedback! Please fill out the form below.</p>
-                
-                <div class="space-y-4">
-                    <div>
-                        <label for="feedbackCategory" class="block text-sm font-medium text-gray-700 mb-2">
-                            Category *
-                        </label>
-                        <select id="feedbackCategory" 
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                                required>
-                            <option value="">Select category</option>
-                            <option value="Feedback">General Feedback</option>
-                            <option value="Request">Special Request</option>
-                            <option value="Complaint">Complaint</option>
-                            <option value="Suggestion">Suggestion</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label for="feedbackPriority" class="block text-sm font-medium text-gray-700 mb-2">
-                            Priority *
-                        </label>
-                        <select id="feedbackPriority" 
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                                required>
-                            <option value="">Select priority</option>
-                            <option value="Low">Low</option>
-                            <option value="Medium">Medium</option>
-                            <option value="High">High</option>
-                            <option value="Urgent">Urgent</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label for="feedbackStudent" class="block text-sm font-medium text-gray-700 mb-2">
-                            Regarding Student *
-                        </label>
-                        <select id="feedbackStudent" 
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                                required>
-                            <option value="">Select student</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label for="feedbackMessage" class="block text-sm font-medium text-gray-700 mb-2">
-                            Your Message *
-                        </label>
-                        <textarea id="feedbackMessage" 
-                                  rows="6"
-                                  placeholder="Please provide details about your feedback..."
-                                  class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200 preserve-whitespace"
-                                  required></textarea>
-                    </div>
-                    
-                    <div class="flex flex-col sm:flex-row gap-2 pt-4">
-                        <button id="submitFeedbackBtn" 
-                                class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
-                            <span id="submitFeedbackText">Submit Feedback</span>
-                            <div id="submitFeedbackSpinner" class="loading-spinner hidden"></div>
-                        </button>
-                        <button onclick="hideFeedbackModal()" 
-                                class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-
-                <div class="mt-6 text-center">
-                    <p class="text-sm text-gray-500">
-                        Your feedback is important to us. We'll respond within 24-48 hours.
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Admin Responses Modal -->
-        <div id="responsesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
-            <div class="bg-white rounded-2xl p-6 md:p-8 max-w-4xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-2xl font-bold text-gray-800">📨 Admin Responses</h3>
-                    <button onclick="hideResponsesModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
-                        &times;
-                    </button>
-                </div>
-                
-                <p class="text-gray-600 mb-6">Responses from our staff to your feedback.</p>
-                
-                <div id="responsesContent" class="space-y-4">
-                    <!-- Responses will be inserted here by JavaScript -->
-                </div>
-
-                <div class="mt-6 text-center">
-                    <button onclick="hideResponsesModal()" 
-                            class="bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 transition-all duration-200">
-                        Close
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <div id="passwordResetModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
-            <div class="bg-white rounded-2xl p-6 md:p-8 max-w-md w-full mx-auto card-glow">
-                <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Reset Password</h3>
-                <p class="text-gray-600 mb-4 text-center">Enter your email address to receive a password reset link.</p>
-                
-                <div class="space-y-4">
-                    <div>
-                        <label for="resetEmail" class="block text-sm font-medium text-gray-700 mb-2">
-                            Email Address
-                        </label>
-                        <input id="resetEmail" 
-                               type="email" 
-                               placeholder="Enter your registered email"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required>
-                    </div>
-                    
-                    <div class="flex flex-col sm:flex-row gap-2">
-                        <button id="sendResetBtn" 
-                                class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
-                            <span id="sendResetText">Send Reset Link</span>
-                            <div id="sendResetSpinner" class="loading-spinner hidden"></div>
-                        </button>
-                        <button id="cancelResetBtn" 
-                                class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-                
-                <div id="resetLoader" class="hidden text-center mt-4">
-                    <div class="loading-spinner mx-auto"></div>
-                    <p class="text-green-600 font-semibold mt-2">Sending reset link...</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="text-center mt-12">
-            <p class="text-green-800 font-semibold">BLOOMING KIDS HOUSE</p>
-            <p class="text-green-600 text-sm">Where Every Child Blossoms</p>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
         </div>
     </div>
 
-    <script src="parent.js"></script>
+    <!-- RIGHT FORM PANEL with original auth-card -->
+    <div class="form-panel">
+        <div class="form-container">
+            <!-- Optional message box -->
+            <div id="authMessageBox" class="msg-box" role="alert" style="display:none;">
+                <span class="msg-icon" id="authMsgIcon"></span>
+                <span id="authMsgText"></span>
+            </div>
+
+            <div class="auth-card">
+                <!-- Hero hidden -->
+                <div class="auth-card-hero" style="display:none;"></div>
+
+                <!-- Original auth tabs -->
+                <div class="auth-tabs">
+                    <button id="signInTab" class="auth-tab-btn active" onclick="switchTab('signin')">Sign In</button>
+                    <button id="signUpTab" class="auth-tab-btn" onclick="switchTab('signup')">Sign Up</button>
+                </div>
+
+                <!-- Sign In Form -->
+                <div class="auth-form-body" id="signInForm">
+                    <div class="field-group">
+                        <label class="field-label" for="loginIdentifier">Phone Number or Email</label>
+                        <input id="loginIdentifier" type="text" placeholder="Enter your phone or email" class="field-input" required>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label" for="loginPassword">Password</label>
+                        <input id="loginPassword" type="password" placeholder="Enter your password" class="field-input" required>
+                    </div>
+                    <div class="flex items-center mb-4">
+                        <input id="rememberMe" type="checkbox" class="h-4 w-4 rounded" style="accent-color:var(--sage)">
+                        <label for="rememberMe" class="ml-2 text-sm" style="color:var(--muted);">Remember me</label>
+                    </div>
+                    <button id="signInBtn" class="btn-primary mb-3">
+                        <span id="signInText">Sign In</span>
+                        <div id="signInSpinner" class="loading-spinner-small hidden"></div>
+                    </button>
+                    <div class="text-center">
+                        <button id="forgotPasswordBtn" class="forgot-link">Forgot Password?</button>
+                    </div>
+                </div>
+
+                <!-- Sign Up Form -->
+                <div class="auth-form-body hidden" id="signUpForm">
+                    <div id="phoneInputContainer">
+                        <div class="field-group">
+                            <label class="field-label" for="signupPhone">Phone Number</label>
+                            <input id="signupPhone" type="tel" placeholder="Enter your phone number" class="field-input" required>
+                        </div>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label" for="signupEmail">Email Address</label>
+                        <input id="signupEmail" type="email" placeholder="Enter your email address" class="field-input" required>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label" for="signupPassword">Password</label>
+                        <input id="signupPassword" type="password" placeholder="Minimum 6 characters" class="field-input" required minlength="6">
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label" for="signupConfirmPassword">Confirm Password</label>
+                        <input id="signupConfirmPassword" type="password" placeholder="Confirm your password" class="field-input" required minlength="6">
+                    </div>
+                    <!-- Privacy consent -->
+                    <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px; padding:10px 12px; margin-bottom:16px;">
+                        <label style="display:flex; align-items:flex-start; gap:8px; font-size:0.8rem; color:#0c4a6e;">
+                            <input type="checkbox" id="privacyConsent" style="margin-top:2px; accent-color:var(--sage);">
+                            <span>I agree to the <a href="#" onclick="showPrivacyPolicy(); return false;" style="color:#0369a1; font-weight:700; text-decoration:underline;">Privacy Policy</a>.</span>
+                        </label>
+                    </div>
+                    <button id="signUpBtn" class="btn-primary">
+                        <span id="signUpText">Create Account</span>
+                        <div id="signUpSpinner" class="loading-spinner-small hidden"></div>
+                    </button>
+                </div>
+
+                <div id="authLoader" class="hidden text-center pb-6">
+                    <div class="loading-spinner mx-auto" style="width:32px;height:32px;border-top-color:var(--sage);border-color:rgba(74,124,89,0.2);"></div>
+                    <p class="mt-2 text-sm" style="color:var(--sage);">Processing… please wait</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== DASHBOARD ===== -->
+<div id="reportArea" class="hidden dashboard-layout">
+    <!-- Welcome Banner -->
+    <div class="dashboard-welcome-bar">
+        <div class="welcome-text">
+            <h2 id="welcomeMessage">Welcome!</h2>
+            <p>Thank you for being part of the Blooming Kids House family 🌿</p>
+        </div>
+        <div class="welcome-actions">
+            <button class="btn-add-student" onclick="showAddStudentModal()">
+                <i class="fa-solid fa-user-plus"></i>
+                <span>Add Student</span>
+            </button>
+            <button id="manualRefreshBtn" class="btn-welcome-action" onclick="manualRefreshReportsV2()">
+                <i class="fa-solid fa-rotate-right"></i>
+                <span>Refresh</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <nav class="main-tabs" id="mainTabNav">
+        <button id="reportTab" class="main-tab-btn active" onclick="switchMainTab('report')">
+            <i class="fa-solid fa-file-lines"></i>
+            <span class="tab-label">Reports</span>
+        </button>
+        <button id="academicsTab" class="main-tab-btn" onclick="switchMainTab('academics')">
+            <i class="fa-solid fa-book-open"></i>
+            <span class="tab-label">Academics</span>
+        </button>
+        <button id="rewardsTab" class="main-tab-btn" onclick="switchMainTab('rewards')">
+            <i class="fa-solid fa-gift"></i>
+            <span class="tab-label">Rewards</span>
+        </button>
+        <button id="paymentsTab" class="main-tab-btn" onclick="switchMainTab('payments')">
+            <i class="fa-solid fa-credit-card"></i>
+            <span class="tab-label">Payments</span>
+        </button>
+        <button id="settingsTab" class="main-tab-btn" onclick="switchMainTab('settings')">
+            <i class="fa-solid fa-gear"></i>
+            <span class="tab-label">Settings</span>
+        </button>
+    </nav>
+
+    <!-- Reports Content -->
+    <div id="reportContentArea" class="content-area">
+        <div class="content-header">
+            <h2>Children's Progress Reports</h2>
+            <p>Click on a student's card to expand their reports</p>
+        </div>
+        <div id="reportsLoading" class="hidden text-center py-12">
+            <div class="loading-spinner mx-auto" style="width:40px;height:40px;"></div>
+            <p class="mt-4 text-sm" style="color:var(--sage);">Loading reports…</p>
+        </div>
+        <div id="reportsEmpty" class="hidden text-center py-16 card" style="padding:48px;">
+            <div style="font-size:3.5rem;margin-bottom:14px;">📬</div>
+            <h3 style="font-size:1.05rem;font-weight:800;color:#374151;margin:0 0 8px;">No Reports Available</h3>
+            <p style="color:#6b7280;font-size:0.85rem;max-width:360px;margin:0 auto;">No progress reports available yet. Check back after your child's sessions.</p>
+        </div>
+        <div id="reportContent" class="space-y-4"></div>
+    </div>
+
+    <!-- Academics Content (placeholder) -->
+    <div id="academicsContentArea" class="content-area hidden">
+        <div class="content-header">
+            <h2>Academic Progress &amp; Assignments</h2>
+            <p>Subjects, schedule, session topics, and homework</p>
+        </div>
+        <div id="academicsStudentDropdown" class="mb-4"></div>
+        <div id="academicsContent" class="card" style="padding:24px;min-height:300px;"></div>
+    </div>
+
+    <!-- Rewards Content -->
+    <div id="rewardsContentArea" class="content-area hidden">
+        <div class="content-header">
+            <h2>Referral Rewards Dashboard</h2>
+            <p>Track your earnings and referral history</p>
+        </div>
+        <div id="rewardsContent" class="card" style="padding:24px;min-height:300px;"></div>
+    </div>
+
+    <!-- Payments Content (original detailed design) -->
+    <div id="paymentsContentArea" class="content-area hidden">
+        <div class="payments-soon">
+            <span class="payments-soon-icon">💳</span>
+            <h2>Payments &amp; Billing</h2>
+            <p>
+                We're counting coins and polishing the payment portal! 💰✨<br>
+                Our team is working hard to bring you a seamless fee payment experience.
+                Check back soon to settle fees with a smile — and maybe even a surprise discount for your patience! 😄
+            </p>
+            <div class="coin-spin">🪙</div>
+            <div class="payment-feature-grid">
+                <div class="payment-feature-card">
+                    <div class="payment-feature-icon">📊</div>
+                    <div class="payment-feature-title">Fee Statements</div>
+                    <div class="payment-feature-sub">Coming Soon</div>
+                </div>
+                <div class="payment-feature-card gold">
+                    <div class="payment-feature-icon">📱</div>
+                    <div class="payment-feature-title gold">Online Payment</div>
+                    <div class="payment-feature-sub">Coming Soon</div>
+                </div>
+                <div class="payment-feature-card blue">
+                    <div class="payment-feature-icon">🧾</div>
+                    <div class="payment-feature-title blue">Receipts</div>
+                    <div class="payment-feature-sub">Coming Soon</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Content -->
+    <div id="settingsContentArea" class="content-area hidden">
+        <div class="content-header">
+            <h2>Family Profile &amp; Settings</h2>
+            <p>Manage your profile and your children's details</p>
+        </div>
+        <div class="settings-inner" style="background:rgba(255,255,255,0.88);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;">
+            <div id="settingsDynamicContent" style="padding:24px;">
+                <div class="text-center py-8">
+                    <div class="loading-spinner mx-auto"></div>
+                    <p class="mt-3 text-sm" style="color:var(--sage);">Loading settings…</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== FAB (Floating Action Button) for Feedback & Messages ===== -->
+<!-- Now using class="hidden" instead of inline style -->
+<div class="fab-container hidden" id="fabContainer">
+    <div class="fab-menu" id="fabMenu">
+        <button class="fab-menu-item messages-item" onclick="openFabTab('messages');closeFab();">
+            <i class="fa-solid fa-envelope"></i>
+            <span>Messages</span>
+        </button>
+        <button class="fab-menu-item feedback-item" onclick="openFabTab('feedback');closeFab();">
+            <i class="fa-solid fa-comment-dots"></i>
+            <span>Send Feedback</span>
+        </button>
+    </div>
+    <button class="fab-main" id="fabMainBtn" onclick="toggleFab()" title="Feedback &amp; Messages" aria-label="Open feedback and messages">
+        <i class="fa-solid fa-plus"></i>
+    </button>
+</div>
+
+<!-- ===== FAB MODAL (Combined Feedback + Messages) ===== -->
+<div id="fabModal" class="modal-overlay hidden">
+    <div class="modal-box modal-box-wide">
+        <div class="modal-header">
+            <h3>💬 Feedback &amp; Messages</h3>
+            <button class="modal-close" onclick="document.getElementById('fabModal').classList.add('hidden')">×</button>
+        </div>
+        <div class="modal-body" style="padding-top:0;">
+            <div class="modal-tab-nav">
+                <button class="modal-tab-btn active" id="fabTabFeedback" onclick="switchFabModalTab('feedback')">
+                    <i class="fa-solid fa-comment-dots mr-1"></i> Send Feedback
+                </button>
+                <button class="modal-tab-btn" id="fabTabMessages" onclick="switchFabModalTab('messages')">
+                    <i class="fa-solid fa-envelope mr-1"></i> Messages
+                </button>
+            </div>
+            <!-- Feedback Panel -->
+            <div id="fabPanelFeedback">
+                <p style="color:var(--muted); font-size:0.85rem; margin-bottom:16px;">We value your feedback! Please fill in the details below.</p>
+                <div class="field-group">
+                    <label class="field-label" for="feedbackCategory">Category *</label>
+                    <select id="feedbackCategory" class="field-input" required>
+                        <option value="">Select category</option>
+                        <option value="Feedback">General Feedback</option>
+                        <option value="Request">Special Request</option>
+                        <option value="Complaint">Complaint</option>
+                        <option value="Suggestion">Suggestion</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label" for="feedbackPriority">Priority *</label>
+                    <select id="feedbackPriority" class="field-input" required>
+                        <option value="">Select priority</option>
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                        <option value="Urgent">Urgent</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label" for="feedbackStudent">Regarding Student *</label>
+                    <select id="feedbackStudent" class="field-input" required>
+                        <option value="">Select student</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label" for="feedbackMessage">Your Message *</label>
+                    <textarea id="feedbackMessage" rows="4" class="field-input preserve-whitespace" placeholder="Describe your feedback…" required style="resize:vertical;"></textarea>
+                </div>
+                <button id="submitFeedbackBtn" class="btn-primary" onclick="submitFeedback()">
+                    <span id="submitFeedbackText">Submit Feedback</span>
+                    <div id="submitFeedbackSpinner" class="loading-spinner-small hidden"></div>
+                </button>
+            </div>
+            <!-- Messages Panel -->
+            <div id="fabPanelMessages" style="display:none;">
+                <p style="color:var(--muted); font-size:0.85rem; margin-bottom:16px;">Responses from our staff to your submitted feedback.</p>
+                <div id="responsesContent"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Legacy modal aliases (for JS backward-compat) -->
+<div id="feedbackModal" class="hidden"></div>
+<div id="responsesModal" class="hidden"></div>
+
+<!-- ===== PASSWORD RESET MODAL ===== -->
+<div id="passwordResetModal" class="modal-overlay hidden">
+    <div class="modal-box" style="max-width:420px;">
+        <div class="modal-header">
+            <h3>🔑 Reset Password</h3>
+            <button class="modal-close" onclick="hidePasswordResetModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <p style="color:var(--muted); font-size:0.85rem; margin-bottom:16px;">Enter your email and we'll send you a reset link.</p>
+            <div class="field-group">
+                <label class="field-label" for="resetEmail">Email Address</label>
+                <input id="resetEmail" type="email" placeholder="your@email.com" class="field-input">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="sendResetBtn" class="btn-primary" onclick="sendPasswordReset()" style="flex:1;">
+                Send Reset Link
+                <div id="resetLoader" class="loading-spinner-small hidden"></div>
+            </button>
+            <button class="btn-secondary" onclick="hidePasswordResetModal()" style="width:auto;padding:11px 18px;">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== ADD STUDENT MODAL (full) ===== -->
+<div id="addStudentModal" class="modal-overlay hidden">
+    <div class="modal-box modal-box-wide">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-user-plus mr-2" style="color:var(--sage);"></i>Add Another Student</h3>
+            <button class="modal-close" onclick="hideAddStudentModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <!-- Step Progress -->
+            <div class="stepper" id="addStudentStepper">
+                <div class="step-item active" id="stepBar1"></div>
+                <div class="step-item" id="stepBar2"></div>
+                <div class="step-item" id="stepBar3"></div>
+                <div class="step-item" id="stepBar4"></div>
+            </div>
+            <p style="font-size:0.77rem;color:var(--muted);margin-bottom:18px;font-weight:600;" id="stepLabel">Step 1 of 4 — Student Details</p>
+
+            <!-- Step 1 -->
+            <div class="step-panel active" id="add-step-1">
+                <h4 style="font-size:0.92rem;font-weight:800;color:var(--sage-dark);margin:0 0 14px;">Step 1 — Student Details</h4>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;">
+                    <div class="field-group" style="margin:0;">
+                        <label class="field-label" for="newStudentFirstName">First Name *</label>
+                        <input id="newStudentFirstName" type="text" placeholder="First name" class="field-input" required>
+                    </div>
+                    <div class="field-group" style="margin:0;">
+                        <label class="field-label" for="newStudentLastName">Last Name *</label>
+                        <input id="newStudentLastName" type="text" placeholder="Last name" class="field-input" required>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:13px;">
+                    <div class="field-group" style="margin:0;">
+                        <label class="field-label" for="newStudentGender">Gender *</label>
+                        <select id="newStudentGender" class="field-input" required>
+                            <option value="">Select gender</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="field-group" style="margin:0;">
+                        <label class="field-label" for="newStudentDob">Date of Birth *</label>
+                        <input id="newStudentDob" type="date" class="field-input" required>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:13px;">
+                    <div class="field-group" style="margin:0;">
+                        <label class="field-label" for="newStudentGradeLevel">Grade Tier *</label>
+                        <select id="newStudentGradeLevel" class="field-input" required onchange="updateAddStudentFees()">
+                            <option value="">Select grade tier</option>
+                            <option value="preschool">Preschool to Grade 1</option>
+                            <option value="grade2-4">Grade 2 to 4</option>
+                            <option value="grade5-8">Grade 5 to 8</option>
+                            <option value="grade9-12">Grade 9 to 12</option>
+                        </select>
+                    </div>
+                    <div class="field-group" style="margin:0;">
+                        <label class="field-label" for="newStudentActualGrade">Actual Grade *</label>
+                        <select id="newStudentActualGrade" class="field-input" required>
+                            <option value="">Select grade</option>
+                            <option value="preschool">Preschool</option>
+                            <option value="kindergarten">Kindergarten</option>
+                            <option value="grade1">Grade 1</option><option value="grade2">Grade 2</option>
+                            <option value="grade3">Grade 3</option><option value="grade4">Grade 4</option>
+                            <option value="grade5">Grade 5</option><option value="grade6">Grade 6</option>
+                            <option value="grade7">Grade 7</option><option value="grade8">Grade 8</option>
+                            <option value="grade9">Grade 9</option><option value="grade10">Grade 10</option>
+                            <option value="grade11">Grade 11</option><option value="grade12">Grade 12</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="field-group" style="margin-top:13px;">
+                    <label class="field-label" for="newStudentStartDate">Desired Start Date</label>
+                    <input id="newStudentStartDate" type="date" class="field-input">
+                </div>
+            </div>
+
+            <!-- Step 2: Subjects & Schedule -->
+            <div class="step-panel" id="add-step-2">
+                <h4 style="font-size:0.92rem;font-weight:800;color:var(--sage-dark);margin:0 0 14px;">Step 2 — Subjects &amp; Schedule</h4>
+                <div class="field-group">
+                    <label class="field-label">Academic Subjects (select all that apply)</label>
+                    <div class="picker-grid" id="newStudentSubjects">
+                        <span class="picker-chip" data-subject="Math" onclick="togglePickerChip(this)">Math</span>
+                        <span class="picker-chip" data-subject="Language Arts" onclick="togglePickerChip(this)">Language Arts</span>
+                        <span class="picker-chip" data-subject="Geography" onclick="togglePickerChip(this)">Geography</span>
+                        <span class="picker-chip" data-subject="Science" onclick="togglePickerChip(this)">Science</span>
+                        <span class="picker-chip" data-subject="Biology" onclick="togglePickerChip(this)">Biology</span>
+                        <span class="picker-chip" data-subject="Physics" onclick="togglePickerChip(this)">Physics</span>
+                        <span class="picker-chip" data-subject="Chemistry" onclick="togglePickerChip(this)">Chemistry</span>
+                        <span class="picker-chip" data-subject="Microbiology" onclick="togglePickerChip(this)">Microbiology</span>
+                    </div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Session Frequency *</label>
+                    <div class="picker-grid" id="newStudentSessions">
+                        <span class="picker-chip" data-sessions="twice" onclick="toggleSessionChip(this)">Twice weekly</span>
+                        <span class="picker-chip" data-sessions="three" onclick="toggleSessionChip(this)">3× weekly</span>
+                        <span class="picker-chip" data-sessions="five" onclick="toggleSessionChip(this)">Daily (5×)</span>
+                    </div>
+                    <div id="sessionFeesDisplay" style="margin-top:10px;font-size:0.8rem;color:var(--sage-dark);font-weight:600;background:rgba(74,124,89,0.08);padding:8px 12px;border-radius:8px;display:none;"></div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Preferred Days (select at least one)</label>
+                    <div class="picker-grid" id="newStudentDays">
+                        <span class="picker-chip" data-day="Monday" onclick="togglePickerChip(this)">Mon</span>
+                        <span class="picker-chip" data-day="Tuesday" onclick="togglePickerChip(this)">Tue</span>
+                        <span class="picker-chip" data-day="Wednesday" onclick="togglePickerChip(this)">Wed</span>
+                        <span class="picker-chip" data-day="Thursday" onclick="togglePickerChip(this)">Thu</span>
+                        <span class="picker-chip" data-day="Friday" onclick="togglePickerChip(this)">Fri</span>
+                        <span class="picker-chip" data-day="Saturday" onclick="togglePickerChip(this)">Sat</span>
+                        <span class="picker-chip" data-day="Sunday" onclick="togglePickerChip(this)">Sun</span>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;">
+                    <div class="field-group" style="margin:0;">
+                        <label class="field-label" for="newStudentStartHour">Class Start Time</label>
+                        <select id="newStudentStartHour" class="field-input">
+                            <option value="">Select hour</option>
+                            <option value="7">7:00 AM</option><option value="8">8:00 AM</option>
+                            <option value="9">9:00 AM</option><option value="10">10:00 AM</option>
+                            <option value="11">11:00 AM</option><option value="12">12:00 PM</option>
+                            <option value="13">1:00 PM</option><option value="14">2:00 PM</option>
+                            <option value="15">3:00 PM</option><option value="16">4:00 PM</option>
+                            <option value="17">5:00 PM</option><option value="18">6:00 PM</option>
+                            <option value="19">7:00 PM</option><option value="20">8:00 PM</option>
+                        </select>
+                    </div>
+                    <div class="field-group" style="margin:0;">
+                        <label class="field-label" for="newStudentEndHour">Class End Time</label>
+                        <select id="newStudentEndHour" class="field-input">
+                            <option value="">Select hour</option>
+                            <option value="8">8:00 AM</option><option value="9">9:00 AM</option>
+                            <option value="10">10:00 AM</option><option value="11">11:00 AM</option>
+                            <option value="12">12:00 PM</option><option value="13">1:00 PM</option>
+                            <option value="14">2:00 PM</option><option value="15">3:00 PM</option>
+                            <option value="16">4:00 PM</option><option value="17">5:00 PM</option>
+                            <option value="18">6:00 PM</option><option value="19">7:00 PM</option>
+                            <option value="20">8:00 PM</option><option value="21">9:00 PM</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="field-group" style="margin-top:13px;">
+                    <label class="field-label" for="newStudentTutor">Tutor Preference</label>
+                    <select id="newStudentTutor" class="field-input">
+                        <option value="">No preference</option>
+                        <option value="male">Male tutor</option>
+                        <option value="female">Female tutor</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Step 3: Fee Summary -->
+            <div class="step-panel" id="add-step-3">
+                <h4 style="font-size:0.92rem;font-weight:800;color:var(--sage-dark);margin:0 0 14px;">Step 3 — Fee Summary</h4>
+                <p style="font-size:0.83rem;color:var(--muted);margin-bottom:16px;">Please review the estimated fees before confirming.</p>
+                <div id="addStudentFeeSummary" style="background:linear-gradient(135deg,rgba(74,124,89,0.06),rgba(74,124,89,0.02));border:1px solid rgba(74,124,89,0.2);border-radius:var(--radius);padding:20px;margin-bottom:14px;">
+                    <!-- populated dynamically by JS -->
+                </div>
+                <div style="background:#fefce8;border:1px solid #fde68a;border-radius:var(--radius);padding:13px;font-size:0.8rem;color:#92400e;">
+                    <strong>ℹ️ Note:</strong> Fees are estimates. Final amounts confirmed by staff. Proration applies for mid-month starts.
+                </div>
+            </div>
+
+            <!-- Step 4: Review & Submit -->
+            <div class="step-panel" id="add-step-4">
+                <h4 style="font-size:0.92rem;font-weight:800;color:var(--sage-dark);margin:0 0 14px;">Step 4 — Review &amp; Confirm</h4>
+                <div id="addStudentReview" style="background:rgba(241,245,249,0.8);border:1px solid var(--border);border-radius:var(--radius);padding:18px;font-size:0.87rem;line-height:1.75;color:#374151;"></div>
+                <p style="margin-top:13px;font-size:0.78rem;color:var(--muted);">
+                    ℹ️ Your new student will be created as <strong>Pending Registration</strong>. Staff will review and confirm.
+                </p>
+            </div>
+        </div>
+        <div class="modal-footer" style="justify-content:space-between;">
+            <button id="addStudentPrevBtn" class="btn-secondary" onclick="addStudentPrev()" style="width:auto;padding:11px 22px;display:none;">← Back</button>
+            <div style="flex:1;"></div>
+            <button id="addStudentNextBtn" class="btn-primary" onclick="addStudentNext()" style="width:auto;padding:11px 22px;">Next →</button>
+            <button id="addStudentSubmitBtn" class="btn-primary hidden" onclick="submitNewStudent()"
+                    style="width:auto;padding:11px 22px;background:linear-gradient(135deg,var(--gold),#e0b95c);color:#2d3f2d;box-shadow:0 4px 14px rgba(201,168,76,0.4);">
+                <span id="addStudentSubmitText">✅ Submit Enrolment</span>
+                <div id="addStudentSubmitSpinner" class="loading-spinner-small hidden"></div>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== FOOTER with privacy & terms links ===== -->
+<footer class="portal-footer">
+    <p>© 2025 Blooming Kids House · Where Every Child Blossoms 🌱</p>
+    <div class="portal-footer-links">
+        <button class="portal-footer-link" onclick="showPrivacyPolicy()">Privacy Policy</button>
+        <span style="color:var(--muted);">|</span>
+        <button class="portal-footer-link" onclick="showTerms()">Terms of Use</button>
+    </div>
+</footer>
+
+<!-- ===== PRIVACY / COOKIE CONSENT BANNER ===== -->
+<div id="privacyCookieBanner">
+    <div style="max-width:900px; margin:0 auto; display:flex; flex-wrap:wrap; align-items:center; gap:12px;">
+        <div style="flex:1; min-width:260px;">
+            <div style="font-weight:700; font-size:0.95rem; margin-bottom:4px;">🔒 We value your privacy</div>
+            <div style="font-size:0.78rem; color:rgba(255,255,255,.7); line-height:1.5;">We use essential cookies for authentication and analytics cookies to improve your experience. We comply with NDPA, GDPR, and COPPA.
+                <a href="#" onclick="showPrivacyPolicy(); return false;" style="color:#60a5fa; text-decoration:underline;">Privacy Policy</a>
+            </div>
+        </div>
+        <div style="display:flex; gap:8px; flex-shrink:0;">
+            <button onclick="acceptPrivacyCookies()" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8); color:#fff; border:none; padding:8px 18px; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.85rem;">Accept All</button>
+            <button onclick="declinePrivacyCookies()" style="background:rgba(255,255,255,.1); color:#fff; border:1px solid rgba(255,255,255,.2); padding:8px 14px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.85rem;">Essential Only</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== PRIVACY POLICY / TERMS MODAL ===== -->
+<div id="privacyPolicyModal">
+    <div class="privacy-modal-content">
+        <div class="privacy-modal-header">
+            <h3 id="modalTitle">🔒 Privacy Policy</h3>
+            <button class="privacy-close" onclick="closePrivacyPolicy()">✕</button>
+        </div>
+        <div class="privacy-modal-body" id="modalBody">
+            <!-- Content populated by JS -->
+        </div>
+        <div class="privacy-modal-footer">
+            <button class="btn-primary" style="width:auto; padding:10px 20px;" onclick="closePrivacyPolicy()">Close</button>
+        </div>
+    </div>
+</div>
+
+</div> <!-- /appRoot -->
+
+<!-- Load parent portal JS -->
+<script src="parent.js" defer></script>
+
+<!-- Privacy / cookie functions and modal content + FAB visibility safety -->
+<script>
+(function() {
+    const CONSENT_KEY = "bkh_cookie_consent";
+    function showBanner() { const b = document.getElementById("privacyCookieBanner"); if(b) b.style.display = "block"; }
+    function hideBanner() { const b = document.getElementById("privacyCookieBanner"); if(b) b.style.display = "none"; }
+    window.acceptPrivacyCookies = function() { localStorage.setItem(CONSENT_KEY, "all"); hideBanner(); };
+    window.declinePrivacyCookies = function() { localStorage.setItem(CONSENT_KEY, "essential"); hideBanner(); };
+
+    // Modal functions
+    const modal = document.getElementById('privacyPolicyModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+
+    window.showPrivacyPolicy = function() {
+        modalTitle.innerHTML = '🔒 Privacy Policy';
+        modalBody.innerHTML = `
+            <p style="font-size:0.8rem; color:#64748b; margin-bottom:16px;">Last updated: January 2025 | Blooming Kids House</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Data We Collect</h3>
+            <p>We collect personal information you provide during registration (name, email, phone number) and usage data (session activity, login times). For students under 13, we collect only what is strictly necessary to provide our services, in compliance with COPPA.</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">How We Use Your Data</h3>
+            <p>Your data is used solely to provide tutoring services, match students with tutors, track academic progress, and communicate with parents/guardians. We do not sell your data to third parties.</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Your Rights (NDPA / GDPR)</h3>
+            <p>You have the right to:</p>
+            <ul style="margin-bottom:16px; padding-left:20px;">
+                <li>Access your personal data</li>
+                <li>Request correction or deletion</li>
+                <li>Withdraw consent at any time</li>
+                <li>Data portability</li>
+                <li>Lodge a complaint with the supervisory authority</li>
+            </ul>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Children Privacy (COPPA)</h3>
+            <p>We never knowingly collect personal data from children under 13 without verifiable parental consent. Parents may review, update, or delete their child's information by contacting us.</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Contact Us</h3>
+            <p>For data requests or privacy concerns, contact: <strong>info@bloomingkidshouse.com</strong></p>
+        `;
+        modal.style.display = 'flex';
+    };
+
+    window.showTerms = function() {
+        modalTitle.innerHTML = '📜 Terms of Use';
+        modalBody.innerHTML = `
+            <p style="font-size:0.8rem; color:#64748b; margin-bottom:16px;">Last updated: January 2025 | Blooming Kids House</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Acceptance of Terms</h3>
+            <p>By accessing or using the Blooming Kids House parent portal, you agree to be bound by these Terms of Use. If you do not agree, you may not use the service.</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Description of Service</h3>
+            <p>Blooming Kids House provides an online platform for parents to monitor their children's academic progress, communicate with tutors, manage payments, and access educational resources.</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">User Accounts</h3>
+            <p>You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account. You must immediately notify us of any unauthorized use.</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Payment Terms</h3>
+            <p>Fees for tutoring services are outlined in your enrollment agreement. Payments are processed through our secure payment gateway. Late payments may result in suspension of services.</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Intellectual Property</h3>
+            <p>All content on the portal, including logos, text, and software, is the property of Blooming Kids House and may not be reproduced without permission.</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Limitation of Liability</h3>
+            <p>Blooming Kids House shall not be liable for any indirect, incidental, or consequential damages arising from the use of the portal.</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Changes to Terms</h3>
+            <p>We reserve the right to modify these terms at any time. Continued use of the portal constitutes acceptance of the revised terms.</p>
+            <h3 style="font-weight:700; color:#1e293b; margin:0 0 8px;">Contact</h3>
+            <p>For questions about these Terms, contact: <strong>info@bloomingkidshouse.com</strong></p>
+        `;
+        modal.style.display = 'flex';
+    };
+
+    window.closePrivacyPolicy = function() {
+        modal.style.display = 'none';
+    };
+
+    // Show cookie banner if consent not given
+    document.addEventListener("DOMContentLoaded", function() {
+        if (!localStorage.getItem(CONSENT_KEY)) showBanner();
+    });
+
+    // SAFETY: Ensure FAB becomes visible when dashboard is shown
+    const checkDashboardAndShowFab = function() {
+        const reportArea = document.getElementById('reportArea');
+        const fabContainer = document.getElementById('fabContainer');
+        if (reportArea && fabContainer) {
+            const isDashboardVisible = window.getComputedStyle(reportArea).display !== 'none' && 
+                                        !reportArea.classList.contains('hidden');
+            if (isDashboardVisible) {
+                fabContainer.classList.remove('hidden');
+                console.log('✅ FAB shown automatically');
+            } else {
+                setTimeout(checkDashboardAndShowFab, 500);
+            }
+        }
+    };
+    // Start checking after a short delay to let parent.js initialize
+    setTimeout(checkDashboardAndShowFab, 1000);
+})();
+</script>
 </body>
 </html>

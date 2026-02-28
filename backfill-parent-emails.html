@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Backfill Parent Emails</title>
+    <script type="module">
+        import { db } from './firebaseConfig.js';
+        import { collection, getDocs, updateDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+        async function backfillAllStudents() {
+            const output = document.getElementById('output');
+            output.innerHTML = '🔄 Starting to backfill all students...<br>';
+            
+            try {
+                // Get ALL students
+                const studentsRef = collection(db, "students");
+                const snapshot = await getDocs(studentsRef);
+                
+                let updated = 0;
+                let skipped = 0;
+                
+                output.innerHTML += `📊 Found ${snapshot.size} students to process...<br>`;
+                
+                for (const studentDoc of snapshot.docs) {
+                    const studentData = studentDoc.data();
+                    
+                    // Skip if already has parentEmail
+                    if (studentData.parentEmail) {
+                        skipped++;
+                        continue;
+                    }
+                    
+                    // Skip if no parentPhone
+                    if (!studentData.parentPhone) {
+                        skipped++;
+                        output.innerHTML += `❌ Student "${studentData.studentName}" has no parentPhone<br>`;
+                        continue;
+                    }
+                    
+                    // Try to find parent email from parents collection
+                    let parentEmail = await findParentEmail(studentData.parentPhone);
+                    
+                    if (parentEmail) {
+                        // Update the student document
+                        await updateDoc(doc(db, "students", studentDoc.id), {
+                            parentEmail: parentEmail
+                        });
+                        
+                        updated++;
+                        output.innerHTML += `✅ Updated "${studentData.studentName}" with email: ${parentEmail}<br>`;
+                    } else {
+                        output.innerHTML += `❓ No parent found for "${studentData.studentName}" (Phone: ${studentData.parentPhone})<br>`;
+                    }
+                    
+                    // Add small delay to avoid rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                
+                output.innerHTML += `<br><strong>🎉 COMPLETE!</strong><br>`;
+                output.innerHTML += `✅ Updated: ${updated} students<br>`;
+                output.innerHTML += `⏭️ Skipped: ${skipped} students<br>`;
+                output.innerHTML += `📊 Total: ${snapshot.size} students<br>`;
+                
+            } catch (error) {
+                output.innerHTML += `<br><strong>❌ ERROR:</strong> ${error.message}<br>`;
+                console.error(error);
+            }
+        }
+
+        async function findParentEmail(parentPhone) {
+            // 1. Search in parents collection
+            const parentsRef = collection(db, "parents");
+            const parentQuery = query(parentsRef, where("phone", "==", parentPhone));
+            const parentSnapshot = await getDocs(parentQuery);
+            
+            if (!parentSnapshot.empty) {
+                return parentSnapshot.docs[0].data().email;
+            }
+            
+            // 2. Search in enrollments collection (if you have one)
+            try {
+                const enrollRef = collection(db, "enrollments");
+                const enrollQuery = query(enrollRef, where("parentPhone", "==", parentPhone));
+                const enrollSnapshot = await getDocs(enrollQuery);
+                
+                if (!enrollSnapshot.empty) {
+                    return enrollSnapshot.docs[0].data().parentEmail || 
+                           enrollSnapshot.docs[0].data().email;
+                }
+            } catch (e) {
+                // Collection might not exist
+            }
+            
+            return null;
+        }
+
+        window.backfillAllStudents = backfillAllStudents;
+    </script>
+</head>
+<body style="font-family: Arial; padding: 20px; max-width: 800px; margin: 0 auto;">
+    <h1>🔧 Backfill Parent Emails</h1>
+    <p>This will add parentEmail to ALL existing students in your database.</p>
+    
+    <button onclick="backfillAllStudents()" 
+            style="background: #059669; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer;">
+        🚀 Start Backfilling All Students
+    </button>
+    
+    <div id="output" style="margin-top: 20px; padding: 15px; background: #f3f4f6; border-radius: 8px; max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 14px;">
+        Click the button above to start...
+    </div>
+    
+    <div style="margin-top: 20px; padding: 15px; background: #fef3c7; border-radius: 8px;">
+        <h3>📝 How this works:</h3>
+        <ol>
+            <li>Finds all students in your database</li>
+            <li>For each student without a parentEmail, it searches for the parent</li>
+            <li>Looks in: parents collection → enrollments collection</li>
+            <li>Updates the student with the parent's email</li>
+            <li><strong>Run this once, then the JS file below will handle new students forever</strong></li>
+        </ol>
+    </div>
+</body>
+</html>

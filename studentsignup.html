@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Production Tailwind CSS via CDN (still) but with CSP fix -->
+    <!-- In true production, you should build Tailwind locally -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <title>BKH Student Portal | Intelligent LMS</title>
+    
+    <!-- Inline styles to avoid CSP issues -->
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+        
+        .hero-gradient { 
+            background: linear-gradient(135deg, #064e3b 0%, #059669 100%); 
+        }
+        
+        .hidden-step { 
+            display: none !important; 
+        }
+        
+        .glass { 
+            background: rgba(255, 255, 255, 0.8); 
+            backdrop-filter: blur(10px); 
+        }
+        
+        .google-btn {
+            background: white;
+            color: #757575;
+            border: 1px solid #ddd;
+            transition: all 0.3s ease;
+        }
+        
+        .google-btn:hover {
+            background: #f8f8f8;
+            border-color: #ccc;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transform: translateY(-1px);
+        }
+        
+        .tab-btn {
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+        
+        .tab-btn.active {
+            background: #059669;
+            color: white;
+            box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+        }
+        
+        .password-strength-meter {
+            height: 6px;
+            margin-top: 6px;
+            border-radius: 3px;
+            transition: all 0.4s ease;
+            background: #e5e7eb;
+            overflow: hidden;
+        }
+        
+        .password-strength-meter .strength-fill {
+            height: 100%;
+            transition: all 0.4s ease;
+        }
+        
+        .strength-0 .strength-fill { width: 20%; background: #dc2626; }
+        .strength-1 .strength-fill { width: 40%; background: #f97316; }
+        .strength-2 .strength-fill { width: 60%; background: #eab308; }
+        .strength-3 .strength-fill { width: 80%; background: #22c55e; }
+        .strength-4 .strength-fill { width: 100%; background: #16a34a; }
+        
+        .password-requirements li {
+            transition: all 0.3s ease;
+            color: #6b7280;
+            list-style: none;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+        
+        .password-requirements li:before {
+            content: '○';
+            position: absolute;
+            left: 0;
+            color: #9ca3af;
+        }
+        
+        .password-requirements li.valid {
+            color: #16a34a;
+        }
+        
+        .password-requirements li.valid:before {
+            content: '✓';
+            color: #16a34a;
+        }
+        
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+        }
+        
+        .tooltip .tooltip-text {
+            visibility: hidden;
+            width: 220px;
+            background-color: #1f2937;
+            color: #fff;
+            text-align: center;
+            border-radius: 8px;
+            padding: 10px;
+            position: absolute;
+            z-index: 100;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 12px;
+            font-weight: normal;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            pointer-events: none;
+        }
+        
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+        
+        .fade-in { 
+            animation: fadeIn 0.5s ease-in; 
+        }
+        
+        @keyframes fadeIn { 
+            from { opacity: 0; transform: translateY(10px); } 
+            to { opacity: 1; transform: translateY(0); } 
+        }
+        
+        .slide-in-right {
+            animation: slideInRight 0.5s ease-out;
+        }
+        
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 16px 24px;
+            border-radius: 12px;
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            z-index: 9999;
+            transform: translateX(150%);
+            transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            max-width: 400px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .toast.show { 
+            transform: translateX(0); 
+        }
+        
+        .toast.success { 
+            background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%); 
+            border-left: 4px solid #15803d;
+        }
+        
+        .toast.error { 
+            background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); 
+            border-left: 4px solid #b91c1c;
+        }
+        
+        .toast.warning { 
+            background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); 
+            border-left: 4px solid #d97706;
+        }
+        
+        .toast.info { 
+            background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%); 
+            border-left: 4px solid #1d4ed8;
+        }
+        
+        /* Modal Background */
+        .modal-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9998;
+            padding: 20px;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        /* Loading Spinner */
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Custom checkbox */
+        input[type="checkbox"] {
+            accent-color: #059669;
+        }
+        
+        /* Smooth transitions */
+        .transition-all-custom {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* Security badge */
+        .security-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(22, 163, 74, 0.1);
+            color: #16a34a;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        /* Custom rounded corners */
+        .rounded-5xl {
+            border-radius: 2.5rem;
+        }
+        
+        /* Focus styles */
+        .focus-ring:focus {
+            outline: none;
+            ring: 4px;
+            ring-color: rgba(5, 150, 105, 0.2);
+        }
+        
+        /* Brand colors */
+        .brand-light { color: #f0fdf4; }
+        .brand-primary { color: #059669; }
+        .brand-dark { color: #064e3b; }
+        .brand-accent { color: #fbbf24; }
+        .brand-danger { color: #dc2626; }
+        
+        .bg-brand-light { background-color: #f0fdf4; }
+        .bg-brand-primary { background-color: #059669; }
+        .bg-brand-dark { background-color: #064e3b; }
+        .bg-brand-accent { background-color: #fbbf24; }
+        .bg-brand-danger { background-color: #dc2626; }
+        
+        /* Gradient backgrounds */
+        .bg-gradient-brand {
+            background: linear-gradient(135deg, #059669 0%, #064e3b 100%);
+        }
+        
+        .bg-gradient-accent {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        }
+    </style>
+    
+    <!-- Note: X-Frame-Options must be set via HTTP headers, not meta tags -->
+    <!-- This should be configured on your web server (Apache/Nginx) -->
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container"></div>
+
+    <div class="flex flex-col lg:flex-row w-full max-w-5xl bg-white rounded-5xl shadow-2xl overflow-hidden min-h-[700px] border border-gray-100">
+        <!-- Left Side - Hero Section -->
+        <div class="hidden lg:flex lg:w-2/5 hero-gradient p-12 flex-col justify-between text-white relative overflow-hidden">
+            <!-- Background patterns -->
+            <div class="absolute top-0 left-0 w-40 h-40 bg-white/10 rounded-full -translate-x-20 -translate-y-20"></div>
+            <div class="absolute bottom-0 right-0 w-56 h-56 bg-white/10 rounded-full translate-x-28 translate-y-28"></div>
+            <div class="absolute top-1/2 left-1/2 w-32 h-32 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
+            
+            <div class="relative space-y-6 z-10">
+                <div class="bg-white/20 p-5 rounded-3xl w-fit backdrop-blur-sm border border-white/30">
+                    <i class="fas fa-shield-alt text-3xl text-yellow-400"></i>
+                </div>
+                <h1 class="text-5xl font-black leading-tight tracking-tight">
+                    BKH <br>Student <br><span class="text-yellow-400">Portal.</span>
+                </h1>
+                <p class="text-emerald-100/90 text-lg font-medium leading-relaxed">
+                    Enterprise-grade security with military-grade encryption. Your data is protected 24/7 with automated threat detection.
+                </p>
+                
+                <!-- Security Features List -->
+                <div class="space-y-4 mt-10">
+                    <div class="flex items-center space-x-4 p-3 rounded-2xl bg-white/10 backdrop-blur-sm">
+                        <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                            <i class="fas fa-lock text-yellow-400"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold">End-to-end encryption</h4>
+                            <p class="text-emerald-100/70 text-sm">All data encrypted in transit and at rest</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-4 p-3 rounded-2xl bg-white/10 backdrop-blur-sm">
+                        <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                            <i class="fas fa-user-shield text-yellow-400"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold">GDPR & COPPA compliant</h4>
+                            <p class="text-emerald-100/70 text-sm">Full compliance with privacy regulations</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-4 p-3 rounded-2xl bg-white/10 backdrop-blur-sm">
+                        <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                            <i class="fas fa-search text-yellow-400"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold">Regular security audits</h4>
+                            <p class="text-emerald-100/70 text-sm">Continuous monitoring and penetration testing</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="relative z-10">
+                <div class="flex items-center justify-between text-xs opacity-70">
+                    <div class="security-badge">
+                        <i class="fas fa-shield-check"></i>
+                        ISO 27001 Certified
+                    </div>
+                    <span>Powered by Blooming Kids House</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side - Auth Forms -->
+        <div class="w-full lg:w-3/5 p-8 lg:p-16 flex flex-col justify-center">
+            
+            <!-- Logo for Mobile -->
+            <div class="lg:hidden mb-10 text-center">
+                <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-600 to-green-800 rounded-3xl mb-6 shadow-lg">
+                    <i class="fas fa-shield-alt text-4xl text-white"></i>
+                </div>
+                <h2 class="text-3xl font-black text-gray-900 mb-2">Secure Student Portal</h2>
+                <p class="text-gray-600">Enterprise-grade security for your education</p>
+            </div>
+            
+            <!-- Tabs for Activation vs Login -->
+            <div class="flex mb-10 bg-gray-100 p-2 rounded-3xl w-fit mx-auto border border-gray-200">
+                <button id="tab-activate" class="tab-btn active px-8 py-4 rounded-3xl font-bold text-lg" data-tab="activate">
+                    <i class="fas fa-user-plus mr-2"></i>Activate Account
+                </button>
+                <button id="tab-login" class="tab-btn px-8 py-4 rounded-3xl font-bold text-lg text-gray-600" data-tab="login">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Login
+                </button>
+            </div>
+
+            <!-- Activation Flow -->
+            <div id="activation-flow" class="space-y-6">
+                <!-- Step 1: Parent Verification -->
+                <div id="step-1" class="space-y-6 fade-in">
+                    <div class="mb-10">
+                        <h3 class="text-4xl font-black text-gray-900 mb-3">Verify Parent</h3>
+                        <p class="text-gray-600 text-lg">Enter the email address used during your parent's registration.</p>
+                    </div>
+                    
+                    <!-- Rate Limiting Indicator -->
+                    <div id="rate-limit-warning" class="hidden p-5 bg-yellow-50 border-2 border-yellow-200 rounded-3xl text-sm text-yellow-800">
+                        <div class="flex items-start space-x-3">
+                            <i class="fas fa-exclamation-triangle text-xl mt-0.5"></i>
+                            <div>
+                                <h4 class="font-bold mb-1">Too Many Attempts</h4>
+                                <p id="rate-limit-message"></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <label class="text-sm font-bold text-gray-500 uppercase tracking-widest ml-2 flex items-center">
+                            <i class="fas fa-envelope mr-2"></i>Parent's Registered Email
+                            <span class="tooltip ml-2">
+                                <i class="fas fa-question-circle text-gray-400"></i>
+                                <span class="tooltip-text">This must match exactly the email your parent used during registration. Contact your parent if you're unsure.</span>
+                            </span>
+                        </label>
+                        <div class="relative">
+                            <i class="fas fa-at absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            <input type="email" id="parent-email" placeholder="parent@email.com" 
+                                class="w-full pl-12 pr-5 py-5 rounded-3xl bg-gray-50 border-2 border-gray-200 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100 transition-all-custom text-lg focus-ring"
+                                autocomplete="email" required>
+                        </div>
+                        <p class="text-xs text-gray-500 ml-2">Enter the exact email your parent registered with</p>
+                    </div>
+                    
+                    <button id="find-profile-btn" 
+                            class="w-full bg-gradient-to-r from-green-600 to-green-800 text-white font-black py-6 rounded-3xl shadow-xl hover:shadow-2xl hover:-translate-y-1 active:scale-[0.98] transition-all-custom disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none">
+                        <span id="find-profile-text" class="flex items-center justify-center">
+                            <i class="fas fa-search mr-3"></i>Find My Profile
+                        </span>
+                        <span id="find-profile-loading" class="hidden items-center justify-center">
+                            <i class="fas fa-spinner spinner mr-3"></i>Verifying...
+                        </span>
+                    </button>
+                    
+                    <!-- Divider with Google Sign-in option -->
+                    <div class="relative py-6">
+                        <div class="absolute inset-0 flex items-center">
+                            <div class="w-full border-t-2 border-gray-200"></div>
+                        </div>
+                        <div class="relative flex justify-center text-sm">
+                            <span class="px-5 bg-white text-gray-500 font-medium">Or activate with</span>
+                        </div>
+                    </div>
+                    
+                    <button id="google-activate-btn" 
+                            class="w-full google-btn font-bold py-5 rounded-3xl flex items-center justify-center gap-4 hover:shadow-lg text-lg">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="w-6 h-6" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIyLjU2IDEyLjI1QzIyLjU2IDExLjQ3IDIyLjQ5IDEwLjcyIDIyLjM2IDEwSDEyVjE0LjI1SDE4LjA5QzE3LjkzIDE1LjMgMTcuMjIgMTYuMTUgMTYuMDIgMTYuNzJWMjAuMDJIMTkuNjRDMjEuNTUgMTguMjQgMjIuNTYgMTUuNSAyMi41NiAxMi4yNVoiIGZpbGw9IiM0Mjg1RjQiLz4KPHBhdGggZD0iTTEyIDIzQzE1LjMgMjMgMTcuOTYgMjEuOTIgMTkuNjQgMjAuMDJMMTYuMDIgMTYuNzJDMTQuOTcgMTcuMjcgMTMuNjUgMTcuNjUgMTIgMTcuNjVDOC44NyAxNy42NSA2LjIxIDE1LjYgNS40NiAxMi44MUgxLjY0VjE2LjE5QzMuMzQgMTkuNDcgNi43IDIyIDEyIDIyWiIgZmlsbD0iIzM0QTg1MyIvPgo8cGF0aCBkPSJNNS40NiAxMi44MUM1LjIgMTEuODEgNS4wOSAxMC43NiA1LjA5IDkuNzVDNS4wOSA4LjczOSA1LjIgNy42OSA1LjQ2IDYuNjlWMy4zMUgxLjY0QzAuNTYgNS4zOSAwIDcuNzggMCA5Ljc1QzAgMTEuNzIgMC41NiAxNC4xMSAxLjY0IDE2LjE5TDUuNDYgMTIuODFaIiBmaWxsPSIiIGlkPSJhIi8+CjxwYXRoIGQ9Ik0xMiA1LjM4QzEzLjYyIDUuMzggMTUuMDYgNS45NCAxNi4xMiA3LjA4TDE5Ljc4IDMuNDJDMTcuOTYgMS43MyAxNS4zIDAgMTIgMEM2LjcgMCAzLjM0IDIuNTMgMS42NCA1LjgxTDUuNDYgOS4xOUM2LjIxIDYuNCA4Ljg3IDQuMzggMTIgNC4zOFoiIGZpbGw9IiNGRjcxMDAiLz4KPC9zdmc+'">
+                        Google Account
+                    </button>
+                    
+                    <div class="pt-4 border-t border-gray-100">
+                        <p class="text-sm text-gray-600 text-center">
+                            <i class="fas fa-lock mr-2"></i>Your information is secured with 256-bit encryption
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Step 2: Claim Profile -->
+                <div id="step-2" class="hidden-step space-y-6 slide-in-right">
+                    <button id="back-to-step1" 
+                            class="flex items-center text-gray-600 hover:text-gray-900 transition-colors mb-2 group">
+                        <i class="fas fa-arrow-left mr-3 group-hover:-translate-x-1 transition-transform"></i> 
+                        <span class="font-semibold">Back to verification</span>
+                    </button>
+                    
+                    <div class="mb-10">
+                        <h3 class="text-4xl font-black text-gray-900 mb-3">Claim Profile</h3>
+                        <p class="text-gray-600 text-lg">Select your name and set up secure login credentials.</p>
+                    </div>
+                    
+                    <div class="space-y-6">
+                        <div class="space-y-3">
+                            <label class="text-sm font-bold text-gray-500 uppercase tracking-widest ml-2 flex items-center">
+                                <i class="fas fa-user mr-2"></i>Who are you?
+                            </label>
+                            <div class="relative">
+                                <i class="fas fa-child absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                <select id="student-select" 
+                                        class="w-full pl-12 pr-5 py-5 rounded-3xl bg-gray-50 border-2 border-gray-200 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100 transition-all-custom cursor-pointer text-lg appearance-none focus-ring">
+                                    <option value="">Select your name</option>
+                                </select>
+                                <i class="fas fa-chevron-down absolute right-5 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3">
+                            <label class="text-sm font-bold text-gray-500 uppercase tracking-widest ml-2 flex items-center">
+                                <i class="fas fa-envelope mr-2"></i>Login Email (Student)
+                            </label>
+                            <div class="relative">
+                                <i class="fas fa-at absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                <input type="email" id="student-email-input" placeholder="student@email.com" 
+                                    class="w-full pl-12 pr-5 py-5 rounded-3xl bg-gray-50 border-2 border-gray-200 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100 transition-all-custom text-lg focus-ring"
+                                    autocomplete="email" required>
+                            </div>
+                            <p class="text-xs text-gray-500 ml-2">This will be your login email for future access</p>
+                        </div>
+
+                        <div class="space-y-3">
+                            <label class="text-sm font-bold text-gray-500 uppercase tracking-widest ml-2 flex items-center">
+                                <i class="fas fa-lock mr-2"></i>Create Password
+                                <span class="tooltip ml-2">
+                                    <i class="fas fa-question-circle text-gray-400"></i>
+                                    <span class="tooltip-text">Strong passwords include uppercase & lowercase letters, numbers, and special characters. Minimum 12 characters required.</span>
+                                </span>
+                            </label>
+                            <div class="relative">
+                                <i class="fas fa-key absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                <input type="password" id="student-pass" placeholder="••••••••••••" 
+                                    class="w-full pl-12 pr-14 py-5 rounded-3xl bg-gray-50 border-2 border-gray-200 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100 transition-all-custom text-lg focus-ring"
+                                    minlength="12" required>
+                                <button type="button" id="toggle-student-password" class="absolute right-5 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors">
+                                    <i class="far fa-eye" id="eye-icon-student"></i>
+                                </button>
+                            </div>
+                            
+                            <!-- Password Strength Meter -->
+                            <div class="mt-4">
+                                <div class="flex justify-between mb-2">
+                                    <span class="text-sm font-medium text-gray-700">Password Strength</span>
+                                    <span id="strength-text" class="text-sm font-bold">Weak</span>
+                                </div>
+                                <div class="password-strength-meter" id="password-strength-meter">
+                                    <div class="strength-fill"></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Password Requirements -->
+                            <ul class="password-requirements text-sm space-y-2 mt-4" id="password-requirements">
+                                <li id="req-length">At least 12 characters</li>
+                                <li id="req-uppercase">One uppercase letter (A-Z)</li>
+                                <li id="req-lowercase">One lowercase letter (a-z)</li>
+                                <li id="req-number">One number (0-9)</li>
+                                <li id="req-special">One special character (!@#$%^&*)</li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Remember Me -->
+                        <div class="flex items-center space-x-3 pt-4">
+                            <input type="checkbox" id="remember-me-activation" 
+                                   class="w-6 h-6 rounded-lg text-green-600 focus:ring-4 focus:ring-green-100 focus-ring">
+                            <label for="remember-me-activation" class="text-gray-700 font-medium cursor-pointer">
+                                <i class="fas fa-history mr-2"></i>Remember me for 30 days
+                            </label>
+                        </div>
+                    </div>
+
+
+                    <!-- Privacy Consent -->
+                    <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:12px 14px;margin-bottom:8px;">
+                        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:0.82rem;color:#0c4a6e;line-height:1.5;">
+                            <input type="checkbox" id="student-privacy-consent" style="margin-top:2px;flex-shrink:0;accent-color:#0ea5e9;">
+                            <span>I agree to the <a href="#" onclick="showPrivacyPolicy();return false;" style="color:#0369a1;font-weight:700;text-decoration:underline;">Privacy Policy</a> and consent to BrightKids Hub collecting and processing my data in accordance with NDPA, GDPR, and COPPA. Parents/guardians confirm they have reviewed this on behalf of minors under 13.</span>
+                        </label>
+                    </div>
+                    <button id="activate-portal-btn" 
+                            class="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 text-green-900 font-black py-6 rounded-3xl shadow-xl hover:shadow-2xl hover:-translate-y-1 active:scale-[0.98] transition-all-custom disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none">
+                        <span id="activate-text" class="flex items-center justify-center">
+                            <i class="fas fa-rocket mr-3"></i>Activate My Portal
+                        </span>
+                        <span id="activate-loading" class="hidden items-center justify-center">
+                            <i class="fas fa-spinner spinner mr-3"></i>Securing Account...
+                        </span>
+                    </button>
+                    
+                    <p class="text-center text-gray-600 mt-6">
+                        Already activated? 
+                        <a id="switch-to-login" href="#" 
+                           class="text-green-600 font-bold hover:underline ml-1 transition-colors">
+                            Switch to Login
+                        </a>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Login Flow -->
+            <div id="login-flow" class="hidden-step space-y-6 fade-in">
+                <div class="mb-10">
+                    <h3 class="text-4xl font-black text-gray-900 mb-3">Student Login</h3>
+                    <p class="text-gray-600 text-lg">Welcome back! Enter your credentials to access your portal.</p>
+                </div>
+                
+                <!-- Failed Attempts Warning -->
+                <div id="failed-attempts-warning" class="hidden p-5 bg-red-50 border-2 border-red-200 rounded-3xl text-sm text-red-800">
+                    <div class="flex items-start space-x-3">
+                        <i class="fas fa-exclamation-circle text-xl mt-0.5"></i>
+                        <div>
+                            <h4 class="font-bold mb-1">Security Alert</h4>
+                            <p id="failed-attempts-message"></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="space-y-6">
+                    <div class="space-y-3">
+                        <label class="text-sm font-bold text-gray-500 uppercase tracking-widest ml-2 flex items-center">
+                            <i class="fas fa-envelope mr-2"></i>Student Email
+                        </label>
+                        <div class="relative">
+                            <i class="fas fa-at absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            <input type="email" id="login-email" placeholder="student@email.com" 
+                                class="w-full pl-12 pr-5 py-5 rounded-3xl bg-gray-50 border-2 border-gray-200 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100 transition-all-custom text-lg focus-ring"
+                                autocomplete="username" required>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <label class="text-sm font-bold text-gray-500 uppercase tracking-widest ml-2 flex items-center">
+                                <i class="fas fa-lock mr-2"></i>Password
+                            </label>
+                            <a id="forgot-password-link" href="#" 
+                               class="text-sm text-green-600 hover:underline font-bold transition-colors">
+                                Forgot Password?
+                            </a>
+                        </div>
+                        <div class="relative">
+                            <i class="fas fa-key absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            <input type="password" id="login-password" placeholder="••••••••" 
+                                class="w-full pl-12 pr-14 py-5 rounded-3xl bg-gray-50 border-2 border-gray-200 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100 transition-all-custom text-lg focus-ring"
+                                autocomplete="current-password" required>
+                            <button type="button" id="toggle-login-password" class="absolute right-5 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors">
+                                <i class="far fa-eye" id="eye-icon-login"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Remember Me -->
+                    <div class="flex items-center space-x-3 pt-2">
+                        <input type="checkbox" id="remember-me-login" 
+                               class="w-6 h-6 rounded-lg text-green-600 focus:ring-4 focus:ring-green-100 focus-ring" checked>
+                        <label for="remember-me-login" class="text-gray-700 font-medium cursor-pointer">
+                            <i class="fas fa-history mr-2"></i>Remember me for 30 days
+                        </label>
+                    </div>
+                </div>
+
+                <button id="login-portal-btn" 
+                        class="w-full bg-gradient-to-r from-green-600 to-green-800 text-white font-black py-6 rounded-3xl shadow-xl hover:shadow-2xl hover:-translate-y-1 active:scale-[0.98] transition-all-custom disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none">
+                    <span id="login-text" class="flex items-center justify-center">
+                        <i class="fas fa-sign-in-alt mr-3"></i>Login to Portal
+                    </span>
+                    <span id="login-loading" class="hidden items-center justify-center">
+                        <i class="fas fa-spinner spinner mr-3"></i>Verifying...
+                    </span>
+                </button>
+                
+                <button id="google-login-btn" 
+                        class="w-full google-btn font-bold py-5 rounded-3xl flex items-center justify-center gap-4 hover:shadow-lg text-lg">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="w-6 h-6" onerror="this.onerror=null;this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIyLjU2IDEyLjI1QzIyLjU2IDExLjQ3IDIyLjQ5IDEwLjcyIDIyLjM2IDEwSDEyVjE0LjI1SDE4LjA5QzE3LjkzIDE1LjMgMTcuMjIgMTYuMTUgMTYuMDIgMTYuNzJWMjAuMDJIMTkuNjRDMjEuNTUgMTguMjQgMjIuNTYgMTUuNSAyMi41NiAxMi4yNVoiIGZpbGw9IiM0Mjg1RjQiLz4KPHBhdGggZD0iTTEyIDIzQzE1LjMgMjMgMTcuOTYgMjEuOTIgMTkuNjQgMjAuMDJMMTYuMDIgMTYuNzJDMTQuOTcgMTcuMjcgMTMuNjUgMTcuNjUgMTIgMTcuNjVDOC44NyAxNy42NSA2LjIxIDE1LjYgNS40NiAxMi44MUgxLjY0VjE2LjE5QzMuMzQgMTkuNDcgNi43IDIyIDEyIDIyWiIgZmlsbD0iIzM0QTg1MyIvPgo8cGF0aCBkPSJNNS40NiAxMi44MUM1LjIgMTEuODEgNS4wOSAxMC43NiA1LjA5IDkuNzVDNS4wOSA4LjczOSA1LjIgNy42OSA1LjQ2IDYuNjlWMy4zMUgxLjY0QzAuNTYgNS4zOSAwIDcuNzggMCA5Ljc1QzAgMTEuNzIgMC41NiAxNC4xMSAxLjY0IDE2LjE5TDUuNDYgMTIuODFaIiBmaWxsPSIiIGlkPSJhIi8+CjxwYXRoIGQ9Ik0xMiA1LjM4QzEzLjYyIDUuMzggMTUuMDYgNS45NCAxNi4xMiA3LjA4TDE5Ljc4IDMuNDJjLTEuODItMS42OS00LjQ4LTMuMTUtOC4xLTMuMTVDNi43IDAgMy4zNCAyLjUzIDEuNjQgNS44MUw1LjQ2IDkuMTlDNi4yMSA2LjQgOC44NyA0LjM4IDEyIDQuMzhaIiBmaWxsPSIjRkY3MTAwIi8+Cjwvc3ZnPgo='">
+                        Continue with Google
+                </button>
+                
+                <p class="text-center text-gray-600 mt-6">
+                    Haven't activated your account? 
+                    <a id="switch-to-activate" href="#" 
+                       class="text-green-600 font-bold hover:underline ml-1 transition-colors">
+                        Switch to Activation
+                    </a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Forgot Password Modal -->
+    <div id="forgot-password-modal" class="modal-bg hidden-step">
+        <div class="bg-white rounded-4xl p-8 max-w-md w-full space-y-6 mx-4 shadow-2xl border border-gray-100">
+            <div class="flex justify-between items-center pb-4 border-b border-gray-100">
+                <div>
+                    <h3 class="text-2xl font-black text-gray-900">Reset Password</h3>
+                    <p class="text-gray-600 mt-1">We'll send you a secure reset link</p>
+                </div>
+                <button id="close-forgot-password" 
+                        class="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times text-gray-600"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="space-y-2">
+                    <label class="text-sm font-bold text-gray-500 uppercase tracking-widest ml-2">Email Address</label>
+                    <div class="relative">
+                        <i class="fas fa-envelope absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <input type="email" id="reset-email" placeholder="student@email.com" 
+                            class="w-full pl-12 pr-5 py-4 rounded-3xl bg-gray-50 border-2 border-gray-200 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100 transition-all-custom focus-ring">
+                    </div>
+                </div>
+                
+                <div class="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                    <div class="flex items-start space-x-3">
+                        <i class="fas fa-info-circle text-blue-500 mt-0.5"></i>
+                        <div>
+                            <h4 class="font-bold text-blue-800 mb-1">How it works</h4>
+                            <p class="text-blue-700 text-sm">We'll email you a secure link to reset your password. The link expires in 1 hour for security.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex space-x-3 pt-4">
+                <button id="cancel-reset" 
+                        class="flex-1 px-6 py-4 rounded-3xl border-2 border-gray-300 text-gray-700 font-bold hover:bg-gray-50 transition-all-custom">
+                    Cancel
+                </button>
+                <button id="send-reset-btn" 
+                        class="flex-1 px-6 py-4 rounded-3xl bg-gradient-to-r from-green-600 to-green-800 text-white font-bold hover:shadow-lg transition-all-custom">
+                    <span id="reset-text" class="flex items-center justify-center">
+                        <i class="fas fa-paper-plane mr-2"></i>Send Reset Link
+                    </span>
+                    <span id="reset-loading" class="hidden items-center justify-center">
+                        <i class="fas fa-spinner spinner mr-2"></i>Sending...
+                    </span>
+                </button>
+            </div>
+            
+            <div class="pt-4 border-t border-gray-100 text-center">
+                <p class="text-xs text-gray-500">
+                    <i class="fas fa-shield-alt mr-1"></i>
+                    Protected by Firebase Authentication
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- External JavaScript Module -->
+    <script type="module" src="./studentsignup-app.js"></script>
+    
+    <!-- Inline initialization script (small, event listeners only) -->
+    <script>
+        // DOM event listeners - this is minimal and necessary
+        document.addEventListener('DOMContentLoaded', function() {
+            // Tab switching
+            document.getElementById('tab-activate').addEventListener('click', function() {
+                window.switchTab('activate');
+            });
+            
+            document.getElementById('tab-login').addEventListener('click', function() {
+                window.switchTab('login');
+            });
+            
+            // Switch links
+            document.getElementById('switch-to-login').addEventListener('click', function(e) {
+                e.preventDefault();
+                window.switchTab('login');
+            });
+            
+            document.getElementById('switch-to-activate').addEventListener('click', function(e) {
+                e.preventDefault();
+                window.switchTab('activate');
+            });
+            
+            // Back button
+            document.getElementById('back-to-step1').addEventListener('click', function() {
+                window.goBackToStep1();
+            });
+            
+            // Forgot password
+            document.getElementById('forgot-password-link').addEventListener('click', function(e) {
+                e.preventDefault();
+                window.showForgotPassword();
+            });
+            
+            document.getElementById('close-forgot-password').addEventListener('click', function() {
+                window.hideForgotPassword();
+            });
+            
+            document.getElementById('cancel-reset').addEventListener('click', function() {
+                window.hideForgotPassword();
+            });
+            
+            // Password visibility toggles
+            document.getElementById('toggle-student-password').addEventListener('click', function() {
+                window.togglePasswordVisibility('student-pass');
+            });
+            
+            document.getElementById('toggle-login-password').addEventListener('click', function() {
+                window.togglePasswordVisibility('login-password');
+            });
+            
+            // Password strength checking
+            document.getElementById('student-pass').addEventListener('input', function() {
+                window.checkPasswordStrength();
+            });
+            
+            // Main action buttons
+            document.getElementById('find-profile-btn').addEventListener('click', function() {
+                window.findStudents();
+            });
+            
+            document.getElementById('activate-portal-btn').addEventListener('click', function() {
+                window.completeRegistration();
+            });
+            
+            document.getElementById('login-portal-btn').addEventListener('click', function() {
+                window.loginStudent();
+            });
+            
+            document.getElementById('google-activate-btn').addEventListener('click', function() {
+                window.signInWithGoogleForActivation();
+            });
+            
+            document.getElementById('google-login-btn').addEventListener('click', function() {
+                window.signInWithGoogle();
+            });
+            
+            document.getElementById('send-reset-btn').addEventListener('click', function() {
+                window.sendPasswordReset();
+            });
+            
+            // Auto-fill remembered email
+            const rememberedEmail = localStorage.getItem('student_email');
+            const rememberMe = localStorage.getItem('student_remember_me') === 'true';
+            
+            if (rememberedEmail && rememberMe) {
+                document.getElementById('login-email').value = rememberedEmail;
+                document.getElementById('remember-me-login').checked = true;
+            }
+            
+            // Enter key support
+            document.getElementById('parent-email').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    window.findStudents();
+                }
+            });
+            
+            document.getElementById('student-email-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    document.getElementById('student-pass').focus();
+                }
+            });
+            
+            document.getElementById('student-pass').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    window.completeRegistration();
+                }
+            });
+            
+            document.getElementById('login-email').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    document.getElementById('login-password').focus();
+                }
+            });
+            
+            document.getElementById('login-password').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    window.loginStudent();
+                }
+            });
+            
+            document.getElementById('reset-email').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    window.sendPasswordReset();
+                }
+            });
+            
+            // Initial focus
+            if (document.getElementById('activation-flow').classList.contains('hidden-step')) {
+                document.getElementById('login-email').focus();
+            } else {
+                document.getElementById('parent-email').focus();
+            }
+        });
+    </script>
+
+<!-- ===== PRIVACY / COOKIE CONSENT BANNER ===== -->
+<div id="privacyCookieBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:99999;background:linear-gradient(135deg,#1e293b,#0f172a);color:#fff;padding:16px 20px;box-shadow:0 -4px 24px rgba(0,0,0,.4);font-family:inherit;">
+    <div style="max-width:900px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:12px;">
+        <div style="flex:1;min-width:260px;">
+            <div style="font-weight:700;font-size:0.95rem;margin-bottom:4px;">🔒 We value your privacy</div>
+            <div style="font-size:0.78rem;color:rgba(255,255,255,.7);line-height:1.5;">We use essential cookies for authentication and analytics cookies to improve your experience. We comply with NDPA, GDPR, and COPPA.
+                <a href="#" onclick="showPrivacyPolicy();return false;" style="color:#60a5fa;text-decoration:underline;">Privacy Policy</a>
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0;">
+            <button onclick="acceptPrivacyCookies()" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.85rem;">Accept All</button>
+            <button onclick="declinePrivacyCookies()" style="background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);padding:8px 14px;border-radius:8px;font-weight:600;cursor:pointer;font-size:0.85rem;">Essential Only</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== PRIVACY POLICY MODAL ===== -->
+<div id="privacyPolicyModal" style="display:none;position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:16px;">
+    <div style="background:#fff;border-radius:20px;width:100%;max-width:680px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.5);">
+        <div style="background:linear-gradient(135deg,#1e40af,#3b82f6);padding:18px 22px;display:flex;align-items:center;justify-content:space-between;">
+            <div style="color:#fff;font-weight:800;font-size:1.05rem;">🔒 Privacy Policy</div>
+            <button onclick="closePrivacyPolicy()" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:1rem;cursor:pointer;">✕</button>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:24px;">
+            <p style="font-size:0.8rem;color:#64748b;margin-bottom:16px;">Last updated: January 2025 | BrightKids Hub</p>
+            <h3 style="font-weight:700;color:#1e293b;margin:0 0 8px;">Data We Collect</h3>
+            <p style="font-size:0.875rem;color:#475569;margin-bottom:16px;line-height:1.6;">We collect personal information you provide during registration (name, email, phone number) and usage data (session activity, login times). For students under 13, we collect only what is strictly necessary to provide our services, in compliance with COPPA.</p>
+            <h3 style="font-weight:700;color:#1e293b;margin:0 0 8px;">How We Use Your Data</h3>
+            <p style="font-size:0.875rem;color:#475569;margin-bottom:16px;line-height:1.6;">Your data is used solely to provide tutoring services, match students with tutors, track academic progress, and communicate with parents/guardians. We do not sell your data to third parties.</p>
+            <h3 style="font-weight:700;color:#1e293b;margin:0 0 8px;">Your Rights (NDPA / GDPR)</h3>
+            <p style="font-size:0.875rem;color:#475569;margin-bottom:8px;line-height:1.6;">You have the right to:</p>
+            <ul style="font-size:0.875rem;color:#475569;margin-bottom:16px;padding-left:20px;line-height:2;">
+                <li>Access your personal data</li>
+                <li>Request correction or deletion</li>
+                <li>Withdraw consent at any time</li>
+                <li>Data portability</li>
+                <li>Lodge a complaint with the supervisory authority</li>
+            </ul>
+            <h3 style="font-weight:700;color:#1e293b;margin:0 0 8px;">Children Privacy (COPPA)</h3>
+            <p style="font-size:0.875rem;color:#475569;margin-bottom:16px;line-height:1.6;">We never knowingly collect personal data from children under 13 without verifiable parental consent. Parents may review, update, or delete their child's information by contacting us.</p>
+            <h3 style="font-weight:700;color:#1e293b;margin:0 0 8px;">Contact Us</h3>
+            <p style="font-size:0.875rem;color:#475569;line-height:1.6;">For data requests or privacy concerns, contact: <strong>privacy@brightkidshub.com</strong></p>
+        </div>
+        <div style="padding:14px 22px;border-top:1px solid #f1f5f9;display:flex;justify-content:flex-end;">
+            <button onclick="closePrivacyPolicy()" style="background:#1e40af;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-weight:700;cursor:pointer;">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var CONSENT_KEY = "bkh_cookie_consent";
+    function showBanner() { var b=document.getElementById("privacyCookieBanner"); if(b) b.style.display="block"; }
+    function hideBanner() { var b=document.getElementById("privacyCookieBanner"); if(b) b.style.display="none"; }
+    window.acceptPrivacyCookies = function() { localStorage.setItem(CONSENT_KEY,"all"); hideBanner(); };
+    window.declinePrivacyCookies = function() { localStorage.setItem(CONSENT_KEY,"essential"); hideBanner(); };
+    window.showPrivacyPolicy = function() { var m=document.getElementById("privacyPolicyModal"); if(m){m.style.display="flex";} };
+    window.closePrivacyPolicy = function() { var m=document.getElementById("privacyPolicyModal"); if(m){m.style.display="none";} };
+    document.addEventListener("DOMContentLoaded", function() {
+        if (!localStorage.getItem(CONSENT_KEY)) showBanner();
+    });
+})();
+</script>
+
+</body>
+</html>
