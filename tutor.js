@@ -68,6 +68,33 @@ let isTransitionAddEnabled = true;
 let isPreschoolAddEnabled = true; 
 let isPlacementTestEnabled = false;    // OFF by default — admin must explicitly enable
 
+/**
+ * Auto-window for monthly report submission.
+ * Returns true if the current date/time is between 11:59 PM on the 19th
+ * and 11:59 PM on the 25th of the current month.
+ * This does NOT override the admin global toggle — it works alongside it.
+ */
+function isWithinReportWindow() {
+    const now = new Date();
+    const day = now.getDate();
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+    const currentMinutes = day * 24 * 60 + hour * 60 + minute;
+    // 19th at 23:59 → day 19, 23:59
+    const windowStart = 19 * 24 * 60 + 23 * 60 + 59;
+    // 25th at 23:59 → day 25, 23:59
+    const windowEnd = 25 * 24 * 60 + 23 * 60 + 59;
+    return currentMinutes >= windowStart && currentMinutes <= windowEnd;
+}
+
+/**
+ * Returns true if report submission should be effectively enabled.
+ * True if the admin toggle is ON *or* the auto-window is active.
+ */
+function isSubmissionEffectivelyEnabled() {
+    return isSubmissionEnabled || isWithinReportWindow();
+}
+
 // Pay Scheme Configuration
 const PAY_SCHEMES = {
     NEW_TUTOR: {
@@ -5053,7 +5080,7 @@ async function renderStudentDatabase(container, tutor) {
                 </div>`;
         }
 
-        studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEnabled ? 'text-green-600' : 'text-red-500'}">${isSubmissionEnabled ? 'Enabled' : 'Disabled'}</strong> by the admin.</p>`;
+        studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEffectivelyEnabled() ? 'text-green-600' : 'text-red-500'}">${isSubmissionEffectivelyEnabled() ? 'Enabled' + (isWithinReportWindow() && !isSubmissionEnabled ? ' (Auto-Window)' : '') : 'Disabled'}</strong></p>`;
 
         if (studentsCount === 0) {
             studentsHTML += `<p class="text-gray-500">You are not assigned to any students yet.</p>`;
@@ -5101,13 +5128,13 @@ async function renderStudentDatabase(container, tutor) {
                             actionsHTML += `<button class="recall-from-break-btn bg-purple-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}">Recall</button>`;
                         }
                     } else {
-                        actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}">Break</button>`;
+                        actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}">Send to Break</button>`;
                     }
                 }
 
                 // ── SETTING 3: Report Submission (only blocked by hasSubmitted + summerBreak, not by other settings) ──
                 if (!hasSubmitted && !student.summerBreak) {
-                    if (isSubmissionEnabled) {
+                    if (isSubmissionEffectivelyEnabled()) {
                         if (approvedStudents.length === 1) {
                             actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-2 py-1 rounded text-xs" data-student-id="${escapeHtml(student.id)}" data-is-transitioning="${student.isTransitioning}">Submit Report</button>`;
                         } else {
@@ -5168,7 +5195,7 @@ async function renderStudentDatabase(container, tutor) {
             if (tutor.isManagementStaff) {
                 studentsHTML += `<div class="bg-green-50 p-4 rounded-lg shadow-md mt-6"><h3 class="text-lg font-bold text-green-800 mb-2">Management Fee</h3><div class="flex items-center space-x-2"><label class="font-semibold">Fee:</label><input type="number" id="management-fee-input" class="p-2 border rounded w-full" value="${escapeHtml(tutor.managementFee || 0)}"><button id="save-management-fee-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Save Fee</button></div></div>`;
             }
-            if (approvedStudents.length > 1 && isSubmissionEnabled) {
+            if (approvedStudents.length > 1 && isSubmissionEffectivelyEnabled()) {
                 const submittable = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length;
                 const allSaved = Object.keys(savedReports).length === submittable && submittable > 0;
                 if (submittable > 0) {
@@ -5263,10 +5290,10 @@ async function renderStudentDatabase(container, tutor) {
             <h3 class="text-xl font-bold mb-4">Confirm Fee for ${escapeHtml(student.studentName)}</h3>
             <p class="text-sm text-gray-600 mb-4">Please verify the monthly fee for this student.</p>
             <div class="space-y-4">
-                <div><label class="block font-semibold">Current Fee (₦)</label><input type="number" id="confirm-student-fee" class="w-full mt-1 p-2 border rounded" value="${escapeHtml(student.studentFee || 0)}"></div>
+                <div><label class="block font-semibold">Current Fee (₦)</label><input type="number" id="confirm-student-fee" class="w-full mt-1 p-2 border rounded bg-gray-100 text-gray-700 cursor-not-allowed" value="${escapeHtml(student.studentFee || 0)}" readonly disabled></div>
                 <div class="flex justify-end space-x-2 mt-6">
                     <button id="cancel-fee-confirm-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
-                    <button id="confirm-fee-btn" class="bg-green-600 text-white px-6 py-2 rounded">Confirm Fee & Save</button>
+                    <button id="confirm-fee-btn" class="bg-green-600 text-white px-6 py-2 rounded">Confirm & Continue</button>
                 </div>
             </div>`;
         const feeModal = document.createElement('div');
@@ -5277,14 +5304,6 @@ async function renderStudentDatabase(container, tutor) {
 
         document.getElementById('cancel-fee-confirm-btn').addEventListener('click', () => feeModal.remove());
         document.getElementById('confirm-fee-btn').addEventListener('click', async () => {
-            const newFee = parseFloat(document.getElementById('confirm-student-fee').value);
-            if (isNaN(newFee) || newFee < 0) { showCustomAlert('Invalid fee.'); return; }
-
-            if (newFee !== student.studentFee) {
-                await updateDoc(doc(db, student.collection, student.id), { studentFee: newFee });
-                student.studentFee = newFee; 
-                showCustomAlert('Fee updated!');
-            }
             feeModal.remove();
             if (isSingleApprovedStudent) { showAccountDetailsModal([reportData]); } else { savedReports[student.id] = reportData; await saveReportsToFirestore(tutor.email, savedReports); showCustomAlert('Report saved.'); renderUI(); }
         });
@@ -5427,7 +5446,7 @@ async function renderStudentDatabase(container, tutor) {
         document.querySelectorAll('.summer-break-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const s = students.find(s => s.id === btn.getAttribute('data-student-id'));
-                if (confirm(`Put ${escapeHtml(s.studentName)} on Break?`)) {
+                if (confirm(`Send ${escapeHtml(s.studentName)} to Break?`)) {
                     await updateDoc(doc(db, "students", s.id), { summerBreak: true });
                     renderStudentDatabase(container, tutor);
                 }
