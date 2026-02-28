@@ -3053,6 +3053,32 @@ class UnifiedAuthManager {
         if (headerAvatar && this.currentUser) {
             const initial = this.currentUser.parentName.charAt(0).toUpperCase();
             headerAvatar.textContent = initial;
+
+            // Inject a logout button next to the avatar if not already present
+            if (!document.getElementById('headerLogoutBtn')) {
+                const logoutBtn = document.createElement('button');
+                logoutBtn.id = 'headerLogoutBtn';
+                logoutBtn.onclick = logout;
+                logoutBtn.title = 'Log Out';
+                logoutBtn.innerHTML = '🚪 <span style="font-size:0.82rem;">Log Out</span>';
+                Object.assign(logoutBtn.style, {
+                    display: 'inline-flex', alignItems: 'center', gap: '4px',
+                    padding: '6px 14px', marginLeft: '10px',
+                    background: '#DC2626', color: '#fff', border: 'none',
+                    borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600',
+                    cursor: 'pointer', transition: 'background 0.2s', whiteSpace: 'nowrap'
+                });
+                logoutBtn.onmouseover = function() { this.style.background = '#B91C1C'; };
+                logoutBtn.onmouseout  = function() { this.style.background = '#DC2626'; };
+
+                // Insert after the avatar (in its parent container)
+                const avatarParent = headerAvatar.parentElement;
+                if (avatarParent) {
+                    avatarParent.style.display = 'flex';
+                    avatarParent.style.alignItems = 'center';
+                    avatarParent.appendChild(logoutBtn);
+                }
+            }
         }
 
         // Ensure the Reports tab is visually active on first load
@@ -3085,7 +3111,7 @@ class UnifiedAuthManager {
 
     setupUIComponents() {
         addManualRefreshButton();
-        // addLogoutButton() removed — single logout button is in the header
+        // Logout button is injected into the header and settings form by showDashboardUI() and renderSettingsForm()
     }
 
     cleanup() {
@@ -3179,10 +3205,9 @@ function addManualRefreshButton() {
     }
 }
 
-// ADD LOGOUT BUTTON — DISABLED: Single logout button already in header
+// LOGOUT BUTTON — now dynamically injected in showDashboardUI() and renderSettingsForm()
 function addLogoutButton() {
-    // The redesigned portal has a single logout button in the header.
-    // No dynamic injection needed.
+    // Kept for backward compatibility — actual injection is in showDashboardUI()
     return;
 }
 
@@ -3260,6 +3285,15 @@ class SettingsManager {
                         class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors">
                         Update My Profile
                     </button>
+
+                    <!-- Logout Button -->
+                    <div style="border-top:1px solid #E5E7EB;padding-top:20px;margin-top:16px;">
+                        <button onclick="logout()" 
+                            style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;background:#DC2626;color:#fff;border:none;border-radius:10px;font-size:0.95rem;font-weight:600;cursor:pointer;transition:background 0.2s;"
+                            onmouseover="this.style.background='#B91C1C'" onmouseout="this.style.background='#DC2626'">
+                            🚪 Log Out
+                        </button>
+                    </div>
                 </div>
 
                 <div class="md:col-span-2 space-y-6">
@@ -5923,6 +5957,12 @@ function showAddStudentModal() {
         if (el) el.value = '';
     });
 
+    // Reset fee summary and review panel
+    const feeSummary = document.getElementById('addStudentFeeSummary');
+    if (feeSummary) { feeSummary.innerHTML = ''; feeSummary.style.display = 'none'; }
+    const reviewDiv = document.getElementById('addStudentReview');
+    if (reviewDiv) reviewDiv.innerHTML = '';
+
     modal.classList.remove('hidden');
 }
 
@@ -5940,6 +5980,10 @@ function hideAddStudentModal() {
  */
 function togglePickerChip(el) {
     el.classList.toggle('selected');
+    // Recalculate fee estimate when subjects are toggled
+    if (el.closest('#newStudentSubjects')) {
+        updateAddStudentFees();
+    }
 }
 
 /**
@@ -5976,21 +6020,33 @@ function _updateAddStudentStepUI() {
  */
 function addStudentNext() {
     if (_addStudentStep === 1) {
-        const name  = document.getElementById('newStudentName')?.value.trim();
-        const dob   = document.getElementById('newStudentDob')?.value;
-        const grade = document.getElementById('newStudentActualGrade')?.value;
-        const group = document.getElementById('newStudentFeeGroup')?.value;
+        const name   = document.getElementById('newStudentName')?.value.trim();
+        const dob    = document.getElementById('newStudentDob')?.value;
+        const gender = document.getElementById('newStudentGender')?.value;
+        const grade  = document.getElementById('newStudentActualGrade')?.value;
+        const group  = document.getElementById('newStudentFeeGroup')?.value;
 
-        if (!name || !dob || !grade || !group) {
-            showMessage('Please fill in all required fields (Name, DOB, Grade, Tuition Level)', 'error');
+        if (!name || !dob || !gender || !grade || !group) {
+            showMessage('Please fill in all required fields (Name, Gender, DOB, Grade, Tuition Level)', 'error');
             return;
         }
     }
 
     if (_addStudentStep === 2) {
-        const days = document.querySelectorAll('#newStudentDays .picker-chip.selected');
+        const days     = document.querySelectorAll('#newStudentDays .picker-chip.selected');
+        const subjects = document.querySelectorAll('#newStudentSubjects .picker-chip.selected');
+        const sessions = document.getElementById('newStudentSessions')?.value;
+
+        if (subjects.length === 0) {
+            showMessage('Please select at least one subject', 'error');
+            return;
+        }
         if (days.length === 0) {
             showMessage('Please select at least one preferred day', 'error');
+            return;
+        }
+        if (!sessions) {
+            showMessage('Please select a session frequency (Twice, 3x, or 5x Weekly)', 'error');
             return;
         }
     }
@@ -6228,6 +6284,13 @@ async function submitNewStudent() {
             : days.join(', ');
 
         if (!name) throw new Error('Student name is required.');
+        if (!gender) throw new Error('Gender is required.');
+        if (!dob) throw new Error('Date of birth is required.');
+        if (!grade) throw new Error('School grade is required.');
+        if (!group) throw new Error('Tuition level is required.');
+        if (subjects.length === 0) throw new Error('Please select at least one subject.');
+        if (days.length === 0) throw new Error('Please select at least one academic day.');
+        if (!sessions) throw new Error('Please select a session frequency.');
 
         // Build Firestore document — matches the schema used by enrollment portal
         // and expected by comprehensiveFindChildren() (which checks parentPhone field)
