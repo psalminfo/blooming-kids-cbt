@@ -10080,6 +10080,23 @@ async function renderMasterPortalPanel(container) {
             </div>
         </div>
 
+        <!-- Tutor Search Bar -->
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-search text-gray-400"></i>
+                </div>
+                <input type="text" id="master-portal-tutor-search" 
+                    placeholder="Search tutors by name..." 
+                    class="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    autocomplete="off">
+                <button id="master-portal-search-clear" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 hidden">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="master-portal-search-count" class="text-xs text-gray-400 mt-1.5 hidden"></div>
+        </div>
+
         <!-- Loading indicator -->
         <div id="master-portal-loading" class="text-center py-12">
             <div class="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
@@ -10294,6 +10311,55 @@ async function renderMasterPortalPanel(container) {
 
         document.getElementById('master-portal-loading').classList.add('hidden');
         listEl.classList.remove('hidden');
+
+        // --- Tutor Search Functionality ---
+        const searchInput = document.getElementById('master-portal-tutor-search');
+        const searchClear = document.getElementById('master-portal-search-clear');
+        const searchCount = document.getElementById('master-portal-search-count');
+        const tutorCards = listEl.querySelectorAll(':scope > div');
+        const totalTutors = tutorCards.length;
+
+        if (searchInput) {
+            searchInput.addEventListener('input', () => {
+                const term = searchInput.value.toLowerCase().trim();
+                
+                // Toggle clear button visibility
+                if (searchClear) searchClear.classList.toggle('hidden', !term);
+                
+                let visibleCount = 0;
+                tutorCards.forEach(card => {
+                    const header = card.querySelector('.accordion-header');
+                    const nameEl = header ? header.querySelector('.font-bold.text-gray-800') : null;
+                    const tutorName = nameEl ? nameEl.textContent.toLowerCase() : '';
+                    
+                    if (!term || tutorName.includes(term)) {
+                        card.style.display = '';
+                        visibleCount++;
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+                
+                // Show result count when filtering
+                if (searchCount) {
+                    if (term) {
+                        searchCount.textContent = `Showing ${visibleCount} of ${totalTutors} tutors`;
+                        searchCount.classList.remove('hidden');
+                    } else {
+                        searchCount.classList.add('hidden');
+                    }
+                }
+            });
+            
+            // Clear button
+            if (searchClear) {
+                searchClear.addEventListener('click', () => {
+                    searchInput.value = '';
+                    searchInput.dispatchEvent(new Event('input'));
+                    searchInput.focus();
+                });
+            }
+        }
 
         // After render, update gamification winner in Firestore if needed
         if (leadingTutor && leadingScore > 0) {
@@ -10757,7 +10823,7 @@ const navigationGroups = {
         label: "Financial",
         items: [
             { id: "navPayAdvice", label: "Pay Advice", icon: "fas fa-file-invoice-dollar", fn: renderPayAdvicePanel },
-            { id: "navReferralsAdmin", label: "Referral Management", icon: "fas fa-handshake", fn: renderReferralsAdminPanel }
+            { id: "navReferralsAdmin", label: "Referral Management", icon: "fas fa-handshake", fn: renderReferralsAdminPanel, perm: "viewReferralsAdmin" }
         ]
     },
     "academics": {
@@ -10803,8 +10869,7 @@ function initializeSidebarNavigation(staffData) {
         const visibleItems = group.items ? group.items.filter(item => {
             // Use explicit perm key if provided on the item, otherwise derive it
             const permKey = item.perm || getPermissionKey(item.id);
-            const hasPermission = item.id === 'navReferralsAdmin' || 
-                                !staffData.permissions || 
+            const hasPermission = !staffData.permissions || 
                                 !staffData.permissions.tabs || 
                                 staffData.permissions.tabs[permKey] === true;
             return hasPermission;
@@ -12199,4 +12264,3 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
-
