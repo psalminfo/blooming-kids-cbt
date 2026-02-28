@@ -9681,489 +9681,364 @@ window.viewStudentTutorHistory = function(studentId) {
     });
 };
 
-async function generateReportHTML(reportId) {
+// ======================================================
+// REPORT PDF ENGINE — A4 Portrait, Single & Batch
+// Uses html2pdf with proper DOM-element rendering
+// ======================================================
+
+const REPORT_LOGO_URL = "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg";
+
+// Pre-fetch & cache logo as base64 so html2canvas never has CORS issues
+let _cachedLogoBase64 = null;
+async function getLogoBase64() {
+    if (_cachedLogoBase64) return _cachedLogoBase64;
+    try {
+        const resp = await fetch(REPORT_LOGO_URL);
+        const blob = await resp.blob();
+        _cachedLogoBase64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    } catch {
+        _cachedLogoBase64 = null; // will skip logo gracefully
+    }
+    return _cachedLogoBase64;
+}
+
+// Fetch report data from Firestore
+async function fetchReportData(reportId) {
     const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
     if (!reportDoc.exists()) throw new Error("Report not found!");
-    const reportData = reportDoc.data();
+    return { id: reportDoc.id, ...reportDoc.data() };
+}
 
-    const reportSections = {
-        "INTRODUCTION": reportData.introduction,
-        "TOPICS & REMARKS": reportData.topics,
-        "PROGRESS & ACHIEVEMENTS": reportData.progress,
-        "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses,
-        "RECOMMENDATIONS": reportData.recommendations,
-        "GENERAL TUTOR'S COMMENTS": reportData.generalComments
+// Build the styled report HTML string (used for preview AND as innerHTML for PDF element)
+function buildReportHTML(reportData, logoSrc) {
+    const sections = [
+        { title: "INTRODUCTION", content: reportData.introduction },
+        { title: "TOPICS & REMARKS", content: reportData.topics },
+        { title: "PROGRESS & ACHIEVEMENTS", content: reportData.progress },
+        { title: "STRENGTHS AND WEAKNESSES", content: reportData.strengthsWeaknesses },
+        { title: "RECOMMENDATIONS", content: reportData.recommendations },
+        { title: "GENERAL TUTOR'S COMMENTS", content: reportData.generalComments }
+    ];
+
+    const sanitize = (text) => {
+        if (!text || !String(text).trim()) return '<span style="color:#9ca3af;font-style:italic;">N/A</span>';
+        return String(text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g, '<br>');
     };
 
-    const sectionsHTML = Object.entries(reportSections).map(([title, content]) => {
-        const sanitizedContent = content ? String(content).replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
-        const displayContent = (sanitizedContent && sanitizedContent.trim() !== '') ? sanitizedContent.replace(/\n/g, '<br>') : 'N/A';
-        return `
-            <div class="report-section">
-                <div class="section-title">${title}</div>
-                <div class="section-body">${displayContent}</div>
-            </div>
-        `;
-    }).join('');
-
-    // PNG logo for reliable html2canvas rendering (SVG support is limited)
-    const logoUrl = "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg";
-
     const submissionDate = reportData.submittedAt
-        ? new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+        ? new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' })
         : 'N/A';
 
-    // CSS written to be safe for html2canvas: no CSS grid, no flex gap, uses table for two-column layout
-    const pdfStyles = `
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: Arial, Helvetica, sans-serif;
-            color: #222;
-            background: #ffffff;
-            font-size: 12.5px;
-            line-height: 1.55;
-        }
-        .report-container {
-            width: 100%;
-            padding: 36px 48px 40px 48px;
-            background: #ffffff;
-        }
+    const logoHTML = logoSrc
+        ? `<img src="${logoSrc}" alt="Logo" style="height:70px;margin:0 auto 8px;display:block;">`
+        : '';
 
-        /* ── HEADER ── */
-        .header {
-            text-align: center;
-            margin-bottom: 26px;
-            padding-bottom: 16px;
-            border-bottom: 3px solid #16a34a;
-        }
-        .header img {
-            height: 64px;
-            display: block;
-            margin: 0 auto 8px auto;
-        }
-        .header .logo-fallback {
-            display: inline-block;
-            font-size: 20px;
-            font-weight: bold;
-            color: #16a34a;
-            margin-bottom: 8px;
-        }
-        .header .company-name {
-            font-size: 20px;
-            font-weight: bold;
-            color: #166534;
-            margin-bottom: 4px;
-        }
-        .header .report-title {
-            font-size: 15px;
-            font-weight: bold;
-            color: #15803d;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            margin-bottom: 5px;
-        }
-        .header .report-date {
-            font-size: 11.5px;
-            color: #555;
-        }
-
-        /* ── STUDENT INFO — table layout, no CSS grid ── */
-        .student-info-box {
-            width: 100%;
-            margin-bottom: 22px;
-            background: #f0fdf4;
-            border: 1px solid #86efac;
-            border-radius: 8px;
-            padding: 12px 16px;
-        }
-        .student-info-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .student-info-table td {
-            width: 50%;
-            padding: 4px 8px 4px 0;
-            font-size: 12px;
-            vertical-align: top;
-        }
-        .student-info-table td strong {
-            color: #166534;
-        }
-
-        /* ── REPORT SECTIONS ── */
-        .report-section {
-            page-break-inside: avoid;
-            break-inside: avoid;
-            margin-bottom: 14px;
-            border: 1px solid #d1fae5;
-            border-left: 5px solid #16a34a;
-            border-radius: 0 6px 6px 0;
-            padding: 13px 16px 13px 14px;
-            background: #ffffff;
-        }
-        .section-title {
-            font-size: 11px;
-            font-weight: bold;
-            color: #166534;
-            text-transform: uppercase;
-            letter-spacing: 1.2px;
-            padding-bottom: 7px;
-            margin-bottom: 8px;
-            border-bottom: 1px solid #d1fae5;
-        }
-        .section-body {
-            line-height: 1.7;
-            white-space: pre-wrap;
-            color: #333;
-            font-size: 12.5px;
-            word-break: break-word;
-        }
-
-        /* ── FOOTER ── */
-        .footer {
-            margin-top: 28px;
-            padding-top: 16px;
-            border-top: 1px solid #e5e7eb;
-            text-align: right;
-            font-size: 12px;
-            color: #555;
-        }
-        .footer strong {
-            color: #166534;
-        }
-    `;
-
-    const bodyHTML = `
-        <div class="report-container">
-            <div class="header">
-                <img src="${logoUrl}" alt="Blooming Kids House Logo"
-                     onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';">
-                <span class="logo-fallback" style="display:none;">🌱</span>
-                <div class="company-name">Blooming Kids House</div>
-                <div class="report-title">Monthly Learning Report</div>
-                <div class="report-date">Date: ${submissionDate}</div>
+    return `
+        <div style="
+            width:170mm;
+            min-height:257mm;
+            margin:0 auto;
+            padding:20mm 20mm 15mm 20mm;
+            font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;
+            font-size:11pt;
+            color:#1f2937;
+            line-height:1.55;
+            box-sizing:border-box;
+            background:#fff;
+        ">
+            <!-- HEADER -->
+            <div style="text-align:center;margin-bottom:22px;padding-bottom:14px;border-bottom:3px solid #16a34a;">
+                ${logoHTML}
+                <div style="font-size:20pt;font-weight:800;color:#15803d;letter-spacing:0.5px;margin-bottom:2px;">
+                    Blooming Kids House
+                </div>
+                <div style="font-size:14pt;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">
+                    Monthly Learning Report
+                </div>
+                <div style="font-size:9.5pt;color:#6b7280;">
+                    Report Date: ${submissionDate}
+                </div>
             </div>
 
-            <div class="student-info-box">
-                <table class="student-info-table">
-                    <tr>
-                        <td><strong>Student's Name:</strong> ${reportData.studentName || 'N/A'}</td>
-                        <td><strong>Parent's Name:</strong> ${reportData.parentName || 'N/A'}</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Parent's Phone:</strong> ${reportData.parentPhone || 'N/A'}</td>
-                        <td><strong>Grade:</strong> ${reportData.grade || 'N/A'}</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Tutor's Name:</strong> ${reportData.tutorName || 'N/A'}</td>
-                        <td></td>
-                    </tr>
-                </table>
-            </div>
+            <!-- STUDENT INFO TABLE -->
+            <table style="width:100%;border-collapse:collapse;margin-bottom:18px;font-size:10pt;">
+                <tr>
+                    <td style="padding:7px 10px;background:#f0fdf4;border:1px solid #d1fae5;font-weight:600;color:#166534;width:28%;">Student's Name</td>
+                    <td style="padding:7px 10px;border:1px solid #e5e7eb;width:22%;">${reportData.studentName || 'N/A'}</td>
+                    <td style="padding:7px 10px;background:#f0fdf4;border:1px solid #d1fae5;font-weight:600;color:#166534;width:28%;">Parent's Name</td>
+                    <td style="padding:7px 10px;border:1px solid #e5e7eb;width:22%;">${reportData.parentName || 'N/A'}</td>
+                </tr>
+                <tr>
+                    <td style="padding:7px 10px;background:#f0fdf4;border:1px solid #d1fae5;font-weight:600;color:#166534;">Parent's Phone</td>
+                    <td style="padding:7px 10px;border:1px solid #e5e7eb;">${reportData.parentPhone || 'N/A'}</td>
+                    <td style="padding:7px 10px;background:#f0fdf4;border:1px solid #d1fae5;font-weight:600;color:#166534;">Grade</td>
+                    <td style="padding:7px 10px;border:1px solid #e5e7eb;">${reportData.grade || 'N/A'}</td>
+                </tr>
+                <tr>
+                    <td style="padding:7px 10px;background:#f0fdf4;border:1px solid #d1fae5;font-weight:600;color:#166534;">Tutor's Name</td>
+                    <td colspan="3" style="padding:7px 10px;border:1px solid #e5e7eb;">${reportData.tutorName || 'N/A'}</td>
+                </tr>
+            </table>
 
-            ${sectionsHTML}
+            <!-- REPORT SECTIONS -->
+            ${sections.map(s => `
+                <div style="margin-bottom:14px;page-break-inside:avoid;">
+                    <div style="
+                        background:#f0fdf4;
+                        border-left:4px solid #16a34a;
+                        padding:6px 12px;
+                        font-size:11pt;
+                        font-weight:700;
+                        color:#15803d;
+                        text-transform:uppercase;
+                        letter-spacing:0.5px;
+                        margin-bottom:6px;
+                    ">${s.title}</div>
+                    <div style="
+                        padding:8px 12px;
+                        border:1px solid #e5e7eb;
+                        border-radius:0 0 6px 6px;
+                        font-size:10.5pt;
+                        line-height:1.65;
+                        white-space:pre-wrap;
+                        word-wrap:break-word;
+                    ">${sanitize(s.content)}</div>
+                </div>
+            `).join('')}
 
-            <div class="footer">
-                <p>Best regards,</p>
-                <p><strong>${reportData.tutorName || 'N/A'}</strong></p>
+            <!-- FOOTER / SIGNATURE -->
+            <div style="margin-top:28px;padding-top:14px;border-top:2px solid #d1fae5;text-align:right;font-size:10.5pt;">
+                <div style="color:#6b7280;">Best regards,</div>
+                <div style="font-weight:700;color:#15803d;font-size:12pt;margin-top:4px;">
+                    ${reportData.tutorName || 'N/A'}
+                </div>
             </div>
         </div>
     `;
-
-    // Full HTML for preview window
-    const fullHTML = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Report — ${reportData.studentName || 'Student'}</title>
-    <style>${pdfStyles}</style>
-</head>
-<body>${bodyHTML}</body>
-</html>`;
-
-    return { html: fullHTML, bodyHTML, pdfStyles, reportData };
 }
 
+// Full standalone HTML document (for preview in new tab)
+function buildFullReportPage(reportData, logoSrc) {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report – ${(reportData.studentName || 'Student').replace(/</g, '')}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { background: #e5e7eb; }
+        @media print {
+            html, body { background: #fff; }
+            @page { size: A4 portrait; margin: 0; }
+        }
+    </style>
+</head>
+<body>
+    ${buildReportHTML(reportData, logoSrc)}
+</body>
+</html>`;
+}
+
+// ── CORE: Render a report into a PDF Blob via html2pdf ──
+// Creates an offscreen DOM element sized to A4 so html2canvas captures it correctly.
+async function renderReportToPdfBlob(reportData, logoBase64) {
+    const container = document.createElement('div');
+    // A4 at 96 DPI ≈ 794 × 1123 px. We set a fixed width so content reflows to A4.
+    container.style.cssText = `
+        position:fixed; left:-9999px; top:0;
+        width:794px;
+        background:#fff;
+        z-index:-1;
+    `;
+    container.innerHTML = buildReportHTML(reportData, logoBase64);
+    document.body.appendChild(container);
+
+    // Give images / fonts a moment to settle
+    await new Promise(r => setTimeout(r, 150));
+
+    const opt = {
+        margin:       [0, 0, 0, 0],
+        image:        { type: 'jpeg', quality: 0.95 },
+        html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#FFFFFF', width: 794, windowWidth: 794 },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+
+    try {
+        const blob = await html2pdf().set(opt).from(container).outputPdf('blob');
+        return blob;
+    } finally {
+        document.body.removeChild(container);
+    }
+}
+
+// Fallback: open print-friendly window if html2pdf is not available
+function openPrintFallback(htmlString) {
+    const w = window.open('', '_blank', 'width=800,height=1000');
+    if (!w) {
+        alert('Pop-ups are blocked. Please allow pop-ups for this site and try again.');
+        return;
+    }
+    w.document.write(htmlString);
+    w.document.close();
+    w.focus();
+    w.onload = () => setTimeout(() => w.print(), 400);
+}
+
+// ── Helper: progress UI ──
+function showProgress(msg, pct) {
+    const modal = document.getElementById('pdf-progress-modal');
+    const bar   = document.getElementById('pdf-progress-bar');
+    const text  = document.getElementById('pdf-progress-text');
+    const msgEl = document.getElementById('pdf-progress-message');
+    if (modal) modal.classList.remove('hidden');
+    if (msgEl) msgEl.textContent = msg;
+    if (bar)   bar.style.width = `${pct}%`;
+    if (text)  text.textContent = `${pct}%`;
+}
+
+function hideProgress() {
+    const modal = document.getElementById('pdf-progress-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+// ──────────────────────────────────────────
+// PUBLIC: Preview Report
+// ──────────────────────────────────────────
 window.previewReport = async function(reportId) {
     try {
-        const { html } = await generateReportHTML(reportId);
-        const newWindow = window.open();
-        newWindow.document.write(html);
-        newWindow.document.close();
+        const reportData = await fetchReportData(reportId);
+        const logoBase64 = await getLogoBase64();
+        const fullPage = buildFullReportPage(reportData, logoBase64 || REPORT_LOGO_URL);
+        const w = window.open('', '_blank');
+        if (!w) { alert('Pop-ups blocked. Please allow pop-ups.'); return; }
+        w.document.write(fullPage);
+        w.document.close();
     } catch (error) {
         console.error("Error previewing report:", error);
         alert(`Error: ${error.message}`);
     }
 };
 
+// ──────────────────────────────────────────
+// PUBLIC: Download Single Report
+// ──────────────────────────────────────────
 window.downloadSingleReport = async function(reportId, event) {
-    // Ensure we grab the actual <button> element even if a child icon was clicked
-    const button = (event?.target || event)?.closest?.('button') || event?.target || event;
+    const button = event?.target?.closest?.('button') || event?.target || event;
     const originalText = button?.innerHTML || '';
-    let tempContainer = null;
-    let styleEl = null;
 
     try {
-        if (button) { button.innerHTML = '⏳ Generating...'; button.disabled = true; }
+        if (button) { button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating…'; button.disabled = true; }
 
-        const progressModal    = document.getElementById('pdf-progress-modal');
-        const progressBar      = document.getElementById('pdf-progress-bar');
-        const progressText     = document.getElementById('pdf-progress-text');
-        const progressMessage  = document.getElementById('pdf-progress-message');
+        showProgress('Fetching report data…', 10);
 
-        const setProgress = (pct, msg) => {
-            if (progressBar)    progressBar.style.width = `${pct}%`;
-            if (progressText)   progressText.textContent = `${pct}%`;
-            if (progressMessage) progressMessage.textContent = msg;
-        };
+        const reportData = await fetchReportData(reportId);
+        const logoBase64 = await getLogoBase64();
 
-        if (progressModal) {
-            progressModal.classList.remove('hidden');
-            setProgress(10, 'Fetching report data...');
-        }
-
-        const { html, bodyHTML, pdfStyles, reportData } = await generateReportHTML(reportId);
-
-        setProgress(40, 'Preparing document layout...');
+        showProgress('Rendering PDF…', 40);
 
         if (typeof html2pdf !== 'undefined') {
-            // ── Inject into a real DOM element for reliable html2canvas capture ──
-            styleEl = document.createElement('style');
-            styleEl.textContent = pdfStyles;
-            document.head.appendChild(styleEl);
+            const pdfBlob = await renderReportToPdfBlob(reportData, logoBase64);
 
-            tempContainer = document.createElement('div');
-            // Position off-screen but at exact A4 content width (794px = 8.27in @ 96dpi)
-            tempContainer.style.cssText = [
-                'position:fixed',
-                'top:0',
-                'left:-9999px',
-                'width:794px',
-                'background:#ffffff',
-                'z-index:-9999',
-                'overflow:visible'
-            ].join(';');
-            tempContainer.innerHTML = bodyHTML;
-            document.body.appendChild(tempContainer);
+            showProgress('Starting download…', 90);
 
-            // Small delay so browser paints the injected DOM before canvas capture
-            await new Promise(r => setTimeout(r, 300));
-
-            setProgress(60, 'Converting to PDF...');
-
-            const safeStudentName = (reportData.studentName || 'Report').replace(/[^a-z0-9]/gi, '_');
-            const reportDate = reportData.submittedAt
+            // Build clean filename
+            const safeName = (reportData.studentName || 'Report').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
+            const dateStr = reportData.submittedAt
                 ? new Date(reportData.submittedAt.seconds * 1000).toISOString().split('T')[0]
                 : new Date().toISOString().split('T')[0];
+            const filename = `${safeName}_Report_${dateStr}.pdf`;
 
-            const options = {
-                margin:   [0.55, 0.5, 0.55, 0.5],   // [top, right, bottom, left] in inches
-                filename: `${safeStudentName}_Report_${reportDate}.pdf`,
-                image:    { type: 'jpeg', quality: 0.97 },
-                html2canvas: {
-                    scale:           2,
-                    useCORS:         true,
-                    allowTaint:      false,
-                    logging:         false,
-                    backgroundColor: '#ffffff',
-                    windowWidth:     794,
-                    scrollX:         0,
-                    scrollY:         0
-                },
-                jsPDF: {
-                    unit:        'in',
-                    format:      'a4',
-                    orientation: 'portrait',
-                    compress:    true
-                },
-                pagebreak: {
-                    mode:   ['avoid-all', 'css', 'legacy'],
-                    before: '.page-break-before',
-                    avoid:  ['.report-section', '.student-info-box', '.header']
-                }
-            };
+            // Trigger download
+            const url = URL.createObjectURL(pdfBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
 
-            await html2pdf().set(options).from(tempContainer).save();
-
+            showProgress('Done!', 100);
+            setTimeout(hideProgress, 1200);
         } else {
             // Fallback: browser print dialog
-            const newWindow = window.open('', '_blank');
-            if (newWindow) {
-                newWindow.document.write(html);
-                newWindow.document.close();
-                newWindow.focus();
-                setTimeout(() => newWindow.print(), 800);
-            } else {
-                alert('Pop-ups blocked. Please allow pop-ups and try again, or use the Preview button and print from there.');
-            }
+            hideProgress();
+            const fullPage = buildFullReportPage(reportData, logoBase64 || REPORT_LOGO_URL);
+            openPrintFallback(fullPage);
         }
-
-        setProgress(100, '✅ Done! Your PDF is downloading.');
-        setTimeout(() => { if (progressModal) progressModal.classList.add('hidden'); }, 1500);
 
     } catch (error) {
         console.error("Error downloading report:", error);
         alert(`Error downloading report: ${error.message}`);
-        const progressModal = document.getElementById('pdf-progress-modal');
-        if (progressModal) progressModal.classList.add('hidden');
+        hideProgress();
     } finally {
         if (button) { button.innerHTML = originalText; button.disabled = false; }
-        if (tempContainer && tempContainer.parentNode) tempContainer.parentNode.removeChild(tempContainer);
-        if (styleEl && styleEl.parentNode) styleEl.parentNode.removeChild(styleEl);
     }
 };
 
+// ──────────────────────────────────────────
+// PUBLIC: ZIP & Download All Reports for a Tutor
+// ──────────────────────────────────────────
 window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
     const originalButtonText = button.innerHTML;
-    let tempContainer = null;
-    let styleEl = null;
 
     try {
+        showProgress(`Preparing ${reports.length} reports for ${tutorName}…`, 0);
         button.disabled = true;
 
-        const progressModal   = document.getElementById('pdf-progress-modal');
-        const progressBar     = document.getElementById('pdf-progress-bar');
-        const progressText    = document.getElementById('pdf-progress-text');
-        const progressMessage = document.getElementById('pdf-progress-message');
-
-        const setProgress = (pct, msg) => {
-            if (progressBar)    progressBar.style.width = `${pct}%`;
-            if (progressText)   progressText.textContent = `${pct}%`;
-            if (progressMessage) progressMessage.textContent = msg;
-        };
-
-        progressModal.classList.remove('hidden');
-        setProgress(0, `Preparing ${reports.length} report${reports.length !== 1 ? 's' : ''} for ${tutorName}...`);
-
-        if (typeof html2pdf === 'undefined') {
-            throw new Error('html2pdf library is not loaded. Cannot generate PDFs.');
-        }
-        if (typeof JSZip === 'undefined') {
-            throw new Error('JSZip library is not loaded. Cannot create ZIP file.');
-        }
+        // Pre-cache logo once for all reports
+        const logoBase64 = await getLogoBase64();
 
         const zip = new JSZip();
-        let processedCount = 0;
-        const errors = [];
-
-        // Create a single persistent off-screen container reused per report
-        styleEl = document.createElement('style');
-        document.head.appendChild(styleEl);
-
-        tempContainer = document.createElement('div');
-        tempContainer.style.cssText = [
-            'position:fixed',
-            'top:0',
-            'left:-9999px',
-            'width:794px',
-            'background:#ffffff',
-            'z-index:-9999',
-            'overflow:visible'
-        ].join(';');
-        document.body.appendChild(tempContainer);
+        let processed = 0;
 
         for (const report of reports) {
-            const pct = Math.round((processedCount / reports.length) * 90);
-            setProgress(pct, `Generating PDF ${processedCount + 1} of ${reports.length}: ${report.studentName || '...'}`);
-            button.innerHTML = `📦 Processing ${processedCount + 1}/${reports.length}`;
+            const pct = Math.round((processed / reports.length) * 90);
+            showProgress(`Processing report ${processed + 1} of ${reports.length}…`, pct);
+            button.innerHTML = `📦 Processing ${processed + 1}/${reports.length}`;
 
             try {
-                const { bodyHTML, pdfStyles, reportData } = await generateReportHTML(report.id);
+                const reportData = await fetchReportData(report.id);
+                const pdfBlob = await renderReportToPdfBlob(reportData, logoBase64);
 
-                // Update styles and content for this report
-                styleEl.textContent = pdfStyles;
-                tempContainer.innerHTML = bodyHTML;
-
-                // Allow browser to paint before capturing
-                await new Promise(r => setTimeout(r, 250));
-
-                const safeStudentName = (reportData.studentName || 'Unknown_Student').replace(/[^a-z0-9]/gi, '_');
-                const reportDate = reportData.submittedAt
+                const safeName = (reportData.studentName || 'Unknown').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
+                const dateStr = reportData.submittedAt
                     ? new Date(reportData.submittedAt.seconds * 1000).toISOString().split('T')[0]
-                    : 'unknown_date';
-                const filename = `${safeStudentName}_${reportDate}.pdf`;
-
-                const options = {
-                    margin:   [0.55, 0.5, 0.55, 0.5],
-                    filename,
-                    image:    { type: 'jpeg', quality: 0.97 },
-                    html2canvas: {
-                        scale:           2,
-                        useCORS:         true,
-                        allowTaint:      false,
-                        logging:         false,
-                        backgroundColor: '#ffffff',
-                        windowWidth:     794,
-                        scrollX:         0,
-                        scrollY:         0
-                    },
-                    jsPDF: {
-                        unit:        'in',
-                        format:      'a4',
-                        orientation: 'portrait',
-                        compress:    true
-                    },
-                    pagebreak: {
-                        mode:   ['avoid-all', 'css', 'legacy'],
-                        before: '.page-break-before',
-                        avoid:  ['.report-section', '.student-info-box', '.header']
-                    }
-                };
-
-                const pdfBlob = await html2pdf().set(options).from(tempContainer).output('blob');
-                zip.file(filename, pdfBlob);
-
+                    : 'unknown';
+                zip.file(`${safeName}_${dateStr}.pdf`, pdfBlob);
             } catch (err) {
-                console.error(`Error processing report for ${report.studentName || report.id}:`, err);
-                errors.push(report.studentName || report.id);
+                console.error(`Skipped report ${report.id}:`, err);
             }
 
-            processedCount++;
-            // Short yield so the UI can breathe between reports
-            await new Promise(r => setTimeout(r, 100));
+            processed++;
+            // Small delay between reports so the browser doesn't choke
+            await new Promise(r => setTimeout(r, 300));
         }
 
-        setProgress(95, 'Creating ZIP archive...');
+        showProgress('Creating ZIP file…', 92);
 
-        const safeTutorName = tutorName.replace(/[^a-z0-9]/gi, '_');
-        const zipFilename = `${safeTutorName}_Reports_${new Date().toISOString().split('T')[0]}.zip`;
+        const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
 
-        const zipBlob = await zip.generateAsync({
-            type:        'blob',
-            compression: 'DEFLATE',
-            compressionOptions: { level: 6 }
-        });
+        showProgress('Download starting…', 100);
 
-        setProgress(100, '✅ ZIP ready — download starting!');
+        const safeTutorName = (tutorName || 'Tutor').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
+        saveAs(zipBlob, `${safeTutorName}_Reports_${new Date().toISOString().split('T')[0]}.zip`);
 
-        if (typeof saveAs !== 'undefined') {
-            saveAs(zipBlob, zipFilename);
-        } else {
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(zipBlob);
-            link.download = zipFilename;
-            link.click();
-            setTimeout(() => URL.revokeObjectURL(link.href), 10000);
-        }
-
-        setTimeout(() => progressModal.classList.add('hidden'), 2500);
-
-        if (errors.length > 0) {
-            setTimeout(() => {
-                alert(`ZIP created, but ${errors.length} report(s) had errors and were skipped:\n• ${errors.join('\n• ')}`);
-            }, 500);
-        }
+        setTimeout(hideProgress, 2000);
 
     } catch (error) {
-        console.error("Error creating ZIP file:", error);
-        alert(`Failed to create ZIP file: ${error.message}\n\nPlease try again.`);
-        const progressModal = document.getElementById('pdf-progress-modal');
-        if (progressModal) progressModal.classList.add('hidden');
+        console.error("Error creating zip file:", error);
+        alert("Failed to create zip file. Please try again.");
+        hideProgress();
     } finally {
         button.innerHTML = originalButtonText;
         button.disabled = false;
-        if (tempContainer && tempContainer.parentNode) tempContainer.parentNode.removeChild(tempContainer);
-        if (styleEl && styleEl.parentNode) styleEl.parentNode.removeChild(styleEl);
     }
 };
 
