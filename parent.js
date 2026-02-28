@@ -5960,21 +5960,40 @@ function togglePickerChip(el) {
 }
 
 /**
+ * Toggle session chip and update fee display
+ */
+function toggleSessionChip(el) {
+    // Deselect other session chips
+    document.querySelectorAll('#newStudentSessions .picker-chip').forEach(chip => {
+        chip.classList.remove('selected');
+    });
+    el.classList.add('selected');
+    updateAddStudentFees();
+}
+
+/**
  * _updateAddStudentStepUI()
  * Shows the correct step panel and updates the stepper bar / buttons.
  */
 function _updateAddStudentStepUI() {
     // Update step panels
-    for (let i = 1; i <= 3; i++) {
+    for (let i = 1; i <= 4; i++) {
         const panel = document.getElementById(`add-step-${i}`);
         if (panel) panel.classList.toggle('active', i === _addStudentStep);
 
-        const bar = document.getElementById(`step-bar-${i}`);
+        const bar = document.getElementById(`stepBar${i}`);
         if (bar) {
             bar.classList.remove('active', 'done');
             if (i < _addStudentStep)  bar.classList.add('done');
             if (i === _addStudentStep) bar.classList.add('active');
         }
+    }
+
+    // Update step label
+    const stepLabel = document.getElementById('stepLabel');
+    if (stepLabel) {
+        const labels = ['Student Details', 'Subjects & Schedule', 'Fee Summary', 'Review & Confirm'];
+        stepLabel.textContent = `Step ${_addStudentStep} of 4 — ${labels[_addStudentStep-1]}`;
     }
 
     // Update nav buttons
@@ -5983,8 +6002,8 @@ function _updateAddStudentStepUI() {
     const submitBtn = document.getElementById('addStudentSubmitBtn');
 
     if (prevBtn)   prevBtn.style.display   = _addStudentStep > 1 ? 'block' : 'none';
-    if (nextBtn)   nextBtn.classList.toggle('hidden', _addStudentStep === 3);
-    if (submitBtn) submitBtn.classList.toggle('hidden', _addStudentStep !== 3);
+    if (nextBtn)   nextBtn.classList.toggle('hidden', _addStudentStep === 4);
+    if (submitBtn) submitBtn.classList.toggle('hidden', _addStudentStep !== 4);
 }
 
 /**
@@ -5993,13 +6012,15 @@ function _updateAddStudentStepUI() {
  */
 function addStudentNext() {
     if (_addStudentStep === 1) {
-        const name  = document.getElementById('newStudentName')?.value.trim();
-        const dob   = document.getElementById('newStudentDob')?.value;
-        const grade = document.getElementById('newStudentActualGrade')?.value;
-        const group = document.getElementById('newStudentFeeGroup')?.value;
+        const firstName = document.getElementById('newStudentFirstName')?.value.trim();
+        const lastName  = document.getElementById('newStudentLastName')?.value.trim();
+        const gender    = document.getElementById('newStudentGender')?.value;
+        const dob       = document.getElementById('newStudentDob')?.value;
+        const gradeTier = document.getElementById('newStudentGradeLevel')?.value;
+        const actualGrade = document.getElementById('newStudentActualGrade')?.value;
 
-        if (!name || !dob || !grade || !group) {
-            showMessage('Please fill in all required fields (Name, DOB, Grade, Tuition Level)', 'error');
+        if (!firstName || !lastName || !gender || !dob || !gradeTier || !actualGrade) {
+            showMessage('Please fill in all required fields in Step 1', 'error');
             return;
         }
     }
@@ -6010,18 +6031,29 @@ function addStudentNext() {
             showMessage('Please select at least one preferred day', 'error');
             return;
         }
+        const sessions = document.querySelectorAll('#newStudentSessions .picker-chip.selected');
+        if (sessions.length === 0) {
+            showMessage('Please select session frequency', 'error');
+            return;
+        }
     }
 
     if (_addStudentStep === 3) {
-        // Show review - handled separately
-        return;
+        // Just go to review, no validation needed
     }
 
-    _addStudentStep = Math.min(3, _addStudentStep + 1);
-    _updateAddStudentStepUI();
+    if (_addStudentStep < 4) {
+        _addStudentStep++;
+        _updateAddStudentStepUI();
+    }
 
-    // On step 3, populate the review panel
+    // On step 3, update fee summary
     if (_addStudentStep === 3) {
+        _updateFeeSummary();
+    }
+
+    // On step 4, populate the review panel
+    if (_addStudentStep === 4) {
         _populateAddStudentReview();
     }
 }
@@ -6036,29 +6068,87 @@ function addStudentPrev() {
 }
 
 /**
+ * Update the fee summary in step 3 based on selections.
+ */
+function _updateFeeSummary() {
+    const gradeTier = document.getElementById('newStudentGradeLevel')?.value;
+    const sessionChip = document.querySelector('#newStudentSessions .picker-chip.selected');
+    const sessionType = sessionChip ? sessionChip.dataset.sessions : null;
+    const summaryDiv = document.getElementById('addStudentFeeSummary');
+
+    // Define fee rates (example values – adjust to your actual pricing)
+    const fees = {
+        preschool: { twice: 15000, three: 20000, five: 30000 },
+        'grade2-4': { twice: 18000, three: 24000, five: 36000 },
+        'grade5-8': { twice: 22000, three: 28000, five: 42000 },
+        'grade9-12': { twice: 26000, three: 32000, five: 48000 }
+    };
+
+    const gradeLabels = {
+        preschool: 'Preschool – Grade 1',
+        'grade2-4': 'Grade 2 – 4',
+        'grade5-8': 'Grade 5 – 8',
+        'grade9-12': 'Grade 9 – 12'
+    };
+
+    const sessionLabels = {
+        twice: 'Twice weekly',
+        three: '3× weekly',
+        five: 'Daily (5×)'
+    };
+
+    if (gradeTier && sessionType && fees[gradeTier] && fees[gradeTier][sessionType]) {
+        const amount = fees[gradeTier][sessionType];
+        summaryDiv.innerHTML = `
+            <div style="margin-bottom:12px;font-weight:700;font-size:1rem;">Estimated Monthly Tuition</div>
+            <table style="width:100%;border-collapse:collapse;">
+                <tr><td>Grade Tier:</td><td style="text-align:right;font-weight:600;">${gradeLabels[gradeTier] || gradeTier}</td></tr>
+                <tr><td>Session Frequency:</td><td style="text-align:right;font-weight:600;">${sessionLabels[sessionType] || sessionType}</td></tr>
+                <tr><td style="padding-top:8px;border-top:1px dashed #ccc;">Estimated Monthly Fee:</td><td style="padding-top:8px;border-top:1px dashed #ccc;text-align:right;font-weight:800;color:var(--primary-dark);font-size:1.1rem;">₦${amount.toLocaleString()}</td></tr>
+            </table>
+            <p style="margin-top:12px;font-size:0.75rem;color:var(--text-muted);">Fees are estimates and subject to confirmation by staff. Proration applies for mid-month starts.</p>
+        `;
+    } else {
+        summaryDiv.innerHTML = '<p style="color:var(--text-muted);">Select grade tier and session frequency to see estimated fees.</p>';
+    }
+}
+
+/**
+ * UpdateAddStudentFees (called from HTML onchange of grade tier)
+ */
+function updateAddStudentFees() {
+    if (_addStudentStep === 3) {
+        _updateFeeSummary();
+    }
+}
+
+/**
  * _populateAddStudentReview()
- * Fills the review panel (step 3) with the collected data.
+ * Fills the review panel (step 4) with the collected data.
  */
 function _populateAddStudentReview() {
     const reviewDiv = document.getElementById('addStudentReview');
     if (!reviewDiv) return;
 
-    const name    = document.getElementById('newStudentName')?.value.trim() || '—';
-    const gender  = document.getElementById('newStudentGender')?.value || '—';
-    const dob     = document.getElementById('newStudentDob')?.value || '—';
-    const grade   = document.getElementById('newStudentActualGrade')?.value || '—';
-    const group   = document.getElementById('newStudentFeeGroup')?.value || '—';
-    const start   = document.getElementById('newStudentStartDate')?.value || '—';
-    const sessions = document.getElementById('newStudentSessions')?.value || 'Not specified';
-    const tutor   = document.getElementById('newStudentTutor')?.value || 'No preference';
+    const firstName = document.getElementById('newStudentFirstName')?.value.trim() || '—';
+    const lastName  = document.getElementById('newStudentLastName')?.value.trim() || '—';
+    const fullName  = firstName + ' ' + lastName;
+    const gender    = document.getElementById('newStudentGender')?.value || '—';
+    const dob       = document.getElementById('newStudentDob')?.value || '—';
+    const gradeTier = document.getElementById('newStudentGradeLevel')?.value || '—';
+    const actualGrade = document.getElementById('newStudentActualGrade')?.value || '—';
+    const start     = document.getElementById('newStudentStartDate')?.value || '—';
 
     const subjects = Array.from(
         document.querySelectorAll('#newStudentSubjects .picker-chip.selected')
-    ).map(c => c.dataset.subject);
+    ).map(c => c.dataset.subject).join(', ') || 'None selected';
 
     const days = Array.from(
         document.querySelectorAll('#newStudentDays .picker-chip.selected')
-    ).map(c => c.dataset.day);
+    ).map(c => c.dataset.day).join(', ');
+
+    const sessionChip = document.querySelector('#newStudentSessions .picker-chip.selected');
+    const sessionLabel = sessionChip ? sessionChip.textContent : 'Not selected';
 
     const startHour = document.getElementById('newStudentStartHour')?.value;
     const endHour   = document.getElementById('newStudentEndHour')?.value;
@@ -6066,31 +6156,40 @@ function _populateAddStudentReview() {
         ? `${_formatHour(startHour)} – ${_formatHour(endHour)}`
         : 'Not specified';
 
+    const tutor = document.getElementById('newStudentTutor')?.value || 'No preference';
+
     const gradeLabels = {
-        'preschool':'Preschool', 'kindergarten':'Kindergarten',
-        'grade1':'Grade 1','grade2':'Grade 2','grade3':'Grade 3',
-        'grade4':'Grade 4','grade5':'Grade 5','grade6':'Grade 6',
-        'grade7':'Grade 7','grade8':'Grade 8','grade9':'Grade 9',
-        'grade10':'Grade 10','grade11':'Grade 11','grade12':'Grade 12'
+        'preschool': 'Preschool',
+        'kindergarten': 'Kindergarten',
+        'grade1': 'Grade 1', 'grade2': 'Grade 2', 'grade3': 'Grade 3',
+        'grade4': 'Grade 4', 'grade5': 'Grade 5', 'grade6': 'Grade 6',
+        'grade7': 'Grade 7', 'grade8': 'Grade 8', 'grade9': 'Grade 9',
+        'grade10': 'Grade 10', 'grade11': 'Grade 11', 'grade12': 'Grade 12'
     };
 
-    const groupLabels = {
-        'preschool':'Preschool – Grade 1','grade2-4':'Grade 2 – 4',
-        'grade5-8':'Grade 5 – 8','grade9-12':'Grade 9 – 12'
+    const tierLabels = {
+        'preschool': 'Preschool – Grade 1',
+        'grade2-4': 'Grade 2 – 4',
+        'grade5-8': 'Grade 5 – 8',
+        'grade9-12': 'Grade 9 – 12'
+    };
+
+    const genderLabel = {
+        'male': 'Male', 'female': 'Female', 'other': 'Other'
     };
 
     reviewDiv.innerHTML = `
         <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
-            ${_reviewRow('👤 Full Name', escapeHtml(name))}
-            ${_reviewRow('⚧ Gender', escapeHtml(gender))}
+            ${_reviewRow('👤 Full Name', escapeHtml(fullName))}
+            ${_reviewRow('⚧ Gender', escapeHtml(genderLabel[gender] || gender))}
             ${_reviewRow('🎂 Date of Birth', escapeHtml(dob))}
-            ${_reviewRow('🎓 School Grade', escapeHtml(gradeLabels[grade] || grade))}
-            ${_reviewRow('📊 Tuition Level', escapeHtml(groupLabels[group] || group))}
+            ${_reviewRow('🎓 Grade Tier', escapeHtml(tierLabels[gradeTier] || gradeTier))}
+            ${_reviewRow('📚 Actual Grade', escapeHtml(gradeLabels[actualGrade] || actualGrade))}
             ${_reviewRow('📅 Start Date', escapeHtml(start))}
-            ${_reviewRow('📚 Subjects', subjects.length ? escapeHtml(subjects.join(', ')) : '<em style="color:#9CA3AF">None selected (extracurricular/test prep only)</em>')}
-            ${_reviewRow('📆 Days', escapeHtml(days.join(', ')))}
+            ${_reviewRow('📚 Subjects', escapeHtml(subjects))}
+            ${_reviewRow('📆 Days', escapeHtml(days))}
             ${_reviewRow('🕐 Class Time', escapeHtml(timeStr))}
-            ${_reviewRow('🔄 Sessions/Week', escapeHtml(sessions))}
+            ${_reviewRow('🔄 Sessions/Week', escapeHtml(sessionLabel))}
             ${_reviewRow('👩‍🏫 Tutor Pref.', escapeHtml(tutor))}
         </table>
     `;
@@ -6140,14 +6239,14 @@ async function submitNewStudent() {
         const parentName    = parentData.parentName || 'Parent';
 
         // Collect form data
-        const name    = document.getElementById('newStudentName')?.value.trim();
-        const gender  = document.getElementById('newStudentGender')?.value;
-        const dob     = document.getElementById('newStudentDob')?.value;
-        const grade   = document.getElementById('newStudentActualGrade')?.value;
-        const group   = document.getElementById('newStudentFeeGroup')?.value;
-        const start   = document.getElementById('newStudentStartDate')?.value;
-        const sessions = document.getElementById('newStudentSessions')?.value || '';
-        const tutor   = document.getElementById('newStudentTutor')?.value || '';
+        const firstName = document.getElementById('newStudentFirstName')?.value.trim();
+        const lastName  = document.getElementById('newStudentLastName')?.value.trim();
+        const name      = firstName + ' ' + lastName;
+        const gender    = document.getElementById('newStudentGender')?.value;
+        const dob       = document.getElementById('newStudentDob')?.value;
+        const gradeTier = document.getElementById('newStudentGradeLevel')?.value;
+        const actualGrade = document.getElementById('newStudentActualGrade')?.value;
+        const start     = document.getElementById('newStudentStartDate')?.value;
 
         const subjects = Array.from(
             document.querySelectorAll('#newStudentSubjects .picker-chip.selected')
@@ -6157,28 +6256,29 @@ async function submitNewStudent() {
             document.querySelectorAll('#newStudentDays .picker-chip.selected')
         ).map(c => c.dataset.day);
 
+        const sessionChip = document.querySelector('#newStudentSessions .picker-chip.selected');
+        const sessions = sessionChip ? sessionChip.dataset.sessions : '';
+
         const startHour = document.getElementById('newStudentStartHour')?.value || '';
         const endHour   = document.getElementById('newStudentEndHour')?.value || '';
-        const schedule  = days.length && startHour && endHour
-            ? `${days.join(', ')} from ${_formatHour(startHour)} to ${_formatHour(endHour)}`
-            : days.join(', ');
+        const academicTime = startHour && endHour ? `${startHour}:${endHour}` : '';
+
+        const tutor = document.getElementById('newStudentTutor')?.value || '';
 
         if (!name) throw new Error('Student name is required.');
 
         // Build Firestore document — matches the schema used by enrollment portal
-        // and expected by comprehensiveFindChildren() (which checks parentPhone field)
         const studentDoc = {
             studentName:      name,
             name:             name,
             gender:           gender,
             dob:              dob,
-            actualGrade:      grade,
-            grade:            group,
+            actualGrade:      actualGrade,
+            grade:            gradeTier,
             startDate:        start,
             selectedSubjects: subjects,
             academicDays:     days,
-            academicSchedule: schedule,
-            academicTime:     startHour && endHour ? `${startHour}:${endHour}` : '',
+            academicTime:     academicTime,
             academicSessions: sessions,
             preferredTutor:   tutor,
             // Phone fields — used by comprehensiveFindChildren for suffix matching
@@ -6386,11 +6486,17 @@ function buildStudentInfoTiles(studentData) {
         ? data.selectedSubjects.join(', ')
         : data.subjects?.join(', ') || 'Not specified';
 
-    const schedule = data.academicSchedule
-        || (data.academicDays?.length
-            ? `${data.academicDays.join(', ')} ${data.academicTime ? '(' + data.academicTime + ')' : ''}`
-            : null)
-        || 'Not specified';
+    // Safely handle academicDays – if it's an array, join; if string, use as is; otherwise default
+    let schedule = 'Not specified';
+    if (Array.isArray(data.academicDays)) {
+        schedule = data.academicDays.join(', ');
+        if (data.academicTime) schedule += ' ' + data.academicTime;
+    } else if (typeof data.academicDays === 'string') {
+        schedule = data.academicDays;
+        if (data.academicTime) schedule += ' ' + data.academicTime;
+    } else if (data.academicSchedule) {
+        schedule = data.academicSchedule;
+    }
 
     const grade = data.actualGrade || data.grade || data.schoolGrade || 'Not specified';
     const tutor = data.preferredTutor || data.tutorPreference || data.tutor || 'No preference';
@@ -6473,6 +6579,8 @@ window.hideAddStudentModal  = hideAddStudentModal;
 window.addStudentNext       = addStudentNext;
 window.addStudentPrev       = addStudentPrev;
 window.togglePickerChip     = togglePickerChip;
+window.toggleSessionChip    = toggleSessionChip;
+window.updateAddStudentFees = updateAddStudentFees;
 window.submitNewStudent     = submitNewStudent;
 window.showPrivacyModal     = showPrivacyModal;
 window.hidePrivacyModal     = hidePrivacyModal;
