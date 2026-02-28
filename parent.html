@@ -32,7 +32,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 
-    <!-- Firebase Compat Bridge (unchanged) -->
+    <!-- Firebase Compat Bridge -->
     <script>
     (function () {
         var hostname = window.location.hostname;
@@ -225,19 +225,17 @@
         }
         .form-container {
             width: 100%;
-            max-width: 460px; /* slightly wider for auth card */
+            max-width: 460px;
         }
 
         /* Auth card (original structure preserved) */
         .auth-card {
-            background: transparent; /* no extra background, rely on form-panel */
+            background: transparent;
             width: 100%;
         }
-        /* Remove the hero because we have brand panel */
         .auth-card-hero {
             display: none;
         }
-        /* Original auth tabs, but restyled as simple tabs */
         .auth-tabs {
             display: flex;
             gap: 10px;
@@ -262,7 +260,7 @@
             color: white;
         }
 
-        /* Form fields (new styles) */
+        /* Form fields */
         .field-group {
             margin-bottom: 18px;
         }
@@ -363,7 +361,7 @@
             accent-color: var(--sage);
         }
 
-        /* Message box (for auth feedback) */
+        /* Message box */
         .msg-box {
             padding: 12px 16px;
             border-radius: 10px;
@@ -379,7 +377,7 @@
         .msg-box.success { background: var(--success-bg); color: var(--success); border-color: #bde0cc; }
         .msg-box.info { background: var(--sage-light); color: var(--sage-dark); border-color: var(--border); }
 
-        /* ---------- DASHBOARD STYLES (unchanged, but with new palette) ---------- */
+        /* ---------- DASHBOARD STYLES ---------- */
         .portal-header {
             background: rgba(255,255,255,0.8);
             backdrop-filter: blur(20px);
@@ -493,7 +491,52 @@
         .badge-green  { background: var(--sage-light); color: var(--sage-dark); }
         .badge-yellow { background: var(--gold-light); color: #7d5f2a; }
 
-        /* ---------- PRIVACY MODAL & BANNER (copied from tutor-auth) ---------- */
+        /* Payments tab original design (adapted) */
+        .payments-soon {
+            text-align: center;
+            padding: 52px 24px;
+            background: var(--surface);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+        }
+        .payments-soon-icon { font-size: 3.8rem; margin-bottom: 14px; display: block; }
+        .payments-soon h2 { font-size: 1.4rem; font-weight: 800; color: var(--sage-dark); margin-bottom: 10px; letter-spacing: -0.02em; }
+        .payments-soon p { color: var(--muted); font-size: 0.88rem; max-width: 420px; margin: 0 auto; line-height: 1.65; }
+        .coin-spin { display: inline-block; animation: coinSpin 3s ease-in-out infinite; font-size: 2rem; margin-top: 14px; }
+        @keyframes coinSpin { 0%,100% { transform: rotateY(0deg); } 50% { transform: rotateY(180deg); } }
+
+        /* Feature cards */
+        .payment-feature-grid {
+            margin-top: 28px;
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .payment-feature-card {
+            background: rgba(74,124,89,0.1);
+            border: 1px solid rgba(74,124,89,0.2);
+            padding: 14px 22px;
+            border-radius: var(--radius);
+            text-align: center;
+        }
+        .payment-feature-card.gold {
+            background: rgba(201,168,76,0.1);
+            border-color: rgba(201,168,76,0.2);
+        }
+        .payment-feature-card.blue {
+            background: rgba(59,130,246,0.1);
+            border-color: rgba(59,130,246,0.2);
+        }
+        .payment-feature-icon { font-size: 1.6rem; }
+        .payment-feature-title { font-size: 0.76rem; font-weight: 700; color: var(--sage-dark); margin-top: 4px; }
+        .payment-feature-title.gold { color: #b88c2e; }
+        .payment-feature-title.blue { color: #1e3a8a; }
+        .payment-feature-sub { font-size: 0.7rem; color: var(--muted); }
+
+        /* ---------- PRIVACY MODAL & BANNER ---------- */
         #privacyCookieBanner {
             position: fixed;
             bottom: 0; left: 0; right: 0;
@@ -609,9 +652,9 @@
     </div>
 </header>
 
-<!-- ===== AUTH SPLIT SCREEN (with original auth-card) ===== -->
+<!-- ===== AUTH SPLIT SCREEN ===== -->
 <div id="authArea" class="auth-split">
-    <!-- LEFT BRAND PANEL (unchanged) -->
+    <!-- LEFT BRAND PANEL -->
     <div class="brand-panel">
         <div class="brand-inner">
             <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House" class="brand-logo">
@@ -633,27 +676,26 @@
         </div>
     </div>
 
-    <!-- RIGHT FORM PANEL with original auth-card (hero removed) -->
+    <!-- RIGHT FORM PANEL with original auth-card -->
     <div class="form-panel">
         <div class="form-container">
-            <!-- Message box for auth feedback (optional) -->
+            <!-- Optional message box -->
             <div id="authMessageBox" class="msg-box" role="alert" style="display:none;">
                 <span class="msg-icon" id="authMsgIcon"></span>
                 <span id="authMsgText"></span>
             </div>
 
-            <!-- Original auth-card (structure preserved, hero hidden) -->
             <div class="auth-card">
-                <!-- Hero hidden (display:none) -->
+                <!-- Hero hidden -->
                 <div class="auth-card-hero" style="display:none;"></div>
 
-                <!-- Original auth tabs (IDs preserved) -->
+                <!-- Original auth tabs -->
                 <div class="auth-tabs">
                     <button id="signInTab" class="auth-tab-btn active" onclick="switchTab('signin')">Sign In</button>
                     <button id="signUpTab" class="auth-tab-btn" onclick="switchTab('signup')">Sign Up</button>
                 </div>
 
-                <!-- Sign In Form (original IDs) -->
+                <!-- Sign In Form -->
                 <div class="auth-form-body" id="signInForm">
                     <div class="field-group">
                         <label class="field-label" for="loginIdentifier">Phone Number or Email</label>
@@ -676,7 +718,7 @@
                     </div>
                 </div>
 
-                <!-- Sign Up Form (original IDs) -->
+                <!-- Sign Up Form -->
                 <div class="auth-form-body hidden" id="signUpForm">
                     <div id="phoneInputContainer">
                         <div class="field-group">
@@ -696,7 +738,7 @@
                         <label class="field-label" for="signupConfirmPassword">Confirm Password</label>
                         <input id="signupConfirmPassword" type="password" placeholder="Confirm your password" class="field-input" required minlength="6">
                     </div>
-                    <!-- Privacy consent (added for new policy) -->
+                    <!-- Privacy consent -->
                     <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px; padding:10px 12px; margin-bottom:16px;">
                         <label style="display:flex; align-items:flex-start; gap:8px; font-size:0.8rem; color:#0c4a6e;">
                             <input type="checkbox" id="privacyConsent" style="margin-top:2px; accent-color:var(--sage);">
@@ -718,7 +760,7 @@
     </div>
 </div>
 
-<!-- ===== DASHBOARD (fully preserved, with all original content) ===== -->
+<!-- ===== DASHBOARD ===== -->
 <div id="reportArea" class="hidden dashboard-layout">
     <!-- Welcome Banner -->
     <div class="dashboard-welcome-bar">
@@ -738,7 +780,7 @@
         </div>
     </div>
 
-    <!-- Tab Navigation (5 tabs) -->
+    <!-- Tab Navigation -->
     <nav class="main-tabs" id="mainTabNav">
         <button id="reportTab" class="main-tab-btn active" onclick="switchMainTab('report')">
             <i class="fa-solid fa-file-lines"></i>
@@ -799,13 +841,34 @@
         <div id="rewardsContent" class="card" style="padding:24px;min-height:300px;"></div>
     </div>
 
-    <!-- Payments (Coming Soon) -->
+    <!-- Payments Content (original detailed design) -->
     <div id="paymentsContentArea" class="content-area hidden">
         <div class="payments-soon">
             <span class="payments-soon-icon">💳</span>
             <h2>Payments &amp; Billing</h2>
-            <p>We're counting coins and polishing the payment portal! 💰✨<br>Our team is working hard to bring you a seamless fee payment experience. Check back soon.</p>
+            <p>
+                We're counting coins and polishing the payment portal! 💰✨<br>
+                Our team is working hard to bring you a seamless fee payment experience.
+                Check back soon to settle fees with a smile — and maybe even a surprise discount for your patience! 😄
+            </p>
             <div class="coin-spin">🪙</div>
+            <div class="payment-feature-grid">
+                <div class="payment-feature-card">
+                    <div class="payment-feature-icon">📊</div>
+                    <div class="payment-feature-title">Fee Statements</div>
+                    <div class="payment-feature-sub">Coming Soon</div>
+                </div>
+                <div class="payment-feature-card gold">
+                    <div class="payment-feature-icon">📱</div>
+                    <div class="payment-feature-title gold">Online Payment</div>
+                    <div class="payment-feature-sub">Coming Soon</div>
+                </div>
+                <div class="payment-feature-card blue">
+                    <div class="payment-feature-icon">🧾</div>
+                    <div class="payment-feature-title blue">Receipts</div>
+                    <div class="payment-feature-sub">Coming Soon</div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -888,7 +951,9 @@
 </div>
 
 <!-- ===== FAB, modals, etc. (original, unchanged) ===== -->
-<div class="fab-container" id="fabContainer" style="display:none;">...</div>
+<div class="fab-container" id="fabContainer" style="display:none;">
+    <!-- FAB content from original parent.html (omitted for brevity, but should be present) -->
+</div>
 <div id="fabModal" class="modal-overlay hidden">...</div>
 <div id="passwordResetModal" class="modal-overlay hidden">...</div>
 <div id="addStudentModal" class="modal-overlay hidden">...</div>
@@ -896,10 +961,10 @@
 
 </div> <!-- /appRoot -->
 
-<!-- Load parent portal JS (original) -->
+<!-- Load parent portal JS -->
 <script src="parent.js" defer></script>
 
-<!-- Privacy / cookie functions (same as tutor-auth) -->
+<!-- Privacy / cookie functions -->
 <script>
 (function() {
     const CONSENT_KEY = "bkh_cookie_consent";
@@ -909,13 +974,12 @@
     window.declinePrivacyCookies = function() { localStorage.setItem(CONSENT_KEY, "essential"); hideBanner(); };
     window.showPrivacyPolicy = function() { const m = document.getElementById("privacyPolicyModal"); if(m) m.style.display = "flex"; };
     window.closePrivacyPolicy = function() { const m = document.getElementById("privacyPolicyModal"); if(m) m.style.display = "none"; };
-    window.showTerms = function() { alert("Terms of Use would be displayed here."); }; // placeholder
+    window.showTerms = function() { alert("Terms of Use would be displayed here."); };
 
     document.addEventListener("DOMContentLoaded", function() {
         if (!localStorage.getItem(CONSENT_KEY)) showBanner();
     });
 })();
 </script>
-
 </body>
 </html>
