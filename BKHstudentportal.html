@@ -719,11 +719,16 @@ function renderChart(docs){
         if(!bySubject[sub])bySubject[sub]=[];
         bySubject[sub].push(s);
     });
-    const ctx=document.getElementById('performanceChart').getContext('2d');
-    if(performanceChart)performanceChart.destroy();
+    const canvasEl=document.getElementById('performanceChart');
+    if(!canvasEl)return;
+    const ctx=canvasEl.getContext('2d');
+    if(performanceChart){performanceChart.destroy();performanceChart=null;}
     if(!scores.length){
-        ctx.clearRect(0,0,400,200);ctx.fillStyle='#9ca3af';ctx.font='14px Inter';
-        ctx.textAlign='center';ctx.fillText('No graded results yet',200,100);return;
+        ctx.clearRect(0,0,canvasEl.offsetWidth||400,canvasEl.offsetHeight||256);
+        ctx.fillStyle='#9ca3af';ctx.font='14px Inter,sans-serif';
+        ctx.textAlign='center';
+        ctx.fillText('No graded results yet',(canvasEl.offsetWidth||400)/2,(canvasEl.offsetHeight||256)/2);
+        return;
     }
     const colours=['#059669','#3b82f6','#f59e0b','#ef4444','#8b5cf6'];
     const subjectEntries=Object.entries(bySubject);let datasets;
@@ -734,16 +739,25 @@ function renderChart(docs){
                 const d=docs[li]?.data();if(!d)return null;
                 return(d.subject||'General')===sub?vals[vi++]||null:null;
             });
-            return{label:sub,data,borderColor:colours[i%colours.length],backgroundColor:'transparent',tension:0.4,spanGaps:true,pointRadius:3};
+            return{label:sub,data,borderColor:colours[i%colours.length],backgroundColor:'transparent',tension:0.4,spanGaps:true,pointRadius:4,pointBackgroundColor:colours[i%colours.length]};
         });
     } else {
-        datasets=[{label:'Score (%)',data:scores,borderColor:'#059669',backgroundColor:'rgba(5,150,105,0.1)',tension:0.4,fill:true,pointRadius:4,pointBackgroundColor:'#059669'}];
+        datasets=[{label:'Score (%)',data:scores,borderColor:'#059669',backgroundColor:'rgba(5,150,105,0.1)',tension:0.4,fill:true,pointRadius:5,pointBackgroundColor:'#059669',pointHoverRadius:7}];
     }
     performanceChart=new Chart(ctx,{
         type:'line',data:{labels,datasets},
-        options:{responsive:true,maintainAspectRatio:false,
-            plugins:{legend:{position:'bottom'}},
-            scales:{y:{beginAtZero:false,min:0,max:100,grid:{color:'#f3f4f6'}},x:{grid:{display:false}}}}
+        options:{
+            responsive:true,maintainAspectRatio:false,
+            interaction:{mode:'index',intersect:false},
+            plugins:{
+                legend:{position:'bottom',labels:{font:{family:'Inter',size:12},padding:16}},
+                tooltip:{backgroundColor:'rgba(15,23,42,0.85)',titleFont:{family:'Inter',size:12},bodyFont:{family:'Inter',size:12},callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y}%`}}
+            },
+            scales:{
+                y:{beginAtZero:false,min:0,max:100,grid:{color:'#f3f4f6'},ticks:{callback:v=>v+'%',font:{family:'Inter',size:11}}},
+                x:{grid:{display:false},ticks:{font:{family:'Inter',size:11},maxRotation:30}}
+            }
+        }
     });
 }
 
@@ -945,17 +959,29 @@ window.openWorkspace = async (assignmentId) => {
           <p class="text-xs text-blue-600 mb-2"><i class="fas fa-info-circle mr-1"></i>Annotate each file separately — all will be merged on submit.</p>`
         : '';
 
-    // ── Build viewer HTML for a given file ──
+    // ── Helper: render a single file for viewing ──
     const buildViewerHTML = (f, idSuffix) => {
         if (!f) return '<p class="text-sm text-gray-400 italic text-center py-4">No file attached.</p>';
         const { url, isImage: img, isPdf: pdf, name } = f;
+        const isDoc = ['doc','docx'].includes(f.ext);
+        const isPPT = ['ppt','pptx'].includes(f.ext);
+        const isXLS = ['xls','xlsx'].includes(f.ext);
+        const officeViewable = isDoc || isPPT || isXLS;
+        const fileIcons = { doc:'📝', docx:'📝', ppt:'📊', pptx:'📊', xls:'📈', xlsx:'📈', txt:'📄', zip:'🗜️', mp4:'🎬', mp3:'🎵' };
         return `
         <div class="border border-gray-200 rounded-xl overflow-hidden">
             ${img
               ? `<img src="${escH(url)}" class="w-full object-contain" style="max-height:420px;">`
               : pdf
               ? `<iframe src="https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true" class="w-full" style="height:500px;border:none;" allowfullscreen></iframe>`
-              : `<iframe src="${escH(url)}" class="w-full" style="height:420px;border:none;" allowfullscreen></iframe>`
+              : officeViewable
+              ? `<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}" class="w-full" style="height:500px;border:none;" allowfullscreen></iframe>`
+              : `<div class="flex flex-col items-center justify-center py-12 bg-gradient-to-br from-sky-50 to-blue-100">
+                   <div class="text-6xl mb-3">${fileIcons[f.ext]||'📎'}</div>
+                   <p class="font-bold text-sky-800 mb-1">${escH(name)}</p>
+                   <p class="text-sm text-gray-500 mb-4">Click to open this file</p>
+                   <a href="${escH(url)}" target="_blank" class="px-5 py-2.5 bg-sky-700 text-white rounded-lg font-bold text-sm">📂 Open File ↗</a>
+                 </div>`
             }
         </div>
         <a href="${escH(url)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 text-brand-primary text-xs font-medium hover:underline mt-1">
@@ -963,14 +989,31 @@ window.openWorkspace = async (assignmentId) => {
         </a>`;
     };
 
-    // ── Build annotate canvas area for file[0] (default) ──
+    // ── Build annotate canvas area for file ──
     const buildAnnotAreaHTML = (f, id) => {
         if (!f) return `<canvas id="annot-canvas-${id}" width="580" height="380"
             style="border:2px dashed #d1d5db;border-radius:12px;cursor:crosshair;display:block;background:#fff;max-width:100%;"></canvas>`;
-        const { url, isImage: img, isPdf: pdf } = f;
+        const { url, isImage: img, isPdf: pdf, ext, name } = f;
+        const isDoc = ['doc','docx'].includes(ext);
+        const isPPT = ['ppt','pptx'].includes(ext);
+        const isXLS = ['xls','xlsx'].includes(ext);
+        const officeViewable = isDoc || isPPT || isXLS;
+        const fileIcons = { doc:'📝', docx:'📝', ppt:'📊', pptx:'📊', xls:'📈', xlsx:'📈', txt:'📄', zip:'🗜️' };
+
+        if (officeViewable) {
+            // Show Office Online viewer for reading + a blank annotation canvas below
+            return `<div style="margin-bottom:8px;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+                <iframe src="https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}"
+                    style="width:100%;height:550px;border:none;display:block;"></iframe>
+            </div>
+            <p class="text-xs text-amber-600 mb-2"><i class="fas fa-info-circle mr-1"></i>Word/Office files can't be drawn on directly — use the canvas below to add your annotations.</p>
+            <canvas id="annot-canvas-${id}" width="700" height="300"
+                style="border:2px dashed #d1d5db;border-radius:12px;cursor:crosshair;display:block;background:#fff;max-width:100%;"></canvas>`;
+        }
+
         return `<div id="annot-wrapper-${id}" style="position:relative;display:inline-block;width:100%;max-width:100%;min-height:200px;">
             ${img
-              ? `<img id="annot-bg-${id}" src="${escH(url)}" style="max-width:100%;display:block;border-radius:10px;border:1px solid #e5e7eb;"
+              ? `<img id="annot-bg-${id}" src="${escH(url)}" style="max-width:100%;display:block;border-radius:10px;border:1px solid #e5e7eb;" crossorigin="anonymous"
                      onerror="this.style.display='none';document.getElementById('annot-fallback-${id}').style.display='block';">
                  <div id="annot-fallback-${id}" style="display:none;width:100%;height:500px;border-radius:10px;border:1px solid #e5e7eb;overflow:hidden;">
                      <iframe src="${escH(url)}" style="width:100%;height:100%;border:none;"></iframe>
@@ -989,7 +1032,11 @@ window.openWorkspace = async (assignmentId) => {
                      <button onclick="annotPdfPage('${id}',1)" class="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 font-bold">Next ▶</button>
                  </div>`
               : `<div id="annot-bg-frame-${id}" style="width:100%;height:500px;border-radius:10px;border:1px solid #e5e7eb;overflow:hidden;">
-                     <iframe src="${escH(url)}" style="width:100%;height:100%;border:none;"></iframe>
+                     <div style="text-align:center;padding:48px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);">
+                         <div style="font-size:4rem;margin-bottom:12px;">${fileIcons[ext]||'📎'}</div>
+                         <p style="font-weight:700;color:#0369a1;margin-bottom:4px;">${escH(name)}</p>
+                         <a href="${escH(url)}" target="_blank" style="color:#2563eb;font-size:.875rem;">Open file ↗</a>
+                     </div>
                  </div>`
             }
             <canvas id="annot-canvas-${id}" style="position:absolute;top:0;left:0;cursor:crosshair;border-radius:10px;"></canvas>
