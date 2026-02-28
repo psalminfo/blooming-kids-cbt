@@ -1502,11 +1502,30 @@ async function uploadToCloudinary(file, studentId) {
         formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
         formData.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
         formData.append('folder', 'homework_assignments');
-        formData.append('public_id', `homework_${studentId}_${Date.now()}_${file.name.replace(/\.[^/.]+$/, "")}`);
-        
-        fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/upload`, { method: 'POST', body: formData })
+
+        // Remove extension and sanitise the filename
+      const baseName = file.name.replace(/\.[^/.]+$/, "");
+const safeBase = baseName.replace(/[^a-zA-Z0-9_-]/g, '_');
+formData.append('public_id', `material_${studentId}_${Date.now()}_${safeBase}`);
+
+        const publicId = `homework_${studentId}_${Date.now()}_${safeBase}`;
+        formData.append('public_id', publicId);
+
+        fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/upload`, {
+            method: 'POST',
+            body: formData
+        })
         .then(r => r.json())
-        .then(d => d.secure_url ? resolve({url: d.secure_url, publicId: d.public_id, format: d.format, bytes: d.bytes, createdAt: d.created_at, fileName: file.name}) : reject(new Error(d.error?.message)))
+        .then(d => d.secure_url
+            ? resolve({
+                url: d.secure_url,
+                publicId: d.public_id,
+                format: d.format,
+                bytes: d.bytes,
+                createdAt: d.created_at,
+                fileName: file.name
+              })
+            : reject(new Error(d.error?.message || 'Upload failed')))
         .catch(e => reject(e));
     });
 }
@@ -7463,3 +7482,4 @@ window.showScheduleCalendarModal = showScheduleCalendarModal;
 window.renderCourses = renderCourses;
 window.loadCourseMaterials = loadCourseMaterials;
 window.uploadCourseMaterial = uploadCourseMaterial;
+
