@@ -145,119 +145,26 @@ class DataCache {
 const dataCache = new DataCache();
 
 // ============================================================================
-// CHART INITIALIZATION HELPER (FIX for charts not rendering)
-// ============================================================================
-// Charts created via innerHTML <script> tags don't execute.
-// Instead, chart configs are queued in window._pendingCharts and
-// initialized after the DOM is updated.
-
-window._pendingCharts = [];
-
-function initPendingCharts() {
-    if (!window._pendingCharts || window._pendingCharts.length === 0) return;
-    
-    const pending = [...window._pendingCharts];
-    window._pendingCharts = [];
-    
-    setTimeout(() => {
-        pending.forEach(({ id, config }) => {
-            try {
-                const ctx = document.getElementById(id);
-                if (ctx) {
-                    // Destroy existing chart on same canvas if any
-                    if (charts.has(id)) {
-                        charts.get(id).destroy();
-                        charts.delete(id);
-                    }
-                    const chart = new Chart(ctx, config);
-                    charts.set(id, chart);
-                    console.log(`📊 Chart initialized: ${id}`);
-                }
-            } catch (e) {
-                console.warn(`Chart init failed for ${id}:`, e);
-            }
-        });
-    }, 200);
-}
-
-// ============================================================================
-// STAT CARD UPDATER
-// ============================================================================
-function updateStatCards() {
-    try {
-        // Children count
-        const childrenEl = document.getElementById('statChildrenCount');
-        if (childrenEl) childrenEl.textContent = userChildren.length || allStudentData.length || 0;
-
-        // Reports count - count report content items
-        const reportItems = document.querySelectorAll('[id^="assessment-block-"]');
-        const reportsEl = document.getElementById('statReportsCount');
-        if (reportsEl) reportsEl.textContent = reportItems.length || '—';
-
-        // Subjects count - aggregate from allStudentData
-        let totalSubjects = 0;
-        if (allStudentData && allStudentData.length > 0) {
-            allStudentData.forEach(s => {
-                const data = s.data || s;
-                const subjects = data.selectedSubjects || data.subjects || [];
-                if (Array.isArray(subjects)) totalSubjects += subjects.length;
-            });
-        }
-        const subjectsEl = document.getElementById('statSubjectsCount');
-        if (subjectsEl) subjectsEl.textContent = totalSubjects || '—';
-    } catch (e) {
-        console.warn('Stat card update error:', e);
-    }
-}
-
-// ============================================================================
-// FEEDBACK MODAL FUNCTIONS (Previously Missing)
+// FEEDBACK MODAL FUNCTIONS — redirected to FAB modal
 // ============================================================================
 
-function showFeedbackModal() {
-    const modal = document.getElementById('feedbackModal');
-    if (modal) {
-        modal.classList.remove('hidden');
-        // Populate student dropdown
-        const feedbackStudentSelect = document.getElementById('feedbackStudent');
-        if (feedbackStudentSelect && userChildren.length > 0) {
-            feedbackStudentSelect.innerHTML = '<option value="">Select student</option>';
-            userChildren.forEach(name => {
-                const option = document.createElement('option');
-                option.value = safePlainText(name);
-                option.textContent = capitalize(name);
-                feedbackStudentSelect.appendChild(option);
-            });
-        }
-    }
-}
+function showFeedbackModal() { openFabTab('feedback'); }
 
 function hideFeedbackModal() {
-    const modal = document.getElementById('feedbackModal');
-    if (modal) {
-        modal.classList.add('hidden');
-        // Reset form
-        const fields = ['feedbackCategory', 'feedbackPriority', 'feedbackStudent', 'feedbackMessage'];
-        fields.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.value = '';
-        });
-    }
+    const modal = document.getElementById('fabModal');
+    if (modal) modal.classList.add('hidden');
+    // Also hide legacy modal if present
+    const legacyModal = document.getElementById('feedbackModal');
+    if (legacyModal) legacyModal.classList.add('hidden');
 }
 
-function showResponsesModal() {
-    const modal = document.getElementById('responsesModal');
-    if (modal) {
-        modal.classList.remove('hidden');
-        loadAdminResponses();
-    }
-}
+function showResponsesModal() { openFabTab('messages'); }
 
 function hideResponsesModal() {
-    const modal = document.getElementById('responsesModal');
-    if (modal) {
-        modal.classList.add('hidden');
-    }
+    const modal = document.getElementById('fabModal');
+    if (modal) modal.classList.add('hidden');
+    const legacyModal = document.getElementById('responsesModal');
+    if (legacyModal) legacyModal.classList.add('hidden');
 }
 
 async function submitFeedback() {
@@ -2500,7 +2407,7 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
         }
     };
 
-    const html = `
+    return `
         <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="assessment-block-${studentIndex}-${sessionId}">
             <div class="text-center mb-6 border-b pb-4">
                 <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
@@ -2543,9 +2450,7 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
             ` : ''}
 
             ${results.length > 0 ? `
-            <div class="chart-container">
-                <canvas id="${chartId}" class="w-full" style="max-height:280px;"></canvas>
-            </div>
+            <canvas id="${chartId}" class="w-full h-48 mb-4"></canvas>
             ` : ''}
             
             <div class="bg-yellow-50 p-4 rounded-lg mt-6">
@@ -2559,16 +2464,16 @@ function createAssessmentReportHTML(sessionReports, studentIndex, sessionId, ful
                 </button>
             </div>
         </div>
+        <script>
+            setTimeout(() => {
+                const ctx = document.getElementById('${chartId}');
+                if (ctx) {
+                    const chart = new Chart(ctx, ${JSON.stringify(chartConfig)});
+                    window.charts.set('${chartId}', chart);
+                }
+            }, 100);
+        </script>
     `;
-
-    // CHART FIX: Register chart config for post-render initialization
-    // (inline <script> tags in innerHTML do not execute)
-    if (!window._pendingCharts) window._pendingCharts = [];
-    if (results.length > 0) {
-        window._pendingCharts.push({ id: chartId, config: chartConfig });
-    }
-
-    return html;
 }
 
 function createMonthlyReportHTML(sessionReports, studentIndex, sessionId, fullName, date) {
@@ -2860,12 +2765,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
 
         reportsHtml = createYearlyArchiveReportView(formattedReportsByStudent);
         reportContent.innerHTML = reportsHtml;
-
-        // CHART FIX: Initialize any pending charts after DOM is updated
-        initPendingCharts();
-
-        // Update stat cards with real data
-        setTimeout(updateStatCards, 300);
+        setTimeout(() => window.initializeCharts && window.initializeCharts(), 150);
 
         // Setup other features in background
         setTimeout(() => {
@@ -2876,6 +2776,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             
             setupRealTimeMonitoring(parentPhone, userId);
             addManualRefreshButton();
+            addLogoutButton();
         }, 100);
 
     } catch (error) {
@@ -3044,44 +2945,15 @@ class UnifiedAuthManager {
             welcomeMessage.textContent = `Welcome, ${this.currentUser.parentName}!`;
         }
 
-        // Show FAB container
-        const fabContainer = document.getElementById("fabContainer");
-        if (fabContainer) fabContainer.style.display = "flex";
-
-        // Set header avatar initial
-        const headerAvatar = document.getElementById("headerAvatar");
-        if (headerAvatar && this.currentUser) {
-            const initial = this.currentUser.parentName.charAt(0).toUpperCase();
-            headerAvatar.textContent = initial;
-
-            // Inject a logout button next to the avatar if not already present
-            if (!document.getElementById('headerLogoutBtn')) {
-                const logoutBtn = document.createElement('button');
-                logoutBtn.id = 'headerLogoutBtn';
-                logoutBtn.onclick = logout;
-                logoutBtn.title = 'Log Out';
-                logoutBtn.innerHTML = '🚪 <span style="font-size:0.82rem;">Log Out</span>';
-                Object.assign(logoutBtn.style, {
-                    display: 'inline-flex', alignItems: 'center', gap: '4px',
-                    padding: '6px 14px', marginLeft: '10px',
-                    background: '#DC2626', color: '#fff', border: 'none',
-                    borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600',
-                    cursor: 'pointer', transition: 'background 0.2s', whiteSpace: 'nowrap'
-                });
-                logoutBtn.onmouseover = function() { this.style.background = '#B91C1C'; };
-                logoutBtn.onmouseout  = function() { this.style.background = '#DC2626'; };
-
-                // Insert after the avatar (in its parent container)
-                const avatarParent = headerAvatar.parentElement;
-                if (avatarParent) {
-                    avatarParent.style.display = 'flex';
-                    avatarParent.style.alignItems = 'center';
-                    avatarParent.appendChild(logoutBtn);
-                }
-            }
+        // ── NEW: populate header greeting and show header actions ──
+        const headerActions  = document.getElementById("headerActions");
+        const headerGreeting = document.getElementById("headerGreeting");
+        if (headerGreeting && this.currentUser) {
+            headerGreeting.textContent = `Hello, ${this.currentUser.parentName.split(' ')[0]}! 👋`;
         }
+        if (headerActions) headerActions.style.display = "flex";
 
-        // Ensure the Reports tab is visually active on first load
+        // ── NEW: ensure the Reports tab is visually active on first load ──
         const reportTab = document.getElementById("reportTab");
         if (reportTab) {
             reportTab.classList.add("active");
@@ -3111,7 +2983,7 @@ class UnifiedAuthManager {
 
     setupUIComponents() {
         addManualRefreshButton();
-        // Logout button is injected into the header and settings form by showDashboardUI() and renderSettingsForm()
+        addLogoutButton();
     }
 
     cleanup() {
@@ -3205,10 +3077,25 @@ function addManualRefreshButton() {
     }
 }
 
-// LOGOUT BUTTON — now dynamically injected in showDashboardUI() and renderSettingsForm()
+// ADD LOGOUT BUTTON
 function addLogoutButton() {
-    // Kept for backward compatibility — actual injection is in showDashboardUI()
-    return;
+    // New design already has logout buttons inline — skip injection
+    if (document.querySelector('.dashboard-welcome-bar')) return;
+
+    const welcomeSection = document.querySelector('.bg-green-50');
+    if (!welcomeSection) return;
+    
+    const buttonContainer = welcomeSection.querySelector('.flex.gap-2');
+    if (!buttonContainer) return;
+    
+    if (buttonContainer.querySelector('button[onclick="logout()"]')) return;
+    
+    const logoutBtn = document.createElement('button');
+    logoutBtn.onclick = logout;
+    logoutBtn.className = 'bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition-all duration-200 btn-glow flex items-center justify-center';
+    logoutBtn.innerHTML = '<span class="mr-2">🚪</span> Logout';
+    
+    buttonContainer.appendChild(logoutBtn);
 }
 
 // ============================================================================
@@ -3218,17 +3105,80 @@ function addLogoutButton() {
 class SettingsManager {
     constructor() {
         this.isActive = false;
-        // Settings UI is now built into HTML, no need to inject
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => this.injectSettingsUI());
+        } else {
+            this.injectSettingsUI();
+        }
     }
 
-    // Called by switchMainTab('settings')
+    injectSettingsUI() {
+        const navContainer = document.querySelector('.bg-green-50 .flex.gap-2');
+        
+        if (navContainer && !document.getElementById('settingsBtn')) {
+            const settingsBtn = document.createElement('button');
+            settingsBtn.id = 'settingsBtn';
+            settingsBtn.onclick = () => this.openSettingsTab();
+            settingsBtn.className = 'bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-700 transition-all duration-200 btn-glow flex items-center justify-center';
+            settingsBtn.innerHTML = '<span class="mr-2">⚙️</span> Settings';
+            
+            const logoutBtn = navContainer.querySelector('button[onclick="logout()"]');
+            if (logoutBtn) {
+                navContainer.insertBefore(settingsBtn, logoutBtn);
+            } else {
+                navContainer.appendChild(settingsBtn);
+            }
+        }
+
+        const mainContainer = document.getElementById('reportArea');
+        if (mainContainer && !document.getElementById('settingsContentArea')) {
+            const settingsDiv = document.createElement('div');
+            settingsDiv.id = 'settingsContentArea';
+            settingsDiv.className = 'hidden max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 fade-in';
+            settingsDiv.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+                    <div class="bg-gray-800 px-6 py-4 flex justify-between items-center">
+                        <h2 class="text-xl font-bold text-white flex items-center">
+                            <span class="mr-2">⚙️</span> Family Profile & Settings
+                        </h2>
+                        <button onclick="switchMainTab('reports')" class="text-gray-300 hover:text-white text-sm">
+                            ← Back to Dashboard
+                        </button>
+                    </div>
+                    <div id="settingsDynamicContent" class="p-6">
+                        <div class="loading-spinner mx-auto"></div>
+                    </div>
+                </div>
+            `;
+            mainContainer.appendChild(settingsDiv);
+        }
+    }
+
+    openSettingsTab() {
+        ['reportContentArea', 'academicsContentArea', 'rewardsContentArea'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('hidden');
+        });
+        
+        ['reportTab', 'academicsTab', 'rewardsTab'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.classList.remove('tab-active-main');
+                el.classList.add('tab-inactive-main');
+            }
+        });
+
+        const settingsArea = document.getElementById('settingsContentArea');
+        if (settingsArea) {
+            settingsArea.classList.remove('hidden');
+            this.loadSettingsData();
+        }
+    }
+
     async loadSettingsData() {
         const content = document.getElementById('settingsDynamicContent');
         const user = auth.currentUser;
-        if (!user || !content) return;
-
-        // Show loading
-        content.innerHTML = '<div class="text-center py-12"><div class="loading-spinner mx-auto" style="width:40px;height:40px;"></div><p class="mt-4 text-sm" style="color:var(--primary);">Loading settings…</p></div>';
+        if (!user) return;
 
         try {
             const userDoc = await db.collection('parent_users').doc(user.uid).get();
@@ -3241,17 +3191,8 @@ class SettingsManager {
 
         } catch (error) {
             console.error("Settings load error:", error);
-            content.innerHTML = `<div class="text-center py-8"><p style="color:var(--danger);">Error loading settings: ${error.message}</p></div>`;
+            content.innerHTML = `<p class="text-red-500">Error loading settings: ${error.message}</p>`;
         }
-    }
-
-    // Legacy method for backward compat
-    openSettingsTab() {
-        switchMainTab('settings');
-    }
-
-    injectSettingsUI() {
-        // No-op: settings UI is now part of the main HTML tabs
     }
 
     renderSettingsForm(userData, students) {
@@ -3285,15 +3226,6 @@ class SettingsManager {
                         class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors">
                         Update My Profile
                     </button>
-
-                    <!-- Logout Button -->
-                    <div style="border-top:1px solid #E5E7EB;padding-top:20px;margin-top:16px;">
-                        <button onclick="logout()" 
-                            style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;background:#DC2626;color:#fff;border:none;border-radius:10px;font-size:0.95rem;font-weight:600;cursor:pointer;transition:background 0.2s;"
-                            onmouseover="this.style.background='#B91C1C'" onmouseout="this.style.background='#DC2626'">
-                            🚪 Log Out
-                        </button>
-                    </div>
                 </div>
 
                 <div class="md:col-span-2 space-y-6">
@@ -4117,47 +4049,38 @@ function switchTab(tab) {
 }
 
 function switchMainTab(tab) {
-    const reportTab = document.getElementById('reportTab');
-    const academicsTab = document.getElementById('academicsTab');
-    const rewardsTab = document.getElementById('rewardsTab');
-    const paymentsTab = document.getElementById('paymentsTab');
-    const settingsTab = document.getElementById('settingsTab');
-    
-    const reportContentArea = document.getElementById('reportContentArea');
-    const academicsContentArea = document.getElementById('academicsContentArea');
-    const rewardsContentArea = document.getElementById('rewardsContentArea');
-    const paymentsContentArea = document.getElementById('paymentsContentArea');
-    const settingsContentArea = document.getElementById('settingsContentArea');
-    
+    const tabIds = ['reportTab', 'academicsTab', 'rewardsTab', 'paymentsTab', 'settingsTab'];
+    const areaIds = ['reportContentArea', 'academicsContentArea', 'rewardsContentArea', 'paymentsContentArea', 'settingsContentArea'];
+
     // Remove active from all tabs
-    [reportTab, academicsTab, rewardsTab, paymentsTab, settingsTab].forEach(btn => {
+    tabIds.forEach(id => {
+        const btn = document.getElementById(id);
         btn?.classList.remove('tab-active-main', 'active');
         btn?.classList.add('tab-inactive-main');
     });
-    
     // Hide all content areas
-    [reportContentArea, academicsContentArea, rewardsContentArea, paymentsContentArea, settingsContentArea].forEach(area => {
-        area?.classList.add('hidden');
-    });
-    
+    areaIds.forEach(id => document.getElementById(id)?.classList.add('hidden'));
+
     if (tab === 'reports' || tab === 'report') {
+        const reportTab = document.getElementById('reportTab');
         reportTab?.classList.remove('tab-inactive-main');
         reportTab?.classList.add('tab-active-main', 'active');
-        reportContentArea?.classList.remove('hidden');
+        document.getElementById('reportContentArea')?.classList.remove('hidden');
     } else if (tab === 'academics') {
+        const academicsTab = document.getElementById('academicsTab');
         academicsTab?.classList.remove('tab-inactive-main');
         academicsTab?.classList.add('tab-active-main', 'active');
-        academicsContentArea?.classList.remove('hidden');
-        // Only load if content is empty (cached after first load)
+        document.getElementById('academicsContentArea')?.classList.remove('hidden');
         const academicsContent = document.getElementById('academicsContent');
         if (!academicsContent || !academicsContent.innerHTML.trim() ||
             academicsContent.innerHTML.includes('Loading')) {
             loadAcademicsData();
         }
     } else if (tab === 'rewards') {
+        const rewardsTab = document.getElementById('rewardsTab');
         rewardsTab?.classList.remove('tab-inactive-main');
         rewardsTab?.classList.add('tab-active-main', 'active');
-        rewardsContentArea?.classList.remove('hidden');
+        document.getElementById('rewardsContentArea')?.classList.remove('hidden');
         const user = auth.currentUser;
         if (user) {
             const rewardsContent = document.getElementById('rewardsContent');
@@ -4167,19 +4090,84 @@ function switchMainTab(tab) {
             }
         }
     } else if (tab === 'payments') {
+        const paymentsTab = document.getElementById('paymentsTab');
         paymentsTab?.classList.remove('tab-inactive-main');
         paymentsTab?.classList.add('tab-active-main', 'active');
-        paymentsContentArea?.classList.remove('hidden');
+        document.getElementById('paymentsContentArea')?.classList.remove('hidden');
     } else if (tab === 'settings') {
+        const settingsTab = document.getElementById('settingsTab');
         settingsTab?.classList.remove('tab-inactive-main');
         settingsTab?.classList.add('tab-active-main', 'active');
-        settingsContentArea?.classList.remove('hidden');
-        // Load settings data
-        if (window.settingsManager) {
-            window.settingsManager.loadSettingsData();
-        }
+        document.getElementById('settingsContentArea')?.classList.remove('hidden');
+        if (window.settingsManager) window.settingsManager.loadSettingsData();
     }
 }
+
+// ============================================================================
+// FAB (Floating Action Button) — Feedback & Messages
+// ============================================================================
+function toggleFab() {
+    const menu = document.getElementById('fabMenu');
+    const btn  = document.getElementById('fabMainBtn');
+    if (!menu) return;
+    const isOpen = menu.classList.contains('open');
+    if (isOpen) {
+        menu.classList.remove('open');
+        btn?.classList.remove('open');
+    } else {
+        menu.classList.add('open');
+        btn?.classList.add('open');
+    }
+}
+
+function closeFab() {
+    document.getElementById('fabMenu')?.classList.remove('open');
+    document.getElementById('fabMainBtn')?.classList.remove('open');
+}
+
+function openFabTab(tab) {
+    closeFab();
+    const modal = document.getElementById('fabModal');
+    if (modal) modal.classList.remove('hidden');
+    switchFabModalTab(tab);
+}
+
+function switchFabModalTab(tab) {
+    const feedbackTab    = document.getElementById('fabTabFeedback');
+    const messagesTab    = document.getElementById('fabTabMessages');
+    const feedbackPanel  = document.getElementById('fabPanelFeedback');
+    const messagesPanel  = document.getElementById('fabPanelMessages');
+    if (!feedbackTab) return;
+    if (tab === 'feedback') {
+        feedbackTab.classList.add('active');
+        messagesTab?.classList.remove('active');
+        if (feedbackPanel)  feedbackPanel.style.display  = 'block';
+        if (messagesPanel)  messagesPanel.style.display  = 'none';
+    } else {
+        messagesTab?.classList.add('active');
+        feedbackTab.classList.remove('active');
+        if (messagesPanel)  messagesPanel.style.display  = 'block';
+        if (feedbackPanel)  feedbackPanel.style.display  = 'none';
+        if (typeof loadAdminResponses === 'function') loadAdminResponses();
+    }
+}
+
+// Note: showFeedbackModal, hideFeedbackModal, showResponsesModal, hideResponsesModal
+// are defined at the top of this file and redirect to the FAB modal.
+
+// Chart initializer — call after rendering report HTML
+window.initializeCharts = function() {
+    if (typeof Chart === 'undefined') return;
+    document.querySelectorAll('canvas[data-config]').forEach(canvas => {
+        if (canvas._chartInstance) return; // already initialized
+        try {
+            const config = JSON.parse(canvas.dataset.config);
+            canvas._chartInstance = new Chart(canvas, config);
+        } catch(e) {
+            console.warn('Chart init failed:', e);
+        }
+    });
+};
 
 function setupEventListeners() {
     const signInBtn = document.getElementById("signInBtn");
@@ -5022,19 +5010,14 @@ window.loadAllReportsForParent = async function(parentPhone, userId, forceRefres
             });
         }
 
-        // Use existing display function
         reportsHtml = createYearlyArchiveReportView(formattedReportsByStudent);
         reportContent.innerHTML = reportsHtml;
-
-        // CHART FIX: Initialize any pending charts
-        initPendingCharts();
-
-        // Update stat cards
-        setTimeout(updateStatCards, 300);
+        setTimeout(() => window.initializeCharts && window.initializeCharts(), 150);
 
         // Setup monitoring silently
         setupRealTimeMonitoring(parentPhone, userId);
         addManualRefreshButton();
+        addLogoutButton();
 
     } catch (error) {
         // Show simple error
@@ -5957,12 +5940,6 @@ function showAddStudentModal() {
         if (el) el.value = '';
     });
 
-    // Reset fee summary and review panel
-    const feeSummary = document.getElementById('addStudentFeeSummary');
-    if (feeSummary) { feeSummary.innerHTML = ''; feeSummary.style.display = 'none'; }
-    const reviewDiv = document.getElementById('addStudentReview');
-    if (reviewDiv) reviewDiv.innerHTML = '';
-
     modal.classList.remove('hidden');
 }
 
@@ -5980,10 +5957,18 @@ function hideAddStudentModal() {
  */
 function togglePickerChip(el) {
     el.classList.toggle('selected');
-    // Recalculate fee estimate when subjects are toggled
-    if (el.closest('#newStudentSubjects')) {
-        updateAddStudentFees();
-    }
+}
+
+/**
+ * Toggle session chip and update fee display
+ */
+function toggleSessionChip(el) {
+    // Deselect other session chips
+    document.querySelectorAll('#newStudentSessions .picker-chip').forEach(chip => {
+        chip.classList.remove('selected');
+    });
+    el.classList.add('selected');
+    updateAddStudentFees();
 }
 
 /**
@@ -5992,16 +5977,23 @@ function togglePickerChip(el) {
  */
 function _updateAddStudentStepUI() {
     // Update step panels
-    for (let i = 1; i <= 3; i++) {
+    for (let i = 1; i <= 4; i++) {
         const panel = document.getElementById(`add-step-${i}`);
         if (panel) panel.classList.toggle('active', i === _addStudentStep);
 
-        const bar = document.getElementById(`step-bar-${i}`);
+        const bar = document.getElementById(`stepBar${i}`);
         if (bar) {
             bar.classList.remove('active', 'done');
             if (i < _addStudentStep)  bar.classList.add('done');
             if (i === _addStudentStep) bar.classList.add('active');
         }
+    }
+
+    // Update step label
+    const stepLabel = document.getElementById('stepLabel');
+    if (stepLabel) {
+        const labels = ['Student Details', 'Subjects & Schedule', 'Fee Summary', 'Review & Confirm'];
+        stepLabel.textContent = `Step ${_addStudentStep} of 4 — ${labels[_addStudentStep-1]}`;
     }
 
     // Update nav buttons
@@ -6010,8 +6002,8 @@ function _updateAddStudentStepUI() {
     const submitBtn = document.getElementById('addStudentSubmitBtn');
 
     if (prevBtn)   prevBtn.style.display   = _addStudentStep > 1 ? 'block' : 'none';
-    if (nextBtn)   nextBtn.classList.toggle('hidden', _addStudentStep === 3);
-    if (submitBtn) submitBtn.classList.toggle('hidden', _addStudentStep !== 3);
+    if (nextBtn)   nextBtn.classList.toggle('hidden', _addStudentStep === 4);
+    if (submitBtn) submitBtn.classList.toggle('hidden', _addStudentStep !== 4);
 }
 
 /**
@@ -6020,47 +6012,48 @@ function _updateAddStudentStepUI() {
  */
 function addStudentNext() {
     if (_addStudentStep === 1) {
-        const name   = document.getElementById('newStudentName')?.value.trim();
-        const dob    = document.getElementById('newStudentDob')?.value;
-        const gender = document.getElementById('newStudentGender')?.value;
-        const grade  = document.getElementById('newStudentActualGrade')?.value;
-        const group  = document.getElementById('newStudentFeeGroup')?.value;
+        const firstName = document.getElementById('newStudentFirstName')?.value.trim();
+        const lastName  = document.getElementById('newStudentLastName')?.value.trim();
+        const gender    = document.getElementById('newStudentGender')?.value;
+        const dob       = document.getElementById('newStudentDob')?.value;
+        const gradeTier = document.getElementById('newStudentGradeLevel')?.value;
+        const actualGrade = document.getElementById('newStudentActualGrade')?.value;
 
-        if (!name || !dob || !gender || !grade || !group) {
-            showMessage('Please fill in all required fields (Name, Gender, DOB, Grade, Tuition Level)', 'error');
+        if (!firstName || !lastName || !gender || !dob || !gradeTier || !actualGrade) {
+            showMessage('Please fill in all required fields in Step 1', 'error');
             return;
         }
     }
 
     if (_addStudentStep === 2) {
-        const days     = document.querySelectorAll('#newStudentDays .picker-chip.selected');
-        const subjects = document.querySelectorAll('#newStudentSubjects .picker-chip.selected');
-        const sessions = document.getElementById('newStudentSessions')?.value;
-
-        if (subjects.length === 0) {
-            showMessage('Please select at least one subject', 'error');
-            return;
-        }
+        const days = document.querySelectorAll('#newStudentDays .picker-chip.selected');
         if (days.length === 0) {
             showMessage('Please select at least one preferred day', 'error');
             return;
         }
-        if (!sessions) {
-            showMessage('Please select a session frequency (Twice, 3x, or 5x Weekly)', 'error');
+        const sessions = document.querySelectorAll('#newStudentSessions .picker-chip.selected');
+        if (sessions.length === 0) {
+            showMessage('Please select session frequency', 'error');
             return;
         }
     }
 
     if (_addStudentStep === 3) {
-        // Show review - handled separately
-        return;
+        // Just go to review, no validation needed
     }
 
-    _addStudentStep = Math.min(3, _addStudentStep + 1);
-    _updateAddStudentStepUI();
+    if (_addStudentStep < 4) {
+        _addStudentStep++;
+        _updateAddStudentStepUI();
+    }
 
-    // On step 3, populate the review panel
+    // On step 3, update fee summary
     if (_addStudentStep === 3) {
+        _updateFeeSummary();
+    }
+
+    // On step 4, populate the review panel
+    if (_addStudentStep === 4) {
         _populateAddStudentReview();
     }
 }
@@ -6075,29 +6068,87 @@ function addStudentPrev() {
 }
 
 /**
+ * Update the fee summary in step 3 based on selections.
+ */
+function _updateFeeSummary() {
+    const gradeTier = document.getElementById('newStudentGradeLevel')?.value;
+    const sessionChip = document.querySelector('#newStudentSessions .picker-chip.selected');
+    const sessionType = sessionChip ? sessionChip.dataset.sessions : null;
+    const summaryDiv = document.getElementById('addStudentFeeSummary');
+
+    // Define fee rates (example values – adjust to your actual pricing)
+    const fees = {
+        preschool: { twice: 15000, three: 20000, five: 30000 },
+        'grade2-4': { twice: 18000, three: 24000, five: 36000 },
+        'grade5-8': { twice: 22000, three: 28000, five: 42000 },
+        'grade9-12': { twice: 26000, three: 32000, five: 48000 }
+    };
+
+    const gradeLabels = {
+        preschool: 'Preschool – Grade 1',
+        'grade2-4': 'Grade 2 – 4',
+        'grade5-8': 'Grade 5 – 8',
+        'grade9-12': 'Grade 9 – 12'
+    };
+
+    const sessionLabels = {
+        twice: 'Twice weekly',
+        three: '3× weekly',
+        five: 'Daily (5×)'
+    };
+
+    if (gradeTier && sessionType && fees[gradeTier] && fees[gradeTier][sessionType]) {
+        const amount = fees[gradeTier][sessionType];
+        summaryDiv.innerHTML = `
+            <div style="margin-bottom:12px;font-weight:700;font-size:1rem;">Estimated Monthly Tuition</div>
+            <table style="width:100%;border-collapse:collapse;">
+                <tr><td>Grade Tier:</td><td style="text-align:right;font-weight:600;">${gradeLabels[gradeTier] || gradeTier}</td></tr>
+                <tr><td>Session Frequency:</td><td style="text-align:right;font-weight:600;">${sessionLabels[sessionType] || sessionType}</td></tr>
+                <tr><td style="padding-top:8px;border-top:1px dashed #ccc;">Estimated Monthly Fee:</td><td style="padding-top:8px;border-top:1px dashed #ccc;text-align:right;font-weight:800;color:var(--primary-dark);font-size:1.1rem;">₦${amount.toLocaleString()}</td></tr>
+            </table>
+            <p style="margin-top:12px;font-size:0.75rem;color:var(--text-muted);">Fees are estimates and subject to confirmation by staff. Proration applies for mid-month starts.</p>
+        `;
+    } else {
+        summaryDiv.innerHTML = '<p style="color:var(--text-muted);">Select grade tier and session frequency to see estimated fees.</p>';
+    }
+}
+
+/**
+ * UpdateAddStudentFees (called from HTML onchange of grade tier)
+ */
+function updateAddStudentFees() {
+    if (_addStudentStep === 3) {
+        _updateFeeSummary();
+    }
+}
+
+/**
  * _populateAddStudentReview()
- * Fills the review panel (step 3) with the collected data.
+ * Fills the review panel (step 4) with the collected data.
  */
 function _populateAddStudentReview() {
     const reviewDiv = document.getElementById('addStudentReview');
     if (!reviewDiv) return;
 
-    const name    = document.getElementById('newStudentName')?.value.trim() || '—';
-    const gender  = document.getElementById('newStudentGender')?.value || '—';
-    const dob     = document.getElementById('newStudentDob')?.value || '—';
-    const grade   = document.getElementById('newStudentActualGrade')?.value || '—';
-    const group   = document.getElementById('newStudentFeeGroup')?.value || '—';
-    const start   = document.getElementById('newStudentStartDate')?.value || '—';
-    const sessions = document.getElementById('newStudentSessions')?.value || 'Not specified';
-    const tutor   = document.getElementById('newStudentTutor')?.value || 'No preference';
+    const firstName = document.getElementById('newStudentFirstName')?.value.trim() || '—';
+    const lastName  = document.getElementById('newStudentLastName')?.value.trim() || '—';
+    const fullName  = firstName + ' ' + lastName;
+    const gender    = document.getElementById('newStudentGender')?.value || '—';
+    const dob       = document.getElementById('newStudentDob')?.value || '—';
+    const gradeTier = document.getElementById('newStudentGradeLevel')?.value || '—';
+    const actualGrade = document.getElementById('newStudentActualGrade')?.value || '—';
+    const start     = document.getElementById('newStudentStartDate')?.value || '—';
 
     const subjects = Array.from(
         document.querySelectorAll('#newStudentSubjects .picker-chip.selected')
-    ).map(c => c.dataset.subject);
+    ).map(c => c.dataset.subject).join(', ') || 'None selected';
 
     const days = Array.from(
         document.querySelectorAll('#newStudentDays .picker-chip.selected')
-    ).map(c => c.dataset.day);
+    ).map(c => c.dataset.day).join(', ');
+
+    const sessionChip = document.querySelector('#newStudentSessions .picker-chip.selected');
+    const sessionLabel = sessionChip ? sessionChip.textContent : 'Not selected';
 
     const startHour = document.getElementById('newStudentStartHour')?.value;
     const endHour   = document.getElementById('newStudentEndHour')?.value;
@@ -6105,102 +6156,43 @@ function _populateAddStudentReview() {
         ? `${_formatHour(startHour)} – ${_formatHour(endHour)}`
         : 'Not specified';
 
+    const tutor = document.getElementById('newStudentTutor')?.value || 'No preference';
+
     const gradeLabels = {
-        'preschool':'Preschool', 'kindergarten':'Kindergarten',
-        'grade1':'Grade 1','grade2':'Grade 2','grade3':'Grade 3',
-        'grade4':'Grade 4','grade5':'Grade 5','grade6':'Grade 6',
-        'grade7':'Grade 7','grade8':'Grade 8','grade9':'Grade 9',
-        'grade10':'Grade 10','grade11':'Grade 11','grade12':'Grade 12'
+        'preschool': 'Preschool',
+        'kindergarten': 'Kindergarten',
+        'grade1': 'Grade 1', 'grade2': 'Grade 2', 'grade3': 'Grade 3',
+        'grade4': 'Grade 4', 'grade5': 'Grade 5', 'grade6': 'Grade 6',
+        'grade7': 'Grade 7', 'grade8': 'Grade 8', 'grade9': 'Grade 9',
+        'grade10': 'Grade 10', 'grade11': 'Grade 11', 'grade12': 'Grade 12'
     };
 
-    const groupLabels = {
-        'preschool':'Preschool – Grade 1','grade2-4':'Grade 2 – 4',
-        'grade5-8':'Grade 5 – 8','grade9-12':'Grade 9 – 12'
+    const tierLabels = {
+        'preschool': 'Preschool – Grade 1',
+        'grade2-4': 'Grade 2 – 4',
+        'grade5-8': 'Grade 5 – 8',
+        'grade9-12': 'Grade 9 – 12'
+    };
+
+    const genderLabel = {
+        'male': 'Male', 'female': 'Female', 'other': 'Other'
     };
 
     reviewDiv.innerHTML = `
         <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
-            ${_reviewRow('👤 Full Name', escapeHtml(name))}
-            ${_reviewRow('⚧ Gender', escapeHtml(gender))}
+            ${_reviewRow('👤 Full Name', escapeHtml(fullName))}
+            ${_reviewRow('⚧ Gender', escapeHtml(genderLabel[gender] || gender))}
             ${_reviewRow('🎂 Date of Birth', escapeHtml(dob))}
-            ${_reviewRow('🎓 School Grade', escapeHtml(gradeLabels[grade] || grade))}
-            ${_reviewRow('📊 Tuition Level', escapeHtml(groupLabels[group] || group))}
+            ${_reviewRow('🎓 Grade Tier', escapeHtml(tierLabels[gradeTier] || gradeTier))}
+            ${_reviewRow('📚 Actual Grade', escapeHtml(gradeLabels[actualGrade] || actualGrade))}
             ${_reviewRow('📅 Start Date', escapeHtml(start))}
-            ${_reviewRow('📚 Subjects', subjects.length ? escapeHtml(subjects.join(', ')) : '<em style="color:#9CA3AF">None selected</em>')}
-            ${_reviewRow('📆 Days', escapeHtml(days.join(', ')))}
+            ${_reviewRow('📚 Subjects', escapeHtml(subjects))}
+            ${_reviewRow('📆 Days', escapeHtml(days))}
             ${_reviewRow('🕐 Class Time', escapeHtml(timeStr))}
-            ${_reviewRow('🔄 Sessions/Week', escapeHtml(sessions))}
+            ${_reviewRow('🔄 Sessions/Week', escapeHtml(sessionLabel))}
             ${_reviewRow('👩‍🏫 Tutor Pref.', escapeHtml(tutor))}
         </table>
     `;
-
-    // ── FEE ESTIMATION (mirrors enrollment portal logic) ──
-    _calculateAndShowFee(group, sessions, subjects.length);
-}
-
-/**
- * _calculateAndShowFee()
- * Uses the same fee structure from the enrollment portal to display
- * an estimated fee on the review step.
- */
-function _calculateAndShowFee(feeGroup, sessionsFreq, subjectCount) {
-    const feeSummaryDiv = document.getElementById('addStudentFeeSummary');
-    if (!feeSummaryDiv) return;
-
-    // Fee structure from enrollment portal CONFIG.ACADEMIC_FEES
-    const ACADEMIC_FEES = {
-        'preschool':  { 'twice': 80000,  'three': 95000,  'five': 150000 },
-        'grade2-4':   { 'twice': 95000,  'three': 110000, 'five': 170000 },
-        'grade5-8':   { 'twice': 105000, 'three': 120000, 'five': 180000 },
-        'grade9-12':  { 'twice': 110000, 'three': 135000, 'five': 200000 }
-    };
-    const ADDITIONAL_SUBJECT_FEE = 40000;
-    const BASE_SUBJECTS_INCLUDED = 2;
-
-    if (!feeGroup || !sessionsFreq || !ACADEMIC_FEES[feeGroup] || !ACADEMIC_FEES[feeGroup][sessionsFreq]) {
-        feeSummaryDiv.style.display = 'none';
-        return;
-    }
-
-    const baseFee = ACADEMIC_FEES[feeGroup][sessionsFreq];
-    const extraSubjects = Math.max(0, subjectCount - BASE_SUBJECTS_INCLUDED);
-    const extraFee = extraSubjects * ADDITIONAL_SUBJECT_FEE;
-    const totalEstimate = baseFee + extraFee;
-
-    const sessionLabels = { 'twice': 'Twice Weekly', 'three': '3x Weekly', 'five': '5x Weekly (Daily)' };
-
-    let html = `
-        <div class="fee-summary-title">
-            <i class="fas fa-calculator"></i> Estimated Monthly Fee
-        </div>
-        <div class="fee-row">
-            <span>Base tuition (${sessionLabels[sessionsFreq] || sessionsFreq})</span>
-            <span style="font-weight:700;">₦${baseFee.toLocaleString()}</span>
-        </div>
-    `;
-
-    if (extraSubjects > 0) {
-        html += `
-        <div class="fee-row">
-            <span>Additional subjects (${extraSubjects} × ₦${ADDITIONAL_SUBJECT_FEE.toLocaleString()})</span>
-            <span style="font-weight:700;">+₦${extraFee.toLocaleString()}</span>
-        </div>
-        `;
-    }
-
-    html += `
-        <div class="fee-row total">
-            <span>Estimated Total</span>
-            <span>₦${totalEstimate.toLocaleString()}/month</span>
-        </div>
-        <p style="font-size:0.78rem;color:#92400e;margin-top:8px;font-style:italic;">
-            * This is an estimate. Final fee will be confirmed by staff after review.
-            Sibling discounts and prorations may apply.
-        </p>
-    `;
-
-    feeSummaryDiv.innerHTML = html;
-    feeSummaryDiv.style.display = 'block';
 }
 
 function _reviewRow(label, value) {
@@ -6217,19 +6209,6 @@ function _formatHour(h) {
     const suffix = hour < 12 ? 'AM' : 'PM';
     const display = hour % 12 || 12;
     return `${display}:00 ${suffix}`;
-}
-
-/**
- * updateAddStudentFees()
- * Called from the HTML onchange handlers on the fee-group and sessions dropdowns.
- * Recalculates and displays the fee estimate in real time as the user selects options.
- */
-function updateAddStudentFees() {
-    const group    = document.getElementById('newStudentFeeGroup')?.value || '';
-    const sessions = document.getElementById('newStudentSessions')?.value || '';
-    const subjectCount = document.querySelectorAll('#newStudentSubjects .picker-chip.selected').length;
-
-    _calculateAndShowFee(group, sessions, subjectCount);
 }
 
 /**
@@ -6260,14 +6239,14 @@ async function submitNewStudent() {
         const parentName    = parentData.parentName || 'Parent';
 
         // Collect form data
-        const name    = document.getElementById('newStudentName')?.value.trim();
-        const gender  = document.getElementById('newStudentGender')?.value;
-        const dob     = document.getElementById('newStudentDob')?.value;
-        const grade   = document.getElementById('newStudentActualGrade')?.value;
-        const group   = document.getElementById('newStudentFeeGroup')?.value;
-        const start   = document.getElementById('newStudentStartDate')?.value;
-        const sessions = document.getElementById('newStudentSessions')?.value || '';
-        const tutor   = document.getElementById('newStudentTutor')?.value || '';
+        const firstName = document.getElementById('newStudentFirstName')?.value.trim();
+        const lastName  = document.getElementById('newStudentLastName')?.value.trim();
+        const name      = firstName + ' ' + lastName;
+        const gender    = document.getElementById('newStudentGender')?.value;
+        const dob       = document.getElementById('newStudentDob')?.value;
+        const gradeTier = document.getElementById('newStudentGradeLevel')?.value;
+        const actualGrade = document.getElementById('newStudentActualGrade')?.value;
+        const start     = document.getElementById('newStudentStartDate')?.value;
 
         const subjects = Array.from(
             document.querySelectorAll('#newStudentSubjects .picker-chip.selected')
@@ -6277,35 +6256,29 @@ async function submitNewStudent() {
             document.querySelectorAll('#newStudentDays .picker-chip.selected')
         ).map(c => c.dataset.day);
 
+        const sessionChip = document.querySelector('#newStudentSessions .picker-chip.selected');
+        const sessions = sessionChip ? sessionChip.dataset.sessions : '';
+
         const startHour = document.getElementById('newStudentStartHour')?.value || '';
         const endHour   = document.getElementById('newStudentEndHour')?.value || '';
-        const schedule  = days.length && startHour && endHour
-            ? `${days.join(', ')} from ${_formatHour(startHour)} to ${_formatHour(endHour)}`
-            : days.join(', ');
+        const academicTime = startHour && endHour ? `${startHour}:${endHour}` : '';
+
+        const tutor = document.getElementById('newStudentTutor')?.value || '';
 
         if (!name) throw new Error('Student name is required.');
-        if (!gender) throw new Error('Gender is required.');
-        if (!dob) throw new Error('Date of birth is required.');
-        if (!grade) throw new Error('School grade is required.');
-        if (!group) throw new Error('Tuition level is required.');
-        if (subjects.length === 0) throw new Error('Please select at least one subject.');
-        if (days.length === 0) throw new Error('Please select at least one academic day.');
-        if (!sessions) throw new Error('Please select a session frequency.');
 
         // Build Firestore document — matches the schema used by enrollment portal
-        // and expected by comprehensiveFindChildren() (which checks parentPhone field)
         const studentDoc = {
             studentName:      name,
             name:             name,
             gender:           gender,
             dob:              dob,
-            actualGrade:      grade,
-            grade:            group,
+            actualGrade:      actualGrade,
+            grade:            gradeTier,
             startDate:        start,
             selectedSubjects: subjects,
             academicDays:     days,
-            academicSchedule: schedule,
-            academicTime:     startHour && endHour ? `${startHour}:${endHour}` : '',
+            academicTime:     academicTime,
             academicSessions: sessions,
             preferredTutor:   tutor,
             // Phone fields — used by comprehensiveFindChildren for suffix matching
@@ -6320,86 +6293,9 @@ async function submitNewStudent() {
         };
 
         // Save to pending_students — comprehensiveFindChildren already searches this collection
-        const docRef = await db.collection('pending_students').add(studentDoc);
+        const docRef = await db.collection('enrollments').add(studentDoc);
 
         console.log('✅ New student saved to pending_students:', docRef.id);
-
-        // ── Also save to enrollments collection (mirrors enrollment portal behaviour) ──
-        const ACADEMIC_FEES = {
-            'preschool':  { 'twice': 80000,  'three': 95000,  'five': 150000 },
-            'grade2-4':   { 'twice': 95000,  'three': 110000, 'five': 170000 },
-            'grade5-8':   { 'twice': 105000, 'three': 120000, 'five': 180000 },
-            'grade9-12':  { 'twice': 110000, 'three': 135000, 'five': 200000 }
-        };
-        const ADDITIONAL_SUBJECT_FEE = 40000;
-        const BASE_SUBJECTS_INCLUDED = 2;
-
-        const baseFee = (ACADEMIC_FEES[group] && ACADEMIC_FEES[group][sessions]) || 0;
-        const extraSubjects = Math.max(0, subjects.length - BASE_SUBJECTS_INCLUDED);
-        const extraFee = extraSubjects * ADDITIONAL_SUBJECT_FEE;
-        const totalFee = baseFee + extraFee;
-
-        const enrollmentId = 'BKH-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5).toUpperCase();
-
-        const enrollmentData = {
-            id: enrollmentId,
-            parent: {
-                name:        parentName,
-                email:       parentEmail,
-                phone:       parentPhone,
-                countryCode: parentData.countryCode || '+234',
-                phoneNumber: (parentPhone || '').replace(/\D/g, '').slice(-10),
-                city:        parentData.city || '',
-                country:     parentData.country || 'Nigeria',
-                address:     parentData.address || ''
-            },
-            referral: {
-                code:          parentData.referralCode || '',
-                bankName:      '',
-                accountNumber: '',
-                accountName:   ''
-            },
-            students: [{
-                id:                1,
-                name:              name,
-                gender:            gender,
-                dob:               dob,
-                grade:             group,
-                actualGrade:       grade,
-                startDate:         start,
-                preferredTutor:    tutor || null,
-                academicSessions:  sessions || null,
-                selectedSubjects:  subjects,
-                academicDays:      days,
-                academicTime:      startHour && endHour ? `${startHour}:${endHour}` : '',
-                academicSchedule:  schedule,
-                extracurriculars:  [],
-                testPrep:          []
-            }],
-            summary: {
-                totalFee:              totalFee,
-                academicFee:           totalFee,
-                extracurricularFee:    0,
-                testPrepFee:           0,
-                proratedAmount:        0,
-                discountAmount:        0,
-                prorationExplanation:  ''
-            },
-            timestamp:       new Date().toISOString(),
-            lastSaved:       new Date().toISOString(),
-            createdAt:       new Date().toISOString(),
-            status:          'pending',
-            addedFromPortal: true,
-            parentUid:       user.uid
-        };
-
-        try {
-            await db.collection('enrollments').doc(enrollmentId).set(enrollmentData);
-            console.log('✅ Enrollment also saved to enrollments collection:', enrollmentId);
-        } catch (enrollErr) {
-            // Non-fatal: the pending_students entry already exists, so log and continue
-            console.warn('⚠️ Could not save to enrollments collection (non-fatal):', enrollErr);
-        }
 
         // Invalidate cache so the dashboard reloads fresh
         dataCache.invalidate();
@@ -6586,24 +6482,21 @@ function buildStudentInfoTiles(studentData) {
 
     const data = studentData.data || studentData;
 
-    // Safely convert to array — Firestore may store strings instead of arrays
-    const _toArray = (val) => {
-        if (Array.isArray(val)) return val;
-        if (typeof val === 'string' && val.trim()) return val.split(',').map(s => s.trim());
-        return [];
-    };
+    const subjects = data.selectedSubjects?.length
+        ? data.selectedSubjects.join(', ')
+        : data.subjects?.join(', ') || 'Not specified';
 
-    const subjectsArr = _toArray(data.selectedSubjects).length
-        ? _toArray(data.selectedSubjects)
-        : _toArray(data.subjects);
-    const subjects = subjectsArr.length ? subjectsArr.join(', ') : 'Not specified';
-
-    const daysArr = _toArray(data.academicDays);
-    const schedule = data.academicSchedule
-        || (daysArr.length
-            ? `${daysArr.join(', ')} ${data.academicTime ? '(' + data.academicTime + ')' : ''}`
-            : null)
-        || 'Not specified';
+    // Safely handle academicDays – if it's an array, join; if string, use as is; otherwise default
+    let schedule = 'Not specified';
+    if (Array.isArray(data.academicDays)) {
+        schedule = data.academicDays.join(', ');
+        if (data.academicTime) schedule += ' ' + data.academicTime;
+    } else if (typeof data.academicDays === 'string') {
+        schedule = data.academicDays;
+        if (data.academicTime) schedule += ' ' + data.academicTime;
+    } else if (data.academicSchedule) {
+        schedule = data.academicSchedule;
+    }
 
     const grade = data.actualGrade || data.grade || data.schoolGrade || 'Not specified';
     const tutor = data.preferredTutor || data.tutorPreference || data.tutor || 'No preference';
@@ -6686,14 +6579,22 @@ window.hideAddStudentModal  = hideAddStudentModal;
 window.addStudentNext       = addStudentNext;
 window.addStudentPrev       = addStudentPrev;
 window.togglePickerChip     = togglePickerChip;
-window.submitNewStudent     = submitNewStudent;
+window.toggleSessionChip    = toggleSessionChip;
 window.updateAddStudentFees = updateAddStudentFees;
+window.submitNewStudent     = submitNewStudent;
 window.showPrivacyModal     = showPrivacyModal;
 window.hidePrivacyModal     = hidePrivacyModal;
 window.downloadReportAsPDF  = downloadReportAsPDF;
 window.buildStudentInfoTiles = buildStudentInfoTiles;
-window.initPendingCharts    = initPendingCharts;
-window.updateStatCards      = updateStatCards;
-window.charts               = charts;
 
-console.log('✅ Parent Portal v3.0 loaded — Redesigned with tutor-inspired UI');
+window.toggleFab            = toggleFab;
+window.closeFab             = closeFab;
+window.openFabTab           = openFabTab;
+window.switchFabModalTab    = switchFabModalTab;
+window.showFeedbackModal    = showFeedbackModal;
+window.hideFeedbackModal    = hideFeedbackModal;
+window.showResponsesModal   = showResponsesModal;
+window.hideResponsesModal   = hideResponsesModal;
+window.switchMainTab        = switchMainTab;
+
+console.log('✅ Parent Portal redesign additions loaded — Add Student, Privacy, Enhanced Academics, FAB, Payments Tab');
