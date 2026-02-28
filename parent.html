@@ -536,6 +536,85 @@
         .payment-feature-title.blue { color: #1e3a8a; }
         .payment-feature-sub { font-size: 0.7rem; color: var(--muted); }
 
+        /* Add Student Modal styles (preserved from original, with new colors) */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15,23,42,0.55);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 16px;
+        }
+        .modal-box {
+            background: white;
+            border-radius: 1.5rem;
+            width: 100%;
+            max-width: 580px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 32px 72px rgba(0,0,0,0.25);
+            animation: modalIn 0.3s cubic-bezier(0.4,0,0.2,1);
+        }
+        .modal-box-wide { max-width: 700px; }
+        @keyframes modalIn { from { opacity:0; transform:scale(0.95) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }
+        .modal-header {
+            padding: 20px 24px 16px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .modal-header h3 { font-size: 1.1rem; font-weight: 800; color: var(--sage-dark); margin: 0; }
+        .modal-close {
+            background: #f1f5f9;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            transition: var(--transition);
+        }
+        .modal-close:hover { background: #e2e8f0; color: var(--ink); }
+        .modal-body { padding: 20px 24px; }
+        .modal-footer {
+            padding: 12px 24px 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        /* Stepper */
+        .stepper { display: flex; gap: 7px; margin-bottom: 20px; }
+        .step-item { flex: 1; height: 4px; border-radius: 2px; background: #e2e8f0; transition: background 0.3s; }
+        .step-item.active { background: var(--sage); }
+        .step-item.done   { background: var(--sage-light); }
+        .step-panel { display: none; }
+        .step-panel.active { display: block; }
+
+        /* Picker chips */
+        .picker-grid { display: flex; flex-wrap: wrap; gap: 7px; }
+        .picker-chip {
+            padding: 6px 13px;
+            border: 1.5px solid var(--border);
+            border-radius: 99px;
+            font-size: 0.79rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            background: white;
+            color: var(--muted);
+        }
+        .picker-chip:hover { border-color: var(--sage); color: var(--sage); }
+        .picker-chip.selected { background: var(--sage); border-color: var(--sage); color: white; }
+
         /* ---------- PRIVACY MODAL & BANNER ---------- */
         #privacyCookieBanner {
             position: fixed;
@@ -896,7 +975,7 @@
     </div>
 </div>
 
-<!-- ===== FOOTER with privacy & terms links (Contact Support removed) ===== -->
+<!-- ===== FOOTER with privacy & terms links ===== -->
 <footer class="portal-footer">
     <p>© 2025 Blooming Kids House · Where Every Child Blossoms 🌱</p>
     <div class="portal-footer-links">
@@ -922,7 +1001,7 @@
     </div>
 </div>
 
-<!-- ===== PRIVACY POLICY / TERMS MODAL (reusable) ===== -->
+<!-- ===== PRIVACY POLICY / TERMS MODAL ===== -->
 <div id="privacyPolicyModal">
     <div class="privacy-modal-content">
         <div class="privacy-modal-header">
@@ -930,7 +1009,7 @@
             <button class="privacy-close" onclick="closePrivacyPolicy()">✕</button>
         </div>
         <div class="privacy-modal-body" id="modalBody">
-            <!-- Content will be populated by JavaScript -->
+            <!-- Content populated by JS -->
         </div>
         <div class="privacy-modal-footer">
             <button class="btn-primary" style="width:auto; padding:10px 20px;" onclick="closePrivacyPolicy()">Close</button>
@@ -938,14 +1017,198 @@
     </div>
 </div>
 
-<!-- ===== FAB, modals, etc. (original, unchanged) ===== -->
+<!-- ===== ADD STUDENT MODAL (full, working) ===== -->
+<div id="addStudentModal" class="modal-overlay hidden">
+    <div class="modal-box modal-box-wide">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-user-plus mr-2" style="color:var(--sage);"></i>Add Another Student</h3>
+            <button class="modal-close" onclick="hideAddStudentModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <!-- Step Progress -->
+            <div class="stepper" id="addStudentStepper">
+                <div class="step-item active" id="stepBar1"></div>
+                <div class="step-item" id="stepBar2"></div>
+                <div class="step-item" id="stepBar3"></div>
+                <div class="step-item" id="stepBar4"></div>
+            </div>
+            <p style="font-size:0.77rem;color:var(--muted);margin-bottom:18px;font-weight:600;" id="stepLabel">Step 1 of 4 — Student Details</p>
+
+            <!-- Step 1 -->
+            <div class="step-panel active" id="add-step-1">
+                <h4 style="font-size:0.92rem;font-weight:800;color:var(--sage-dark);margin:0 0 14px;">Step 1 — Student Details</h4>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;">
+                    <div class="field-group" style="margin:0;">
+                        <label class="field-label" for="newStudentFirstName">First Name *</label>
+                        <input id="newStudentFirstName" type="text" placeholder="First name" class="field-input" required>
+                    </div>
+                    <div class="field-group" style="margin:0;">
+                        <label class="field-label" for="newStudentLastName">Last Name *</label>
+                        <input id="newStudentLastName" type="text" placeholder="Last name" class="field-input" required>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:13px;">
+                    <div class="field-group" style="margin:0;">
+                        <label class="field-label" for="newStudentGender">Gender *</label>
+                        <select id="newStudentGender" class="field-input" required>
+                            <option value="">Select gender</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="field-group" style="margin:0;">
+                        <label class="field-label" for="newStudentDob">Date of Birth *</label>
+                        <input id="newStudentDob" type="date" class="field-input" required>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:13px;">
+                    <div class="field-group" style="margin:0;">
+                        <label class="field-label" for="newStudentGradeLevel">Grade Tier *</label>
+                        <select id="newStudentGradeLevel" class="field-input" required onchange="updateAddStudentFees()">
+                            <option value="">Select grade tier</option>
+                            <option value="preschool">Preschool to Grade 1</option>
+                            <option value="grade2-4">Grade 2 to 4</option>
+                            <option value="grade5-8">Grade 5 to 8</option>
+                            <option value="grade9-12">Grade 9 to 12</option>
+                        </select>
+                    </div>
+                    <div class="field-group" style="margin:0;">
+                        <label class="field-label" for="newStudentActualGrade">Actual Grade *</label>
+                        <select id="newStudentActualGrade" class="field-input" required>
+                            <option value="">Select grade</option>
+                            <option value="preschool">Preschool</option>
+                            <option value="kindergarten">Kindergarten</option>
+                            <option value="grade1">Grade 1</option><option value="grade2">Grade 2</option>
+                            <option value="grade3">Grade 3</option><option value="grade4">Grade 4</option>
+                            <option value="grade5">Grade 5</option><option value="grade6">Grade 6</option>
+                            <option value="grade7">Grade 7</option><option value="grade8">Grade 8</option>
+                            <option value="grade9">Grade 9</option><option value="grade10">Grade 10</option>
+                            <option value="grade11">Grade 11</option><option value="grade12">Grade 12</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="field-group" style="margin-top:13px;">
+                    <label class="field-label" for="newStudentStartDate">Desired Start Date</label>
+                    <input id="newStudentStartDate" type="date" class="field-input">
+                </div>
+            </div>
+
+            <!-- Step 2: Subjects & Schedule -->
+            <div class="step-panel" id="add-step-2">
+                <h4 style="font-size:0.92rem;font-weight:800;color:var(--sage-dark);margin:0 0 14px;">Step 2 — Subjects &amp; Schedule</h4>
+                <div class="field-group">
+                    <label class="field-label">Academic Subjects (select all that apply)</label>
+                    <div class="picker-grid" id="newStudentSubjects">
+                        <span class="picker-chip" data-subject="Math" onclick="togglePickerChip(this)">Math</span>
+                        <span class="picker-chip" data-subject="Language Arts" onclick="togglePickerChip(this)">Language Arts</span>
+                        <span class="picker-chip" data-subject="Geography" onclick="togglePickerChip(this)">Geography</span>
+                        <span class="picker-chip" data-subject="Science" onclick="togglePickerChip(this)">Science</span>
+                        <span class="picker-chip" data-subject="Biology" onclick="togglePickerChip(this)">Biology</span>
+                        <span class="picker-chip" data-subject="Physics" onclick="togglePickerChip(this)">Physics</span>
+                        <span class="picker-chip" data-subject="Chemistry" onclick="togglePickerChip(this)">Chemistry</span>
+                        <span class="picker-chip" data-subject="Microbiology" onclick="togglePickerChip(this)">Microbiology</span>
+                    </div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Session Frequency *</label>
+                    <div class="picker-grid" id="newStudentSessions">
+                        <span class="picker-chip" data-sessions="twice" onclick="toggleSessionChip(this)">Twice weekly</span>
+                        <span class="picker-chip" data-sessions="three" onclick="toggleSessionChip(this)">3× weekly</span>
+                        <span class="picker-chip" data-sessions="five" onclick="toggleSessionChip(this)">Daily (5×)</span>
+                    </div>
+                    <div id="sessionFeesDisplay" style="margin-top:10px;font-size:0.8rem;color:var(--sage-dark);font-weight:600;background:rgba(74,124,89,0.08);padding:8px 12px;border-radius:8px;display:none;"></div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Preferred Days (select at least one)</label>
+                    <div class="picker-grid" id="newStudentDays">
+                        <span class="picker-chip" data-day="Monday" onclick="togglePickerChip(this)">Mon</span>
+                        <span class="picker-chip" data-day="Tuesday" onclick="togglePickerChip(this)">Tue</span>
+                        <span class="picker-chip" data-day="Wednesday" onclick="togglePickerChip(this)">Wed</span>
+                        <span class="picker-chip" data-day="Thursday" onclick="togglePickerChip(this)">Thu</span>
+                        <span class="picker-chip" data-day="Friday" onclick="togglePickerChip(this)">Fri</span>
+                        <span class="picker-chip" data-day="Saturday" onclick="togglePickerChip(this)">Sat</span>
+                        <span class="picker-chip" data-day="Sunday" onclick="togglePickerChip(this)">Sun</span>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;">
+                    <div class="field-group" style="margin:0;">
+                        <label class="field-label" for="newStudentStartHour">Class Start Time</label>
+                        <select id="newStudentStartHour" class="field-input">
+                            <option value="">Select hour</option>
+                            <option value="7">7:00 AM</option><option value="8">8:00 AM</option>
+                            <option value="9">9:00 AM</option><option value="10">10:00 AM</option>
+                            <option value="11">11:00 AM</option><option value="12">12:00 PM</option>
+                            <option value="13">1:00 PM</option><option value="14">2:00 PM</option>
+                            <option value="15">3:00 PM</option><option value="16">4:00 PM</option>
+                            <option value="17">5:00 PM</option><option value="18">6:00 PM</option>
+                            <option value="19">7:00 PM</option><option value="20">8:00 PM</option>
+                        </select>
+                    </div>
+                    <div class="field-group" style="margin:0;">
+                        <label class="field-label" for="newStudentEndHour">Class End Time</label>
+                        <select id="newStudentEndHour" class="field-input">
+                            <option value="">Select hour</option>
+                            <option value="8">8:00 AM</option><option value="9">9:00 AM</option>
+                            <option value="10">10:00 AM</option><option value="11">11:00 AM</option>
+                            <option value="12">12:00 PM</option><option value="13">1:00 PM</option>
+                            <option value="14">2:00 PM</option><option value="15">3:00 PM</option>
+                            <option value="16">4:00 PM</option><option value="17">5:00 PM</option>
+                            <option value="18">6:00 PM</option><option value="19">7:00 PM</option>
+                            <option value="20">8:00 PM</option><option value="21">9:00 PM</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="field-group" style="margin-top:13px;">
+                    <label class="field-label" for="newStudentTutor">Tutor Preference</label>
+                    <select id="newStudentTutor" class="field-input">
+                        <option value="">No preference</option>
+                        <option value="male">Male tutor</option>
+                        <option value="female">Female tutor</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Step 3: Fee Summary -->
+            <div class="step-panel" id="add-step-3">
+                <h4 style="font-size:0.92rem;font-weight:800;color:var(--sage-dark);margin:0 0 14px;">Step 3 — Fee Summary</h4>
+                <p style="font-size:0.83rem;color:var(--muted);margin-bottom:16px;">Please review the estimated fees before confirming.</p>
+                <div id="addStudentFeeSummary" style="background:linear-gradient(135deg,rgba(74,124,89,0.06),rgba(74,124,89,0.02));border:1px solid rgba(74,124,89,0.2);border-radius:var(--radius);padding:20px;margin-bottom:14px;">
+                    <!-- populated dynamically by JS -->
+                </div>
+                <div style="background:#fefce8;border:1px solid #fde68a;border-radius:var(--radius);padding:13px;font-size:0.8rem;color:#92400e;">
+                    <strong>ℹ️ Note:</strong> Fees are estimates. Final amounts confirmed by staff. Proration applies for mid-month starts.
+                </div>
+            </div>
+
+            <!-- Step 4: Review & Submit -->
+            <div class="step-panel" id="add-step-4">
+                <h4 style="font-size:0.92rem;font-weight:800;color:var(--sage-dark);margin:0 0 14px;">Step 4 — Review &amp; Confirm</h4>
+                <div id="addStudentReview" style="background:rgba(241,245,249,0.8);border:1px solid var(--border);border-radius:var(--radius);padding:18px;font-size:0.87rem;line-height:1.75;color:#374151;"></div>
+                <p style="margin-top:13px;font-size:0.78rem;color:var(--muted);">
+                    ℹ️ Your new student will be created as <strong>Pending Registration</strong>. Staff will review and confirm.
+                </p>
+            </div>
+        </div>
+        <div class="modal-footer" style="justify-content:space-between;">
+            <button id="addStudentPrevBtn" class="btn-secondary" onclick="addStudentPrev()" style="width:auto;padding:11px 22px;display:none;">← Back</button>
+            <div style="flex:1;"></div>
+            <button id="addStudentNextBtn" class="btn-primary" onclick="addStudentNext()" style="width:auto;padding:11px 22px;">Next →</button>
+            <button id="addStudentSubmitBtn" class="btn-primary hidden" onclick="submitNewStudent()"
+                    style="width:auto;padding:11px 22px;background:linear-gradient(135deg,var(--gold),#e0b95c);color:#2d3f2d;box-shadow:0 4px 14px rgba(201,168,76,0.4);">
+                <span id="addStudentSubmitText">✅ Submit Enrolment</span>
+                <div id="addStudentSubmitSpinner" class="loading-spinner-small hidden"></div>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== FAB and other modals (original, placeholder) ===== -->
 <div class="fab-container" id="fabContainer" style="display:none;">
-    <!-- FAB content from original parent.html (omitted for brevity, but should be present) -->
+    <!-- FAB content from original parent.html -->
 </div>
 <div id="fabModal" class="modal-overlay hidden">...</div>
 <div id="passwordResetModal" class="modal-overlay hidden">...</div>
-<div id="addStudentModal" class="modal-overlay hidden">...</div>
-<!-- Original privacyModal removed, now using the one above -->
 
 </div> <!-- /appRoot -->
 
@@ -1024,6 +1287,15 @@
         if (!localStorage.getItem(CONSENT_KEY)) showBanner();
     });
 })();
+
+// Add Student modal functions (these should be defined in parent.js, but we keep them for reference)
+window.showAddStudentModal = function() {
+    document.getElementById('addStudentModal').classList.remove('hidden');
+};
+window.hideAddStudentModal = function() {
+    document.getElementById('addStudentModal').classList.add('hidden');
+};
+// Other functions (addStudentNext, addStudentPrev, submitNewStudent, togglePickerChip, etc.) are expected in parent.js
 </script>
 </body>
 </html>
