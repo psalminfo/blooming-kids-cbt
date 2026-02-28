@@ -6293,7 +6293,7 @@ async function submitNewStudent() {
         };
 
         // Save to pending_students — comprehensiveFindChildren already searches this collection
-        const docRef = await db.collection('pending_students').add(studentDoc);
+        const docRef = await db.collection('enrollments').add(studentDoc);
 
         console.log('✅ New student saved to pending_students:', docRef.id);
 
