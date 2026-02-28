@@ -6108,32 +6108,8 @@ function triggerConfetti() {
  * SECTION 14: ADMIN SETTINGS LISTENER (UPDATED – NO REDECLARATION)
  ******************************************************************************/
 
-// Listen for changes to admin settings
-const settingsDocRef = doc(db, "settings", "global_settings");
-onSnapshot(settingsDocRef, (docSnap) => {
-    if (docSnap.exists()) {
-        const data = docSnap.data();
-        
-        // ✅ Existing flags – assign, do NOT redeclare
-        isSubmissionEnabled     = data.isReportEnabled          ?? false;
-        isTutorAddEnabled       = data.isTutorAddEnabled        ?? false;
-        isSummerBreakEnabled    = data.isSummerBreakEnabled     ?? false;
-        isBypassApprovalEnabled = data.bypassPendingApproval    ?? false;
-        showStudentFees         = data.showStudentFees          ?? false;
-        showEditDeleteButtons   = data.showEditDeleteButtons    ?? false;
-        
-        // 🆕 NEW FLAGS – you MUST declare these ONCE at the top of the file
-        //    (see instructions below)
-        isTransitionAddEnabled  = data.showTransitionButton     ?? true;
-        isPreschoolAddEnabled   = data.preschoolAddTransition   ?? true;
-
-        // Re‑render student database if it's currently visible
-        const mainContent = document.getElementById('mainContent');
-        if (mainContent && mainContent.querySelector('#student-list-view')) {
-            renderStudentDatabase(mainContent, window.tutorData);
-        }
-    }
-});
+// ✅ Global settings listener is registered inside onAuthStateChanged (below)
+// after window.tutorData is confirmed set, to prevent re-render crashes.
 
 /*******************************************************************************
  * SECTION 17: COURSE MATERIALS UPLOAD (NEW TAB)
@@ -6480,7 +6456,43 @@ async function initTutorApp() {
                 }
                 tutorData.messagingId = tutorData.tutorUid || tutorDoc.id;
                 window.tutorData = tutorData;
-                
+
+                // ✅ Register global settings listener HERE — after tutorData is confirmed set
+                // This ensures re-renders never run with undefined tutorData
+                if (!window._globalSettingsUnsub) {
+                    const settingsDocRef = doc(db, "settings", "global_settings");
+                    window._globalSettingsUnsub = onSnapshot(settingsDocRef, (docSnap) => {
+                        if (docSnap.exists()) {
+                            const data = docSnap.data();
+
+                            isSubmissionEnabled     = data.isReportEnabled          ?? false;
+                            isTutorAddEnabled       = data.isTutorAddEnabled        ?? false;
+                            isSummerBreakEnabled    = data.isSummerBreakEnabled     ?? false;
+                            isBypassApprovalEnabled = data.bypassPendingApproval    ?? false;
+                            showStudentFees         = data.showStudentFees          ?? false;
+                            showEditDeleteButtons   = data.showEditDeleteButtons    ?? false;
+                            isTransitionAddEnabled  = data.showTransitionButton     ?? true;
+                            isPreschoolAddEnabled   = data.preschoolAddTransition   ?? true;
+
+                            console.log('✅ Global settings updated:', {
+                                isSubmissionEnabled, isTutorAddEnabled, isSummerBreakEnabled,
+                                isBypassApprovalEnabled, showStudentFees, showEditDeleteButtons,
+                                isTransitionAddEnabled, isPreschoolAddEnabled
+                            });
+
+                            // Re-render student database only if visible AND tutorData is ready
+                            const mainContent = document.getElementById('mainContent');
+                            if (mainContent && mainContent.querySelector('#student-list-view') && window.tutorData) {
+                                renderStudentDatabase(mainContent, window.tutorData).catch(e => console.error('❌ Re-render after settings update failed:', e));
+                            }
+                        } else {
+                            console.warn('⚠️ global_settings document does not exist yet. Using defaults.');
+                        }
+                    }, (error) => {
+                        console.error('❌ Settings listener error:', error);
+                    });
+                }
+
                 // Expose Firebase config so the grading-tab can initialise its own Firebase instance
                 if (!window.__firebaseConfig) {
                     // Try to read the config from the already-initialised Firebase app
