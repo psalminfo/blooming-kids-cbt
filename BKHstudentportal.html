@@ -8,7 +8,7 @@
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- Firebase SDK — fixed: was 12.0.0 (does not exist), now 10.12.2 -->
+<!-- Firebase SDK -->
 <script type="module">
       import { auth, db } from './firebaseConfig-studentsignupmodular.js';
     import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -79,6 +79,10 @@ details[open] > summary .chev { transform:rotate(90deg); }
 /* Notif ring animation */
 @keyframes bellRing { 0%,100%{transform:rotate(0)} 20%{transform:rotate(-15deg)} 40%{transform:rotate(15deg)} 60%{transform:rotate(-10deg)} 80%{transform:rotate(10deg)} }
 .bell-ring { animation: bellRing 0.6s ease; }
+/* Annotation container */
+.annot-container { position:relative; display:inline-block; width:100%; max-width:100%; }
+.annot-container img { max-width:100%; display:block; border-radius:10px; border:1px solid #e5e7eb; }
+.annot-container canvas { position:absolute; top:0; left:0; cursor:crosshair; border-radius:10px; }
 </style>
 </head>
 
@@ -847,7 +851,7 @@ window.openWorkspace = async (assignmentId) => {
     modal.className = 'fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-3';
 
     const colorDots = ['#1f2937','#ef4444','#3b82f6','#f59e0b','#059669','#8b5cf6']
-        .map(c => `<span class="color-dot active" data-color="${c}" onclick="setAnnotColor('${assignmentId}','${c}')" style="background:${c};"></span>`).join('');
+        .map(c => `<span class="color-dot" data-color="${c}" onclick="setAnnotColor('${assignmentId}','${c}')" style="background:${c};"></span>`).join('');
 
     modal.innerHTML = `
     <div class="bg-white rounded-2xl w-full flex flex-col ws-modal-container" style="max-width:95vw;width:95vw;height:95vh;max-height:95vh;">
@@ -904,7 +908,7 @@ window.openWorkspace = async (assignmentId) => {
                 ${a.feedback?`<div class="bg-blue-50 border border-blue-200 rounded-xl p-4"><p class="text-xs font-bold text-blue-700 mb-1">Tutor Feedback:</p><p class="text-sm text-blue-800 italic">"${escH(a.feedback)}"</p></div>`:''}
             </div>
 
-            <!-- ANNOTATE TAB -->
+            <!-- ANNOTATE TAB - FIXED VERSION -->
             <div id="wscontent-annotate-${assignmentId}" class="p-5 hidden">
                 <p class="text-xs text-gray-500 mb-3">Use the tools below to annotate your assignment. Your annotation will be included when you submit.</p>
                 <div class="annot-toolbar">
@@ -913,14 +917,14 @@ window.openWorkspace = async (assignmentId) => {
                     <button id="tool-text-${assignmentId}" class="annot-tool-btn" onclick="setAnnotTool('${assignmentId}','text')" title="Add Text"><i class="fas fa-font"></i></button>
                     <button id="tool-eraser-${assignmentId}" class="annot-tool-btn" onclick="setAnnotTool('${assignmentId}','eraser')" title="Eraser"><i class="fas fa-eraser"></i></button>
                     <span class="text-xs font-semibold text-gray-500 ml-1">Size:</span>
-                    <input type="range" id="brush-size-${assignmentId}" min="1" max="20" value="3" class="w-20" oninput="_annotState['${assignmentId}']&&(_annotState['${assignmentId}'].size=+this.value)">
+                    <input type="range" id="brush-size-${assignmentId}" min="1" max="20" value="3" class="w-20" oninput="updateBrushSize('${assignmentId}', this.value)">
                     <span class="text-xs font-semibold text-gray-500 ml-1">Color:</span>
                     ${colorDots}
                     <button onclick="undoAnnot('${assignmentId}')" class="ml-1 px-2 py-1 text-xs bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300" title="Undo"><i class="fas fa-undo"></i></button>
                     <button onclick="clearAnnotCanvas('${assignmentId}')" class="px-2 py-1 text-xs bg-red-100 text-red-600 rounded-lg hover:bg-red-200" title="Clear"><i class="fas fa-trash-alt"></i></button>
                 </div>
                 ${isImage && fileUrl
-                    ? `<div style="position:relative;display:inline-block;width:100%;max-width:100%;">
+                    ? `<div class="annot-container" id="annot-container-${assignmentId}">
                         <img id="annot-bg-${assignmentId}" src="${escH(fileUrl)}" style="max-width:100%;display:block;border-radius:10px;border:1px solid #e5e7eb;" crossorigin="anonymous">
                         <canvas id="annot-canvas-${assignmentId}" style="position:absolute;top:0;left:0;cursor:crosshair;border-radius:10px;"></canvas>
                        </div>`
@@ -966,11 +970,11 @@ window.openWorkspace = async (assignmentId) => {
 
     document.body.appendChild(modal);
 
-    // Init canvas after modal is in DOM
-    setTimeout(() => initAnnotCanvas(assignmentId, isImage, fileUrl), 120);
+    // Initialize annotation canvas after modal is in DOM
+    setTimeout(() => initAnnotCanvas(assignmentId, isImage, fileUrl), 100);
 };
 
-// ── ANNOTATION CANVAS ENGINE ──
+// ── ANNOTATION CANVAS ENGINE - FIXED VERSION ──
 function initAnnotCanvas(id, isImage, fileUrl) {
     const canvas = document.getElementById('annot-canvas-' + id);
     if (!canvas) return;
@@ -978,82 +982,162 @@ function initAnnotCanvas(id, isImage, fileUrl) {
     if (isImage && fileUrl) {
         const img = document.getElementById('annot-bg-' + id);
         if (img) {
-            const applySize = () => {
-                canvas.width = img.offsetWidth || 580;
-                canvas.height = img.offsetHeight || 380;
-                canvas.style.width = img.offsetWidth + 'px';
-                canvas.style.height = img.offsetHeight + 'px';
+            const resizeCanvasToImage = () => {
+                // Get natural dimensions when available
+                if (img.naturalWidth && img.naturalHeight) {
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                } else {
+                    // Fallback to displayed dimensions
+                    canvas.width = img.offsetWidth || 580;
+                    canvas.height = img.offsetHeight || 380;
+                }
+                
+                // Match the display size through CSS
+                canvas.style.width = '100%';
+                canvas.style.height = 'auto';
+                
+                // Re-apply any existing zoom level
+                const s = _annotState[id];
+                if (s && s._zoom && s._zoom !== 1) {
+                    applyZoom(id, s._zoom);
+                }
+                
+                console.log('Canvas resized to:', canvas.width, 'x', canvas.height);
             };
-            img.complete ? applySize() : (img.onload = applySize);
+
+            if (img.complete) {
+                resizeCanvasToImage();
+            } else {
+                img.onload = resizeCanvasToImage;
+            }
         }
+    } else {
+        // For non-image assignments, set default canvas size
+        canvas.width = 580;
+        canvas.height = 380;
     }
 
+    // Get or create context
     const ctx = canvas.getContext('2d');
-    _annotState[id] = { tool:'pen', color:'#1f2937', size:3, drawing:false, history:[], ctx };
-    _saveAnnotHistory(id);
+    
+    // Initialize state
+    _annotState[id] = { 
+        tool: 'pen', 
+        color: '#1f2937', 
+        size: 3, 
+        drawing: false, 
+        history: [], 
+        ctx,
+        _zoom: 1
+    };
+    
+    // Save initial blank state
+    saveAnnotHistory(id);
 
-    canvas.addEventListener('mousedown', e => _annotStart(e, id, canvas));
-    canvas.addEventListener('mousemove', e => _annotDraw(e, id, canvas));
-    canvas.addEventListener('mouseup',   () => _annotStop(id));
-    canvas.addEventListener('mouseleave',() => _annotStop(id));
-    canvas.addEventListener('touchstart', e => { e.preventDefault(); _annotStart(e.touches[0], id, canvas); }, {passive:false});
-    canvas.addEventListener('touchmove',  e => { e.preventDefault(); _annotDraw(e.touches[0], id, canvas); }, {passive:false});
-    canvas.addEventListener('touchend',   () => _annotStop(id));
+    // Remove existing event listeners by cloning and replacing
+    const newCanvas = canvas.cloneNode(true);
+    canvas.parentNode.replaceChild(newCanvas, canvas);
+    
+    // Re-attach event listeners to the new canvas
+    const freshCanvas = document.getElementById('annot-canvas-' + id);
+    
+    // Mouse events
+    freshCanvas.addEventListener('mousedown', e => annotStart(e, id, freshCanvas));
+    freshCanvas.addEventListener('mousemove', e => annotDraw(e, id, freshCanvas));
+    freshCanvas.addEventListener('mouseup', () => annotStop(id));
+    freshCanvas.addEventListener('mouseleave', () => annotStop(id));
+    
+    // Touch events
+    freshCanvas.addEventListener('touchstart', e => { 
+        e.preventDefault(); 
+        annotStart(e.touches[0], id, freshCanvas); 
+    }, {passive: false});
+    
+    freshCanvas.addEventListener('touchmove', e => { 
+        e.preventDefault(); 
+        annotDraw(e.touches[0], id, freshCanvas); 
+    }, {passive: false});
+    
+    freshCanvas.addEventListener('touchend', () => annotStop(id));
+
+    // Update context reference
+    _annotState[id].ctx = freshCanvas.getContext('2d');
+    
+    // Set initial tool hint
+    const hint = document.getElementById('annot-hint-'+id);
+    if (hint) hint.innerHTML = '<i class="fas fa-pen mr-1"></i>Pen selected — click and drag to draw';
 }
 
-function _getPos(e, canvas) {
-    const r = canvas.getBoundingClientRect();
-    return { x:(e.clientX-r.left)*(canvas.width/r.width), y:(e.clientY-r.top)*(canvas.height/r.height) };
-}
-
-function _annotStart(e, id, canvas) {
-    const s = _annotState[id]; if (!s) return;
-    const pos = _getPos(e, canvas);
+function annotStart(e, id, canvas) {
+    const s = _annotState[id]; 
+    if (!s) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    
     if (s.tool === 'text') {
         const txt = prompt('Enter text to add to annotation:');
         if (txt) {
-            s.ctx.font = `bold ${Math.max(14, s.size*5)}px Inter, sans-serif`;
+            s.ctx.font = `bold ${Math.max(14, s.size * 4)}px Inter, sans-serif`;
             s.ctx.fillStyle = s.color;
-            s.ctx.fillText(txt, pos.x, pos.y);
-            _saveAnnotHistory(id);
+            s.ctx.fillText(txt, x, y);
+            saveAnnotHistory(id);
         }
         return;
     }
+    
     s.drawing = true;
     s.ctx.beginPath();
-    s.ctx.moveTo(pos.x, pos.y);
+    s.ctx.moveTo(x, y);
 }
 
-function _annotDraw(e, id, canvas) {
-    const s = _annotState[id]; if (!s || !s.drawing) return;
-    const pos = _getPos(e, canvas);
+function annotDraw(e, id, canvas) {
+    const s = _annotState[id]; 
+    if (!s || !s.drawing) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    
     if (s.tool === 'eraser') {
-        s.ctx.clearRect(pos.x - s.size*2, pos.y - s.size*2, s.size*4, s.size*4);
+        s.ctx.clearRect(x - s.size * 2, y - s.size * 2, s.size * 4, s.size * 4);
     } else {
         s.ctx.strokeStyle = s.color;
         s.ctx.lineWidth = s.size;
         s.ctx.lineCap = 'round';
         s.ctx.lineJoin = 'round';
-        s.ctx.lineTo(pos.x, pos.y);
+        s.ctx.lineTo(x, y);
         s.ctx.stroke();
     }
 }
 
-function _annotStop(id) {
-    const s = _annotState[id]; if (!s || !s.drawing) return;
+function annotStop(id) {
+    const s = _annotState[id]; 
+    if (!s || !s.drawing) return;
     s.drawing = false;
-    _saveAnnotHistory(id);
+    saveAnnotHistory(id);
 }
 
-function _saveAnnotHistory(id) {
-    const s = _annotState[id]; if (!s) return;
-    const c = document.getElementById('annot-canvas-'+id); if (!c) return;
+function saveAnnotHistory(id) {
+    const s = _annotState[id]; 
+    if (!s) return;
+    const c = document.getElementById('annot-canvas-'+id); 
+    if (!c) return;
     s.history.push(c.toDataURL());
     if (s.history.length > 25) s.history.shift();
 }
 
 window.setAnnotTool = (id, tool) => {
-    const s = _annotState[id]; if (!s) return;
+    const s = _annotState[id]; 
+    if (!s) return;
     s.tool = tool;
     ['pen','text','eraser'].forEach(t => {
         const btn = document.getElementById('tool-'+t+'-'+id);
@@ -1070,7 +1154,8 @@ window.setAnnotTool = (id, tool) => {
 };
 
 window.setAnnotColor = (id, color) => {
-    const s = _annotState[id]; if (!s) return;
+    const s = _annotState[id]; 
+    if (!s) return;
     s.color = color;
     if (s.tool === 'eraser') setAnnotTool(id, 'pen');
     document.querySelectorAll(`#ws-modal-${id} .color-dot`).forEach(dot => {
@@ -1078,31 +1163,64 @@ window.setAnnotColor = (id, color) => {
     });
 };
 
+window.updateBrushSize = (id, size) => {
+    const s = _annotState[id];
+    if (s) s.size = parseInt(size);
+};
+
 window.undoAnnot = (id) => {
-    const s = _annotState[id]; if (!s || s.history.length < 2) return;
+    const s = _annotState[id]; 
+    if (!s || s.history.length < 2) return;
     s.history.pop();
-    const c = document.getElementById('annot-canvas-'+id); if (!c) return;
+    const c = document.getElementById('annot-canvas-'+id); 
+    if (!c) return;
     const img = new Image();
-    img.onload = () => { s.ctx.clearRect(0,0,c.width,c.height); s.ctx.drawImage(img,0,0); };
+    img.onload = () => { 
+        s.ctx.clearRect(0, 0, c.width, c.height); 
+        s.ctx.drawImage(img, 0, 0); 
+    };
     img.src = s.history[s.history.length-1];
 };
 
 window.clearAnnotCanvas = (id) => {
-    const s = _annotState[id]; if (!s) return;
-    const c = document.getElementById('annot-canvas-'+id); if (!c) return;
-    s.ctx.clearRect(0,0,c.width,c.height);
-    _saveAnnotHistory(id);
+    const s = _annotState[id]; 
+    if (!s) return;
+    const c = document.getElementById('annot-canvas-'+id); 
+    if (!c) return;
+    s.ctx.clearRect(0, 0, c.width, c.height);
+    saveAnnotHistory(id);
 };
 
-/** Zoom controls for annotation workspace */
-window.annotZoom = (id, delta) => {
-    const s = _annotState[id];
-    const container = document.getElementById('annot-canvas-'+id)?.parentElement;
+function applyZoom(id, scale) {
+    const container = document.getElementById('annot-container-'+id);
     const bgImg = document.getElementById('annot-bg-'+id);
     const canvas = document.getElementById('annot-canvas-'+id);
+    
+    if (!container || !canvas) return;
+    
+    if (bgImg) {
+        bgImg.style.transform = `scale(${scale})`;
+        bgImg.style.transformOrigin = 'top left';
+    }
+    
+    canvas.style.transform = `scale(${scale})`;
+    canvas.style.transformOrigin = 'top left';
+    
+    // Adjust container to match scaled dimensions
+    container.style.width = (canvas.width * scale) + 'px';
+    container.style.height = (canvas.height * scale) + 'px';
+}
+
+window.annotZoom = (id, delta) => {
+    const s = _annotState[id];
+    if (!s) return;
+    
+    const container = document.getElementById('annot-container-'+id);
+    const canvas = document.getElementById('annot-canvas-'+id);
+    
     if (!container || !canvas) return;
 
-    // Initialize zoom state if needed
+    // Initialize or update zoom
     if (!s._zoom) s._zoom = 1;
 
     if (delta === 'fit') {
@@ -1114,18 +1232,11 @@ window.annotZoom = (id, delta) => {
         s._zoom = Math.max(0.25, Math.min(4, s._zoom + delta));
     }
 
-    // Apply transform
-    const scale = s._zoom;
-    const transformCSS = `transform-origin:top left;transform:scale(${scale});`;
-    if (bgImg) bgImg.style.cssText += transformCSS;
-    canvas.style.cssText += transformCSS;
-    // Adjust container to match scaled dimensions
-    container.style.width = (canvas.width * scale) + 'px';
-    container.style.height = (canvas.height * scale) + 'px';
+    applyZoom(id, s._zoom);
 
     // Update label
     const label = document.getElementById('zoom-level-'+id);
-    if (label) label.textContent = Math.round(scale * 100) + '%';
+    if (label) label.textContent = Math.round(s._zoom * 100) + '%';
 };
 
 window.wsTab = (id, tab) => {
@@ -1135,20 +1246,34 @@ window.wsTab = (id, tab) => {
         if (content) content.classList.toggle('hidden', t !== tab);
         if (btn) btn.classList.toggle('active', t === tab);
     });
-    if (tab === 'submit') _updateAnnotPreview(id);
+    
+    if (tab === 'submit') {
+        updateAnnotPreview(id);
+    }
+    
     if (tab === 'annotate' && !_annotState[id]) {
-        const c = document.getElementById('annot-canvas-'+id);
-        if (c) initAnnotCanvas(id, false, '');
+        const canvas = document.getElementById('annot-canvas-'+id);
+        const img = document.getElementById('annot-bg-'+id);
+        if (canvas && img) {
+            initAnnotCanvas(id, true, img.src);
+        } else if (canvas) {
+            initAnnotCanvas(id, false, '');
+        }
     }
 };
 
-function _updateAnnotPreview(id) {
+function updateAnnotPreview(id) {
     const canvas = document.getElementById('annot-canvas-'+id);
     const preview = document.getElementById('annot-preview-'+id);
     const previewImg = document.getElementById('annot-preview-img-'+id);
+    
     if (!canvas || !preview || !previewImg) return;
-    const data = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
-    const hasContent = Array.from(data).some((v,i) => i%4===3 && v>0);
+    
+    // Check if canvas has any content
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const hasContent = imageData.data.some((val, idx) => idx % 4 === 3 && val > 0);
+    
     if (hasContent) {
         preview.classList.remove('hidden');
         previewImg.src = canvas.toDataURL('image/png');
@@ -1181,8 +1306,9 @@ window.submitWork = async (id) => {
         let annotUrl = '';
         const canvas = document.getElementById('annot-canvas-'+id);
         if (canvas) {
-            const data = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
-            const hasContent = Array.from(data).some((v,i) => i%4===3 && v>0);
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.getImageData(0,0,canvas.width,canvas.height);
+            const hasContent = imageData.data.some((val, idx) => idx % 4 === 3 && val > 0);
             if (hasContent) {
                 const blob = await new Promise(r => canvas.toBlob(r,'image/png'));
                 const fd = new FormData();
@@ -1339,8 +1465,9 @@ function initRealtimeNotifications() {
         }
         _updateNotifBadge();
         // Update dashboard pending tasks count
-        const pendEl = document.getElementById('dash-pending-count');
+        const pendEl = document.getElementById('pending-tasks-count');
         if (pendEl) pendEl.textContent = snap.size;
+        document.getElementById('pending-count').textContent = snap.size;
     }, err => console.warn('Notif assignments listener:', err)));
 
     // 1b. ALL homework listener — for average grade, graded count, due-soon
@@ -1360,15 +1487,15 @@ function initRealtimeNotifications() {
             }
         });
         // Update dashboard average grade
-        const avgEl = document.getElementById('dash-avg-grade');
+        const avgEl = document.getElementById('average-grade');
         if (avgEl && gradedCount > 0) {
             const avg = Math.round(totalScore / gradedCount);
-            const letter = avg >= 90 ? 'A' : avg >= 80 ? 'B' : avg >= 70 ? 'C' : avg >= 60 ? 'D' : 'F';
+            const letter = avg >= 90 ? 'A' : avg >= 80 ? 'B+' : avg >= 70 ? 'B' : avg >= 60 ? 'C+' : avg >= 50 ? 'C' : 'F';
             avgEl.textContent = avg + '% (' + letter + ')';
         }
         // Update due-soon indicator
-        const dueEl = document.getElementById('dash-due-soon');
-        if (dueEl) dueEl.textContent = dueSoon > 0 ? dueSoon + ' due soon' : '';
+        const dueEl = document.getElementById('pending-due');
+        if (dueEl) dueEl.textContent = dueSoon > 0 ? dueSoon + ' due soon' : 'No immediate deadlines';
     }, err => console.warn('Notif all-homework listener:', err)));
 
     // 2. Live conversations (messages) listener
@@ -1422,17 +1549,17 @@ function initRealtimeNotifications() {
             if (!snap.exists()) return;
             const data = snap.data();
             // Auto-update schedule widgets when tutor modifies schedule
-            const schedEl = document.getElementById('dash-schedule-info');
-            if (schedEl && data.schedule) {
-                // Update the stored student data
-                window.currentStudent = { ...window.currentStudent, ...data, id: snap.id };
-            }
+            window.currentStudent = { ...window.currentStudent, ...data, id: snap.id };
             // Update subjects display
-            const subjEl = document.getElementById('dash-subjects');
+            const subjEl = document.getElementById('student-subjects');
             if (subjEl && data.subjects) {
                 const subjs = Array.isArray(data.subjects) ? data.subjects : [data.subjects];
                 subjEl.textContent = subjs.join(', ');
             }
+            // Reload schedule if changed
+            loadSchedule();
+            loadNextClass();
+            loadUpcomingSchedule();
         }, err => console.warn('Student doc listener:', err)));
     }
 
