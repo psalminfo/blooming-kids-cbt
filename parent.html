@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
-    <title>Parent Portal — Blooming Kids House</title>
+    <title>Blooming Kids House Parent Portal</title>
 
     <!-- Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-NBTVEGH1SL"></script>
@@ -1079,7 +1079,8 @@
 </div>
 
 <!-- ===== FAB (Floating Action Button) for Feedback & Messages ===== -->
-<div class="fab-container" id="fabContainer" style="display:none;">
+<!-- Now using class="hidden" instead of inline style -->
+<div class="fab-container hidden" id="fabContainer">
     <div class="fab-menu" id="fabMenu">
         <button class="fab-menu-item messages-item" onclick="openFabTab('messages');closeFab();">
             <i class="fa-solid fa-envelope"></i>
@@ -1419,7 +1420,7 @@
 <!-- Load parent portal JS -->
 <script src="parent.js" defer></script>
 
-<!-- Privacy / cookie functions and modal content -->
+<!-- Privacy / cookie functions and modal content + FAB visibility safety -->
 <script>
 (function() {
     const CONSENT_KEY = "bkh_cookie_consent";
@@ -1490,58 +1491,25 @@
     document.addEventListener("DOMContentLoaded", function() {
         if (!localStorage.getItem(CONSENT_KEY)) showBanner();
     });
-})();
 
-// Fallback definitions for modal functions (should be overridden by parent.js)
-window.showAddStudentModal = window.showAddStudentModal || function() {
-    document.getElementById('addStudentModal')?.classList.remove('hidden');
-};
-window.hideAddStudentModal = window.hideAddStudentModal || function() {
-    document.getElementById('addStudentModal')?.classList.add('hidden');
-};
-window.hidePasswordResetModal = window.hidePasswordResetModal || function() {
-    document.getElementById('passwordResetModal')?.classList.add('hidden');
-};
-window.toggleFab = window.toggleFab || function() {
-    const menu = document.getElementById('fabMenu');
-    const btn = document.getElementById('fabMainBtn');
-    if (menu && btn) {
-        menu.classList.toggle('open');
-        btn.classList.toggle('open');
-    }
-};
-window.closeFab = window.closeFab || function() {
-    const menu = document.getElementById('fabMenu');
-    const btn = document.getElementById('fabMainBtn');
-    if (menu && btn) {
-        menu.classList.remove('open');
-        btn.classList.remove('open');
-    }
-};
-window.openFabTab = window.openFabTab || function(tab) {
-    const modal = document.getElementById('fabModal');
-    if (modal) {
-        modal.classList.remove('hidden');
-        switchFabModalTab(tab);
-    }
-};
-window.switchFabModalTab = window.switchFabModalTab || function(tab) {
-    const feedbackPanel = document.getElementById('fabPanelFeedback');
-    const messagesPanel = document.getElementById('fabPanelMessages');
-    const feedbackTab = document.getElementById('fabTabFeedback');
-    const messagesTab = document.getElementById('fabTabMessages');
-    if (tab === 'feedback') {
-        feedbackPanel.style.display = 'block';
-        messagesPanel.style.display = 'none';
-        feedbackTab.classList.add('active');
-        messagesTab.classList.remove('active');
-    } else {
-        feedbackPanel.style.display = 'none';
-        messagesPanel.style.display = 'block';
-        messagesTab.classList.add('active');
-        feedbackTab.classList.remove('active');
-    }
-};
+    // SAFETY: Ensure FAB becomes visible when dashboard is shown
+    const checkDashboardAndShowFab = function() {
+        const reportArea = document.getElementById('reportArea');
+        const fabContainer = document.getElementById('fabContainer');
+        if (reportArea && fabContainer) {
+            const isDashboardVisible = window.getComputedStyle(reportArea).display !== 'none' && 
+                                        !reportArea.classList.contains('hidden');
+            if (isDashboardVisible) {
+                fabContainer.classList.remove('hidden');
+                console.log('✅ FAB shown automatically');
+            } else {
+                setTimeout(checkDashboardAndShowFab, 500);
+            }
+        }
+    };
+    // Start checking after a short delay to let parent.js initialize
+    setTimeout(checkDashboardAndShowFab, 1000);
+})();
 </script>
 </body>
 </html>
