@@ -615,6 +615,109 @@
         .picker-chip:hover { border-color: var(--sage); color: var(--sage); }
         .picker-chip.selected { background: var(--sage); border-color: var(--sage); color: white; }
 
+        /* FAB (Floating Action Button) */
+        .fab-container {
+            position: fixed;
+            bottom: 22px;
+            right: 22px;
+            z-index: 500;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+        }
+        .fab-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            align-items: flex-end;
+            transition: var(--transition);
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(12px) scale(0.95);
+        }
+        .fab-menu.open {
+            pointer-events: auto;
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+        .fab-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 18px;
+            border-radius: 99px;
+            border: none;
+            font-size: 0.84rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: var(--shadow);
+            white-space: nowrap;
+        }
+        .fab-menu-item.feedback-item {
+            background: linear-gradient(135deg, #7c3aed, #6d28d9);
+            color: white;
+        }
+        .fab-menu-item.messages-item {
+            background: linear-gradient(135deg, var(--sage), var(--sage-dark));
+            color: white;
+        }
+        .fab-menu-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+        .fab-main {
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--sage), var(--sage-dark));
+            color: white;
+            border: none;
+            font-size: 1.25rem;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 8px 24px rgba(74,124,89,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .fab-main:hover {
+            transform: scale(1.08) rotate(10deg);
+            box-shadow: 0 20px 40px rgba(74,124,89,0.5);
+        }
+        .fab-main.open {
+            transform: rotate(45deg);
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+
+        /* Modal tabs (for fabModal) */
+        .modal-tab-nav {
+            display: flex;
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 18px;
+        }
+        .modal-tab-btn {
+            flex: 1;
+            padding: 11px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 0.84rem;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-family: inherit;
+            color: #64748b;
+            transition: var(--transition);
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+        }
+        .modal-tab-btn.active {
+            color: var(--sage-dark);
+            border-bottom-color: var(--sage);
+        }
+
         /* ---------- PRIVACY MODAL & BANNER ---------- */
         #privacyCookieBanner {
             position: fixed;
@@ -975,49 +1078,115 @@
     </div>
 </div>
 
-<!-- ===== FOOTER with privacy & terms links ===== -->
-<footer class="portal-footer">
-    <p>© 2025 Blooming Kids House · Where Every Child Blossoms 🌱</p>
-    <div class="portal-footer-links">
-        <button class="portal-footer-link" onclick="showPrivacyPolicy()">Privacy Policy</button>
-        <span style="color:var(--muted);">|</span>
-        <button class="portal-footer-link" onclick="showTerms()">Terms of Use</button>
+<!-- ===== FAB (Floating Action Button) for Feedback & Messages ===== -->
+<div class="fab-container" id="fabContainer" style="display:none;">
+    <div class="fab-menu" id="fabMenu">
+        <button class="fab-menu-item messages-item" onclick="openFabTab('messages');closeFab();">
+            <i class="fa-solid fa-envelope"></i>
+            <span>Messages</span>
+        </button>
+        <button class="fab-menu-item feedback-item" onclick="openFabTab('feedback');closeFab();">
+            <i class="fa-solid fa-comment-dots"></i>
+            <span>Send Feedback</span>
+        </button>
     </div>
-</footer>
+    <button class="fab-main" id="fabMainBtn" onclick="toggleFab()" title="Feedback &amp; Messages" aria-label="Open feedback and messages">
+        <i class="fa-solid fa-plus"></i>
+    </button>
+</div>
 
-<!-- ===== PRIVACY / COOKIE CONSENT BANNER ===== -->
-<div id="privacyCookieBanner">
-    <div style="max-width:900px; margin:0 auto; display:flex; flex-wrap:wrap; align-items:center; gap:12px;">
-        <div style="flex:1; min-width:260px;">
-            <div style="font-weight:700; font-size:0.95rem; margin-bottom:4px;">🔒 We value your privacy</div>
-            <div style="font-size:0.78rem; color:rgba(255,255,255,.7); line-height:1.5;">We use essential cookies for authentication and analytics cookies to improve your experience. We comply with NDPA, GDPR, and COPPA.
-                <a href="#" onclick="showPrivacyPolicy(); return false;" style="color:#60a5fa; text-decoration:underline;">Privacy Policy</a>
+<!-- ===== FAB MODAL (Combined Feedback + Messages) ===== -->
+<div id="fabModal" class="modal-overlay hidden">
+    <div class="modal-box modal-box-wide">
+        <div class="modal-header">
+            <h3>💬 Feedback &amp; Messages</h3>
+            <button class="modal-close" onclick="document.getElementById('fabModal').classList.add('hidden')">×</button>
+        </div>
+        <div class="modal-body" style="padding-top:0;">
+            <div class="modal-tab-nav">
+                <button class="modal-tab-btn active" id="fabTabFeedback" onclick="switchFabModalTab('feedback')">
+                    <i class="fa-solid fa-comment-dots mr-1"></i> Send Feedback
+                </button>
+                <button class="modal-tab-btn" id="fabTabMessages" onclick="switchFabModalTab('messages')">
+                    <i class="fa-solid fa-envelope mr-1"></i> Messages
+                </button>
+            </div>
+            <!-- Feedback Panel -->
+            <div id="fabPanelFeedback">
+                <p style="color:var(--muted); font-size:0.85rem; margin-bottom:16px;">We value your feedback! Please fill in the details below.</p>
+                <div class="field-group">
+                    <label class="field-label" for="feedbackCategory">Category *</label>
+                    <select id="feedbackCategory" class="field-input" required>
+                        <option value="">Select category</option>
+                        <option value="Feedback">General Feedback</option>
+                        <option value="Request">Special Request</option>
+                        <option value="Complaint">Complaint</option>
+                        <option value="Suggestion">Suggestion</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label" for="feedbackPriority">Priority *</label>
+                    <select id="feedbackPriority" class="field-input" required>
+                        <option value="">Select priority</option>
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                        <option value="Urgent">Urgent</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label" for="feedbackStudent">Regarding Student *</label>
+                    <select id="feedbackStudent" class="field-input" required>
+                        <option value="">Select student</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label" for="feedbackMessage">Your Message *</label>
+                    <textarea id="feedbackMessage" rows="4" class="field-input preserve-whitespace" placeholder="Describe your feedback…" required style="resize:vertical;"></textarea>
+                </div>
+                <button id="submitFeedbackBtn" class="btn-primary" onclick="submitFeedback()">
+                    <span id="submitFeedbackText">Submit Feedback</span>
+                    <div id="submitFeedbackSpinner" class="loading-spinner-small hidden"></div>
+                </button>
+            </div>
+            <!-- Messages Panel -->
+            <div id="fabPanelMessages" style="display:none;">
+                <p style="color:var(--muted); font-size:0.85rem; margin-bottom:16px;">Responses from our staff to your submitted feedback.</p>
+                <div id="responsesContent"></div>
             </div>
         </div>
-        <div style="display:flex; gap:8px; flex-shrink:0;">
-            <button onclick="acceptPrivacyCookies()" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8); color:#fff; border:none; padding:8px 18px; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.85rem;">Accept All</button>
-            <button onclick="declinePrivacyCookies()" style="background:rgba(255,255,255,.1); color:#fff; border:1px solid rgba(255,255,255,.2); padding:8px 14px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.85rem;">Essential Only</button>
+    </div>
+</div>
+
+<!-- Legacy modal aliases (for JS backward-compat) -->
+<div id="feedbackModal" class="hidden"></div>
+<div id="responsesModal" class="hidden"></div>
+
+<!-- ===== PASSWORD RESET MODAL ===== -->
+<div id="passwordResetModal" class="modal-overlay hidden">
+    <div class="modal-box" style="max-width:420px;">
+        <div class="modal-header">
+            <h3>🔑 Reset Password</h3>
+            <button class="modal-close" onclick="hidePasswordResetModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <p style="color:var(--muted); font-size:0.85rem; margin-bottom:16px;">Enter your email and we'll send you a reset link.</p>
+            <div class="field-group">
+                <label class="field-label" for="resetEmail">Email Address</label>
+                <input id="resetEmail" type="email" placeholder="your@email.com" class="field-input">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="sendResetBtn" class="btn-primary" onclick="sendPasswordReset()" style="flex:1;">
+                Send Reset Link
+                <div id="resetLoader" class="loading-spinner-small hidden"></div>
+            </button>
+            <button class="btn-secondary" onclick="hidePasswordResetModal()" style="width:auto;padding:11px 18px;">Cancel</button>
         </div>
     </div>
 </div>
 
-<!-- ===== PRIVACY POLICY / TERMS MODAL ===== -->
-<div id="privacyPolicyModal">
-    <div class="privacy-modal-content">
-        <div class="privacy-modal-header">
-            <h3 id="modalTitle">🔒 Privacy Policy</h3>
-            <button class="privacy-close" onclick="closePrivacyPolicy()">✕</button>
-        </div>
-        <div class="privacy-modal-body" id="modalBody">
-            <!-- Content populated by JS -->
-        </div>
-        <div class="privacy-modal-footer">
-            <button class="btn-primary" style="width:auto; padding:10px 20px;" onclick="closePrivacyPolicy()">Close</button>
-        </div>
-    </div>
-</div>
-
-<!-- ===== ADD STUDENT MODAL (full, working) ===== -->
+<!-- ===== ADD STUDENT MODAL (full) ===== -->
 <div id="addStudentModal" class="modal-overlay hidden">
     <div class="modal-box modal-box-wide">
         <div class="modal-header">
@@ -1203,12 +1372,47 @@
     </div>
 </div>
 
-<!-- ===== FAB and other modals (original, placeholder) ===== -->
-<div class="fab-container" id="fabContainer" style="display:none;">
-    <!-- FAB content from original parent.html -->
+<!-- ===== FOOTER with privacy & terms links ===== -->
+<footer class="portal-footer">
+    <p>© 2025 Blooming Kids House · Where Every Child Blossoms 🌱</p>
+    <div class="portal-footer-links">
+        <button class="portal-footer-link" onclick="showPrivacyPolicy()">Privacy Policy</button>
+        <span style="color:var(--muted);">|</span>
+        <button class="portal-footer-link" onclick="showTerms()">Terms of Use</button>
+    </div>
+</footer>
+
+<!-- ===== PRIVACY / COOKIE CONSENT BANNER ===== -->
+<div id="privacyCookieBanner">
+    <div style="max-width:900px; margin:0 auto; display:flex; flex-wrap:wrap; align-items:center; gap:12px;">
+        <div style="flex:1; min-width:260px;">
+            <div style="font-weight:700; font-size:0.95rem; margin-bottom:4px;">🔒 We value your privacy</div>
+            <div style="font-size:0.78rem; color:rgba(255,255,255,.7); line-height:1.5;">We use essential cookies for authentication and analytics cookies to improve your experience. We comply with NDPA, GDPR, and COPPA.
+                <a href="#" onclick="showPrivacyPolicy(); return false;" style="color:#60a5fa; text-decoration:underline;">Privacy Policy</a>
+            </div>
+        </div>
+        <div style="display:flex; gap:8px; flex-shrink:0;">
+            <button onclick="acceptPrivacyCookies()" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8); color:#fff; border:none; padding:8px 18px; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.85rem;">Accept All</button>
+            <button onclick="declinePrivacyCookies()" style="background:rgba(255,255,255,.1); color:#fff; border:1px solid rgba(255,255,255,.2); padding:8px 14px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.85rem;">Essential Only</button>
+        </div>
+    </div>
 </div>
-<div id="fabModal" class="modal-overlay hidden">...</div>
-<div id="passwordResetModal" class="modal-overlay hidden">...</div>
+
+<!-- ===== PRIVACY POLICY / TERMS MODAL ===== -->
+<div id="privacyPolicyModal">
+    <div class="privacy-modal-content">
+        <div class="privacy-modal-header">
+            <h3 id="modalTitle">🔒 Privacy Policy</h3>
+            <button class="privacy-close" onclick="closePrivacyPolicy()">✕</button>
+        </div>
+        <div class="privacy-modal-body" id="modalBody">
+            <!-- Content populated by JS -->
+        </div>
+        <div class="privacy-modal-footer">
+            <button class="btn-primary" style="width:auto; padding:10px 20px;" onclick="closePrivacyPolicy()">Close</button>
+        </div>
+    </div>
+</div>
 
 </div> <!-- /appRoot -->
 
@@ -1288,14 +1492,56 @@
     });
 })();
 
-// Add Student modal functions (these should be defined in parent.js, but we keep them for reference)
-window.showAddStudentModal = function() {
-    document.getElementById('addStudentModal').classList.remove('hidden');
+// Fallback definitions for modal functions (should be overridden by parent.js)
+window.showAddStudentModal = window.showAddStudentModal || function() {
+    document.getElementById('addStudentModal')?.classList.remove('hidden');
 };
-window.hideAddStudentModal = function() {
-    document.getElementById('addStudentModal').classList.add('hidden');
+window.hideAddStudentModal = window.hideAddStudentModal || function() {
+    document.getElementById('addStudentModal')?.classList.add('hidden');
 };
-// Other functions (addStudentNext, addStudentPrev, submitNewStudent, togglePickerChip, etc.) are expected in parent.js
+window.hidePasswordResetModal = window.hidePasswordResetModal || function() {
+    document.getElementById('passwordResetModal')?.classList.add('hidden');
+};
+window.toggleFab = window.toggleFab || function() {
+    const menu = document.getElementById('fabMenu');
+    const btn = document.getElementById('fabMainBtn');
+    if (menu && btn) {
+        menu.classList.toggle('open');
+        btn.classList.toggle('open');
+    }
+};
+window.closeFab = window.closeFab || function() {
+    const menu = document.getElementById('fabMenu');
+    const btn = document.getElementById('fabMainBtn');
+    if (menu && btn) {
+        menu.classList.remove('open');
+        btn.classList.remove('open');
+    }
+};
+window.openFabTab = window.openFabTab || function(tab) {
+    const modal = document.getElementById('fabModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        switchFabModalTab(tab);
+    }
+};
+window.switchFabModalTab = window.switchFabModalTab || function(tab) {
+    const feedbackPanel = document.getElementById('fabPanelFeedback');
+    const messagesPanel = document.getElementById('fabPanelMessages');
+    const feedbackTab = document.getElementById('fabTabFeedback');
+    const messagesTab = document.getElementById('fabTabMessages');
+    if (tab === 'feedback') {
+        feedbackPanel.style.display = 'block';
+        messagesPanel.style.display = 'none';
+        feedbackTab.classList.add('active');
+        messagesTab.classList.remove('active');
+    } else {
+        feedbackPanel.style.display = 'none';
+        messagesPanel.style.display = 'block';
+        messagesTab.classList.add('active');
+        feedbackTab.classList.remove('active');
+    }
+};
 </script>
 </body>
 </html>
