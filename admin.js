@@ -98,6 +98,8 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewInactiveTutors: false,
             viewArchivedStudents: false,
             viewMasterPortal: false,   // Management Portal tab
+            viewReferralsAdmin: false, // Referral Management tab
+            viewUserDirectory: false,  // User Directory tab
             canQA: false,              // QA Session Observation button
             canQC: false               // Lesson Plan QC button
         }, 
@@ -122,6 +124,8 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewInactiveTutors: false,
             viewArchivedStudents: false,
             viewMasterPortal: false,   // Management Portal tab
+            viewReferralsAdmin: false, // Referral Management tab
+            viewUserDirectory: false,  // User Directory tab
             canQA: false,              // QA Session Observation button
             canQC: false               // Lesson Plan QC button
         }, 
@@ -146,6 +150,8 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewInactiveTutors: true,
             viewArchivedStudents: true,
             viewMasterPortal: true,    // Managers can see the Master View
+            viewReferralsAdmin: true,  // Managers can see Referral Management
+            viewUserDirectory: true,   // Managers can see User Directory
             canQA: false,              // Only QA officers rate sessions
             canQC: false               // Only QC officers rate lesson plans
         }, 
@@ -170,6 +176,8 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewInactiveTutors: true,
             viewArchivedStudents: true,
             viewMasterPortal: true,    // Directors can see the Master View
+            viewReferralsAdmin: true,  // Directors can see Referral Management
+            viewUserDirectory: true,   // Directors can see User Directory
             canQA: true,               // Directors can do QA ratings
             canQC: true                // Directors can do QC ratings
         }, 
@@ -194,6 +202,8 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewInactiveTutors: true,
             viewArchivedStudents: true,
             viewMasterPortal: true,    // Admins have full access
+            viewReferralsAdmin: true,  // Admins can see Referral Management
+            viewUserDirectory: true,   // Admins can see User Directory
             canQA: true,               // Admins can do QA ratings
             canQC: true                // Admins can do QC ratings
         }, 
@@ -2552,6 +2562,8 @@ async function openPermissionsModal(staffId) {
                             <label class="flex items-center"><input type="checkbox" id="p-viewInactiveTutors" class="mr-2" ${permissions.tabs?.viewInactiveTutors ? 'checked' : ''}> Inactive Tutors</label>
                             <label class="flex items-center"><input type="checkbox" id="p-viewArchivedStudents" class="mr-2" ${permissions.tabs?.viewArchivedStudents ? 'checked' : ''}> Archived Students</label>
                             <label class="flex items-center col-span-2"><input type="checkbox" id="p-viewMasterPortal" class="mr-2" ${permissions.tabs?.viewMasterPortal ? 'checked' : ''}> <span class="font-semibold text-emerald-700">🗂 Management Portal (Master View)</span></label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewReferralsAdmin" class="mr-2" ${permissions.tabs?.viewReferralsAdmin ? 'checked' : ''}> <span class="text-indigo-700">🤝 Referral Management</span></label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewUserDirectory" class="mr-2" ${permissions.tabs?.viewUserDirectory ? 'checked' : ''}> <span class="text-teal-700">📋 User Directory</span></label>
                         </div>
                     </div>
                     <div class="border-t pt-4">
@@ -2592,6 +2604,8 @@ async function openPermissionsModal(staffId) {
                 viewInactiveTutors: document.getElementById('p-viewInactiveTutors').checked,
                 viewArchivedStudents: document.getElementById('p-viewArchivedStudents').checked,
                 viewMasterPortal: document.getElementById('p-viewMasterPortal').checked,
+                viewReferralsAdmin: document.getElementById('p-viewReferralsAdmin').checked,
+                viewUserDirectory: document.getElementById('p-viewUserDirectory').checked,
                 canQA: document.getElementById('p-canQA').checked,
                 canQC: document.getElementById('p-canQC').checked
             },
