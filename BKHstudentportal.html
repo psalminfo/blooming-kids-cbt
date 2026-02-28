@@ -969,6 +969,20 @@ window.openWorkspace = async (assignmentId) => {
                         style="border:2px dashed #d1d5db;border-radius:12px;cursor:crosshair;display:block;background:#fff;max-width:100%;"></canvas>`
                 }
                 <p id="annot-hint-${assignmentId}" class="text-xs text-blue-500 mt-2"><i class="fas fa-pen mr-1"></i>Pen selected — click and drag to draw</p>
+                <!-- Annotation preview + quick submit -->
+                <div id="annot-live-preview-${assignmentId}" class="hidden mt-4 bg-gray-50 rounded-xl p-3 border border-gray-200">
+                    <p class="text-xs font-bold text-gray-600 mb-2"><i class="fas fa-eye mr-1 text-brand-primary"></i>Merged preview (what the tutor will see):</p>
+                    <img id="annot-live-preview-img-${assignmentId}" class="max-w-full rounded-lg border border-gray-200" src="" style="max-height:260px;">
+                </div>
+                <div class="flex gap-3 mt-4 pt-3 border-t border-gray-100">
+                    <button onclick="previewAnnotation('${assignmentId}')" class="px-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-semibold hover:bg-blue-100 transition-colors">
+                        <i class="fas fa-eye mr-1"></i>Preview
+                    </button>
+                    <button id="annot-submit-btn-${assignmentId}" onclick="submitAnnotation('${assignmentId}')"
+                        class="flex-1 px-4 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-brand-dark transition-colors">
+                        <i class="fas fa-paper-plane mr-1"></i>Submit Annotation to Tutor
+                    </button>
+                </div>
             </div>
 
             <!-- SUBMIT TAB -->
@@ -1040,6 +1054,22 @@ function initAnnotCanvas(id) {
         canvas.height = h;
         canvas.style.width = w + 'px';
         canvas.style.height = h + 'px';
+    }
+
+    // ── Prefetch the file as a same-origin blob so we can merge later without CORS issues ──
+    if (fileUrl && (isImage || isPdf)) {
+        fetch(fileUrl, { mode:'cors' })
+            .then(r => r.blob())
+            .then(blob => {
+                s._bgBlobUrl = URL.createObjectURL(blob);
+                // For images, also preload into an offscreen Image so merge is instant
+                if (isImage) {
+                    const offscreen = new Image();
+                    offscreen.onload = () => { s._bgOffscreenImg = offscreen; };
+                    offscreen.src = s._bgBlobUrl;
+                }
+            })
+            .catch(() => { /* CORS blocked — will use PDF canvas or fallback at merge time */ });
     }
 
     // ─── IMAGE background ───
@@ -1413,7 +1443,7 @@ window.wsTab = (id, tab) => {
     if (tab === 'submit') _updateAnnotPreview(id);
 };
 
-function _updateAnnotPreview(id) {
+async function _updateAnnotPreview(id) {
     const canvas = document.getElementById('annot-canvas-'+id);
     const preview = document.getElementById('annot-preview-'+id);
     const previewImg = document.getElementById('annot-preview-img-'+id);
@@ -1422,42 +1452,185 @@ function _updateAnnotPreview(id) {
     const hasContent = Array.from(data).some((v,i) => i%4===3 && v>0);
     if (hasContent) {
         preview.classList.remove('hidden');
-        // Merge background + annotation for PDF/image
-        previewImg.src = _getMergedAnnotation(id);
+        previewImg.src = await _getMergedAnnotation(id);
     } else {
         preview.classList.add('hidden');
     }
 }
 
-// Merge background (PDF page or image) with annotation canvas into single image
-function _getMergedAnnotation(id) {
+// ── Merge background + annotations into one image (async, CORS-safe) ──
+async function _getMergedAnnotation(id) {
     const annotCanvas = document.getElementById('annot-canvas-'+id);
-    if (!annotCanvas) return '';
+    if (!annotCanvas || annotCanvas.width === 0) return '';
     const s = _annotState[id];
 
-    // Create a temp canvas to composite layers
     const merged = document.createElement('canvas');
     merged.width = annotCanvas.width;
     merged.height = annotCanvas.height;
     const mCtx = merged.getContext('2d');
 
-    // Draw background layer first (PDF canvas or image)
+    // White base
+    mCtx.fillStyle = '#ffffff';
+    mCtx.fillRect(0, 0, merged.width, merged.height);
+
+    let bgDrawn = false;
+
+    // 1) PDF.js bg canvas — already same-origin, just draw it
     const bgCanvas = document.getElementById('annot-bg-canvas-'+id);
-    const bgImg = document.getElementById('annot-bg-'+id);
-    if (bgCanvas && bgCanvas.width > 0) {
-        mCtx.drawImage(bgCanvas, 0, 0, merged.width, merged.height);
-    } else if (bgImg && bgImg.complete && bgImg.naturalWidth > 0) {
-        try { mCtx.drawImage(bgImg, 0, 0, merged.width, merged.height); } catch(e) {}
-    } else {
-        // White background for iframe-overlay or blank canvas
-        mCtx.fillStyle = '#fff';
-        mCtx.fillRect(0, 0, merged.width, merged.height);
+    if (bgCanvas && bgCanvas.width > 0 && bgCanvas.height > 0) {
+        try { mCtx.drawImage(bgCanvas, 0, 0, merged.width, merged.height); bgDrawn = true; } catch(e) {}
+    }
+
+    // 2) Prefetched same-origin blob image (avoids CORS taint)
+    if (!bgDrawn && s && s._bgOffscreenImg) {
+        try { mCtx.drawImage(s._bgOffscreenImg, 0, 0, merged.width, merged.height); bgDrawn = true; } catch(e) {}
+    }
+
+    // 3) Last resort — try fetch as blob right now
+    if (!bgDrawn && s && s.fileUrl && s.isImage) {
+        try {
+            const resp = await fetch(s.fileUrl, { mode:'cors' });
+            const blob = await resp.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const img = await new Promise((resolve, reject) => {
+                const i = new Image();
+                i.onload = () => resolve(i);
+                i.onerror = reject;
+                i.src = blobUrl;
+            });
+            mCtx.drawImage(img, 0, 0, merged.width, merged.height);
+            URL.revokeObjectURL(blobUrl);
+            bgDrawn = true;
+        } catch(e) { console.warn('Could not fetch image for merge:', e); }
+    }
+
+    // 4) For PDFs that fell back to Google Viewer — can't capture iframe,
+    //    but if we have the blob, render via PDF.js into the merged canvas directly
+    if (!bgDrawn && s && s._pdfDoc && s._pdfPage) {
+        try {
+            const page = await s._pdfDoc.getPage(s._pdfPage);
+            const vp = page.getViewport({ scale: merged.width / page.getViewport({scale:1}).width });
+            // Resize merged to match aspect ratio
+            merged.height = vp.height;
+            mCtx.fillStyle = '#ffffff';
+            mCtx.fillRect(0, 0, merged.width, merged.height);
+            await page.render({ canvasContext: mCtx, viewport: vp }).promise;
+            bgDrawn = true;
+        } catch(e) { console.warn('Could not render PDF page for merge:', e); }
     }
 
     // Draw annotation overlay on top
-    mCtx.drawImage(annotCanvas, 0, 0);
+    mCtx.drawImage(annotCanvas, 0, 0, merged.width, merged.height);
+
     return merged.toDataURL('image/png');
 }
+
+// ── PREVIEW & SUBMIT ANNOTATION (from annotate tab) ──
+window.previewAnnotation = async (id) => {
+    const preview = document.getElementById('annot-live-preview-'+id);
+    const previewImg = document.getElementById('annot-live-preview-img-'+id);
+    if (!preview || !previewImg) return;
+
+    const canvas = document.getElementById('annot-canvas-'+id);
+    if (!canvas || canvas.width === 0) return;
+    const data = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+    const hasContent = Array.from(data).some((v,i) => i%4===3 && v>0);
+    if (!hasContent) {
+        alert('Nothing drawn yet — use the tools above to annotate first.');
+        return;
+    }
+
+    preview.classList.remove('hidden');
+    previewImg.src = '';
+    previewImg.alt = 'Generating preview...';
+    const merged = await _getMergedAnnotation(id);
+    if (merged) {
+        previewImg.src = merged;
+        previewImg.alt = 'Annotation preview';
+    } else {
+        previewImg.alt = 'Could not generate preview';
+    }
+};
+
+window.submitAnnotation = async (id) => {
+    const canvas = document.getElementById('annot-canvas-'+id);
+    if (!canvas || canvas.width === 0) { alert('Nothing to submit.'); return; }
+    const data = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+    const hasContent = Array.from(data).some((v,i) => i%4===3 && v>0);
+    if (!hasContent) { alert('Nothing drawn yet — use the tools above to annotate first.'); return; }
+
+    const btn = document.getElementById('annot-submit-btn-'+id);
+    const origHTML = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Merging & uploading...';
+    btn.disabled = true;
+
+    try {
+        // 1) Merge background + annotations
+        const mergedDataUrl = await _getMergedAnnotation(id);
+        if (!mergedDataUrl) throw new Error('Failed to generate merged annotation');
+
+        // 2) Upload to Cloudinary
+        const mergedBlob = await (await fetch(mergedDataUrl)).blob();
+        const fd = new FormData();
+        fd.append('file', mergedBlob, 'annotation.png');
+        fd.append('upload_preset', CLOUDINARY.preset);
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY.cloudName}/upload`, {method:'POST', body:fd});
+        const d = await res.json();
+        const annotUrl = d.secure_url || '';
+        if (!annotUrl) throw new Error('Upload failed');
+
+        // 3) Update Firestore assignment
+        await updateDoc(doc(db,'homework_assignments',id), {
+            status: 'submitted',
+            submittedAt: new Date(),
+            annotationUrl: annotUrl
+        });
+
+        // 4) Send to tutor's conversation
+        if (window.currentStudent) {
+            try {
+                const convSnap = await getDocs(query(collection(db,'conversations'), where('studentId','==',window.currentStudent.id)));
+                const convId = convSnap.docs[0]?.id;
+                if (convId) {
+                    const assignSnap = await getDoc(doc(db,'homework_assignments',id));
+                    const aTitle = assignSnap.exists() ? (assignSnap.data().title||'Assignment') : 'Assignment';
+                    await addDoc(collection(db,'conversations',convId,'messages'), {
+                        content: `📝 Annotated work for: "${aTitle}"`,
+                        imageUrl: annotUrl,
+                        senderId: window.currentStudent.id,
+                        senderName: window.currentStudent.name,
+                        senderRole: 'student',
+                        createdAt: new Date(),
+                        read: false
+                    });
+                    const cSnap = await getDoc(doc(db,'conversations',convId));
+                    const cur = cSnap.exists() ? (cSnap.data().unreadCount||0) : 0;
+                    await updateDoc(doc(db,'conversations',convId), {
+                        lastMessage: '📝 Submitted annotated work',
+                        lastMessageTimestamp: new Date(),
+                        lastSenderId: window.currentStudent.id,
+                        unreadCount: cur + 1
+                    });
+                }
+            } catch(msgErr) { console.warn('Could not send to conversation:', msgErr); }
+        }
+
+        // 5) Cleanup
+        if (_resizeObservers[id]) { _resizeObservers[id].disconnect(); delete _resizeObservers[id]; }
+        const s = _annotState[id];
+        if (s && s._bgBlobUrl) { URL.revokeObjectURL(s._bgBlobUrl); }
+        document.getElementById('ws-modal-'+id)?.remove();
+        playNotifSound('general');
+        alert('✅ Annotation submitted successfully!');
+        await loadAssignments();
+        await loadPendingTasks();
+    } catch(e) {
+        console.error('Annotation submit error:', e);
+        btn.innerHTML = origHTML;
+        btn.disabled = false;
+        alert('Error submitting annotation: ' + e.message);
+    }
+};
 
 // ── SUBMIT WORK (with annotation upload) ──
 window.submitWork = async (id) => {
@@ -1482,19 +1655,21 @@ window.submitWork = async (id) => {
         // Upload annotation canvas if student drew anything
         let annotUrl = '';
         const canvas = document.getElementById('annot-canvas-'+id);
-        if (canvas) {
+        if (canvas && canvas.width > 0) {
             const data = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
             const hasContent = Array.from(data).some((v,i) => i%4===3 && v>0);
             if (hasContent) {
-                // Get merged image (background + annotations)
-                const mergedDataUrl = _getMergedAnnotation(id);
-                const mergedBlob = await (await fetch(mergedDataUrl)).blob();
-                const fd = new FormData();
-                fd.append('file', mergedBlob, 'annotation.png');
-                fd.append('upload_preset', CLOUDINARY.preset);
-                const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY.cloudName}/upload`, {method:'POST',body:fd});
-                const d = await res.json();
-                annotUrl = d.secure_url || '';
+                // Get merged image (background + annotations) — CORS-safe
+                const mergedDataUrl = await _getMergedAnnotation(id);
+                if (mergedDataUrl) {
+                    const mergedBlob = await (await fetch(mergedDataUrl)).blob();
+                    const fd = new FormData();
+                    fd.append('file', mergedBlob, 'annotation.png');
+                    fd.append('upload_preset', CLOUDINARY.preset);
+                    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY.cloudName}/upload`, {method:'POST',body:fd});
+                    const d = await res.json();
+                    annotUrl = d.secure_url || '';
+                }
             }
         }
 
@@ -1537,11 +1712,13 @@ window.submitWork = async (id) => {
             } catch(msgErr) { console.warn('Could not send to conversation:', msgErr); }
         }
 
-        // Clean up resize observer
+        // Clean up resize observer and blob URLs
         if (_resizeObservers[id]) {
             _resizeObservers[id].disconnect();
             delete _resizeObservers[id];
         }
+        const _s = _annotState[id];
+        if (_s && _s._bgBlobUrl) { URL.revokeObjectURL(_s._bgBlobUrl); }
 
         // Close modal by its unique ID
         document.getElementById('ws-modal-'+id)?.remove();
