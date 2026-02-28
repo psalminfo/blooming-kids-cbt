@@ -2962,6 +2962,9 @@ class UnifiedAuthManager {
         }
 
         localStorage.setItem('isAuthenticated', 'true');
+
+        // ── Inject FAB (Feedback / Responses floating button) ──
+        if (typeof initFab === 'function') initFab();
     }
 
     showAuthScreen() {
@@ -4154,6 +4157,355 @@ function switchFabModalTab(tab) {
 
 // Note: showFeedbackModal, hideFeedbackModal, showResponsesModal, hideResponsesModal
 // are defined at the top of this file and redirect to the FAB modal.
+
+// ============================================================================
+// FAB (Floating Action Button) — DYNAMIC HTML INJECTION & STYLES
+// ============================================================================
+
+/**
+ * injectFabHtml()
+ * Creates the floating action button (message icon) and its modal overlay
+ * for Feedback + Admin Responses. Called once after auth is confirmed.
+ */
+function injectFabHtml() {
+    // Don't double-inject
+    if (document.getElementById('fabContainer')) return;
+
+    // ── FAB button + speed-dial menu ──
+    const fabContainer = document.createElement('div');
+    fabContainer.id = 'fabContainer';
+    fabContainer.innerHTML = `
+        <!-- Speed-dial menu (hidden until FAB is tapped) -->
+        <div id="fabMenu" class="fab-menu">
+            <button class="fab-menu-item" onclick="openFabTab('feedback')" title="Send Feedback">
+                <span class="fab-menu-icon">✉️</span>
+                <span class="fab-menu-label">Send Feedback</span>
+            </button>
+            <button class="fab-menu-item" onclick="openFabTab('messages')" title="View Responses">
+                <span class="fab-menu-icon">💬</span>
+                <span class="fab-menu-label">Responses</span>
+            </button>
+        </div>
+
+        <!-- Main FAB button -->
+        <button id="fabMainBtn" class="fab-main-btn" onclick="toggleFab()" title="Feedback & Messages">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+        </button>
+
+        <!-- FAB Modal (feedback form + responses viewer) -->
+        <div id="fabModal" class="fab-modal hidden">
+            <div class="fab-modal-backdrop" onclick="document.getElementById('fabModal').classList.add('hidden')"></div>
+            <div class="fab-modal-content">
+                <!-- Close button -->
+                <button class="fab-modal-close" onclick="document.getElementById('fabModal').classList.add('hidden')">&times;</button>
+
+                <!-- Tabs -->
+                <div class="fab-modal-tabs">
+                    <button id="fabTabFeedback" class="fab-tab active" onclick="switchFabModalTab('feedback')">Send Feedback</button>
+                    <button id="fabTabMessages" class="fab-tab" onclick="switchFabModalTab('messages')">Responses</button>
+                </div>
+
+                <!-- Feedback Panel -->
+                <div id="fabPanelFeedback" class="fab-panel">
+                    <div style="display:flex;flex-direction:column;gap:12px;">
+                        <select id="feedbackCategory" class="fab-input">
+                            <option value="">Select Category</option>
+                            <option value="Academic">Academic</option>
+                            <option value="Scheduling">Scheduling</option>
+                            <option value="Billing">Billing</option>
+                            <option value="Tutor">Tutor Feedback</option>
+                            <option value="Technical">Technical Issue</option>
+                            <option value="General">General</option>
+                        </select>
+                        <select id="feedbackPriority" class="fab-input">
+                            <option value="">Priority</option>
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                        <select id="feedbackStudent" class="fab-input">
+                            <option value="">Select Student</option>
+                        </select>
+                        <textarea id="feedbackMessage" class="fab-input" rows="4" placeholder="Describe your feedback or concern…"></textarea>
+                        <button id="submitFeedbackBtn" class="fab-submit-btn" onclick="submitFeedback()">
+                            <span id="submitFeedbackText">Submit Feedback</span>
+                            <span id="submitFeedbackSpinner" class="loading-spinner-small hidden"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Responses Panel -->
+                <div id="fabPanelMessages" class="fab-panel" style="display:none;">
+                    <div id="responsesContent" style="display:flex;flex-direction:column;gap:12px;">
+                        <p style="color:#9CA3AF;text-align:center;padding:24px 0;">Loading responses…</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(fabContainer);
+
+    // Populate the student dropdown with children data
+    _populateFabStudentDropdown();
+}
+
+/**
+ * _populateFabStudentDropdown()
+ * Fills the feedbackStudent <select> with the parent's enrolled children.
+ */
+function _populateFabStudentDropdown() {
+    const select = document.getElementById('feedbackStudent');
+    if (!select) return;
+
+    // Keep the default option
+    select.innerHTML = '<option value="">Select Student</option>';
+
+    // Use the global allStudentData / userChildren arrays
+    const children = (allStudentData && allStudentData.length > 0)
+        ? allStudentData
+        : (userChildren && userChildren.length > 0 ? userChildren : []);
+
+    if (children.length === 0) {
+        select.innerHTML += '<option value="General">General / No students yet</option>';
+        return;
+    }
+
+    children.forEach(child => {
+        const childName = child.name || child.studentName || 'Unknown';
+        const opt = document.createElement('option');
+        opt.value = childName;
+        opt.textContent = childName;
+        select.appendChild(opt);
+    });
+}
+
+/**
+ * Inject FAB styles
+ */
+function injectFabStyles() {
+    if (document.getElementById('fabStyles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'fabStyles';
+    style.textContent = `
+        /* ── FAB Main Button ── */
+        .fab-main-btn {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #10B981, #059669);
+            color: #fff;
+            border: none;
+            box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 9998;
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .fab-main-btn:hover {
+            transform: scale(1.08);
+            box-shadow: 0 6px 24px rgba(16, 185, 129, 0.55);
+        }
+        .fab-main-btn.open {
+            transform: rotate(45deg);
+        }
+
+        /* ── FAB Speed-Dial Menu ── */
+        .fab-menu {
+            position: fixed;
+            bottom: 96px;
+            right: 28px;
+            display: flex;
+            flex-direction: column-reverse;
+            gap: 10px;
+            z-index: 9997;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(16px);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+        .fab-menu.open {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+        .fab-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px 8px 10px;
+            border-radius: 24px;
+            background: #fff;
+            border: 1px solid #E5E7EB;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #374151;
+            white-space: nowrap;
+            transition: background 0.15s ease, box-shadow 0.15s ease;
+        }
+        .fab-menu-item:hover {
+            background: #ECFDF5;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+        }
+        .fab-menu-icon { font-size: 1.1rem; }
+        .fab-menu-label { font-family: 'DM Sans', sans-serif; }
+
+        /* ── FAB Modal ── */
+        .fab-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 10000;
+            display: flex;
+            align-items: flex-end;
+            justify-content: flex-end;
+            padding: 16px;
+        }
+        .fab-modal.hidden { display: none !important; }
+        .fab-modal-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.35);
+        }
+        .fab-modal-content {
+            position: relative;
+            background: #fff;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 420px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+            padding: 20px;
+            animation: fabSlideUp 0.3s ease-out;
+        }
+        @keyframes fabSlideUp {
+            from { transform: translateY(40px); opacity: 0; }
+            to   { transform: translateY(0);    opacity: 1; }
+        }
+        .fab-modal-close {
+            position: absolute;
+            top: 12px;
+            right: 14px;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #6B7280;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .fab-modal-close:hover { color: #111; }
+
+        /* Tabs */
+        .fab-modal-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 16px;
+            border-bottom: 2px solid #E5E7EB;
+        }
+        .fab-tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #9CA3AF;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: color 0.2s, border-color 0.2s;
+            font-family: 'DM Sans', sans-serif;
+        }
+        .fab-tab.active {
+            color: #059669;
+            border-bottom-color: #059669;
+        }
+
+        /* Inputs / form */
+        .fab-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #D1D5DB;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-family: 'DM Sans', sans-serif;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .fab-input:focus { border-color: #10B981; }
+        textarea.fab-input { resize: vertical; min-height: 80px; }
+        .fab-submit-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #10B981, #059669);
+            color: #fff;
+            font-weight: 700;
+            font-size: 0.95rem;
+            border: none;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            font-family: 'DM Sans', sans-serif;
+        }
+        .fab-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .fab-submit-btn:hover:not(:disabled) { opacity: 0.9; }
+
+        /* Response bubble */
+        .response-bubble {
+            background: #ECFDF5;
+            border-left: 3px solid #10B981;
+            border-radius: 0 8px 8px 0;
+            padding: 10px 12px;
+        }
+        .response-header {
+            font-weight: 700;
+            color: #065F46;
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+        }
+
+        /* Mobile tweaks */
+        @media (max-width: 480px) {
+            .fab-main-btn { bottom: 18px; right: 18px; width: 50px; height: 50px; }
+            .fab-menu { bottom: 78px; right: 18px; }
+            .fab-modal { padding: 8px; }
+            .fab-modal-content { max-width: 100%; max-height: 85vh; }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// ── Auto-inject FAB when page loads ──
+// We call this after DOMContentLoaded + auth state check.
+function initFab() {
+    injectFabStyles();
+    injectFabHtml();
+}
+
+// Attempt to refresh the student dropdown whenever children are loaded
+const _originalComprehensiveFindChildren = window.comprehensiveFindChildren;
+if (typeof _originalComprehensiveFindChildren === 'function') {
+    window.comprehensiveFindChildren = async function (...args) {
+        const result = await _originalComprehensiveFindChildren.apply(this, args);
+        // Re-populate the dropdown now that children data may have updated
+        setTimeout(_populateFabStudentDropdown, 500);
+        return result;
+    };
+}
 
 // Chart initializer — call after rendering report HTML
 window.initializeCharts = function() {
@@ -5957,6 +6309,86 @@ function hideAddStudentModal() {
  */
 function togglePickerChip(el) {
     el.classList.toggle('selected');
+    // Recalculate fees when subjects change (additional subject fee)
+    updateAddStudentFees();
+}
+
+/**
+ * _getOrdinalSuffix(n) — e.g. 1→"st", 2→"nd", 11→"th"
+ */
+function _getOrdinalSuffix(n) {
+    if (n > 3 && n < 21) return 'th';
+    switch (n % 10) {
+        case 1: return 'st';
+        case 2: return 'nd';
+        case 3: return 'rd';
+        default: return 'th';
+    }
+}
+
+/**
+ * _calculateAddStudentFees()
+ * Computes the full fee breakdown for the Add Student form.
+ * Uses the SAME logic as enrollment portal CONFIG.
+ * Returns an object with all fee components.
+ */
+function _calculateAddStudentFees() {
+    const ACADEMIC_FEES = {
+        'preschool':  { twice: 80000,  three: 95000,  five: 150000 },
+        'grade2-4':   { twice: 95000,  three: 110000, five: 170000 },
+        'grade5-8':   { twice: 105000, three: 120000, five: 180000 },
+        'grade9-12':  { twice: 110000, three: 135000, five: 200000 }
+    };
+    const ADDITIONAL_SUBJECT_FEE = 40000;
+    const BASE_SUBJECTS_INCLUDED = 2;
+
+    const gradeTier = document.getElementById('newStudentGradeLevel')?.value;
+    const sessionChip = document.querySelector('#newStudentSessions .picker-chip.selected');
+    const sessionType = sessionChip ? sessionChip.dataset.sessions : null;
+    const startDate = document.getElementById('newStudentStartDate')?.value;
+    const selectedSubjects = document.querySelectorAll('#newStudentSubjects .picker-chip.selected');
+    const subjectCount = selectedSubjects.length;
+
+    const result = {
+        baseFee: 0,
+        additionalSubjectFee: 0,
+        fullMonthlyFee: 0,
+        proratedFee: 0,
+        prorationDeduction: 0,
+        prorationExplanation: '',
+        gradeTier: gradeTier || '',
+        sessionType: sessionType || '',
+        subjectCount: subjectCount,
+        extraSubjects: 0
+    };
+
+    if (!gradeTier || !sessionType || !ACADEMIC_FEES[gradeTier] || !ACADEMIC_FEES[gradeTier][sessionType]) {
+        return result;
+    }
+
+    result.baseFee = ACADEMIC_FEES[gradeTier][sessionType];
+    result.extraSubjects = Math.max(0, subjectCount - BASE_SUBJECTS_INCLUDED);
+    result.additionalSubjectFee = result.extraSubjects * ADDITIONAL_SUBJECT_FEE;
+    result.fullMonthlyFee = result.baseFee + result.additionalSubjectFee;
+    result.proratedFee = result.fullMonthlyFee;
+
+    if (startDate) {
+        const start = new Date(startDate);
+        const dayOfMonth = start.getDate();
+        if (dayOfMonth === 1 || (dayOfMonth >= 2 && dayOfMonth <= 6)) {
+            result.prorationExplanation = `Full month fee (starting on ${dayOfMonth}${_getOrdinalSuffix(dayOfMonth)})`;
+        } else {
+            const year = start.getFullYear();
+            const month = start.getMonth();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const daysRemaining = daysInMonth - dayOfMonth + 1;
+            result.proratedFee = Math.round((result.fullMonthlyFee / daysInMonth) * daysRemaining);
+            result.prorationDeduction = result.fullMonthlyFee - result.proratedFee;
+            result.prorationExplanation = `Prorated: ${daysRemaining}/${daysInMonth} days (starting ${dayOfMonth}${_getOrdinalSuffix(dayOfMonth)})`;
+        }
+    }
+
+    return result;
 }
 
 /**
@@ -6069,42 +6501,95 @@ function addStudentPrev() {
 
 /**
  * Update the fee summary in step 3 based on selections.
+ * Uses the SAME fee structure as the enrollment portal (enrollment-portal.js CONFIG.ACADEMIC_FEES).
  */
 function _updateFeeSummary() {
     const gradeTier = document.getElementById('newStudentGradeLevel')?.value;
     const sessionChip = document.querySelector('#newStudentSessions .picker-chip.selected');
     const sessionType = sessionChip ? sessionChip.dataset.sessions : null;
     const summaryDiv = document.getElementById('addStudentFeeSummary');
+    const startDate = document.getElementById('newStudentStartDate')?.value;
 
-    // Define fee rates (example values – adjust to your actual pricing)
-    const fees = {
-        preschool: { twice: 15000, three: 20000, five: 30000 },
-        'grade2-4': { twice: 18000, three: 24000, five: 36000 },
-        'grade5-8': { twice: 22000, three: 28000, five: 42000 },
-        'grade9-12': { twice: 26000, three: 32000, five: 48000 }
+    // ── CORRECT FEES — mirrors CONFIG.ACADEMIC_FEES in enrollment-portal.js ──
+    const ACADEMIC_FEES = {
+        'preschool':  { twice: 80000,  three: 95000,  five: 150000 },
+        'grade2-4':   { twice: 95000,  three: 110000, five: 170000 },
+        'grade5-8':   { twice: 105000, three: 120000, five: 180000 },
+        'grade9-12':  { twice: 110000, three: 135000, five: 200000 }
     };
 
+    const ADDITIONAL_SUBJECT_FEE = 40000;
+    const BASE_SUBJECTS_INCLUDED = 2;
+
     const gradeLabels = {
-        preschool: 'Preschool – Grade 1',
-        'grade2-4': 'Grade 2 – 4',
-        'grade5-8': 'Grade 5 – 8',
-        'grade9-12': 'Grade 9 – 12'
+        'preschool':  'Preschool – Grade 1',
+        'grade2-4':   'Grade 2 – 4',
+        'grade5-8':   'Grade 5 – 8',
+        'grade9-12':  'Grade 9 – 12'
     };
 
     const sessionLabels = {
         twice: 'Twice weekly',
         three: '3× weekly',
-        five: 'Daily (5×)'
+        five:  'Daily (5×)'
     };
 
-    if (gradeTier && sessionType && fees[gradeTier] && fees[gradeTier][sessionType]) {
-        const amount = fees[gradeTier][sessionType];
+    if (gradeTier && sessionType && ACADEMIC_FEES[gradeTier] && ACADEMIC_FEES[gradeTier][sessionType]) {
+        const baseFee = ACADEMIC_FEES[gradeTier][sessionType];
+
+        // Count selected subjects
+        const selectedSubjects = document.querySelectorAll('#newStudentSubjects .picker-chip.selected');
+        const subjectCount = selectedSubjects.length;
+        const extraSubjects = Math.max(0, subjectCount - BASE_SUBJECTS_INCLUDED);
+        const additionalSubjectFee = extraSubjects * ADDITIONAL_SUBJECT_FEE;
+
+        const fullMonthlyFee = baseFee + additionalSubjectFee;
+
+        // ── Proration logic (matches enrollment portal) ──
+        let proratedFee = fullMonthlyFee;
+        let prorationNote = '';
+        let prorationDeduction = 0;
+
+        if (startDate) {
+            const start = new Date(startDate);
+            const dayOfMonth = start.getDate();
+
+            if (dayOfMonth === 1 || (dayOfMonth >= 2 && dayOfMonth <= 6)) {
+                prorationNote = `Full month fee (starting on ${dayOfMonth}${_getOrdinalSuffix(dayOfMonth)})`;
+            } else {
+                // Prorate from 7th onward
+                const year = start.getFullYear();
+                const month = start.getMonth();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const daysRemaining = daysInMonth - dayOfMonth + 1;
+                proratedFee = Math.round((fullMonthlyFee / daysInMonth) * daysRemaining);
+                prorationDeduction = fullMonthlyFee - proratedFee;
+                prorationNote = `Prorated: ${daysRemaining}/${daysInMonth} days (starting ${dayOfMonth}${_getOrdinalSuffix(dayOfMonth)})`;
+            }
+        }
+
+        let rows = `
+            <tr><td>Grade Tier:</td><td style="text-align:right;font-weight:600;">${gradeLabels[gradeTier] || gradeTier}</td></tr>
+            <tr><td>Session Frequency:</td><td style="text-align:right;font-weight:600;">${sessionLabels[sessionType] || sessionType}</td></tr>
+            <tr><td>Base Tuition:</td><td style="text-align:right;font-weight:600;">₦${baseFee.toLocaleString()}</td></tr>
+        `;
+
+        if (subjectCount > 0) {
+            rows += `<tr><td>Subjects Selected:</td><td style="text-align:right;font-weight:600;">${subjectCount} (${BASE_SUBJECTS_INCLUDED} included)</td></tr>`;
+        }
+        if (extraSubjects > 0) {
+            rows += `<tr><td>Additional Subjects (${extraSubjects} × ₦${ADDITIONAL_SUBJECT_FEE.toLocaleString()}):</td><td style="text-align:right;font-weight:600;color:#D97706;">+₦${additionalSubjectFee.toLocaleString()}</td></tr>`;
+        }
+        if (prorationDeduction > 0) {
+            rows += `<tr><td>Proration Discount:</td><td style="text-align:right;font-weight:600;color:#10B981;">-₦${prorationDeduction.toLocaleString()}</td></tr>`;
+        }
+
+        rows += `<tr><td style="padding-top:8px;border-top:1px dashed #ccc;">First Month Fee:</td><td style="padding-top:8px;border-top:1px dashed #ccc;text-align:right;font-weight:800;color:var(--primary-dark);font-size:1.1rem;">₦${proratedFee.toLocaleString()}</td></tr>`;
+
         summaryDiv.innerHTML = `
             <div style="margin-bottom:12px;font-weight:700;font-size:1rem;">Estimated Monthly Tuition</div>
             <table style="width:100%;border-collapse:collapse;">
-                <tr><td>Grade Tier:</td><td style="text-align:right;font-weight:600;">${gradeLabels[gradeTier] || gradeTier}</td></tr>
-                <tr><td>Session Frequency:</td><td style="text-align:right;font-weight:600;">${sessionLabels[sessionType] || sessionType}</td></tr>
-                <tr><td style="padding-top:8px;border-top:1px dashed #ccc;">Estimated Monthly Fee:</td><td style="padding-top:8px;border-top:1px dashed #ccc;text-align:right;font-weight:800;color:var(--primary-dark);font-size:1.1rem;">₦${amount.toLocaleString()}</td></tr>
+                ${rows}
             </table>
             <p style="margin-top:12px;font-size:0.75rem;color:var(--text-muted);">Fees are estimates and subject to confirmation by staff. Proration applies for mid-month starts.</p>
         `;
@@ -6114,10 +6599,11 @@ function _updateFeeSummary() {
 }
 
 /**
- * UpdateAddStudentFees (called from HTML onchange of grade tier)
+ * UpdateAddStudentFees (called from HTML onchange of grade tier, subjects, sessions, start date)
  */
 function updateAddStudentFees() {
-    if (_addStudentStep === 3) {
+    // Always recalculate when fields change — the summary is shown on step 3
+    if (_addStudentStep >= 2) {
         _updateFeeSummary();
     }
 }
@@ -6178,6 +6664,12 @@ function _populateAddStudentReview() {
         'male': 'Male', 'female': 'Female', 'other': 'Other'
     };
 
+    // Calculate fee for review display
+    const feeCalc = _calculateAddStudentFees();
+    const feeDisplay = feeCalc.proratedFee > 0
+        ? `₦${feeCalc.proratedFee.toLocaleString()}${feeCalc.prorationDeduction > 0 ? ' (prorated)' : ''}`
+        : 'Select grade & sessions';
+
     reviewDiv.innerHTML = `
         <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
             ${_reviewRow('👤 Full Name', escapeHtml(fullName))}
@@ -6191,6 +6683,7 @@ function _populateAddStudentReview() {
             ${_reviewRow('🕐 Class Time', escapeHtml(timeStr))}
             ${_reviewRow('🔄 Sessions/Week', escapeHtml(sessionLabel))}
             ${_reviewRow('👩‍🏫 Tutor Pref.', escapeHtml(tutor))}
+            ${_reviewRow('💰 Est. First Month', feeDisplay)}
         </table>
     `;
 }
@@ -6267,8 +6760,20 @@ async function submitNewStudent() {
 
         if (!name) throw new Error('Student name is required.');
 
+        // ── Calculate fees using the same logic as enrollment portal ──
+        const feeCalc = _calculateAddStudentFees();
+
+        // Build academic schedule string (mirrors enrollment portal format)
+        let academicSchedule = '';
+        if (days.length > 0 && startHour && endHour) {
+            const startTime = `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}`;
+            const endTime   = `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}`;
+            academicSchedule = `${days.join(', ')} from ${startTime} to ${endTime}`;
+        }
+
         // Build Firestore document — matches the schema used by enrollment portal
         const studentDoc = {
+            // ── Student info ──
             studentName:      name,
             name:             name,
             gender:           gender,
@@ -6279,28 +6784,66 @@ async function submitNewStudent() {
             selectedSubjects: subjects,
             academicDays:     days,
             academicTime:     academicTime,
+            academicSchedule: academicSchedule,
             academicSessions: sessions,
             preferredTutor:   tutor,
-            // Phone fields — used by comprehensiveFindChildren for suffix matching
+            // ── Parent linkage (used by comprehensiveFindChildren) ──
             parentPhone:      parentPhone,
             parentEmail:      parentEmail,
             parentName:       parentName,
             parentUid:        user.uid,
+            // ── Fee summary — mirrors enrollment portal's summary structure ──
+            summary: {
+                totalFee:              feeCalc.proratedFee,
+                academicFee:           feeCalc.baseFee,
+                additionalSubjectFee:  feeCalc.additionalSubjectFee,
+                fullMonthlyFee:        feeCalc.fullMonthlyFee,
+                proratedAmount:        feeCalc.prorationDeduction,
+                prorationExplanation:  feeCalc.prorationExplanation,
+                extracurricularFee:    0,
+                testPrepFee:           0,
+                discountAmount:        0
+            },
+            // ── Wrap student in the students array format used by enrollment portal ──
+            parent: {
+                name:  parentName,
+                email: parentEmail,
+                phone: parentPhone
+            },
+            students: [{
+                id: 1,
+                name: name,
+                gender: gender,
+                dob: dob,
+                grade: gradeTier,
+                actualGrade: actualGrade,
+                startDate: start,
+                preferredTutor: tutor,
+                academicSessions: sessions,
+                selectedSubjects: subjects,
+                academicDays: days,
+                academicTime: academicTime,
+                academicSchedule: academicSchedule,
+                extracurriculars: [],
+                testPrep: []
+            }],
+            // ── Status / meta ──
             status:           'pending',
             addedFromPortal:  true,
             createdAt:        firebase.firestore.FieldValue.serverTimestamp(),
-            updatedAt:        firebase.firestore.FieldValue.serverTimestamp()
+            updatedAt:        firebase.firestore.FieldValue.serverTimestamp(),
+            timestamp:        new Date().toISOString()
         };
 
-        // Save to pending_students — comprehensiveFindChildren already searches this collection
+        // Save to enrollments collection — same collection used by enrollment portal
         const docRef = await db.collection('enrollments').add(studentDoc);
 
-        console.log('✅ New student saved to pending_students:', docRef.id);
+        console.log('✅ New student saved to enrollments:', docRef.id);
 
         // Invalidate cache so the dashboard reloads fresh
         dataCache.invalidate();
 
-        showMessage(`${name} has been added! They will appear in your dashboard shortly.`, 'success');
+        showMessage(`${name} has been added! Estimated first month fee: ₦${feeCalc.proratedFee.toLocaleString()}`, 'success');
         hideAddStudentModal();
 
         // Reload reports and academics to show the new student
@@ -6595,6 +7138,10 @@ window.showFeedbackModal    = showFeedbackModal;
 window.hideFeedbackModal    = hideFeedbackModal;
 window.showResponsesModal   = showResponsesModal;
 window.hideResponsesModal   = hideResponsesModal;
+window.initFab              = initFab;
+window.injectFabHtml        = injectFabHtml;
+window._populateFabStudentDropdown = _populateFabStudentDropdown;
+window._calculateAddStudentFees    = _calculateAddStudentFees;
 window.switchMainTab        = switchMainTab;
 
-console.log('✅ Parent Portal redesign additions loaded — Add Student, Privacy, Enhanced Academics, FAB, Payments Tab');
+console.log('✅ Parent Portal redesign additions loaded — Add Student, Privacy, Enhanced Academics, FAB (Feedback/Responses), Payments Tab, Correct Fees');
