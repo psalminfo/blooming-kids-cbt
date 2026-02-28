@@ -409,7 +409,7 @@ window.completeRegistration = async () => {
         
         // Redirect after delay
         setTimeout(() => {
-            window.location.href = 'BKHstudentlogin.html';
+            window.location.href = 'bkhstudentportal.html';
         }, 2000);
 
     } catch (error) {
@@ -512,7 +512,7 @@ window.loginStudent = async () => {
         
         // Redirect after delay
         setTimeout(() => {
-            window.location.href = 'BKHstudentlogin.html';
+            window.location.href = 'bkhstudentportal.html';
         }, 1500);
 
     } catch (error) {
@@ -593,7 +593,7 @@ window.signInWithGoogle = async () => {
                 localStorage.setItem('student_email', user.email);
             }
             
-            window.location.href = 'BKHstudentlogin.html';
+            window.location.href = 'bkhstudentportal.html';
             return;
         }
 
@@ -614,7 +614,7 @@ window.signInWithGoogle = async () => {
                 localStorage.setItem('student_email', user.email);
             }
             
-            window.location.href = 'BKHstudentlogin.html';
+            window.location.href = 'bkhstudentportal.html';
             return;
         }
 
