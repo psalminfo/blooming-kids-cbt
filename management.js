@@ -10439,119 +10439,89 @@ async function generateReportHTML(reportId) {
         "GENERAL TUTOR'S COMMENTS": reportData.generalComments
     };
 
-    const sectionsHTML = Object.entries(reportSections).map(([title, content]) => {
-        const sanitizedContent = content ? String(content).replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
-        const displayContent = (sanitizedContent && sanitizedContent.trim() !== '') ? sanitizedContent.replace(/\n/g, '<br>') : 'N/A';
-        return `<div class="report-section"><h2>${title}</h2><p>${displayContent}</p></div>`;
-    }).join('');
-
-    // Pre-fetch logo as base64 to prevent blank image / delayed load that causes
-    // html2canvas to render a blank first page. Falls back to text-only header.
-    const logoUrl = "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg";
-    let logoImgTag = '';
-    try {
-        const logoResponse = await fetch(logoUrl);
-        if (logoResponse.ok) {
-            const blob = await logoResponse.blob();
-            const base64 = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-            });
-            logoImgTag = `<img src="${base64}" alt="Blooming Kids House" style="height:60px;margin-bottom:6px;">`;
-        }
-    } catch (e) {
-        console.warn('Logo fetch failed, using text-only header:', e);
-    }
+    // Only include sections that have actual content
+    const sectionsHTML = Object.entries(reportSections)
+        .filter(([, content]) => content && String(content).trim() !== '')
+        .map(([title, content]) => {
+            const sanitizedContent = String(content).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            const displayContent = sanitizedContent.replace(/\n/g, '<br>');
+            return `<div class="report-section"><h2>${title}</h2><p>${displayContent}</p></div>`;
+        }).join('');
 
     const reportDate = reportData.submittedAt
         ? new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()
         : 'N/A';
 
-    // Build compact, html2pdf-friendly template
-    // Key fixes vs original:
-    //  • Logo embedded as base64 data-URL (no cross-origin load delay)
-    //  • Zero default body margin/padding — let html2pdf margin handle spacing
-    //  • Student-info uses a simple table instead of CSS Grid (html2canvas compat)
-    //  • Minimal vertical margins to prevent page 1 being blank
-    //  • @media print rules for clean browser-print fallback
+    const logoUrl = "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg";
+
+    // CRITICAL FIX: Template has ZERO top margin/padding on body + first element.
+    // html2pdf + html2canvas computes content height incorrectly when there is any
+    // top margin, producing a blank first page. All spacing is handled by html2pdf
+    // margin option + internal element padding only.
     const reportTemplate = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
+<title>Report - ${reportData.studentName || 'Student'}</title>
 <style>
-    *, *::before, *::after { box-sizing: border-box; }
-    @page { margin: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
-        margin: 0; padding: 0;
+        margin: 0 !important; padding: 0 !important;
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        font-size: 13px; color: #333;
+        font-size: 12px; line-height: 1.4; color: #333;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+        background: #fff;
     }
     .report-container {
-        width: 100%; max-width: 750px;
-        margin: 0 auto; padding: 10px 16px;
+        width: 100%; max-width: 720px;
+        margin: 0 auto; padding: 0 8px;
     }
-    /* --- Header --- */
     .header {
-        text-align: center;
+        display: flex; align-items: center; justify-content: center; gap: 10px;
         padding: 8px 0 6px 0;
-        margin-bottom: 10px;
-        border-bottom: 3px solid #16a34a;
+        border-bottom: 2px solid #16a34a;
+        margin-bottom: 8px;
     }
-    .header img { height: 60px; margin-bottom: 6px; }
-    .header .company-name { color: #15803d; font-size: 22px; font-weight: bold; margin: 4px 0 2px 0; }
-    .header .report-title { color: #166534; font-size: 18px; font-weight: bold; margin: 0 0 4px 0; }
-    .header .report-date { color: #555; font-size: 13px; margin: 2px 0 0 0; }
-    /* --- Student Info --- */
+    .header img { height: 48px; flex-shrink: 0; }
+    .header-text { text-align: center; }
+    .header-text .company-name { color: #15803d; font-size: 16px; font-weight: bold; margin: 0; }
+    .header-text .report-title { color: #166534; font-size: 13px; font-weight: bold; margin: 2px 0 0 0; }
+    .header-date { font-size: 11px; color: #555; text-align: right; white-space: nowrap; }
     .student-info-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 14px;
-        background-color: #f9fafb;
-        border: 1px solid #e5e7eb;
-        border-radius: 6px;
-        overflow: hidden;
+        width: 100%; border-collapse: collapse;
+        margin-bottom: 8px; background: #f9fafb;
+        border: 1px solid #e5e7eb; font-size: 11.5px;
     }
     .student-info-table td {
-        padding: 7px 12px;
-        font-size: 13px;
-        border-bottom: 1px solid #f0f0f0;
-        vertical-align: top;
+        padding: 4px 10px; border-bottom: 1px solid #f0f0f0;
     }
     .student-info-table td strong { color: #374151; }
-    /* --- Report Sections --- */
     .report-section {
         page-break-inside: avoid;
-        margin-bottom: 12px;
+        margin-bottom: 7px;
         border: 1px solid #e5e7eb;
-        border-left: 4px solid #16a34a;
-        padding: 10px 14px;
-        border-radius: 4px;
+        border-left: 3px solid #16a34a;
+        padding: 6px 10px;
     }
     .report-section h2 {
-        font-size: 14px; font-weight: bold;
-        color: #16a34a; margin: 0 0 6px 0;
-        padding-bottom: 5px;
-        border-bottom: 2px solid #d1fae5;
+        font-size: 11.5px; font-weight: bold;
+        color: #16a34a; margin: 0 0 3px 0;
+        padding-bottom: 2px;
+        border-bottom: 1px solid #d1fae5;
+        text-transform: uppercase;
     }
     .report-section p {
-        line-height: 1.55; white-space: pre-wrap;
-        margin: 0; font-size: 13px;
+        line-height: 1.45; white-space: pre-wrap;
+        margin: 0; font-size: 11px;
     }
-    /* --- Footer --- */
     .footer {
-        text-align: right;
-        margin-top: 20px;
-        padding-top: 10px;
-        border-top: 1px solid #e5e7eb;
+        text-align: right; margin-top: 12px;
+        padding-top: 6px; border-top: 1px solid #e5e7eb;
     }
-    .footer p { margin: 2px 0; font-size: 13px; }
-    /* --- Print fallback --- */
+    .footer p { margin: 1px 0; font-size: 11px; }
     @media print {
-        body { margin: 0.5in; }
+        body { margin: 0.4in !important; }
         .report-container { padding: 0; }
     }
 </style>
@@ -10559,22 +10529,24 @@ async function generateReportHTML(reportId) {
 <body>
 <div class="report-container">
     <div class="header">
-        ${logoImgTag}
-        <div class="company-name">Blooming Kids House</div>
-        <div class="report-title">MONTHLY LEARNING REPORT</div>
-        <div class="report-date">Date: ${reportDate}</div>
+        <img src="${logoUrl}" alt="Blooming Kids House" onerror="this.style.display='none'">
+        <div class="header-text">
+            <div class="company-name">Blooming Kids House</div>
+            <div class="report-title">MONTHLY LEARNING REPORT</div>
+        </div>
+        <div class="header-date">Date:<br>${reportDate}</div>
     </div>
     <table class="student-info-table">
         <tr>
-            <td><strong>Student's Name:</strong> ${reportData.studentName || 'N/A'}</td>
-            <td><strong>Parent's Name:</strong> ${reportData.parentName || 'N/A'}</td>
+            <td style="width:50%"><strong>Student:</strong> ${reportData.studentName || 'N/A'}</td>
+            <td><strong>Parent:</strong> ${reportData.parentName || 'N/A'}</td>
         </tr>
         <tr>
-            <td><strong>Parent's Phone:</strong> ${reportData.parentPhone || 'N/A'}</td>
+            <td><strong>Phone:</strong> ${reportData.parentPhone || 'N/A'}</td>
             <td><strong>Grade:</strong> ${reportData.grade || 'N/A'}</td>
         </tr>
         <tr>
-            <td colspan="2"><strong>Tutor's Name:</strong> ${reportData.tutorName || 'N/A'}</td>
+            <td colspan="2"><strong>Tutor:</strong> ${reportData.tutorName || 'N/A'}</td>
         </tr>
     </table>
     ${sectionsHTML}
@@ -10588,6 +10560,26 @@ async function generateReportHTML(reportId) {
     return { html: reportTemplate, reportData: reportData };
 }
 
+// ======================================================
+// HELPER: Render HTML into off-screen DOM element for html2pdf.
+// html2pdf produces a blank first page when given an HTML *string*
+// because its temp container has no explicit width. By creating a
+// real, width-constrained element we guarantee html2canvas measures
+// the content correctly.
+// ======================================================
+function createPdfContainer(htmlString) {
+    const wrapper = document.createElement('div');
+    // 794px = A4 width at 96 DPI. Position off-screen so it's invisible.
+    wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;z-index:-1;';
+    wrapper.innerHTML = htmlString;
+    document.body.appendChild(wrapper);
+    return wrapper;
+}
+
+function removePdfContainer(el) {
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+}
+
 window.previewReport = async function(reportId) {
     try {
         const { html } = await generateReportHTML(reportId);
@@ -10596,7 +10588,6 @@ window.previewReport = async function(reportId) {
             newWindow.document.write(html);
             newWindow.document.close();
         } else {
-            // Popup blocked — fallback: open as blob URL
             const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             window.open(url, '_blank') || alert('Pop-ups are blocked. Please allow pop-ups for this site and try again.');
@@ -10610,15 +10601,16 @@ window.previewReport = async function(reportId) {
 window.downloadSingleReport = async function(reportId, event) {
     const button = event?.target?.closest('button') || event?.target || event;
     const originalText = button?.innerHTML || '';
-    
+    let pdfEl = null;
+
     try {
         if (button) { button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Downloading...'; button.disabled = true; }
-        
+
         const progressModal = document.getElementById('pdf-progress-modal');
         const progressBar = document.getElementById('pdf-progress-bar');
         const progressText = document.getElementById('pdf-progress-text');
         const progressMessage = document.getElementById('pdf-progress-message');
-        
+
         if (progressModal) {
             progressModal.classList.remove('hidden');
             if (progressMessage) progressMessage.textContent = 'Generating report...';
@@ -10627,7 +10619,7 @@ window.downloadSingleReport = async function(reportId, event) {
         }
 
         const { html, reportData } = await generateReportHTML(reportId);
-        
+
         if (progressBar) progressBar.style.width = '50%';
         if (progressText) progressText.textContent = '50%';
 
@@ -10638,23 +10630,33 @@ window.downloadSingleReport = async function(reportId, event) {
 
         if (typeof html2pdf !== 'undefined') {
             if (progressMessage) progressMessage.textContent = 'Converting to PDF...';
+
+            // KEY FIX: Render into a real off-screen DOM element instead of passing
+            // the HTML string directly. This prevents the blank-first-page bug.
+            pdfEl = createPdfContainer(html);
+
+            // Let browser finish layout before html2canvas captures
+            await new Promise(r => setTimeout(r, 250));
+
             const options = {
                 margin: [0.3, 0.4, 0.3, 0.4],
                 filename: `${safeStudentName}_Report_${reportDate}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
+                image: { type: 'jpeg', quality: 0.95 },
                 html2canvas: {
                     scale: 2,
                     useCORS: true,
                     logging: false,
                     backgroundColor: '#FFFFFF',
+                    width: 794,
                     windowWidth: 794
                 },
                 jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
                 pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
             };
-            await html2pdf().set(options).from(html).save();
+            await html2pdf().set(options).from(pdfEl).save();
+            removePdfContainer(pdfEl);
+            pdfEl = null;
         } else {
-            // Fallback: download as an HTML file with all the content
             if (progressMessage) progressMessage.textContent = 'Saving as HTML...';
             const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
@@ -10666,18 +10668,19 @@ window.downloadSingleReport = async function(reportId, event) {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
-        
+
         if (progressBar) progressBar.style.width = '100%';
         if (progressText) progressText.textContent = '100%';
         if (progressMessage) progressMessage.textContent = 'Done!';
         setTimeout(() => { if (progressModal) progressModal.classList.add('hidden'); }, 1000);
-        
+
     } catch (error) {
         console.error("Error downloading report:", error);
         alert(`Error downloading report: ${error.message}`);
         const progressModal = document.getElementById('pdf-progress-modal');
         if (progressModal) progressModal.classList.add('hidden');
     } finally {
+        if (pdfEl) removePdfContainer(pdfEl);
         if (button) { button.innerHTML = originalText; button.disabled = false; }
     }
 };
@@ -10739,20 +10742,26 @@ window.zipAndDownloadTutorReports = async function(reportsOrCacheKey, tutorName,
                     'unknown_date';
 
                 if (useHtml2Pdf) {
+                    // Use real DOM element to avoid blank-first-page bug
+                    const pdfEl = createPdfContainer(html);
+                    await new Promise(r => setTimeout(r, 200));
+
                     const options = {
                         margin: [0.3, 0.4, 0.3, 0.4],
-                        image: { type: 'jpeg', quality: 0.98 },
+                        image: { type: 'jpeg', quality: 0.95 },
                         html2canvas: {
                             scale: 2,
                             useCORS: true,
                             logging: false,
                             backgroundColor: '#FFFFFF',
+                            width: 794,
                             windowWidth: 794
                         },
                         jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
                         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
                     };
-                    const pdfBlob = await html2pdf().set(options).from(html).output('blob');
+                    const pdfBlob = await html2pdf().set(options).from(pdfEl).output('blob');
+                    removePdfContainer(pdfEl);
                     zip.file(`${safeStudentName}_${reportDate}.pdf`, pdfBlob);
                 } else {
                     // Fallback: save as HTML files instead of blank PDFs
