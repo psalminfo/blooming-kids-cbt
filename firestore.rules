@@ -1,0 +1,326 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    //  BLOOMING KIDS HOUSE — FIRESTORE SECURITY RULES
+    //  Portals: Admin, Management, Tutor, Parent, Enrollment,
+    //           Assessment Test
+    //
+    //  ROLES (auto-stamped by Cloud Function on signup):
+    //    'admin'   → everything, everywhere
+    //    'staff'   → full operational access
+    //    'tutor'   → own reports, assigned students, schedules
+    //    'parent'  → own children's data only
+    //    (none)    → enrollment portal only (public)
+    // ============================================================
+
+
+    // ============================================================
+    //  HELPER FUNCTIONS
+    // ============================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.role == 'admin';
+    }
+
+    function isStaff() {
+      return isSignedIn() && (
+        request.auth.token.role == 'staff' ||
+        request.auth.token.role == 'admin'
+      );
+    }
+
+    function isTutor() {
+      return isSignedIn() && (
+        request.auth.token.role == 'tutor' ||
+        request.auth.token.role == 'admin'
+      );
+    }
+
+    function isParent() {
+      return isSignedIn() && (
+        request.auth.token.role == 'parent' ||
+        request.auth.token.role == 'admin'
+      );
+    }
+
+    function isKnownUser() {
+      return isSignedIn() && (
+        request.auth.token.role == 'admin'  ||
+        request.auth.token.role == 'staff'  ||
+        request.auth.token.role == 'tutor'  ||
+        request.auth.token.role == 'parent'
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isEmailOwner(email) {
+      return isSignedIn() && request.auth.token.email == email;
+    }
+
+
+    // ============================================================
+    //  1. ENROLLMENT PORTAL  (public — no login needed)
+    // ============================================================
+
+    match /enrollments/{enrollmentId} {
+      allow create: if true;
+      allow read:   if true;
+      allow update: if true;
+      allow delete: if isStaff();
+    }
+
+    match /pending_students/{docId} {
+      allow create: if true;
+      allow read:   if isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    match /referral_transactions/{docId} {
+      allow create: if true;
+      allow read:   if isStaff() || isParent();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+
+    // ============================================================
+    //  2. STUDENT DATA  (Management + Tutor + Parent)
+    // ============================================================
+
+    match /students/{studentId} {
+      allow read:   if isStaff() || isTutor() || isParent();
+      allow create: if isStaff() || isParent();
+      allow update: if isStaff() || isParent();
+      allow delete: if isStaff();
+    }
+
+    match /student_results/{docId} {
+      allow read:           if isStaff() || isTutor() || isParent();
+      allow create, update: if isTutor() || isStaff();
+      allow delete:         if isStaff();
+    }
+
+    match /student_activity_log/{docId} {
+      allow read:           if isStaff() || isTutor() || isParent();
+      allow create:         if isKnownUser();
+      allow update, delete: if isStaff();
+    }
+
+    match /studentEvents/{docId} {
+      allow read:           if isKnownUser();
+      allow create, update: if isTutor() || isStaff();
+      allow delete:         if isStaff();
+    }
+
+
+    // ============================================================
+    //  3. TUTOR PORTAL
+    // ============================================================
+
+    match /tutors/{tutorId} {
+      allow read:   if isStaff() || isTutor();
+      allow create: if isStaff();
+      allow update: if isStaff() || isOwner(tutorId);
+      allow delete: if isStaff();
+    }
+
+    match /tutor_saved_reports/{tutorEmail} {
+      allow read, write: if isStaff() || isEmailOwner(tutorEmail);
+    }
+
+    match /tutor_submissions/{docId} {
+      allow read:           if isStaff() || isTutor();
+      allow create, update: if isTutor();
+      allow delete:         if isStaff();
+    }
+
+    match /tutor_messages/{docId} {
+      allow read:   if isStaff() || isTutor();
+      allow create: if isStaff() || isTutor();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    match /tutor_notifications/{docId} {
+      allow read:           if isStaff() || isTutor();
+      allow create:         if isStaff();
+      allow update:         if isTutor() || isStaff();
+      allow delete:         if isStaff();
+    }
+
+    match /tutorAssignments/{docId} {
+      allow read:           if isStaff() || isTutor();
+      allow create, update: if isStaff();
+      allow delete:         if isStaff();
+    }
+
+    match /homework_assignments/{docId} {
+      allow read:           if isKnownUser();
+      allow create, update: if isTutor() || isStaff();
+      allow delete:         if isStaff();
+    }
+
+    match /schedules/{docId} {
+      allow read:           if isKnownUser();
+      allow create, update: if isTutor() || isStaff();
+      allow delete:         if isStaff();
+    }
+
+    match /ttt_games/{docId} {
+      allow read:           if isKnownUser();
+      allow create, update: if isTutor();
+      allow delete:         if isStaff();
+    }
+
+    match /recall_requests/{docId} {
+      allow read:   if isStaff() || isTutor();
+      allow create: if isKnownUser();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    match /tenure_bonus_logs/{docId} {
+      allow read:           if isStaff() || isTutor();
+      allow create, update: if isStaff();
+      allow delete:         if isStaff();
+    }
+
+    match /daily_topics/{docId} {
+      allow read:           if isKnownUser();
+      allow create, update: if isTutor() || isStaff();
+      allow delete:         if isStaff();
+    }
+
+    match /gamification/{docId} {
+      allow read:           if isKnownUser();
+      allow create, update: if isTutor() || isStaff();
+      allow delete:         if isStaff();
+    }
+
+    match /leaderboard/{docId} {
+      allow read:           if isKnownUser();
+      allow create, update: if isTutor() || isStaff();
+      allow delete:         if isStaff();
+    }
+
+
+    // ============================================================
+    //  4. PARENT PORTAL
+    // ============================================================
+
+    match /parent_users/{parentId} {
+      allow read:   if isStaff() || isOwner(parentId);
+      allow create: if isStaff() || isOwner(parentId);
+      allow update: if isStaff() || isOwner(parentId);
+      allow delete: if isStaff();
+    }
+
+    match /parent_messages/{docId} {
+      allow read:   if isStaff() || isParent();
+      allow create: if isParent() || isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    match /parent_feedback/{docId} {
+      allow read:           if isStaff();
+      allow create:         if isParent();
+      allow update, delete: if isStaff();
+    }
+
+    match /email_reminders/{docId} {
+      allow read:           if isStaff() || isParent();
+      allow create, update: if isStaff();
+      allow delete:         if isStaff();
+    }
+
+
+    // ============================================================
+    //  5. ASSESSMENT TEST PORTAL
+    // ============================================================
+
+    match /tests/{testId} {
+      allow read:           if isKnownUser();
+      allow create, update: if isTutor() || isStaff();
+      allow delete:         if isStaff();
+    }
+
+    match /admin_questions/{docId} {
+      allow read:           if isKnownUser();
+      allow create, update: if isStaff();
+      allow delete:         if isStaff();
+    }
+
+
+    // ============================================================
+    //  6. MANAGEMENT / ADMIN PORTAL
+    // ============================================================
+
+    match /staff/{staffId} {
+      allow read:           if isStaff();
+      allow create, update: if isAdmin();
+      allow delete:         if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read:   if isAdmin() || isOwner(userId);
+      allow create: if isAdmin();
+      allow update: if isAdmin() || isOwner(userId);
+      allow delete: if isAdmin();
+    }
+
+    match /settings/{docId} {
+      allow read:  if isKnownUser();
+      allow write: if isAdmin();
+    }
+
+    match /management_activity/{docId} {
+      allow read:           if isStaff();
+      allow create:         if isKnownUser();
+      allow update, delete: if isStaff();
+    }
+
+    match /system_logs/{docId} {
+      allow read:           if isAdmin();
+      allow create:         if isKnownUser();
+      allow update, delete: if isAdmin();
+    }
+
+
+    // ============================================================
+    //  7. COMMUNICATION
+    // ============================================================
+
+    match /conversations/{docId} {
+      allow read, create, update: if isKnownUser();
+      allow delete:               if isStaff();
+    }
+
+
+    // ============================================================
+    //  8. FUTURE / NEW COLLECTIONS
+    //  Any collection not listed above:
+    //    Admin + Staff get full access automatically
+    //    Everyone else is denied until you add a rule above
+    // ============================================================
+
+    match /{newCollection}/{docId} {
+      allow read, write: if isStaff();
+    }
+
+    match /{newCollection}/{docId}/{subCollection}/{subDocId} {
+      allow read, write: if isStaff();
+    }
+
+  }
+}
