@@ -4963,10 +4963,10 @@ async function exportPayAdviceAsXLS() {
     }
 }
 
-// Remove the old downloadMultipleXLSFiles and downloadAsXLS functions as they're no longer needed
+
 
 // ======================================================
-// SUBSECTION 4.1B: Tenure Bonus Panel
+// SUBSECTION 4.1B: Tenure Bonus Panel (MANUAL ONLY)
 // ======================================================
 
 // Tenure Bonus constants
@@ -5018,18 +5018,13 @@ async function renderTenureBonusPanel(container) {
                         <i class="fas fa-award text-yellow-500"></i> Tenure Bonus
                     </h2>
                     <p class="text-sm text-gray-500 mt-1">
-                        Tutors who complete 1 full year receive a one-time ₦10,000 increase per regular student fee (effective from March 1, 2026). Transitioning students are excluded. Bonuses auto-apply when this tab is opened.
+                        Tutors who complete 1 full year receive a one-time ₦10,000 increase per regular student fee (effective from March 1, 2026). Transitioning students are excluded.
                     </p>
                 </div>
-                <div class="mt-3 md:mt-0 flex items-center gap-2">
+                <div class="mt-3 md:mt-0">
                     <button id="tb-refresh-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm font-medium">
                         <i class="fas fa-sync-alt mr-1"></i> Refresh
                     </button>
-                    ${canApplyBonus ? `
-                    <button id="tb-run-auto-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">
-                        <i class="fas fa-magic mr-1"></i> Re-check & Upgrade
-                    </button>
-                    ` : ''}
                 </div>
             </div>
 
@@ -5142,11 +5137,6 @@ async function renderTenureBonusPanel(container) {
         loadTenureBonusData();
     });
 
-    // Wire auto-upgrade (only if button exists based on permission)
-    document.getElementById('tb-run-auto-btn')?.addEventListener('click', () => {
-        runTenureAutoUpgrade();
-    });
-
     // Load data
     await loadTenureBonusData();
 }
@@ -5221,128 +5211,10 @@ async function loadTenureBonusData() {
 
         renderTenureBonusTable();
 
-        // Auto-apply: silently upgrade any eligible tutors who just clocked 1 year and haven't been upgraded yet
-        await silentAutoApplyTenureBonus();
-
     } catch (err) {
         console.error('Error loading tenure bonus data:', err);
         if (tableBody) tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500">Failed to load data: ${escapeHtml(err.message)}</td></tr>`;
     }
-}
-
-// Silent auto-apply: runs every time the tab loads, automatically upgrades any tutor
-// who has JUST clocked 1 year and hasn't been upgraded yet. No confirmation needed.
-let _silentAutoRunning = false;
-async function silentAutoApplyTenureBonus() {
-    if (_silentAutoRunning) return; // prevent double-run
-    _silentAutoRunning = true;
-
-    try {
-        const now = new Date();
-        if (now < TENURE_BONUS_EFFECTIVE_DATE) { _silentAutoRunning = false; return; }
-
-        // Only auto-apply if the current user has the canApplyTenureBonus permission
-        const canApply = window.userData?.permissions?.actions?.canApplyTenureBonus === true;
-        if (!canApply) { _silentAutoRunning = false; return; }
-
-        // Find tutors who are over 1 year, qualify for bonus (anniversary on/after March 1, 2026), NOT already upgraded, and have regular students
-        const toUpgrade = tenureBonusTutors.filter(t => t.tenure.isOverOneYear && t.tenure.qualifiesForBonus && !t.bonusApplied && t.studentCount > 0);
-
-        if (toUpgrade.length === 0) { _silentAutoRunning = false; return; }
-
-        let successCount = 0;
-        let totalBonusApplied = 0;
-        const upgradedNames = [];
-
-        for (const tutor of toUpgrade) {
-            try {
-                const batch = writeBatch(db);
-                const updatedStudents = [];
-                const tBonus = TENURE_BONUS_AMOUNT * tutor.studentCount;
-
-                for (const student of tutor.students) {
-                    const oldFee = student.studentFee || 0;
-                    const newFee = oldFee + TENURE_BONUS_AMOUNT;
-                    const studentRef = doc(db, "students", student.id);
-                    batch.update(studentRef, { studentFee: newFee });
-                    updatedStudents.push({
-                        studentId: student.id,
-                        studentName: student.studentName || student.name || 'Unknown',
-                        oldFee,
-                        newFee
-                    });
-                }
-
-                const bonusRef = doc(collection(db, "tenure_bonuses"));
-                batch.set(bonusRef, {
-                    tutorEmail: tutor.email,
-                    tutorName: tutor.name,
-                    employmentDate: tutor.employmentDate || '',
-                    tenureMonths: tutor.tenure.totalMonths,
-                    studentCount: tutor.studentCount,
-                    bonusPerStudent: TENURE_BONUS_AMOUNT,
-                    totalBonus: tBonus,
-                    updatedStudents,
-                    appliedAt: Timestamp.now(),
-                    appliedBy: window.userData?.email || 'System (Auto)',
-                    type: 'auto_on_load'
-                });
-
-                const logRef = doc(collection(db, "tenure_bonus_logs"));
-                batch.set(logRef, {
-                    tutorEmail: tutor.email,
-                    tutorName: tutor.name,
-                    action: 'auto_upgrade',
-                    details: `Auto-applied on tab load: ₦${TENURE_BONUS_AMOUNT.toLocaleString()} × ${tutor.studentCount} regular student(s) = ₦${tBonus.toLocaleString()}`,
-                    studentDetails: updatedStudents,
-                    appliedBy: window.userData?.email || 'System (Auto)',
-                    appliedByName: window.userData?.name || 'System',
-                    timestamp: Timestamp.now()
-                });
-
-                await batch.commit();
-                successCount++;
-                totalBonusApplied += tBonus;
-                upgradedNames.push(tutor.name);
-            } catch (err) {
-                console.error(`Silent auto-upgrade failed for ${tutor.name}:`, err);
-            }
-        }
-
-        if (successCount > 0) {
-            await logManagementActivity('Auto Tenure Bonus', `Auto-upgraded ${successCount} tutor(s): ${upgradedNames.join(', ')}. Total: ₦${totalBonusApplied.toLocaleString()}`);
-            invalidateCache('students');
-
-            // Show a non-blocking toast notification
-            showTenureBonusToast(`✅ Auto-upgraded ${successCount} tutor(s) who just clocked 1 year: ${upgradedNames.join(', ')}`, 'success');
-
-            // Reload data to reflect changes (without re-triggering auto-apply since they're now upgraded)
-            _silentAutoRunning = false;
-            await loadTenureBonusData();
-            return;
-        }
-    } catch (err) {
-        console.error('Silent auto-apply error:', err);
-    }
-    _silentAutoRunning = false;
-}
-
-function showTenureBonusToast(message, type = 'success') {
-    const existing = document.getElementById('tb-toast');
-    if (existing) existing.remove();
-
-    const bgColor = type === 'success' ? 'bg-green-600' : 'bg-blue-600';
-    const toast = document.createElement('div');
-    toast.id = 'tb-toast';
-    toast.className = `fixed top-4 right-4 z-50 ${bgColor} text-white px-5 py-3 rounded-lg shadow-xl max-w-md text-sm font-medium flex items-center gap-2`;
-    toast.style.transition = 'opacity 0.5s';
-    toast.innerHTML = `<i class="fas fa-award"></i> <span>${escapeHtml(message)}</span>`;
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 500);
-    }, 8000);
 }
 
 function renderTenureBonusTable() {
@@ -5379,12 +5251,6 @@ function renderTenureBonusTable() {
         const anniversaryStr = t.tenure.oneYearAnniversary ? t.tenure.oneYearAnniversary.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
         // Determine status
-        // bonusApplied = already upgraded
-        // isOverOneYear + qualifiesForBonus + !bonusApplied = pending upgrade (show buttons)
-        // isOverOneYear + !qualifiesForBonus = pre-policy tutor (anniversary before March 2026, no buttons)
-        // !isOverOneYear + qualifiesForBonus = upcoming (hasn't clocked 1 year yet, but will qualify when they do)
-        // !isOverOneYear + !qualifiesForBonus = not eligible
-
         let statusBadge = '';
         let rowClass = '';
         let showApplyBtn = false;
@@ -5397,7 +5263,7 @@ function renderTenureBonusTable() {
             rowClass = 'bg-green-50';
             showViewBtn = true;
         } else if (t.tenure.isOverOneYear && t.tenure.qualifiesForBonus) {
-            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800"><i class="fas fa-clock"></i> Pending Upgrade</span>`;
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800"><i class="fas fa-clock"></i> Ready for Bonus</span>`;
             rowClass = 'bg-orange-50';
             showApplyBtn = canApplyBonus;
             showManualBtn = canManualAdjust;
@@ -5541,7 +5407,7 @@ async function applyTenureBonus(tutorEmail) {
             updatedStudents: updatedStudents,
             appliedAt: Timestamp.now(),
             appliedBy: window.userData?.email || 'Unknown',
-            type: 'automatic'
+            type: 'manual'
         });
 
         // Create log entry
@@ -5573,99 +5439,6 @@ async function applyTenureBonus(tutorEmail) {
         console.error('Error applying tenure bonus:', err);
         alert(`Failed to apply tenure bonus: ${err.message}`);
     }
-}
-
-async function runTenureAutoUpgrade() {
-    const now = new Date();
-    if (now < TENURE_BONUS_EFFECTIVE_DATE) {
-        return alert(`Auto-upgrade is only available from March 1, 2026 onwards.`);
-    }
-
-    const eligibleNotUpgraded = tenureBonusTutors.filter(t => t.tenure.isOverOneYear && t.tenure.qualifiesForBonus && !t.bonusApplied && t.studentCount > 0);
-
-    if (eligibleNotUpgraded.length === 0) {
-        return alert('No eligible tutors pending upgrade. All eligible tutors have already been upgraded, or no tutors have completed 1 year yet.');
-    }
-
-    const totalStudents = eligibleNotUpgraded.reduce((sum, t) => sum + t.studentCount, 0);
-    const totalBonus = totalStudents * TENURE_BONUS_AMOUNT;
-
-    const confirmed = confirm(
-        `Auto-Upgrade Summary\n\n` +
-        `• Tutors to upgrade: ${eligibleNotUpgraded.length}\n` +
-        `• Total students affected: ${totalStudents}\n` +
-        `• Bonus per student: ₦${TENURE_BONUS_AMOUNT.toLocaleString()}\n` +
-        `• Grand total increase: ₦${totalBonus.toLocaleString()}\n\n` +
-        `Tutors:\n${eligibleNotUpgraded.map(t => `  - ${t.name} (${t.studentCount} students)`).join('\n')}\n\n` +
-        `Proceed with auto-upgrade for all?`
-    );
-
-    if (!confirmed) return;
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const tutor of eligibleNotUpgraded) {
-        try {
-            const batch = writeBatch(db);
-            const updatedStudents = [];
-            const tBonus = TENURE_BONUS_AMOUNT * tutor.studentCount;
-
-            for (const student of tutor.students) {
-                const oldFee = student.studentFee || 0;
-                const newFee = oldFee + TENURE_BONUS_AMOUNT;
-                const studentRef = doc(db, "students", student.id);
-                batch.update(studentRef, { studentFee: newFee });
-                updatedStudents.push({
-                    studentId: student.id,
-                    studentName: student.studentName || student.name || 'Unknown',
-                    oldFee,
-                    newFee
-                });
-            }
-
-            const bonusRef = doc(collection(db, "tenure_bonuses"));
-            batch.set(bonusRef, {
-                tutorEmail: tutor.email,
-                tutorName: tutor.name,
-                employmentDate: tutor.employmentDate || '',
-                tenureMonths: tutor.tenure.totalMonths,
-                studentCount: tutor.studentCount,
-                bonusPerStudent: TENURE_BONUS_AMOUNT,
-                totalBonus: tBonus,
-                updatedStudents,
-                appliedAt: Timestamp.now(),
-                appliedBy: window.userData?.email || 'Unknown',
-                type: 'automatic_batch'
-            });
-
-            const logRef = doc(collection(db, "tenure_bonus_logs"));
-            batch.set(logRef, {
-                tutorEmail: tutor.email,
-                tutorName: tutor.name,
-                action: 'auto_upgrade',
-                details: `Auto-upgrade: ₦${TENURE_BONUS_AMOUNT.toLocaleString()} × ${tutor.studentCount} students = ₦${tBonus.toLocaleString()}`,
-                studentDetails: updatedStudents,
-                appliedBy: window.userData?.email || 'Unknown',
-                appliedByName: window.userData?.name || 'Unknown',
-                timestamp: Timestamp.now()
-            });
-
-            await batch.commit();
-            successCount++;
-        } catch (err) {
-            console.error(`Failed to upgrade ${tutor.name}:`, err);
-            failCount++;
-        }
-    }
-
-    await logManagementActivity('Batch Tenure Auto-Upgrade', `Upgraded ${successCount} tutors, ${failCount} failed. Total: ₦${totalBonus.toLocaleString()}`);
-
-    invalidateCache('students');
-
-    alert(`Auto-Upgrade Complete!\n\n✅ Successfully upgraded: ${successCount}\n${failCount > 0 ? `❌ Failed: ${failCount}` : ''}`);
-
-    await loadTenureBonusData();
 }
 
 function showManualFeeAdjustModal(tutorEmail, tutorName) {
@@ -5854,9 +5627,9 @@ function renderTenureBonusLog() {
         if (log.action === 'manual_adjust') {
             iconClass = 'fas fa-edit text-blue-500';
             bgClass = 'bg-blue-50 border-blue-200';
-        } else if (log.action === 'auto_upgrade') {
-            iconClass = 'fas fa-magic text-purple-500';
-            bgClass = 'bg-purple-50 border-purple-200';
+        } else if (log.action === 'bonus_applied') {
+            iconClass = 'fas fa-award text-green-500';
+            bgClass = 'bg-green-50 border-green-200';
         }
 
         const studentSummary = (log.studentDetails || []).map(s =>
@@ -5870,7 +5643,7 @@ function renderTenureBonusLog() {
                     <div class="flex-1 min-w-0">
                         <div class="flex flex-wrap items-center gap-2 mb-1">
                             <span class="font-bold text-sm">${escapeHtml(log.tutorName || 'Unknown')}</span>
-                            <span class="text-xs px-2 py-0.5 rounded-full bg-white border font-medium">${escapeHtml(log.action === 'manual_adjust' ? 'Manual' : log.action === 'auto_upgrade' ? 'Auto' : 'Applied')}</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-white border font-medium">${escapeHtml(log.action === 'manual_adjust' ? 'Manual Adjust' : 'Bonus Applied')}</span>
                         </div>
                         <p class="text-sm text-gray-700">${escapeHtml(log.details || '')}</p>
                         ${studentSummary ? `<div class="mt-2 flex flex-wrap">${studentSummary}</div>` : ''}
@@ -5883,7 +5656,7 @@ function renderTenureBonusLog() {
             </div>
         `;
     }).join('');
-} 
+}
 
 // ======================================================
 // SUBSECTION 4.2: Referral Management Panel
@@ -13625,5 +13398,6 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
 
 
