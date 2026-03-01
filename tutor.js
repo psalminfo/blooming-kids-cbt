@@ -2992,8 +2992,8 @@ async function loadTutorNotifications(modal) {
             const notif = d.data();
             const isUnread = !notif.read;
             const time = notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleDateString('en-NG', {day:'numeric',month:'short',year:'numeric'}) : '';
-            const typeIcon = notif.type === 'broadcast' ? '📢' : notif.type === 'new_student' ? '👤' : notif.type === 'student_approved' ? '✅' : notif.type === 'management_message' ? '🏢' : notif.type === 'management_reply' ? '💬' : '🔔';
-            const priorityStyle = notif.priority === 'urgent' ? 'border-left:4px solid #ef4444;' : notif.priority === 'important' ? 'border-left:4px solid #f59e0b;' : (notif.type === 'management_message' || notif.type === 'management_reply') ? 'border-left:4px solid #3b82f6;' : 'border-left:4px solid #10b981;';
+            const typeIcon = notif.type === 'broadcast' ? '📢' : notif.type === 'new_student' ? '👤' : notif.type === 'student_approved' ? '✅' : notif.type === 'management_message' ? '🏢' : notif.type === 'management_reply' ? '💬' : notif.type === 'ttt_challenge' ? '🎮' : notif.type === 'word_challenge' ? '🧩' : '🔔';
+            const priorityStyle = notif.priority === 'urgent' ? 'border-left:4px solid #ef4444;' : notif.priority === 'important' ? 'border-left:4px solid #f59e0b;' : (notif.type === 'management_message' || notif.type === 'management_reply') ? 'border-left:4px solid #3b82f6;' : (notif.type === 'ttt_challenge' || notif.type === 'word_challenge') ? 'border-left:4px solid #6366f1;' : 'border-left:4px solid #10b981;';
             
             const el = document.createElement('div');
             el.style.cssText = `padding:12px 14px;border-bottom:1px solid #f3f4f6;cursor:pointer;${isUnread ? 'background:#eff6ff;' : 'background:#fff;'}${priorityStyle}`;
@@ -3003,7 +3003,7 @@ async function loadTutorNotifications(modal) {
                     ${isUnread ? '<span style="background:#ef4444;color:#fff;border-radius:9999px;padding:1px 7px;font-size:0.65rem;font-weight:700;">NEW</span>' : ''}
                 </div>
                 <div style="font-size:0.75rem;color:#374151;line-height:1.4;">${msgEscapeHtml((notif.message||'').substring(0,120))}${(notif.message||'').length>120?'…':''}</div>
-                <div style="font-size:0.7rem;color:#9ca3af;margin-top:4px;">📅 ${time}${notif.senderDisplay ? ' · From: '+msgEscapeHtml(notif.senderDisplay) : ''}${(notif.type==='management_message'||notif.type==='management_reply') ? ' · <span style="color:#2563eb;font-weight:700;">Tap to reply →</span>' : ''}</div>
+                <div style="font-size:0.7rem;color:#9ca3af;margin-top:4px;">📅 ${time}${notif.senderDisplay ? ' · From: '+msgEscapeHtml(notif.senderDisplay) : ''}${(notif.type==='management_message'||notif.type==='management_reply') ? ' · <span style="color:#2563eb;font-weight:700;">Tap to reply →</span>' : ''}${(notif.type==='ttt_challenge'||notif.type==='word_challenge') ? ' · <span style="color:#4338ca;font-weight:700;">🎮 Tap to accept challenge →</span>' : ''}</div>
             `;
             el.onmouseover = () => { el.style.background = '#f0fdf4'; };
             el.onmouseout = () => { el.style.background = isUnread ? '#eff6ff' : '#fff'; };
@@ -3011,6 +3011,19 @@ async function loadTutorNotifications(modal) {
                 // Mark as read
                 try { await updateDoc(doc(db, "tutor_notifications", d.id), { read: true }); } catch(e){}
                 el.style.background = '#fff';
+
+                // ═══ GAME CHALLENGES: Open arcade and join the game ═══
+                if (notif.type === 'ttt_challenge' || notif.type === 'word_challenge') {
+                    const gameId   = notif.gameId;
+                    const gameType = notif.gameType || (notif.type === 'ttt_challenge' ? 'ttt' : 'word');
+                    if (gameId && typeof window.bkAcceptGameChallenge === 'function') {
+                        // Close inbox modal first
+                        const inboxModal = document.getElementById('bk-inbox-modal') || document.querySelector('[id*="inbox-modal"]');
+                        if (inboxModal) inboxModal.style.display = 'none';
+                        window.bkAcceptGameChallenge(gameId, gameType);
+                    }
+                    return;
+                }
 
                 // ═══ MANAGEMENT MESSAGES: Open real chat for reply ═══
                 if (notif.type === 'management_message' || notif.type === 'management_reply') {
