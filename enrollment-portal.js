@@ -302,7 +302,7 @@ class EnrollmentApp {
             <div class="form-row">
                 <div class="form-group">
                     <label>Preferred Start Date <span class="required">*</span></label>
-                    <input type="date" class="form-control student-start-date" min="${new Date().toISOString().split('T')[0]}" data-validate="required" value="${prefillData?.startDate || defaultStartDate}">
+                    <input type="date" class="form-control student-start-date" min="${new Date().toISOString().split('T')[0]}" data-validate="required" value="${prefillData?.startDate || defaultStartDate}" onkeydown="return false;" onpaste="return false;" style="cursor:pointer;">
                     <div class="error-message student-start-date-error"></div>
                 </div>
             </div>
@@ -1598,6 +1598,19 @@ class EnrollmentApp {
                     allValid = false;
                 }
             });
+            
+            // Validate start date is not in the past
+            const startDateEl = entry.querySelector('.student-start-date');
+            if (startDateEl && startDateEl.value) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const chosenDate = new Date(startDateEl.value + 'T00:00:00');
+                if (chosenDate < today) {
+                    allValid = false;
+                    const errEl = entry.querySelector('.student-start-date-error');
+                    if (errEl) { errEl.textContent = 'Start date cannot be in the past'; errEl.classList.add('show'); }
+                }
+            }
             
             // Validate test prep times
             entry.querySelectorAll('.test-prep-card.active').forEach(card => {
