@@ -6433,8 +6433,8 @@ async function renderTutorReportsPanel(container) {
 if (typeof XLSX === 'undefined') {
     console.error('XLSX library not loaded. Excel export will not work.');
 }
-if (typeof html2canvas === 'undefined') {
-    console.error('html2canvas library not loaded. Invoice download will not work.');
+if (typeof window.jspdf === 'undefined') {
+    console.error('jsPDF library not loaded. PDF download will not work.');
 }
 if (typeof firebase === 'undefined' && typeof db === 'undefined') {
     console.error('Firebase not initialized. Check your Firebase setup.');
@@ -6491,7 +6491,7 @@ function parseFeeValue(feeValue) {
 function checkLibraries(libs) {
     const missing = libs.filter(lib => {
         if (lib === 'XLSX') return typeof XLSX === 'undefined';
-        if (lib === 'html2canvas') return typeof html2canvas === 'undefined';
+        if (lib === 'jspdf') return typeof window.jspdf === 'undefined';
         return false;
     });
     if (missing.length > 0) {
@@ -10384,126 +10384,288 @@ window.viewStudentTutorHistory = function(studentId) {
 };
 
 // ======================================================
-// BULLETPROOF PDF GENERATION ENGINE
+// jsPDF DIRECT-DRAW PDF ENGINE (No canvas, no screenshots)
+// Requires: jspdf 2.5.x + jspdf-autotable 3.8.x
 // ======================================================
 
-async function generateReportHTML(reportId) {
+// --- Cached logo (fetched once, reused forever) ---
+let _reportLogoBase64 = null;
+
+async function fetchReportLogo() {
+    if (_reportLogoBase64) return _reportLogoBase64;
+    try {
+        // Use Cloudinary's format transform to get PNG (jsPDF can't render SVG natively)
+        const pngUrl = 'https://res.cloudinary.com/dy2hxcyaf/image/upload/f_png,h_160/v1757700806/newbhlogo_umwqzy';
+        const response = await fetch(pngUrl, { mode: 'cors' });
+        const blob = await response.blob();
+        _reportLogoBase64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+        return _reportLogoBase64;
+    } catch (e) {
+        console.error('Logo fetch failed, PDF will generate without logo:', e);
+        return null;
+    }
+}
+
+// --- Fetch report data from Firestore ---
+async function getReportData(reportId) {
     const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
     if (!reportDoc.exists()) throw new Error("Report not found!");
-    const reportData = reportDoc.data();
-    
-    const reportSections = {
-        "INTRODUCTION": reportData.introduction,
-        "TOPICS & REMARKS": reportData.topics,
-        "PROGRESS & ACHIEVEMENTS": reportData.progress,
-        "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses,
-        "RECOMMENDATIONS": reportData.recommendations,
-        "GENERAL TUTOR'S COMMENTS": reportData.generalComments
-    };
+    return reportDoc.data();
+}
 
-    // Use inline styles to ensure html2pdf doesn't strip them
-    const sectionsHTML = Object.entries(reportSections).map(([title, content]) => {
-        const sanitizedContent = content ? String(content).replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
-        const displayContent = (sanitizedContent && sanitizedContent.trim() !== '') ? sanitizedContent.replace(/\n/g, '<br>') : 'N/A';
-        return `
-            <div style="page-break-inside: avoid; margin-bottom: 20px; border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; background-color: #fff;">
-                <h2 style="font-size: 18px; font-weight: bold; color: #16a34a; margin-top: 0; padding-bottom: 8px; border-bottom: 2px solid #d1fae5;">${title}</h2>
-                <p style="line-height: 1.6; white-space: pre-wrap; margin-top: 0; color: #333;">${displayContent}</p>
-            </div>
-        `;
+// --- Core: Build a jsPDF document from report data ---
+function buildReportPDF(reportData, logoBase64) {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+    const pageW = pdf.internal.pageSize.getWidth();   // 210
+    const pageH = pdf.internal.pageSize.getHeight();   // 297
+    const marginL = 18;
+    const marginR = 18;
+    const contentW = pageW - marginL - marginR;        // 174
+    const bottomMargin = 25;
+    let y = 20; // current Y cursor
+
+    // Colors
+    const green700 = [21, 128, 61];    // #15803d
+    const green800 = [22, 101, 52];    // #166534
+    const green500 = [22, 163, 74];    // #16a34a
+    const greenLight = [209, 250, 229]; // #d1fae5
+    const gray100 = [243, 244, 246];
+    const gray500 = [107, 114, 128];
+    const black = [51, 51, 51];
+
+    // Helper: check page space, add new page if needed
+    function ensureSpace(needed) {
+        if (y + needed > pageH - bottomMargin) {
+            pdf.addPage();
+            y = 20;
+        }
+    }
+
+    // ===== HEADER =====
+    // Logo (centered)
+    if (logoBase64) {
+        try {
+            const logoH = 18;
+            const logoW = 18; // square-ish, auto scales
+            const logoX = (pageW - logoW) / 2;
+            pdf.addImage(logoBase64, 'PNG', logoX, y, logoW, logoH);
+            y += logoH + 3;
+        } catch (e) {
+            // Skip logo silently if it fails
+        }
+    }
+
+    // Company name
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(20);
+    pdf.setTextColor(...green700);
+    pdf.text('Blooming Kids House', pageW / 2, y, { align: 'center' });
+    y += 9;
+
+    // Report title
+    pdf.setFontSize(16);
+    pdf.setTextColor(...green800);
+    pdf.text('MONTHLY LEARNING REPORT', pageW / 2, y, { align: 'center' });
+    y += 7;
+
+    // Date
+    const reportDate = reportData.submittedAt
+        ? new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()
+        : 'N/A';
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.setTextColor(...gray500);
+    pdf.text(`Date: ${reportDate}`, pageW / 2, y, { align: 'center' });
+    y += 10;
+
+    // ===== STUDENT INFO TABLE =====
+    pdf.autoTable({
+        startY: y,
+        margin: { left: marginL, right: marginR },
+        theme: 'plain',
+        styles: {
+            fontSize: 10,
+            cellPadding: { top: 3, bottom: 3, left: 5, right: 5 },
+            textColor: black,
+            lineColor: [229, 231, 235],
+            lineWidth: 0.2,
+        },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+        body: [
+            [
+                { content: `Student's Name:  ${reportData.studentName || 'N/A'}`, styles: { fontStyle: 'bold' } },
+                { content: `Parent's Name:  ${reportData.parentName || 'N/A'}`, styles: { fontStyle: 'bold' } }
+            ],
+            [
+                { content: `Parent's Phone:  ${reportData.parentPhone || 'N/A'}`, styles: { fontStyle: 'bold' } },
+                { content: `Grade:  ${reportData.grade || 'N/A'}`, styles: { fontStyle: 'bold' } }
+            ],
+            [
+                { content: `Tutor's Name:  ${reportData.tutorName || 'N/A'}`, styles: { fontStyle: 'bold' } },
+                ''
+            ]
+        ],
+        columnStyles: {
+            0: { cellWidth: contentW / 2 },
+            1: { cellWidth: contentW / 2 }
+        },
+        tableLineColor: [229, 231, 235],
+        tableLineWidth: 0.3,
+    });
+
+    y = pdf.lastAutoTable.finalY + 10;
+
+    // ===== REPORT SECTIONS =====
+    const sections = [
+        { title: 'INTRODUCTION', content: reportData.introduction },
+        { title: 'TOPICS & REMARKS', content: reportData.topics },
+        { title: 'PROGRESS & ACHIEVEMENTS', content: reportData.progress },
+        { title: 'STRENGTHS AND WEAKNESSES', content: reportData.strengthsWeaknesses },
+        { title: 'RECOMMENDATIONS', content: reportData.recommendations },
+        { title: "GENERAL TUTOR'S COMMENTS", content: reportData.generalComments },
+    ];
+
+    sections.forEach(section => {
+        const text = (section.content && String(section.content).trim()) ? String(section.content).trim() : 'N/A';
+
+        // Wrap text to measure height
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+        const wrappedLines = pdf.splitTextToSize(text, contentW - 10);
+        const textBlockH = wrappedLines.length * 5; // ~5mm per line at font 10
+        const sectionH = 12 + textBlockH + 8; // header(12) + text + padding(8)
+
+        ensureSpace(Math.min(sectionH, 80)); // at least try to keep header + some text together
+
+        // Section box border
+        const boxY = y;
+        const boxH = 12 + textBlockH + 8;
+        pdf.setDrawColor(229, 231, 235);
+        pdf.setLineWidth(0.3);
+        pdf.roundedRect(marginL, boxY, contentW, boxH, 2, 2, 'S');
+
+        // Section title
+        y += 8;
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(12);
+        pdf.setTextColor(...green500);
+        pdf.text(section.title, marginL + 5, y);
+        y += 2;
+
+        // Green underline
+        pdf.setDrawColor(...greenLight);
+        pdf.setLineWidth(0.6);
+        pdf.line(marginL + 5, y, marginL + contentW - 5, y);
+        y += 5;
+
+        // Section body text
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+        pdf.setTextColor(...black);
+
+        // Print wrapped lines, handling page breaks mid-text
+        wrappedLines.forEach(line => {
+            if (y > pageH - bottomMargin) {
+                pdf.addPage();
+                y = 20;
+            }
+            pdf.text(line, marginL + 5, y);
+            y += 5;
+        });
+
+        y += 6; // spacing between sections
+    });
+
+    // ===== FOOTER / SIGNATURE =====
+    ensureSpace(25);
+    y += 5;
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.setTextColor(...black);
+    pdf.text('Best regards,', pageW - marginR, y, { align: 'right' });
+    y += 6;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(reportData.tutorName || 'N/A', pageW - marginR, y, { align: 'right' });
+
+    return pdf;
+}
+
+// --- Generate HTML for preview (screen only, not PDF) ---
+function generateReportPreviewHTML(reportData) {
+    const reportDate = reportData.submittedAt
+        ? new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()
+        : 'N/A';
+    const logoUrl = 'https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg';
+    const sectionKeys = {
+        'INTRODUCTION': reportData.introduction,
+        'TOPICS & REMARKS': reportData.topics,
+        'PROGRESS & ACHIEVEMENTS': reportData.progress,
+        'STRENGTHS AND WEAKNESSES': reportData.strengthsWeaknesses,
+        'RECOMMENDATIONS': reportData.recommendations,
+        "GENERAL TUTOR'S COMMENTS": reportData.generalComments,
+    };
+    const sectionsHTML = Object.entries(sectionKeys).map(([title, content]) => {
+        const safe = content ? String(content).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') : 'N/A';
+        return `<div style="margin-bottom:20px;border:1px solid #e5e7eb;padding:15px;border-radius:8px;">
+            <h2 style="font-size:18px;font-weight:bold;color:#16a34a;margin:0 0 8px 0;padding-bottom:8px;border-bottom:2px solid #d1fae5;">${title}</h2>
+            <p style="line-height:1.6;white-space:pre-wrap;margin:0;color:#333;">${safe}</p>
+        </div>`;
     }).join('');
 
-    const logoUrl = "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg";
-    const reportDate = reportData.submittedAt ? new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A';
-
-    // Swapped CSS Grid for a stable HTML Table layout (html2canvas renders tables flawlessly)
-    const reportTemplate = `
-        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; max-width: 800px; margin: auto; padding: 20px; background-color: #ffffff;">
-            <div style="text-align: center; margin-bottom: 40px;">
-                <img src="${logoUrl}" crossorigin="anonymous" alt="Company Logo" style="height: 80px; width: auto; display: inline-block;">
-                <h2 style="color: #15803d; margin: 10px 0; font-size: 28px;">Blooming Kids House</h2>
-                <h1 style="color: #166534; margin: 0; font-size: 24px;">MONTHLY LEARNING REPORT</h1>
-                <p style="margin: 5px 0; color: #555;">Date: ${reportDate}</p>
+    return `<html><head><style>body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#333;background:#f3f4f6;margin:0;padding:20px;}</style></head><body>
+        <div style="max-width:800px;margin:auto;padding:20px;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+            <div style="text-align:center;margin-bottom:30px;">
+                <img src="${logoUrl}" style="height:70px;margin-bottom:8px;" alt="Logo">
+                <h2 style="color:#15803d;margin:8px 0;font-size:24px;">Blooming Kids House</h2>
+                <h1 style="color:#166534;margin:0;font-size:20px;">MONTHLY LEARNING REPORT</h1>
+                <p style="color:#555;margin:5px 0;">Date: ${reportDate}</p>
             </div>
-            
-            <div style="margin-bottom: 30px; background-color: #f9f9f9; border: 1px solid #eee; padding: 15px; border-radius: 8px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 15px;">
-                    <tr>
-                        <td style="padding: 5px 0; width: 50%;"><strong>Student's Name:</strong> ${reportData.studentName || 'N/A'}</td>
-                        <td style="padding: 5px 0; width: 50%;"><strong>Parent's Name:</strong> ${reportData.parentName || 'N/A'}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 5px 0;"><strong>Parent's Phone:</strong> ${reportData.parentPhone || 'N/A'}</td>
-                        <td style="padding: 5px 0;"><strong>Grade:</strong> ${reportData.grade || 'N/A'}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 5px 0;"><strong>Tutor's Name:</strong> ${reportData.tutorName || 'N/A'}</td>
-                        <td></td>
-                    </tr>
-                </table>
-            </div>
-            
+            <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:25px;background:#f9fafb;border:1px solid #eee;border-radius:8px;">
+                <tr><td style="padding:8px 12px;"><strong>Student:</strong> ${reportData.studentName || 'N/A'}</td><td style="padding:8px 12px;"><strong>Parent:</strong> ${reportData.parentName || 'N/A'}</td></tr>
+                <tr><td style="padding:8px 12px;"><strong>Phone:</strong> ${reportData.parentPhone || 'N/A'}</td><td style="padding:8px 12px;"><strong>Grade:</strong> ${reportData.grade || 'N/A'}</td></tr>
+                <tr><td style="padding:8px 12px;"><strong>Tutor:</strong> ${reportData.tutorName || 'N/A'}</td><td></td></tr>
+            </table>
             ${sectionsHTML}
-            
-            <div style="text-align: right; margin-top: 40px;">
-                <p style="margin-bottom: 5px;">Best regards,</p>
+            <div style="text-align:right;margin-top:30px;">
+                <p>Best regards,</p>
                 <p><strong>${reportData.tutorName || 'N/A'}</strong></p>
             </div>
         </div>
-    `;
-
-    return { html: reportTemplate, reportData: reportData };
+    </body></html>`;
 }
+
+// ===== PUBLIC API =====
 
 window.previewReport = async function(reportId) {
     try {
-        const { html } = await generateReportHTML(reportId);
+        const reportData = await getReportData(reportId);
+        const html = generateReportPreviewHTML(reportData);
         const newWindow = window.open();
-        newWindow.document.write(`<html><body style="background: #f3f4f6;">${html}</body></html>`);
-        newWindow.document.close();
+        if (newWindow) {
+            newWindow.document.write(html);
+            newWindow.document.close();
+        } else {
+            alert('Pop-ups blocked. Please allow pop-ups to preview.');
+        }
     } catch (error) {
         console.error("Error previewing report:", error);
         alert(`Error: ${error.message}`);
     }
 };
 
-// --- DOM INJECTION HELPER (Forces images to load before snapshot) ---
-async function buildOffscreenContainer(htmlString) {
-    const container = document.createElement('div');
-    container.innerHTML = htmlString;
-    container.style.position = 'absolute';
-    container.style.left = '-9999px';
-    container.style.top = '0';
-    container.style.width = '800px';
-    container.style.backgroundColor = '#FFFFFF';
-    document.body.appendChild(container);
-
-    // Wait for all images to fully load
-    await Promise.all(Array.from(container.querySelectorAll('img')).map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise(resolve => {
-            img.onload = resolve;
-            img.onerror = resolve;
-        });
-    }));
-    return container;
-}
-
-const getPdfOptions = (filename) => ({
-    margin: [0.5, 0.5, 0.5, 0.5],
-    filename: filename,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true },
-    jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
-    pagebreak: { mode: ['css', 'legacy'] } 
-});
-
 window.downloadSingleReport = async function(reportId, event) {
     const button = event?.target || event;
     const originalText = button?.innerHTML || '';
-    
+
     try {
-        if (button.innerHTML) {
+        if (button?.innerHTML) {
             button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             button.disabled = true;
         }
@@ -10515,34 +10677,29 @@ window.downloadSingleReport = async function(reportId, event) {
 
         if (progressModal) {
             progressModal.classList.remove('hidden');
-            if (progressMessage) progressMessage.textContent = 'Generating PDF...';
-            if (progressBar) progressBar.style.width = '20%';
-            if (progressText) progressText.textContent = '20%';
+            if (progressMessage) progressMessage.textContent = 'Fetching report data...';
+            if (progressBar) progressBar.style.width = '15%';
+            if (progressText) progressText.textContent = '15%';
         }
 
-        const { html, reportData } = await generateReportHTML(reportId);
+        // Fetch logo + data in parallel
+        const [logoBase64, reportData] = await Promise.all([
+            fetchReportLogo(),
+            getReportData(reportId)
+        ]);
 
-        if (typeof html2pdf !== 'undefined') {
-            const container = await buildOffscreenContainer(html);
-            const safeStudentName = (reportData.studentName || 'Student').replace(/[^a-z0-9]/gi, '_');
-            const filename = `${safeStudentName}_Report_${Date.now()}.pdf`;
+        if (progressBar) progressBar.style.width = '50%';
+        if (progressText) progressText.textContent = '50%';
+        if (progressMessage) progressMessage.textContent = 'Building PDF...';
 
-            if (progressBar) progressBar.style.width = '60%';
-            if (progressMessage) progressMessage.textContent = 'Rendering Layout...';
+        const pdf = buildReportPDF(reportData, logoBase64);
 
-            await html2pdf().set(getPdfOptions(filename)).from(container).save();
-            document.body.removeChild(container);
-        } else {
-            const newWindow = window.open('', '_blank');
-            if (newWindow) {
-                newWindow.document.write(`<html><body>${html}</body></html>`);
-                newWindow.document.close();
-                newWindow.focus();
-                setTimeout(() => newWindow.print(), 800);
-            } else {
-                alert('Pop-ups blocked. Please allow pop-ups to print.');
-            }
-        }
+        if (progressBar) progressBar.style.width = '90%';
+        if (progressText) progressText.textContent = '90%';
+        if (progressMessage) progressMessage.textContent = 'Saving file...';
+
+        const safeStudentName = (reportData.studentName || 'Student').replace(/[^a-z0-9]/gi, '_');
+        pdf.save(`${safeStudentName}_Report_${Date.now()}.pdf`);
 
         if (progressBar) progressBar.style.width = '100%';
         if (progressText) progressText.textContent = '100%';
@@ -10568,12 +10725,15 @@ window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
         const progressBar = document.getElementById('pdf-progress-bar');
         const progressText = document.getElementById('pdf-progress-text');
         const progressMessage = document.getElementById('pdf-progress-message');
-        
+
         progressModal.classList.remove('hidden');
         progressMessage.textContent = `Preparing ${reports.length} reports for ${tutorName}...`;
         progressBar.style.width = '0%';
         progressText.textContent = '0%';
-        
+
+        // Pre-fetch logo once for all reports
+        const logoBase64 = await fetchReportLogo();
+
         const zip = new JSZip();
         let processedCount = 0;
 
@@ -10585,17 +10745,18 @@ window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
                 progressMessage.textContent = `Processing report ${processedCount + 1} of ${reports.length}...`;
                 button.innerHTML = `📦 Processing ${processedCount + 1}/${reports.length}`;
 
-                const { html, reportData } = await generateReportHTML(report.id);
-                const container = await buildOffscreenContainer(html);
-                
+                const reportData = await getReportData(report.id);
+                const pdf = buildReportPDF(reportData, logoBase64);
+
                 const safeStudentName = (reportData.studentName || 'Unknown_Student').replace(/[^a-z0-9]/gi, '_');
-                const reportDate = reportData.submittedAt ? new Date(reportData.submittedAt.seconds * 1000).toISOString().split('T')[0] : 'unknown_date';
+                const reportDate = reportData.submittedAt
+                    ? new Date(reportData.submittedAt.seconds * 1000).toISOString().split('T')[0]
+                    : 'unknown_date';
                 const filename = `${safeStudentName}_${reportDate}.pdf`;
 
-                const pdfBlob = await html2pdf().set(getPdfOptions(filename)).from(container).output('blob');
-                document.body.removeChild(container);
-                
+                const pdfBlob = pdf.output('blob');
                 zip.file(filename, pdfBlob);
+
             } catch (error) {
                 console.error(`Error processing report ${report.id}:`, error);
             }
@@ -10606,19 +10767,19 @@ window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
         progressBar.style.width = '95%';
         progressText.textContent = '95%';
 
-        const zipBlob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
-        
+        const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+
         progressMessage.textContent = 'Download starting...';
         progressBar.style.width = '100%';
         progressText.textContent = '100%';
-        
+
         saveAs(zipBlob, `${tutorName}_Reports_${new Date().toISOString().split('T')[0]}.zip`);
         setTimeout(() => progressModal.classList.add('hidden'), 2000);
 
     } catch (error) {
         console.error("Error creating zip file:", error);
         alert("Failed to create zip file. Please try again.");
-        document.getElementById('pdf-progress-modal').classList.add('hidden');
+        document.getElementById('pdf-progress-modal')?.classList.add('hidden');
     } finally {
         button.innerHTML = originalButtonText;
         button.disabled = false;
