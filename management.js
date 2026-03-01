@@ -10442,80 +10442,149 @@ async function generateReportHTML(reportId) {
     const sectionsHTML = Object.entries(reportSections).map(([title, content]) => {
         const sanitizedContent = content ? String(content).replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
         const displayContent = (sanitizedContent && sanitizedContent.trim() !== '') ? sanitizedContent.replace(/\n/g, '<br>') : 'N/A';
-        return `
-            <div class="report-section">
-                <h2>${title}</h2>
-                <p>${displayContent}</p>
-            </div>
-        `;
+        return `<div class="report-section"><h2>${title}</h2><p>${displayContent}</p></div>`;
     }).join('');
 
+    // Pre-fetch logo as base64 to prevent blank image / delayed load that causes
+    // html2canvas to render a blank first page. Falls back to text-only header.
     const logoUrl = "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg";
-    const reportTemplate = `
-        <html>
-        <head>
-            <style>
-                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; }
-                .report-container { max-width: 800px; margin: auto; padding: 20px; }
-                .header { text-align: center; margin-bottom: 40px; }
-                .header img { height: 80px; }
-                .header h1 { color: #166534; margin: 0; font-size: 24px; }
-                .header h2 { color: #15803d; margin: 10px 0; font-size: 28px; }
-                .header p { margin: 5px 0; color: #555; }
-                .student-info { 
-                    display: grid; 
-                    grid-template-columns: 1fr 1fr; 
-                    gap: 10px 20px; 
-                    margin-bottom: 30px; 
-                    background-color: #f9f9f9;
-                    border: 1px solid #eee;
-                    padding: 15px;
-                    border-radius: 8px;
-                }
-                .student-info p { margin: 5px 0; }
-                .report-section {
-                    page-break-inside: avoid;
-                    margin-bottom: 20px;
-                    border: 1px solid #e5e7eb;
-                    padding: 15px;
-                    border-radius: 8px;
-                }
-                .report-section h2 { 
-                    font-size: 18px; 
-                    font-weight: bold; 
-                    color: #16a34a; 
-                    margin-top: 0; 
-                    padding-bottom: 8px;
-                    border-bottom: 2px solid #d1fae5;
-                }
-                .report-section p { line-height: 1.6; white-space: pre-wrap; margin-top: 0; }
-                .footer { text-align: right; margin-top: 40px; }
-            </style>
-        </head>
-        <body>
-            <div class="report-container">
-                <div class="header">
-                    <img src="${logoUrl}" alt="Company Logo">
-                    <h2>Blooming Kids House</h2>
-                    <h1>MONTHLY LEARNING REPORT</h1>
-                    <p>Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p>
-                </div>
-                <div class="student-info">
-                    <p><strong>Student's Name:</strong> ${reportData.studentName || 'N/A'}</p>
-                    <p><strong>Parent's Name:</strong> ${reportData.parentName || 'N/A'}</p>
-                    <p><strong>Parent's Phone:</strong> ${reportData.parentPhone || 'N/A'}</p>
-                    <p><strong>Grade:</strong> ${reportData.grade || 'N/A'}</p>
-                    <p><strong>Tutor's Name:</strong> ${reportData.tutorName || 'N/A'}</p>
-                </div>
-                ${sectionsHTML}
-                <div class="footer">
-                    <p>Best regards,</p>
-                    <p><strong>${reportData.tutorName || 'N/A'}</strong></p>
-                </div>
-            </div>
-        </body>
-        </html>
-    `;
+    let logoImgTag = '';
+    try {
+        const logoResponse = await fetch(logoUrl);
+        if (logoResponse.ok) {
+            const blob = await logoResponse.blob();
+            const base64 = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+            logoImgTag = `<img src="${base64}" alt="Blooming Kids House" style="height:60px;margin-bottom:6px;">`;
+        }
+    } catch (e) {
+        console.warn('Logo fetch failed, using text-only header:', e);
+    }
+
+    const reportDate = reportData.submittedAt
+        ? new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()
+        : 'N/A';
+
+    // Build compact, html2pdf-friendly template
+    // Key fixes vs original:
+    //  • Logo embedded as base64 data-URL (no cross-origin load delay)
+    //  • Zero default body margin/padding — let html2pdf margin handle spacing
+    //  • Student-info uses a simple table instead of CSS Grid (html2canvas compat)
+    //  • Minimal vertical margins to prevent page 1 being blank
+    //  • @media print rules for clean browser-print fallback
+    const reportTemplate = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+    *, *::before, *::after { box-sizing: border-box; }
+    @page { margin: 0; }
+    html, body {
+        margin: 0; padding: 0;
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-size: 13px; color: #333;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    .report-container {
+        width: 100%; max-width: 750px;
+        margin: 0 auto; padding: 10px 16px;
+    }
+    /* --- Header --- */
+    .header {
+        text-align: center;
+        padding: 8px 0 6px 0;
+        margin-bottom: 10px;
+        border-bottom: 3px solid #16a34a;
+    }
+    .header img { height: 60px; margin-bottom: 6px; }
+    .header .company-name { color: #15803d; font-size: 22px; font-weight: bold; margin: 4px 0 2px 0; }
+    .header .report-title { color: #166534; font-size: 18px; font-weight: bold; margin: 0 0 4px 0; }
+    .header .report-date { color: #555; font-size: 13px; margin: 2px 0 0 0; }
+    /* --- Student Info --- */
+    .student-info-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 14px;
+        background-color: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+    .student-info-table td {
+        padding: 7px 12px;
+        font-size: 13px;
+        border-bottom: 1px solid #f0f0f0;
+        vertical-align: top;
+    }
+    .student-info-table td strong { color: #374151; }
+    /* --- Report Sections --- */
+    .report-section {
+        page-break-inside: avoid;
+        margin-bottom: 12px;
+        border: 1px solid #e5e7eb;
+        border-left: 4px solid #16a34a;
+        padding: 10px 14px;
+        border-radius: 4px;
+    }
+    .report-section h2 {
+        font-size: 14px; font-weight: bold;
+        color: #16a34a; margin: 0 0 6px 0;
+        padding-bottom: 5px;
+        border-bottom: 2px solid #d1fae5;
+    }
+    .report-section p {
+        line-height: 1.55; white-space: pre-wrap;
+        margin: 0; font-size: 13px;
+    }
+    /* --- Footer --- */
+    .footer {
+        text-align: right;
+        margin-top: 20px;
+        padding-top: 10px;
+        border-top: 1px solid #e5e7eb;
+    }
+    .footer p { margin: 2px 0; font-size: 13px; }
+    /* --- Print fallback --- */
+    @media print {
+        body { margin: 0.5in; }
+        .report-container { padding: 0; }
+    }
+</style>
+</head>
+<body>
+<div class="report-container">
+    <div class="header">
+        ${logoImgTag}
+        <div class="company-name">Blooming Kids House</div>
+        <div class="report-title">MONTHLY LEARNING REPORT</div>
+        <div class="report-date">Date: ${reportDate}</div>
+    </div>
+    <table class="student-info-table">
+        <tr>
+            <td><strong>Student's Name:</strong> ${reportData.studentName || 'N/A'}</td>
+            <td><strong>Parent's Name:</strong> ${reportData.parentName || 'N/A'}</td>
+        </tr>
+        <tr>
+            <td><strong>Parent's Phone:</strong> ${reportData.parentPhone || 'N/A'}</td>
+            <td><strong>Grade:</strong> ${reportData.grade || 'N/A'}</td>
+        </tr>
+        <tr>
+            <td colspan="2"><strong>Tutor's Name:</strong> ${reportData.tutorName || 'N/A'}</td>
+        </tr>
+    </table>
+    ${sectionsHTML}
+    <div class="footer">
+        <p>Best regards,</p>
+        <p><strong>${reportData.tutorName || 'N/A'}</strong></p>
+    </div>
+</div>
+</body>
+</html>`;
     return { html: reportTemplate, reportData: reportData };
 }
 
@@ -10570,11 +10639,18 @@ window.downloadSingleReport = async function(reportId, event) {
         if (typeof html2pdf !== 'undefined') {
             if (progressMessage) progressMessage.textContent = 'Converting to PDF...';
             const options = {
-                margin: 0.5,
+                margin: [0.3, 0.4, 0.3, 0.4],
                 filename: `${safeStudentName}_Report_${reportDate}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#FFFFFF' },
-                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+                html2canvas: {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#FFFFFF',
+                    windowWidth: 794
+                },
+                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
+                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
             };
             await html2pdf().set(options).from(html).save();
         } else {
@@ -10664,10 +10740,17 @@ window.zipAndDownloadTutorReports = async function(reportsOrCacheKey, tutorName,
 
                 if (useHtml2Pdf) {
                     const options = {
-                        margin: 0.5,
+                        margin: [0.3, 0.4, 0.3, 0.4],
                         image: { type: 'jpeg', quality: 0.98 },
-                        html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#FFFFFF' },
-                        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+                        html2canvas: {
+                            scale: 2,
+                            useCORS: true,
+                            logging: false,
+                            backgroundColor: '#FFFFFF',
+                            windowWidth: 794
+                        },
+                        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
+                        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
                     };
                     const pdfBlob = await html2pdf().set(options).from(html).output('blob');
                     zip.file(`${safeStudentName}_${reportDate}.pdf`, pdfBlob);
