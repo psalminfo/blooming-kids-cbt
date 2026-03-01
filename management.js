@@ -4966,12 +4966,21 @@ async function exportPayAdviceAsXLS() {
 // Remove the old downloadMultipleXLSFiles and downloadAsXLS functions as they're no longer needed
 
 // ======================================================
-// SUBSECTION 4.1B: Tenure Bonus Panel
+// SUBSECTION 4.1B: Tenure Bonus Panel (FIXED)
 // ======================================================
 
 // Tenure Bonus constants
 const TENURE_BONUS_AMOUNT = 10000; // ₦10,000 per student
 const TENURE_BONUS_EFFECTIVE_DATE = new Date('2026-03-01'); // March 1, 2026
+
+// Compare two dates by year, month, day only (ignores time)
+function isSameOrAfterDate(date1, date2) {
+    const d1 = new Date(date1);
+    const d2 = new Date(date2);
+    d1.setHours(0, 0, 0, 0);
+    d2.setHours(0, 0, 0, 0);
+    return d1 >= d2;
+}
 
 let tenureBonusTutors = [];
 let tenureBonusLogs = [];
@@ -4995,7 +5004,7 @@ function calculateTenureDetails(employmentDate) {
         oneYearAnniversary.setFullYear(oneYearAnniversary.getFullYear() + 1);
 
         // Tutor qualifies for bonus ONLY if their 1-year anniversary is ON or AFTER March 1, 2026
-        const qualifiesForBonus = oneYearAnniversary >= TENURE_BONUS_EFFECTIVE_DATE;
+        const qualifiesForBonus = isSameOrAfterDate(oneYearAnniversary, TENURE_BONUS_EFFECTIVE_DATE);
 
         let label = '';
         if (years > 0) label += `${years} year${years > 1 ? 's' : ''}`;
@@ -5051,6 +5060,19 @@ async function renderTenureBonusPanel(container) {
                     <p class="text-xs font-bold text-purple-700 uppercase">Already Upgraded</p>
                     <p id="tb-upgraded-count" class="text-2xl font-extrabold text-purple-800">0</p>
                 </div>
+            </div>
+
+            <!-- Date info line (added) -->
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-sm flex flex-wrap items-center justify-between">
+                <div>
+                    <span class="font-medium text-gray-700">📅 Current date/time:</span> 
+                    <span class="text-gray-900">${new Date().toLocaleString('en-GB', { timeZoneName: 'short' })}</span>
+                </div>
+                <div>
+                    <span class="font-medium text-gray-700">🎯 Effective date:</span> 
+                    <span class="text-gray-900">${TENURE_BONUS_EFFECTIVE_DATE.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                </div>
+                <div class="text-xs text-gray-500">(Bonus applies if 1‑year anniversary is on/after effective date)</div>
             </div>
 
             <!-- Search -->
@@ -5238,17 +5260,30 @@ async function silentAutoApplyTenureBonus() {
     _silentAutoRunning = true;
 
     try {
+        // Use date-only comparison
         const now = new Date();
-        if (now < TENURE_BONUS_EFFECTIVE_DATE) { _silentAutoRunning = false; return; }
+        if (!isSameOrAfterDate(now, TENURE_BONUS_EFFECTIVE_DATE)) {
+            console.log('Silent auto‑apply: not yet effective date');
+            _silentAutoRunning = false;
+            return;
+        }
 
         // Only auto-apply if the current user has the canApplyTenureBonus permission
         const canApply = window.userData?.permissions?.actions?.canApplyTenureBonus === true;
-        if (!canApply) { _silentAutoRunning = false; return; }
+        if (!canApply) {
+            console.log('Silent auto‑apply: user lacks permission');
+            _silentAutoRunning = false;
+            return;
+        }
 
         // Find tutors who are over 1 year, qualify for bonus (anniversary on/after March 1, 2026), NOT already upgraded, and have regular students
         const toUpgrade = tenureBonusTutors.filter(t => t.tenure.isOverOneYear && t.tenure.qualifiesForBonus && !t.bonusApplied && t.studentCount > 0);
 
-        if (toUpgrade.length === 0) { _silentAutoRunning = false; return; }
+        if (toUpgrade.length === 0) {
+            console.log('Silent auto‑apply: no eligible tutors');
+            _silentAutoRunning = false;
+            return;
+        }
 
         let successCount = 0;
         let totalBonusApplied = 0;
@@ -5379,12 +5414,6 @@ function renderTenureBonusTable() {
         const anniversaryStr = t.tenure.oneYearAnniversary ? t.tenure.oneYearAnniversary.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
         // Determine status
-        // bonusApplied = already upgraded
-        // isOverOneYear + qualifiesForBonus + !bonusApplied = pending upgrade (show buttons)
-        // isOverOneYear + !qualifiesForBonus = pre-policy tutor (anniversary before March 2026, no buttons)
-        // !isOverOneYear + qualifiesForBonus = upcoming (hasn't clocked 1 year yet, but will qualify when they do)
-        // !isOverOneYear + !qualifiesForBonus = not eligible
-
         let statusBadge = '';
         let rowClass = '';
         let showApplyBtn = false;
@@ -5453,6 +5482,7 @@ function renderTenureBonusTable() {
     // Wire apply bonus buttons
     document.querySelectorAll('.tb-apply-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
+            console.log('Apply Bonus clicked for', e.currentTarget.dataset.email);
             const email = e.currentTarget.dataset.email;
             await applyTenureBonus(email);
         });
@@ -5482,8 +5512,8 @@ async function applyTenureBonus(tutorEmail) {
     if (tutor.bonusApplied) return alert('Bonus already applied for this tutor.');
 
     const now = new Date();
-    if (now < TENURE_BONUS_EFFECTIVE_DATE) {
-        return alert(`Tenure bonus is only effective from March 1, 2026. Current date is before the effective date.`);
+    if (!isSameOrAfterDate(now, TENURE_BONUS_EFFECTIVE_DATE)) {
+        return alert(`Tenure bonus is only effective from March 1, 2026. Today is ${now.toLocaleDateString()}.`);
     }
 
     if (!tutor.tenure.isOverOneYear) {
@@ -5577,8 +5607,8 @@ async function applyTenureBonus(tutorEmail) {
 
 async function runTenureAutoUpgrade() {
     const now = new Date();
-    if (now < TENURE_BONUS_EFFECTIVE_DATE) {
-        return alert(`Auto-upgrade is only available from March 1, 2026 onwards.`);
+    if (!isSameOrAfterDate(now, TENURE_BONUS_EFFECTIVE_DATE)) {
+        return alert(`Auto‑upgrade is only available from March 1, 2026 onwards. Today is ${now.toLocaleDateString()}.`);
     }
 
     const eligibleNotUpgraded = tenureBonusTutors.filter(t => t.tenure.isOverOneYear && t.tenure.qualifiesForBonus && !t.bonusApplied && t.studentCount > 0);
@@ -13625,3 +13655,4 @@ onAuthStateChanged(auth, async (user) => {
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("✅ Mobile Patches Active: Tables are scrollable, Modals are responsive.");
 })();
+
