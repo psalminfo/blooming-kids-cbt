@@ -4801,17 +4801,13 @@ window.handleSignUpFull = async function(countryCode, localPhone, email, passwor
         if (signUpSpinner) signUpSpinner.classList.add('hidden');
         if (authLoader) authLoader.classList.add('hidden');
         
-        // Step 6: Force auth state refresh
-        console.log("🔄 Refreshing auth state...");
-        
-        // Method 1: Reload page (most reliable)
-        setTimeout(() => {
-            window.location.reload();
-        }, 2000);
-        
-        // Method 2: Alternative - trigger auth refresh without reload
-        // await auth.currentUser.reload();
-        // console.log("🔄 Auth state refreshed");
+        // Step 6: Let onAuthStateChanged handle the transition — NO reload (prevents double signup)
+        console.log("✅ Signup complete — auth state change will load dashboard automatically");
+        // Reset debounce so auth state change is processed immediately
+        if (window.authManager) {
+            window.authManager.isProcessing = false;
+            window.authManager.lastProcessTime = 0;
+        }
         
     } catch (error) {
         if (!pendingRequests.has(requestId)) return;
@@ -4886,43 +4882,82 @@ UnifiedAuthManager.prototype.loadUserDashboard = async function(user) {
         }
         
         if (!userDoc || !userDoc.exists) {
-            console.log("🆕 Creating missing user profile...");
-            
-            // Create a basic profile
-            const minimalProfile = {
-                email: user.email || '',
-                phone: user.phoneNumber || '',
-                normalizedPhone: user.phoneNumber || '',
-                parentName: 'Parent',
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                uid: user.uid,
-                // Try to get from recent signup
-                ...window.tempSignupData
-            };
-            
-            await db.collection('parent_users').doc(user.uid).set(minimalProfile);
-            
-            console.log("✅ Created missing profile");
-            
-            // Show user-friendly message
-            showMessage('Welcome! Finishing your account setup...', 'success');
-            
-            // Short delay then reload
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
-            
+            // No profile found — this email is not registered in our system.
+            // Sign them out to prevent unauthorized access.
+            console.warn("🚫 No parent profile found for this user — signing out");
+            showMessage('Access denied. Please register first or contact support.', 'error');
+            setTimeout(async () => {
+                await auth.signOut();
+                this.showAuthScreen();
+            }, 2000);
             return;
         }
         
         // Continue with original logic if profile exists
         const userData = userDoc.data();
+        const userPhone = userData.normalizedPhone || userData.phone || '';
+
+        // Look up parentName from students collection by phone matching
+        let resolvedParentName = userData.parentName || '';
+        if (!resolvedParentName || resolvedParentName === 'Parent') {
+            try {
+                const phoneSuffix = extractPhoneSuffix(userPhone);
+                if (phoneSuffix) {
+                    const studentsSnap = await db.collection('students').get();
+                    studentsSnap.forEach(doc => {
+                        if (resolvedParentName && resolvedParentName !== 'Parent') return;
+                        const d = doc.data();
+                        const phoneFields = [d.normalizedPhone, d.normalizedParentPhone, d.parentPhone];
+                        for (const fp of phoneFields) {
+                            if (fp && extractPhoneSuffix(fp) === phoneSuffix) {
+                                if (d.parentName && d.parentName.trim() && d.parentName !== 'Parent') {
+                                    resolvedParentName = d.parentName.trim();
+                                }
+                                break;
+                            }
+                        }
+                    });
+                }
+            } catch (e) {
+                console.warn('Could not look up parentName from students:', e.message);
+            }
+        }
+        if (!resolvedParentName || resolvedParentName === 'Parent') {
+            // Also try enrollments collection
+            try {
+                const phoneSuffix = extractPhoneSuffix(userPhone);
+                if (phoneSuffix) {
+                    const enrollSnap = await db.collection('enrollments').limit(50).get();
+                    enrollSnap.forEach(doc => {
+                        if (resolvedParentName && resolvedParentName !== 'Parent') return;
+                        const d = doc.data();
+                        const parentPhoneFields = [
+                            d.parent?.phone, d.parentPhone,
+                            d.normalizedPhone, d.normalizedParentPhone
+                        ];
+                        for (const fp of parentPhoneFields) {
+                            if (fp && extractPhoneSuffix(fp) === phoneSuffix) {
+                                const nameCandidate = d.parent?.name || d.parentName;
+                                if (nameCandidate && nameCandidate.trim() && nameCandidate !== 'Parent') {
+                                    resolvedParentName = nameCandidate.trim();
+                                }
+                                break;
+                            }
+                        }
+                    });
+                }
+            } catch (e) {
+                console.warn('Could not look up parentName from enrollments:', e.message);
+            }
+        }
+        if (!resolvedParentName) resolvedParentName = 'Parent';
+
         this.currentUser = {
             uid: user.uid,
             email: userData.email,
             phone: userData.phone,
-            normalizedPhone: userData.normalizedPhone || userData.phone,
-            parentName: userData.parentName || 'Parent',
+            normalizedPhone: userPhone,
+            parentName: resolvedParentName,
             referralCode: userData.referralCode
         };
 
@@ -6250,621 +6285,983 @@ if (typeof window.sharedAccessInstalled === 'undefined') {
 // ============================================================================
 
 // ============================================================================
-// ██████████████████████████████████████████████████████████████████████████
-// NEW FEATURES — ADDED BY PARENT PORTAL REDESIGN
-// ██████████████████████████████████████████████████████████████████████████
+// ADD STUDENT MODAL — Full 3-category enrolment (Academic / Extracurricular / Test Prep)
+// Mirrors enrollment portal exactly for subjects, fees, proration, and email.
 // ============================================================================
 
-// ============================================================================
-// ADD STUDENT MODAL — Step-based enrolment using enrollment portal logic
-// ============================================================================
+// ── Configuration (MUST match enrollment-portal.js CONFIG exactly) ──────────
+const _PORTAL_CONFIG = {
+    ACADEMIC_SUBJECTS: [
+        "Math", "Language Arts", "Geography", "Science",
+        "Biology", "Physics", "Chemistry", "Microbiology"
+    ],
+    EXTRACURRICULAR_FEES: [
+        { id: 'comic',           name: 'COMIC BOOK DESIGN',        fee: 35000 },
+        { id: 'graphics',        name: 'GRAPHICS DESIGNING',        fee: 35000 },
+        { id: 'ai',              name: 'GENERATIVE AI',             fee: 40000 },
+        { id: 'youtube',         name: 'YOUTUBE FOR KIDS',          fee: 40000 },
+        { id: 'animation',       name: 'STOP MOTION ANIMATION',     fee: 35000 },
+        { id: 'videography',     name: 'VIDEOGRAPHY',               fee: 40000 },
+        { id: 'music',           name: 'KIDS MUSIC LESSON',         fee: 45000 },
+        { id: 'coding',          name: 'CODING CLASSES FOR KIDS',   fee: 45000 },
+        { id: 'sketch',          name: 'SMART SKETCH',              fee: 45000 },
+        { id: 'foreign',         name: 'FOREIGN LANGUAGE',          fee: 55000 },
+        { id: 'global_discovery',name: 'GLOBAL DISCOVERY CLUB',     fee: 50000 },
+        { id: 'native',          name: 'NATIVE LANGUAGE',           fee: 30000 },
+        { id: 'speaking',        name: 'PUBLIC SPEAKING',           fee: 35000 },
+        { id: 'bible',           name: 'BIBLE STUDY',               fee: 35000 },
+        { id: 'chess',           name: 'CHESS CLASS',               fee: 40000 }
+    ],
+    TEST_PREP_FEES: [
+        { id: 'sat',    name: 'SAT',          rate: 20000 },
+        { id: 'igcse',  name: 'IGCSE & GCSE', rate: 20000 },
+        { id: '11plus', name: '11+ Exam Prep', rate: 15000 }
+    ],
+    ACADEMIC_FEES: {
+        'preschool': { twice: 80000,  three: 95000,  five: 150000 },
+        'grade2-4':  { twice: 95000,  three: 110000, five: 170000 },
+        'grade5-8':  { twice: 105000, three: 120000, five: 180000 },
+        'grade9-12': { twice: 110000, three: 135000, five: 200000 }
+    },
+    ADDITIONAL_SUBJECT_FEE: 40000,
+    BASE_SUBJECTS_INCLUDED: 2,
+    WEEKS_PER_MONTH: 4,
+    PRORATION_START_DAY: 7, // days 1-6 = full fee; day 7+ = prorated
+    DAYS: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],
+    HOURS: Array.from({length: 24}, (_, i) => i)
+};
 
-let _addStudentStep = 1;
+// ── Inject the Add Student Modal HTML into the page ──────────────────────────
+(function _injectAddStudentModal() {
+    // Remove any previous version
+    const old = document.getElementById('addStudentModal');
+    if (old) old.remove();
 
-/**
- * showAddStudentModal()
- * Opens the "Add Another Student" multi-step modal.
- */
-function showAddStudentModal() {
-    const modal = document.getElementById('addStudentModal');
-    if (!modal) return;
-
-    // Reset to step 1
-    _addStudentStep = 1;
-    _updateAddStudentStepUI();
-
-    // Set default start date to 1st of next month
+    const today = new Date().toISOString().split('T')[0];
     const nextMonth = new Date();
     nextMonth.setMonth(nextMonth.getMonth() + 1);
     nextMonth.setDate(1);
-    const el = document.getElementById('newStudentStartDate');
-    if (el) el.value = nextMonth.toISOString().split('T')[0];
+    const defaultStart = nextMonth.toISOString().split('T')[0];
 
-    // Reset all picker chips
-    document.querySelectorAll('#newStudentSubjects .picker-chip,#newStudentDays .picker-chip')
-        .forEach(c => c.classList.remove('selected'));
+    // Hour options helper
+    const hourOpts = _PORTAL_CONFIG.HOURS.map(h => {
+        const h12 = h % 12 || 12;
+        const ampm = h < 12 ? 'AM' : 'PM';
+        return `<option value="${String(h).padStart(2,'0')}">${h12} ${ampm}</option>`;
+    }).join('');
 
-    // Clear text fields
-    ['newStudentName','newStudentDob','newStudentGender','newStudentActualGrade',
-     'newStudentFeeGroup','newStudentStartHour','newStudentEndHour',
-     'newStudentSessions','newStudentTutor'].forEach(id => {
+    // Academic subjects grid
+    const subjectChips = _PORTAL_CONFIG.ACADEMIC_SUBJECTS.map(s =>
+        `<div class="pp-chip" data-subject="${s}" onclick="ppToggleSubjectChip(this)">${s}</div>`
+    ).join('');
+
+    // Extracurricular cards
+    const extracurricularsHTML = _PORTAL_CONFIG.EXTRACURRICULAR_FEES.map(act => {
+        const isGlobal = act.id === 'global_discovery';
+        const freqBtns = isGlobal
+            ? `<button type="button" class="pp-freq-btn" data-frequency="once" onclick="ppSelectFreq(this,'${act.id}')">Every Saturday (Monthly)</button>`
+            : `<button type="button" class="pp-freq-btn" data-frequency="once" onclick="ppSelectFreq(this,'${act.id}')">Once Weekly</button>
+               <button type="button" class="pp-freq-btn" data-frequency="twice" onclick="ppSelectFreq(this,'${act.id}')">Twice Weekly</button>`;
+        const dayBtns = _PORTAL_CONFIG.DAYS.map(d =>
+            `<button type="button" class="pp-day-btn" data-day="${d}" onclick="ppToggleDayBtn(this)" title="${d}">${d.slice(0,3)}</button>`
+        ).join('');
+        return `
+        <div class="pp-extra-card" data-activity-id="${act.id}" id="ppExtra_${act.id}" onclick="ppToggleExtraCard(event,this)">
+            <div class="pp-extra-header">
+                <span class="pp-extra-name">${act.name}</span>
+                <span class="pp-extra-price">₦${act.fee.toLocaleString()}/mo</span>
+            </div>
+            <div class="pp-extra-body" onclick="event.stopPropagation()">
+                <div class="pp-freq-row" id="ppFreq_${act.id}">${freqBtns}</div>
+                <div class="pp-label" style="margin-top:8px;font-size:12px;color:#555;">Select Day(s):</div>
+                <div class="pp-days-row" id="ppExtraDays_${act.id}">${dayBtns}</div>
+                <div class="pp-label" style="margin-top:8px;font-size:12px;color:#555;">Preferred Time:</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    <label style="font-size:12px;">From:</label>
+                    <select class="pp-time-sel" id="ppExtraStart_${act.id}"><option value="">Hour</option>${hourOpts}</select>
+                    <label style="font-size:12px;">To:</label>
+                    <select class="pp-time-sel" id="ppExtraEnd_${act.id}"><option value="">Hour</option>${hourOpts}</select>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+
+    // Test prep cards
+    const testPrepHTML = _PORTAL_CONFIG.TEST_PREP_FEES.map(t => {
+        const dayBtns = _PORTAL_CONFIG.DAYS.map(d =>
+            `<button type="button" class="pp-day-btn" data-day="${d}" onclick="ppToggleDayBtn(this)" title="${d}">${d.slice(0,3)}</button>`
+        ).join('');
+        return `
+        <div class="pp-testprep-card" data-test-id="${t.id}" id="ppTest_${t.id}">
+            <div class="pp-tp-header">
+                <span class="pp-tp-name">${t.name}</span>
+                <span class="pp-tp-rate">₦${t.rate.toLocaleString()}/hr</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;margin:8px 0;">
+                <label style="font-size:13px;">Hours per session:</label>
+                <input type="number" class="pp-tp-hours" id="ppTpHours_${t.id}" 
+                       min="0" max="8" step="0.5" value="0" placeholder="0"
+                       style="width:60px;padding:4px 8px;border:1.5px solid #ccc;border-radius:6px;"
+                       oninput="ppCalcFees()">
+            </div>
+            <div class="pp-label" style="font-size:12px;color:#555;">Select Day(s):</div>
+            <div class="pp-days-row" id="ppTpDays_${t.id}">${dayBtns}</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;">
+                <label style="font-size:12px;">From:</label>
+                <select class="pp-time-sel" id="ppTpStart_${t.id}"><option value="">Hour</option>${hourOpts}</select>
+                <label style="font-size:12px;">To:</label>
+                <select class="pp-time-sel" id="ppTpEnd_${t.id}"><option value="">Hour</option>${hourOpts}</select>
+            </div>
+        </div>`;
+    }).join('');
+
+    const modalHTML = `
+    <div id="addStudentModal" class="hidden" style="
+        position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;
+        justify-content:center;z-index:9999;padding:12px;overflow-y:auto;">
+      <div style="background:#fff;border-radius:16px;width:100%;max-width:680px;max-height:92vh;
+                  overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,0.25);display:flex;flex-direction:column;">
+
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg,#2E8B57,#1E6B47);color:#fff;padding:20px 24px;
+                    border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+            <div>
+                <h2 style="margin:0;font-size:1.2rem;">➕ Add Another Student</h2>
+                <p style="margin:4px 0 0;font-size:0.8rem;opacity:0.85;" id="ppStepLabel">Step 1 of 3 — Student Details</p>
+            </div>
+            <button onclick="hideAddStudentModal()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;
+                    width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:18px;line-height:1;">×</button>
+        </div>
+
+        <!-- Step Bar -->
+        <div style="display:flex;gap:0;flex-shrink:0;">
+            <div id="ppStepBar1" style="flex:1;height:4px;background:#2E8B57;transition:background 0.3s;"></div>
+            <div id="ppStepBar2" style="flex:1;height:4px;background:#e2e8f0;transition:background 0.3s;"></div>
+            <div id="ppStepBar3" style="flex:1;height:4px;background:#e2e8f0;transition:background 0.3s;"></div>
+        </div>
+
+        <!-- Body -->
+        <div style="padding:20px 24px;overflow-y:auto;flex:1;">
+
+            <!-- ═══════════════ STEP 1: STUDENT INFO ═══════════════ -->
+            <div id="ppStep1" class="pp-step-panel">
+                <h3 style="color:#1E6B47;margin:0 0 16px;font-size:1rem;">👤 Student Details</h3>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div>
+                        <label class="pp-lbl">First Name <span style="color:red;">*</span></label>
+                        <input id="newStudentFirstName" class="pp-inp" type="text" placeholder="First name">
+                    </div>
+                    <div>
+                        <label class="pp-lbl">Last Name <span style="color:red;">*</span></label>
+                        <input id="newStudentLastName" class="pp-inp" type="text" placeholder="Last name">
+                    </div>
+                    <div>
+                        <label class="pp-lbl">Gender <span style="color:red;">*</span></label>
+                        <select id="newStudentGender" class="pp-sel">
+                            <option value="">Select</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="other">Other</option>
+                            <option value="prefer-not-to-say">Prefer not to say</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="pp-lbl">Date of Birth <span style="color:red;">*</span></label>
+                        <input id="newStudentDob" class="pp-inp" type="date">
+                    </div>
+                    <div>
+                        <label class="pp-lbl">Grade Tier (Fee Group) <span style="color:red;">*</span></label>
+                        <select id="newStudentGradeLevel" class="pp-sel" onchange="ppCalcFees()">
+                            <option value="">Select tier</option>
+                            <option value="preschool">Preschool – Grade 1</option>
+                            <option value="grade2-4">Grade 2 – 4</option>
+                            <option value="grade5-8">Grade 5 – 8</option>
+                            <option value="grade9-12">Grade 9 – 12</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="pp-lbl">Actual Grade <span style="color:red;">*</span></label>
+                        <select id="newStudentActualGrade" class="pp-sel">
+                            <option value="">Select</option>
+                            <option value="preschool">Preschool</option>
+                            <option value="kindergarten">Kindergarten</option>
+                            <option value="grade1">Grade 1</option><option value="grade2">Grade 2</option>
+                            <option value="grade3">Grade 3</option><option value="grade4">Grade 4</option>
+                            <option value="grade5">Grade 5</option><option value="grade6">Grade 6</option>
+                            <option value="grade7">Grade 7</option><option value="grade8">Grade 8</option>
+                            <option value="grade9">Grade 9</option><option value="grade10">Grade 10</option>
+                            <option value="grade11">Grade 11</option><option value="grade12">Grade 12</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="pp-lbl">Preferred Start Date <span style="color:red;">*</span></label>
+                        <input id="newStudentStartDate" class="pp-inp" type="date"
+                               min="${today}" value="${defaultStart}"
+                               onkeydown="return false;" onpaste="return false;"
+                               style="cursor:pointer;" onchange="ppCalcFees()">
+                    </div>
+                    <div>
+                        <label class="pp-lbl">Preferred Tutor</label>
+                        <select id="newStudentTutor" class="pp-sel">
+                            <option value="no-preference">No preference</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                        </select>
+                    </div>
+                </div>
+                <!-- Preferred Days & Time -->
+                <div style="margin-top:16px;">
+                    <label class="pp-lbl">Preferred Days <span style="color:red;">*</span></label>
+                    <div id="newStudentDays" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+                        ${_PORTAL_CONFIG.DAYS.map(d=>`<div class="pp-chip" data-day="${d}" onclick="ppToggleDayChip(this)">${d.slice(0,3)}</div>`).join('')}
+                    </div>
+                </div>
+                <div style="margin-top:12px;display:flex;gap:12px;flex-wrap:wrap;">
+                    <div>
+                        <label class="pp-lbl">Class Start Time</label>
+                        <select id="newStudentStartHour" class="pp-sel" style="width:130px;">
+                            <option value="">Hour</option>${hourOpts}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="pp-lbl">Class End Time</label>
+                        <select id="newStudentEndHour" class="pp-sel" style="width:130px;">
+                            <option value="">Hour</option>${hourOpts}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══════════════ STEP 2: COURSES ═══════════════ -->
+            <div id="ppStep2" class="pp-step-panel" style="display:none;">
+                <h3 style="color:#1E6B47;margin:0 0 12px;font-size:1rem;">📚 Select Courses</h3>
+
+                <!-- Course Tabs -->
+                <div style="display:flex;border-bottom:2px solid #e2e8f0;margin-bottom:16px;">
+                    <button type="button" class="pp-course-tab active" id="ppTab_academic"
+                            onclick="ppSwitchCourseTab('academic')">
+                        🎓 Academic
+                    </button>
+                    <button type="button" class="pp-course-tab" id="ppTab_extracurricular"
+                            onclick="ppSwitchCourseTab('extracurricular')">
+                        🎨 Extracurricular
+                    </button>
+                    <button type="button" class="pp-course-tab" id="ppTab_testprep"
+                            onclick="ppSwitchCourseTab('testprep')">
+                        📊 Test Prep
+                    </button>
+                </div>
+
+                <!-- Academic Tab Content -->
+                <div id="ppTabContent_academic" class="pp-tab-content">
+                    <p style="font-size:13px;color:#555;margin-bottom:10px;padding:8px;background:#f0fdf4;border-radius:6px;border-left:3px solid #2E8B57;">
+                        First 2 subjects included. Each additional subject: <strong>+₦40,000/month</strong>
+                    </p>
+                    <div style="margin-bottom:12px;">
+                        <label class="pp-lbl">Session Frequency <span style="color:red;">*</span></label>
+                        <div id="newStudentSessions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
+                            <div class="pp-session-chip" data-sessions="twice" onclick="ppToggleSessionChip(this)">
+                                Twice Weekly<br><small id="ppPrice_twice" style="color:#2E8B57;">₦0</small>
+                            </div>
+                            <div class="pp-session-chip" data-sessions="three" onclick="ppToggleSessionChip(this)">
+                                3× Weekly<br><small id="ppPrice_three" style="color:#2E8B57;">₦0</small>
+                            </div>
+                            <div class="pp-session-chip" data-sessions="five" onclick="ppToggleSessionChip(this)">
+                                5× Weekly (Daily)<br><small id="ppPrice_five" style="color:#2E8B57;">₦0</small>
+                            </div>
+                        </div>
+                    </div>
+                    <label class="pp-lbl">Subjects</label>
+                    <div id="newStudentSubjects" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
+                        ${subjectChips}
+                    </div>
+                </div>
+
+                <!-- Extracurricular Tab Content -->
+                <div id="ppTabContent_extracurricular" class="pp-tab-content" style="display:none;">
+                    <p style="font-size:13px;color:#555;margin-bottom:10px;padding:8px;background:#f0fdf4;border-radius:6px;border-left:3px solid #2E8B57;">
+                        Click an activity to select it. Choose frequency and days. Global Discovery is Saturdays only.
+                    </p>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">
+                        ${extracurricularsHTML}
+                    </div>
+                </div>
+
+                <!-- Test Prep Tab Content -->
+                <div id="ppTabContent_testprep" class="pp-tab-content" style="display:none;">
+                    <p style="font-size:13px;color:#555;margin-bottom:10px;padding:8px;background:#f0fdf4;border-radius:6px;border-left:3px solid #2E8B57;">
+                        Fee = Hours/session × Rate × Days/week × 4 weeks. Proration applies for mid-month starts.
+                    </p>
+                    <div style="display:flex;flex-direction:column;gap:12px;">
+                        ${testPrepHTML}
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══════════════ STEP 3: REVIEW & FEE ═══════════════ -->
+            <div id="ppStep3" class="pp-step-panel" style="display:none;">
+                <h3 style="color:#1E6B47;margin:0 0 12px;font-size:1rem;">✅ Review & Fee Summary</h3>
+                <div id="ppReviewContent" style="background:#f8fafc;border-radius:10px;padding:16px;margin-bottom:16px;font-size:0.9rem;"></div>
+                <div id="ppFeeSummary" style="background:#f0fdf4;border:1.5px solid #a7f3d0;border-radius:10px;padding:16px;font-size:0.9rem;"></div>
+            </div>
+
+        </div><!-- /body -->
+
+        <!-- Footer buttons -->
+        <div style="padding:16px 24px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;flex-shrink:0;">
+            <button id="ppPrevBtn" type="button" onclick="ppStepPrev()"
+                    style="display:none;padding:10px 20px;border:2px solid #2E8B57;background:#fff;
+                           color:#2E8B57;border-radius:8px;cursor:pointer;font-weight:600;">
+                ← Back
+            </button>
+            <div style="flex:1;"></div>
+            <button id="ppNextBtn" type="button" onclick="ppStepNext()"
+                    style="padding:10px 24px;background:#2E8B57;color:#fff;border:none;
+                           border-radius:8px;cursor:pointer;font-weight:600;">
+                Next →
+            </button>
+            <button id="ppSubmitBtn" type="button" onclick="ppSubmitNewStudent()"
+                    style="display:none;padding:10px 24px;background:#2E8B57;color:#fff;border:none;
+                           border-radius:8px;cursor:pointer;font-weight:600;">
+                <span id="ppSubmitText">✅ Submit Enrolment</span>
+                <span id="ppSubmitSpinner" class="hidden" style="display:none;">⏳</span>
+            </button>
+        </div>
+      </div>
+    </div>
+
+    <style>
+    .pp-step-panel { animation: ppFadeIn 0.3s ease; }
+    @keyframes ppFadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    .pp-lbl { display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:4px; }
+    .pp-inp { width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;background:#fff; }
+    .pp-inp:focus { outline:none;border-color:#2E8B57;box-shadow:0 0 0 3px rgba(46,139,87,0.1); }
+    .pp-sel { width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;background:#fff;box-sizing:border-box; }
+    .pp-chip { padding:8px 14px;border:2px solid #e2e8f0;border-radius:20px;cursor:pointer;font-size:13px;user-select:none;transition:all 0.2s; }
+    .pp-chip:hover { border-color:#2E8B57; }
+    .pp-chip.selected { background:#2E8B57;color:#fff;border-color:#2E8B57; }
+    .pp-session-chip { padding:10px 14px;border:2px solid #e2e8f0;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;user-select:none;transition:all 0.2s;text-align:center;min-width:100px; }
+    .pp-session-chip:hover { border-color:#2E8B57;background:#f0fdf4; }
+    .pp-session-chip.selected { background:#2E8B57;color:#fff;border-color:#2E8B57; }
+    .pp-session-chip.selected small { color:#d1fae5 !important; }
+    .pp-course-tab { padding:10px 16px;background:none;border:none;border-bottom:3px solid transparent;font-size:14px;font-weight:600;color:#666;cursor:pointer;transition:all 0.2s;white-space:nowrap; }
+    .pp-course-tab:hover { color:#2E8B57;background:rgba(46,139,87,0.04); }
+    .pp-course-tab.active { color:#1E6B47;border-bottom-color:#2E8B57;background:rgba(46,139,87,0.07); }
+    .pp-extra-card { border:2px solid #e2e8f0;border-radius:10px;padding:12px;cursor:pointer;transition:all 0.2s;background:#fff; }
+    .pp-extra-card:hover { border-color:#2E8B57;box-shadow:0 4px 12px rgba(46,139,87,0.1); }
+    .pp-extra-card.selected { border-color:#2E8B57;background:#f0fdf4; }
+    .pp-extra-header { display:flex;justify-content:space-between;align-items:center;margin-bottom:8px; }
+    .pp-extra-name { font-weight:600;font-size:13px;color:#1a1a1a; }
+    .pp-extra-price { font-weight:700;font-size:13px;color:#2E8B57; }
+    .pp-extra-body { margin-top:8px;padding-top:8px;border-top:1px solid #e2e8f0; }
+    .pp-extra-body select, .pp-time-sel { padding:6px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px;background:#fff; }
+    .pp-freq-row { display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px; }
+    .pp-freq-btn { padding:4px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:12px;background:#fff;cursor:pointer;transition:all 0.2s; }
+    .pp-freq-btn.selected { background:#2E8B57;color:#fff;border-color:#2E8B57; }
+    .pp-days-row { display:flex;flex-wrap:wrap;gap:4px;margin:4px 0; }
+    .pp-day-btn { padding:4px 8px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:12px;background:#fff;cursor:pointer;transition:all 0.2s; }
+    .pp-day-btn.selected { background:#2E8B57;color:#fff;border-color:#2E8B57; }
+    .pp-testprep-card { border:1.5px solid #e2e8f0;border-radius:10px;padding:14px;background:#fff; }
+    </style>`;
+
+    const container = document.createElement('div');
+    container.innerHTML = modalHTML;
+    document.body.appendChild(container.firstElementChild);
+    document.body.appendChild(container.lastElementChild); // style tag
+})();
+
+// ── Internal step state ──────────────────────────────────────────────────────
+let _ppStep = 1;
+
+function showAddStudentModal() {
+    const modal = document.getElementById('addStudentModal');
+    if (!modal) return;
+    _ppStep = 1;
+    _ppUpdateStepUI();
+    _ppResetForm();
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+}
+
+function hideAddStudentModal() {
+    const modal = document.getElementById('addStudentModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+}
+
+function _ppResetForm() {
+    // Clear all text inputs & selects
+    ['newStudentFirstName','newStudentLastName','newStudentGender','newStudentDob',
+     'newStudentGradeLevel','newStudentActualGrade','newStudentTutor',
+     'newStudentStartHour','newStudentEndHour'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
-
-    modal.classList.remove('hidden');
-}
-
-/**
- * hideAddStudentModal()
- */
-function hideAddStudentModal() {
-    const modal = document.getElementById('addStudentModal');
-    if (modal) modal.classList.add('hidden');
-}
-
-/**
- * togglePickerChip(el)
- * Toggles the "selected" class on subject/day picker chips.
- */
-function togglePickerChip(el) {
-    el.classList.toggle('selected');
-    // Recalculate fees when subjects change (additional subject fee)
-    updateAddStudentFees();
-}
-
-/**
- * _getOrdinalSuffix(n) — e.g. 1→"st", 2→"nd", 11→"th"
- */
-function _getOrdinalSuffix(n) {
-    if (n > 3 && n < 21) return 'th';
-    switch (n % 10) {
-        case 1: return 'st';
-        case 2: return 'nd';
-        case 3: return 'rd';
-        default: return 'th';
+    // Reset start date to 1st of next month
+    const sd = document.getElementById('newStudentStartDate');
+    if (sd) {
+        const nm = new Date();
+        nm.setMonth(nm.getMonth() + 1);
+        nm.setDate(1);
+        sd.value = nm.toISOString().split('T')[0];
     }
-}
-
-/**
- * _calculateAddStudentFees()
- * Computes the full fee breakdown for the Add Student form.
- * Uses the SAME logic as enrollment portal CONFIG.
- * Returns an object with all fee components.
- */
-function _calculateAddStudentFees() {
-    const ACADEMIC_FEES = {
-        'preschool':  { twice: 80000,  three: 95000,  five: 150000 },
-        'grade2-4':   { twice: 95000,  three: 110000, five: 170000 },
-        'grade5-8':   { twice: 105000, three: 120000, five: 180000 },
-        'grade9-12':  { twice: 110000, three: 135000, five: 200000 }
-    };
-    const ADDITIONAL_SUBJECT_FEE = 40000;
-    const BASE_SUBJECTS_INCLUDED = 2;
-
-    const gradeTier = document.getElementById('newStudentGradeLevel')?.value;
-    const sessionChip = document.querySelector('#newStudentSessions .picker-chip.selected');
-    const sessionType = sessionChip ? sessionChip.dataset.sessions : null;
-    const startDate = document.getElementById('newStudentStartDate')?.value;
-    const selectedSubjects = document.querySelectorAll('#newStudentSubjects .picker-chip.selected');
-    const subjectCount = selectedSubjects.length;
-
-    const result = {
-        baseFee: 0,
-        additionalSubjectFee: 0,
-        fullMonthlyFee: 0,
-        proratedFee: 0,
-        prorationDeduction: 0,
-        prorationExplanation: '',
-        gradeTier: gradeTier || '',
-        sessionType: sessionType || '',
-        subjectCount: subjectCount,
-        extraSubjects: 0
-    };
-
-    if (!gradeTier || !sessionType || !ACADEMIC_FEES[gradeTier] || !ACADEMIC_FEES[gradeTier][sessionType]) {
-        return result;
-    }
-
-    result.baseFee = ACADEMIC_FEES[gradeTier][sessionType];
-    result.extraSubjects = Math.max(0, subjectCount - BASE_SUBJECTS_INCLUDED);
-    result.additionalSubjectFee = result.extraSubjects * ADDITIONAL_SUBJECT_FEE;
-    result.fullMonthlyFee = result.baseFee + result.additionalSubjectFee;
-    result.proratedFee = result.fullMonthlyFee;
-
-    if (startDate) {
-        const start = new Date(startDate);
-        const dayOfMonth = start.getDate();
-        if (dayOfMonth === 1 || (dayOfMonth >= 2 && dayOfMonth <= 6)) {
-            result.prorationExplanation = `Full month fee (starting on ${dayOfMonth}${_getOrdinalSuffix(dayOfMonth)})`;
-        } else {
-            const year = start.getFullYear();
-            const month = start.getMonth();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            const daysRemaining = daysInMonth - dayOfMonth + 1;
-            result.proratedFee = Math.round((result.fullMonthlyFee / daysInMonth) * daysRemaining);
-            result.prorationDeduction = result.fullMonthlyFee - result.proratedFee;
-            result.prorationExplanation = `Prorated: ${daysRemaining}/${daysInMonth} days (starting ${dayOfMonth}${_getOrdinalSuffix(dayOfMonth)})`;
-        }
-    }
-
-    return result;
-}
-
-/**
- * Toggle session chip and update fee display
- */
-function toggleSessionChip(el) {
-    // Deselect other session chips
-    document.querySelectorAll('#newStudentSessions .picker-chip').forEach(chip => {
-        chip.classList.remove('selected');
+    // Clear subject chips
+    document.querySelectorAll('#newStudentSubjects .pp-chip').forEach(c => c.classList.remove('selected'));
+    // Clear day chips
+    document.querySelectorAll('#newStudentDays .pp-chip').forEach(c => c.classList.remove('selected'));
+    // Clear session chips
+    document.querySelectorAll('#newStudentSessions .pp-session-chip').forEach(c => c.classList.remove('selected'));
+    // Clear extracurricular selections
+    document.querySelectorAll('.pp-extra-card').forEach(c => {
+        c.classList.remove('selected');
+        c.querySelectorAll('.pp-freq-btn').forEach(b => b.classList.remove('selected'));
+        c.querySelectorAll('.pp-day-btn').forEach(b => b.classList.remove('selected'));
     });
+    // Clear test prep
+    _PORTAL_CONFIG.TEST_PREP_FEES.forEach(t => {
+        const hoursEl = document.getElementById(`ppTpHours_${t.id}`);
+        if (hoursEl) hoursEl.value = '0';
+        const daysContainer = document.getElementById(`ppTpDays_${t.id}`);
+        if (daysContainer) daysContainer.querySelectorAll('.pp-day-btn').forEach(b => b.classList.remove('selected'));
+    });
+    // Reset to first tab
+    ppSwitchCourseTab('academic');
+    // Update grade prices
+    ppCalcFees();
+}
+
+function _ppUpdateStepUI() {
+    // Show/hide panels
+    for (let i = 1; i <= 3; i++) {
+        const panel = document.getElementById(`ppStep${i}`);
+        if (panel) panel.style.display = i === _ppStep ? 'block' : 'none';
+    }
+    // Step bars
+    for (let i = 1; i <= 3; i++) {
+        const bar = document.getElementById(`ppStepBar${i}`);
+        if (bar) bar.style.background = i <= _ppStep ? '#2E8B57' : '#e2e8f0';
+    }
+    // Label
+    const labels = ['Student Details','Select Courses','Review & Confirm'];
+    const lbl = document.getElementById('ppStepLabel');
+    if (lbl) lbl.textContent = `Step ${_ppStep} of 3 — ${labels[_ppStep-1]}`;
+    // Buttons
+    const prev = document.getElementById('ppPrevBtn');
+    const next = document.getElementById('ppNextBtn');
+    const sub  = document.getElementById('ppSubmitBtn');
+    if (prev) prev.style.display = _ppStep > 1 ? 'block' : 'none';
+    if (next) { next.style.display = _ppStep < 3 ? 'inline-block' : 'none'; }
+    if (sub)  { sub.style.display  = _ppStep === 3 ? 'inline-block' : 'none'; }
+}
+
+function ppSwitchCourseTab(tab) {
+    ['academic','extracurricular','testprep'].forEach(t => {
+        const tabBtn = document.getElementById(`ppTab_${t}`);
+        const content = document.getElementById(`ppTabContent_${t}`);
+        if (tabBtn) tabBtn.classList.toggle('active', t === tab);
+        if (content) content.style.display = t === tab ? 'block' : 'none';
+    });
+}
+
+function ppToggleSubjectChip(el) {
+    el.classList.toggle('selected');
+    ppCalcFees();
+}
+
+function ppToggleDayChip(el) {
+    el.classList.toggle('selected');
+}
+
+function ppToggleSessionChip(el) {
+    document.querySelectorAll('#newStudentSessions .pp-session-chip').forEach(c => c.classList.remove('selected'));
     el.classList.add('selected');
-    updateAddStudentFees();
+    ppCalcFees();
 }
 
-/**
- * _updateAddStudentStepUI()
- * Shows the correct step panel and updates the stepper bar / buttons.
- */
-function _updateAddStudentStepUI() {
-    // Update step panels
-    for (let i = 1; i <= 4; i++) {
-        const panel = document.getElementById(`add-step-${i}`);
-        if (panel) panel.classList.toggle('active', i === _addStudentStep);
+function ppToggleExtraCard(event, card) {
+    // Only toggle if the click wasn't inside pp-extra-body
+    if (event.target.closest('.pp-extra-body')) return;
+    card.classList.toggle('selected');
+    ppCalcFees();
+}
 
-        const bar = document.getElementById(`stepBar${i}`);
-        if (bar) {
-            bar.classList.remove('active', 'done');
-            if (i < _addStudentStep)  bar.classList.add('done');
-            if (i === _addStudentStep) bar.classList.add('active');
+function ppSelectFreq(btn, activityId) {
+    const card = document.getElementById(`ppExtra_${activityId}`);
+    if (!card) return;
+    card.querySelectorAll('.pp-freq-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    // Ensure card is selected when choosing frequency
+    card.classList.add('selected');
+    ppCalcFees();
+}
+
+function ppToggleDayBtn(btn) {
+    btn.classList.toggle('selected');
+    ppCalcFees();
+}
+
+// ── Proration helper (EXACT match to enrollment portal) ─────────────────────
+function _ppProrate(fullFee, startDateStr) {
+    if (!startDateStr || fullFee === 0) return { toPay: fullFee, deduction: 0, explanation: 'Full month fee' };
+    try {
+        const start = new Date(startDateStr + 'T00:00:00');
+        const day = start.getDate();
+        if (day <= 6) {
+            return { toPay: fullFee, deduction: 0, explanation: `Full month fee (starting ${day}${_ppOrd(day)})` };
         }
+        const daysInMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
+        const daysRemaining = daysInMonth - day + 1;
+        const toPay = Math.round((fullFee / daysInMonth) * daysRemaining);
+        const deduction = fullFee - toPay;
+        return {
+            toPay,
+            deduction,
+            daysInMonth,
+            daysRemaining,
+            explanation: `Prorated: ${daysRemaining}/${daysInMonth} days (starting ${day}${_ppOrd(day)})`
+        };
+    } catch(e) {
+        return { toPay: fullFee, deduction: 0, explanation: 'Full month fee' };
     }
-
-    // Update step label
-    const stepLabel = document.getElementById('stepLabel');
-    if (stepLabel) {
-        const labels = ['Student Details', 'Subjects & Schedule', 'Fee Summary', 'Review & Confirm'];
-        stepLabel.textContent = `Step ${_addStudentStep} of 4 — ${labels[_addStudentStep-1]}`;
-    }
-
-    // Update nav buttons
-    const prevBtn   = document.getElementById('addStudentPrevBtn');
-    const nextBtn   = document.getElementById('addStudentNextBtn');
-    const submitBtn = document.getElementById('addStudentSubmitBtn');
-
-    if (prevBtn)   prevBtn.style.display   = _addStudentStep > 1 ? 'block' : 'none';
-    if (nextBtn)   nextBtn.classList.toggle('hidden', _addStudentStep === 4);
-    if (submitBtn) submitBtn.classList.toggle('hidden', _addStudentStep !== 4);
 }
 
-/**
- * addStudentNext()
- * Validates the current step then advances to the next.
- */
-function addStudentNext() {
-    if (_addStudentStep === 1) {
-        const firstName = document.getElementById('newStudentFirstName')?.value.trim();
-        const lastName  = document.getElementById('newStudentLastName')?.value.trim();
-        const gender    = document.getElementById('newStudentGender')?.value;
-        const dob       = document.getElementById('newStudentDob')?.value;
-        const gradeTier = document.getElementById('newStudentGradeLevel')?.value;
+function _ppOrd(n) {
+    if (n > 3 && n < 21) return 'th';
+    switch(n % 10) { case 1: return 'st'; case 2: return 'nd'; case 3: return 'rd'; default: return 'th'; }
+}
+
+// ── Main fee calculation (all 3 categories) ──────────────────────────────────
+function ppCalcFees() {
+    const gradeTier = document.getElementById('newStudentGradeLevel')?.value;
+    const startDate = document.getElementById('newStudentStartDate')?.value;
+
+    // Update session chip prices based on grade tier
+    const fees = gradeTier && _PORTAL_CONFIG.ACADEMIC_FEES[gradeTier]
+        ? _PORTAL_CONFIG.ACADEMIC_FEES[gradeTier] : null;
+    ['twice','three','five'].forEach(s => {
+        const el = document.getElementById(`ppPrice_${s}`);
+        if (el) el.textContent = fees ? `₦${fees[s].toLocaleString()}` : '₦0';
+    });
+
+    // ── Academic ──
+    const sessionChip = document.querySelector('#newStudentSessions .pp-session-chip.selected');
+    const sessionType = sessionChip ? sessionChip.dataset.sessions : null;
+    const selectedSubjects = document.querySelectorAll('#newStudentSubjects .pp-chip.selected').length;
+    let academicBase = 0, additionalSubjectFee = 0;
+    if (fees && sessionType && fees[sessionType]) {
+        academicBase = fees[sessionType];
+        const extra = Math.max(0, selectedSubjects - _PORTAL_CONFIG.BASE_SUBJECTS_INCLUDED);
+        additionalSubjectFee = extra * _PORTAL_CONFIG.ADDITIONAL_SUBJECT_FEE;
+    }
+    const academicFull = academicBase + additionalSubjectFee;
+    const academicProration = _ppProrate(academicFull, startDate);
+
+    // ── Extracurricular ──
+    let extracurricularFull = 0;
+    _PORTAL_CONFIG.EXTRACURRICULAR_FEES.forEach(act => {
+        const card = document.getElementById(`ppExtra_${act.id}`);
+        if (!card || !card.classList.contains('selected')) return;
+        const selectedDays = card.querySelectorAll('.pp-day-btn.selected').length;
+        if (selectedDays === 0) return;
+        const freqBtn = card.querySelector('.pp-freq-btn.selected');
+        const freq = freqBtn ? freqBtn.dataset.frequency : 'once';
+        let baseFee = act.id === 'global_discovery' ? act.fee : (freq === 'twice' ? act.fee * 2 : act.fee);
+        extracurricularFull += baseFee;
+    });
+    const extraProration = _ppProrate(extracurricularFull, startDate);
+
+    // ── Test Prep ──
+    let testPrepFull = 0;
+    _PORTAL_CONFIG.TEST_PREP_FEES.forEach(t => {
+        const hoursEl = document.getElementById(`ppTpHours_${t.id}`);
+        const hours = parseFloat(hoursEl?.value) || 0;
+        if (hours <= 0) return;
+        const daysContainer = document.getElementById(`ppTpDays_${t.id}`);
+        const daysPerWeek = daysContainer ? daysContainer.querySelectorAll('.pp-day-btn.selected').length : 0;
+        if (daysPerWeek === 0) return;
+        const monthlyHours = hours * daysPerWeek * _PORTAL_CONFIG.WEEKS_PER_MONTH;
+        testPrepFull += monthlyHours * t.rate;
+    });
+    const testProration = _ppProrate(testPrepFull, startDate);
+
+    const totalFee = academicProration.toPay + extraProration.toPay + testProration.toPay;
+
+    // Store on window for use in step 3 and submit
+    window._ppFeeResult = {
+        academicBase, additionalSubjectFee, academicFull,
+        academicProratedFee: academicProration.toPay,
+        academicDeduction: academicProration.deduction,
+        extracurricularFull,
+        extracurricularProratedFee: extraProration.toPay,
+        extracurricularDeduction: extraProration.deduction,
+        testPrepFull,
+        testPrepProratedFee: testProration.toPay,
+        testPrepDeduction: testProration.deduction,
+        totalFee,
+        prorationExplanation: academicProration.explanation,
+        sessionType, gradeTier, selectedSubjects, startDate
+    };
+    return window._ppFeeResult;
+}
+
+// ── Step navigation ──────────────────────────────────────────────────────────
+function ppStepNext() {
+    if (_ppStep === 1) {
+        const firstName  = document.getElementById('newStudentFirstName')?.value.trim();
+        const lastName   = document.getElementById('newStudentLastName')?.value.trim();
+        const gender     = document.getElementById('newStudentGender')?.value;
+        const dob        = document.getElementById('newStudentDob')?.value;
+        const gradeTier  = document.getElementById('newStudentGradeLevel')?.value;
         const actualGrade = document.getElementById('newStudentActualGrade')?.value;
+        const startDate  = document.getElementById('newStudentStartDate')?.value;
+        const days       = document.querySelectorAll('#newStudentDays .pp-chip.selected');
 
         if (!firstName || !lastName || !gender || !dob || !gradeTier || !actualGrade) {
             showMessage('Please fill in all required fields in Step 1', 'error');
             return;
         }
-    }
-
-    if (_addStudentStep === 2) {
-        const days = document.querySelectorAll('#newStudentDays .picker-chip.selected');
         if (days.length === 0) {
             showMessage('Please select at least one preferred day', 'error');
             return;
         }
-        const sessions = document.querySelectorAll('#newStudentSessions .picker-chip.selected');
-        if (sessions.length === 0) {
-            showMessage('Please select session frequency', 'error');
+        if (startDate) {
+            const today = new Date(); today.setHours(0,0,0,0);
+            if (new Date(startDate + 'T00:00:00') < today) {
+                showMessage('Start date cannot be in the past', 'error');
+                const sd = document.getElementById('newStudentStartDate');
+                if (sd) sd.value = today.toISOString().split('T')[0];
+                return;
+            }
+        }
+    }
+    if (_ppStep === 2) {
+        // At least one course category must be selected
+        const hasAcademic = document.querySelector('#newStudentSessions .pp-session-chip.selected') !== null
+                         && document.querySelectorAll('#newStudentSubjects .pp-chip.selected').length > 0;
+        const hasExtra    = document.querySelector('.pp-extra-card.selected') !== null;
+        const hasTestPrep = _PORTAL_CONFIG.TEST_PREP_FEES.some(t => {
+            const h = parseFloat(document.getElementById(`ppTpHours_${t.id}`)?.value) || 0;
+            return h > 0;
+        });
+        if (!hasAcademic && !hasExtra && !hasTestPrep) {
+            showMessage('Please select at least one course (Academic, Extracurricular, or Test Prep)', 'error');
+            return;
+        }
+        if (hasAcademic && !document.querySelector('#newStudentSessions .pp-session-chip.selected')) {
+            showMessage('Please select session frequency for Academic subjects', 'error');
             return;
         }
     }
-
-    if (_addStudentStep === 3) {
-        // Just go to review, no validation needed
-    }
-
-    if (_addStudentStep < 4) {
-        _addStudentStep++;
-        _updateAddStudentStepUI();
-    }
-
-    // On step 3, update fee summary
-    if (_addStudentStep === 3) {
-        _updateFeeSummary();
-    }
-
-    // On step 4, populate the review panel
-    if (_addStudentStep === 4) {
-        _populateAddStudentReview();
+    if (_ppStep < 3) {
+        _ppStep++;
+        _ppUpdateStepUI();
+        if (_ppStep === 3) {
+            ppCalcFees();
+            _ppPopulateReview();
+        }
     }
 }
 
-/**
- * addStudentPrev()
- * Goes back a step.
- */
-function addStudentPrev() {
-    _addStudentStep = Math.max(1, _addStudentStep - 1);
-    _updateAddStudentStepUI();
-}
-
-/**
- * Update the fee summary in step 3 based on selections.
- * Uses the SAME fee structure as the enrollment portal (enrollment-portal.js CONFIG.ACADEMIC_FEES).
- */
-function _updateFeeSummary() {
-    const gradeTier = document.getElementById('newStudentGradeLevel')?.value;
-    const sessionChip = document.querySelector('#newStudentSessions .picker-chip.selected');
-    const sessionType = sessionChip ? sessionChip.dataset.sessions : null;
-    const summaryDiv = document.getElementById('addStudentFeeSummary');
-    const startDate = document.getElementById('newStudentStartDate')?.value;
-
-    // ── CORRECT FEES — mirrors CONFIG.ACADEMIC_FEES in enrollment-portal.js ──
-    const ACADEMIC_FEES = {
-        'preschool':  { twice: 80000,  three: 95000,  five: 150000 },
-        'grade2-4':   { twice: 95000,  three: 110000, five: 170000 },
-        'grade5-8':   { twice: 105000, three: 120000, five: 180000 },
-        'grade9-12':  { twice: 110000, three: 135000, five: 200000 }
-    };
-
-    const ADDITIONAL_SUBJECT_FEE = 40000;
-    const BASE_SUBJECTS_INCLUDED = 2;
-
-    const gradeLabels = {
-        'preschool':  'Preschool – Grade 1',
-        'grade2-4':   'Grade 2 – 4',
-        'grade5-8':   'Grade 5 – 8',
-        'grade9-12':  'Grade 9 – 12'
-    };
-
-    const sessionLabels = {
-        twice: 'Twice weekly',
-        three: '3× weekly',
-        five:  'Daily (5×)'
-    };
-
-    if (gradeTier && sessionType && ACADEMIC_FEES[gradeTier] && ACADEMIC_FEES[gradeTier][sessionType]) {
-        const baseFee = ACADEMIC_FEES[gradeTier][sessionType];
-
-        // Count selected subjects
-        const selectedSubjects = document.querySelectorAll('#newStudentSubjects .picker-chip.selected');
-        const subjectCount = selectedSubjects.length;
-        const extraSubjects = Math.max(0, subjectCount - BASE_SUBJECTS_INCLUDED);
-        const additionalSubjectFee = extraSubjects * ADDITIONAL_SUBJECT_FEE;
-
-        const fullMonthlyFee = baseFee + additionalSubjectFee;
-
-        // ── Proration logic (matches enrollment portal) ──
-        let proratedFee = fullMonthlyFee;
-        let prorationNote = '';
-        let prorationDeduction = 0;
-
-        if (startDate) {
-            const start = new Date(startDate);
-            const dayOfMonth = start.getDate();
-
-            if (dayOfMonth === 1 || (dayOfMonth >= 2 && dayOfMonth <= 6)) {
-                prorationNote = `Full month fee (starting on ${dayOfMonth}${_getOrdinalSuffix(dayOfMonth)})`;
-            } else {
-                // Prorate from 7th onward
-                const year = start.getFullYear();
-                const month = start.getMonth();
-                const daysInMonth = new Date(year, month + 1, 0).getDate();
-                const daysRemaining = daysInMonth - dayOfMonth + 1;
-                proratedFee = Math.round((fullMonthlyFee / daysInMonth) * daysRemaining);
-                prorationDeduction = fullMonthlyFee - proratedFee;
-                prorationNote = `Prorated: ${daysRemaining}/${daysInMonth} days (starting ${dayOfMonth}${_getOrdinalSuffix(dayOfMonth)})`;
-            }
-        }
-
-        let rows = `
-            <tr><td>Grade Tier:</td><td style="text-align:right;font-weight:600;">${gradeLabels[gradeTier] || gradeTier}</td></tr>
-            <tr><td>Session Frequency:</td><td style="text-align:right;font-weight:600;">${sessionLabels[sessionType] || sessionType}</td></tr>
-            <tr><td>Base Tuition:</td><td style="text-align:right;font-weight:600;">₦${baseFee.toLocaleString()}</td></tr>
-        `;
-
-        if (subjectCount > 0) {
-            rows += `<tr><td>Subjects Selected:</td><td style="text-align:right;font-weight:600;">${subjectCount} (${BASE_SUBJECTS_INCLUDED} included)</td></tr>`;
-        }
-        if (extraSubjects > 0) {
-            rows += `<tr><td>Additional Subjects (${extraSubjects} × ₦${ADDITIONAL_SUBJECT_FEE.toLocaleString()}):</td><td style="text-align:right;font-weight:600;color:#D97706;">+₦${additionalSubjectFee.toLocaleString()}</td></tr>`;
-        }
-        if (prorationDeduction > 0) {
-            rows += `<tr><td>Proration Discount:</td><td style="text-align:right;font-weight:600;color:#10B981;">-₦${prorationDeduction.toLocaleString()}</td></tr>`;
-        }
-
-        rows += `<tr><td style="padding-top:8px;border-top:1px dashed #ccc;">First Month Fee:</td><td style="padding-top:8px;border-top:1px dashed #ccc;text-align:right;font-weight:800;color:var(--primary-dark);font-size:1.1rem;">₦${proratedFee.toLocaleString()}</td></tr>`;
-
-        summaryDiv.innerHTML = `
-            <div style="margin-bottom:12px;font-weight:700;font-size:1rem;">Estimated Monthly Tuition</div>
-            <table style="width:100%;border-collapse:collapse;">
-                ${rows}
-            </table>
-            <p style="margin-top:12px;font-size:0.75rem;color:var(--text-muted);">Fees are estimates and subject to confirmation by staff. Proration applies for mid-month starts.</p>
-        `;
-    } else {
-        summaryDiv.innerHTML = '<p style="color:var(--text-muted);">Select grade tier and session frequency to see estimated fees.</p>';
+function ppStepPrev() {
+    if (_ppStep > 1) {
+        _ppStep--;
+        _ppUpdateStepUI();
     }
 }
 
-/**
- * UpdateAddStudentFees (called from HTML onchange of grade tier, subjects, sessions, start date)
- */
-function updateAddStudentFees() {
-    // Always recalculate when fields change — the summary is shown on step 3
-    if (_addStudentStep >= 2) {
-        _updateFeeSummary();
-    }
-}
+// ── Populate review ──────────────────────────────────────────────────────────
+function _ppPopulateReview() {
+    const reviewDiv = document.getElementById('ppReviewContent');
+    const feeDiv    = document.getElementById('ppFeeSummary');
+    if (!reviewDiv || !feeDiv) return;
 
-/**
- * _populateAddStudentReview()
- * Fills the review panel (step 4) with the collected data.
- */
-function _populateAddStudentReview() {
-    const reviewDiv = document.getElementById('addStudentReview');
-    if (!reviewDiv) return;
-
-    const firstName = document.getElementById('newStudentFirstName')?.value.trim() || '—';
-    const lastName  = document.getElementById('newStudentLastName')?.value.trim() || '—';
-    const fullName  = firstName + ' ' + lastName;
-    const gender    = document.getElementById('newStudentGender')?.value || '—';
-    const dob       = document.getElementById('newStudentDob')?.value || '—';
-    const gradeTier = document.getElementById('newStudentGradeLevel')?.value || '—';
+    const firstName  = document.getElementById('newStudentFirstName')?.value.trim() || '';
+    const lastName   = document.getElementById('newStudentLastName')?.value.trim() || '';
+    const gender     = document.getElementById('newStudentGender')?.value || '—';
+    const dob        = document.getElementById('newStudentDob')?.value || '—';
+    const gradeTier  = document.getElementById('newStudentGradeLevel')?.value || '—';
     const actualGrade = document.getElementById('newStudentActualGrade')?.value || '—';
-    const start     = document.getElementById('newStudentStartDate')?.value || '—';
+    const startDate  = document.getElementById('newStudentStartDate')?.value || '—';
+    const days       = Array.from(document.querySelectorAll('#newStudentDays .pp-chip.selected')).map(c => c.dataset.day).join(', ') || 'None';
+    const subjects   = Array.from(document.querySelectorAll('#newStudentSubjects .pp-chip.selected')).map(c => c.dataset.subject).join(', ') || 'None';
+    const sessionChip = document.querySelector('#newStudentSessions .pp-session-chip.selected');
+    const sessionLabel = sessionChip ? sessionChip.childNodes[0]?.textContent?.trim() : 'None';
+    const tutor      = document.getElementById('newStudentTutor')?.value || 'No preference';
+    const startHour  = document.getElementById('newStudentStartHour')?.value;
+    const endHour    = document.getElementById('newStudentEndHour')?.value;
+    const timeStr    = startHour && endHour ? `${_ppFmtHour(startHour)} – ${_ppFmtHour(endHour)}` : 'Not specified';
 
-    const subjects = Array.from(
-        document.querySelectorAll('#newStudentSubjects .picker-chip.selected')
-    ).map(c => c.dataset.subject).join(', ') || 'None selected';
+    const tierLabels = { 'preschool':'Preschool – Grade 1','grade2-4':'Grade 2 – 4','grade5-8':'Grade 5 – 8','grade9-12':'Grade 9 – 12' };
 
-    const days = Array.from(
-        document.querySelectorAll('#newStudentDays .picker-chip.selected')
-    ).map(c => c.dataset.day).join(', ');
+    // Extracurricular selections summary
+    const extrasSelected = _PORTAL_CONFIG.EXTRACURRICULAR_FEES.filter(a => {
+        const card = document.getElementById(`ppExtra_${a.id}`);
+        return card && card.classList.contains('selected');
+    }).map(a => a.name).join(', ') || 'None';
 
-    const sessionChip = document.querySelector('#newStudentSessions .picker-chip.selected');
-    const sessionLabel = sessionChip ? sessionChip.textContent : 'Not selected';
+    // Test prep summary
+    const tpSelected = _PORTAL_CONFIG.TEST_PREP_FEES.filter(t => {
+        return (parseFloat(document.getElementById(`ppTpHours_${t.id}`)?.value) || 0) > 0;
+    }).map(t => {
+        const hrs = document.getElementById(`ppTpHours_${t.id}`)?.value;
+        return `${t.name} (${hrs}h)`;
+    }).join(', ') || 'None';
 
-    const startHour = document.getElementById('newStudentStartHour')?.value;
-    const endHour   = document.getElementById('newStudentEndHour')?.value;
-    const timeStr   = startHour && endHour
-        ? `${_formatHour(startHour)} – ${_formatHour(endHour)}`
-        : 'Not specified';
+    const row = (lbl, val) => `<tr><td style="padding:6px 4px;font-weight:600;color:#065f46;width:40%;">${lbl}</td><td style="padding:6px 4px;color:#374151;">${escapeHtml(String(val))}</td></tr>`;
 
-    const tutor = document.getElementById('newStudentTutor')?.value || 'No preference';
+    reviewDiv.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+        ${row('Full Name', `${firstName} ${lastName}`)}
+        ${row('Gender', gender)}
+        ${row('Date of Birth', dob)}
+        ${row('Grade Tier', tierLabels[gradeTier] || gradeTier)}
+        ${row('Actual Grade', actualGrade)}
+        ${row('Start Date', startDate)}
+        ${row('Preferred Days', days)}
+        ${row('Class Time', timeStr)}
+        ${row('Sessions/Week', sessionLabel)}
+        ${row('Subjects', subjects)}
+        ${row('Extracurricular', extrasSelected)}
+        ${row('Test Prep', tpSelected)}
+        ${row('Tutor Pref.', tutor)}
+    </table>`;
 
-    const gradeLabels = {
-        'preschool': 'Preschool',
-        'kindergarten': 'Kindergarten',
-        'grade1': 'Grade 1', 'grade2': 'Grade 2', 'grade3': 'Grade 3',
-        'grade4': 'Grade 4', 'grade5': 'Grade 5', 'grade6': 'Grade 6',
-        'grade7': 'Grade 7', 'grade8': 'Grade 8', 'grade9': 'Grade 9',
-        'grade10': 'Grade 10', 'grade11': 'Grade 11', 'grade12': 'Grade 12'
-    };
+    // Fee breakdown
+    const f = window._ppFeeResult || ppCalcFees();
 
-    const tierLabels = {
-        'preschool': 'Preschool – Grade 1',
-        'grade2-4': 'Grade 2 – 4',
-        'grade5-8': 'Grade 5 – 8',
-        'grade9-12': 'Grade 9 – 12'
-    };
+    let feeRows = '';
+    if (f.academicFull > 0) {
+        feeRows += `<tr><td>Academic Base Fee:</td><td style="text-align:right;">₦${f.academicBase.toLocaleString()}</td></tr>`;
+        if (f.additionalSubjectFee > 0) feeRows += `<tr><td>Additional Subjects:</td><td style="text-align:right;color:#d97706;">+₦${f.additionalSubjectFee.toLocaleString()}</td></tr>`;
+        if (f.academicDeduction > 0) feeRows += `<tr><td>Proration Discount (Academic):</td><td style="text-align:right;color:#10b981;">-₦${f.academicDeduction.toLocaleString()}</td></tr>`;
+        feeRows += `<tr><td style="padding-top:6px;font-weight:600;">Academic Total:</td><td style="text-align:right;font-weight:600;padding-top:6px;">₦${f.academicProratedFee.toLocaleString()}</td></tr>`;
+    }
+    if (f.extracurricularFull > 0) {
+        feeRows += `<tr style="border-top:1px dashed #ccc;"><td style="padding-top:8px;">Extracurricular:</td><td style="text-align:right;padding-top:8px;">₦${f.extracurricularFull.toLocaleString()}</td></tr>`;
+        if (f.extracurricularDeduction > 0) feeRows += `<tr><td>Proration (Extracurricular):</td><td style="text-align:right;color:#10b981;">-₦${f.extracurricularDeduction.toLocaleString()}</td></tr>`;
+        feeRows += `<tr><td style="font-weight:600;">Extracurricular Total:</td><td style="text-align:right;font-weight:600;">₦${f.extracurricularProratedFee.toLocaleString()}</td></tr>`;
+    }
+    if (f.testPrepFull > 0) {
+        feeRows += `<tr style="border-top:1px dashed #ccc;"><td style="padding-top:8px;">Test Prep:</td><td style="text-align:right;padding-top:8px;">₦${f.testPrepFull.toLocaleString()}</td></tr>`;
+        if (f.testPrepDeduction > 0) feeRows += `<tr><td>Proration (Test Prep):</td><td style="text-align:right;color:#10b981;">-₦${f.testPrepDeduction.toLocaleString()}</td></tr>`;
+        feeRows += `<tr><td style="font-weight:600;">Test Prep Total:</td><td style="text-align:right;font-weight:600;">₦${f.testPrepProratedFee.toLocaleString()}</td></tr>`;
+    }
+    feeRows += `<tr style="border-top:2px solid #2E8B57;"><td style="font-size:1rem;font-weight:800;padding-top:10px;color:#1E6B47;">First Month TOTAL:</td><td style="text-align:right;font-size:1rem;font-weight:800;padding-top:10px;color:#1E6B47;">₦${f.totalFee.toLocaleString()}</td></tr>`;
+    if (f.prorationExplanation) feeRows += `<tr><td colspan="2" style="font-size:11px;color:#666;padding-top:6px;">${escapeHtml(f.prorationExplanation)}</td></tr>`;
 
-    const genderLabel = {
-        'male': 'Male', 'female': 'Female', 'other': 'Other'
-    };
-
-    // Calculate fee for review display
-    const feeCalc = _calculateAddStudentFees();
-    const feeDisplay = feeCalc.proratedFee > 0
-        ? `₦${feeCalc.proratedFee.toLocaleString()}${feeCalc.prorationDeduction > 0 ? ' (prorated)' : ''}`
-        : 'Select grade & sessions';
-
-    reviewDiv.innerHTML = `
-        <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
-            ${_reviewRow('👤 Full Name', escapeHtml(fullName))}
-            ${_reviewRow('⚧ Gender', escapeHtml(genderLabel[gender] || gender))}
-            ${_reviewRow('🎂 Date of Birth', escapeHtml(dob))}
-            ${_reviewRow('🎓 Grade Tier', escapeHtml(tierLabels[gradeTier] || gradeTier))}
-            ${_reviewRow('📚 Actual Grade', escapeHtml(gradeLabels[actualGrade] || actualGrade))}
-            ${_reviewRow('📅 Start Date', escapeHtml(start))}
-            ${_reviewRow('📚 Subjects', escapeHtml(subjects))}
-            ${_reviewRow('📆 Days', escapeHtml(days))}
-            ${_reviewRow('🕐 Class Time', escapeHtml(timeStr))}
-            ${_reviewRow('🔄 Sessions/Week', escapeHtml(sessionLabel))}
-            ${_reviewRow('👩‍🏫 Tutor Pref.', escapeHtml(tutor))}
-            ${_reviewRow('💰 Est. First Month', feeDisplay)}
+    feeDiv.innerHTML = `
+        <div style="font-weight:700;font-size:1rem;margin-bottom:10px;color:#1E6B47;">💰 Fee Breakdown</div>
+        <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+            ${feeRows}
         </table>
-    `;
+        <p style="margin-top:10px;font-size:11px;color:#6b7280;">Fees are estimates subject to confirmation. Proration applies for mid-month starts (day 7 onward).</p>`;
 }
 
-function _reviewRow(label, value) {
-    return `
-        <tr style="border-bottom:1px solid #D1FAE5;">
-            <td style="padding:8px 4px;font-weight:600;color:#065f46;width:42%;">${label}</td>
-            <td style="padding:8px 4px;color:#374151;">${value}</td>
-        </tr>
-    `;
-}
-
-function _formatHour(h) {
+function _ppFmtHour(h) {
     const hour = parseInt(h);
-    const suffix = hour < 12 ? 'AM' : 'PM';
-    const display = hour % 12 || 12;
-    return `${display}:00 ${suffix}`;
+    return `${hour % 12 || 12}:00 ${hour < 12 ? 'AM' : 'PM'}`;
 }
 
-/**
- * submitNewStudent()
- * Saves the new student to pending_students collection with the parent's phone
- * number so comprehensiveFindChildren() will pick them up immediately.
- * Mirrors the data structure used in the enrollment portal.
- */
-async function submitNewStudent() {
-    const submitBtn  = document.getElementById('addStudentSubmitBtn');
-    const submitText = document.getElementById('addStudentSubmitText');
-    const spinner    = document.getElementById('addStudentSubmitSpinner');
+// ── Submit new student ───────────────────────────────────────────────────────
+async function ppSubmitNewStudent() {
+    const submitBtn  = document.getElementById('ppSubmitBtn');
+    const submitText = document.getElementById('ppSubmitText');
+    const spinner    = document.getElementById('ppSubmitSpinner');
 
     if (submitBtn) submitBtn.disabled = true;
-    if (spinner)   spinner.classList.remove('hidden');
+    if (spinner)   spinner.style.display = 'inline';
     if (submitText) submitText.textContent = 'Saving…';
 
     try {
         const user = auth.currentUser;
         if (!user) throw new Error('You must be signed in.');
 
-        // Fetch parent's phone number from their profile
         const userDoc = await db.collection('parent_users').doc(user.uid).get();
         if (!userDoc.exists) throw new Error('Parent profile not found.');
-        const parentData = userDoc.data();
+        const parentData    = userDoc.data();
         const parentPhone   = parentData.normalizedPhone || parentData.phone || '';
         const parentEmail   = parentData.email || '';
         const parentName    = parentData.parentName || 'Parent';
 
         // Collect form data
-        const firstName = document.getElementById('newStudentFirstName')?.value.trim();
-        const lastName  = document.getElementById('newStudentLastName')?.value.trim();
-        const name      = firstName + ' ' + lastName;
-        const gender    = document.getElementById('newStudentGender')?.value;
-        const dob       = document.getElementById('newStudentDob')?.value;
-        const gradeTier = document.getElementById('newStudentGradeLevel')?.value;
-        const actualGrade = document.getElementById('newStudentActualGrade')?.value;
-        const start     = document.getElementById('newStudentStartDate')?.value;
-
-        const subjects = Array.from(
-            document.querySelectorAll('#newStudentSubjects .picker-chip.selected')
-        ).map(c => c.dataset.subject);
-
-        const days = Array.from(
-            document.querySelectorAll('#newStudentDays .picker-chip.selected')
-        ).map(c => c.dataset.day);
-
-        const sessionChip = document.querySelector('#newStudentSessions .picker-chip.selected');
-        const sessions = sessionChip ? sessionChip.dataset.sessions : '';
-
-        const startHour = document.getElementById('newStudentStartHour')?.value || '';
-        const endHour   = document.getElementById('newStudentEndHour')?.value || '';
+        const firstName  = document.getElementById('newStudentFirstName')?.value.trim();
+        const lastName   = document.getElementById('newStudentLastName')?.value.trim();
+        const name       = `${firstName} ${lastName}`.trim();
+        const gender     = document.getElementById('newStudentGender')?.value || '';
+        const dob        = document.getElementById('newStudentDob')?.value || '';
+        const gradeTier  = document.getElementById('newStudentGradeLevel')?.value || '';
+        const actualGrade = document.getElementById('newStudentActualGrade')?.value || '';
+        const startDate  = document.getElementById('newStudentStartDate')?.value || '';
+        const tutor      = document.getElementById('newStudentTutor')?.value || 'no-preference';
+        const startHour  = document.getElementById('newStudentStartHour')?.value || '';
+        const endHour    = document.getElementById('newStudentEndHour')?.value || '';
         const academicTime = startHour && endHour ? `${startHour}:${endHour}` : '';
 
-        const tutor = document.getElementById('newStudentTutor')?.value || '';
+        if (!name.trim()) throw new Error('Student name is required.');
 
-        if (!name) throw new Error('Student name is required.');
-
-        // ── Calculate fees using the same logic as enrollment portal ──
-        const feeCalc = _calculateAddStudentFees();
-
-        // Build academic schedule string (mirrors enrollment portal format)
-        let academicSchedule = '';
-        if (days.length > 0 && startHour && endHour) {
-            const startTime = `${parseInt(startHour) % 12 || 12} ${parseInt(startHour) < 12 ? 'AM' : 'PM'}`;
-            const endTime   = `${parseInt(endHour) % 12 || 12} ${parseInt(endHour) < 12 ? 'AM' : 'PM'}`;
-            academicSchedule = `${days.join(', ')} from ${startTime} to ${endTime}`;
+        // Validate start date not in past
+        if (startDate) {
+            const today = new Date(); today.setHours(0,0,0,0);
+            if (new Date(startDate + 'T00:00:00') < today) {
+                throw new Error('Start date cannot be in the past.');
+            }
         }
 
-        // Build Firestore document — matches the schema used by enrollment portal
+        // Subjects and days
+        const subjects = Array.from(document.querySelectorAll('#newStudentSubjects .pp-chip.selected')).map(c => c.dataset.subject);
+        const days     = Array.from(document.querySelectorAll('#newStudentDays .pp-chip.selected')).map(c => c.dataset.day);
+        const sessionChip = document.querySelector('#newStudentSessions .pp-session-chip.selected');
+        const sessions = sessionChip ? sessionChip.dataset.sessions : '';
+
+        // Extracurriculars
+        const extracurriculars = _PORTAL_CONFIG.EXTRACURRICULAR_FEES.filter(a => {
+            const card = document.getElementById(`ppExtra_${a.id}`);
+            return card && card.classList.contains('selected');
+        }).map(a => {
+            const card = document.getElementById(`ppExtra_${a.id}`);
+            const freqBtn = card.querySelector('.pp-freq-btn.selected');
+            const freq = freqBtn ? freqBtn.dataset.frequency : 'once';
+            const actDays = Array.from(card.querySelectorAll('.pp-day-btn.selected')).map(b => b.dataset.day);
+            const startH = document.getElementById(`ppExtraStart_${a.id}`)?.value || '';
+            const endH   = document.getElementById(`ppExtraEnd_${a.id}`)?.value || '';
+            return { id: a.id, name: a.name, frequency: freq, days: actDays, time: startH && endH ? `${startH}:${endH}` : '' };
+        });
+
+        // Test prep
+        const testPrep = _PORTAL_CONFIG.TEST_PREP_FEES.filter(t => {
+            return (parseFloat(document.getElementById(`ppTpHours_${t.id}`)?.value) || 0) > 0;
+        }).map(t => {
+            const hours = parseFloat(document.getElementById(`ppTpHours_${t.id}`)?.value) || 0;
+            const tpDays = Array.from((document.getElementById(`ppTpDays_${t.id}`) || {}).querySelectorAll?.('.pp-day-btn.selected') || []).map(b => b.dataset.day);
+            const startH = document.getElementById(`ppTpStart_${t.id}`)?.value || '';
+            const endH   = document.getElementById(`ppTpEnd_${t.id}`)?.value || '';
+            return { id: t.id, name: t.name, hours, days: tpDays, time: startH && endH ? `${startH}:${endH}` : '' };
+        });
+
+        // Calculate fees
+        const f = ppCalcFees();
+
+        // Academic schedule string
+        let academicSchedule = '';
+        if (days.length > 0 && startHour && endHour) {
+            academicSchedule = `${days.join(', ')} from ${_ppFmtHour(startHour)} to ${_ppFmtHour(endHour)}`;
+        }
+
+        // Build Firestore document
         const studentDoc = {
-            // ── Student info ──
-            studentName:      name,
-            name:             name,
-            gender:           gender,
-            dob:              dob,
-            actualGrade:      actualGrade,
-            grade:            gradeTier,
-            startDate:        start,
+            studentName: name, name,
+            gender, dob,
+            actualGrade, grade: gradeTier,
+            startDate,
             selectedSubjects: subjects,
-            academicDays:     days,
-            academicTime:     academicTime,
-            academicSchedule: academicSchedule,
+            academicDays: days,
+            academicTime, academicSchedule,
             academicSessions: sessions,
-            preferredTutor:   tutor,
-            // ── Parent linkage (used by comprehensiveFindChildren) ──
-            parentPhone:      parentPhone,
-            parentEmail:      parentEmail,
-            parentName:       parentName,
-            parentUid:        user.uid,
-            // ── Fee summary — mirrors enrollment portal's summary structure ──
+            preferredTutor: tutor,
+            extracurriculars, testPrep,
+            parentPhone, parentEmail, parentName, parentUid: user.uid,
             summary: {
-                totalFee:              feeCalc.proratedFee,
-                academicFee:           feeCalc.baseFee,
-                additionalSubjectFee:  feeCalc.additionalSubjectFee,
-                fullMonthlyFee:        feeCalc.fullMonthlyFee,
-                proratedAmount:        feeCalc.prorationDeduction,
-                prorationExplanation:  feeCalc.prorationExplanation,
-                extracurricularFee:    0,
-                testPrepFee:           0,
-                discountAmount:        0
+                totalFee:              f.totalFee,
+                academicFee:           f.academicBase,
+                additionalSubjectFee:  f.additionalSubjectFee,
+                fullMonthlyAcademic:   f.academicFull,
+                proratedAcademic:      f.academicProratedFee,
+                extracurricularFee:    f.extracurricularProratedFee,
+                testPrepFee:           f.testPrepProratedFee,
+                prorationDeduction:    f.academicDeduction + f.extracurricularDeduction + f.testPrepDeduction,
+                prorationExplanation:  f.prorationExplanation,
+                discountAmount: 0
             },
-            // ── Wrap student in the students array format used by enrollment portal ──
-            parent: {
-                name:  parentName,
-                email: parentEmail,
-                phone: parentPhone
-            },
+            parent: { name: parentName, email: parentEmail, phone: parentPhone },
             students: [{
-                id: 1,
-                name: name,
-                gender: gender,
-                dob: dob,
-                grade: gradeTier,
-                actualGrade: actualGrade,
-                startDate: start,
+                id: 1, name, gender, dob,
+                grade: gradeTier, actualGrade, startDate,
                 preferredTutor: tutor,
                 academicSessions: sessions,
                 selectedSubjects: subjects,
                 academicDays: days,
-                academicTime: academicTime,
-                academicSchedule: academicSchedule,
-                extracurriculars: [],
-                testPrep: []
+                academicTime, academicSchedule,
+                extracurriculars, testPrep
             }],
-            // ── Status / meta ──
-            status:           'pending',
-            addedFromPortal:  true,
-            createdAt:        firebase.firestore.FieldValue.serverTimestamp(),
-            updatedAt:        firebase.firestore.FieldValue.serverTimestamp(),
-            timestamp:        new Date().toISOString()
+            status: 'pending',
+            addedFromPortal: true,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            timestamp: new Date().toISOString()
         };
 
-        // Save to enrollments collection — same collection used by enrollment portal
         const docRef = await db.collection('enrollments').add(studentDoc);
-
         console.log('✅ New student saved to enrollments:', docRef.id);
 
-        // Invalidate cache so the dashboard reloads fresh
-        dataCache.invalidate();
+        // Send email notification (same as enrollment portal)
+        setTimeout(() => {
+            const scriptUrl = "https://script.google.com/macros/s/AKfycbxKPivWuCyEywMCxgleEoP7MBNxT6ZEvd5WWomDNGYADZmDcBcsO4Eif-JyHSJ5mpXBaw/exec";
+            fetch(scriptUrl, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "send_enrollment_notification",
+                    timestamp: new Date().toISOString(),
+                    applicationId: docRef.id,
+                    parent: { name: parentName, email: parentEmail, phone: parentPhone },
+                    managementEmail: "psalm4all@gmail.com",
+                    students: 1,
+                    totalFee: f.totalFee,
+                    status: 'pending'
+                })
+            }).catch(e => console.warn('Email notification failed:', e));
+        }, 1000);
 
-        showMessage(`${name} has been added! Estimated first month fee: ₦${feeCalc.proratedFee.toLocaleString()}`, 'success');
+        dataCache.invalidate();
+        showMessage(`${name} added! Est. first month fee: ₦${f.totalFee.toLocaleString()}`, 'success');
         hideAddStudentModal();
 
-        // Reload reports and academics to show the new student
+        // Reload dashboard data
         setTimeout(() => {
             if (window.authManager && authManager.currentUser) {
                 loadAllReportsForParent(authManager.currentUser.normalizedPhone, user.uid, true);
-                // Clear academics cache to force reload on next tab visit
                 const ac = document.getElementById('academicsContent');
                 if (ac) ac.innerHTML = '';
             }
         }, 1500);
 
     } catch (err) {
-        console.error('submitNewStudent error:', err);
+        console.error('ppSubmitNewStudent error:', err);
         showMessage(`Failed to add student: ${err.message}`, 'error');
     } finally {
         if (submitBtn) submitBtn.disabled = false;
-        if (spinner)   spinner.classList.add('hidden');
+        if (spinner)   spinner.style.display = 'none';
         if (submitText) submitText.textContent = '✅ Submit Enrolment';
     }
 }
+
+// ── Keep backward-compat aliases ─────────────────────────────────────────────
+function togglePickerChip(el) { ppToggleSubjectChip(el); }
+function toggleSessionChip(el) { ppToggleSessionChip(el); }
+function addStudentNext() { ppStepNext(); }
+function addStudentPrev() { ppStepPrev(); }
+function submitNewStudent() { ppSubmitNewStudent(); }
+function updateAddStudentFees() { ppCalcFees(); }
+
+// Expose globally
+window.showAddStudentModal  = showAddStudentModal;
+window.hideAddStudentModal  = hideAddStudentModal;
+window.ppStepNext           = ppStepNext;
+window.ppStepPrev           = ppStepPrev;
+window.ppSwitchCourseTab    = ppSwitchCourseTab;
+window.ppToggleSubjectChip  = ppToggleSubjectChip;
+window.ppToggleSessionChip  = ppToggleSessionChip;
+window.ppToggleDayChip      = ppToggleDayChip;
+window.ppToggleDayBtn       = ppToggleDayBtn;
+window.ppToggleExtraCard    = ppToggleExtraCard;
+window.ppSelectFreq         = ppSelectFreq;
+window.ppCalcFees           = ppCalcFees;
+window.ppSubmitNewStudent   = ppSubmitNewStudent;
+window.submitNewStudent     = ppSubmitNewStudent;
+window.addStudentNext       = ppStepNext;
+window.addStudentPrev       = ppStepPrev;
+
 
 // ============================================================================
 // PRIVACY POLICY & TERMS OF USE MODAL
@@ -7141,7 +7538,7 @@ window.hideResponsesModal   = hideResponsesModal;
 window.initFab              = initFab;
 window.injectFabHtml        = injectFabHtml;
 window._populateFabStudentDropdown = _populateFabStudentDropdown;
-window._calculateAddStudentFees    = _calculateAddStudentFees;
+window._calculateAddStudentFees    = ppCalcFees;
 window.switchMainTab        = switchMainTab;
 
 console.log('✅ Parent Portal redesign additions loaded — Add Student, Privacy, Enhanced Academics, FAB (Feedback/Responses), Payments Tab, Correct Fees');
